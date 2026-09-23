@@ -18,7 +18,7 @@ const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = requi
 // exported from visualBible.js for coverIterate.js, which still uses it.
 const { REQUIRED_TEXT_AUTHORING_RULE, declaredText } = require('./requiredText');
 const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote } = require('./visualBible');
-const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective } = require('./shotVocabulary');
+const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { castCoverage, castCoverageRule } = require('./castCoverage');
 // REQUIRED IN-IMAGE TEXT: one source for the generator block, the repair
@@ -2516,6 +2516,27 @@ function namedByMain(inputData = {}, main = true) {
 }
 
 /**
+ * The two cover cast lines of the Art Director's cover hints. Built here, not
+ * templated, because the template spliced namedByMain's 'None' into a list:
+ * "up to 5 characters from Levin, Julian, Max, Kiaan and None" (staging
+ * job_1790100385959_1nitlympp — a cast with no primary characters).
+ */
+function buildCoverCastLines(inputData = {}) {
+  const names = (main) => (inputData.characters || [])
+    .filter(c => ((inputData.mainCharacters || []).includes(c.id) ? main : !main))
+    .map(c => c.name)
+    .filter(Boolean);
+  const main = names(true);
+  const primary = names(false);
+  const title = main.length ? `Title Page: only ${main.join(', ')}.` : 'Title Page: the characters of the Initial Page.';
+  const pool = [...main, ...primary];
+  const rest = pool.length <= 5
+    ? `Initial Page and Back Cover: ${pool.join(', ')}.`
+    : `Initial Page and Back Cover: up to 5 characters from ${pool.join(', ')}${main.length ? `, always including ${main.join(', ')}` : ''}. Over 5, drop the least important characters entirely.`;
+  return `${title}\n${rest}`;
+}
+
+/**
  * ONE state line for a recurring-elements dump, WITH the state's page range
  * (2026-09-17). The bible declares each state's `pages` and a page cites the
  * state whose range covers it; the brief REWRITER was shown the states' names
@@ -2725,11 +2746,12 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // The Art Director AUTHORS the Visual Bible now (2026-09-11), so the three
     // inputs the bible rules need travel here instead of to the bible stage.
     CHARACTER_NAMES: characters.map(c => c.name).filter(Boolean).join(', ') || 'None',
-    MAIN_CHARACTER_NAMES: namedByMain(inputData, true),
-    PRIMARY_CHARACTER_NAMES: namedByMain(inputData, false),
+    COVER_CAST: buildCoverCastLines(inputData),
     // Each landmark's PHOTOS line: the bible may only name a viewpoint one of
     // them shows, and the per-page `landmarkView` is picked from the same list.
-    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote, { jsonFields: true }),
+    // The Art Director variant: it marks which of the plan's places are listed
+    // landmarks and writes no story (2026-09-23).
+    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote, { forArtDirector: true }),
     CHILD_AGE_BAND: buildChildAgeBandNote(commissionedChildBand(inputData.characters || [])),
     CREATURE_TONE: buildCreatureToneSection(inputData),
     MAX_CHARACTERS_PER_SCENE: options.maxCharactersPerScene || 3,
@@ -2755,13 +2777,18 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // four sites and a rule that reaches one of them is absent on the other
     // three. See CONCEALED_OBJECT_RULE / STAGED_PROP_RULE / CONTACT_VERB_RULE /
     // REACHABLE_CONTACT_RULE.
+    // STAGED_PROP is NOT filled here: it is a page-TEXT rule and this call
+    // runs before any page text exists (owner, 2026-09-23). The other three
+    // brief-authoring sites see the text and keep it.
     CONCEALED_OBJECT: CONCEALED_OBJECT_RULE,
-    STAGED_PROP: STAGED_PROP_RULE,
     CONTACT_VERB: CONTACT_VERB_RULE,
     REACHABLE_CONTACT: REACHABLE_CONTACT_RULE,
     // Rule 11 in both Art Director templates — ONE constant, so the framing and
     // the field that records it cannot drift apart.
     GAP_ACTION_FRAMING: GAP_ACTION_FRAMING_RULE,
+    // Rules 6d / 8l, shared with scene-review.txt check 6.
+    EYES_OPEN: EYES_OPEN_RULE,
+    CREATURE_FACE: CREATURE_FACE_RULE,
     // SEVEN page-brief contracts, one constant each, filled at all FOUR sites
     // that author a page brief — see ONE_INSTANT_RULE and the block around it.
     // Registered as sibling set art-director-vs-iterate.
@@ -2774,10 +2801,10 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     WORN_ON_OTHER: WORN_ON_OTHER_RULE,
     NEVER_NAME_ABSENT: ABSENT_THING_RULE,
     SCENE_INTENT_FIELD: SCENE_INTENT_FIELD_RULE,
-    // ONE rule for every template that authors or judges a page against its
-    // text — see TEXT_NOT_A_CHECKLIST_RULE. The brief author's half is the
-    // PERMISSION: the page text may name more than the frame stages.
-    TEXT_NOT_A_CHECKLIST: textNotAChecklistRule({ role: 'author' }),
+    // No TEXT_NOT_A_CHECKLIST: the page text is written AFTER these briefs, so
+    // this call never sees it and a rule about it cannot apply (owner,
+    // 2026-09-23). The per-page Art Director and both iterate templates see
+    // the text and keep the rule.
     // ONE scale vocabulary for every Visual-Bible authoring site (the
     // all-pages Art Director and the trial writer) — see SCALE_CLASS_SPEC.
     SCALE_CLASS_SPEC,
@@ -2804,6 +2831,9 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // business but the shot word's own.
     DISTANCE_SHOTS: DISTANCE_SHOTS.map(x => '`' + x + '`').join(', '),
     SHOT_POSITIONS,
+    // Which pages a vantage's plate can hold — the same line the brief check
+    // `shot_off_plate` measures (shotVocabulary.VANTAGE_SHOT_RULE).
+    VANTAGE_SHOT: VANTAGE_SHOT_RULE,
   });
   return applyTextZoneGate(filledAll, textZoneRulesActive(inputData));
 }
@@ -3068,6 +3098,9 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // Rule 11 in both Art Director templates — ONE constant, so the framing and
     // the field that records it cannot drift apart.
     GAP_ACTION_FRAMING: GAP_ACTION_FRAMING_RULE,
+    // Rules 6d / 8l, shared with scene-review.txt check 6.
+    EYES_OPEN: EYES_OPEN_RULE,
+    CREATURE_FACE: CREATURE_FACE_RULE,
     // SEVEN page-brief contracts, one constant each, filled at all FOUR sites
     // that author a page brief — see ONE_INSTANT_RULE and the block around it.
     // Registered as sibling set art-director-vs-iterate.
@@ -8312,6 +8345,17 @@ const DECLARED_TRAIT_VERBATIM_RULE = "A trait CHARACTER DETAILS states — hair 
  * tests/unit/ad-iterate-parity.test.ts asserts each one reaches all four BUILT
  * prompts byte-identically.
  */
+/**
+ * TWO RULES THE CRITIC NEVER HAD (2026-09-23). Both Art Director templates
+ * stated them (6d, 8l) and the scene review had no check for either, so on
+ * staging job_1790100385959_1nitlympp "eyes squeezed shut" (p12) and a creature
+ * with no face written (p9, p11, p17) shipped past it. One constant each, filled
+ * into both AD templates and scene-review.txt check 6 (sibling set
+ * scene-brief-generator-vs-critic).
+ */
+const EYES_OPEN_RULE = 'No closed eyes and no eyes shut on any rendered figure — write "eyes narrowed", "a focused gaze", "looking down at the work".';
+const CREATURE_FACE_RULE = 'Every page holding a creature states its brow, eyes and mouth in the prose — including a creature acting hard, diving, chasing, calling or lifting, and at any distance the face can be read at.';
+
 const ONE_INSTANT_RULE = "The prose never asks the picture to show how many times something happened, what just finished, or what comes next — no \"again\", \"for the third time\", \"already\", no object both mid-motion and in its ended state. Write the single visible instant.";
 
 const GAZE_TARGET_RULE = "Name at most one gaze target, and compose the frame so that target is the dominant element — large, central, or nearest the camera. Every other figure looks at that same target or at the page's action. Two named characters facing each other are the one exception — a standoff, an exchange, a conversation — and there each looks at the other; that pair is a single relationship, not two targets, and nobody else in the frame looks anywhere but at them or at the action. A gaze aimed at anything smaller or further off than the frame's dominant element lands on the dominant element instead. Never write a gaze to the viewer.";
@@ -9748,14 +9792,19 @@ function buildSceneReviewBibleBlock(visualBible) {
   // usually has none of. Locations and secondary characters are not text
   // carriers and stay out.
   const textLines = [];
+  let anyDeclared = false;
   for (const key of ['artifacts', 'vehicles', 'clothing', 'animals']) {
     for (const e of (Array.isArray(visualBible[key]) ? visualBible[key] : [])) {
       if (!e || !e.id) continue;
       const label = elementDisplayLabel(e) || e.name || String(e.id);
       const declared = declaredText(e);
+      if (declared) anyDeclared = true;
       textLines.push(`- ${String(e.id).trim().toUpperCase()} (${key}) "${label}" — ${declared ? `text: "${declared}"` : 'text: (none declared)'}`);
     }
   }
+  // Nothing declared: one line says it for every element (2026-09-23 — the
+  // per-element list was nine identical "(none declared)" rows).
+  if (textLines.length > 0 && !anyDeclared) textLines.splice(0, textLines.length, '- every element: text: (none declared)');
 
   const blocks = [];
   if (lines.length > 0) {
@@ -9814,7 +9863,13 @@ function buildSceneReviewCastBlock(inputData, options = {}) {
 }
 
 function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
-  const template = PROMPT_TEMPLATES.sceneReview;
+  // Check 0 is about the MECHANICAL CLOTHING FAULTS section and is sent only
+  // with it (2026-09-23): with no section it told the reviewer about a block
+  // that is not there.
+  const rawTemplate = PROMPT_TEMPLATES.sceneReview;
+  const template = rawTemplate && (options.clothingFindings
+    ? rawTemplate.replace(/<!-- CLOTHING_MECHANICAL_(BEGIN|END) -->\n?/g, '')
+    : rawTemplate.replace(/<!-- CLOTHING_MECHANICAL_BEGIN -->[\s\S]*?<!-- CLOTHING_MECHANICAL_END -->\n?/g, ''));
   if (!template) {
     log.error('[PROMPT] sceneReview template not loaded — scene review unavailable');
     return null;
@@ -9863,12 +9918,12 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
     // scene review — see PLAN_LINE_CAST_RULE / MULTI_PICTURE_PROP_RULE.
     PLAN_LINE_CAST: PLAN_LINE_CAST_RULE,
     MULTI_PICTURE_PROP: MULTI_PICTURE_PROP_RULE,
-    // ONE rule for every template that authors or judges a page against its
-    // text — see TEXT_NOT_A_CHECKLIST_RULE. This reviewer is the only stage
-    // holding the whole book's plan lines at once, so the second half — a
-    // character whose own moment no plan line stages — is nameable here and
-    // nowhere else upstream of the finished book.
-    TEXT_NOT_A_CHECKLIST: TEXT_NOT_A_CHECKLIST_RULE,
+    // No TEXT_NOT_A_CHECKLIST: this reviewer is shown neither the page text
+    // (written after the images are planned) nor the arc — its job is
+    // drawability (owner, 2026-09-23).
+    // Check 6, from the constants both Art Director templates state as 6d / 8l.
+    EYES_OPEN: EYES_OPEN_RULE,
+    CREATURE_FACE: CREATURE_FACE_RULE,
     // ONE authoring contract for readable in-image lettering, shared with the
     // two Visual Bible authoring templates — see REQUIRED_TEXT_AUTHORING_RULE.
     REQUIRED_TEXT_AUTHORING: REQUIRED_TEXT_AUTHORING_RULE,
@@ -10335,19 +10390,24 @@ function shortLandmarkDescription(extract) {
 
 /**
  * @param {Object} opts
- *   jsonFields  emit the `isRealLandmark` / `landmarkQuery` output contract and
- *               its JSON example. ONLY the Art Director emits those fields, and
- *               only it should be told about them. The arc creator writes
- *               numbered prose sentences and was carrying ~900 chars of JSON
- *               schema for a format it must never produce — including a worked
- *               example object with a "description" key, in a prompt that ends
- *               "Last line, exactly: Stronger: Arc <N>".
+ *   forArtDirector  the Art Director's variant (2026-09-23). The AD writes no
+ *               story: it decides which of the plan's places are listed
+ *               landmarks and emits the `isRealLandmark` / `landmarkQuery`
+ *               contract, so it gets that contract and none of the writer's
+ *               wording ("woven into the story's action", "incorporate it
+ *               authentically into your story", "your name can be creative")
+ *               or the writer's worked example, whose "description" key the
+ *               `locations` schema does not have. Those told the AD to add to
+ *               a plan line its rule 1 forbids it to add to. The writers
+ *               (arc, beats) keep the story wording and never see the
+ *               contract: they write prose (2026-09-19, the arc prompt was
+ *               carrying ~900 chars of JSON schema it must never produce).
  *   descriptions  false drops each DESCRIPTION line and its two use-rules. The
  *               arc PANEL asks only whether a named place is on the list and
  *               seen from a vantage a photo shows; the extracts were ~3k of its
  *               prompt it never used (audit 01 C, 2026-09-23).
  */
-function buildAvailableLandmarksSection(landmarks, retryNote = '', { jsonFields = false, descriptions = true } = {}) {
+function buildAvailableLandmarksSection(landmarks, retryNote = '', { forArtDirector = false, descriptions = true } = {}) {
   if (!landmarks || landmarks.length === 0) {
     return '';
   }
@@ -10385,33 +10445,31 @@ function buildAvailableLandmarksSection(landmarks, retryNote = '', { jsonFields 
 
   const hasDescriptions = descriptions && landmarks.some(l => l.wikipediaExtract || l.wikipedia_extract);
   const hasPhotos = landmarks.some(l => Array.isArray(l.photoVariants) && l.photoVariants.length > 0);
+  const photoRule = hasPhotos ? `- A landmark is drawn from one of its PHOTOS. Name a location or a vantage of it only from a viewpoint one of its photos shows — an exterior is seen from the street or the square, an interior from inside, a distant or view-from photo from afar. If no photo shows the view a page needs (a skyline from a hilltop, a bird's-eye, the far side), that landmark is not available for that page: use one whose photos fit, or none. A view the commission's own words describe is the exception: it stands, and the landmark in it is drawn from what its photos show` : '';
 
   // THE ONE STATEMENT OF THE LANDMARK RULE (owner, 2026-09-19). The telling
   // rules used to carry a second, contradictory one ("at most on the opening
   // page ... or not at all"); it is deleted. If a landmark rule needs changing,
-  // it changes here and nowhere else.
-  return `**REAL LANDMARKS — use only where they belong to the world the commission names. When the story's own places offer landmarks from this list, build at least two of them in, woven into the story's action (two to four is the target); never relocate the story or bend the plot to collect them. A story set anywhere else uses none${jsonFields ? ' — no entry with isRealLandmark or landmarkQuery' : ''}, and no listed landmark renamed or reworked into a feature of the story's own setting. A landmark carried as background scenery counts as used:**
+  // it changes here and nowhere else — both readers' wordings below.
+  if (forArtDirector) {
+    return `**REAL LANDMARKS — only where they belong to the world the commission names. When the places the plan lines stage are, or stand beside, landmarks from this list, stage at least two of them as those landmarks (two to four is the target), as the setting or its backdrop; never add a place or an action to a plan line to reach one. A story set anywhere else uses none — no entry with isRealLandmark or landmarkQuery — and no listed landmark is reworked into a feature of the story's own setting. A landmark carried as background scenery counts as used:**
+${retryNote ? `\n${retryNote}\n` : ''}
+${landmarkList}
+
+For each landmark you use:
+- \`isRealLandmark\`: true, and \`landmarkQuery\`: its EXACT name from the list above, without the [type]. Its \`name\` may be the one the story uses.
+${hasDescriptions ? `- The DESCRIPTION says what the landmark is; it is not wording for a brief.\n` : ''}${photoRule}
+`;
+  }
+  return `**REAL LANDMARKS — use only where they belong to the world the commission names. When the story's own places offer landmarks from this list, build at least two of them in, woven into the story's action (two to four is the target); never relocate the story or bend the plot to collect them. A story set anywhere else uses none, and no listed landmark renamed or reworked into a feature of the story's own setting. A landmark carried as background scenery counts as used:**
 ${retryNote ? `\n${retryNote}\n` : ''}
 ${landmarkList}
 
 When you use a landmark from the list (even if you rename it in your story):
-${jsonFields ? `- Set "isRealLandmark": true
-- Set "landmarkQuery": copy-paste the EXACT name from the list above (WITHOUT the [type])
-` : ''}${hasDescriptions ? `- Use the DESCRIPTION above to understand what the landmark is and incorporate it authentically into your story
+${hasDescriptions ? `- Use the DESCRIPTION above to understand what the landmark is and incorporate it authentically into your story
 - The DESCRIPTION is reference for you, not wording for the page. Never carry an abbreviation, acronym or technical term from it into the story — name the thing the way a child would say it` : ''}
-${hasPhotos ? `- A landmark is drawn from one of its PHOTOS. Name a location or a vantage of it only from a viewpoint one of its photos shows — an exterior is seen from the street or the square, an interior from inside, a distant or view-from photo from afar. If no photo shows the view a page needs (a skyline from a hilltop, a bird's-eye, the far side), that landmark is not available for that page: use one whose photos fit, or none. A view the commission's own words describe is the exception: it stands, and the landmark in it is drawn from what its photos show` : ''}
-
-${jsonFields ? `
-EXAMPLE - Using "Ruine Stein [Ruins]" as "The Enchanted Castle" in your story:
-{
-  "name": "The Enchanted Castle",
-  "isRealLandmark": true,
-  "landmarkQuery": "Ruine Stein",
-  "description": "<write a scene description appropriate for your story>"
-}
-
-Your "name" can be creative, but "landmarkQuery" MUST match the original name exactly (without the [type] suffix)!
-` : ''}`;
+${photoRule}
+`;
 }
 
 // ============================================================================
@@ -10776,6 +10834,9 @@ module.exports = {
   MULTI_PICTURE_PROP_RULE,
   CONCEALED_OBJECT_RULE,
   STAGED_PROP_RULE,
+  EYES_OPEN_RULE,
+  CREATURE_FACE_RULE,
+  buildCoverCastLines,
   CONTACT_VERB_RULE,
   REACHABLE_CONTACT_RULE,
   GAP_ACTION_FRAMING_RULE,

@@ -33,7 +33,11 @@ describe('an Art Director rule id names exactly one rule', () => {
 
   it('both templates carry the SAME rule ids — they are a registered sibling pair', () => {
     const [all, per] = AD_TEMPLATES.map(k => ruleIds(String(PROMPT_TEMPLATES[k] || '')));
-    expect([...all].sort()).toEqual([...per].sort());
+    // 5f and 12j are page-TEXT rules. The per-page Art Director is shown the
+    // page text; the all-pages one runs before any exists (owner, 2026-09-23).
+    const PAGE_TEXT_ONLY = new Set(['5f', '12j']);
+    expect([...all].sort()).toEqual([...per].filter(id => !PAGE_TEXT_ONLY.has(id)).sort());
+    for (const id of PAGE_TEXT_ONLY) expect(all.includes(id), `all-pages carries page-text rule ${id}`).toBe(false);
   });
 
   it('the creature-face rule kept its own id, and the expression rule kept 8k', () => {

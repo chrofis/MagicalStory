@@ -263,7 +263,8 @@ describe('the reviewer carries the replacement check', () => {
     const prompt = PB.buildSceneReviewPrompt(
       { title: 'A Story', language: 'de', characters: [{ id: 1, name: 'A' }], mainCharacters: [1] },
       [{ pageNumber: 1, brief: 'A character stands at a rail.' }],
-      {},
+      // Check 0 is sent only with the section it is about (2026-09-23).
+      { clothingFindings: '# MECHANICAL CLOTHING FAULTS\n- Page 1: a fault' },
     );
     const check0 = String(prompt).split('[page_repetition]')[0];
     expect(check0).toContain('[clothing_mechanical]');
