@@ -1,6 +1,7 @@
 
 
 const { runPlanCounters, collectPlaceNames, castLostByReplan, reviewPlanChanges, refreshPlanShot } = require('./planCounters');
+const { commissionedCast } = require('./castCoverage');
 const { lookupByName } = require('./castResolver');
 const { textZoneRulesActive } = require('../config/runtime');
 const { commissionedChildBand, applySecondaryAgeBand } = require('./inventedAgeBand');
@@ -1290,10 +1291,13 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   let beatsReviewReport = null;
   // The character list PLUS the figures the premise supplied (the arc reports
   // them; see `arcPremiseNames`). A pet the commission named is commissioned.
-  const commissionedNames = [
-    ...(inputData?.characters || []).map(c => c && c.name).filter(Boolean),
-    ...arcPremiseNames.filter(n => n && String(n).trim()),
-  ];
+  //
+  // ONE definition, shared with the Test Lab replay (castCoverage.commissionedCast):
+  // `listed` is the character list — the characters that owe the book a focal
+  // page and the castCoverage() appearance floor — and `all` adds the figures
+  // the commission supplied elsewhere, which are never invented.
+  const commission = commissionedCast(inputData, arcPremiseNames);
+  const commissionedNames = commission.all;
   if (arcPremiseNames.length) log.info(`👪 [BEATS] Premise figures counted as commissioned: ${arcPremiseNames.join(', ')}`);
   // The counters must never read a PLACE as a person. The names come from the
   // same authoritative data the planner itself was given — the resolved
@@ -1384,7 +1388,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       log.error(`❌ [BEATS] Plan check (${label}) failed (${err.message}) — NO ROSTER, so the entire plan-counter layer is skipped this round`);
       gl.error(`${label}_failed`, `Plan check failed: ${err.message} — no roster, so every plan counter (cast, invented cast, shot variety, focal pages) is skipped this round`, null, { error: err.message, model: planCheckModel });
     }
-    const counters = runPlanCounters({ pages, commissionedNames, placeNames, maxCharactersPerScene: maxCast, declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit, roster, peoplelessPick });
+    const counters = runPlanCounters({ pages, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit, roster, peoplelessPick });
     // NO FALLBACK, NO SYNTHESIS. The finding degrades to its page-less
     // sentence when Q6 nominated nothing; code never picks the page itself.
     // The miss is loud so a checker that stops answering Q6 is visible.

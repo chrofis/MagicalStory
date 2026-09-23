@@ -9779,7 +9779,8 @@ async function runBeatsReplanStage(target, { params = {} }) {
   // Production's counter inputs, as far as a stored story carries them (see the
   // header: the arc machine's premise figures and invented allowance do not
   // survive into the row).
-  const commissionedNames = (storyData?.characters || []).map(c => c && c.name).filter(Boolean);
+  const commission = require('./castCoverage').commissionedCast(storyData);
+  const commissionedNames = commission.all;
   const placeNames = collectPlaceNames(storyData, [
     ...(storyData?.storyCategory === 'historical'
       ? [...getHistoricalLocations(storyData.storyTopic), ...getHistoricalObjects(storyData.storyTopic)].map(e => e && e.name)
@@ -9803,7 +9804,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
   const roster = parsePlanCheckRoster(checkRes.text || '');
   const obstacles = parsePlanCheckObstacles(checkRes.text || '');
   const counters = runPlanCounters({
-    pages: standing, commissionedNames, placeNames, maxCharactersPerScene: maxCast, roster,
+    pages: standing, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, roster,
   });
   const findings = [
     ...counters.findings.map((f, i) => ({ kind: 'counter', code: f.code, line: counters.lines[i] })),

@@ -20,6 +20,7 @@ const { REQUIRED_TEXT_AUTHORING_RULE, declaredText } = require('./requiredText')
 const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote } = require('./visualBible');
 const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
+const { castCoverage, castCoverageRule } = require('./castCoverage');
 // REQUIRED IN-IMAGE TEXT: one source for the generator block, the repair
 // clause and the judges' TEXT RULES block. Safe as a top-level require --
 // requiredText.js requires promptBuilders LAZILY.
@@ -7525,6 +7526,11 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // for the waist-up rule is one constant, not two hand-kept sentences.
     CLOSEUP_BELOW_WAIST: CLOSEUP_BELOW_WAIST_PHRASE,
     PAGE_COUNT: pageCount,
+    // HOW MUCH OF THE BOOK EACH COMMISSIONED CHARACTER GETS (owner,
+    // 2026-09-23): a focal page each when the book has room, 3-4 pages in
+    // frame scaled down as the cast grows. The SAME castCoverage() object the
+    // plan counters measure NO_FOCAL_PAGE and UNDER_COVERED_CHARACTER against.
+    CAST_COVERAGE: castCoverageRule(castCoverage({ pageCount, castCount: (inputData?.characters || []).filter(c => c && c.name).length })),
     // The output scope follows the mode. A first plan (no replan section)
     // owes every page; a re-plan owes only the pages it changes under RE-DIVIDE
     // — the merge in beatsPipeline restores every other page from the division

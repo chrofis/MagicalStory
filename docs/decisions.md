@@ -33147,7 +33147,7 @@ Per-ruling detail:
   no life skill, and an unconditional question would manufacture faults. The
   "never stated as a moral" tail composes with the existing ending-craft rule
   that already bans stated morals.
-- **R20 — coverage floor, alongside the focal page.** `NO_FOCAL_PAGE` (every
+- **R20 — coverage floor, alongside the focal page.** (Floor superseded 2026-09-23 by castCoverage(), see "Every commissioned child gets a moment".) `NO_FOCAL_PAGE` (every
   commissioned character alone in frame once, or the subject of a close-up) is
   a different property, not a replacement: a character can own one close-up and
   be absent from the rest of the book. Both counters now run.
@@ -56502,4 +56502,36 @@ sweatshirt…", "…sneakers, and a forest green long-sleeve zip-up fleece jacke
 sleeveless front-zip body warmer…"; a second pass finds 0; no avatar re-render.
 
 **Touched:** `server/lib/clothingCheck.js`, `tests/unit/worn-garment-review-chain.test.ts`.
+**Status:** ✅ active on staging.
+
+## 2026-09-23 — Every commissioned child gets a moment: one castCoverage() for the arc, the planner and the counters
+
+**Context.** Owner decision on the main-cast conflict, verbatim: "Every child gets a moment. And ideally
+we have them in multiple images. Depends on the story length and amount of characters, ideally each one is
+on 3-4 images. Fine for up to 2-3 characters and long books, but for 7 characters in 10 pages it will not
+work." The book held every commissioned character to a fixed floor of two pages in frame
+(`UNDER_COVERED_CHARACTER`, R20 above) and a focal page each (`NO_FOCAL_PAGE`) whatever the book's size, the
+planner was told neither number, and the arc prompt said "at most two carry a book".
+
+**Decision.** One function, `castCoverage({ pageCount, castCount })` in `server/lib/castCoverage.js`,
+gives the numbers from the page count and the size of the commission's character list:
+- a focal page each (alone or with one companion) whenever ceil(cast/2) such pages fit in half the book;
+  otherwise the cast shares group moments and nobody is dropped;
+- a target of 3-4 pages in frame each, scaled down as the cast grows or the book shrinks: two named
+  characters per peopled page, one page people-free, the main character taking half the book, the rest
+  shared; the counter floor is 3 when the target reaches 4, else the target itself.
+Measured on the three owner cases: 4 children / 18 pages → focal each, 3-4 pages; 7 / 10 → focal each,
+at least 2 pages; 2 / 24 → focal each, 3-4 pages; 12 / 10 → group moments, at least 1.
+`castCoverageRule(cov)` states it to the planner (`{CAST_COVERAGE}` in story-beats.txt, page form) and to
+the arc (story form, wired by the arc stage in place of "at most two carry a book"). The plan counters call
+the same function on the plan (`NO_FOCAL_PAGE` only when focal-each holds, `UNDER_COVERED_CHARACTER` at the
+`min` floor), so generator and critic hold one number. The duties apply to the commission's character list
+(`commissionedCast().listed`); a figure the commission supplies elsewhere (premise, saved details) is
+commissioned, never invented, and owes no page — before this a premise pet drew `NO_FOCAL_PAGE`.
+Supersedes the fixed two-page floor of R20 (2026-09 "coverage floor, alongside the focal page") and the
+"at most two carry a book" line. plan-check.txt asks no coverage question; the counters own it.
+
+**Touched:** `server/lib/castCoverage.js` (new), `server/lib/planCounters.js`, `server/lib/promptBuilders.js`
+(`buildBeatsPrompt`), `prompts/story-beats.txt`, `server/lib/beatsPipeline.js`, `server/lib/testlab.js`
+(beats_replan replay), `tests/unit/cast-coverage.test.ts`, `tests/unit/plan-counters.test.ts`.
 **Status:** ✅ active on staging.
