@@ -1398,6 +1398,30 @@
       "fixedAt": "2026-09-23",
       "fixedIn": "86d6ff4a7",
       "fix": "isNegativeFigureAnswer tests the answer's head: a leading '(' dropped, cut at the first '(', ',', ';' or ':'. Shared by both lists. arcCritiqueSpec and arc-retell.txt say an empty list is the heading alone, with no dash line. Replay on the stored arc: premise ['(none'] -> []; invented lists unchanged. Pinned by tests/unit/arc-invented-figures.test.ts."
+    },
+    {
+      "id": "review-deleted-off-row-paints-garment-back",
+      "title": "The element budget counted worn garments the picker never packs; the scene review deleted their off wornItems rows to obey it, the missing row resolved to worn, and the post-review clothing re-check never ran",
+      "reportedAt": "2026-09-23",
+      "source": "Reproduced from stored data, dragon run 6 (staging job_1790100385959_1nitlympp): all 4 vb_element_overflow and 11 vb_page_uncited findings were garments; the review dropped the ART005 off rows on p11/p12 (and rows on p9, p16, p18); the p12 image prompt says \"Max IS wearing this … purple hooded sweatshirt\" against prose in a white shirt; p12 duplicate_character CRITICAL, final score 10.",
+      "rootCause": "(1) vbElementBudget.rankPageElements and sceneBriefCheck.checkBiblePageTable counted a wornAs garment worn by its owner, which visualBible.getElementReferenceImagesForPage drops (two predicates for one question). (2) carryForwardWornItems carried rows only when the rewrite emitted none, and the scene-review adopt did not carry at all, so an omitted row resolved to the default worn. (3) The post-review clothing re-check in beatsPipeline ran only if the PRE-review check found something.",
+      "impact": "Any story whose Art Director tracks worn garments: fake budget faults drive destructive rewrites, and a deleted off row paints the garment back on (duplicate figures, continuity breaks). Staging.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "ee8890278",
+      "fix": "wornItems.carriedByReference is the one predicate for the picker drop and the budget count; a wornItems row is page presence in checkBiblePageTable; carryForwardWornItems merges per id and carryForwardWornItemsInBrief is applied at both scene-review adopt points and the Lab mirrors; the re-check runs on every reviewed run. Replay over the stored run: overflow pages 4->1 (p16 real), uncited 12->1, counter==picker 18/18, review-introduced removal_unstated 7->0. Pinned by tests/unit/worn-garment-review-chain.test.ts."
+    },
+    {
+      "id": "wardrobe-rewording-rebuilds-avatar",
+      "title": "A same-garment rewording of an outfit clause by the Visual Bible rebuilt the whole avatar sheet from photos",
+      "reportedAt": "2026-09-23",
+      "source": "Reproduced from stored data, dragon run 6 (staging job_1790100385959_1nitlympp): beats_wardrobe_bible_conflict at 20:39:37 CH, Levin \"forest green zip-up fleece jacket\" vs ART006 and Kiaan \"rust-brown quilted gilet\" vs ART004, both corrected; Levin and Kiaan got full second pass1+pass2 sheet runs (06-avatars 4-/5- files), Levin face and hair visibly changed, about $0.15.",
+      "rootCause": "clothingCheck kind reconcile restates any differently-worded wornAs clause, and beatsPipeline fired onWardrobeCorrected for every applied finding, so storyJobPipeline invalidated and re-rendered the sheet from photos even when the garment and colours were unchanged.",
+      "impact": "Every story whose Art Director restates a linked garment in its own words: an extra avatar build per character and an identity re-roll mid-story. Staging.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "ee8890278",
+      "fix": "checkWardrobeAgainstBible marks a reconcile as rewording (element slot noun in the clause, no new slot noun in the replacement, same plain colour words); only non-rewording corrections reach onWardrobeCorrected. The contract text still moves to the bible words (2026-09-15 not reversed). Replay of the 20:39 reconcile: both rewording, re-render fires for nobody (was Levin, Kiaan). Pinned by tests/unit/worn-garment-review-chain.test.ts and tests/unit/wardrobe-vs-bible.test.ts."
     }
   ]
 }
