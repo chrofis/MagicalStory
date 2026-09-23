@@ -2583,7 +2583,33 @@ function describeDegradedSceneMetadata(sceneMetadata) {
   return { recovered: true, emptyInputs: empty };
 }
 
+/**
+ * Who has hands on which object, from a page's `interactions[]`: object (lower
+ * case) -> the names on rows with `hands: true`. A fused "A + B" row counts
+ * each name. ONE reading for the two hand-off counters (sceneBriefCheck check D,
+ * sceneConsistencyCheck c3).
+ *
+ * A PLACE IS NOT A GRIP (2026-09-23). A row whose object is a location id
+ * (`LOC002`, `LOC002.3`) is people working the ground they stand in — banking
+ * leaves, digging — not one object passed between hands. On staging
+ * job_1790100385959_1nitlympp p9 and p12 the counters reported "2 characters
+ * have hands on loc002.3" and the review restaged the page to answer it.
+ * Structured only: the id's shape, never the `where` prose.
+ */
+function handsPerObject(interactions) {
+  const perObject = new Map();
+  for (const row of (Array.isArray(interactions) ? interactions : [])) {
+    if (!row || row.hands !== true) continue;
+    const obj = String(row.object || '').trim().toLowerCase();
+    if (!obj || /^loc\d{3}(?:\.\d+)?$/.test(obj)) continue;
+    const who = String(row.character || '').split(/\s*(?:\+|&|\band\b|,)\s*/i).map(s => s.trim()).filter(Boolean);
+    perObject.set(obj, (perObject.get(obj) || []).concat(who.length ? who : ['?']));
+  }
+  return perObject;
+}
+
 module.exports = {
+  handsPerObject,
   POPULATION_LEVELS,
   normalisePopulation,
   resolvePopulation,

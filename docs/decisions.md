@@ -21,6 +21,28 @@ superseded and link forward.
 
 ---
 
+## 2026-09-23 — A place is never a one-grip object; the brief rewrite gets eyes-open and the creature face from the Art Director's constants
+
+**Context:** Staging `job_1790100385959_1nitlympp` p9 and p12: the hand-off guard reported "2 characters
+have hands on loc002.3" / "6 characters on loc002.4" for children banking and digging leaves, and the
+scene review restaged both pages to answer it. The guard existed twice (sceneBriefCheck check D,
+sceneConsistencyCheck c3). Separately, the two iterate templates carried hand-written copies of the
+eyes-open and creature-face rules, which the Art Director and the scene review now take from one constant.
+
+**Decision:** `sceneMetadata.handsPerObject` is the one reading for both counters and skips a row whose
+object is a location id (`LOC###`, `LOC###.N`) — id shape only, never the `where` prose. The shared-hands
+rule itself (the A+B conflict, 🟡 2026-08-23) is untouched and still the owner's call. scene-iteration.txt
+and scene-iteration-free.txt fill `{EYES_OPEN}` / `{CREATURE_FACE}`; both are anchors of the
+`art-director-vs-iterate` sibling set.
+
+**Rationale:** a location is the ground people stand in, not a thing passed between hands; a rule the
+first author holds and the rewriter does not is deleted by one repair round.
+
+**Touched files:** server/lib/sceneMetadata.js, server/lib/sceneBriefCheck.js,
+server/lib/sceneConsistencyCheck.js, prompts/scene-iteration.txt, prompts/scene-iteration-free.txt,
+server/lib/promptBuilders.js, scripts/admin/sibling-registry.json, tests/unit/ad-iterate-parity.test.ts,
+tests/unit/art-director-audit-2026-09-23.test.ts.
+
 ## 2026-09-23 — The all-pages Art Director and the scene review see no page text and no art style; the review gets the checks the Art Director was given
 
 **Context:** Prompt audit 04 (`docs/audits/prompt-audit-2026-09-23/04-art-director.md`) over staging
@@ -57217,4 +57239,228 @@ dropping or capping advisory Q9 lines in the re-plan (W9, 2026-09-09 ruling); ra
 `scripts/admin/sibling-registry.json`, `tests/unit/page-plan-audit-2026-09-23.test.ts`,
 `tests/unit/commissioned-figure-definition.test.ts`, `tests/unit/invented-allowance-counts-the-book.test.ts`,
 `tests/unit/plan-collective-cast.test.ts`.
+## 2026-09-23 — Char-fix reads the brief's current schema, and a face repair keeps its face treatment
+
+**Context.** Dragon run 6 (staging `job_1790100385959_1nitlympp`) p14, audit
+`docs/audits/prompt-audit-2026-09-23/08-page-images.md` S5. The char-fix repaint of Julian lost the
+chestnut he was biting and left a hard horizontal seam across his jacket plus a blocky patch at the
+shoulder. Two separate causes, both confirmed from the stored v1 (`imageVersions[1]`: sent prompt,
+`char-repair-grok-raw`, `inpaint-ref-1`, `char-repair-blend-mask` 439×517).
+1. `faceRepair.buildActionContext` read `characters[].pose / action / gaze / holding`, fields the brief
+   schema no longer has (hands live in `interactions[]` per AD rule 8j, eyes in `looksAt`). Only
+   `Expression` reached the prompt; the interaction-based builder was a fallback that only ran when the
+   character had no `characters[]` row at all, so it never ran on a real page.
+2. `repairPipeline` passed the FACE box as the repair's figure box on a face repair. Downstream it became
+   `bodyBbox`, so the large-face-box guard (face area / body area ≥ 0.6) saw face == body on every
+   pipeline face repair and turned it into a full-figure crosshatch confined to face box + 10%. The hatch
+   and the paste then ended in straight crop lines through the torso: that is the seam. The manual
+   endpoint, the entity repair and the Lab pass the body box there already.
+
+**Decision.** The state block is built from the current schema through the page's own EXACT POSES
+builder (`buildExactPosesBlock`): the character's interactions (including a row naming several actors,
+split by the shared `splitInteractionActors`), `expression` + `looksAt`, and `perspective`. The dead
+`imageCompositing.buildCharActionContextFromInteractions` is deleted (no fallback). `repairPipeline`
+passes the figure box as `bbox` and the face box as `faceBbox`, like its siblings; the telemetry
+`targetBbox` still records the box that was treated.
+
+**Replay (rung 1, stored briefs, no model calls):** p14 Julian now carries "holds one cooled Marroni from
+the paper bag and bites into it" plus expression and gaze; p12 rows naming six actors reach each actor.
+The geometry guard on p14's stored boxes (face .42×.36, body .87×.78, ratio .22) keeps the face blur.
+
+**Touched:** `server/lib/faceRepair.js`, `server/lib/promptBuilders.js`, `server/lib/imageCompositing.js`,
+`server/lib/repairPipeline.js`, `tests/unit/char-fix-page-state.test.ts`.
+**Status:** ✅ active on staging.
+
+## 2026-09-23 — A page brief names content, never rendering (all four brief authors)
+
+**Context.** Dragon run 6 (staging `job_1790100385959_1nitlympp`) p17, audit 08 S4. The iterate rewrite
+wrote "shallow depth of field" into the page prose and into its `emptyScenePrompt`; the image prompt then
+carried it next to an ART STYLE block reading "depth from atmospheric haze, not optical blur". None of the
+four brief-authoring templates is given the art style, and none said that rendering is not the brief's
+business. (The same rewrite's cast and dropped creature citations were fixed in 32dce4da9.)
+
+**Decision.** One constant, `NO_LENS_RULE`, filled as `{NO_LENS}` into all four brief authors
+(`scene-expansion.txt`, `scene-expansion-all.txt`, `scene-iteration.txt`, `scene-iteration-free.txt`) and
+anchored in sibling set `art-director-vs-iterate`: the brief says what the frame holds and where the
+camera stands, never depth of field, focus, blur, bokeh, lens or film words, in the prose or in
+`emptyScenePrompt`. The medium stays the art style's. The rewrite's free-text self-report
+(`draftValidation.fixesApplied` "Retained all previously cited object ids …" listing ids the parent never
+cited) is audit-only and read by nothing; left as is.
+
+**Validation.** Rung 1: `tests/unit/ad-iterate-parity.test.ts` pins the constant byte-identical in all four
+BUILT prompts. Not validated against a model: one stochastic rewrite would prove nothing either way.
+
+**Touched:** `server/lib/promptBuilders.js`, the four templates above, `scripts/admin/sibling-registry.json`,
+`tests/unit/ad-iterate-parity.test.ts`.
+**Status:** ✅ active on staging.
+
+## 2026-09-23 — The consolidator writes no coordinates into an edit instruction, and computes no score nobody reads
+
+**Context.** Dragon run 6 (staging `job_1790100385959_1nitlympp`) p12, audit 08 S1/S13. (1) The consolidator
+wrote "Remove the figure … that is not at bbox [0.363, 0.058, 0.712, 0.27]" into `fix_instruction`, and
+Grok received it verbatim; Grok cannot read coordinates and v1 came back pixel-near-identical. Rule 3 told
+the model to build identifiers "from the detected figures (use bbox / position / clothing)" and never said
+the numbers stay out. (2) The prompt carried a "Final score (0–100) — audit only" section (the deduction
+table, `final_score`, `final_score_reason`): the pipeline scores from `deduped_issues`, and nothing read
+`final_score` (`feedbackConsolidator.js` only clamped it; no client, test or pipeline consumer).
+
+**Decision.** Rule 3: `fix_instruction`, `scene_fix.instruction` and `preserve` never carry a bbox, a number
+list or a grid-cell label; a place is named in words, the bbox stays in the `bbox` field. The audit-only
+score (old rules 9-10 and the example's two fields) is deleted from the prompt and its clamp from the code;
+`deduped_issues` (the scoring source) is kept whole as rule 9. The audit measured 9.3k chars for the
+section, but 7k of that is the `deduped_issues` contract the score depends on; 2.1k was removable.
+
+**Replay (rung 2, one qwen-plus call, $0.0033):** the stored p12 round-0 prompt with both edits (35.0k →
+32.9k chars): no coordinate in any instruction, `deduped_issues` intact with types, severities and
+sources.
+
+**Touched:** `prompts/feedback-consolidator.txt`, `server/lib/feedbackConsolidator.js`,
+`scripts/analysis/qwen-eval-ab.js`, `docs/prompt-inventory.md`.
+**Status:** ✅ active on staging.
+
+## 2026-09-23 — The plate is judged on what its author was told: one camera, a medium and a figure check, no pixel-only retry, derived plates judged
+
+**Context.** Dragon run 6 (staging `job_1790100385959_1nitlympp`), audit 08 S9/S10. (1) The vantage plate
+prompt named three cameras: a SHOT line from the representative page (`close-up`), a FRAMING paragraph the
+Art Director wrote for the vantage ("downward-looking aerial view"), and the sentence "The FRAMING
+paragraph decides the camera position", while `empty-scene.txt` ends "Use the camera angle named in the
+SHOT line". (2) The geometry block's lighting line said "take the light from the direction named above"
+when the only lighting fact named no direction. (3) Both plate retries were judged with `skipVision: true`,
+so a retry that fixed nothing the vision check had failed still won. (4) Derived plates (angled pages,
+2026-09-21) were never judged, and the derive edit went out with `artStyle: null`; the p12 aerial derive
+read as a photograph and carried small people. (5) The QC said "small background figures, animals and
+distant people are fine" while the generator says to add no figure the description does not name, and the
+QC had no medium or camera check although the plate prompt opens with ART STYLE and carries a SHOT line.
+
+**Decision.**
+- One camera source: the SHOT line decides height, angle and distance; FRAMING decides composition and
+  foreground, and a camera it names gives way (with no SHOT line FRAMING keeps the camera).
+- A geometry dimension counts as found only through a fact that names a direction or position; such a
+  fact is preferred when a dimension has several. An undirected fact is still listed, but earns no
+  "named above" author line and no judge check (one source, `sceneGeometry.selectGeometryFacts`).
+- The QC is given `artStyle` and `shot` and asks a medium check (photograph = FAIL) and a camera check. A
+  vantage base plate is shared by every close-up, medium and wide page on it, so it is held to its plate
+  class (eye level), never to one page's distance; a derived plate to its own shot; a per-page plate to
+  its page's shot. The figure line now matches the generator: people, animals or figures the scene does
+  not name FAIL; a crowd or passers-by it names is fine (the plate-population design of 5beac7c16 stands).
+- Every retry is judged with the first judgement's options (vision included), base and per-page.
+- A derived plate is edited with the book's art style and judged by the same QC (its own shot, the
+  place, the medium; not the page's geometry facts or placements, which the edit never saw), with one
+  re-derive on the QC feedback, the fewer-issues version kept — the same shape as the base plate. The
+  derive instruction adds "no one is added to it". The Lab's `edit_image` plate mode and `empty_scene`
+  stage pass the same style and shot.
+
+**Replay (rung 2, two gemini-2.5-flash calls, < $0.01):** the new QC on the stored run-6 plates — the p12
+aerial derive FAILS on medium and figures (both confirmed in the audit's pixel read); the p14 vantage base
+plate PASSES at eye level. (At `close-up` it failed the camera check, which is why the base plate is held
+to its class.) No plate was re-rendered.
+
+**Touched:** `storyJobPipeline.js`, `server/lib/evalPipeline.js`, `server/lib/sceneGeometry.js`,
+`server/lib/shotVocabulary.js`, `server/lib/testlab.js`, `prompts/empty-scene-qc.txt`,
+`tests/unit/empty-scene-qc-extraction.test.ts`, `tests/unit/empty-scene-geometry.test.ts`,
+`tests/unit/plate-derive-for-angle.test.ts`, `docs/image-routing.md`, `docs/prompt-inventory.md`.
+**Status:** ✅ active on staging. Cost: one more gemini-2.5-flash call per plate retry and one or two per
+derived plate.
+
+## 2026-09-23 — A style-gate observation copied from the ART STYLE is no verdict
+
+**Context.** Dragon run 6 (staging `job_1790100385959_1nitlympp`), audit 08 S11. The quality judge's style
+gate asks for three observations "before you read the ART STYLE", but the ART STYLE is in the same prompt.
+All six stored quality responses for p12/p14/p17 returned `faces` as the style's own face clause ("loose
+washes with visible brushstroke texture", once with "paint" spliced in), each with `matches_style: true`;
+the book-level style check called the faces "smooth and digitally rendered". The gate could only agree.
+
+**Decision.** The avatar-sheet echo guard's idea (isEchoedJudgeVerdict, 86d6ff4a7), applied to the page
+gate without a re-ask (a re-ask is a full quality call per page, and the next answer reads the same ART
+STYLE): `styleGateEchoedFields` flags a gate field when four consecutive words of it sit verbatim in the
+art style and not in the template's own example answers. A flagged gate that did not say `false` is
+recorded as `styleGate.echoed = [fields]`, `matches_style: null`, and logged — no verdict, never a pass. A
+`false` stands. Nothing is charged or uncharged: only `false` ever produced a finding, so no severity moves.
+Style repair stays OFF (SETTLED, 2026-09-19); this only stops a copied answer from reading as a check.
+
+**Proposal (owner):** make the gate genuinely blind by moving the three observations into the blind
+inventory call (image only, no ART STYLE; runs on every page already) and letting the quality judge
+compare those against the ART STYLE. Touches the inventory schema set and the "P1 is blind" contract
+(SETTLED line 34 stays true: the inventory still names nobody).
+
+**Replay (rung 1, stored responses, no calls):** 6/6 run-6 gates flagged on `faces`; `linework` ("no
+outlines at all, forms defined by paint edges", a template option) is never flagged.
+
+**Touched:** `server/lib/evalPipeline.js`, `tests/unit/style-gate-echo.test.ts`.
+**Status:** ✅ active on staging.
+
+## 2026-09-23 — No gaze at the page's own place (the height-order clash is an owner call)
+
+**Context.** Dragon run 6 (staging `job_1790100385959_1nitlympp`) p12, audit 08 S12. The built page prompt
+contradicted itself twice. (1) HEIGHT ORDER, from stored centimetres, read "Max (shortest) → Julian
+(slightly taller)" (98 cm vs 102 cm) while AGE & PROPORTIONS drew Julian as a toddler "clearly smaller than
+a preschooler" (his apparentAge; the age-band clamp itself is settled and untouched). (2) Three children
+digging in Lindenhof square carried "eyes on Lindenhof square" — `looksAt: LOC002.4`, the page's own
+location, resolved into a gaze target — and the three judges were handed the same line.
+
+**Decision.** (1) HEIGHT ORDER is NOT changed: audit 04 A9 already records it as an OWNER CALL with two
+options — drop the comparative clauses from the age-cue markers (HEIGHT ORDER keeps the measured order), or
+order HEIGHT ORDER by age category first (a younger category is shorter, centimetres order within one).
+The second was built and replayed on the run's cast ("Julian (shortest) → Max (taller) → Kiaan (slightly
+taller) → Levin (slightly taller)") and then withdrawn for the owner's pick. (2) `vbIdGuard.gazeTarget`: a `looksAt` naming a LOC the page's `objects[]`
+cites is no gaze target. It is read once, through the reader every consumer already used for the judges
+(`gazeCharacters`), and the page prompt's EXACT POSES / EXPRESSIONS block and the character repair's
+state block read it through the same function.
+
+**Not changed (proposal for the Art Director owner):** the p12 interaction row
+"Max + Levin + Kiaan + Julian + ANI001 + ANI002: dig and rake" puts Julian in an action his own prose clause
+("stands nearby wiping his eyes") and expression ("eyes squeezed shut, crying") contradict. The builder
+cannot tell which of the AD's two statements is meant; the rule belongs in the AD templates (a row names
+only actors who do that action) and the brief check.
+
+**Replay (rung 1, stored story data):** the p12 gaze lines for Max, Levin and Kiaan are gone from the judge
+block, Julian keeps "away".
+
+**Touched:** `server/lib/promptBuilders.js`, `server/lib/vbIdGuard.js`, `server/lib/faceRepair.js`,
+`tests/unit/page-prompt-self-consistency.test.ts`.
+**Status:** ✅ active on staging.
+
+## 2026-09-23 — A crop artefact takes no repair route
+
+**Context.** Dragon run 6 (staging `job_1790100385959_1nitlympp`) p14, audit 08 S7. The entity grid cut
+Julian out with his SAM silhouette; the paper bag he held was half outside the mask, so the grid cell showed
+a dithered white block over the bag and arm. The entity judge filed it correctly as `cutout_artifact`
+MAJOR, which costs nothing (ZERO_POINT_TYPES, owner 2026-09-01: "an artifact of our crop extraction, not of
+the page"), but the consolidator then planned `per_character_fixes[{types:["cutout_artifact"]}]`:
+"Remove the white pixelated artifact from the right arm and the chestnut" — a repair slot and a paid edit
+for a defect the page does not have. A CRITICAL one would also have routed a char-fix.
+
+**Decision.** Keyed on the declared type (type or subType), never on text: `CROP_ARTIFACT_TYPES`
+(`cutout_artifact`) is added to `NOT_INPAINTABLE_TYPES`, so a fix whose types are all crop artefacts is
+blocked at the inpaint executor, and both entity char-fix gates (`decideRepairMethod`,
+`selectCharRepairTasks`) skip it. The finding stays reported in full; only its route is closed, the same
+contract as the other entries of that set. The crop itself is unchanged: cutting to the silhouette is what
+keeps neighbours out of the cell; a mask that keeps held objects is an open improvement (BACKLOG).
+
+**Touched:** `server/lib/repairLogic.js`, `tests/unit/crop-artifact-no-repair.test.ts`.
+**Status:** ✅ active on staging.
+
+## 2026-09-23 — The per-image judge prompts are stored: `eval_calls`
+
+**Context.** The 2026-09-23 prompt audit (audit 08) had to rebuild the quality, semantic and inventory
+judge prompts, the plate-QC prompt and the iterate re-brief prompt from their builders: none was stored
+(docs/prompt-inventory.md, "Prompts and replies that are NOT stored"). The semantic raw reply was not
+stored either.
+
+**Decision.** A table of its own, `eval_calls` (migration 041: story_id, page_number, kind, label, model,
+prompt, raw_response), written by `server/lib/evalCallLog.recordEvalCall` at the five call sites: kinds
+`quality` / `quality_cover`, `semantic`, `inventory`, `plate_qc` (label = vantage / derived / page
+context), `iterate_rebrief` (and its retry). Text only. Not stories.data: ~30k characters of judge prompt
+per rendered version would bloat the row `upsertStory` rewrites whole (same reason as
+`consolidator_calls`). The story id comes from the caller or the job's async scope (the styled-avatar cache
+scope, whose id is the job id; `trial-<userId>` on trials); outside a scope nothing is written. A failed
+write is a WARN and never fails the judge call. Repairs started from the regeneration routes run outside a
+job scope and are not recorded.
+
+**Validation.** Migration 041 applied and one row inserted inside a rolled-back transaction on the staging
+database. `tests/unit/eval-calls-stored.test.ts` pins the columns and the five call sites.
+
+**Touched:** `migrations/041_eval_calls.sql`, `server/lib/evalCallLog.js`, `server/lib/evalPipeline.js`,
+`server/lib/sceneValidator.js`, `server/lib/images.js`, `storyJobPipeline.js`, `docs/prompt-inventory.md`,
+`tests/unit/eval-calls-stored.test.ts`.
 **Status:** ✅ active on staging.

@@ -192,6 +192,25 @@ describe('only the dimensions the prose actually states reach either side', () =
     expect(judge).not.toContain('Vanishing point / opening position');
   });
 
+  // Dragon run 6 p14 (2026-09-23): the only lighting fact named no direction,
+  // and the author line still said "take the light from the direction named above".
+  it('a fact that names no direction is listed but earns no "named above" line', () => {
+    const { selectGeometryFacts } = geom();
+    const prose = 'The harsh yellow streetlamp light cuts through the dark autumn night.';
+    const { facts, dims } = selectGeometryFacts({ mainScenePrompt: prose, castNames: [] });
+    expect(facts.length).toBe(1);
+    expect(dims).toEqual([]);
+    expect(build({ mainScenePrompt: prose, castNames: [] })).not.toContain('named above');
+  });
+
+  it('a directed fact is preferred over an undirected one for the same dimension', () => {
+    const { selectGeometryFacts } = geom();
+    const prose = 'Soft light fills the square. Lamplight falls from the left across the stones.';
+    const { facts, dims } = selectGeometryFacts({ mainScenePrompt: prose, castNames: [], maxFacts: 1 });
+    expect(facts[0]).toMatch(/from the left/);
+    expect(dims).toEqual(['lighting']);
+  });
+
   it('no dimension found means no author block and no judge block', () => {
     const { selectGeometryFacts, buildGeometryJudgeChecks } = geom();
     const prose = 'Mira hugs Tomas and the dog leaps between them.';

@@ -14,6 +14,7 @@
 5. **One moment, one focal point.** Single instant; one main action draws the eye. When the page text chains physical actions, depict the one with the most motion.
 5b. **One instant, no history.** {ONE_INSTANT}
 5c. **The page text is not a checklist.** {TEXT_NOT_A_CHECKLIST}
+5d. **Content, not rendering.** {NO_LENS}
 6. **Characters are active.** Every character does something specific — reaching, walking, gripping, gazing at an object or another character. Never standing-and-smiling. Eyes look at what they interact with, not at the camera.
 6b. **One gaze target.** {GAZE_TARGET}
 6c. **Eyes are a field.** {LOOKS_AT_FIELD}
@@ -25,7 +26,7 @@
 11. **Age = apparent-age category.** Use the `Looks:` category from CHARACTER DETAILS verbatim (`school-age boy`, `teenager`, `middle-aged man`). Never numeric years.
 11a. **A declared trait is copied, not recalled.** {DECLARED_TRAIT_VERBATIM}
 12. **No collective nouns.** ❌ "the children" ✅ name each character, or "all three", "the group".
-13. **No closed eyes, no pointing-as-cliché.** Open eyes; use looking, walking toward, reaching, discovering instead of pointing.
+13. **Eyes are open, no pointing-as-cliché.** {EYES_OPEN} Use looking, walking toward, reaching, discovering instead of pointing.
 <!-- TEXT_OVERLAY_BEGIN -->
 14. **No closed pose for the calm zone.** The page's `textPosition` is locked from first generation. The corner it names must read as calm, uncluttered scene content (smooth sky, unbroken wall, open water, foliage, ground). Do NOT place a named character, an active figure, a weapon, or a busy crowd in that corner. If the previous render put a figure there, move that figure to a different region in the rewrite.
 <!-- TEXT_OVERLAY_END -->
@@ -39,7 +40,7 @@
 20. **A worn item on someone else.** {WORN_ON_OTHER}
 21. **Counting.** {COUNTING_RULE}
 22. **A two-sided prop.** {MULTI_PICTURE_PROP}
-23. **A creature in frame has a written face.** A page holding a creature states its brow, eyes and mouth in the prose, in the terms of the creature-tone block below — including a creature acting hard, diving, chasing, calling or lifting, and at any distance the face can be read at.
+23. **A creature in frame has a written face.** {CREATURE_FACE} Write it in the terms of the creature-tone block below.
 {CREATURE_TONE}
 
 ---

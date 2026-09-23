@@ -4116,6 +4116,9 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   log.info(`🔄 [ITERATE] Page ${pageNumber}: Running 18 validation checks with ${effectiveSceneModel}...`);
   let sceneResult = await callClaudeAPI(scenePrompt, null, effectiveSceneModel, { usageLabel: 'scene_iterate' });
   let newSceneDescription = sceneResult.text;
+  require('./evalCallLog').recordEvalCall({
+    kind: 'iterate_rebrief', pageNumber, model: sceneResult.modelId || effectiveSceneModel, prompt: scenePrompt, rawResponse: sceneResult.text,
+  });
 
   // Track usage (Claude Haiku scene re-expansion)
   if (usageTracker && sceneResult.usage) {
@@ -4139,13 +4142,15 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   let briefCheck = assessIterateBrief(newSceneDescription, { truncation: sceneResult.truncation });
   if (!briefCheck.usable) {
     log.warn(`⚠️ [ITERATE] Page ${pageNumber}: scene iteration returned an unusable brief (${describeIterateBrief(briefCheck)}) — retrying once`);
-    const retry = await callClaudeAPI(
-      `${scenePrompt}\n\nYour previous answer was incomplete: it must be the full prose brief followed by a ---METADATA--- block whose JSON includes the mandatory "sceneIntent" field. Return the whole thing.`,
-      null, effectiveSceneModel, { usageLabel: 'scene_iterate_retry' }
-    );
+    const retryPrompt = `${scenePrompt}\n\nYour previous answer was incomplete: it must be the full prose brief followed by a ---METADATA--- block whose JSON includes the mandatory "sceneIntent" field. Return the whole thing.`;
+    const retry = await callClaudeAPI(retryPrompt, null, effectiveSceneModel, { usageLabel: 'scene_iterate_retry' });
     if (usageTracker && retry.usage) {
       usageTracker('anthropic', retry.usage, 'scene_iterate', retry.modelId || effectiveSceneModel);
     }
+    require('./evalCallLog').recordEvalCall({
+      kind: 'iterate_rebrief', label: 'retry', pageNumber, model: retry.modelId || effectiveSceneModel,
+      prompt: retryPrompt, rawResponse: retry.text,
+    });
     const retryCheck = assessIterateBrief(retry.text, { truncation: retry.truncation });
     if (retryCheck.usable) {
       sceneResult = retry;

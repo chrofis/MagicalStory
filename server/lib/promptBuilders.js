@@ -2794,6 +2794,7 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // that author a page brief — see ONE_INSTANT_RULE and the block around it.
     // Registered as sibling set art-director-vs-iterate.
     ONE_INSTANT: ONE_INSTANT_RULE,
+    NO_LENS: NO_LENS_RULE,
     GAZE_TARGET: GAZE_TARGET_RULE,
     LOOKS_AT_FIELD: LOOKS_AT_FIELD_RULE,
     EXPRESSION_FIELD: EXPRESSION_FIELD_RULE,
@@ -3106,6 +3107,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // that author a page brief — see ONE_INSTANT_RULE and the block around it.
     // Registered as sibling set art-director-vs-iterate.
     ONE_INSTANT: ONE_INSTANT_RULE,
+    NO_LENS: NO_LENS_RULE,
     GAZE_TARGET: GAZE_TARGET_RULE,
     LOOKS_AT_FIELD: LOOKS_AT_FIELD_RULE,
     EXPRESSION_FIELD: EXPRESSION_FIELD_RULE,
@@ -3545,9 +3547,13 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       // carry. An iterate rewrites the WHOLE brief, so a rule the first pass was
       // given and the rewrite was not is a rule one repair round undoes.
       CONCEALED_OBJECT: CONCEALED_OBJECT_RULE,
-        STAGED_PROP: STAGED_PROP_RULE,
+      STAGED_PROP: STAGED_PROP_RULE,
       CONTACT_VERB: CONTACT_VERB_RULE,
       REACHABLE_CONTACT: REACHABLE_CONTACT_RULE,
+      // Eyes open and the creature face, the same constants both Art Director
+      // templates and scene-review check 6 carry (2026-09-23).
+      EYES_OPEN: EYES_OPEN_RULE,
+      CREATURE_FACE: CREATURE_FACE_RULE,
     // Rule 11 in both Art Director templates — ONE constant, so the framing and
     // the field that records it cannot drift apart.
     GAP_ACTION_FRAMING: GAP_ACTION_FRAMING_RULE,
@@ -3555,6 +3561,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     // that author a page brief — see ONE_INSTANT_RULE and the block around it.
     // Registered as sibling set art-director-vs-iterate.
     ONE_INSTANT: ONE_INSTANT_RULE,
+    NO_LENS: NO_LENS_RULE,
     GAZE_TARGET: GAZE_TARGET_RULE,
     LOOKS_AT_FIELD: LOOKS_AT_FIELD_RULE,
     EXPRESSION_FIELD: EXPRESSION_FIELD_RULE,
@@ -4724,9 +4731,14 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   // foreground/midground figure that has no declared interaction. This
   // closes the gap where Sonnet writes one interaction per page but leaves
   // other characters uncovered — those default to a camera-facing portrait.
-  const metaCharacters = Array.isArray(metadata?.fullData?.characters) && metadata.fullData.characters.length > 0
+  // The gaze goes through the one reader the judges use (vbIdGuard.gazeTarget):
+  // a looksAt naming the place the page is set in is no gaze target.
+  const { gazeTarget } = require('./vbIdGuard');
+  const pageObjects = metadata?.objects || metadata?.fullData?.objects || [];
+  const metaCharacters = (Array.isArray(metadata?.fullData?.characters) && metadata.fullData.characters.length > 0
     ? metadata.fullData.characters
-    : (Array.isArray(metadata?.characters) ? metadata.characters : []);
+    : (Array.isArray(metadata?.characters) ? metadata.characters : []))
+    .map(c => (c && typeof c === 'object' ? { ...c, looksAt: gazeTarget(c.looksAt, pageObjects) } : c));
   const exactPosesBlock = buildExactPosesBlock(metadata?.interactions, metaCharacters, visualBible, { language: inputData?.language });
   const eraGuard = buildEraGuard(metadata?.era);
   // The page draws ONE shot: emit that one word's definition, not the table.
@@ -5167,6 +5179,17 @@ function looksAtPhrase(target, visualBible = null) {
   return `eyes on ${scrubVbIds(t, visualBible)}`;
 }
 
+/**
+ * The actors an interaction row names. `character` may list several
+ * ("Hans + Emma", "A, B and C"); each is one figure.
+ */
+function splitInteractionActors(who) {
+  return String(who || '')
+    .split(/\s*(?:\+|&|\band\b|,)\s*/i)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
 function buildExactPosesBlock(interactions, sceneCharacters = [], visualBible = null, options = {}) {
   const interactionList = Array.isArray(interactions) ? interactions : [];
   const language = options.language || 'en';
@@ -5198,10 +5221,7 @@ function buildExactPosesBlock(interactions, sceneCharacters = [], visualBible = 
     // POSES line as one figure; "Hans + Emma + Noah" gets read as a single
     // weird label, not three figures, so the third figure drifts to "looking
     // at viewer" by default. Allowed input separators: `+`, `&`, `and`, `,`.
-    const splitChars = who
-      .split(/\s*(?:\+|&|\band\b|,)\s*/i)
-      .map(s => s.trim())
-      .filter(Boolean);
+    const splitChars = splitInteractionActors(who);
     const targets = splitChars.length > 1 ? splitChars : [who];
 
     // The schema asks for `where` to be a complete sentence with the object
@@ -8514,6 +8534,12 @@ const DECLARED_TRAIT_VERBATIM_RULE = "A trait CHARACTER DETAILS states — hair 
 const EYES_OPEN_RULE = 'No closed eyes and no eyes shut on any rendered figure — write "eyes narrowed", "a focused gaze", "looking down at the work".';
 const CREATURE_FACE_RULE = 'Every page holding a creature states its brow, eyes and mouth in the prose — including a creature acting hard, diving, chasing, calling or lifting, and at any distance the face can be read at.';
 
+// A brief describes what the frame holds, never how it renders. The medium is
+// the art style's, sent to the illustrator as its own block; an iterate rewrite
+// on staging job_1790100385959_1nitlympp p17 wrote "shallow depth of field"
+// into the prose and the plate prompt, against an ART STYLE that says "depth
+// from atmospheric haze, not optical blur" in the same image prompt.
+const NO_LENS_RULE = "The brief says what the frame holds and where the camera stands, never how it renders: no depth of field, focus, blur, bokeh, lens or film words, in the prose or in `emptyScenePrompt`. The medium comes from the art style, sent separately.";
 const ONE_INSTANT_RULE = "The prose never asks the picture to show how many times something happened, what just finished, or what comes next — no \"again\", \"for the third time\", \"already\", no object both mid-motion and in its ended state. Write the single visible instant.";
 
 const GAZE_TARGET_RULE = "Name at most one gaze target, and compose the frame so that target is the dominant element — large, central, or nearest the camera. Every other figure looks at that same target or at the page's action. Two named characters facing each other are the one exception — a standoff, an exchange, a conversation — and there each looks at the other; that pair is a single relationship, not two targets, and nobody else in the frame looks anywhere but at them or at the action. A gaze aimed at anything smaller or further off than the frame's dominant element lands on the dominant element instead. Never write a gaze to the viewer.";
@@ -11048,6 +11074,7 @@ module.exports = {
   elementLeadLabel,
   vbDeclaredLetteringNames,
   buildExactPosesBlock,
+  splitInteractionActors,
   buildReceiverPlacement,
   sliceAnalysisAspect,
   stripReviewAspectMarkers,
@@ -11107,6 +11134,7 @@ module.exports = {
   GAP_ACTION_FRAMING_RULE,
   DECLARED_TRAIT_VERBATIM_RULE,
   ONE_INSTANT_RULE,
+  NO_LENS_RULE,
   GAZE_TARGET_RULE,
   LOOKS_AT_FIELD_RULE,
   EXPRESSION_FIELD_RULE,

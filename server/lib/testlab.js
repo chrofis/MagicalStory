@@ -787,9 +787,11 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
     ctx.visualBible, ctx.pageNumber, ctx.landmarkPhotos, aboardId, meta.objects || null
   );
 
+  // One style string for the plate prompt and its QC, as in production.
+  const plateStyle = resolveArtStyleForEmptyScene(params.artStyleOverride || ctx.artStyle, null);
   const prompt = buildEmptyScenePrompt({
     template: promptOverride || undefined,
-    style: resolveArtStyleForEmptyScene(params.artStyleOverride || ctx.artStyle, null),
+    style: plateStyle,
     description,
     characterSpace: meta.characterSpace || '',
     textAreaInstruction: wantsTextZone
@@ -843,6 +845,8 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
       sceneDescription: description,
       mainScenePrompt: ctx.scene.sceneDescription || null,
       storyEra: meta.era || null,
+      artStyle: plateStyle,
+      shot: (meta.fullData?.shot || meta.shot || '').trim() || null,
     });
     qc = { pass: qcRes.pass, issues: qcRes.issues || [], visionFeedback: qcRes.visionFeedback || null };
   } catch (err) {
@@ -5450,7 +5454,7 @@ async function runEditImageStage(ctx, { experimentId, promptOverride, params = {
   // params.source='empty_scene' edits the page's stored background plate
   // exactly as the plate-derive step does in production (storyJobPipeline.js,
   // "AN ANGLED PAGE TAKES A PLATE DERIVED FROM THIS ONE"): the plate model and
-  // no art-style block. Pick the page that carries the vantage's BASE plate.
+  // the book's art style (since 2026-09-23). Pick the page that carries the vantage's BASE plate.
   const onPlate = params.source === 'empty_scene';
   const imageData = onPlate
     ? await loadEmptyScene(ctx.storyId, ctx.pageNumber)
@@ -5459,7 +5463,7 @@ async function runEditImageStage(ctx, { experimentId, promptOverride, params = {
 
   const t0 = Date.now();
   const result = onPlate
-    ? await editImageWithPrompt(imageData, instruction, MODEL_DEFAULTS.emptyScenePlateModel, [], null)
+    ? await editImageWithPrompt(imageData, instruction, MODEL_DEFAULTS.emptyScenePlateModel, [], ctx.artStyle)
     : await editImageWithPrompt(imageData, instruction, null, [], ctx.artStyle);
   const elapsedMs = Date.now() - t0;
   const edited = result?.imageData || null;

@@ -736,14 +736,8 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
   // same story. Counted from the declared `hands` flag and the character names
   // already on the row — a fused "A + B" row is two pairs of hands on one
   // object, which is the hand-off shape. Rows without the flag never count.
-  const handRows = interactions.filter(i => i && i.hands === true);
-  const perObject = new Map();
-  for (const row of handRows) {
-    const obj = String(row.object || '').trim().toLowerCase();
-    if (!obj) continue;
-    const who = String(row.character || '').split(/\s*(?:\+|&|\band\b|,)\s*/i).map(s => s.trim()).filter(Boolean);
-    perObject.set(obj, (perObject.get(obj) || []).concat(who.length ? who : ['?']));
-  }
+  // A location id is never a one-grip object (sceneMetadata.handsPerObject).
+  const perObject = require('./sceneMetadata').handsPerObject(interactions);
   for (const [obj, who] of perObject) {
     if (who.length < 2) continue;
     findings.push({

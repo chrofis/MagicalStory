@@ -256,6 +256,11 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
     }
 
     const p1Text = p1Data.candidates[0]?.content?.parts?.[0]?.text?.trim();
+    if (p1Text) {
+      require('./evalCallLog').recordEvalCall({
+        kind: 'inventory', label: pageContext || null, pageNumber: opts.pageNumber ?? null, model: modelId, prompt: inventoryPrompt, rawResponse: p1Text,
+      });
+    }
     if (!p1Text) {
       log.warn(`⚠️ [QUALITY P1] No text response`);
       return null;
@@ -405,7 +410,7 @@ function largestInteriorUniformFraction(mask, rows, cols) {
  * asserted without a paid vision call, and so the plate generator/critic pair
  * names two file paths instead of this module.
  */
-function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, characterPlacements = null, mainScenePrompt = '' } = {}) {
+function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, characterPlacements = null, mainScenePrompt = '', artStyle = '', shot = '' } = {}) {
   const sceneCtx = sceneDescription
     ? `\nEXPECTED SCENE: "${sceneDescription.substring(0, 300)}"`
     : '';
@@ -465,8 +470,24 @@ function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, chara
         castNames: Array.isArray(characterPlacements) ? characterPlacements.map(c => c && c.name).filter(Boolean) : [],
       }).dims)
     : '';
+  // THE PLATE IS JUDGED ON WHAT ITS AUTHOR WAS TOLD (2026-09-23). The plate
+  // prompt opens with ART STYLE and carries a SHOT line; the judge had
+  // neither, so a photographic plate or a wrong camera passed (staging
+  // job_1790100385959_1nitlympp: the p12 aerial derive read as a photograph,
+  // the LOC002.4/.5 plates came back eye-level medium-wide).
+  const styleCheck = String(artStyle || '').trim()
+    ? `\n${fillTemplate(qc.STYLE_CHECK, { ART_STYLE: String(artStyle).trim() })}` : '';
+  // `shot` is a shot id, or the base plate class ('eye-level'): a vantage's
+  // base plate is shared by every close-up, medium and wide page on it, so it
+  // is held to its height and angle only, never to one page's distance.
+  const shotId = String(shot || '').trim();
+  const { PLATE_BASE_CLASS } = require('./shotVocabulary');
+  const cameraCheck = shotId
+    ? `\n${fillTemplate(qc.CAMERA_CHECK, { SHOT: shotId === PLATE_BASE_CLASS ? 'at eye level' : `as the ${shotId} shot` })}` : '';
   return fillTemplate(qc.BODY, {
     SCENE_CTX: sceneCtx,
+    STYLE_CHECK: styleCheck,
+    CAMERA_CHECK: cameraCheck,
     ERA_BLOCK: eraBlock,
     PLACEMENTS_BLOCK: placementsBlock,
     MAIN_SCENE_BLOCK: mainSceneBlock,
@@ -491,7 +512,7 @@ function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, chara
  * @returns {{ pass: boolean, issues: string[], calmnessScore: number, visionFeedback: string|null }}
  */
 async function validateEmptyScene(imageData, textPosition, pageContext = '', options = {}) {
-  const { sceneDescription = null, skipVision = false, characterPlacements = null, mainScenePrompt = null, storyEra = null } = options;
+  const { sceneDescription = null, skipVision = false, characterPlacements = null, mainScenePrompt = null, storyEra = null, artStyle = null, shot = null } = options;
   try {
     const base64 = r2Lib.stripDataUriPrefix(imageData);
     const buf = Buffer.from(base64, 'base64');
@@ -605,7 +626,7 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
           const base64ForVision = r2Lib.stripDataUriPrefix(imageData);
           const mimeType = imageData.match(/^data:(image\/\w+);/)?.[1] || 'image/jpeg';
 
-          const qcPrompt = buildEmptySceneQcPrompt({ sceneDescription, storyEra, characterPlacements, mainScenePrompt });
+          const qcPrompt = buildEmptySceneQcPrompt({ sceneDescription, storyEra, characterPlacements, mainScenePrompt, artStyle, shot });
 
           const visionUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
           const visionResp = await fetch(visionUrl, {
@@ -625,6 +646,9 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
           if (visionResp.ok) {
             const visionData = await visionResp.json();
             const visionText = visionData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            require('./evalCallLog').recordEvalCall({
+              kind: 'plate_qc', label: pageContext || null, pageNumber: options.pageNumber ?? null, model: 'gemini-2.5-flash', prompt: qcPrompt, rawResponse: visionText,
+            });
             try {
               const visionResult = JSON.parse(visionText);
               if (visionResult.pass === false) {
@@ -1935,6 +1959,36 @@ function buildEvalClothingContract({
   }
 }
 
+/**
+ * The style-gate observations copied out of the ART STYLE block.
+ *
+ * A field counts as copied when any four consecutive words of it sit verbatim in
+ * the art style and NOT in the evaluation template itself — the template lists
+ * its own example answers ("no outlines at all, forms defined by paint edges"),
+ * and picking one of those is an answer, not an echo. Four words, not the whole
+ * value: run 6 also returned the style's face clause with one word spliced in
+ * ("loose paint washes with visible brushstroke texture"). Structured comparison
+ * of the gate's fields against the input it was given; no finding text is read.
+ *
+ * @returns {string[]} the echoed field names, e.g. ['faces']
+ */
+const STYLE_ECHO_SPAN = 4;
+function styleGateEchoedFields(styleGate, artStyleText, templateText = '') {
+  const norm = (t) => String(t || '').normalize('NFKC').toLowerCase()
+    .replace(/[^\p{L}\p{N}\s-]/gu, ' ').replace(/\s+/g, ' ').trim();
+  const style = ` ${norm(artStyleText)} `;
+  if (!style.trim() || !styleGate || typeof styleGate !== 'object') return [];
+  const template = ` ${norm(templateText)} `;
+  return ['observed', 'linework', 'faces'].filter((k) => {
+    const words = norm(styleGate[k]).split(' ').filter(Boolean);
+    for (let i = 0; i + STYLE_ECHO_SPAN <= words.length; i++) {
+      const span = ` ${words.slice(i, i + STYLE_ECHO_SPAN).join(' ')} `;
+      if (style.includes(span) && !template.includes(span)) return true;
+    }
+    return false;
+  });
+}
+
 async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene', qualityModelOverride = null, pageContext = '', storyText = null, sceneHint = null, sceneCharacters = null, evalOptions = {}) {
   // evalOptions.evalTemplateOverride / .semanticTemplateOverride: Test Lab A/B
   // variants — full replacement template strings used instead of the loaded
@@ -2243,6 +2297,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         landmarkContext: landmarkContextBlock,
         // Same REQUIRED TEXT allow-list the other two judges get.
         textRules: requiredTextBlock,
+        // Where the call's prompt is recorded (eval_calls).
+        pageNumber: evalOptions.pageNumber ?? null,
       });
       log.debug('🔍 [QUALITY] Starting parallel semantic fidelity evaluation');
     }
@@ -2297,7 +2353,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           // `inventoryModel`: Qwen3-VL on staging, 2.5 Flash elsewhere). A
           // Lab quality-model override still wins so an A/B measures one model.
           qualityModelOverride || MODEL_DEFAULTS.inventoryModel || MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash',
-          process.env.GEMINI_API_KEY, pageContext
+          process.env.GEMINI_API_KEY, pageContext,
+          { pageNumber: evalOptions.pageNumber ?? null }
         );
         log.debug(`📊 [EVAL P1] Shared blind inventory launched for ${pageContext || 'scene'}`);
       }
@@ -2785,6 +2842,16 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     }
 
     const responseText = data.candidates[0].content.parts[0].text.trim();
+    // The prompt that produced this reply — the last text part, which the
+    // blocked-content retry replaces with its fully sanitized version.
+    require('./evalCallLog').recordEvalCall({
+      kind: evaluationType === 'cover' ? 'quality_cover' : 'quality',
+      label: pageContext || null,
+      pageNumber: evalOptions.pageNumber ?? null,
+      model: modelId,
+      prompt: parts[parts.length - 1]?.text || evaluationPrompt,
+      rawResponse: responseText,
+    });
 
     // Parse FIX_TARGETS section if present (bounding boxes for auto-repair)
     const parseFixTargets = (text) => {
@@ -2925,7 +2992,19 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         const faces = String(styleGate.faces || '').trim();
         const seen = [observed, linework && `linework: ${linework}`, faces && `faces: ${faces}`]
           .filter(Boolean).join(' | ');
-        if (styleGate.matches_style === false) {
+        // AN OBSERVATION COPIED OUT OF THE ART STYLE IS NOT AN OBSERVATION
+        // (2026-09-23). On dragon run 6 all six quality responses read returned
+        // `faces` as the ART STYLE's own face clause, verbatim, with
+        // matches_style true, while the book-level style check found the faces
+        // smooth and digitally rendered. Same guard as the avatar sheet judges
+        // (isEchoedJudgeVerdict): the echo is detected in code and the gate's
+        // agreement is recorded as no verdict, never as a pass. A `false` stands.
+        const echoed = styleGateEchoedFields(styleGate, artStyleForEval, evaluationTemplate);
+        if (echoed.length > 0 && styleGate.matches_style !== false) {
+          styleGate.echoed = echoed;
+          styleGate.matches_style = null;
+          log.warn(`🎨 [EVAL] ${pageContext ? `[${pageContext}] ` : ""}style gate ECHOED the ART STYLE in ${echoed.join(', ')} — saw [${seen}] — no style verdict for this page`);
+        } else if (styleGate.matches_style === false) {
           // Gate wins over a mis-severitied STEP 4 finding — same precedence as
           // the coherence gate, and the same failure it exists to prevent.
           const already = fixableIssues.some(i => /style_consistency/i.test(String(i.type || '')));
@@ -3654,6 +3733,7 @@ module.exports = {
   runVisualInventory,
   validateEmptyScene,
   buildEmptySceneQcPrompt,
+  styleGateEchoedFields,
   largestInteriorUniformFraction,
   capComplianceIdentitySeverity,
   evaluateThreeStage,

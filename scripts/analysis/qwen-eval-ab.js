@@ -84,8 +84,8 @@ function costOf(model, inTok, outTok) {
         const T = totals[model]; T.cost += c; T.inTok += inTok; T.outTok += outTok; T.runs++; T.ms += ms;
         const pcf = res.plan?.per_character_fixes || [];
         const scene = res.plan?.scene_fix || {};
-        const score = res.plan?.final_score;
-        console.log(`  ${model.padEnd(14)} ${String(inTok).padStart(6)}in/${String(outTok).padStart(5)}out  $${c.toFixed(4)}  ${(ms/1000).toFixed(1)}s  score=${score ?? '?'}  ${pcf.length} char-fix, scene=${scene.severity || '?'}${res.error ? '  ERR:' + res.error : ''}`);
+        const score = (res.plan?.deduped_issues || []).length;
+        console.log(`  ${model.padEnd(14)} ${String(inTok).padStart(6)}in/${String(outTok).padStart(5)}out  $${c.toFixed(4)}  ${(ms/1000).toFixed(1)}s  deduped=${score}  ${pcf.length} char-fix, scene=${scene.severity || '?'}${res.error ? '  ERR:' + res.error : ''}`);
         for (const f of pcf.slice(0, 6)) {
           console.log(`      • [${f.character || f.name || '?'}] ${String(f.instruction || f.fix || JSON.stringify(f)).slice(0, 150)}`);
         }
