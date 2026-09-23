@@ -1563,6 +1563,42 @@
       "status": "fixed",
       "fixedAt": "2026-09-23",
       "fixedIn": "4994fe530"
+    },
+    {
+      "id": "shrink-cuts-generator-critic-parity-anchors",
+      "title": "The image-prompt shrink deleted NO MARKS and HANDS - the generator halves of judge rules D-24 / D-16b - so over-cap pages were judged for rules the illustrator never received",
+      "reportedAt": "2026-09-23",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "769c655ff",
+      "source": "Stored prompt_shrink events, staging job_1790100385959_1nitlympp: p12 (10,097 -> 6,834) and initialPage / frontCover / backCover (9,849 / 10,615 / 9,819 -> 7,764 / 7,351 / 7,734) all dropped COUNTS, DEPTH AND SIZE, HANDS, NO MARKS, REQUIRED CAST (+ the whole Composition block on p12 and the front cover). Audit 08 S3, 09 C3.",
+      "rootCause": "sectionAwareCut listed HANDS and NO MARKS as droppable blocks 3 and 4; Composition went as one 1,176-char block; the reach test checked the built prompt, not the sent one.",
+      "impact": "Every page or cover over the 7,900 Grok cap: the judges deduct for marks and invented props the generator was never forbidden; a page ~110 chars over lost all its composition rules.",
+      "fix": "Anchors are not drop units (cutBlocks throws if one ever would be); units in rank order with Composition cut per bullet; reach tested on the sent prompt of an over-cap page and cover."
+    },
+    {
+      "id": "cover-shot-block-reads-portrait-as-closeup",
+      "title": "Every cover was told \"a close-up ends at the waist: feet cannot appear\" because the prose fallback read \"group portrait\" as close-up, beside a composition demanding visible feet",
+      "reportedAt": "2026-09-23",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "769c655ff",
+      "source": "Stored cover prompts, staging job_1790100385959_1nitlympp: all three end with the close-up SHOT definition; buildShotDefinitions(null, \"A wide group portrait set before ...\") -> close-up (shotVocabulary close-up match includes \"portrait\", ranked before \"wide\").",
+      "rootCause": "Covers declare no shot, so buildImagePrompt fell back to reading the shot word from the prose, and buildCoverSceneFromHint writes \"portrait\".",
+      "impact": "Every cover: a self-contradicting framing instruction (~220 chars) in an over-cap prompt.",
+      "fix": "buildImagePrompt builds no SHOT block for a cover page number (COVER_PAGE_NUMBERS); the cover composition owns the framing."
+    },
+    {
+      "id": "cover-worn-held-dedupe-drops-garment-on-colour-word",
+      "title": "The cover worn/held dedupe deleted \"brown ankle boots\" from a character holding a \"brown paper bag\" - a slotless prop was classified a duplicate of a garment",
+      "reportedAt": "2026-09-23",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "769c655ff",
+      "source": "Stored initialPage prompt, staging job_1790100385959_1nitlympp: Julian's outfit line lacks the boots the front cover keeps; ART001 \"brown paper bag of Marroni\" (type bag, no worn slot) token-matched the segment on \"brown\"; classifyOverlap returned duplicate for any artifact without a slot (coverIterate.js).",
+      "rootCause": "classifyOverlap: `if (!meta.slot || !segSlot) return \"duplicate\"` - an artifact with no body slot fell to the old loose-match behaviour.",
+      "impact": "Any cover where a held prop shares a colour or material word with the holder's outfit: a garment silently leaves the clothing text.",
+      "fix": "An artifact with no worn slot is \"unrelated\" to every outfit segment; replayed on the stored bible - boots kept."
     }
   ]
 }
