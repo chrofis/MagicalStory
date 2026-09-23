@@ -3545,9 +3545,13 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       // carry. An iterate rewrites the WHOLE brief, so a rule the first pass was
       // given and the rewrite was not is a rule one repair round undoes.
       CONCEALED_OBJECT: CONCEALED_OBJECT_RULE,
-        STAGED_PROP: STAGED_PROP_RULE,
+      STAGED_PROP: STAGED_PROP_RULE,
       CONTACT_VERB: CONTACT_VERB_RULE,
       REACHABLE_CONTACT: REACHABLE_CONTACT_RULE,
+      // Eyes open and the creature face, the same constants both Art Director
+      // templates and scene-review check 6 carry (2026-09-23).
+      EYES_OPEN: EYES_OPEN_RULE,
+      CREATURE_FACE: CREATURE_FACE_RULE,
     // Rule 11 in both Art Director templates — ONE constant, so the framing and
     // the field that records it cannot drift apart.
     GAP_ACTION_FRAMING: GAP_ACTION_FRAMING_RULE,

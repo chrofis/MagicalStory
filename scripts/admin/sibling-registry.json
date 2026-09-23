@@ -390,6 +390,8 @@
           "{SCENE_INTENT_FIELD}",
           "{CONCEALED_OBJECT}",
           "{CONTACT_VERB}",
+          "{EYES_OPEN}",
+          "{CREATURE_FACE}",
           "{REACHABLE_CONTACT}",
           "{PLAN_LINE_CAST}",
           "{COUNTING_RULE}",

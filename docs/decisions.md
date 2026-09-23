@@ -21,6 +21,28 @@ superseded and link forward.
 
 ---
 
+## 2026-09-23 — A place is never a one-grip object; the brief rewrite gets eyes-open and the creature face from the Art Director's constants
+
+**Context:** Staging `job_1790100385959_1nitlympp` p9 and p12: the hand-off guard reported "2 characters
+have hands on loc002.3" / "6 characters on loc002.4" for children banking and digging leaves, and the
+scene review restaged both pages to answer it. The guard existed twice (sceneBriefCheck check D,
+sceneConsistencyCheck c3). Separately, the two iterate templates carried hand-written copies of the
+eyes-open and creature-face rules, which the Art Director and the scene review now take from one constant.
+
+**Decision:** `sceneMetadata.handsPerObject` is the one reading for both counters and skips a row whose
+object is a location id (`LOC###`, `LOC###.N`) — id shape only, never the `where` prose. The shared-hands
+rule itself (the A+B conflict, 🟡 2026-08-23) is untouched and still the owner's call. scene-iteration.txt
+and scene-iteration-free.txt fill `{EYES_OPEN}` / `{CREATURE_FACE}`; both are anchors of the
+`art-director-vs-iterate` sibling set.
+
+**Rationale:** a location is the ground people stand in, not a thing passed between hands; a rule the
+first author holds and the rewriter does not is deleted by one repair round.
+
+**Touched files:** server/lib/sceneMetadata.js, server/lib/sceneBriefCheck.js,
+server/lib/sceneConsistencyCheck.js, prompts/scene-iteration.txt, prompts/scene-iteration-free.txt,
+server/lib/promptBuilders.js, scripts/admin/sibling-registry.json, tests/unit/ad-iterate-parity.test.ts,
+tests/unit/art-director-audit-2026-09-23.test.ts.
+
 ## 2026-09-23 — The all-pages Art Director and the scene review see no page text and no art style; the review gets the checks the Art Director was given
 
 **Context:** Prompt audit 04 (`docs/audits/prompt-audit-2026-09-23/04-art-director.md`) over staging

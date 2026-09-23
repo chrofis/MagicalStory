@@ -149,3 +149,32 @@ describe('the scene review block with nothing declared', () => {
     expect(block).not.toContain('ART001');
   });
 });
+
+// A place is not a grip (2026-09-23): p9 / p12 of the same run were faulted
+// "2 characters have hands on loc002.3" for banking leaves on the ground.
+describe('the hand-off counters never count a location id as a one-grip object', () => {
+  const { handsPerObject } = require_('../../server/lib/sceneMetadata');
+  const { checkSceneConsistency } = require_('../../server/lib/sceneConsistencyCheck');
+  const rows = [
+    { character: 'Levin + Kiaan', object: 'LOC002.3', hands: true, action: 'banking leaves' },
+    { character: 'Max', object: 'LOC002', hands: true, action: 'banking leaves' },
+  ];
+  const shared = [{ character: 'Levin + Kiaan', object: 'ART002.1', hands: true, action: 'lifting' }];
+  const typesD = (interactions: any[]) => checkPage({ pageNumber: 9, brief: brief({ shot: 'medium', objects: ['LOC002.2'], landmarkView: 'exterior', interactions }) }, [], bible(), {})
+    .map((f: any) => f.type);
+  const typesC3 = (interactions: any[]) => checkSceneConsistency([{ pageNumber: 9, sceneProse: 'Prose.', sceneHint: JSON.stringify({ characters: [], objects: [], interactions }) }])
+    .flatMap((r: any) => r.issues.map((i: any) => i.type));
+
+  it('handsPerObject skips LOC ids, bare and dotted', () => {
+    expect([...handsPerObject(rows).keys()]).toEqual([]);
+    expect(handsPerObject(shared).get('art002.1')).toEqual(['Levin', 'Kiaan']);
+  });
+  it('neither counter fires on a place', () => {
+    expect(typesD(rows)).not.toContain('interaction_object_shared_hands');
+    expect(typesC3(rows)).not.toContain('interaction_object_shared_hands');
+  });
+  it('both still fire on a shared grip on a real object', () => {
+    expect(typesD(shared)).toContain('interaction_object_shared_hands');
+    expect(typesC3(shared)).toContain('interaction_object_shared_hands');
+  });
+});
