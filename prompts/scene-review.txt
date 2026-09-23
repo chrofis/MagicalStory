@@ -106,7 +106,7 @@ how the figure looks.
 
 ---SCENES---
 ## Page <number>
-<the corrected brief for that page, complete: prose then its JSON object, in the same shape it arrived>
+<the corrected brief for that page, complete: its prose, then a line reading ---METADATA---, then its JSON object unfenced — the shape it arrived in>
 
 Include a page only if you rewrote it. Use its real page number. When nothing needs rewriting, still output the analysis, then:
 

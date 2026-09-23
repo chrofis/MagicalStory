@@ -311,6 +311,13 @@
 </tr>
 
 <tr>
+  <td>Trial front cover references (plate + landmark + VB grid)</td>
+  <td><code>storyJobPipeline.js</code> <code>onCoverScene</code> → <code>coverIterate.buildCoverReferences({ sceneBackground: &lt;page plate&gt;, requirePlate: true })</code> → <code>generateImageOnly(coverPrompt, coverPhotos, { sceneBackground, landmarkPhotos, visualBibleGrid })</code></td>
+  <td>Grok edit, the people-free plate as slot 0 (magenta-extended to the cover aspect); the raw landmark photo is never packed</td>
+  <td>Since 2026-09-23 the trial cover uses the same helper as every full-account cover. The plate is the one the trial pages rendered for the cover&rsquo;s LOC (<code>trialPlatesByLoc</code>, no extra call); with none, <code>buildCoverReferences</code> renders a cover plate from the scene&rsquo;s <code>setting</code> only (<code>trialCoverPlateDescription</code>). <code>requirePlate</code>: a landmark photo with no plate THROWS, it never reaches the render. Before this the trial cover sent the raw photo with no plate, <code>packReferences</code> promoted it to slot 0 and the cover was an edit of the photograph, people included (prod <code>job_1790169018278_n57xpnufo</code>; decisions.md 2026-09-23).</td>
+</tr>
+
+<tr>
   <td>Generate clothing avatars (winter / standard / summer)</td>
   <td><code>POST /api/generate-clothing-avatars</code> → <code>editWithGrok</code></td>
   <td>Grok edit, 1–2 ref images (body + optional face crop)</td>

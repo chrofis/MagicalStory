@@ -21,6 +21,71 @@ superseded and link forward.
 
 ---
 
+## 2026-09-23 — The trial front cover is rendered on a people-free plate, never on the raw landmark photo; it shares buildCoverReferences with the full-account cover
+
+**Context:** Owner-reported, prod trial `job_1790169018278_n57xpnufo`. The front cover's packed slot 0
+(`debug/frontCover/v0/grok-ref-0.jpg`) was the raw Wikimedia photo of its landmark (Parvis Notre-Dame
+variant 2: a silhouette artist cutting a man's profile) and the cover painted those two men beside the child.
+`onCoverScene` resolved the photo with `getLandmarkPhotosForScene` and passed it to `generateImageOnly` with
+no `sceneBackground`; `packReferences` promotes `landmarkPhotos[0]` to the scene slot whenever no plate is
+given. Every trial page's slot 0 was the painted plate of that square (vantage `LOC001.1`), and the
+full-account cover always plated inside `buildCoverReferences`. The trial cover also hand-rolled its own VB
+grid, a copy of the helper's.
+**Decision:** The trial cover calls `buildCoverReferences` — one helper for every first-render cover. Two new
+inputs: `sceneBackground` (an existing plate; no plate render) and `requirePlate` (plate whatever
+`singlePassScene` says, and THROW when a landmark photo resolved but no plate exists). The trial passes the
+plate its pages already rendered for the cover's LOC (`trialPlatesByLoc`, filled in the trial plate loop,
+first vantage per LOC wins); when that plate is missing or failed, the helper renders a cover-aspect plate
+from the scene's `setting` only (`trialCoverPlateDescription` — no `imageSummary`, no characters). The raw
+photo path and the hand-rolled grid are deleted. The trial cover's catch now logs an error and rethrows, so
+the failure lands in the stored genLog (`cover_failed`) instead of a silent `null`.
+**Rationale:** Reusing the page plate costs no call and no latency beyond awaiting a plate that started at
+Visual Bible time, and it keeps the cover in the same painted place as the pages. The square page plate is
+brought to the 3:4 cover aspect by the same slot-0 magenta extension that used to extend the landscape raw
+photo. No fallback to the photo: a cover without a plate is not rendered (NO FALLBACKS).
+**Not changed (open, owner call):** the full-account callers (streaming cover, `iterateCover`,
+regeneration.js) do not pass `requirePlate`, so a failed plate there still leaves the raw photo to be promoted
+to slot 0. Trial PAGES do the same when their plate fails (`plate unavailable (rendering without it)` then the
+raw photo is packed). Gemini's branch of `generateImageOnly` adds the primary landmark photo as its own part
+even beside a `[Background]` plate (only reached on a Grok failure for Grok-routed covers).
+**Touched:** `storyJobPipeline.js` (`trialPlatesByLoc`, `onCoverScene`), `server/lib/coverIterate.js`
+(`buildCoverReferences` `sceneBackground`/`requirePlate`, `trialCoverLocationId`,
+`trialCoverPlateDescription`), `tests/unit/trial-cover-plate-not-raw-photo.test.ts`,
+`docs/image-routing.md`, `docs/image-generation-methods.html`.
+**Status:** ✅ active on staging.
+
+## 2026-09-23 — A scene brief has ONE prose/metadata split, three carriers; prose is never rebuilt from its JSON
+
+**Context:** Production `job_1790107559778_fcmlfa8kn`: the scene review was handed ten canonical briefs
+(prose + `---METADATA---` + JSON) and returned the seven it rewrote as prose + a trailing fenced ```json
+block. `parseProseMetadataFormat` knew only the delimiter, so `stripSceneMetadata` sent those briefs to the
+bare-JSON path, where `buildTextFromJson` rebuilds a scene from the metadata alone: page 7's image scene
+became the single word "Objects:", page 3's "- Manuel:, center midground, ...". The builder also chose the
+legacy JSON wrapping for them. Eight more readers split on the delimiter by hand. A read-only scan of 137
+staging + 66 production stories found three carriers in stored rows: delimiter (1,699), trailing fenced
+block (13), trailing bare object on its own line (7).
+
+**Decision:** `sceneMetadata.splitBrief` is the one split, recognising all three carriers (a fence or bare
+object only when it ENDS the text and follows real prose). `parseProseMetadataFormat`,
+`extractSceneMetadata`, `findCastMissingFromMetadata`, the clothing-check prose in beatsPipeline and the Lab,
+the composite scene text in storyJobPipeline, the cast-span locator in sceneReviewGuard and the eval-strip
+gate in evalPipeline all read it. `stripSceneMetadata` THROWS when a text carries prose before a JSON object
+in no recognised carrier, instead of rebuilding it from the JSON — the only stored example is one staging
+page with a `---VISUAL BIBLE---` section appended after its metadata (`job_1789681157795_wkt20ckod`, the
+older merge bug `BRIEF_TRAILING_MARKERS` fixed at source). scene-review.txt's output line now names the
+delimiter and "unfenced" explicitly.
+
+**Rationale:** the fenced and bare carriers are already in stored rows and the iterate round produces them
+too, so normalising only at the review merge would leave every other author and every stored brief on the
+lossy path; recognising the carriers in the one split fixes every reader at once. No brief is canonicalised
+on write — there is one parse, not a parse plus a rewriter.
+
+**Touched files:** server/lib/sceneMetadata.js, server/lib/storyHelpers.js, server/lib/beatsPipeline.js,
+server/lib/testlab.js, server/lib/sceneReviewGuard.js, server/lib/evalPipeline.js, storyJobPipeline.js,
+prompts/scene-review.txt, tests/unit/brief-carrier-split.test.ts.
+
+**Status:** ✅ active
+
 ## 2026-09-23 — A place is never a one-grip object; the brief rewrite gets eyes-open and the creature face from the Art Director's constants
 
 **Context:** Staging `job_1790100385959_1nitlympp` p9 and p12: the hand-off guard reported "2 characters
@@ -57463,6 +57528,37 @@ database. `tests/unit/eval-calls-stored.test.ts` pins the columns and the five c
 **Touched:** `migrations/041_eval_calls.sql`, `server/lib/evalCallLog.js`, `server/lib/evalPipeline.js`,
 `server/lib/sceneValidator.js`, `server/lib/images.js`, `storyJobPipeline.js`, `docs/prompt-inventory.md`,
 `tests/unit/eval-calls-stored.test.ts`.
+**Status:** ✅ active on staging.
+
+## 2026-09-23 — Arc: two storylines from age 6; the landmark list stays whole for diversity (owner)
+
+**Context.** Two owner questions from the arc audit (`docs/audits/prompt-audit-2026-09-23/01-arc.md`).
+(1) `buildTellingRulesSection` decided whether the cast must stay on one path from the SHAPE band, which has
+not returned `standard` since the 2026-09-14 band split, so no book of any age could take the "reason to
+separate and a reason to meet again" branch. (2) The 20-entry landmark list reaches arc create and retell
+whole, many entries far from the premise's place.
+
+**Decisions (owner, 2026-09-23).**
+1. **Two storylines: "allow it".** From age 6 (the focus character's age) the cast may split into two threads
+   that meet again, e.g. two children search one place while the others search another. Younger books, and
+   books with no recorded age, stay together on one path. One predicate, `twoThreadsAllowed(inputData)`,
+   drives the telling rules' stay-together line and the 1st-grade read-aloud budget line, which now says "at
+   most two threads" instead of "one thread" where a split is allowed. Siblings checked: the page plan's
+   STORY SHAPE already offers a secondary strand by page count and cast; the Art Director's group rules
+   (scene-expansion-all.txt 4, 6b) and the planner's grouping rules govern who shares ONE frame, not whether
+   the cast is together across the book; plan-check, the plan counters and the text audits carry no
+   whole-cast togetherness rule. The ending rule ("the children safe and together") still closes the book.
+2. **Landmarks: no list trimming.** The owner wants diversity in landmarks, so the 20-entry list stays whole
+   for create and retell (the panel's copy drops only the DESCRIPTION extracts). The audit's relevance-cut
+   proposal is closed.
+
+**Validation.** Rebuilt the arc prompts from the stored row of staging `job_1790100385959_1nitlympp`: the
+real ages (focus 5) keep the one-path line; the same row with every age +3 gets "The group stays together
+unless it has a reason to separate…" and "at most two threads"; no unfilled placeholder. Pinned in
+`tests/unit/arc-prompt-audit-2026-09-23.test.ts`.
+
+**Touched:** `server/lib/promptBuilders.js`, `tests/unit/arc-prompt-audit-2026-09-23.test.ts`,
+`docs/audits/prompt-audit-2026-09-23/01-arc.md`, `tasks/BACKLOG.md`.
 **Status:** ✅ active on staging.
 
 ## 2026-09-23 — The blind text audit asks about style (STYLE, against the injected STYLE_RULEBOOK)

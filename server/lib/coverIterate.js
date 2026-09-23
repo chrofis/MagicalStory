@@ -1686,6 +1686,41 @@ async function loadLandmarkBytes(lm) {
 }
 
 /**
+ * The LOC id the trial cover scene is set at: `setting.location` ("Name
+ * [LOC001]") first, then the first LOC in `objects` (strings or {id} entries).
+ * Null when the cover names no location.
+ */
+function trialCoverLocationId(coverScene) {
+  const fromText = (s) => (typeof s === 'string' ? s.match(/\bLOC\d+\b/i)?.[0]?.toUpperCase() : null) || null;
+  const fromSetting = fromText(coverScene?.setting?.location);
+  if (fromSetting) return fromSetting;
+  for (const obj of (coverScene?.objects || [])) {
+    const id = typeof obj === 'string' ? fromText(obj) : fromText(obj?.id);
+    if (id) return id;
+  }
+  return null;
+}
+
+/**
+ * People-free plate description for the trial cover, built from the scene's
+ * `setting` only. The cover JSON's imageSummary and characters[] describe the
+ * figures, and a plate must contain none — a figure painted on the plate
+ * survives into the render as a phantom. `depthLayers` is left out too: it
+ * places the figures ("the hero in the middle holding the crown").
+ */
+function trialCoverPlateDescription(coverScene) {
+  const s = coverScene?.setting || {};
+  const lines = [];
+  const where = [s.location, s.description].filter(v => typeof v === 'string' && v.trim()).join('. ');
+  if (where) lines.push(`**SETTING:** ${where}`);
+  if (s.indoorOutdoor) lines.push(`**INDOOR/OUTDOOR:** ${s.indoorOutdoor}`);
+  if (s.lighting) lines.push(`**LIGHTING:** ${s.lighting}`);
+  if (s.weather) lines.push(`**WEATHER:** ${s.weather}`);
+  lines.push(`**CAMERA:** ${s.camera || 'wide'} shot`);
+  return lines.join('\n');
+}
+
+/**
  * Build the cover-specific reference set (landmark photos, optional empty-scene
  * background plate, VB grid) so initial-gen and iterate can both use the same
  * anchors. Returns the same shape both call sites pass into
@@ -1703,6 +1738,8 @@ async function loadLandmarkBytes(lm) {
  * @param {string} [args.emptyScenePromptOverride] - structured emptyScenePrompt from scene expansion
  * @param {Function} [args.usageTracker] - (usage, modelId) => void for empty-scene cost tracking
  * @param {string} [args.logLabel] - prefix for log lines (defaults to cover label)
+ * @param {string} [args.sceneBackground] - an existing people-free plate for this cover's location; skips the plate render
+ * @param {boolean} [args.requirePlate] - always plate, and throw when a landmark photo resolved but no plate exists
  * @returns {Promise<{landmarkPhotos: Array, visualBibleGrid: Buffer|null, sceneBackground: string|null, sceneMetadata: Object|null, coverPageNumber: number}>}
  */
 async function buildCoverReferences({
@@ -1719,6 +1756,15 @@ async function buildCoverReferences({
   emptyScenePromptOverride = null,
   usageTracker = null,
   logLabel = null,
+  // A people-free plate that already exists for this cover's location (the
+  // trial cover reuses its pages' plate). When given, no plate is rendered here.
+  sceneBackground: providedSceneBackground = null,
+  // The caller never renders this cover without a plate: the plate is built
+  // whatever singlePassScene says, and a landmark photo with no plate throws
+  // instead of reaching the render — packReferences would otherwise promote
+  // the raw photograph into the scene slot and the model edits the photo,
+  // people and all (prod trial job_1790169018278_n57xpnufo).
+  requirePlate = false,
 }) {
   const { resolveArtStyle, resolveArtStyleForEmptyScene, extractSceneMetadata, getLandmarkPhotosForScene } = getStoryHelpers();
   const { generateImageOnly } = require('./images');
@@ -1817,8 +1863,10 @@ async function buildCoverReferences({
   // --- Generate empty scene for style anchoring ---
   // Respect MODEL_DEFAULTS.singlePassScene: when true (the default), pages render
   // in a single pass with no plate.
-  let sceneBackground = null;
-  if (MODEL_DEFAULTS.singlePassScene === true) {
+  let sceneBackground = providedSceneBackground || null;
+  if (sceneBackground) {
+    log.info(`🎬 [COVER-REFS] ${label}: reusing the existing people-free plate for this location`);
+  } else if (MODEL_DEFAULTS.singlePassScene === true && !requirePlate) {
     log.info(`🎛️ [COVER-REFS] ${label}: singlePassScene=true — skipping empty-scene plate`);
   } else {
     try {
@@ -1888,6 +1936,9 @@ async function buildCoverReferences({
     } catch (err) {
       log.warn(`⚠️ [COVER-REFS] ${label}: empty scene failed: ${err.message}`);
     }
+  }
+  if (requirePlate && landmarkPhotos.length > 0 && !sceneBackground) {
+    throw new Error(`${label}: no people-free plate for landmark "${landmarkPhotos[0]?.name || 'unknown'}" — the cover is not rendered on the raw photograph`);
   }
 
   // --- Build VB grid ---
@@ -2106,6 +2157,8 @@ function buildCoverSceneFromHint(hint, visualBible, characters, opts = {}) {
 module.exports = {
   iterateCover,
   buildCoverReferences,
+  trialCoverLocationId,
+  trialCoverPlateDescription,
   buildCoverSceneFromHint,
   stripCharacterSentences,
   buildPlateDescription,

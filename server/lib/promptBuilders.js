@@ -8038,6 +8038,17 @@ function arcInventedAllowance(inputData) {
   return Math.max(2, base - Math.floor(cast / 2));
 }
 
+/**
+ * May the cast split into two threads that meet again? From age 6 (the focus
+ * character's age), never below it and never when no age is recorded (owner,
+ * 2026-09-23). ONE predicate for the telling rules' stay-together line and
+ * the budgets' read-aloud line, which said "one thread" beside it.
+ */
+function twoThreadsAllowed(inputData = {}) {
+  const age = focusAge(inputData);
+  return age !== null && age >= 6;
+}
+
 function buildArcBudgetSection(inputData, pageCount) {
   const pages = Math.max(4, parseInt(pageCount, 10) || 10);
   const lvl = String(inputData?.languageLevel || 'standard').toLowerCase();
@@ -8083,7 +8094,7 @@ function buildArcBudgetSection(inputData, pageCount) {
     // which is how a length rule once deleted a story's causality (2026-09-07).
     '- One telling carries one thing the reader did not already know. Further facts arrive where they are needed — at the page that turns on them — or are found and shown rather than said.',
     actionsLine,
-    ...(lvl === '1st-grade' ? [`- This book is read aloud to ${readerAgeLabel(inputData, band)} and must be simple to follow: one question open at a time, one thread, and every turn traceable to something already shown on the page.`] : []),
+    ...(lvl === '1st-grade' ? [`- This book is read aloud to ${readerAgeLabel(inputData, band)} and must be simple to follow: one question open at a time, ${twoThreadsAllowed(inputData) ? 'at most two threads' : 'one thread'}, and every turn traceable to something already shown on the page.`] : []),
     `- Invented named figures: this book has room for ${allowance} beyond the commissioned cast; each one past that carries one line of justification on its own line before the numbered arc, never inside a numbered sentence.`,
     '- A figure counts when the story gives it a name and the commission did not: persons, animals and creatures alike, including one who appears on a single page, one who never speaks, and any adult who frames a scene — a parent, grandparent, teacher, shopkeeper or neighbour who sets a rule, waits, permits or welcomes. Standing in the background does not take a figure off the list.',
     `- Not counted: the commissioned cast, which is ${COMMISSIONED_CAST_DEF}; places, buildings, landmarks, rivers, mountains, vehicles and objects, however named; a group named collectively; ${UNNAMED_FIGURE_EXEMPT}.`,
@@ -8888,7 +8899,6 @@ const CENTRAL_FIGURE_DEF = 'the creature, title figure or object the story idea 
 // version is the rule, and it is stated ONCE, where the landmarks are listed.
 function buildTellingRulesSection(inputData = {}) {
   const band = resolveAgeBand(inputData);
-  const lvl = String(inputData?.languageLevel || 'standard').toLowerCase();
   const simple = SIMPLE_BANDS.has(band);
   // The therapeutic payload of a life-skill book: the one CATEGORY_GUIDELINES
   // clause ("include practical tips or coping strategies woven into the
@@ -8898,11 +8908,10 @@ function buildTellingRulesSection(inputData = {}) {
   // clause beats an overridden one, and this file exists because four telling
   // rules once demanded what those bands forbid.
   const lifeSkillStrategy = String(inputData?.storyCategory || '') === 'life-challenge' && !simple;
-  // A second thread is legitimate only at the standard band on the older
-  // reading levels, where the STORY SHAPE explicitly allows one. Four of seven
-  // measured arcs split the cast, including a band whose own budget says
-  // "one thread".
-  const noSplit = band !== 'standard' || lvl === '1st-grade';
+  // TWO STORYLINES FROM AGE 6 (owner, 2026-09-23: "allow it"). The old test
+  // read the SHAPE band, which has not returned 'standard' since the
+  // 2026-09-14 band split, so every book was held to one path.
+  const noSplit = !twoThreadsAllowed(inputData);
   return [
     '# RULES OF THE TELLING',
     '- Factual register: plain declarative sentences stating what happens and why. No imagery, no metaphors, no inner monologue, no emotional narration, no decorative adjectives.',
@@ -11117,6 +11126,7 @@ module.exports = {
   buildArcAmendPrompt,
   buildArcBudgetSection,
   buildTellingRulesSection,
+  twoThreadsAllowed,
   characterSourceRule,
   arcCritiqueSpec,
   COMMISSIONED_CAST_DEF,

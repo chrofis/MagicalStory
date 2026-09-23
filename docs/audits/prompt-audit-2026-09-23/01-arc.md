@@ -6,9 +6,10 @@ Checked against staging `31fd7db0c` (after the evening fix round). FIXED = the c
 
 - FIXED: #1 "(none" parsed as a character — `86d6ff4a7` (open-bracket sentinel in `parseFigureList`; the create spec and arc-retell say an empty list is the heading alone).
 - FIXED (arc-audit commit, decisions.md "Arc prompts after the prompt audit", 2026-09-23): #2 one commissioned-cast definition incl. saved details (`COMMISSIONED_CAST_DEF`, owner chose the prompt route); #3 owner ruling "every child acts" replaces "No moment of their own" / "at most two carry a book" (`EVERY_CHILD_ACTS_RULE`; the "(main character)" label still differs from STORY SHAPE's mains — see OPEN); #4 language line on panel and hints; #5 central figure defined; #6 ENTRANCE / ASSUMED / SENSE are telling rules, one string each with the panel; #7 a view the commission describes stands; #8 topic guide is material, never wording, and its COSTUME field is dropped; #9 hints carry sentence anchors; #11 persona is the book's reader; B arc_hints prompt + raw reply and retell raw reply stored; C panel landmark list without DESCRIPTION lines, the two stay-together lines are one.
-- OPEN: #10 commission walk, #14 "therefore" connector, the "(main character)" label in CHARACTER DETAILS (all four) vs STORY SHAPE's two mains, the `noSplit` branch that no book can leave since the 2026-09-14 band split (tasks/BACKLOG.md).
+- OPEN: #10 commission walk, #14 "therefore" connector, the "(main character)" label in CHARACTER DETAILS (all four) vs STORY SHAPE's two mains.
+- CLOSED (owner, 2026-09-23, decisions.md "Arc: two storylines from age 6…"): the `noSplit` branch no book could leave — books from age 6 may now split into two threads (`twoThreadsAllowed`); C landmark-list trimming — no trimming, the owner wants landmark diversity.
 - OWNER DECIDED 2026-09-23: #3 two rules — in the ARC every child gets an action of their own that matters to the plot (f25a51f3f); in the PAGE PLAN every child appears in enough images (target 3-4, scaled to length and cast) with their action staged as a picture. #12 closed, no change: the redo keeps "change as little as possible" (2026-09-06), owner reaffirmed.
-- OWNER CALL: #13 permitting parent closing the loop; C landmark-list relevance cut (the 20-entry limit is an owner ruling of 2026-09-19); C rules stated in both the age-band file and TELLING_RULES.
+- OWNER CALL: #13 permitting parent closing the loop; C rules stated in both the age-band file and TELLING_RULES.
 
 ---
 

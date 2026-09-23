@@ -249,7 +249,7 @@ function revertUndeclaredRemovals(expansions, sceneDiffs, changed, audit) {
  */
 function castArraySpan(brief) {
   const text = String(brief || '');
-  const marker = text.indexOf('---METADATA---');
+  const marker = require('./sceneMetadata').splitBrief(text).metadataStart;
   const from = marker >= 0 ? marker : 0;
   const key = text.indexOf('"characters"', from);
   if (key < 0) return null;
