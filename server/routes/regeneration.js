@@ -62,6 +62,8 @@ async function stampCanonicalScore(version, imageResult, opts = {}) {
     reasoning: imageResult.reasoning || imageResult.qualityReasoning || null,
     semanticResult: imageResult.semanticResult || null,
     threeStageResult: imageResult.threeStageResult || null,
+    // The required lettering the judges saw — the consolidator must see it too.
+    requiredTexts: imageResult.requiredTexts || [],
   } : null;
   const entityResult = (opts.entityIssues || opts.entityPenalty != null)
     ? { issues: opts.entityIssues || [], penalty: opts.entityPenalty || 0 }
@@ -4187,6 +4189,7 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
             reasoning: evaluation.reasoning,
             semanticResult: evaluation.semanticResult || null,
             threeStageResult: evaluation.threeStageResult || null,
+            requiredTexts: evaluation.requiredTexts || [],
           }, {
             entityIssues,
             entityPenalty: entityPenalty || 0,

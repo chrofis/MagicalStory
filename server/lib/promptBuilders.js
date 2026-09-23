@@ -2318,8 +2318,11 @@ function buildCoverPrompt(coverType, {
   // their titles. Same failure class as the frame-colour map and rules block,
   // which earned verbatim carve-outs; the title gets tail placement instead,
   // which needs no carve-out code.
+  // Headed REQUIRED TEXT because the shared preamble (image-generation.txt)
+  // bans all lettering except "a REQUIRED TEXT block below". Headed TITLE,
+  // the prompt contradicted itself: the one exception it names never appeared.
   return prompt + '\n\n' + [
-    '**TITLE:**',
+    '**REQUIRED TEXT:**',
     bakedTitleLine(bakedTitle),
   ].join('\n');
 }

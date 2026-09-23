@@ -1422,6 +1422,18 @@
       "fixedAt": "2026-09-23",
       "fixedIn": "ee8890278",
       "fix": "checkWardrobeAgainstBible marks a reconcile as rewording (element slot noun in the clause, no new slot noun in the replacement, same plain colour words); only non-rewording corrections reach onWardrobeCorrected. The contract text still moves to the bible words (2026-09-15 not reversed). Replay of the 20:39 reconcile: both rewording, re-render fires for nobody (was Levin, Kiaan). Pinned by tests/unit/worn-garment-review-chain.test.ts and tests/unit/wardrobe-vs-bible.test.ts."
+    },
+    {
+      "id": "cover-title-erased-by-title-blind-judges",
+      "title": "The front cover shipped without its title: the semantic judge flagged the correctly painted title as unrequested text, the repair erased it, and the titleless version scored 100",
+      "reportedAt": "2026-09-23",
+      "source": "Staging job_1790100385959_1nitlympp (\"Das Ei im Laub\"). frontCover v0 has the title painted correctly; v1 (active, image_version_meta.frontCover.activeVersion=1) is the same painting with the title erased; titleBaked:true still stamped. Semantic judge on v0: [CRITICAL] rendered_text 'Das Ei im Laub' ... IMAGE_PROMPT states 'No lettering' and the TEXT_RULES block is empty. Consolidator scene_fix: \"Remove the text 'Das Ei im Laub'.\" Inpaint prompt (91 chars) did exactly that; re-judge of v1: quality 100, semantic 100.",
+      "rootCause": "The cover title reached the quality judge only as a note prepended to USER_PROMPT; every judge's structured {TEXT_RULES} input was built from Visual Bible text alone and was empty on covers, so the semantic judge was never told the title was required, D-33 skipped, and the consolidator (told only the scene) and the inpaint (clause built from VB ids only) had no title at all. The judges' ORIGINAL_PROMPT is the pre-tail compressedScene, which keeps the \"No lettering\" preamble but not the TITLE block. The generator prompt contradicted itself: the preamble allows only a REQUIRED TEXT block, the title came as **TITLE:**.",
+      "impact": "Every baked front cover (coverTitleMode=baked, staging and production): a correct title could be flagged as unrequested text and erased by repair, and a titleless re-render scored clean.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "recorded in the follow-up bug commit",
+      "fix": "requiredText.coverRequiredTexts turns the structured cover contract (expectedText/textMode) into a required-text item; evaluateImageQuality folds it into the one {TEXT_RULES} block all three judges get, returns it as result.requiredTexts (carried by carryEvalEvidence), and the consolidator renders it as lettering that must never be removed. inpaintPage adds it to its required-text clause (repairPipeline + Lab inpaint pass the contract). cover-evaluation-notes.txt TEXT_RULES allow-list replaced by COVER_TEXT (what the string is; missing/misspelled = required_text CATASTROPHIC), given to quality and semantic judges. Generator title block headed **REQUIRED TEXT:**, the exception its preamble names. Replay on stored v0/v1: v0 100 with no text finding; v1 semantic [CATASTROPHIC] required_text missing, score 40."
     }
   ]
 }

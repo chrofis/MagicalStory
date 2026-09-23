@@ -58,12 +58,29 @@ function buildFeedbackInput({
   // copied that exact array into `scene_fix.preserve`, and its instruction
   // fields are the text that reaches Grok.
   visualBible = null,
+  // The lettering this image is REQUIRED to show — the same items the judges
+  // got in their TEXT RULES (requiredText.js; evaluateImageQuality returns
+  // them as `requiredTexts`). A cover's painted title is one. The scene
+  // description carries none of it: on staging job_1790100385959_1nitlympp the
+  // consolidator, told only the scene, turned a false "unrequested text"
+  // finding into "Remove the text '<title>'" and the repair erased the title.
+  requiredTexts = [],
 }) {
   const parts = [];
 
   parts.push('## Intended scene description');
   parts.push(sceneDescription || '(not provided)');
   parts.push('');
+
+  const requiredTextLines = (Array.isArray(requiredTexts) ? requiredTexts : [])
+    .filter(t => t && typeof t.text === 'string' && t.text.trim())
+    .map(t => `- on the ${t.label || 'image'}: "${t.text}"`);
+  if (requiredTextLines.length > 0) {
+    parts.push('## Required lettering — PRESENT BY DESIGN (never remove)');
+    parts.push(...requiredTextLines);
+    parts.push('Each string above must appear exactly as written. It is never unrequested text: never write a fix that removes, covers or paints over it. A finding that it is missing, misspelled or out of order is fixed by repainting it to read exactly as written.');
+    parts.push('');
+  }
 
   parts.push('## Characters (name → physical description)');
   const charEntries = Object.entries(characterDescriptions);
@@ -431,6 +448,7 @@ async function consolidateFeedback({
       characterDescriptions,
       landmarkProtection,
       visualBible,
+      requiredTexts: evaluation.requiredTexts || [],
     });
 
     // Text-only — no image passed. The consolidator's job is to dedupe / sort /

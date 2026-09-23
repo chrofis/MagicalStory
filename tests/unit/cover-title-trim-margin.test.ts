@@ -61,7 +61,7 @@ describe('baked cover title: trim-safe margin', () => {
   it('leaves the TITLE block at the absolute end of the prompt', () => {
     for (const t of TITLES) {
       const p = frontPrompt(t).trimEnd();
-      const idx = p.indexOf('**TITLE:**');
+      const idx = p.indexOf('**REQUIRED TEXT:**');
       expect(idx, t).toBeGreaterThan(-1);
       // Nothing may follow the title block — the margin clause is its last
       // sentence, so it is the tail of the whole prompt.
@@ -79,7 +79,7 @@ describe('baked cover title: trim-safe margin', () => {
         characters: [{ name: 'Emma' }],
         options: { bakeTitle: TITLES[0] },
       });
-      expect(p, key).not.toContain('**TITLE:**');
+      expect(p, key).not.toContain('**REQUIRED TEXT:**');
       expect(p, key).not.toContain('8% of the canvas width');
     }
   });

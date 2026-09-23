@@ -13,9 +13,6 @@ const PRE_COVER_NOTE = 'COVER NOTE: a book-cover portrait. Do not deduct for cha
 
 const PRE_TEXT_NOTE = 'TEXT NOTE: The title, dedication, and "magicalstory.ch" branding on this cover are handled by the app as a typographic overlay, not painted by the image model. Never flag missing/absent title/dedication/branding text as a defect, and if such text IS present treat it as the intended app-composited overlay — never flag it as unrequested rendered text.';
 
-const preTextRules = (expectedText: string) =>
-  `⚠️ TEXT RULES FOR THIS IMAGE:\nAllowed text: "${expectedText}" — and nothing else prominent.\nSeverities for text issues:\n- Allowed text missing or misspelled (any character difference) → severity: CATASTROPHIC.\n- Other prominent unrequested text on the cover (labels, captions, watermarks, extra words) → severity: MAJOR.\n- Small incidental in-world signage in the background → do not flag; if garbled → severity: MINOR.\nIf the only text on the image is exactly the allowed text, evaluate normally.\n\nBefore reporting a title misspelling, RE-READ the rendered text letter-by-letter against the allowed text above. Report a mismatch ONLY if you can quote the exact rendered string and it differs from the allowed text. If you are uncertain whether the rendering matches, do NOT flag it.`;
-
 let sections: Record<string, string>;
 let fillTemplate: any;
 
@@ -28,7 +25,7 @@ beforeAll(async () => {
 
 describe('cover critic notes — extraction is a move, not an edit', () => {
   it('the template file loaded and split into the three declared sections', () => {
-    expect(Object.keys(sections).sort()).toEqual(['COVER_NOTE', 'TEXT_NOTE_APP_OVERLAY', 'TEXT_RULES']);
+    expect(Object.keys(sections).sort()).toEqual(['COVER_NOTE', 'COVER_TEXT', 'TEXT_NOTE_APP_OVERLAY']);
   });
 
   it('COVER_NOTE is byte-identical to the pre-extraction literal', () => {
@@ -39,19 +36,13 @@ describe('cover critic notes — extraction is a move, not an edit', () => {
     expect(sections.TEXT_NOTE_APP_OVERLAY).toBe(PRE_TEXT_NOTE);
   });
 
-  it('TEXT_RULES renders byte-identical for real expected-text inputs', () => {
-    for (const title of ['Die Reise zum Leuchtturm', 'magicalstory.ch', 'For our daughter — with love']) {
-      expect(fillTemplate(sections.TEXT_RULES, { EXPECTED_TEXT: title })).toBe(preTextRules(title));
-    }
-  });
+  // TEXT_RULES (the allow-list with {EXPECTED_TEXT}) was replaced by COVER_TEXT on
+  // 2026-09-23: the title now rides every judge's structured {TEXT_RULES} slot
+  // (requiredText.coverRequiredTexts) and this note only says what that string is.
 
-  it('every placeholder in the template is declared by the caller', () => {
-    const declared = new Set(['{EXPECTED_TEXT}']);
-    const tokens = (sections.TEXT_RULES + sections.COVER_NOTE + sections.TEXT_NOTE_APP_OVERLAY)
-      .match(/\{[A-Z][A-Z0-9_]*\}/g) || [];
-    for (const t of tokens) expect(declared.has(t), `undeclared placeholder ${t}`).toBe(true);
-    // ...and nothing unfilled survives the real fill.
-    const built = fillTemplate(sections.TEXT_RULES, { EXPECTED_TEXT: 'A Title' });
-    expect(built.match(/\{[A-Z][A-Z0-9_]*\}/g)).toBe(null);
+  it('the notes carry no placeholders — the title reaches the judges through TEXT RULES', () => {
+    const tokens = (sections.COVER_TEXT + sections.COVER_NOTE + sections.TEXT_NOTE_APP_OVERLAY)
+      .match(/{[A-Z][A-Z0-9_]*}/g) || [];
+    expect(tokens).toEqual([]);
   });
 });

@@ -1220,8 +1220,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // later — inpaint the served (textless) image as-is, no restamp.
     // A BAKED-title front cover (runtime coverTitleMode='baked') also has no
     // ${key}Art row, by design: its title lives in the pixels and there is no
-    // textless layer to inpaint. The same branch handles it correctly — the
-    // served image is inpainted and nothing is restamped over it.
+    // textless layer to inpaint. The served image is inpainted, nothing is
+    // restamped over it, and its title is kept by the required-text clause
+    // (expectedText / textMode on the inpaintPage call below).
     const coverKey = img.pageNumber === -1 ? 'frontCover'
       : img.pageNumber === -2 ? 'initialPage'
       : img.pageNumber === -3 ? 'backCover' : null;
@@ -1304,6 +1305,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       landmarkPhotos: img.landmarkPhotos || null,
       era: resolveSceneEra(img.sceneMetadata),
       sceneMetadata: img.sceneMetadata || null,
+      // A cover whose lettering lives in the pixels (baked title) must keep it
+      // through the edit — the contract joins the required-text clause. When
+      // the textless art layer is being repainted, the text is restamped
+      // afterward, so the edit is told nothing about it.
+      expectedText: restampCoverAfter ? null : (img.expectedText ?? null),
+      textMode: restampCoverAfter ? null : (img.textMode ?? null),
     });
     // Re-composite the cover text onto the repainted textless art (reuses
     // composeCover). The served image keeps its title; artImageData is the new

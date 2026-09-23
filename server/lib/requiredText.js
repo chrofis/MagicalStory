@@ -131,6 +131,44 @@ function collectRequiredTexts({ entries = null, objectIds = null, visualBible = 
   return out;
 }
 
+/**
+ * A cover's own painted lettering (its title, dedication or brand line) as a
+ * required-text item, so it rides the SAME channel as a page's declared
+ * strings: the generator block, all three judges' {TEXT_RULES}, the
+ * consolidator input and the repair clause.
+ *
+ * Until 2026-09-23 the title reached the quality judge only as a prepended
+ * note, while every judge's structured TEXT RULES was empty. On staging
+ * job_1790100385959_1nitlympp the semantic judge — told "no lettering" and
+ * handed an empty allow-list — filed the correctly painted front-cover title
+ * as CRITICAL unrequested text, the repair erased it, and the titleless
+ * re-render scored 100 because D-33 skips an empty TEXT RULES.
+ *
+ * `textMode` / `expectedText` are the structured cover contract
+ * (coverTypography.resolveCoverTextContract). 'appOverlay' art is textless by
+ * design — the app composites its text later — so it requires nothing here.
+ *
+ * @returns {Array<{id: null, label: string, text: string}>}
+ */
+function coverRequiredTexts({ expectedText = null, textMode = null } = {}) {
+  if (textMode === 'appOverlay') return [];
+  const text = typeof expectedText === 'string' ? expectedText.trim() : '';
+  return text ? [{ id: null, label: 'cover', text }] : [];
+}
+
+/**
+ * Every string one image must show: the Visual Bible elements it cites plus,
+ * on a cover, the cover's own painted lettering. The one list the eval and the
+ * repair both build from, so the judge scores and the repair keeps the same
+ * strings.
+ */
+function collectImageRequiredTexts({ objectIds = null, visualBible = null, language = 'en', expectedText = null, textMode = null } = {}) {
+  return [
+    ...coverRequiredTexts({ expectedText, textMode }),
+    ...collectRequiredTexts({ objectIds, visualBible, language }),
+  ];
+}
+
 /** `- on the **signpost**: "WORD"` lines, shared by every block below. */
 const itemLines = (items) => items.map(i => `- on the **${i.label}**: "${i.text}"`).join('\n');
 
@@ -145,9 +183,9 @@ function buildRequiredTextBlock(items) {
 }
 
 /**
- * The JUDGE block ({TEXT_RULES}). Mirrors the cover allow-list mechanism
- * (prompts/cover-evaluation-notes.txt TEXT_RULES): the same shape — allowed
- * strings named up front, then how to read them — applied to an interior page.
+ * The JUDGE block ({TEXT_RULES}): allowed strings named up front, then how to
+ * read them. Pages and covers share it — a cover's title arrives as an item
+ * from coverRequiredTexts, never as a separate note.
  * SEVERITY IS NOT STATED HERE: the judge templates own classification and
  * severity (docs/SETTLED.md, "classification is the PROMPT's job"); this block
  * supplies only the page's strings and the shared rule.
@@ -185,6 +223,8 @@ module.exports = {
   REQUIRED_TEXT_AUTHORING_RULE,
   declaredText,
   collectRequiredTexts,
+  coverRequiredTexts,
+  collectImageRequiredTexts,
   buildRequiredTextBlock,
   buildRequiredTextRulesBlock,
   buildRequiredTextRepairClause,

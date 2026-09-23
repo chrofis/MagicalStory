@@ -5,7 +5,7 @@ import path from 'node:path';
 
 const require_ = createRequire(import.meta.url);
 
-// BEHAVIOUR PINNED: `notEvaluated` (and `threeStageResult`) survive the
+// BEHAVIOUR PINNED: `notEvaluated` (and `threeStageResult`, `requiredTexts`) survive the
 // result-assembly whitelists in images.js. Every provider branch of
 // generateImageOnly and evaluateImageBatch rebuilds its own object from the
 // evaluateImageQuality return — a field not listed there never reaches storage,
@@ -17,11 +17,12 @@ describe('carryEvalEvidence', () => {
     const { carryEvalEvidence } = require_('../../server/lib/images.js');
     const ne = [{ dimension: 'held_objects', reason: 'no_required_objects' }];
     const ts = { stage2: { issues: [] } };
-    expect(carryEvalEvidence({ notEvaluated: ne, threeStageResult: ts }))
-      .toEqual({ notEvaluated: ne, threeStageResult: ts });
+    const rt = [{ id: null, label: 'cover', text: 'A Title' }];
+    expect(carryEvalEvidence({ notEvaluated: ne, threeStageResult: ts, requiredTexts: rt }))
+      .toEqual({ notEvaluated: ne, threeStageResult: ts, requiredTexts: rt });
     // Evaluated-and-nothing-skipped ([]) must NOT collapse to null.
     expect(carryEvalEvidence({ notEvaluated: [] }).notEvaluated).toEqual([]);
-    expect(carryEvalEvidence(null)).toEqual({ notEvaluated: null, threeStageResult: null });
+    expect(carryEvalEvidence(null)).toEqual({ notEvaluated: null, threeStageResult: null, requiredTexts: null });
   });
 
   it('every runEval assembly branch in images.js spreads it', () => {

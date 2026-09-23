@@ -4830,6 +4830,7 @@ async function runInpaintStage(ctx, { experimentId, params = {} }) {
     era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
   });
 
+  const coverTextContract = buildEvalReplayOptions(ctx, { detectedFigures: null }).options;
   const t0 = Date.now();
   const result = await inpaintPage(imageData, evaluation, {
     consolidatedPlan: params.consolidatedPlan || consolidated.plan || null,
@@ -4847,6 +4848,10 @@ async function runInpaintStage(ctx, { experimentId, params = {} }) {
     landmarkPhotos: ctx.scene.landmarkPhotos || null,
     era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
     sceneMetadata: ctx.scene.sceneMetadata || null,
+    // A cover target's text contract, from the same resolver the Lab evals use,
+    // so a baked title is kept through the edit exactly as in production.
+    expectedText: coverTextContract.expectedText,
+    textMode: coverTextContract.textMode,
   });
   const elapsedMs = Date.now() - t0;
   if (!result?.repaired || !result?.imageData) {

@@ -84,6 +84,67 @@ and `arc-retell.txt` now say an empty list is the heading alone, with no dash li
 
 **Status:** ✅ active.
 
+---
+
+## 2026-09-23 — A painted cover title is REQUIRED TEXT on every side: all judges, the consolidator and the repair are told it
+
+**Context:** Staging `job_1790100385959_1nitlympp` shipped its front cover with no title. v0 had
+"Das Ei im Laub" painted correctly. The semantic judge flagged it as CRITICAL unrequested
+`rendered_text`: its IMAGE_PROMPT carried the "No lettering" preamble, and its TEXT RULES allow-list
+was empty. The consolidator had been told only the scene, so it wrote "Remove the text '…'". The
+inpaint erased the title, and the titleless v1 then scored 100 from both judges. The cause was that
+the cover's text contract (`expectedText` / `textMode`) reached only the quality judge, and only as
+a note prepended to USER_PROMPT. The structured `{TEXT_RULES}` slot is built from Visual Bible text,
+and it was empty on every cover, so D-33 skipped. The judges' ORIGINAL_PROMPT is the pre-tail
+`compressedScene`, which keeps the preamble and drops the title block, because the title block sits
+in the protected tail on purpose. The inpaint's required-text clause was built from VB ids only. The
+comment claiming covers "render textless and are restamped" had been stale since SETTLED
+"model-baked title everywhere". The generator prompt also contradicted itself: the preamble allows
+lettering only in "a REQUIRED TEXT block below", but the title arrived as `**TITLE:**`.
+
+**Decision:** The cover's lettering rides the same channel as a page's declared strings (the
+2026-09-21 REQUIRED TEXT mechanism). This goes into structured inputs; no finding text is matched
+in code.
+- `requiredText.coverRequiredTexts({expectedText, textMode})` turns the structured contract into an
+  item. `collectImageRequiredTexts` joins it with the VB strings.
+- `evaluateImageQuality` resolves the contract once, before any judge launches, and folds the item
+  into the one `{TEXT_RULES}` block that quality, semantic and compliance all receive.
+- The eval result carries the items as `requiredTexts`, passed through `carryEvalEvidence` and
+  regeneration's rebuilt evalResult. The consolidator renders them as "Required lettering — PRESENT
+  BY DESIGN (never remove)".
+- `inpaintPage` adds them to its repair clause. `repairPipeline` passes the contract unless it is
+  repainting a textless art layer that gets restamped. The Lab inpaint stage passes it from
+  `buildEvalReplayOptions`.
+- In `cover-evaluation-notes.txt`, the old TEXT_RULES allow-list (it had a second copy of the
+  string) is replaced by COVER_TEXT. COVER_TEXT says what the required string is on a cover, and
+  that a missing or misspelled one is `required_text` at CATASTROPHIC, not D-33's page-level MAJOR.
+  This keeps the cover's previous severity. Both the quality and the semantic judge get it.
+- The generator's title block is headed `**REQUIRED TEXT:**`, the exception its own preamble names.
+  It stays at the absolute end of the prompt, and the title wording is unchanged.
+- App-overlay covers (textless art) require nothing, so their behaviour is unchanged.
+
+**Rationale:** A rule a judge can deduct for must be a rule the generator was given, and every
+judge must be given the same allow-list. That is the one-channel shape the page path already has.
+The title is structured input (the contract), so classification stays in the prompts. D-23 already
+says a string TEXT RULES names is permitted and goes to D-33.
+Validation: a rung-1 replay rebuilt the judge inputs from the stored cover (the title is now in
+item 11 and in the semantic TEXT_RULES). A capped paid re-judge of the stored images gave v0 100
+with no text finding, and v1 a semantic `[CATASTROPHIC] required_text` "missing from the cover",
+score 40. In that one sample the quality judge did not fire D-33 on v1; the semantic judge carried
+the verdict.
+
+**Out of scope (owner call):** the cover cast backfill (findings C4), and the appOverlay note that
+excuses painted lettering on textless covers (C6).
+
+**Touched:** `server/lib/requiredText.js`, `server/lib/evalPipeline.js`, `server/lib/images.js`
+(carryEvalEvidence, inpaintPage), `server/lib/feedbackConsolidator.js`, `server/lib/repairPipeline.js`,
+`server/lib/testlab.js`, `server/routes/regeneration.js`, `server/lib/promptBuilders.js`
+(buildCoverPrompt), `prompts/cover-evaluation-notes.txt`, `tests/unit/cover-title-required-text.test.ts`.
+
+**Status:** ✅ active
+
+---
+
 ## 2026-09-23 — Char-fix: no judge text. A character-repair prompt carries the finding's TYPE as a fixed phrase, never the judge's sentence
 
 **Context:** Staging `job_1790100385959_1nitlympp` (dragon run 6) p14. The entity grid judge wrote a
