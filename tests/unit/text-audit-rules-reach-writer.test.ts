@@ -168,7 +168,7 @@ describe('a reversed decision is a rule on both sides', () => {
   it('the blind auditor asks it under CONTRADICTION, not under a new type', () => {
     const p = blind();
     expect(p).toContain('acting against a decision an earlier page had them state or carry out');
-    expect(p.match(/^\d+\. [A-Z]+:/gm)).toHaveLength(6);
+    expect(p.match(/^\d+\. [A-Z]+:/gm)).toHaveLength(7);
   });
 
   it('no auditor gained a fault type the writer was never given', () => {
@@ -180,6 +180,9 @@ describe('a reversed decision is a rule on both sides', () => {
     ]);
     // ENDING is the writer's own rule too: the rulebook's last-page line (2026-09-23).
     expect(beats()).toContain('The last page ends on the concrete act or spoken line the story ends with');
-    expect(types(blind())).toEqual(['CONFUSION', 'CONTRADICTION', 'IDLE', 'TRANSITION', 'PAYOFF', 'ENDING']);
+    // STYLE (2026-09-23) checks the writer's own STYLE_RULEBOOK, injected verbatim.
+    expect(types(blind())).toEqual(['CONFUSION', 'CONTRADICTION', 'IDLE', 'TRANSITION', 'PAYOFF', 'ENDING', 'STYLE']);
+    expect(blind()).toContain(B.STYLE_RULEBOOK);
+    expect(beats()).toContain(B.STYLE_RULEBOOK);
   });
 });

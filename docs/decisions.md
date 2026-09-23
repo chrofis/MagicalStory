@@ -57464,3 +57464,43 @@ database. `tests/unit/eval-calls-stored.test.ts` pins the columns and the five c
 `server/lib/sceneValidator.js`, `server/lib/images.js`, `storyJobPipeline.js`, `docs/prompt-inventory.md`,
 `tests/unit/eval-calls-stored.test.ts`.
 **Status:** ✅ active on staging.
+
+## 2026-09-23 — The blind text audit asks about style (STYLE, against the injected STYLE_RULEBOOK)
+
+**Context.** The text repair rewrites only the pages an audit names, and no audit question asked about
+style. The rulebook reached the writer, the repair, the diff pass and the lector, but none of them
+reports a breach the WRITER made: the repair never sees an unnamed page, the diff only judges what the
+repair changed, and the lector is told to stay out of style. So bare fragments survived the whole
+chain — writer reruns on staging `job_1790100385959_1nitlympp`: Lab 1426 p7 «Wieder nur Rauch.», p15
+«Hier. Da. Nichts.»; Lab 1428 p3 «Dünner weisser Dampf, genau wie über der Marroni-Tüte.»
+
+**Decision (owner, 2026-09-23: "Audit asks about style").**
+- `story-text-audit-blind.txt` gains question 7, **STYLE**: every sentence of every page is checked
+  against `{STYLE_RULEBOOK}` (the same constant, filled in `buildTextAuditBlindPrompt` — never a hand
+  copy), one `FAULT[STYLE]: p<N> — «<sentence>» <rule>` per breaching sentence, a sentence another
+  question already filed is not filed again.
+- **The blind reader carries it, the arc-informed audit does not.** Style is a property of the words as
+  heard; the blind reader reads the text cold with nothing else in its prompt, which is exactly how a
+  fragment or a paired negation lands. The arc-informed audit already asks fourteen plot questions
+  against arc, plan and pictures; a fifteenth of a different kind would compete for its attention, and
+  asking on both sides would only produce duplicates for the merge to fold. STYLE is the blind side's
+  own category (like CONFUSION/IDLE), so the category-tag dedupe gains no shared meaning.
+- `text-refine.txt`: a STYLE finding is closed by recasting the quoted sentence alone (or joining it
+  into the sentence beside it) and never licenses another change on its page; a page named only by
+  STYLE findings is not analysed under the checks. Routing needed no code: any finding with a page
+  makes that page rewritable, and the ledger/report carry the category as-is.
+- **No mechanical fragment check.** A sentence without a finite verb cannot be told apart in code, across
+  languages, from a legitimate short exclamation or a line of dialogue without classifying prose meaning
+  (a word-count or verb-list heuristic is exactly that); classification stays with the prompt.
+- Test Lab `audit_replay` gains `params.fromExperiment` (+ `fromResultIndex`): audit the page text a
+  stored `story_text_replay` result produced, with the story's own briefs and plan lines, so an audit
+  prompt change is measured on the writer output that motivated it.
+
+**Rationale.** A rule the generator is given and no critic reports is a rule nothing enforces once the
+writer misses it (generator-vs-critic). One constant means writer, repair, diff, lector and auditor
+cannot drift apart.
+
+**Touched:** `prompts/story-text-audit-blind.txt`, `prompts/text-refine.txt`,
+`server/lib/promptBuilders.js` (`buildTextAuditBlindPrompt`), `server/lib/textRefine.js` (comment),
+`server/lib/testlab.js` (`runAuditReplayStage`), `tests/unit/text-audit-style.test.ts`,
+`tests/unit/text-audit-rules-reach-writer.test.ts`, `docs/prompt-inventory.md`.

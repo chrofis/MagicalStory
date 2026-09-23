@@ -9681,7 +9681,11 @@ function buildTextAuditBlindPrompt(inputData, pages = []) {
   const body = pages
     .map(p => `--- Page ${p.pageNumber} ---\n${String(p.text || '').trim()}`)
     .join('\n\n');
-  return fillTemplate(template, { PAGES: body });
+  // STYLE (owner, 2026-09-23): the repair rewrites only pages an audit names,
+  // so a rulebook breach the writer made survived the chain unless an audit
+  // filed it. The blind reader files it, against the SAME constant the writer
+  // and the repair were given — never a hand copy.
+  return fillTemplate(template, { PAGES: body, STYLE_RULEBOOK });
 }
 
 /**

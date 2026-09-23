@@ -75,6 +75,8 @@ Every page you rewrite keeps the style rules below:
 
 {STYLE_RULEBOOK}
 
+A STYLE finding quotes one sentence that breaks one of these rules. It is closed by recasting that sentence alone, or by joining it into the sentence beside it, and it never licenses a change anywhere else on its page. A page named only by STYLE findings is not analysed under the checks below.
+
 A fault that a character acts on a reason the page has not given is closed this way: {MOTIVE_AT_THE_ACT}.
 
 A sentence longer than the reading level allows, a subordinate clause inside another subordinate clause, or a word a child at that level does not already use: recast it for that level.
