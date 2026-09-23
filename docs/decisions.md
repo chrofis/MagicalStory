@@ -55755,3 +55755,6 @@ face turned away into the picture. The shot definition puts the subject far acro
 away. `OTS_NEAR_FIGURE_RULE` has the near figure look straight ahead toward the subject, never up at it. All three
 reach the planner, the four brief templates and the image prompt through the existing constants.
 **Touched:** server/lib/shotVocabulary.js, tests/unit/ots-near-figure-crop.test.ts.
+**Result (Lab 1420, 4th paid p10 render):** camera now behind the near figure (back of head and ear, face turned
+away, crop at the shoulders); the subject is still drawn large and close, about a third of the frame height.
+Owner accepted this state; to be judged on the next full run. Untried: a measurable subject size.
