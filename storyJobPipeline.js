@@ -4813,7 +4813,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // ONE set of QC options for the plate, its retry and every plate
               // derived from it — the retry was judged on pixels only and the
               // derived plates not at all (2026-09-23, dragon run 6).
-              let plateQcOpts = { artStyle: artStyleDesc, shot: plateClass(vantageShot), pageNumber: repPageNum };
+              let plateQcOpts = { artStyle: artStyleDesc, shot: plateClass(vantageShot), pageNumber: repPageNum, landmarkPhoto: landmarkPhotos[0] || null };
               const { validateEmptyScene } = require('./server/lib/images');
               try {
                 const seenPlacement = new Set();
@@ -4944,6 +4944,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     artStyle: artStyleDesc,
                     shot: cls,
                     pageNumber: group.pageNumbers.find(pn => plateClass(shotOfPage(pn)) === cls) ?? repPageNum,
+                    // The derive keeps the base plate's landmark, which was
+                    // painted from this photo — judged against it, not the words.
+                    landmarkPhoto: plateQcOpts.landmarkPhoto || null,
                   };
                   let derivedImage = await derive(deriveInstruction);
                   let derivedPrompt = deriveInstruction;
@@ -5267,6 +5270,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   artStyle: artStyleDesc,
                   shot: shotForCamera || null,
                   pageNumber: pageData.pageNumber,
+                  landmarkPhoto: pageData.landmarkPhotos?.[0] || null,
                 };
                 const qc = await validateEmptyScene(result.imageData, textPos, `P${pageData.pageNumber}`, pageQcOpts);
                 if (!qc.pass) {

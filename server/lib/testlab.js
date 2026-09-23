@@ -847,6 +847,7 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
       storyEra: meta.era || null,
       artStyle: plateStyle,
       shot: (meta.fullData?.shot || meta.shot || '').trim() || null,
+      landmarkPhoto: ctx.landmarkPhotos?.[0] || null,
     });
     qc = { pass: qcRes.pass, issues: qcRes.issues || [], visionFeedback: qcRes.visionFeedback || null };
   } catch (err) {

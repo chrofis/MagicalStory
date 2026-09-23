@@ -1815,6 +1815,18 @@
       "fixedAt": "2026-09-23",
       "fixedIn": "684f51d93",
       "fix": "resolveObjectState rule 0: covers take the cited dotted state, else finalObjectState; getElementReferenceImagesByIds / enrichCoverHintWithArtifacts / cover VB-NAME-MATCH resolve through it with the cover page number. Pinned by tests/unit/cover-object-final-state.test.ts."
+    },
+    {
+      "id": "plate-qc-judges-landmark-against-text-not-photo",
+      "title": "The plate QC failed a photo-faithful landmark plate against a wrong written description and its feedback repainted the landmark",
+      "reportedAt": "2026-09-23",
+      "source": "Production story job_1790107559778_fcmlfa8kn p7/p8 (vantage LOC003.1, Fernsehturm Uetliberg, landmark_index 5854). stories.data sceneImages[p7].emptySceneQc.v1Issues: 'The tower is a solid concrete structure, not a lattice metal structure as specified'; visionFeedback 'The tower must be a lattice metal structure with metal legs'. photo_description_2 described the separate lattice observation tower in slot 2 as the TV tower's support structure.",
+      "rootCause": "validateEmptyScene was never sent the landmark photo and had no rule placing the photo above the text, so it judged the landmark against the brief; its feedback was appended to the retry prompt. The index description of slot 2 was wrong.",
+      "impact": "A real landmark repainted as a different structure on the plate every page of that vantage is drawn on. Staging and production.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "PENDING",
+      "fix": "DB: 5854 (prod) / 2149 (staging) descriptions rewritten from the photos. Code: LANDMARK_PHOTO_AUTHORITY in buildLandmarkFidelityBlock and the new LANDMARK_CHECK of empty-scene-qc.txt; the landmark photo is attached to the plate judge at every call site; era lines aligned with the generator. Pinned by tests/unit/landmark-photo-authority.test.ts. Model-level effect of the final wording not yet replayed (docs/decisions.md 2026-09-23)."
     }
   ]
 }

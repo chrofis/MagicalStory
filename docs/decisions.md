@@ -57730,3 +57730,50 @@ drift (fix the mirror class, not the instance).
 **Touched:** `server/lib/promptBuilders.js` (`SIZE_LOOK_RULE`, `STYLE_RULEBOOK`,
 `buildTellingRulesSection`, `buildBeatsPrompt`), `server/lib/visualBible.js` (`SCALE_CLASS_SPEC`),
 `prompts/story-beats.txt`, `tests/unit/size-look-rule.test.ts`, `docs/prompt-inventory.md`.
+
+## 2026-09-23 — A real landmark's plate is judged against its photo, never against its written description
+
+**Context.** Production story `job_1790107559778_fcmlfa8kn`, landmark "Fernsehturm Uetliberg"
+(`landmark_index` 5854, story LOC003). Photo slot 2 (`307b0e461132.jpg`) shows TWO structures: the concrete
+TV tower and, beside it, a separate steel-lattice observation tower. Its `photo_description_2` called the
+lattice "the same transmission tower's metal lattice support structure". That text became the Visual Bible
+features ("lattice metal structure"), the brief, and the page text. The p7/p8 plate was painted from the
+slot-1 photo and came out nearly right (concrete shaft with pod). The plate QC (`validateEmptyScene`) never
+saw any photo — it judged the plate against the text, failed it ("a solid concrete structure, not a lattice
+metal structure as specified"; "the modern tower is anachronistic"), and its feedback ("must be a lattice
+metal structure with metal legs") was appended to the retry, which painted a lattice tower.
+
+**Decision.** (owner-approved: "the background check trusts the real photo over the written description")
+1. **Data.** The three descriptions of 5854 (prod) / 2149 (staging) were rewritten from the photos; slot 2
+   now names both towers as separate structures. Slot 2 was NOT demoted: it shows the TV tower's pod and
+   mast clearly, and `photo_score` (<40 = not served) is the only exclusion mechanism — a call for the owner.
+2. **One sentence, both sides.** `LANDMARK_PHOTO_AUTHORITY` (`promptBuilders.js`): the photo is the authority
+   on what the landmark looks like; where words describe it differently, the photo is right. It is in both
+   shapes of `buildLandmarkFidelityBlock` (every plate, page, iterate and cover prompt that attaches a
+   landmark photo) and in the plate judge's new `LANDMARK_CHECK` section (`empty-scene-qc.txt`), stated
+   before the checks so every check reads it.
+3. **The judge gets the photo.** `validateEmptyScene({ landmarkPhoto })` attaches the reference the plate
+   was painted from as a labelled second image, at every call site: vantage base plate + retry, derived
+   plates, per-page plates, and the Test Lab empty-scene stage. The landmark check is emitted only when the
+   photo actually loaded; a photo that cannot load is a logged error, and the check is left out rather than
+   naming an absent image.
+4. **Era lines aligned with the generator.** The author has always been told "keep the landmark itself
+   unchanged; only remove the modern surroundings"; the judge was told "any modern elements visible in the
+   photo must NOT appear". The judge's STORY ERA line and anachronism check now say the landmark itself
+   stays as it really stands.
+
+**Validation.** Free: the built judge prompt for the stored p7 plate carries the photo rule and the aligned
+era lines; unit tests pin that the photo reaches the call as the labelled second image
+(`tests/unit/landmark-photo-authority.test.ts`). Paid (Gemini 2.5 Flash, ~$0.005) on the stored p7 v1 plate
+with the slot-1 photo, FIRST version of the rule (a trailing check, unlabelled images, old era line): before
+= 4 issues (lattice, anachronistic tower, camera, "metal legs"); after = 2 issues, and the judge still asked
+for "a lattice metal support structure as shown in the reference photo" — which the photo does not show.
+The revised wording (rule before the checks, labelled images, era alignment) is **not yet validated with a
+model call** (two-attempt cap). Open: re-run the stored-plate replay once, and if the judge still reads the
+text over the photo, the next lever is what the judge is SENT (the landmark's written features in
+EXPECTED SCENE / MAIN SCENE PROSE), which is an owner call.
+
+**Touched:** `server/lib/promptBuilders.js`, `prompts/empty-scene-qc.txt`, `server/lib/evalPipeline.js`,
+`storyJobPipeline.js`, `server/lib/testlab.js`, `docs/prompt-inventory.md`,
+`tests/unit/landmark-photo-authority.test.ts`, `tests/unit/empty-scene-qc-extraction.test.ts`.
+**Status:** 🟡 on staging, model-level effect partly unproven.

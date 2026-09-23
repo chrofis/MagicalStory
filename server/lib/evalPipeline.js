@@ -410,7 +410,7 @@ function largestInteriorUniformFraction(mask, rows, cols) {
  * asserted without a paid vision call, and so the plate generator/critic pair
  * names two file paths instead of this module.
  */
-function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, characterPlacements = null, mainScenePrompt = '', artStyle = '', shot = '' } = {}) {
+function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, characterPlacements = null, mainScenePrompt = '', artStyle = '', shot = '', landmarkName = '' } = {}) {
   const sceneCtx = sceneDescription
     ? `\nEXPECTED SCENE: "${sceneDescription.substring(0, 300)}"`
     : '';
@@ -418,7 +418,7 @@ function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, chara
   // infer it. Caller derives this from storyType + costumed clothing.
   // "present-day" (or null) disables the anachronism check.
   const eraBlock = storyEra
-    ? `\n\nSTORY ERA: ${storyEra} — render accordingly. Landmark reference photos are present-day; any modern elements visible in the photo must NOT appear in the output.`
+    ? `\n\nSTORY ERA: ${storyEra} — render accordingly. Landmark reference photos are present-day; modern things around the landmark in the photo must NOT appear in the output — the landmark itself stays as the photo shows it.`
     : '';
   // If the outline already declared where each character will land, ask
   // the vision model to verify the empty scene has flat usable space at
@@ -484,6 +484,16 @@ function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, chara
   const { PLATE_BASE_CLASS } = require('./shotVocabulary');
   const cameraCheck = shotId
     ? `\n${fillTemplate(qc.CAMERA_CHECK, { SHOT: shotId === PLATE_BASE_CLASS ? 'at eye level' : `as the ${shotId} shot` })}` : '';
+  // THE PHOTO WINS OVER THE WORDS (owner, 2026-09-23). Emitted only when the
+  // caller attached the landmark photo as the second image — the check names
+  // that image. The authority sentence is the same constant the plate author's
+  // fidelity block carries (buildLandmarkFidelityBlock), so the judge holds the
+  // landmark to the photo exactly as the author was told to draw it.
+  const landmark = String(landmarkName || '').trim();
+  const landmarkCheck = landmark
+    ? `
+
+${fillTemplate(qc.LANDMARK_CHECK, { LANDMARK_NAME: landmark, LANDMARK_PHOTO_AUTHORITY: require('./promptBuilders').LANDMARK_PHOTO_AUTHORITY })}` : '';
   return fillTemplate(qc.BODY, {
     SCENE_CTX: sceneCtx,
     STYLE_CHECK: styleCheck,
@@ -494,6 +504,7 @@ function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, chara
     ERA_CHECK: storyEra ? `\n${qc.ERA_CHECK}` : '',
     PLACEMENTS_CHECK: placementsCheck,
     GEOMETRY_CHECK: geometryCheck,
+    LANDMARK_CHECK: landmarkCheck,
   });
 }
 
@@ -501,18 +512,21 @@ function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, chara
  * Validate an empty scene (background-only) image.
  * Two-phase check:
  * Phase 1 (pixel): calmness heatmap — white boxes, too dark, text area readiness (<50ms, free)
- * Phase 2 (vision): Gemini Flash-lite — people/figures, setting/geometry/anachronism issues (no landmark-identity check) (~2s, cheap)
+ * Phase 2 (vision): Gemini Flash — people/figures, setting/geometry/anachronism issues; with a landmark photo, the landmark is judged against the photo (~2s, cheap)
  *
  * @param {string} imageData - base64 data URI
  * @param {string} textPosition - e.g. 'top-right'
  * @param {string} pageContext - logging context
  * @param {object} [options]
- * @param {string} [options.sceneDescription] - expected scene description (for landmark check)
+ * @param {string} [options.sceneDescription] - expected scene description
+ * @param {{name: string, photoUrl?: string, photoData?: string}} [options.landmarkPhoto] - the landmark
+ *        reference photo the plate was painted from; attached as the judge's second image, and the
+ *        landmark is judged against it instead of the written description
  * @param {boolean} [options.skipVision=false] - skip the Gemini vision check (pixel only)
  * @returns {{ pass: boolean, issues: string[], calmnessScore: number, visionFeedback: string|null }}
  */
 async function validateEmptyScene(imageData, textPosition, pageContext = '', options = {}) {
-  const { sceneDescription = null, skipVision = false, characterPlacements = null, mainScenePrompt = null, storyEra = null, artStyle = null, shot = null } = options;
+  const { sceneDescription = null, skipVision = false, characterPlacements = null, mainScenePrompt = null, storyEra = null, artStyle = null, shot = null, landmarkPhoto = null } = options;
   try {
     const base64 = r2Lib.stripDataUriPrefix(imageData);
     const buf = Buffer.from(base64, 'base64');
@@ -626,7 +640,22 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
           const base64ForVision = r2Lib.stripDataUriPrefix(imageData);
           const mimeType = imageData.match(/^data:(image\/\w+);/)?.[1] || 'image/jpeg';
 
-          const qcPrompt = buildEmptySceneQcPrompt({ sceneDescription, storyEra, characterPlacements, mainScenePrompt, artStyle, shot });
+          // The landmark photo the plate was painted from rides as the second
+          // image, loaded the way the plate generator loads it (R2 URL first,
+          // then photoData). A photo that was handed in but cannot be loaded is
+          // an error, and the landmark check is left out rather than naming an
+          // image that is not attached.
+          let landmarkPart = null;
+          if (landmarkPhoto?.name) {
+            for (const source of [landmarkPhoto.photoUrl, landmarkPhoto.photoData].filter(v => typeof v === 'string' && v.length > 0)) {
+              try {
+                const lmBuf = await r2Lib.bytesFromAnyImage(source);
+                if (lmBuf) { landmarkPart = { inline_data: { mime_type: 'image/jpeg', data: lmBuf.toString('base64') } }; break; }
+              } catch { /* next source */ }
+            }
+            if (!landmarkPart) log.error(`❌ [EMPTY-SCENE-QC] ${pageContext} landmark photo for "${landmarkPhoto.name}" could not be loaded — the plate is judged without it`);
+          }
+          const qcPrompt = buildEmptySceneQcPrompt({ sceneDescription, storyEra, characterPlacements, mainScenePrompt, artStyle, shot, landmarkName: landmarkPart ? landmarkPhoto.name : '' });
 
           const visionUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
           const visionResp = await fetch(visionUrl, {
@@ -634,7 +663,11 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               contents: [{ parts: [
+                // With a landmark photo the two images are labelled, as the
+                // plate generator labels its landmark reference.
+                ...(landmarkPart ? [{ text: '[Background plate to judge]:' }] : []),
                 { inline_data: { mime_type: mimeType, data: base64ForVision } },
+                ...(landmarkPart ? [{ text: `[Landmark reference photo: ${landmarkPhoto.name}]:` }, landmarkPart] : []),
                 { text: guardPromptString(qcPrompt, 'validateEmptyScene') }
               ]}],
               generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
