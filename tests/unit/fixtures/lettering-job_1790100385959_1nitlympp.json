@@ -1,0 +1,37 @@
+{
+  "source": "Lab 1405 — blind inventory (qwen3-vl, image-inventory-unified) on dragon run 6 pages 1 and 6, captured 2026-09-23",
+  "pages": {
+    "1": {
+      "lettering": [
+        {
+          "text": "TAXI",
+          "surface": "white sign on glass structure",
+          "position": "left-midground",
+          "readable": true
+        },
+        {
+          "text": "BUTTERCUP",
+          "surface": "yellow awning on building",
+          "position": "center-midground",
+          "readable": true
+        },
+        {
+          "text": "BRITISH",
+          "surface": "flag banner",
+          "position": "center-background",
+          "readable": true
+        }
+      ]
+    },
+    "6": {
+      "lettering": [
+        {
+          "text": "TENSE BUT QUIET STANDOFF",
+          "surface": "white rectangular label in bottom-right corner",
+          "position": "bottom-right",
+          "readable": true
+        }
+      ]
+    }
+  }
+}

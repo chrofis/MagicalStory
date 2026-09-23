@@ -55443,3 +55443,50 @@ lens that covers the mirror case is extended on both sides:
 
 **Touched:** `prompts/arc-panel.txt`, `server/lib/promptBuilders.js`.
 **Status:** 🟡 conditional — validate with `arc_panel_replay` on run 6's arc.
+
+## 2026-09-23 — Writing nobody asked for is captured in code and becomes a finding
+
+**Context:** dragon run 6 p6 carried a large English label, "TENSE BUT QUIET
+STANDOFF", and scored **100** with zero findings. Its source: the Art Director's
+`sceneIntent` ended on a mood caption ("Tense but quiet standoff in the cool
+autumn breeze.") that becomes the image headline, and the image model lettered
+it despite the unchanged "No lettering on any surface" rule. Unrequested-
+lettering detection lived in the blind compliance judge, switched off on
+2026-09-19; the sighted quality judge did not see the caption. The blind
+inventory did, exactly: `{"text":"TENSE BUT QUIET STANDOFF","surface":"white
+rectangular label in bottom-right corner","readable":true}` — and on p1 it
+recorded TAXI, BUTTERCUP and BRITISH (a British banner in a Zurich street).
+
+Owner: text is no longer forbidden outright — an ABC story needs letters — but
+text must be captured and become feedback.
+
+**Decision:** `server/lib/letteringCheck.js`, run beside the gaze comparison at
+the P1 merge in `evaluateImageQuality`, scenes only. It compares the inventory's
+`lettering[]` against the strings the page DECLARES — the same
+`collectRequiredTexts()` list the three judges' REQUIRED TEXT block is built from,
+now also kept as `declaredTexts`. No new call.
+
+Severity maps onto the evaluator's own **D-23** using only the structured
+`readable` flag, never the prose:
+- readable, undeclared → `rendered_text` **CRITICAL** (D-23 puts prominent
+  lettering at CATASTROPHIC; code cannot measure prominence, so it takes the
+  level that always reaches a repair without forcing a regeneration);
+- unreadable scribble → **MINOR** (D-23's own class);
+- declared → nothing, matched after squashing to letters and digits so "A B C",
+  "a-b-c" and "ABC" are one string, and a declared word inside a longer run
+  still counts.
+
+`rendered_text` is page-scoped in scoring, so a sighted-judge finding for the
+same text is charged once, not twice.
+
+**Consequence to know:** in-world signage the page never declared (a TAXI sign
+at a Zurich taxi stand) is now charged CRITICAL and repaired away. That follows
+the owner's rule — writing the page did not ask for is a defect — and is the
+first thing to revisit if it proves too eager.
+
+**Not yet addressed:** the SOURCE — a mood caption as the last sentence of
+`sceneIntent`.
+
+**Touched:** `server/lib/letteringCheck.js` (new), `server/lib/evalPipeline.js`,
+`tests/unit/lettering-check.test.ts` (8), fixture from Lab 1405.
+**Status:** ✅ active

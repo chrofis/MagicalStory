@@ -2035,16 +2035,20 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // page declares none, which is the honest default -- the templates then
     // apply the plain no-lettering rule unchanged.
     let requiredTextBlock = '';
+    // The same declared strings, as a list: the undeclared-lettering check
+    // below compares the blind inventory against exactly this, never a
+    // second derivation of what the page asked for.
+    let declaredTexts = [];
     try {
       const requiredTextLib = require('./requiredText');
       const ids = Array.isArray(evalOptions.sceneMetadata?.objects) ? evalOptions.sceneMetadata.objects : [];
-      requiredTextBlock = requiredTextLib.buildRequiredTextRulesBlock(
-        requiredTextLib.collectRequiredTexts({
-          objectIds: ids,
-          visualBible: evalOptions.visualBible || null,
-          language: evalOptions.language || evalOptions.storyMeta?.language || 'en',
-        })
-      );
+      const required = requiredTextLib.collectRequiredTexts({
+        objectIds: ids,
+        visualBible: evalOptions.visualBible || null,
+        language: evalOptions.language || evalOptions.storyMeta?.language || 'en',
+      });
+      declaredTexts = required.map(r => r.text).filter(Boolean);
+      requiredTextBlock = requiredTextLib.buildRequiredTextRulesBlock(required);
     } catch (err) {
       // Loud, and recorded on the result: a page whose declared string could
       // not be resolved was NOT judged for it -- never silently clean.
@@ -3171,6 +3175,24 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
               }
             } catch (e) {
               log.warn(`⚠️ [GAZE] ${pageContext || 'page'}: comparison failed — ${e.message}`);
+            }
+
+            // UNDECLARED LETTERING (owner, 2026-09-23: text must be captured and
+            // become feedback). The blind inventory lists every piece of writing
+            // it sees; anything readable the page did not declare is a
+            // rendered_text finding. Its old reader, the blind compliance judge,
+            // is switched off, and the sighted judge missed a full-width caption
+            // on dragon run 6 p6. Scenes only: a cover's title has its own path.
+            try {
+              const lettering = evaluationType !== 'scene' ? [] : require('./letteringCheck').checkUndeclaredLettering({
+                lettering: p1Result.lettering, declared: declaredTexts,
+              });
+              for (const f of lettering) {
+                fixableIssues.push(f);
+                log.info(`🔠 [LETTERING] ${pageContext || 'page'}: [${f.severity}] ${f.description}`);
+              }
+            } catch (e) {
+              log.warn(`⚠️ [LETTERING] ${pageContext || 'page'}: check failed — ${e.message}`);
             }
           }
         } catch (e) {
