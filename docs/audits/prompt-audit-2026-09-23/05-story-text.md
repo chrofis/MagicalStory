@@ -1,5 +1,15 @@
 # 05 — STORY TEXT stage group: findings
 
+## Status 2026-09-23
+
+Checked against staging `31fd7db0c` (after the evening fix round). FIXED = the commit that fixes it; OPEN = no fix yet, no ruling needed to start; OWNER CALL = touches a decision, a SETTLED line or has options the owner picks. Stale-doc and registry items listed at the end of each file were corrected in `a25ecb865` unless listed below.
+
+- FIXED: #1 the diff reverting the refine's fixes — `5a4672c7a` (the diff sees the findings each rewrite answered) + `e47a513f0` (ledger settled after the diff, `restoredSentences`; the word counter also measures the shipped text). #2 arc hints now reach the arc-informed audit and the refine (`{ARC_HINTS}`, `HINT_VS_ARC_RULE`) and both are in the `arc-hint-handoff` set — `e47a513f0`. #5 refine scope is one rule and the refine gets the checker form of DO-NOT-WRITE — `e47a513f0`. D outline-reviewer const assignment — `e47a513f0`.
+- OPEN: #3 story-logic defects no judge flagged (deadline, reversed refusal, unshown fear, refine self-contradiction, vague ending; LOADBEARING over-broad), #6 sentence/paragraph counts have no counter, #7 lector without a reading level, #8 wording (Tüte, heavy words); B writer brief bloat. Backlog: rough-text lines (run 6).
+- OWNER CALL: #4 narrowing the blind audit's picture exemption and a Lab recall check of the blind slot (2026-09-03 ruling); #1 (b) a code guard on restored spans was not built (decisions: "no code provenance guard").
+
+---
+
 Run: job_1790100385959_1nitlympp, "Das Ei im Laub", 18 pp, de-ch, 1st-grade (budget 25-70 words, 3-6 sentences), cast 3-5, commit b03c64b0.
 Chain: writer (sonnet-4-6) -> audits (arc-informed gemini-3.1-pro: 10 faults; blind grok-4.6: 0) + word counter (1) -> text_refine (claude-opus-5, rewrote 9 pages) -> text_diff (gpt-5.6-luna-pro, **11 corrections applied**) -> lector (gemini-3.1-pro, 4 applied).
 Since b03c64b0, **no text-stage template or builder has changed** (`git diff b03c64b0 HEAD` touches only OTS/shot code in promptBuilders.js and arc effort in beatsPipeline.js). So none of the findings below is fixed yet.

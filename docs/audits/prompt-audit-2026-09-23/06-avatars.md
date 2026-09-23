@@ -1,5 +1,15 @@
 # 06 — STYLED AVATARS: prompt-judge findings
 
+## Status 2026-09-23
+
+Checked against staging `31fd7db0c` (after the evening fix round). FIXED = the commit that fixes it; OPEN = no fix yet, no ruling needed to start; OWNER CALL = touches a decision, a SETTLED line or has options the owner picks. Stale-doc and registry items listed at the end of each file were corrected in `a25ecb865` unless listed below.
+
+- FIXED: the reconcile re-render — a same-garment rewording re-renders nobody (option b) — `ee8890278`. S1-1 row judges copying the example and S1-2 style judge copying TASK text — `86d6ff4a7` (placeholder examples, per-cell reasons, one echo guard `isEchoedJudgeVerdict` behind `askSheetJudge` for all four judges: re-ask once, then throw). S2-1 cell 4/8 pose — `86d6ff4a7` (`REAR_TURN_POSE`, one constant in both row generators and all four judges). S3-3 wrong bodies example and the `anglesScore` field name — `86d6ff4a7` (placeholder examples, `angles.score`).
+- OPEN: S2-3 head row not head-and-shoulders, S2-4 collar/placket rule only in dead `buildPrompt`, S2-5 pass 2 paints backdrops and drops dividers (no judge), S3-2 colour drift (compare pass 2 to pass 1), S3-3 `reviewHeadRow` trusts the model's `finalScore`, S3-4 hair text reaches no critic, mojibake check; S4 dead code and Lab prefills; sheet-eval prompts and raw replies still not stored.
+- OWNER CALL: option (c) re-render a VISIBLE change from the approved sheet instead of the photos; S2-2 figure-free style anchor (reverses 2026-08-12); S3-1 drawn-younger age (standing ruling — report only).
+
+---
+
 Run: `job_1790100385959_1nitlympp` ("Das Ei im Laub", watercolor, Levin 5 / Julian 3 / Max 3 / Kiaan 3), built at `b03c64b0`.
 Stage: pass 1 (decoupled body row + head row, grok-imagine-image) → pass 1 row judges (gemini-2.5-flash: heads, bodies, identity) → pass 2 style transfer (grok, watercolor anchor as Image 2) → pass 2 style judge (gemini-2.5-flash).
 Evidence: the stored prompts and verdicts in `06-avatars/`, the staging DB (`stories.data.styledAvatarGeneration`, `generationLog`), and **the pixels**. I downloaded all 6 pass-1 composites, all 8 pass-2 outputs and the style anchor to `06-avatars/img/` and looked at each one.

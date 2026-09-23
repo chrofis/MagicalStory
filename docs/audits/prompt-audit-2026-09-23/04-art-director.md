@@ -1,5 +1,15 @@
 # 04 — Art Director / scene expansion + Visual Bible + scene review
 
+## Status 2026-09-23
+
+Checked against staging `31fd7db0c` (after the evening fix round). FIXED = the commit that fixes it; OPEN = no fix yet, no ruling needed to start; OWNER CALL = touches a decision, a SETTLED line or has options the owner picks. Stale-doc and registry items listed at the end of each file were corrected in `a25ecb865` unless listed below.
+
+- FIXED: A1 review-deleted `off` row reverting to worn, and the post-review clothing re-check gated on pre-review findings — `ee8890278` (declared rows carried forward per id at both adopt points; the re-check runs on every reviewed run). A2 the element budget / page table counting garments the picker never packs — `ee8890278` (`wornItems.carriedByReference`, one predicate; a `wornItems` row is page presence). A12's p17 iterate cast — `32dce4da9`.
+- OWNER CALL: A3 shared-hands rule (AD lines 587 vs 591 vs the code guard; the documented 🟡 conflict — this run is the evidence), A8 the reviewer reads VB-merged outfit strings (tied to 03 F1's direction), A9 HEIGHT ORDER vs age cues.
+- OPEN: A4 reviewer check 4 vs a scattered plan line, A5 page table mutated before the checks, A6 missing critic checks (eyes closed, creature face, `landmarkView`, shot vs vantage, VB size/shape rules), A7 one plate across a time-of-day change, A10 dead/misaddressed AD instructions, A11 9f vs AD state citation; C8/C9 trimming; `docs/SETTLED.md:62` still says three elements (needs the SETTLED protocol).
+
+---
+
 Run: staging `job_1790100385959_1nitlympp` ("Das Ei im Laub", 18 p, de-ch, cast 3-5, watercolor), built at `b03c64b0`.
 Stages judged as one system:
 - **Creation:** `beats_scene_expansion` (gemini-3.1-pro-preview), prompt 112,251 chars → VB + cover hints + 18 briefs.

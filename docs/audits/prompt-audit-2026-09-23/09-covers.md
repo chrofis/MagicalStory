@@ -1,4 +1,14 @@
 # 09 — COVERS: prompt judge findings
+
+## Status 2026-09-23
+
+Checked against staging `31fd7db0c` (after the evening fix round). FIXED = the commit that fixes it; OPEN = no fix yet, no ruling needed to start; OWNER CALL = touches a decision, a SETTLED line or has options the owner picks. Stale-doc and registry items listed at the end of each file were corrected in `a25ecb865` unless listed below.
+
+- FIXED: C1 title erased by title-blind judges — `c9484709c` (the cover text contract is a required-text item in the one `{TEXT_RULES}` block all three judges get; COVER_TEXT replaces the prepended TEXT_RULES; the generator's title block is headed `**REQUIRED TEXT:**`). C2 repair path protecting a painted title — `c9484709c` (the consolidator renders required lettering as never-remove; `inpaintPage` adds the title to its required-text clause when the cover is not restamped). The stale `images.js` comment and image-routing rows — `a25ecb865`.
+- OPEN: C3 cover shrink drops REQUIRED CAST / DEPTH AND SIZE while keeping SHOT and non-cover rules, C5 `classifyOverlap` drops an unrelated garment, C6 painted lettering on textless covers excused by the app-overlay note, C7 false entity finding (crop artefact, same class as 08 S7), C8 height order vs age words, C9 one missing prop counted twice, C10 cover layout rules never judged, C11 the root `prompt` holds the inpaint text, C12 reference-card colour rule vs outfits.
+- OWNER CALL: C4 backfill fills to 5 even when nothing was dropped; C3 item 3 (touches the 2026-08-26 unified cover template decision).
+
+---
 Run: job_1790100385959_1nitlympp "Das Ei im Laub" (staging, built at b03c64b0). Judge: covers group (creation → judges → consolidation → inpaint as one system).
 
 ## What I looked at

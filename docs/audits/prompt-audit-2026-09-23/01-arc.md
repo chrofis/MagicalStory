@@ -1,5 +1,15 @@
 # 01-ARC — judge findings (job_1790100385959_1nitlympp, "Das Ei im Laub", built at b03c64b0)
 
+## Status 2026-09-23
+
+Checked against staging `31fd7db0c` (after the evening fix round). FIXED = the commit that fixes it; OPEN = no fix yet, no ruling needed to start; OWNER CALL = touches a decision, a SETTLED line or has options the owner picks. Stale-doc and registry items listed at the end of each file were corrected in `a25ecb865` unless listed below.
+
+- FIXED: #1 "(none" parsed as a character — `86d6ff4a7` (open-bracket sentinel in `parseFigureList`; the create spec and arc-retell say an empty list is the heading alone).
+- OPEN: #4 panel/hints language line, #5 "central figure" definition, #6 ENTRANCE/ASSUMED rule missing from TELLING_RULES, #8 topic-guide lines lifted verbatim, #9 hints carry no sentence anchors, #10 commission walk, #11 eight-year-old listener vs AGE_MODE, #14 "therefore" connector; B (arc_hints prompt and retell raw reply not stored).
+- OWNER CALL: #2 pets named in saved details (prompt widening vs code harvest), #3 main-cast label vs STORY SHAPE, #7 user-described view vs photo-vantage rule, #12 size-of-change exception (reversal of 2026-09-06), #13 permitting parent closing the loop; C landmark-list trimming.
+
+---
+
 Stages: arc_create (claude-opus-5, default effort) → arc_panel ×3 (grok-4.6 / deepseek-v4-pro / gpt-5.6-luna-pro, same prompt) → arc_retell (claude-opus-5) → arc_hints (grok-4.6, prompt NOT stored; rebuilt from `prompts/arc-hints.txt` + `buildArcHintsPrompt` promptBuilders.js:8646).
 Prompts as sent: create 32.7k chars, panel 23.2k, retell 53.1k, hints ≈6.5k (brief 1.8k + final arc 4.3k + source rule 0.4k + char details 2.4k).
 Create committed Arc 2 ("Turi"); retell rebuilt it (shop-window trip cut); final critique = 5 × MINOR.

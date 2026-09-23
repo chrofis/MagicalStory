@@ -1,5 +1,15 @@
 # 03 — STORY BIBLE + WARDROBE: judge findings
 
+## Status 2026-09-23
+
+Checked against staging `31fd7db0c` (after the evening fix round). FIXED = the commit that fixes it; OPEN = no fix yet, no ruling needed to start; OWNER CALL = touches a decision, a SETTLED line or has options the owner picks. Stale-doc and registry items listed at the end of each file were corrected in `a25ecb865` unless listed below.
+
+- FIXED (part of F1): a same-garment same-colour restatement is flagged `rewording` and re-renders no avatar — `ee8890278`; the spliced clause keeps its joiner and article, and a garment's slot is read from its declared `wornAs`/`type` so Max's hoodie is now compared — `6a2b0e121`.
+- OWNER CALL: F1 direction — the contract still takes the Art Director's words (2026-09-15 "the bible owns the words" was NOT reversed); flipping it needs the reversal protocol. F2 review latency (serial kickoff ruled 2026-09-21; p90 389 s is the new evidence if wanted). F6 feed the stored clothing or delete the sentence.
+- OPEN: F3 reviewer dresses non-cast creatures, F4 base layers identical once outer layers come off, F5 plot-worn "jacket" missing from the wardrobe + no reviewer check, F7 off-list colour words, F8 "checks 1-10" count, F9 stale cover rule; J1-J5; `wardrobeBibleReport` still not persisted.
+
+---
+
 Run: staging `job_1790100385959_1nitlympp` ("Das Ei im Laub", 18 pp, de-ch, 4 boys aged 3-5, watercolor), built at `b03c64b0`.
 Stages: `beats_story_bible` (claude-sonnet-4-6, 8.1 s) → `beats_clothing_review` (deepseek-v4-pro, **185.9 s**, 0 rewrites) → avatar kickoff → Art Director → `applyWardrobeBibleCorrections` (clothingCheck.js) → **final contract**.
 
