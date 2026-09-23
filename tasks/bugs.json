@@ -1302,6 +1302,15 @@
       "fixedAt": "2026-09-21",
       "fixedIn": "8c992616741bf65f84eab7c5b46b22395f2dfeef",
       "fix": "storyJobPipeline.js requires node crypto. Both claim-minting sites (storyJobPipeline.js unified completion mail, server/lib/trialEmail.js) gate the claim link on claim STATE — is_trial === true && has_set_password !== true — matching the gate trialReminders.js already used; the PDF stays gated on trial origin by design. Greeting resolution collapsed into one exported helper, email.resolveGreetingName(), which rejects any candidate containing \"@\"; the 56 template salutations became \"Hallo{greeting},\" so a nameless greeting renders bare, and order-failed's four gendered salutations (Dear / Liebe/r / Cher-Chère / Caro-Cara) became the neutral forms the other templates use. Pinned by tests/unit/email-greeting-and-claim-gate.test.ts."
+    },
+    {
+      "id": "iterate-repair-cast-from-name-scan",
+      "title": "The iterate repair builds its cast by name-scanning the rewritten brief, so a page with no boys got all four boys' references and a false \"Levin absent\" CRITICAL",
+      "reportedAt": "2026-09-23",
+      "source": "Reproduced from stored data, dragon run 6 (staging job_1790100385959_1nitlympp) p17: v0 prompt names none of Levin/Julian/Max/Kiaan; the iterate repair v1 prompt names each 3 times and carries a HEIGHT ORDER block; the page stores unrepairedCritical missing_character \"Levin is absent … EXPECTED CAST of 4\". v1 (45) beat v0 (43) and shipped: the hatchling is drawn as a red copy of the adult dragon and the eggshell is gone.",
+      "rootCause": "server/lib/images.js:4263 builds the iterate cast with getCharactersInScene(newSceneDescription, characters). The rewrite's metadata lists only non-photo-backed creatures, so the structured step matches nobody and it falls back to a name scan of the whole text incl. metadata (server/lib/sceneMetadata.js:1531-1545), which found the boys named in a garment/diagnosis line. Generation uses unionPageCast (storyJobPipeline.js:1231/4231), a different builder. The rewrite also dropped the creature ids from objects[].",
+      "impact": "Any iterate repair on a page whose cast is creatures only (or whose rewrite text mentions an absent character) is rendered with the wrong people as references and scored against a wrong expected cast; the false CRITICAL can let a worse version win or block a good one. Staging and production.",
+      "status": "open"
     }
   ]
 }
