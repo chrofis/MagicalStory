@@ -1,0 +1,51 @@
+Lab #1421 — arc_effort, model claude-opus-5-5 (Opus 5.5), stage create only (no panel, no retell)
+Story: job_1789853503332_riqncqg1i (staging). Prompt: create prompt sent by Lab #1375, verbatim (params.promptFrom=1375, same source #1416-1418 used).
+Judges: claude-sonnet + grok-4.6 (story-arc-judge.txt). Run 2026-09-23 on staging commit be213ec9. Experiment total $3.95 (Opus calls + judges).
+not returned = 1 - (visible chars / 3.5) / billed output tokens.
+
+=== ARM 1: create, effort xhigh ===
+Opus cost: $1.2873   output tokens: 62669   input tokens: 8489   visible chars: 14126   not returned: 94%   elapsed: 730 s
+Judged: 5.96  (sonnet 6.14 / grok 5.79)   judge cost $0.0646
+change: sonnet 7 / grok 4    attempts: sonnet 5 / grok 6
+All dimensions:
+  fit         sonnet  6   grok  5
+  lost        sonnet  7   grok  7
+  focus       sonnet  5   grok  5
+  sense       sonnet  6   grok  5
+  shape       sonnet  7   grok  6
+  agency      sonnet  6   grok  8
+  change      sonnet  7   grok  4
+  attempts    sonnet  5   grok  6
+  blockers    sonnet  4   grok  6
+  engaging    sonnet  8   grok  7
+  ensemble    sonnet  4   grok  5
+  entrances   sonnet  7   grok  7
+  grounding   sonnet  7   grok  4
+  difficulty  sonnet  7   grok  6
+
+Committed arc (verbatim):
+
+1. On an autumn afternoon, Levin (5) plays Unihockey with his little brother Julian (3) under the red and yellow lindens on the Lindenhof, where the cold wind from the lake blows leaves over the gravel, and Levin wishes, as always, that he could see a real dragon just once.
+2. Levin shoots the ball, and it rolls into a hole between the roots of the biggest linden, so he reaches in after it and touches an egg as big as a football and as warm as a stove tile, but at the same moment two hands grab it from the other side of the trunk.
+3. Max pulls and shouts, "Stopp! Das ist unser Ei! Wir haben es zuerst gesehen!", and Kiaan, holding the other end, says slowly, "Wir haben es alle gleichzeitig gesehen... glaub ich."
+4. Then the egg knocks from inside, tock, tock, so Julian cries "Das beisst!", runs behind a bench and will not come closer, no matter what Levin says.
+5. Levin lifts the egg against his tummy, it knocks happily while Julian watches from behind the bench, and Levin says out loud, "Das ist ein Drachenei, es heisst Funke, und wenn die Sonne hinter den Dächern ist, wird es zu kalt zum Schlüpfen."
+6. Max cries, "Dann kommt Funke zu uns, in Nias warmes Körbchen!", and grabs the egg to carry it home across the river, but Levin holds on, and while they pull, the egg wriggles out of all four hands and rolls down the slope toward the steep steps.
+7. Levin runs fast and puts his Unihockey stick in its way like in a game, so the egg stops, but the blade cracks in two, and Levin is sad, because it was his best stick.
+8. Kiaan says, "Der ist viel zu wild zum Tragen," and Levin looks around for a grown-up, but the cold Lindenhof holds only empty chess boards and blowing leaves, so the four boys must keep Funke warm right here.
+9. The hole under the linden lies in cold shade, so Levin rolls the egg into the last sunny spot at the foot of the terrace wall, where the stones are still warm, and Funke knocks again, and Levin is relieved.
+10. But Kiaan points and says, "Der Schatten kommt," because the shadow of the houses is creeping over the gravel, so the boys push the egg along the wall into the sun again and again, while Max keeps saying, "Wenn er schlüpft, gehört er uns!" and Levin answers, "Nein, uns!"
+11. The wind turns colder, so Levin wraps his jacket around the egg, and Max, who will not be outdone, wraps his jacket around it too, and both boys shiver.
+12. Then the sun shines only on the tops of the Grossmünster towers across the river, and then not even there, the egg feels cool through the jackets, and Funke stops knocking, so Max stops saying "uns", and Levin is sad, because he thinks it is over.
+13. Julian comes out from behind the bench, although he is still afraid, and he wraps his arms around the cold egg and presses his warm tummy against it, the way he saw Levin do, and after a while a tiny knock comes from inside.
+14. Levin understands, so he shouts, "Wir sind warm! Alle zusammen!", and all four boys pile around the egg with their arms around it and around each other and the jackets on top, like a nest made of children.
+15. The knocking grows louder, tock, tock, TOCK, and the shell cracks, and a golden-red dragon no bigger than a cat climbs out and blows a warm puff of smoke over the four cold boys.
+16. Funke touches each boy's nose with its snout, one after another, so Max laughs and says, "Dann gehört er uns allen!", and Levin nods.
+17. Funke crawls back into the hole between the linden roots where the egg lay, and it curls up there, glowing warm like embers in a stove.
+18. Julian goes to the tree first and knocks on the bark, "Klopf, klopf, Funke!", and from the roots comes a knock back and a little warm puff, so Julian laughs and is not afraid anymore, and Levin has seen his real dragon.
+
+=== ARM 2: create, effort max ===
+Opus cost: $2.5940   output tokens: 128000 (= the model ceiling, max_tokens 128000)   input tokens: 8489   visible chars: 0   not returned: 100%   elapsed: 1268 s
+Result: NO ARC. The whole 128,000-token budget went to thinking and the call returned zero visible characters, so parseArcCreate failed ("no "Stronger: Arc N" commitment line") and the arm was not judged.
+
+Committed arc (verbatim): none — the call returned no text.

@@ -55743,6 +55743,21 @@ finished book.
 Lab-only), `server/lib/testlab.js` (`arc_effort`: `model`, `stage: 'pipeline'`, `promptFrom`),
 `client/src/services/testlabService.ts` (label). Commits `175cc22bc`, `fd10b8af4`.
 
+**Follow-up 2026-09-23 (Lab #1421): Opus 5.5 create at xhigh and max.** Same story,
+`promptFrom=1375`, same judges, create only.
+
+| Lab | model | stage | effort | cost | out tok | not returned | judged (sonnet / grok) | change (s/g) | attempts (s/g) |
+|---|---|---|---|---|---|---|---|---|---|
+| #1421 | Opus 5.5 | create | xhigh | $1.287 | 62,669 | 94% | 5.96 (6.14 / 5.79) | 7 / 4 | 5 / 6 |
+| #1421 | Opus 5.5 | create | max | $2.594 | 128,000 | 100% | no arc | — | — |
+
+xhigh costs 2.6× the 5.5 high arm and 1.65× Opus 5 at high, and it scores 5.96, still below Opus
+5 high (6.39). Its ending shows an act (the scared little brother goes to the tree first and
+knocks), then states the change anyway ("is not afraid anymore"). At max the model spent the whole 128k output
+ceiling thinking and returned no text, so there was nothing to parse. That is $2.59 for nothing,
+and on 5.5 `max` cannot run inside the output ceiling for this prompt. Neither level changes the
+recommendation above. Arcs and per-dimension scores: `tests/manual/arc-effort/opus55-xhigh-max.txt`.
+
 **Status:** 🟡 recommendation pending owner
 
 ## 2026-09-23 — Over-the-shoulder: the camera is named as BEHIND the near figure
