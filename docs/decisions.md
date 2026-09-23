@@ -57268,3 +57268,27 @@ BUILT prompts. Not validated against a model: one stochastic rewrite would prove
 **Touched:** `server/lib/promptBuilders.js`, the four templates above, `scripts/admin/sibling-registry.json`,
 `tests/unit/ad-iterate-parity.test.ts`.
 **Status:** ✅ active on staging.
+
+## 2026-09-23 — The consolidator writes no coordinates into an edit instruction, and computes no score nobody reads
+
+**Context.** Dragon run 6 (staging `job_1790100385959_1nitlympp`) p12, audit 08 S1/S13. (1) The consolidator
+wrote "Remove the figure … that is not at bbox [0.363, 0.058, 0.712, 0.27]" into `fix_instruction`, and
+Grok received it verbatim; Grok cannot read coordinates and v1 came back pixel-near-identical. Rule 3 told
+the model to build identifiers "from the detected figures (use bbox / position / clothing)" and never said
+the numbers stay out. (2) The prompt carried a "Final score (0–100) — audit only" section (the deduction
+table, `final_score`, `final_score_reason`): the pipeline scores from `deduped_issues`, and nothing read
+`final_score` (`feedbackConsolidator.js` only clamped it; no client, test or pipeline consumer).
+
+**Decision.** Rule 3: `fix_instruction`, `scene_fix.instruction` and `preserve` never carry a bbox, a number
+list or a grid-cell label; a place is named in words, the bbox stays in the `bbox` field. The audit-only
+score (old rules 9-10 and the example's two fields) is deleted from the prompt and its clamp from the code;
+`deduped_issues` (the scoring source) is kept whole as rule 9. The audit measured 9.3k chars for the
+section, but 7k of that is the `deduped_issues` contract the score depends on; 2.1k was removable.
+
+**Replay (rung 2, one qwen-plus call, $0.0033):** the stored p12 round-0 prompt with both edits (35.0k →
+32.9k chars): no coordinate in any instruction, `deduped_issues` intact with types, severities and
+sources.
+
+**Touched:** `prompts/feedback-consolidator.txt`, `server/lib/feedbackConsolidator.js`,
+`scripts/analysis/qwen-eval-ab.js`, `docs/prompt-inventory.md`.
+**Status:** ✅ active on staging.

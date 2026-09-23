@@ -140,7 +140,7 @@ Sizes measured 2026-08-09.
 | image-visual-inventory.txt | 5,377 | 138 | regeneration.js (admin route: shown as `prompt` only, the call it makes sends image-inventory-unified.txt); testlab.js `split_p1` arm | **Not the production inventory** (corrected 2026-09-23): `runVisualInventory` (evalPipeline.js:98) loads image-inventory-unified.txt |
 | image-inspection.txt | 2,457 | 52 | images.js `inspectImageForErrors` | Image error inspection |
 | generated-image-analysis.txt | 1,106 | 39 | sceneValidator.js `analyzeGeneratedImage` | Generated-image analysis |
-| feedback-consolidator.txt | 17,739 | 167 | feedbackConsolidator.js `consolidateFeedback` | Merges all four evaluators into `deduped_issues[]` — **this list is what scoring charges** |
+| feedback-consolidator.txt | 25,879 | 194 | feedbackConsolidator.js `consolidateFeedback` | Merges all four evaluators into `deduped_issues[]` — **this list is what scoring charges**; no model-computed score since 2026-09-23 (the audit-only `final_score` section was deleted) |
 | repair-verification.txt | 1,799 | 48 | repairVerification.js `verifyRepairWithGemini` | Verifies a repair changed the target region |
 | story-text-quality-judge.txt | 2,880 | 48 | textQualityJudge.js `judgeStoryText` | Test Lab text-only harness: scores story TEXT on 5 criteria (cross-model judge) |
 | story-scorecard-judge.txt | 2,398 | 50 | testlab.js `runStoryScorecardStage` / storyScorecard.js | Test Lab `story_scorecard` stage: LLM judge rates 4 final artifacts (beats/scene/text/VB) on a 4×5 rubric for model comparison |
