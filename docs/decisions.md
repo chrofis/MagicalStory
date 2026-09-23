@@ -54,6 +54,38 @@ even beside a `[Background]` plate (only reached on a Grok failure for Grok-rout
 `docs/image-routing.md`, `docs/image-generation-methods.html`.
 **Status:** ✅ active on staging.
 
+## 2026-09-23 — A scene brief has ONE prose/metadata split, three carriers; prose is never rebuilt from its JSON
+
+**Context:** Production `job_1790107559778_fcmlfa8kn`: the scene review was handed ten canonical briefs
+(prose + `---METADATA---` + JSON) and returned the seven it rewrote as prose + a trailing fenced ```json
+block. `parseProseMetadataFormat` knew only the delimiter, so `stripSceneMetadata` sent those briefs to the
+bare-JSON path, where `buildTextFromJson` rebuilds a scene from the metadata alone: page 7's image scene
+became the single word "Objects:", page 3's "- Manuel:, center midground, ...". The builder also chose the
+legacy JSON wrapping for them. Eight more readers split on the delimiter by hand. A read-only scan of 137
+staging + 66 production stories found three carriers in stored rows: delimiter (1,699), trailing fenced
+block (13), trailing bare object on its own line (7).
+
+**Decision:** `sceneMetadata.splitBrief` is the one split, recognising all three carriers (a fence or bare
+object only when it ENDS the text and follows real prose). `parseProseMetadataFormat`,
+`extractSceneMetadata`, `findCastMissingFromMetadata`, the clothing-check prose in beatsPipeline and the Lab,
+the composite scene text in storyJobPipeline, the cast-span locator in sceneReviewGuard and the eval-strip
+gate in evalPipeline all read it. `stripSceneMetadata` THROWS when a text carries prose before a JSON object
+in no recognised carrier, instead of rebuilding it from the JSON — the only stored example is one staging
+page with a `---VISUAL BIBLE---` section appended after its metadata (`job_1789681157795_wkt20ckod`, the
+older merge bug `BRIEF_TRAILING_MARKERS` fixed at source). scene-review.txt's output line now names the
+delimiter and "unfenced" explicitly.
+
+**Rationale:** the fenced and bare carriers are already in stored rows and the iterate round produces them
+too, so normalising only at the review merge would leave every other author and every stored brief on the
+lossy path; recognising the carriers in the one split fixes every reader at once. No brief is canonicalised
+on write — there is one parse, not a parse plus a rewriter.
+
+**Touched files:** server/lib/sceneMetadata.js, server/lib/storyHelpers.js, server/lib/beatsPipeline.js,
+server/lib/testlab.js, server/lib/sceneReviewGuard.js, server/lib/evalPipeline.js, storyJobPipeline.js,
+prompts/scene-review.txt, tests/unit/brief-carrier-split.test.ts.
+
+**Status:** ✅ active
+
 ## 2026-09-23 — A place is never a one-grip object; the brief rewrite gets eyes-open and the creature face from the Art Director's constants
 
 **Context:** Staging `job_1790100385959_1nitlympp` p9 and p12: the hand-off guard reported "2 characters

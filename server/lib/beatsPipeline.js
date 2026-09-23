@@ -126,6 +126,7 @@ const {
   BRIEF_TRAILING_MARKERS,
   buildAvailableAvatarsForPrompt,
   extractSceneMetadata,
+  splitBrief,
   stripTrailingSeparator,
   getHistoricalLocations,
   getHistoricalObjects,
@@ -2603,7 +2604,7 @@ ${bibleBody}` : bibleBody;
       const meta = extractSceneMetadata(x.brief) || {};
       return {
         pageNumber: x.pageNumber,
-        prose: String(x.brief || '').split('---METADATA---')[0],
+        prose: splitBrief(x.brief).prose,
         cast: (meta.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
         perCharClothing: meta.characterClothing || {},
         // Structured worn-item states (server/lib/wornItems.js) — removal_unstated
@@ -2959,7 +2960,7 @@ ${bibleBody}` : bibleBody;
             const m2 = extractSceneMetadata(x.brief) || {};
             return {
               pageNumber: x.pageNumber,
-              prose: String(x.brief || '').split('---METADATA---')[0],
+              prose: splitBrief(x.brief).prose,
               cast: (m2.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
               perCharClothing: m2.characterClothing || {},
               wornItems: m2.wornItems || [],
@@ -3030,7 +3031,7 @@ ${bibleBody}` : bibleBody;
                   const m3 = extractSceneMetadata(x.brief) || {};
                   return {
                     pageNumber: x.pageNumber,
-                    prose: String(x.brief || '').split('---METADATA---')[0],
+                    prose: splitBrief(x.brief).prose,
                     cast: (m3.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
                     perCharClothing: m3.characterClothing || {},
                     wornItems: m3.wornItems || [],

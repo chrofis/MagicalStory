@@ -336,18 +336,83 @@ function sanitizeInteractions(rawInteractions) {
   return kept;
 }
 
+const METADATA_DELIMITER = '---METADATA---';
+// A fenced ```json block that ENDS the text, preceded by a newline.
+const TRAILING_FENCE_RE = /\n[ \t]*```(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*```\s*$/i;
+
 /**
- * Parse prose+metadata format: natural prose followed by ---METADATA--- JSON block.
+ * THE one split of a scene brief into its prose and its metadata JSON text.
+ *
+ * A brief is prose followed by one metadata object, and it reaches us in three
+ * carriers: after a `---METADATA---` line (the shape every author is asked
+ * for), as a trailing fenced ```json block, or as a trailing bare object on
+ * its own line. The fenced one is real, not
+ * hypothetical: the scene review was handed canonical briefs and returned 7 of
+ * 10 in the fenced carrier on production job_1790107559778_fcmlfa8kn, and the
+ * iterate round has returned it too (iterateBriefGuard.js). Before this split
+ * existed only the first carrier was recognised, so a fenced brief fell to the
+ * bare-JSON path and `buildTextFromJson` rebuilt it from the metadata alone —
+ * all Art Director prose gone (page 7 of that job rendered from "Objects:").
+ *
+ * Every reader of a brief's prose or metadata goes through this function; do
+ * not split on the delimiter by hand.
+ *
+ * @param {string} text
+ * @returns {{prose:string, metadataText:string, metadataStart:number, carrier:'delimiter'|'fence'|'bare'|null}}
+ *   carrier null → no metadata block; prose is the whole (trimmed) text.
+ */
+function splitBrief(text) {
+  const s = typeof text === 'string' ? text : String(text || '');
+  const idx = s.indexOf(METADATA_DELIMITER);
+  if (idx !== -1) {
+    return {
+      prose: s.substring(0, idx).trim(),
+      metadataText: s.substring(idx + METADATA_DELIMITER.length).trim(),
+      metadataStart: idx,
+      carrier: 'delimiter',
+    };
+  }
+  const m = s.match(TRAILING_FENCE_RE);
+  if (m) {
+    const prose = s.substring(0, m.index).trim();
+    const body = m[1].trim();
+    // One fence, closing the text, holding an object, after real prose. Text
+    // with an earlier fence is some other document (legacy markdown briefs put
+    // sections after their fence, so they never match the trailing anchor).
+    if (prose && !prose.includes('```') && body.startsWith('{') && !body.includes('```')) {
+      return { prose, metadataText: body, metadataStart: m.index, carrier: 'fence' };
+    }
+  }
+  // Bare carrier: prose, then an unfenced object on its own line that runs to
+  // the end of the text and parses whole (8 stored staging briefs, 2026-09).
+  // The earliest such line wins — a later `{` line is inside the object.
+  if (s.trimEnd().endsWith('}')) {
+    const lineStart = /\n[ \t]*\{/g;
+    let hit;
+    while ((hit = lineStart.exec(s)) !== null) {
+      const prose = s.substring(0, hit.index).trim();
+      if (!prose || prose.includes('```')) break;
+      const body = s.substring(hit.index).trim();
+      try {
+        const obj = JSON.parse(body);
+        if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+          return { prose, metadataText: body, metadataStart: hit.index, carrier: 'bare' };
+        }
+      } catch { /* not this line — keep scanning */ }
+    }
+  }
+  return { prose: s.trim(), metadataText: '', metadataStart: -1, carrier: null };
+}
+
+/**
+ * Parse prose+metadata format: natural prose followed by its metadata JSON
+ * object, in either carrier `splitBrief` recognises.
  * Returns { prose, metadata } if detected, null otherwise.
  */
 function parseProseMetadataFormat(text) {
   if (!text || typeof text !== 'string') return null;
-  const delimiter = '---METADATA---';
-  const idx = text.indexOf(delimiter);
-  if (idx === -1) return null;
-
-  const prose = text.substring(0, idx).trim();
-  const jsonPart = text.substring(idx + delimiter.length).trim();
+  const { prose, metadataText: jsonPart, carrier } = splitBrief(text);
+  if (!carrier) return null;
   if (!prose || !jsonPart) return null;
 
   try {
@@ -587,7 +652,16 @@ function stripSceneMetadata(sceneDescription) {
   // Fallback: use parsed directly if it has scene fields
   if (!sceneData) sceneData = parsed;
   if (sceneData && (sceneData.imageSummary || sceneData.characters)) {
-    // Convert structured JSON to prose for image prompt
+    // buildTextFromJson rebuilds a scene from its JSON fields ONLY. That is
+    // right for a brief that IS a JSON object, and it silently threw away the
+    // whole Art Director prose of every brief whose metadata arrived in a
+    // carrier the splitter did not know (production job_1790107559778_fcmlfa8kn:
+    // page 7 rendered from the single word "Objects:"). Text before the JSON
+    // is prose; never discard it — refuse instead.
+    const head = sceneDescription.trim();
+    if (!head.startsWith('{') && !head.startsWith('```')) {
+      throw new Error(`[SCENE META] brief carries prose AND a JSON object in no recognised carrier (---METADATA---, trailing fenced block, or trailing bare object) — refusing to rebuild it from the JSON alone, which would discard the prose. Head: ${head.slice(0, 120).replace(/\n/g, ' ')} … tail: ${head.slice(-120).replace(/\n/g, ' ')}`);
+    }
     return buildTextFromJson(sceneData);
   }
 
@@ -861,7 +935,8 @@ function extractSceneMetadata(sceneDescription) {
   // ---METADATA--- delimiter we'll know any failure is a broken-metadata bug,
   // not "this is a different format". Used at the bottom for loud logging
   // and for the prose-recovery fallback.
-  const hasProseDelim = sceneDescription.includes('---METADATA---');
+  const briefSplit = splitBrief(sceneDescription);
+  const hasProseDelim = briefSplit.carrier !== null;
 
   // Try prose+metadata format first (natural prose + ---METADATA--- JSON block)
   const proseFormat = parseProseMetadataFormat(sceneDescription);
@@ -1208,9 +1283,7 @@ function extractSceneMetadata(sceneDescription) {
   // In all cases, return a degraded metadata object that preserves the prose
   // so image prompts still have something to render from.
   if (hasProseDelim) {
-    const idx = sceneDescription.indexOf('---METADATA---');
-    const prose = sceneDescription.substring(0, idx).trim();
-    const tail = sceneDescription.substring(idx + '---METADATA---'.length).trim();
+    const { prose, metadataText: tail } = briefSplit;
     const tailHead = tail.slice(0, 200).replace(/\n/g, ' ');
     const looksLikeJson = tail.startsWith('{') || /^```json/i.test(tail);
     let critiqueOnly = false;
@@ -1431,7 +1504,7 @@ function findCastMissingFromMetadata(sceneDescription, castNames, sceneMetadata 
   const metadata = sceneMetadata || extractSceneMetadata(sceneDescription);
   if (!metadata || !Array.isArray(metadata.characters)) return [];
 
-  const prose = sceneDescription.split('---METADATA---')[0];
+  const prose = splitBrief(sceneDescription).prose;
   const listed = metadata.characters
     .map(c => String(typeof c === 'string' ? c : (c && c.name) || '').trim())
     .filter(Boolean);
@@ -2616,6 +2689,8 @@ module.exports = {
   extractJsonFromText,
   sanitizeInteractions,
   parseProseMetadataFormat,
+  splitBrief,
+  METADATA_DELIMITER,
   POSITION_ABBREVIATIONS,
   expandPositionAbbreviations,
   stripEntityIds,

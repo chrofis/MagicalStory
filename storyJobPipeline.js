@@ -5825,9 +5825,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     // before the first paid call (44 of 49 staging outcomes;
                     // the composite never produced a production page).
                     scene: {
-                      description: String(fdMeta.description || pageData.scene?.sceneDescription || pageData.sceneDescription || '').split('---METADATA---')[0].trim(),
+                      description: require('./server/lib/sceneMetadata').splitBrief(fdMeta.description || pageData.scene?.sceneDescription || pageData.sceneDescription || '').prose,
                       artStyle: inputData.artStyle || 'watercolor',
-                      pageBrief: String(fdMeta.pageBrief || pageData.scene?.sceneDescription || pageData.sceneDescription || '').split('---METADATA---')[0].trim(),
+                      pageBrief: require('./server/lib/sceneMetadata').splitBrief(fdMeta.pageBrief || pageData.scene?.sceneDescription || pageData.sceneDescription || '').prose,
                       interactions: fdMeta.interactions || [],
                       // Per-character expression + attention target, the two
                       // things a pasted avatar cut-out cannot supply (it is
