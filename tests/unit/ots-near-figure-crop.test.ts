@@ -157,3 +157,19 @@ describe('one rule reaches the planner and every brief-authoring template', () =
     }
   });
 });
+
+describe('the camera is BEHIND the near figure, not beside it (Lab 1419 rendered a profile)', () => {
+  it('the crop says the face is turned away from the camera', () => {
+    expect(OTS_NEAR_FIGURE_CROP).toMatch(/back of their head/);
+    expect(OTS_NEAR_FIGURE_CROP).toMatch(/face is turned away/);
+  });
+
+  it('the near figure looks straight ahead, never up at the subject', () => {
+    expect(OTS_NEAR_FIGURE_RULE).toMatch(/straight ahead/);
+  });
+
+  it('the subject is placed far off, not beside the near figure', () => {
+    const ots = SHOTS.find((s: { id: string }) => s.id === 'over-the-shoulder');
+    expect(ots.definition).toMatch(/far across the frame/);
+  });
+});

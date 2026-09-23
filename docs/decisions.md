@@ -55744,3 +55744,14 @@ Lab-only), `server/lib/testlab.js` (`arc_effort`: `model`, `stage: 'pipeline'`, 
 `client/src/services/testlabService.ts` (label). Commits `175cc22bc`, `fd10b8af4`.
 
 **Status:** 🟡 recommendation pending owner
+
+## 2026-09-23 — Over-the-shoulder: the camera is named as BEHIND the near figure
+
+**Context:** Lab 1419 (p10 of dragon run 6, after 50e150c21): the crop worked (no legs, cut at mid-chest) but Grok
+drew the near figure in clean profile, face visible, with the subject large beside him. The brief had him "look up
+at" the subject "a few steps beyond".
+**Decision (owner):** `OTS_NEAR_FIGURE_CROP` states what the camera sees: the back of the head and the hair, the
+face turned away into the picture. The shot definition puts the subject far across the frame, several body lengths
+away. `OTS_NEAR_FIGURE_RULE` has the near figure look straight ahead toward the subject, never up at it. All three
+reach the planner, the four brief templates and the image prompt through the existing constants.
+**Touched:** server/lib/shotVocabulary.js, tests/unit/ots-near-figure-crop.test.ts.

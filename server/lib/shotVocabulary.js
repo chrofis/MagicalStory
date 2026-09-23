@@ -38,7 +38,7 @@
  * crops. Positive only, and never the words "back view": Grok anchors on the
  * pose-category word and ignores the qualifier after it.
  */
-const OTS_NEAR_FIGURE_CROP = 'the back of the head, one shoulder and the upper arm, large in a front corner and cut by the frame edge; nothing below the shoulder blades is in frame';
+const OTS_NEAR_FIGURE_CROP = 'the back of the head, one shoulder and the upper arm, large in a front corner and cut by the frame edge; nothing below the shoulder blades is in frame. The camera sees the back of their head and their hair; their face is turned away from us, into the picture';
 
 /**
  * The shots, TIGHTEST FIRST. `id` is the word every stage writes and reads,
@@ -89,7 +89,7 @@ const SHOTS = [
     id: 'over-the-shoulder',
     axis: 'position',
     match: /\b(?:over[-\s]?the[-\s]?shoulder|over[-\s]?shoulder)\b/i,
-    definition: `An over-the-shoulder shot stands behind one figure, who is a crop: ${OTS_NEAR_FIGURE_CROP}. What they face sits small and deep in the opposite corner. The camera's own axis is the line between them, so the picture states who is acting on whom without having to work it out.`,
+    definition: `An over-the-shoulder shot stands behind one figure, who is a crop: ${OTS_NEAR_FIGURE_CROP}. What they face sits far across the frame, small and deep in the opposite corner, several body lengths away. The camera's own axis is the line between them, so the picture states who is acting on whom without having to work it out.`,
   },
   {
     id: 'high-angle',
@@ -144,7 +144,7 @@ const OTS_NO_CONTACT_RULE = "Over-the-shoulder never goes on a page where the ne
  * what its prose may describe. Filled into scene-expansion.txt,
  * scene-expansion-all.txt, scene-iteration.txt and scene-iteration-free.txt.
  */
-const OTS_NEAR_FIGURE_RULE = `On an \`over-the-shoulder\` page the figure nearest the camera gets \`perspective: over-the-shoulder\` — never \`back view\` and never a glance over the shoulder — and is seen as a crop: ${OTS_NEAR_FIGURE_CROP}. Describe only what that crop shows: the hair, the collar and sleeve of the upper garment, anything held up into frame. That figure's prose names no legs, trousers, footwear or stance. ${OTS_NO_CONTACT_RULE}`;
+const OTS_NEAR_FIGURE_RULE = `On an \`over-the-shoulder\` page the figure nearest the camera gets \`perspective: over-the-shoulder\` — never \`back view\` and never a glance over the shoulder — and is seen as a crop: ${OTS_NEAR_FIGURE_CROP}. Describe only what that crop shows: the hair, the collar and sleeve of the upper garment, anything held up into frame. That figure's prose names no legs, trousers, footwear or stance, and it looks straight ahead into the scene toward what it faces — never up at it. ${OTS_NO_CONTACT_RULE}`;
 
 /**
  * Whether a character annotation declares the over-the-shoulder near figure.
