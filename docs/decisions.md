@@ -55957,3 +55957,51 @@ text cold and is told to say nothing about content, so it cannot revert a fix; t
 output contract is unchanged.
 **Status:** ✅ active on staging. Not re-run with a model: the only Lab stage is `text_refine`, the whole
 chain (~$1.29 on run 6), above the $0.30 cap for this task.
+
+## 2026-09-23 — A garment off by design is never charged as missing: the entity grid reads the page's worn state under either bible key
+
+**Context:** Dragon run 6 (staging `job_1790100385959_1nitlympp`). The briefs for p11 and p12 declare
+`{id: ART004, owner: Kiaan, state: "off"}` (the gilet is snatched on p11 and lies by the wall on p12), and
+p16 declares Levin's fleece `ART006` off. The entity grid still charged "Kiaan is missing the rust-brown …
+body warmer" (MAJOR, −15) on p11 v0 and p12 v1, and "Levin is missing the … fleece jacket" (MAJOR, −15)
+on p16 v0. On p12 the qwen-plus consolidator happened to drop the finding on v0 and keep it on v1, so a
+judgement call swung the repair comparison. The stored report shows why: every off page sat in Kiaan's
+plain `standard` grid (`byClothing: ["standard"]`, pages 4,5,9,11,12,16,18), judged against the sheet
+that wears the gilet — the exact fault the 2026-09-19 wardrobe-state split (`f1a897765`) exists to close.
+That commit moved the worn resolution to collection time (`collectEntityAppearances`) and read
+`storyData.visualBible` alone; the pipeline's entity-check input (`repairPipeline.js buildEntityCheckData`)
+carries the bible only as `wornItemsVisualBible`, deliberately, because the plain key also switches on
+visual-bible secondary-character checks. The line it replaced had read both keys. So on every pipeline
+entity check since 2026-09-19 no page's off rows resolved and the split was inert.
+
+**Decision:** The owner's rule ("worn-state findings": a garment that is off by design is never charged as
+missing, decided from the stored worn state, not by the consolidator) is met by the structured mechanism
+that already exists, repaired — not by a new filter. `wornItems.wornItemsBibleOf(storyData)` is the one
+reader of the worn-state bible (either key); `runEntityConsistencyChecks` passes it to
+`collectEntityAppearances` as its own `wornItemsVisualBible` option, which the per-page worn resolution
+reads. The plain `visualBible` option keeps its other job (VB creatures in fallback detection) unchanged.
+The two existing `visualBible || wornItemsVisualBible` readers (`resolveOutfitForStoryPage`,
+`repairSinglePage`) now call the same function. An off page lands in its own `--off:` wardrobe grid,
+judged against the redressed variant sheet with the removal stated, or — with no variant sheet — is
+left wardrobe-unjudged and judged for identity only (never against the wearing sheet). A page where the
+garment is WORN stays in the wearing grid, so a garment that is worn and missing is still charged.
+
+**Rationale:** Entity findings carry no garment id (`clothing_inconsistent`, character, page, cells), so a
+code filter would have had to read the description to know which garment it was about — forbidden. It
+is also unnecessary: the grid is keyed by the declared worn state, so the judge is never shown an off
+page against a reference that wears the garment. Fixing the lost key restores that; no prompt and no
+scoring table changes.
+
+**Replay (rung 1, stored run 6 data, no model calls):** collection over the stored briefs and
+detections, before vs after. Before: Kiaan `standard` = p4,5,9,11,12,16,18 (identical to the stored
+report). After: Kiaan `standard` = p4,5,9,16,18 and `standard--off:ART004` = p11,12; Levin p16 →
+`standard--off:ART006`; Max p9 → `standard--off:ART005`. The three stored worn-state MAJORs (p11 v0,
+p12 v1, p16 v0; −15 each) have no grid left to come from. Out of scope and unchanged: p12 v0's QUALITY
+finding "Kiaan's gilet is missing from the scene" (fix: "add it in a heap beside the wall") — that is the
+brief's declared `location` for the off garment not being drawn, a different finding from "the wearer is
+missing it".
+
+**Touched:** `server/lib/wornItems.js` (`wornItemsBibleOf`), `server/lib/entityConsistency.js`
+(`runEntityConsistencyChecks` → `collectEntityAppearances` option `wornItemsVisualBible`; `repairSinglePage`),
+`tests/unit/entity-worn-state-bible-key.test.ts`.
+**Status:** ✅ active on staging.

@@ -957,6 +957,9 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
       storyCharacters: characters,
       clothingRequirements: storyData.clothingRequirements || null,
       visualBible: storyData.visualBible || null,
+      // Per-page worn state reads the bible under EITHER key — the pipeline's
+      // entity-check input carries it as `wornItemsVisualBible` only.
+      wornItemsVisualBible: require('./wornItems').wornItemsBibleOf(storyData),
       artStyle,
     });
 
@@ -1736,7 +1739,7 @@ function collectSecondaryEntities(visualBible, sceneImages = []) {
 }
 
 async function collectEntityAppearances(sceneImages, characters = [], sceneDescriptions = [], options = {}) {
-  const { skipMinAppearancesFilter = false, storyCharacters = null, clothingRequirements = null, visualBible = null, artStyle = 'watercolor' } = options;
+  const { skipMinAppearancesFilter = false, storyCharacters = null, clothingRequirements = null, visualBible = null, wornItemsVisualBible = null, artStyle = 'watercolor' } = options;
   const pagesWithNewBbox = [];
   const appearances = new Map();
 
@@ -1816,7 +1819,7 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
     // so it is stamped on the appearance here — ONE derivation, the same
     // `offIdsForCharacter` the avatar and repair paths call.
     let pageWornResolved = [];
-    if (visualBible) {
+    if (wornItemsVisualBible) {
       const sceneDesc = sceneDescriptions.find(s => s.pageNumber === pageNumber);
       const desc = sceneDesc && (sceneDesc.description || sceneDesc.sceneDescription);
       if (desc) {
@@ -1824,7 +1827,7 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
           const meta = extractSceneMetadata(desc);
           if (meta) {
             pageWornResolved = require('./wornItems')
-              .resolveWornItemsForPage(visualBible, meta.characters || [], meta, { pageNumber }) || [];
+              .resolveWornItemsForPage(wornItemsVisualBible, meta.characters || [], meta, { pageNumber }) || [];
           }
         } catch (err) {
           log.warn(`⚠️ [ENTITY-COLLECT] Page ${pageNumber}: worn-item resolution failed (${err.message}) — no wardrobe state stamped on this page's crops`);
@@ -3366,7 +3369,7 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
       buildClothingDescription(character, clothingCategory, artStyle, storyData.clothingRequirements),
       charName,
       {
-        visualBible: storyData?.visualBible || storyData?.wornItemsVisualBible || null,
+        visualBible: require('./wornItems').wornItemsBibleOf(storyData),
         sceneMetadata: pageWornMeta,
         pageNumber,
       }

@@ -1511,6 +1511,24 @@ function resolveGeneratedOutfit(outfitText, ownerName, { visualBible = null, sce
 }
 
 /**
+ * The Visual Bible a `storyData` carries for resolving per-page worn state.
+ *
+ * The bible arrives under one of TWO keys, and both are the same data:
+ * `visualBible` on a stored story, `wornItemsVisualBible` on the entity-check
+ * input the repair pipeline assembles (repairPipeline.js buildEntityCheckData),
+ * which deliberately avoids the plain key because that one also switches on the
+ * visual-bible secondary-character checks. Every worn-state reader goes through
+ * this one function: when f1a897765 (2026-09-19) moved the entity grid's worn
+ * resolution to collection time it read `visualBible` alone, so on every
+ * pipeline entity check the page's `off` rows resolved to nothing and a garment
+ * taken off by design was judged against the sheet that still wears it —
+ * staging job_1790100385959_1nitlympp p11/p12, "Kiaan is missing the gilet".
+ */
+function wornItemsBibleOf(storyData) {
+  return (storyData && (storyData.visualBible || storyData.wornItemsVisualBible)) || null;
+}
+
+/**
  * The same one resolved outfit, for a caller that holds a whole `storyData` and
  * a page number rather than a parsed brief — the three character-repair entry
  * points (repairPipeline, routes/regeneration, entityConsistency's single-page
@@ -1529,7 +1547,7 @@ function resolveOutfitForStoryPage(outfitText, characterName, storyData, pageNum
     if (!desc) return String(outfitText || '');
     const { extractSceneMetadata } = require('./sceneMetadata');
     return resolveGeneratedOutfit(outfitText, characterName, {
-      visualBible: (storyData && (storyData.visualBible || storyData.wornItemsVisualBible)) || null,
+      visualBible: wornItemsBibleOf(storyData),
       sceneMetadata: extractSceneMetadata(desc),
       pageNumber,
     });
@@ -1570,5 +1588,6 @@ module.exports = {
   resolveOutfitForPage,
   resolveOutfitForStoryPage,
   resolveGeneratedOutfit,
+  wornItemsBibleOf,
   sameName,
 };
