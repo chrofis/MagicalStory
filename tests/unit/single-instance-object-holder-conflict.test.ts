@@ -107,7 +107,7 @@ describe('single-instance object — two conflicting holder findings are one con
     // recorded as a spec_conflict. The single-instance-object shape must be
     // inside that section, after the body-part shape it generalises.
     const specStart = t.indexOf('## Spec check (required)');
-    const specEnd = t.indexOf('## Final score');
+    const specEnd = t.indexOf('## Deduplicated issues');
     expect(specStart).toBeGreaterThan(-1);
     expect(specEnd).toBeGreaterThan(specStart);
     const section = t.slice(specStart, specEnd);
@@ -119,7 +119,7 @@ describe('single-instance object — two conflicting holder findings are one con
 
   it('keys the object on the declared spec, not on matching finding wording', () => {
     const t = tpl();
-    const section = t.slice(t.indexOf('## Spec check (required)'), t.indexOf('## Final score'));
+    const section = t.slice(t.indexOf('## Spec check (required)'), t.indexOf('## Deduplicated issues'));
     // CLAUDE.md forbids working out what a finding means from its prose; the two
     // real findings name the prop differently, so wording-matching is also
     // useless here. The spec is the arbiter, and the holder may be declared in

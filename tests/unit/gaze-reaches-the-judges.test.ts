@@ -32,7 +32,7 @@ const OBJECTS = [
 describe('gazeCharacters — the array that actually carries looksAt', () => {
   it('prefers the objects over the bare name strings', () => {
     const meta = { characters: NAMES, fullData: { characters: OBJECTS } };
-    expect(gazeCharacters(meta)).toBe(OBJECTS);
+    expect(gazeCharacters(meta)).toEqual(OBJECTS);
   });
 
   it('is not fooled by a non-empty array of strings', () => {
@@ -41,7 +41,7 @@ describe('gazeCharacters — the array that actually carries looksAt', () => {
   });
 
   it('takes the top-level array when IT holds the objects', () => {
-    expect(gazeCharacters({ characters: OBJECTS })).toBe(OBJECTS);
+    expect(gazeCharacters({ characters: OBJECTS })).toEqual(OBJECTS);
   });
 
   it('returns null when neither shape carries objects', () => {
@@ -53,7 +53,7 @@ describe('gazeCharacters — the array that actually carries looksAt', () => {
 
   it('accepts objects even when only some declare a gaze', () => {
     const mixed = [{ name: 'A', looksAt: 'ART001' }, { name: 'B' }];
-    expect(gazeCharacters({ characters: NAMES, fullData: { characters: mixed } })).toBe(mixed);
+    expect(gazeCharacters({ characters: NAMES, fullData: { characters: mixed } })).toEqual(mixed);
   });
 });
 

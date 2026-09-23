@@ -32,7 +32,7 @@
 5c. **One instant, no history.** {ONE_INSTANT}
 5d. **The plan line's verb and shot are the default.** Follow the plan line's action verb and shot size unless they cannot be staged. A plan line naming an in-progress movement — wading, climbing, swimming toward something — is staged mid-effort in that element, never as the arrived or dry state (the no-partial-immersion rule restages the pose, not the moment). A close-up is not widened into an establishing shot without need.
 5e. **The plan line's stakes set the faces and the effort.** A plan line that carries threat, hurry or strain is drawn under it: every `expression` names the strain in brows, eyes and mouth, bodies brace, lean or hurry, and nothing in the frame rests. A calm plan line is drawn calm. Mood is shown through faces, bodies, light and weather — never named.
-5f. **Content, not rendering.** {NO_LENS}
+5g. **Content, not rendering.** {NO_LENS}
 6. **Characters are active.** Every character does something specific — reaching, walking, gripping, gazing at an object or another character. Never standing-and-smiling. Eyes look at what they interact with, not at the camera.
 6b. **A group acts together.** When several characters share the frame, show them mid-action on one shared task, turned toward it and each other — never lined up abreast facing the viewer.
 6c. **One gaze target per page.** {GAZE_TARGET}

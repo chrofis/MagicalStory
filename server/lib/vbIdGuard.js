@@ -232,7 +232,7 @@ function gazeCharacters(meta) {
   const pageObjects = meta?.objects || meta?.fullData?.objects || [];
   for (const candidate of [meta?.fullData?.characters, meta?.characters]) {
     if (Array.isArray(candidate) && candidate.some(c => c && typeof c === 'object' && c.name)) {
-      return candidate.map(c => (c && typeof c === 'object' ? { ...c, looksAt: gazeTarget(c.looksAt, pageObjects) } : c));
+      return candidate.map(c => (c && typeof c === "object" && c.looksAt ? { ...c, looksAt: gazeTarget(c.looksAt, pageObjects) } : c));
     }
   }
   return null;
