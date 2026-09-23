@@ -1952,7 +1952,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // arrives as sceneHint (scene.outlineExtract). Comparing the cover against
     // its own brief catches wrong placement ("characters standing in the
     // river"), wrong/extra objects, and missing figures. The title/dedication
-    // text is the only cover-specific concern, handled by the TEXT RULES below.
+    // text is the only cover-specific concern. NOTE (2026-09-23 audit): the title
+    // reaches only the QUALITY judge (prepended in the cover branch below); this
+    // judge's TEXT_RULES is requiredTextBlock, which never carries the title.
     const isCover = evaluationType === 'cover';
     // Covers are head-on portraits: viewer-gaze and a flat 2D title are correct,
     // not defects. Tell the fidelity evaluators so they don't penalize those,

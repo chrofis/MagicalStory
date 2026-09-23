@@ -746,8 +746,8 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
     });
   }
 
-  // G — the VB element budget (owner, 2026-09-06): never more than three
-  // packable Visual Bible elements on a page. Counted and ranked in
+  // G — the VB element budget (owner, 2026-09-06; FOUR since 2026-09-11,
+  // VB_ELEMENT_BUDGET): packable Visual Bible elements on a page. Counted and ranked in
   // vbElementBudget.js against the same set and the same priority order the
   // reference selection uses, so the finding names exactly the elements the
   // packer would keep and drop.
@@ -889,8 +889,8 @@ function checkScenes(pages, castNames = [], visualBible = null, opts = {}) {
 //     distribution floors are a whole-book tally and carry pageNumber 0; R4's
 //     collision is per page. Both restore rules the old unified chain enforced
 //     and the beats chain silently dropped (rule-survival audit, 2026-09-03).
-//   vb_element_overflow  the owner's cap of three packable Visual Bible
-//     elements per page (2026-09-06). Mechanical, and the fix is a deletion the
+//   vb_element_overflow  the owner's cap of packable Visual Bible elements
+//     per page (three 2026-09-06; FOUR since 2026-09-11, VB_ELEMENT_BUDGET). Mechanical, and the fix is a deletion the
 //     reviewer can make without inventing anything. SENT; what survives the
 //     review is truncated in code.
 //   vb_state_contradicted / vb_state_no_base  a stated object whose states[]

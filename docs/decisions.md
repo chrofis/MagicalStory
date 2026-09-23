@@ -9435,6 +9435,9 @@ Total measured savings: 1,230 KiB → 339 KiB (−891 KiB, 72.4 %).
 ---
 
 ## Covers get full page-style evaluation (semantic + 3-stage + placement)
+
+> → corrected 2026-09-23 (the cover note reaches both judges, but the cover TITLE contract reaches the quality judge only), see "2026-09-23 — Prompt audit of job_1790100385959: corrections to earlier entries", item 2.
+
 **Context:** Cover images (title page, initial page, back cover) skipped semantic
 eval, three-stage compliance, and the P1 visual-inventory pass — all gated to
 `evaluationType === 'scene'` in `evaluateImageQuality`. Those passes carry the
@@ -32443,6 +32446,8 @@ status on the 2026-08-04 idle-shutdown entry.
 
 ## 2026-09-03 — The text chain is TWO PARALLEL AUDITS → merge → ONE repair → ONE lector that returns corrected pages (owner ruling; supersedes today's earlier lector-chain entry)
 
+> → corrected 2026-09-23 (the arc-informed audit gets no back cover, and the repair model is claude-opus, not deepseek-v4-pro), see "2026-09-23 — Prompt audit of job_1790100385959: corrections to earlier entries", item 3.
+
 **Context:** the chain committed this morning in `81f1c0798` was
 audit → fix → **audit2 → corrective fix** → lector → **apply**: six model calls,
 two of them a second causality audit and its round, one of them a separate pass
@@ -35762,6 +35767,9 @@ the page is *for*, and it was the half the render dropped here.
 **Status:** ✅ active
 
 ## Cover hint casts are validated against the real cast, phantoms dropped and slots refilled (2026-09-06)
+
+> → corrected 2026-09-23 (the code fills every cover up to the cap even when nothing was dropped, and the prompt rule now lives in the Art Director template), see "2026-09-23 — Prompt audit of job_1790100385959: corrections to earlier entries", item 8.
+
 **Context:**   Staging beats run `job_1788641639919_mpjwlzkf1` (cast Lily, Ethan,
 James, Rachel, Margaret; mains Lily + Ethan) produced a back-cover hint listing five
 characters, one of which — "The smallest girl (centre front, facing viewer)" — is in no
@@ -36869,6 +36877,8 @@ per arm.
 ---
 
 ### The diff pass does NOT invent prose, and must never get a length guard (correction, 2026-09-06)
+
+> → corrected 2026-09-23 (the "never invents" finding is refuted by run 6), see "2026-09-23 — Prompt audit of job_1790100385959: corrections to earlier entries", item 4.
 
 **Context.** The diff pass added in the 2026-09-06 entry above sometimes emits a
 "correction" whose replacement is LONGER than the span it quotes. That was initially
@@ -47372,6 +47382,8 @@ QC retry), `server/lib/evalPipeline.js` (comment), `tests/unit/empty-scene-geome
 
 ## 2026-09-15 — The Visual Bible outranks the wardrobe contract when they dress the same body slot
 
+> → corrected 2026-09-23 (its reconcile half runs opposite to the same-day plot-critical-object entry), see "2026-09-23 — Prompt audit of job_1790100385959: corrections to earlier entries", item 7.
+
 **Context:** staging `job_1789420511893_zly5rcdej` drew Captain Sarah in a pirate tricorn on the back
 cover, the initial page and interior pages 14-15, while `ART002` — a navy captain's cap with a gold
 anchor, the object the whole plot turns on — was assigned to nine of her pages. Three causes, all
@@ -47416,6 +47428,8 @@ NOT built: that is an eval classification change and the owner's call.
 **Status:** ✅ active — staging only, not on master
 
 ## 2026-09-15 — A plot-critical worn object is described IN FULL in the outfit, not left out of it
+
+> → corrected 2026-09-23 (the code copies the Visual Bible's words into the outfit, the reverse of "the Visual Bible can then copy that"), see "2026-09-23 — Prompt audit of job_1790100385959: corrections to earlier entries", item 7.
 
 **Context:** supersedes the same-day rule that told the wardrobe writer to leave a plot-critical slot
 empty for the story's own object to fill. The owner's ruling: *"why leave it open, why not put what
@@ -48097,6 +48111,8 @@ are now pinned so the pair cannot drift again.
 **Touched files.** `server/lib/coverIterate.js`, `tests/unit/cover-worn-held-slot-conflict.test.ts`.
 
 ## 2026-09-15 — A wardrobe correction re-renders its avatar; the early kickoff stays early
+
+> → corrected 2026-09-23 (corrections are not rare: a same-garment re-wording re-renders too), see "2026-09-23 — Prompt audit of job_1790100385959: corrections to earlier entries", item 6.
 
 **Context:** `applyWardrobeBibleCorrections` needs the Visual Bible, so it can only run after the
 all-pages Art Director call. The styled-avatar kickoff fires several stages earlier, at the
@@ -49532,6 +49548,8 @@ on a parser succeeding upstream is not a guard.
 ---
 
 ## 2026-09-19 — The character-source rule reaches all four stages that claim one, and names the right master for each
+
+> → corrected 2026-09-23 (its line that arc-hints.txt "makes no source claim" is stale for arc-hints), see "2026-09-23 — Prompt audit of job_1790100385959: corrections to earlier entries", item 1.
 
 **Context.** The split shipped earlier today ("the commission owns the situation, the
 saved profile owns the person") landed on `arc-create.txt` and `arc-retell.txt` and
@@ -51535,6 +51553,8 @@ is the open alternative, and is a prompt-side change the owner should see first.
 ---
 
 ## 2026-09-20 — The re-plan convergence test counts CAST/FOCAL must-fix findings, not the raw must-fix total
+
+> → corrected 2026-09-23 ("a round that raises the cast/focal count is discarded" holds for round 2+ only), see "2026-09-23 — Prompt audit of job_1790100385959: corrections to earlier entries", item 5.
 
 **Context:** `beatsPipeline.js` decides whether to keep or discard a re-plan
 round by comparing must-fix counts before and after: `stillMustFix.length >=
@@ -56070,3 +56090,94 @@ source. Owner decision needed.
 replaces `restoreParentObjects`), `tests/unit/iterate-rewrite-cast-is-the-list.test.ts` (new, 12),
 `tests/unit/iterate-rewrite-keeps-the-brief.test.ts`, `tests/unit/iterate-cast-writeback.test.ts`.
 **Status:** ✅ active on staging.
+
+---
+
+## 2026-09-23 — Prompt audit of job_1790100385959: corrections to earlier entries
+
+**Context.** Eight judges read every prompt of staging `job_1790100385959_1nitlympp` ("Das Ei im Laub",
+dragon run 6, built at `b03c64b0`), one judge per stage: arc, page plan, wardrobe, Art Director and
+scene review, story text, avatars, page images, covers. Their findings are copied into the repo at
+`docs/audits/prompt-audit-2026-09-23/`. Some of them show that earlier entries in this file no longer
+describe the code. Each correction below was checked against the code at `e3923bf03`, not taken from
+the judges' wording. The old entries are **not rewritten**; each one carries a one-line
+"→ corrected 2026-09-23" pointer under its heading. The table of what every call sees and is blind
+to, and which prompts are not stored, is in `docs/prompt-inventory.md` ("What each call sees").
+
+**Corrections.**
+1. **"The character-source rule reaches all four stages…" (2026-09-19)** says `arc-panel.txt` and
+   `arc-hints.txt` "make no source claim". Since 2026-09-20 ("The hint pass answers to the arc")
+   `arc-hints.txt:11` fills `{CHARACTER_SOURCE_RULE}` with master `arc` (`buildArcHintsPrompt`,
+   promptBuilders.js:8660). The line still holds for `arc-panel.txt`, which reads the same saved
+   profiles with no rule. The panel's omission is recorded, but only as "cannot contradict"; the
+   judge saw no harm on this run.
+2. **"Covers get full page-style evaluation"** says a COVER note tells the fidelity and quality
+   evaluators. Both get a note, but not the same one: the quality judge gets
+   `prompts/cover-evaluation-notes.txt` (COVER_NOTE plus the title TEXT_RULES, prepended into
+   USER_PROMPT, evalPipeline.js cover branch); the semantic judge gets a hand-kept inline
+   `coverEvalNote` (evalPipeline.js:1960) and a `TEXT_RULES` of `requiredTextBlock`, which never
+   carries the title. On run 6 the semantic judge filed the correctly painted title as a CRITICAL
+   `rendered_text`, the consolidator ordered it removed and the shipped front cover has no title
+   (audit 09 C1). The evaluator comment claiming the title is "handled by the TEXT RULES below" was
+   corrected in the same commit.
+3. **"The text chain is TWO PARALLEL AUDITS…" (2026-09-03)** lists the arc-informed audit's inputs as
+   "back cover + final arc + page plan + pages + what each picture shows". The template has no back-cover
+   placeholder; it gets the arc, the plan lines and each page's WHOLE brief
+   (`resolveTextStagePictureSpec`), and no commission and no arc hints. The same entry names the repair
+   model `deepseek-v4-pro`; "The chain's single repair pass runs on claude-opus" (2026-09-03, later the
+   same day) replaced it, and `textRefineModel` is `claude-opus` (models.js:473). The stale "back cover"
+   also sat in the `textRefine.js` header and in a misplaced docblock above `buildTextProofreadPrompt`;
+   both were corrected in the same commit.
+4. **"The diff pass does NOT invent prose…" (2026-09-06).** Already superseded in part by "The diff
+   pass sees the findings the repair answered" (2026-09-23), which records run 6's invented
+   «Turi blieb auf der Mauer.». Listed here so the audit's list is complete.
+5. **"The re-plan convergence test counts CAST/FOCAL…" (2026-09-20).** Its decision sentence reads "a
+   round that raises the cast/focal count is discarded". The code is `>= bestMustFix && round > 1`
+   (beatsPipeline.js:1702): round 1 is never discarded, and a tie is. The entry's own "Not changed"
+   paragraph discloses `round > 1` and leaves it to the owner. On run 6 round 1 raised cast/focal
+   must-fix from 5 to 7 and shipped (audit 02 W4). Still an owner decision; nothing changed.
+6. **"A wardrobe correction re-renders its avatar" (2026-09-15)** justifies the re-render as serving "a
+   rare conflict". The `reconcile` kind (`checkWardrobeAgainstBible`, clothingCheck.js:653) fires
+   whenever a `wornAs` element words a garment differently, even when it is the same garment. On run 6
+   that re-rendered Levin and Kiaan from their photos, 2 of 4 characters, and Levin's second sheet has
+   a different face and hair (audit 06). The comment at storyJobPipeline.js:2052 said the same thing
+   and was corrected in this commit.
+7. **Two 2026-09-15 entries disagree on direction.** "A plot-critical worn object is described IN FULL
+   in the outfit" (and `story-bible-from-beats.txt:38`, `scene-expansion-all.txt:146`) says the wardrobe
+   authors the words and the Visual Bible copies them. "The Visual Bible outranks the wardrobe
+   contract" and the code (`clothingCheck.js:647-653`, "the bible's words become the contract's
+   words") do the reverse for a declared `wornAs` item. On run 6 the reviewed contract was overwritten
+   after review by the Art Director's paraphrase (audit 03 F1). Which direction wins is an owner
+   decision; flagged, not changed.
+8. **"Cover hint casts are validated against the real cast…" (2026-09-06)** says the code "refills the
+   freed slots". `validateCoverHintCast` (coverIterate.js:650-686) fills every non-front cover up to
+   `MAX_COVER_CHARACTERS` (5) even when no phantom was dropped, and a backfilled figure gets
+   `position: ''`. On run 6 the Art Director's two-child initial page became a four-boy line-up (audit
+   09 C4). The entry also puts the cover-cast prompt rule in `story-bible-from-beats.txt`; cover hints
+   moved to `scene-expansion-all.txt` on 2026-09-11. Whether "fill to the cap" is intended is an owner
+   decision.
+
+**Not corrected here, listed for the owner.**
+- `docs/SETTLED.md:62` says "Three Visual Bible elements per page" and names `rankPageElements` /
+  `truncateBriefToBudget` as enforcers. The code budget is FOUR since 2026-09-11 (`VB_ELEMENT_BUDGET`,
+  vbElementBudget.js:80), and that module's header says the code-side enforcers were removed. SETTLED
+  has its own protocol, so the line was left alone.
+- The arc critique's "answered as an eight-year-old listener" (`arcCritiqueSpec`, promptBuilders.js:8557)
+  dates from the 2026-08-30 arc-machine refinement, before the age-mode section. No entry reconciles it
+  with the stated reader age in the same prompt (audit 01 #11).
+- `docs/image-routing.md` rows 29-30 (cover typography, painted-title plate pass) contradicted SETTLED
+  (model-baked title everywhere, 2026-09-06). They were corrected in this commit. Row 20 (plates) says
+  an edit on a photoreal base "drags toward realism". The derived plate (2026-09-21, "An angled page
+  takes a plate DERIVED from the vantage's") is exactly such an edit, and it is never QC'd; a note was
+  added to that row.
+
+**Rationale.** Documentation that disagrees with the code is how the audit's judges, and the next
+session, reason from a false premise. The corrections are append-only so the history of each decision
+stays readable.
+
+**Touched:** `docs/decisions.md` (this entry and eight pointers), `docs/prompt-inventory.md`,
+`docs/image-routing.md`, `scripts/admin/sibling-registry.json`, `tasks/BACKLOG.md`,
+`docs/audits/prompt-audit-2026-09-23/` (the eight findings files). Comment-only edits:
+`server/lib/sceneBriefCheck.js`, `server/lib/images.js`, `server/lib/textRefine.js`,
+`server/lib/promptBuilders.js`, `server/lib/evalPipeline.js`, `storyJobPipeline.js`.
+**Status:** ✅ documentation only; no behaviour change.

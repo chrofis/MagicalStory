@@ -266,26 +266,42 @@
     {
       "id": "cover-generator-vs-critic",
       "axis": "generator-vs-critic",
-      "reason": "cover-evaluation-notes.txt is the cover-only preamble the evaluator is given (viewer gaze, flat title, and the text regime), and cover-composition.txt plus the cover hint assembly in coverIterate.js is what the cover was painted from; a text or gaze rule tightened on one side and not the other scores a cover for a brief it never had. Extracted from evalPipeline.js string literals on 2026-09-15 so this pair can name a path instead of a 5,000-line module.",
+      "reason": "cover-evaluation-notes.txt is the cover-only preamble the evaluator is given (viewer gaze, flat title, and the text regime), and cover-composition.txt plus the cover hint assembly in coverIterate.js is what the cover was painted from; a text or gaze rule tightened on one side and not the other scores a cover for a brief it never had. Extracted from evalPipeline.js string literals on 2026-09-15 so this pair can name a path instead of a 5,000-line module. Widened 2026-09-23: a cover is also judged by the semantic judge (image-semantic.txt, via evalPipeline.js's cover branch), consolidated by feedback-consolidator.txt (repairPipeline.js), and its structured {TEXT_RULES} comes from requiredText.js. None of the three carried the baked title, so on staging job_1790100385959_1nitlympp the semantic judge filed the correctly painted title as CRITICAL, the consolidator ordered it removed and the front cover shipped without one (docs/audits/prompt-audit-2026-09-23/09-covers.md C1). The title generator itself is buildCoverPrompt/bakedTitleLine in promptBuilders.js, not listed here because every commit touches that module.",
       "generators": [
         "prompts/cover-composition.txt",
         "server/lib/coverIterate.js"
       ],
       "critics": [
-        "prompts/cover-evaluation-notes.txt"
+        "prompts/cover-evaluation-notes.txt",
+        "prompts/image-semantic.txt",
+        "prompts/feedback-consolidator.txt",
+        "server/lib/requiredText.js"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "wardrobe-bible-vs-clothing-review",
+      "axis": "generator-vs-critic",
+      "reason": "clothing-review.txt reviews the wardrobe contract story-bible-from-beats.txt writes (buildClothingReviewPrompt fills {CURRENT_CLOTHING} from the bible's used outfits) and rewrites it before the styled avatars start. A check the reviewer applies must be a rule the bible writer was given, and a bible rule the reviewer never checks is a rule nobody enforces: on 2026-09-23 the audit found the plot-worn-object rule (bible :38) and the base-layer variety under a removed outer layer with no reviewer check, and the reviewer dressing non-cast creatures because nothing told it only the listed characters have a wardrobe (docs/audits/prompt-audit-2026-09-23/03-wardrobe.md F3-F5).",
+      "generators": [
+        "prompts/story-bible-from-beats.txt"
+      ],
+      "critics": [
+        "prompts/clothing-review.txt"
       ],
       "severity": "block"
     },
     {
       "id": "arc-generator-vs-critic",
       "axis": "generator-vs-critic",
-      "reason": "arc-panel.txt walks the committed arc lens by lens and names what the creator missed; arc-create.txt writes the arc and arc-retell.txt rewrites it against the panel. A lens the panel scores by must be a fault-shape the creator and the re-teller were GIVEN — otherwise the arc is corrected after the fact instead of written right, which buys a fault the generator could have avoided at the price of a whole extra round trip. Note the shape of the hazard: arc-create.txt and arc-retell.txt each carry their OWN hand-maintained near-duplicate copy of the same 'they usually look like:' fault-shape list, so they drift from each other as well as from the panel — adding a lens means editing three files, two of which look identical and are not. Prefer one promptBuilders constant injected into both generators over a third hand-kept copy; {TELLING_RULES} and {ARC_BUDGETS} are the existing precedent in this family.",
+      "reason": "arc-panel.txt walks the committed arc lens by lens and names what the creator missed; arc-create.txt writes the arc and arc-retell.txt rewrites it against the panel. A lens the panel scores by must be a fault-shape the creator and the re-teller were GIVEN — otherwise the arc is corrected after the fact instead of written right, which buys a fault the generator could have avoided at the price of a whole extra round trip. Since 2026-09-19 the creator's and re-teller's fault-shape list is ONE constant, arcCritiqueSpec() in promptBuilders.js, filled into both as {ARC_CRITIQUE_SPEC} (the two hand-kept near-duplicate copies this reason used to warn about are gone); {TELLING_RULES} and {ARC_BUDGETS} are the same pattern. The drift left is between that constant and the panel's lenses, and between the arc rules and TELLING_RULES: the 2026-09-23 SENSE lens reached the critique list but not TELLING_RULES (docs/audits/prompt-audit-2026-09-23/01-arc.md #6). arc-hints.txt joined as a critic on 2026-09-23: it reads the settled arc and its CHANGE lines steer the planner, so a hint shape the arc was never told to avoid is a fault the arc could not have prevented.",
       "generators": [
         "prompts/arc-create.txt",
         "prompts/arc-retell.txt"
       ],
       "critics": [
-        "prompts/arc-panel.txt"
+        "prompts/arc-panel.txt",
+        "prompts/arc-hints.txt"
       ],
       "severity": "block"
     },
@@ -479,13 +495,14 @@
     {
       "id": "character-source-claim",
       "axis": "which document outranks the saved character profile",
-      "reason": "Five prompts state what a saved character profile is AUTHORITATIVE FOR, and they must not disagree. The arc creator, its re-telling and its reviewer answer to the COMMISSION; the beats planner divides a settled arc and answers to the ARC. All four fill {CHARACTER_SOURCE_RULE} from characterSourceRule() in promptBuilders.js, with the planner and the hint pass passing master:'arc'. This set exists because the rule drifted the day it was written (2026-09-19): the split landed on arc-create and arc-retell, while story-arc-review still called the profile the source of truth — so the arc creator was told the premise outranks a saved detail while its own CRITIC was told the opposite. The motivating story is staging job_1789759147125_p08djwhbl, whose premise stages four boys meeting as strangers over one egg while every profile calls them good friends. It drifted a second time the same way: arc-hints.txt, a FIFTH stage reading the same saved profiles beside the settled arc, was never given the rule at all, and on job_1789853503332_riqncqg1i it emitted a CHANGE undoing the first meeting the arc staged — the hint rides into buildBeatsPrompt, and the planner obeyed it over the arc.",
+      "reason": "Five prompts state what a saved character profile is AUTHORITATIVE FOR, and they must not disagree. The arc creator, its re-telling and its reviewer answer to the COMMISSION; the beats planner divides a settled arc and answers to the ARC. All four fill {CHARACTER_SOURCE_RULE} from characterSourceRule() in promptBuilders.js, with the planner and the hint pass passing master:'arc'. This set exists because the rule drifted the day it was written (2026-09-19): the split landed on arc-create and arc-retell, while story-arc-review still called the profile the source of truth — so the arc creator was told the premise outranks a saved detail while its own CRITIC was told the opposite. The motivating story is staging job_1789759147125_p08djwhbl, whose premise stages four boys meeting as strangers over one egg while every profile calls them good friends. It drifted a second time the same way: arc-hints.txt, a FIFTH stage reading the same saved profiles beside the settled arc, was never given the rule at all, and on job_1789853503332_riqncqg1i it emitted a CHANGE undoing the first meeting the arc staged — the hint rides into buildBeatsPrompt, and the planner obeyed it over the arc. arc-panel.txt joined on 2026-09-23 as a SIXTH reader of the same saved profiles (it fills {CHARACTER_DETAILS} beside the committed arc) that carries NO {CHARACTER_SOURCE_RULE}: decisions.md 2026-09-19 left it out because it 'makes no source claim, so cannot contradict'. It is a member so a change to how profiles are framed is weighed there too; whether it should carry the rule is an owner question (docs/audits/prompt-audit-2026-09-23/01-arc.md B).",
       "members": [
         "prompts/arc-create.txt",
         "prompts/arc-retell.txt",
         "prompts/story-arc-review.txt",
         "prompts/story-beats.txt",
-        "prompts/arc-hints.txt"
+        "prompts/arc-hints.txt",
+        "prompts/arc-panel.txt"
       ],
       "severity": "block"
     },

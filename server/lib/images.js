@@ -843,8 +843,8 @@ function cutBlocks() {
     { label: 'HANDS', text: HANDS_HOLD_ONLY_NAMED_RULE },
     { label: 'NO MARKS', text: NO_CHARACTER_MARKING_RULE },
     { label: 'REQUIRED CAST', text: templateParagraph('**REQUIRED CAST:**') },
-    // Page facts. Last to go, and in practice never reached once the shot block
-    // carries one definition instead of eight.
+    // Page facts. Last to go. NOT "never reached": staging job_1790100385959
+    // p12 and its front cover both lost Composition here (2026-09-23 audit).
     { label: 'Composition', text: templateParagraph('**Composition:**') },
     { label: 'HEIGHT ORDER', re: /^\*\*HEIGHT ORDER[^\n]*\n/m },
     { label: 'AGE & PROPORTIONS', re: /^AGE & PROPORTIONS[\s\S]*?(?=\n\n|$)/m },
@@ -3442,10 +3442,12 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     ? `\n\nQuiet zone: keep the ${TEXT_POSITION_DESC_INPAINT[textPosition]} as ${inpaintTextZoneDesc ? `the established ${inpaintTextZoneDesc} — preserve its existing atmospheric character (clouds, gradient, texture)` : 'soft and visually calm'}. Do not introduce faces, hats, patterns, or other high-contrast detail there, and do not flatten it to a uniform color. It is intentional negative space in the composition.`
     : '';
 
-  // (Cover text is no longer preserved via a prompt hint. Covers render textless
-  // and the title/dedication/branding is composited app-side by composeCover;
-  // cover inpaint repaints the textless art layer and re-composites the text
-  // afterward — see executeInpaintAction / restampCover.)
+  // (Cover text is not preserved via a prompt hint. STALE premise corrected
+  // 2026-09-23: only the initial page and back cover render textless and get
+  // their text composited afterward (restampCover). The FRONT cover's title is
+  // model-baked since 2026-09-06 (docs/SETTLED.md, coverTitleMode 'baked'), has
+  // no textless art layer, and this instruction carries NO clause keeping it —
+  // see docs/audits/prompt-audit-2026-09-23/09-covers.md C1/C2.)
 
   // Strip entity-grid vocabulary ("cells A, D, F", "the reference (R)")
   // before the instruction reaches the image model — image models DRAW what

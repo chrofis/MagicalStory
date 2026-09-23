@@ -629,6 +629,7 @@ measurement, is lost).
 ---
 
 ## Decisions waiting on the owner
+- [ ] Prompt audit 2026-09-23 findings (8 stages: arc, page plan, wardrobe, Art Director + scene review, story text, avatars, page images, covers; staging job_1790100385959_1nitlympp) awaiting owner triage. Includes the "reason not recorded — owner to confirm" rows of the blind table (docs/prompt-inventory.md, *What each call sees*) and the corrections entry (docs/decisions.md 2026-09-23 "Prompt audit of job_1790100385959") → docs/audits/prompt-audit-2026-09-23/
 - [ ] Repair ties keep the older version (`repairPipeline.js:41-56` earliest wins) — dragon run 6 P7 lost a real fix at 85=85. Options: tie goes to the repair, or a pairwise before/after judge (~$0.01/repair). Not picked 2026-09-23.
 - [ ] Consolidator issues an inpaint for a restaging it also marks `requires_char_fix_not_inpaint` (run 6 P8, feedback-consolidator.txt rule 7); inpaint turned a close-up into a full-body shot.
 - [ ] Quality judge `duplicate_character` CRITICAL routes a repair without checking the detector's figure count (run 6 P12: invented second boy; repair instruction carried bbox coordinates Grok cannot read).

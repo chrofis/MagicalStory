@@ -2049,8 +2049,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // (beatsPipeline). The early kickoff is deliberate — avatars are the long
     // pole in front of every image — so the fix is not to delay it but to
     // re-render exactly the characters whose outfit text actually changed.
-    // Corrections are rare (a genuine contract/bible contradiction), so this is
-    // one avatar render per corrected character and nothing when nothing moved.
+    // NOT rare (2026-09-23 audit): a 'reconcile' finding re-renders on a mere
+    // re-wording of the same garment. One render per corrected character.
     const onWardrobeCorrectedReady = (characterNames, requirements) => {
       if (inputData.trialMode || skipImages) return;
       const names = (characterNames || []).filter(Boolean);

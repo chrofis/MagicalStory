@@ -9104,11 +9104,6 @@ function buildChildCriticPrompt(inputData, arc) {
   });
 }
 
-/**
- * Blind audit of the finished text as the audience receives it: back cover,
- * page prose, and what each picture shows (the DEPICTS block only — the rest
- * of a scene brief describes intent the viewer never sees).
- */
 // THE LECTOR (2026-08-26, refocused 2026-09-03): the last thing that reads the
 // finished prose, and it looks for one class of thing only — objective language
 // faults, listed as `PAGE n: 'quoted' → 'corrected'`. The old closed defect
@@ -9197,6 +9192,12 @@ function buildTextAuditBlindPrompt(inputData, pages = []) {
   return fillTemplate(template, { PAGES: body });
 }
 
+/**
+ * ARC-INFORMED audit of the writer's text: the final arc, the page plan, each
+ * page's text and its whole picture brief. No back cover, no commission and no
+ * arc hints (a stale docblock claiming "back cover + DEPICTS only" sat above the
+ * lector builder until 2026-09-23).
+ */
 function buildTextAuditPrompt(inputData, pages = [], arc = '') {
   const template = PROMPT_TEMPLATES.storyTextAudit;
   if (!template) {

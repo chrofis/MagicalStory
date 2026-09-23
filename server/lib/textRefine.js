@@ -13,8 +13,9 @@
  * round."):
  *
  *   1. TWO AUDITS, in parallel, on the writer's text
- *        a. arc-informed  — gemini-3.1-pro, story-text-audit.txt (back cover,
- *           arc, page plan, page text, what each picture shows)
+ *        a. arc-informed  — gemini-3.1-pro, story-text-audit.txt (final arc,
+ *           page plan, page text, each page's whole picture brief; no back
+ *           cover, no commission, no arc hints — corrected 2026-09-23)
  *        b. blind         — grok-4.6, story-text-audit-blind.txt (page text and
  *           nothing else)
  *   2. MERGE + DEDUPE the two fault lists in code (mergeAuditFindings)
