@@ -1825,7 +1825,7 @@
       "impact": "A real landmark repainted as a different structure on the plate every page of that vantage is drawn on. Staging and production.",
       "status": "fixed",
       "fixedAt": "2026-09-23",
-      "fixedIn": "PENDING",
+      "fixedIn": "c55871cbf",
       "fix": "DB: 5854 (prod) / 2149 (staging) descriptions rewritten from the photos. Code: LANDMARK_PHOTO_AUTHORITY in buildLandmarkFidelityBlock and the new LANDMARK_CHECK of empty-scene-qc.txt; the landmark photo is attached to the plate judge at every call site; era lines aligned with the generator. Pinned by tests/unit/landmark-photo-authority.test.ts. Model-level effect of the final wording not yet replayed (docs/decisions.md 2026-09-23)."
     }
   ]
