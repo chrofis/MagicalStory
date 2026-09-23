@@ -256,6 +256,11 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
     }
 
     const p1Text = p1Data.candidates[0]?.content?.parts?.[0]?.text?.trim();
+    if (p1Text) {
+      require('./evalCallLog').recordEvalCall({
+        kind: 'inventory', label: pageContext || null, pageNumber: opts.pageNumber ?? null, model: modelId, prompt: inventoryPrompt, rawResponse: p1Text,
+      });
+    }
     if (!p1Text) {
       log.warn(`⚠️ [QUALITY P1] No text response`);
       return null;
@@ -641,6 +646,9 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
           if (visionResp.ok) {
             const visionData = await visionResp.json();
             const visionText = visionData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            require('./evalCallLog').recordEvalCall({
+              kind: 'plate_qc', label: pageContext || null, pageNumber: options.pageNumber ?? null, model: 'gemini-2.5-flash', prompt: qcPrompt, rawResponse: visionText,
+            });
             try {
               const visionResult = JSON.parse(visionText);
               if (visionResult.pass === false) {
@@ -2289,6 +2297,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         landmarkContext: landmarkContextBlock,
         // Same REQUIRED TEXT allow-list the other two judges get.
         textRules: requiredTextBlock,
+        // Where the call's prompt is recorded (eval_calls).
+        pageNumber: evalOptions.pageNumber ?? null,
       });
       log.debug('🔍 [QUALITY] Starting parallel semantic fidelity evaluation');
     }
@@ -2343,7 +2353,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           // `inventoryModel`: Qwen3-VL on staging, 2.5 Flash elsewhere). A
           // Lab quality-model override still wins so an A/B measures one model.
           qualityModelOverride || MODEL_DEFAULTS.inventoryModel || MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash',
-          process.env.GEMINI_API_KEY, pageContext
+          process.env.GEMINI_API_KEY, pageContext,
+          { pageNumber: evalOptions.pageNumber ?? null }
         );
         log.debug(`📊 [EVAL P1] Shared blind inventory launched for ${pageContext || 'scene'}`);
       }
@@ -2831,6 +2842,16 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     }
 
     const responseText = data.candidates[0].content.parts[0].text.trim();
+    // The prompt that produced this reply — the last text part, which the
+    // blocked-content retry replaces with its fully sanitized version.
+    require('./evalCallLog').recordEvalCall({
+      kind: evaluationType === 'cover' ? 'quality_cover' : 'quality',
+      label: pageContext || null,
+      pageNumber: evalOptions.pageNumber ?? null,
+      model: modelId,
+      prompt: parts[parts.length - 1]?.text || evaluationPrompt,
+      rawResponse: responseText,
+    });
 
     // Parse FIX_TARGETS section if present (bounding boxes for auto-repair)
     const parseFixTargets = (text) => {

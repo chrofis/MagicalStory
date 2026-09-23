@@ -57414,3 +57414,28 @@ keeps neighbours out of the cell; a mask that keeps held objects is an open impr
 
 **Touched:** `server/lib/repairLogic.js`, `tests/unit/crop-artifact-no-repair.test.ts`.
 **Status:** ✅ active on staging.
+
+## 2026-09-23 — The per-image judge prompts are stored: `eval_calls`
+
+**Context.** The 2026-09-23 prompt audit (audit 08) had to rebuild the quality, semantic and inventory
+judge prompts, the plate-QC prompt and the iterate re-brief prompt from their builders: none was stored
+(docs/prompt-inventory.md, "Prompts and replies that are NOT stored"). The semantic raw reply was not
+stored either.
+
+**Decision.** A table of its own, `eval_calls` (migration 041: story_id, page_number, kind, label, model,
+prompt, raw_response), written by `server/lib/evalCallLog.recordEvalCall` at the five call sites: kinds
+`quality` / `quality_cover`, `semantic`, `inventory`, `plate_qc` (label = vantage / derived / page
+context), `iterate_rebrief` (and its retry). Text only. Not stories.data: ~30k characters of judge prompt
+per rendered version would bloat the row `upsertStory` rewrites whole (same reason as
+`consolidator_calls`). The story id comes from the caller or the job's async scope (the styled-avatar cache
+scope, whose id is the job id; `trial-<userId>` on trials); outside a scope nothing is written. A failed
+write is a WARN and never fails the judge call. Repairs started from the regeneration routes run outside a
+job scope and are not recorded.
+
+**Validation.** Migration 041 applied and one row inserted inside a rolled-back transaction on the staging
+database. `tests/unit/eval-calls-stored.test.ts` pins the columns and the five call sites.
+
+**Touched:** `migrations/041_eval_calls.sql`, `server/lib/evalCallLog.js`, `server/lib/evalPipeline.js`,
+`server/lib/sceneValidator.js`, `server/lib/images.js`, `storyJobPipeline.js`, `docs/prompt-inventory.md`,
+`tests/unit/eval-calls-stored.test.ts`.
+**Status:** ✅ active on staging.

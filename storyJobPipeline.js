@@ -4779,7 +4779,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // ONE set of QC options for the plate, its retry and every plate
               // derived from it — the retry was judged on pixels only and the
               // derived plates not at all (2026-09-23, dragon run 6).
-              let plateQcOpts = { artStyle: artStyleDesc, shot: plateClass(vantageShot) };
+              let plateQcOpts = { artStyle: artStyleDesc, shot: plateClass(vantageShot), pageNumber: repPageNum };
               const { validateEmptyScene } = require('./server/lib/images');
               try {
                 const seenPlacement = new Set();
@@ -4909,6 +4909,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     storyEra: plateQcOpts.storyEra || null,
                     artStyle: artStyleDesc,
                     shot: cls,
+                    pageNumber: group.pageNumbers.find(pn => plateClass(shotOfPage(pn)) === cls) ?? repPageNum,
                   };
                   let derivedImage = await derive(deriveInstruction);
                   let derivedPrompt = deriveInstruction;
@@ -5231,6 +5232,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   storyEra,
                   artStyle: artStyleDesc,
                   shot: shotForCamera || null,
+                  pageNumber: pageData.pageNumber,
                 };
                 const qc = await validateEmptyScene(result.imageData, textPos, `P${pageData.pageNumber}`, pageQcOpts);
                 if (!qc.pass) {
