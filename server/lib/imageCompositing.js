@@ -678,31 +678,6 @@ async function grokEditSceneExact(prompt, referenceUris, sceneBuf, sceneW, scene
 }
 
 
-// Build action context from structured interactions[] for the named character.
-// Replaces the prose-name-slicing fallback that leaked the metadata JSON block
-// and other characters' clauses into per-character inpaint prompts.
-function buildCharActionContextFromInteractions(sceneDescription, charName, visualBible = null) {
-  if (!sceneDescription || !charName) return '';
-  try {
-    const meta = require('./storyHelpers').extractSceneMetadata(sceneDescription);
-    const interactions = meta?.fullData?.interactions || [];
-    const lower = charName.toLowerCase();
-    const lines = interactions
-      .filter(i => i?.character && i.character.toLowerCase() === lower)
-      .map(i => `- ${String(i.where || '').trim()} ${String(i.object || '').trim()}`.replace(/\s+/g, ' ').trim())
-      .filter(l => l.length > 2);
-    if (lines.length === 0) return '';
-    // `i.object` is a raw Visual Bible id and this string goes into a
-    // CHARACTER-REPAIR prompt for an image model — the one place an id gets
-    // painted onto the page as lettering. The `where` clause already names the
-    // thing in prose, so a generic noun costs nothing here.
-    const body = require('./vbIdGuard').scrubVbIds(lines.join('\n'), visualBible);
-    return `\n\n${charName} in this scene:\n${body}`;
-  } catch {
-    return '';
-  }
-}
-
 /**
  * Strip cross-image-comparison vocabulary from an issue description before
  * embedding it in an inpaint prompt. Entity-consistency findings are written
@@ -812,7 +787,6 @@ module.exports = {
   correctColorShift,
   resizeGrokToSceneDims,
   grokEditSceneExact,
-  buildCharActionContextFromInteractions,
   sanitizeIssueForInpaint,
   stripCharacterNames,
   measureRegionSharpness,

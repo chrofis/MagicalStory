@@ -380,6 +380,7 @@
       "parity": {
         "anchors": [
           "{ONE_INSTANT}",
+          "{NO_LENS}",
           "{GAZE_TARGET}",
           "{LOOKS_AT_FIELD}",
           "{EXPRESSION_FIELD}",
@@ -390,6 +391,8 @@
           "{SCENE_INTENT_FIELD}",
           "{CONCEALED_OBJECT}",
           "{CONTACT_VERB}",
+          "{EYES_OPEN}",
+          "{CREATURE_FACE}",
           "{REACHABLE_CONTACT}",
           "{PLAN_LINE_CAST}",
           "{COUNTING_RULE}",

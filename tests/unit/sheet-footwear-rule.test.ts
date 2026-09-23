@@ -25,7 +25,7 @@ import fs from 'fs';
 import path from 'path';
 
 const sheet = require('../../server/lib/character2x4Sheet');
-const { buildBodyRowPrompt, buildPrompt, buildFootwearRule } = sheet._internal;
+const { buildBodyRowPrompt, buildFootwearRule } = sheet._internal;
 
 const read = (p: string) => fs.readFileSync(path.join(process.cwd(), p), 'utf8');
 
@@ -42,12 +42,6 @@ describe('reference-sheet prompts require footwear', () => {
     // The carry-over source is the body reference, so an outfit with no text
     // description still lands shod.
     expect(p).toMatch(/the footwear the body reference shows/);
-  });
-
-  it('the single-call 2x4 prompt carries the same rule', () => {
-    const p = buildPrompt('standard outfit', { name: 'A', physical: {} }, false, null);
-    expect(requiresFootwear(p)).toBe(true);
-    expect(keepsNoFeetException(p)).toBe(true);
   });
 
   it('a redress sheet takes footwear from the costume, never from the wrong-outfit reference', () => {
@@ -70,7 +64,6 @@ describe('reference-sheet prompts require footwear', () => {
     const redress = buildFootwearRule(true);
     expect(plain).not.toEqual(redress);
     expect(buildBodyRowPrompt('standard outfit', null, false, null)).toContain(plain);
-    expect(buildPrompt('standard outfit', null, false, null)).toContain(plain);
     expect(buildBodyRowPrompt('standard outfit', null, true, null)).toContain(redress);
   });
 

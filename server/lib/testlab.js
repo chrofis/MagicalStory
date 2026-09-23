@@ -787,9 +787,11 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
     ctx.visualBible, ctx.pageNumber, ctx.landmarkPhotos, aboardId, meta.objects || null
   );
 
+  // One style string for the plate prompt and its QC, as in production.
+  const plateStyle = resolveArtStyleForEmptyScene(params.artStyleOverride || ctx.artStyle, null);
   const prompt = buildEmptyScenePrompt({
     template: promptOverride || undefined,
-    style: resolveArtStyleForEmptyScene(params.artStyleOverride || ctx.artStyle, null),
+    style: plateStyle,
     description,
     characterSpace: meta.characterSpace || '',
     textAreaInstruction: wantsTextZone
@@ -843,6 +845,8 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
       sceneDescription: description,
       mainScenePrompt: ctx.scene.sceneDescription || null,
       storyEra: meta.era || null,
+      artStyle: plateStyle,
+      shot: (meta.fullData?.shot || meta.shot || '').trim() || null,
     });
     qc = { pass: qcRes.pass, issues: qcRes.issues || [], visionFeedback: qcRes.visionFeedback || null };
   } catch (err) {
@@ -2601,6 +2605,7 @@ async function runAvatarStyleStage(target, { experimentId, promptOverride, param
     facePhoto,
     artStyle,
     characterName: character.name,
+    characterAge: character.age ?? null,
     promptOverride: promptOverride || null,
   });
   if (!result?.imageData) throw new Error('style transfer returned no image');
@@ -5449,7 +5454,7 @@ async function runEditImageStage(ctx, { experimentId, promptOverride, params = {
   // params.source='empty_scene' edits the page's stored background plate
   // exactly as the plate-derive step does in production (storyJobPipeline.js,
   // "AN ANGLED PAGE TAKES A PLATE DERIVED FROM THIS ONE"): the plate model and
-  // no art-style block. Pick the page that carries the vantage's BASE plate.
+  // the book's art style (since 2026-09-23). Pick the page that carries the vantage's BASE plate.
   const onPlate = params.source === 'empty_scene';
   const imageData = onPlate
     ? await loadEmptyScene(ctx.storyId, ctx.pageNumber)
@@ -5458,7 +5463,7 @@ async function runEditImageStage(ctx, { experimentId, promptOverride, params = {
 
   const t0 = Date.now();
   const result = onPlate
-    ? await editImageWithPrompt(imageData, instruction, MODEL_DEFAULTS.emptyScenePlateModel, [], null)
+    ? await editImageWithPrompt(imageData, instruction, MODEL_DEFAULTS.emptyScenePlateModel, [], ctx.artStyle)
     : await editImageWithPrompt(imageData, instruction, null, [], ctx.artStyle);
   const elapsedMs = Date.now() - t0;
   const edited = result?.imageData || null;
@@ -6710,7 +6715,11 @@ async function resolveAvatarSlotBytes(slot) {
  *       params.entryIndex when a character has several entries; default = latest.
  *   • LAB test version: pass params.versionIndex (a tl_avatar), as before.
  * params.model A/Bs the eval model (any Gemini id; default gemini-2.5-flash);
- * promptOverride A/Bs the eval prompt text. Both are eval-only — no image is
+ * promptOverride A/Bs ONE judge's prompt text — params.evalPrompt names which
+ * (heads | bodies | identity on pass 1, style on pass 2), the same key the
+ * Lab's "Load current template" reads. Production runs four different judge
+ * templates; one override replacing two of them (the pre-2026-09-23 wiring)
+ * measured nothing production does. Both are eval-only — no image is
  * generated, so this never spends generation credits.
  */
 async function runAvatarEvalStage(target, { experimentId, promptOverride, params = {} }) {
@@ -6719,6 +6728,13 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
   const { _internal, resolveFacePhoto } = require('./character2x4Sheet');
   const { character, costume } = await loadCharacterContext(target.storyId, target.character);
   const model = params.model || 'gemini-2.5-flash';
+  // Production judges against the character's declared age; so does the Lab
+  // unless an experiment sets one.
+  const declaredAge = params.declaredAge ?? character.age ?? null;
+  if (promptOverride && !params.evalPrompt) {
+    throw new Error('avatar_eval promptOverride needs params.evalPrompt (heads | bodies | identity | style) — it replaces that one judge');
+  }
+  const promptOverrides = promptOverride ? { [params.evalPrompt]: promptOverride } : {};
   const t0 = Date.now();
 
   const versionIndex = params.versionIndex ?? target.versionIndex;
@@ -6727,24 +6743,25 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
     const sheet = await loadTestImage(target.storyId, 'tl_avatar', null, versionIndex);
     if (!sheet?.imageData) throw new Error(`tl_avatar v${versionIndex} not found`);
     const facePhoto = await resolveFacePhoto(character);
+    // Same single-source evaluator production calls — never a lab-only judge.
     let evalResult;
     if (params.styled) {
       const realisticVersionIndex = params.realisticVersionIndex;
       if (realisticVersionIndex == null) throw new Error('styled avatar_eval requires realisticVersionIndex');
       const anchor = await loadTestImage(target.storyId, 'tl_avatar', null, realisticVersionIndex);
       if (!anchor?.imageData) throw new Error(`realistic anchor v${realisticVersionIndex} not found`);
-      evalResult = await _internal.evaluateStyledSheetWithGemini(
-        facePhoto, anchor.imageData, sheet.imageData,
-        params.artStyle || target.artStyle || 'pixar', process.env.GEMINI_API_KEY,
-        null /* usageTracker */, params.declaredAge ?? null,
-        { model, promptOverride }
-      );
+      ({ verdict: evalResult } = await _internal.evaluateAvatarSheet(sheet.imageData, {
+        pass: 2, facePhoto, realisticSheet: anchor.imageData,
+        artStyle: params.artStyle || target.artStyle || 'pixar',
+        declaredAge, model, promptOverrides,
+      }));
     } else {
-      evalResult = await _internal.evaluateSheetWithGemini(
-        sheet.imageData, costume.description || 'standard outfit',
-        process.env.GEMINI_API_KEY, facePhoto, null,
-        { characterDescription: character.description || '', model, promptOverride }
-      );
+      const { split } = await _internal.evaluateAvatarSheet(sheet.imageData, {
+        pass: 1, facePhoto,
+        costumeDescription: costume.description || 'standard outfit',
+        declaredAge, model, promptOverrides,
+      });
+      evalResult = { split: true, splitY: split.splitY, model, heads: split.heads, bodies: split.bodies, identity: split.identity, finalScore: split.verdict.finalScore, valid: split.verdict.valid };
     }
     return { character: character.name, source: 'testVersion', versionIndex, styled: !!params.styled, model, elapsedMs: Date.now() - t0, report: evalResult };
   }
@@ -6812,8 +6829,7 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
     const { split } = await _internal.evaluateAvatarSheet(sheetForDisplay, {
       pass: 1, facePhoto, standardAvatar,
       costumeDescription: costume.description || 'standard outfit',
-      declaredAge: params.declaredAge ?? null,
-      model, promptOverride,
+      declaredAge, model, promptOverrides,
     });
     const { heads, bodies, identity } = split;
     splitPromptUsed = split.promptUsed;
@@ -6838,7 +6854,7 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
       // No costumeDescription: pass 2 is a style transfer and its judge does
       // not score the outfit (that axis lives on pass 1).
       pass: 2, facePhoto, realisticSheet: realistic, artStyle,
-      declaredAge: params.declaredAge ?? null, model, promptOverride,
+      declaredAge, model, promptOverrides,
     }));
   }
 

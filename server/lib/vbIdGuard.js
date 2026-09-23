@@ -229,10 +229,35 @@ function scrubVbIds(text, visualBible = null, pageNumber = null) {
  * where `a` is truthy and wrong.
  */
 function gazeCharacters(meta) {
+  const pageObjects = meta?.objects || meta?.fullData?.objects || [];
   for (const candidate of [meta?.fullData?.characters, meta?.characters]) {
-    if (Array.isArray(candidate) && candidate.some(c => c && typeof c === 'object' && c.name)) return candidate;
+    if (Array.isArray(candidate) && candidate.some(c => c && typeof c === 'object' && c.name)) {
+      return candidate.map(c => (c && typeof c === "object" && c.looksAt ? { ...c, looksAt: gazeTarget(c.looksAt, pageObjects) } : c));
+    }
   }
   return null;
+}
+
+/**
+ * The declared gaze, or '' when it names no target. A character stands IN the
+ * place its page is set in, so a `looksAt` naming that place (a LOC id the
+ * page's `objects[]` cites) points the eyes nowhere: staging
+ * job_1790100385959_1nitlympp p12 sent "eyes on Lindenhof square" for three
+ * children digging in Lindenhof square, and the judges checked it. The image
+ * prompt, the judges and the character repair all read the gaze through here.
+ *
+ * @param {string} looksAt - characters[].looksAt
+ * @param {Array} pageObjects - the page's objects[] (ids)
+ * @returns {string}
+ */
+function gazeTarget(looksAt, pageObjects = []) {
+  const t = String(looksAt || '').trim();
+  if (!t) return '';
+  const base = baseVbId(t);
+  if (!base || !/^LOC/i.test(base)) return t;
+  const cited = (Array.isArray(pageObjects) ? pageObjects : [])
+    .some(o => baseVbId(String((o && o.id) || o || '')) === base);
+  return cited ? '' : t;
 }
 
 function formatInteractionsBlock(interactions, visualBible = null, characters = null) {
@@ -319,5 +344,6 @@ module.exports = {
   scrubVbIds,
   formatInteractionsBlock,
   gazeCharacters,
+  gazeTarget,
   formatElementsBlock,
 };

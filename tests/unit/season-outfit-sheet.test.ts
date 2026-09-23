@@ -20,7 +20,7 @@
 import { describe, it, expect } from 'vitest';
 
 const { seasonOutfitGuidance, SEASONS } = require('../../server/lib/season');
-const { buildBodyRowPrompt, buildPrompt, buildFootwearRule, buildSeasonOutfitBlock } =
+const { buildBodyRowPrompt, buildFootwearRule, buildSeasonOutfitBlock } =
   require('../../server/lib/character2x4Sheet')._internal;
 
 const forSeason = (season: string) => seasonOutfitGuidance({ season });
@@ -81,9 +81,8 @@ describe('the sheet prompt carries the season as an OUTFIT rule only', () => {
       .not.toContain(winter.outfit);
   });
 
-  it('reaches both sheet builders when passed', () => {
+  it('reaches the body-row builder when passed', () => {
     expect(buildBodyRowPrompt('standard outfit', null, false, null, winter)).toContain(winter.outfit);
-    expect(buildPrompt('watercolor', 'standard outfit', null, false, null, winter)).toContain(winter.outfit);
   });
 
   it('changes nothing at all when no season is passed', () => {

@@ -940,6 +940,9 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
         { inlineData: { mimeType: 'image/png', data: imageBase64 } }
       ]);
       const text = result.response.text(); // throws on block
+      require('./evalCallLog').recordEvalCall({
+        kind: 'semantic', pageNumber: evalContext.pageNumber ?? null, model: VISION_MODEL, prompt, rawResponse: text,
+      });
       return parseResponse(text, result.response.usageMetadata, Date.now() - startTime);
     } catch (err) {
       const isBlock = err.message?.includes('PROHIBITED_CONTENT') || err.message?.includes('blocked') || err.message?.includes('SAFETY');
@@ -977,6 +980,9 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
       const text = grokData?.candidates?.[0]?.content?.parts?.[0]?.text;
       if (text) {
         log.info('✅ [SEMANTIC] Grok fallback succeeded');
+        require('./evalCallLog').recordEvalCall({
+          kind: 'semantic', pageNumber: evalContext.pageNumber ?? null, model: grokModelId, prompt: fullPrompt, rawResponse: text,
+        });
         return parseResponse(text, grokData.usageMetadata, Date.now() - startTime);
       }
     }

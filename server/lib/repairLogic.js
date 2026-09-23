@@ -669,7 +669,7 @@ function selectCharRepairTasks(entityReport, options = {}) {
       // major/critical compare never matched the evaluator's UPPERCASE
       // severities, so this selector was dead code too.
       const sev = String(issue.severity || '').toLowerCase();
-      if (sev !== 'critical') continue;
+      if (sev !== 'critical' || isCropArtifact(issue)) continue;
 
       const pagesToFix = issue.pagesToFix || (issue.pageNumber ? [issue.pageNumber] : []);
       for (const pageNum of pagesToFix) {
@@ -906,7 +906,7 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
       }
       for (const issue of allIssues) {
         const sev = String(issue.severity || '').toLowerCase();
-        if (sev !== 'critical') continue;
+        if (sev !== 'critical' || isCropArtifact(issue)) continue;
         const pages = issue.pagesToFix || (issue.pageNumber ? [issue.pageNumber] : []);
         if (!pages.includes(pageNumber)) continue;
         if (!worst) worst = { severity: sev, charName, issue };
@@ -1264,7 +1264,23 @@ const NOT_INPAINTABLE_TYPES = new Set([
   // cover. The finding stays scored and stays in the shippedDefective report;
   // only its ROUTE is closed, like every other entry here.
   'extra_character',
+  // cutout_artifact: see CROP_ARTIFACT_TYPES — the page has no such defect.
+  'cutout_artifact',
 ]);
+
+/**
+ * Types that describe OUR entity-grid crop, not the page: a hard white gap or a
+ * missing region cut by the silhouette mask (owner, 2026-09-01: "an artifact of
+ * our crop extraction, not of the page"). scoring.js ZERO_POINT_TYPES already
+ * charges nothing for them; they take no repair route either — no char-fix, no
+ * inpaint. On staging job_1790100385959_1nitlympp p14 the consolidator planned
+ * "Remove the white pixelated artifact from the right arm and the chestnut" for
+ * a white block that existed only in the grid crop. Keyed on the declared type.
+ */
+const CROP_ARTIFACT_TYPES = new Set(['cutout_artifact']);
+function isCropArtifact(issue) {
+  return [issue?.type, issue?.subType].some(t => CROP_ARTIFACT_TYPES.has(String(t || '').toLowerCase()));
+}
 
 /**
  * ONE predicate for "may inpaint be asked to do this?", given the DECLARED types
@@ -1468,4 +1484,4 @@ function describeFigureForRepair({
 
 module.exports = {
   describeFigureForRepair,
-  repairAttemptFromResult, detectionForRetryEntry, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX };
+  repairAttemptFromResult, detectionForRetryEntry, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, CROP_ARTIFACT_TYPES, isCropArtifact, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX };

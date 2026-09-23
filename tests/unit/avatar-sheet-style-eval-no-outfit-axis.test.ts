@@ -109,7 +109,7 @@ describe('Pass-2 style eval — the outfit axis is gone', () => {
 
   it('the axes it does judge are still the style-transfer ones', () => {
     expect(declaredAxes().sort()).toEqual([
-      'ageScore', 'bodyFaceScore', 'cleanScore', 'identityScore',
+      'ageScore', 'backgroundScore', 'bodyFaceScore', 'cleanScore', 'identityScore',
       'layoutScore', 'soloScore', 'styleScore',
     ]);
   });
@@ -120,7 +120,7 @@ describe('Pass-2 style eval — the outfit axis is gone', () => {
     expect(fn).not.toMatch(/CLOTHING_DESCRIPTION/);
     // …and nothing forwards one into the pass-2 branch of the single-source evaluator.
     expect(extractFunction(SRC, 'evaluateAvatarSheet')).toMatch(
-      /evaluateStyledSheetWithGemini\([^)]*\{ model: model \|\| undefined, promptOverride \}/s
+      /evaluateStyledSheetWithGemini\([^)]*\{ model: model \|\| undefined, promptOverride: promptOverrides\?\.style \|\| null \}/s
     );
   });
 

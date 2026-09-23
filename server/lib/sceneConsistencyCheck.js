@@ -210,14 +210,8 @@ function checkSceneConsistency(pages, rawOutput = null, options = {}) {
     // "A + B" row with hands on one object is the hand-off shape, which scored
     // 10/20/30 on every instance in job_1787493968756_4fgr5nukroz while
     // one-character-one-object pages in the same story scored 70–100.
-    const perObj = new Map();
-    for (const row of interactions.filter(i => i && i.hands === true)) {
-      const obj = String(row.object || '').trim().toLowerCase();
-      if (!obj) continue;
-      const who = String(row.character || '')
-        .split(/\s*(?:\+|&|\band\b|,)\s*/i).map(x => x.trim()).filter(Boolean);
-      perObj.set(obj, (perObj.get(obj) || []).concat(who.length ? who : ['?']));
-    }
+    // The same reading as check D: a location id is never a one-grip object.
+    const perObj = require('./sceneMetadata').handsPerObject(interactions);
     for (const [obj, who] of perObj) {
       if (who.length < 2) continue;
       issues.push({

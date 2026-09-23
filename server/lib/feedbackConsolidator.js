@@ -577,19 +577,6 @@ async function consolidateFeedback({
       }
     }
 
-    // Final score (0-100) — the consolidator's deduplicated, tolerant judgment.
-    // Authoritative for redo decisions; replaces the old practice of summing
-    // raw evaluator penalties (which double-counted the same physical issue
-    // when quality + semantic + entity all flagged it). Coerce to integer in
-    // [0, 100] and default to a passing score when the LLM omits the field
-    // (defensive — the prompt requires it, but old replays may not have it).
-    if (typeof plan.final_score === 'number' && Number.isFinite(plan.final_score)) {
-      plan.final_score = Math.max(0, Math.min(100, Math.round(plan.final_score)));
-    } else {
-      plan.final_score = null;
-    }
-    if (typeof plan.final_score_reason !== 'string') plan.final_score_reason = '';
-
     // Full deduplicated issue list — what the UI displays. Not capped at 3.
     // Falls back to an empty array when the consolidator omits it (older replays).
     if (!Array.isArray(plan.deduped_issues)) {
@@ -871,8 +858,6 @@ async function consolidateEvaluation({
       per_character_fixes: [],
       scene_fix: { severity: 'NONE', instruction: '', preserve: [] },
       dropped_issues: [],
-      final_score: 100,
-      final_score_reason: 'no evaluator issues',
       deduped_issues: [],
       skipped: true,
     };

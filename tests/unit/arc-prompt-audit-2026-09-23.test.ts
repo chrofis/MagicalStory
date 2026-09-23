@@ -113,6 +113,23 @@ describe('arc prompts after the 2026-09-23 audit', () => {
     expect(rules).not.toContain('unless it has a reason to separate');
   });
 
+  it('from age 6 the cast may split into two threads; younger books and unknown ages stay together (owner, 2026-09-23)', () => {
+    const at = (age: any, languageLevel = 'standard') => ({ languageLevel, characters: [{ id: 'a', name: 'Anna', age }], mainCharacters: ['a'] });
+    for (const age of [6, 9, 12]) {
+      expect(PB.twoThreadsAllowed(at(age)), `age ${age}`).toBe(true);
+      const rules = PB.buildTellingRulesSection(at(age));
+      expect(rules).toContain('unless it has a reason to separate');
+      expect(rules).not.toContain('never two groups going separate ways');
+    }
+    for (const age of [3, 5, undefined]) {
+      expect(PB.twoThreadsAllowed(at(age)), `age ${age}`).toBe(false);
+      expect(PB.buildTellingRulesSection(at(age))).toContain('never two groups going separate ways');
+    }
+    // The 1st-grade read-aloud line no longer says "one thread" beside a split it allows.
+    expect(PB.buildArcBudgetSection(at(6, '1st-grade'), 18)).toContain('at most two threads');
+    expect(PB.buildArcBudgetSection(at(5, '1st-grade'), 18)).toContain('one thread');
+  });
+
   it('the topic guide reaches the arc with its use rule and without the avatar COSTUME field', () => {
     const create = PB.buildArcCreatePrompt(input(), 18);
     expect(create).toContain('# TOPIC GUIDE');
