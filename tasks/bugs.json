@@ -1837,7 +1837,7 @@
       "impact": "Every story citing a real landmark: a full-book review rewrite for no change, with planned close-ups lost and new cast faults introduced.",
       "status": "fixed",
       "fixedAt": "2026-09-24",
-      "fixedIn": "pending",
+      "fixedIn": "a387828f0",
       "fix": "landmark_view_missing deleted (no derivation: the default is the exterior photo and the views that differ are not in any structured field). shotVocabulary.CLOSEUP_KEPT_RULE shared by AD 11c, scene-review 7b / 10 and shot_widened; shot_off_plate keeps a planned shot and offers only a vantage; 9e / C7 place by the place. Pinned by tests/unit/art-director-audit-2026-09-23.test.ts. docs/decisions.md 2026-09-24."
     }
   ]
