@@ -1470,6 +1470,30 @@
       "fixedAt": "2026-09-23",
       "fixedIn": "2e36a6636",
       "fix": "Owner chose prompt + code. Prompts: D-03 cites two non-overlapping matched figures; N-07b own summary is not evidence; `absent` field + region named on quality and semantic findings; consolidator rule 2a and typed drops. Code (severity only): absenceCheck.capDuplicatesByDetector (detector people <= cast people -> MINOR) and secondLookAbsenceClaims (one independent Gemini look per page at CRITICAL/MAJOR absence claims; unconfirmed -> MINOR), wired in evaluateImageQuality before scoring; feedbackConsolidator.enforceNotADefectDrops. Replay + one paid look on stored p12 v0: duplicate -> MINOR, boots 'yes', gilet 'yes' -> MINOR. Pinned by tests/unit/absence-severity-guards.test.ts."
+    },
+    {
+      "id": "arc-saved-detail-figure-charged-invented",
+      "title": "A figure named only in a character's saved details fitted neither arc figure list and was charged as invented by the plan counters",
+      "reportedAt": "2026-09-23",
+      "source": "Reproduced from stored data, staging job_1790100385959_1nitlympp: the dog named in one boy's saved details is on neither \"Premise figures:\" nor \"Invented figures:\" of the committed arc (the creator explained it in prose after the Allowed line); rawOutline BEATS REVIEW carries PLAN[ARC_INVENTED_UNDECLARED] and PLAN[ARC_INVENTED_OVER_ALLOWANCE] (3 against 2) naming it on both plan rounds.",
+      "rootCause": "Three definitions of \"commissioned\": the budgets (\"anyone the commission named\"), the Premise-figures spec (\"the commission's own premise supplies\") and the panel CAST lens (\"the commission did not name\") — none covered saved details, while the counters count only the character list plus the arc's Premise-figures names.",
+      "impact": "Any story whose saved character details name a pet, sibling or friend the arc uses: false invented-cast findings, a spent re-plan slot, and a possible forced arc round.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "f25a51f3f",
+      "fix": "COMMISSIONED_CAST_DEF (promptBuilders.js) = character list plus any named figure the premise supplies or a character's saved details name; one string in the budgets, the shared PREMISE_FIGURES_SPEC (create + retell) and the panel CAST lens. The counters read the list it fills. Pinned by tests/unit/arc-prompt-audit-2026-09-23.test.ts."
+    },
+    {
+      "id": "arc-hints-prompt-and-retell-raw-not-stored",
+      "title": "The arc trail claimed \"everything the machine produced, verbatim\" but never stored the hint pass's prompt or reply, or the re-telling's raw reply",
+      "reportedAt": "2026-09-23",
+      "source": "Staging job_1790100385959_1nitlympp arcReviewReport: no hints prompt, no hints raw reply, rounds[] without the retell raw text (parsed fields only); the audit had to rebuild the hints prompt from the template.",
+      "rootCause": "beatsPipeline.js built hintsPrompt inside the try block and kept only the parsed arcHints; roundReports kept parsed retell fields only.",
+      "impact": "A hint or a figure list could not be traced to what the stage was shown or what it answered; Challenges-taken tags stripped by the parser could not be audited.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "f25a51f3f",
+      "fix": "rounds[].retellRaw; arcReviewReport.hintsModel / hintsPrompt / hintsRaw, kept even when the pass fails to parse. Pinned by tests/unit/arc-prompt-audit-2026-09-23.test.ts."
     }
   ]
 }
