@@ -431,6 +431,14 @@ const MODEL_DEFAULTS = {
   // temperature); these apply on OpenRouter/xAI paths only.
   arcPanelTemperature: 0.8,
   arcRetellTemperature: 0.6,
+  // Thinking effort on the two creator calls (owner, 2026-09-23, staging trial
+  // pending evidence from the next stories). Sent as output_config.effort on
+  // the Anthropic path; other providers ignore it. Unset = the model's default
+  // (`high` on Opus 5). Lab #1375 (create sweep) / #1416 (re-tell at low held
+  // within noise of high). The create gets the most thinking; the re-telling is
+  // bounded by the committed arc and the panel's solutions.
+  arcCreateEffort: 'max',
+  arcRetellEffort: 'medium',
   // The three reviews used to share outlineReviewModel, so switching the BEATS
   // reviewer silently moved the scene and wardrobe reviews too. They are
   // separate decisions with separate evidence and now separate keys.

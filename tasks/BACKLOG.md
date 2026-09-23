@@ -564,6 +564,7 @@ measurement, is lost).
 
 ## Verification pending (code shipped, proof not taken)
 - [ ] Over-the-shoulder / ultra-wide: judge on the next full dragon run (commission file ready). OTS accepted as is by owner 2026-09-23: camera behind + crop work (Lab 1420), subject still drawn large/close; untried idea = give the subject a measurable size in the shot definition (as the ultra-wide plate fix did). → docs/decisions.md 2026-09-23 over-the-shoulder entries
+- [ ] Arc create `max` / re-tell `medium` (staging trial, owner 2026-09-23): read the next staging stories' arcs and costs against high/high before any master push; open question whether the re-tell can be skipped when the first arc is good enough (today it always runs; the create critique always names 3-6 faults). → docs/decisions.md:55777
 
 - [ ] **The unified writer's composition rules changed and no story has run through them** (2026-09-15,
       `3d28c6e45`). `AD_COMPOSITION_RULE` replaced the unified twins' own two focal-point bullets with

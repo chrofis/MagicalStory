@@ -8798,6 +8798,8 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
       const t = Date.now();
       const res = await callTextModelStreaming(retellPrompt, null, null, retellModel, {
         usageLabel: 'testlab_arc_retell_replay', ...tempFor(retellModel, MODEL_DEFAULTS.arcRetellTemperature),
+        // Production's re-tell effort, so the replay reproduces the shipped call.
+        ...(MODEL_DEFAULTS.arcRetellEffort ? { effort: MODEL_DEFAULTS.arcRetellEffort } : {}),
       });
       const parsed = H.parseArcRetell(res.text || '');
       retell = {

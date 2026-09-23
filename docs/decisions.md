@@ -55819,6 +55819,16 @@ machine. Master/production still runs high/high until a master push is approved.
 panel's solutions; `medium` is a step down from today's `high` with the low-effort re-tell
 evidence from #1416 behind it. No Opus 5 re-tell below high has been measured.
 
+**When a re-tell runs (measured, not changed):** always. With `arcRounds` = 1, round 1's panel and
+re-tell run unconditionally (beatsPipeline.js:1006 loop, re-tell at :1052); the only skip is an
+entirely failed panel (:1027). The early stops (:1128, :1141) act on round 2+ only. The panel
+gives no verdict or fault count: each panelist proposes one solution. The create's own critique
+cannot come back clean: arcCritiqueSpec asks for "3 to 6 numbered story-level faults"
+(promptBuilders.js:8565). Staging, last 20 stories with an arc (2026-09-09 to 2026-09-22): 20/20
+re-told; every create critique's worst tag was MAJOR (0 CRITICAL, 2-4 MAJOR, 2-4 MINOR). A "skip
+the review when the first arc is good enough" gate on the create critique would have fired on
+0/20 as the spec stands.
+
 **Touched:** `server/config/models.js` (`arcCreateEffort`, `arcRetellEffort`),
 `server/lib/beatsPipeline.js` (`creatorCall` takes an effort; the two call sites),
 `server/lib/testlab.js` (`arc_panel_replay` re-tell), `tests/unit/arc-creator-effort.test.ts`.

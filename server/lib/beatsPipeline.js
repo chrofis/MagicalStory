@@ -939,11 +939,13 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       (temp == null || TEXT_MODELS[model]?.provider === 'anthropic') ? {} : { temperature: temp };
 
     /** Creator-side call: one retry, then throw — the creator is not advisory. */
-    const creatorCall = async (prompt, label, temp) => {
+    // `effort` is the thinking level for this call (MODEL_DEFAULTS.arcCreateEffort
+    // / arcRetellEffort); null max_tokens = the model's own ceiling.
+    const creatorCall = async (prompt, label, temp, effort) => {
       let lastErr = null;
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
-          const res = await textModels.callTextModelStreaming(prompt, null, onChunk, arcCreatorModel, { usageLabel: label, ...tempFor(arcCreatorModel, temp) });
+          const res = await textModels.callTextModelStreaming(prompt, null, onChunk, arcCreatorModel, { usageLabel: label, ...tempFor(arcCreatorModel, temp), ...(effort ? { effort } : {}) });
           if (!String(res?.text || '').trim()) throw new Error('empty response');
           // A cut arc parses as a shorter arc (missing ARC 2, missing critique
           // lines) — treat it as a failed attempt, never as the creator's answer.
@@ -965,7 +967,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     let createRes = null;
     let commit = null;
     for (let attempt = 1; attempt <= 2 && !commit; attempt++) {
-      createRes = await creatorCall(createPrompt, 'arc_create', null);
+      createRes = await creatorCall(createPrompt, 'arc_create', null, MODEL_DEFAULTS.arcCreateEffort);
       try {
         commit = parseArcCreate(createRes.text);
       } catch (parseErr) {
@@ -1047,7 +1049,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       let retellRes = null;
       let retold = null;
       for (let attempt = 1; attempt <= 2 && !retold; attempt++) {
-        retellRes = await creatorCall(retellPrompt, 'arc_retell', MODEL_DEFAULTS.arcRetellTemperature);
+        retellRes = await creatorCall(retellPrompt, 'arc_retell', MODEL_DEFAULTS.arcRetellTemperature, MODEL_DEFAULTS.arcRetellEffort);
         try {
           retold = parseArcRetell(retellRes.text);
         } catch (parseErr) {
