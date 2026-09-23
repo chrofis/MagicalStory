@@ -4692,7 +4692,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               `${shotPrefix}**LOCATION:** ${locationRef}\n**VANTAGE:** ${v.name || ''}`,
               v.description || '',
               adEmptyPrompt
-                ? `**FRAMING:** ${adEmptyPrompt}\n\nThe FRAMING paragraph decides the camera position, the composition and what fills the foreground. The LOCATION and VANTAGE lines are setting context — use them for what the place looks like, not for how it is framed.`
+                ? `**FRAMING:** ${adEmptyPrompt}\n\n${vantageShot ? 'The SHOT line decides the camera: its height, angle and distance. The FRAMING paragraph decides the composition and what fills the foreground; a camera it names gives way to the SHOT line.' : 'The FRAMING paragraph decides the camera, the composition and what fills the foreground.'} The LOCATION and VANTAGE lines are setting context — use them for what the place looks like, not for how it is framed.`
                 : '',
             ].filter(Boolean).join('\n\n');
             const characterSpace = `Render this as an empty location backdrop. Foreground, midground and background bands all show the scene's natural ground/floor/water surface continuing unbroken — characters will be composited into them later. No figures, no animals.`;
@@ -4776,8 +4776,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               let platePrompt = emptyPrompt;
               let plateRefs = result.grokRefImages || null;
               let plateQcRecord = null;
+              // ONE set of QC options for the plate, its retry and every plate
+              // derived from it — the retry was judged on pixels only and the
+              // derived plates not at all (2026-09-23, dragon run 6).
+              let plateQcOpts = { artStyle: artStyleDesc, shot: plateClass(vantageShot) };
+              const { validateEmptyScene } = require('./server/lib/images');
               try {
-                const { validateEmptyScene } = require('./server/lib/images');
                 const seenPlacement = new Set();
                 const placements = [];
                 for (const pn of group.pageNumbers) {
@@ -4799,12 +4803,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   const themeBits = [inputData.storyTheme, inputData.storyTopic, inputData.storyType].filter(Boolean).join(' / ');
                   storyEra = themeBits ? `${costumedTypes[0]} (${themeBits})` : costumedTypes[0];
                 }
-                const qc = await validateEmptyScene(plateImage, null, `vantage-${vantageId}`, {
+                plateQcOpts = {
+                  ...plateQcOpts,
                   sceneDescription: emptySceneDesc,
                   characterPlacements: placements.length > 0 ? placements : null,
                   mainScenePrompt: repPageData.scene?.sceneDescription || null,
                   storyEra,
-                });
+                };
+                const qc = await validateEmptyScene(plateImage, null, `vantage-${vantageId}`, plateQcOpts);
                 if (!qc.pass) {
                   genLog.warn('vantage_plate_qc_failed', `Vantage plate ${vantageId} (${v.locationName} – ${v.name}, pages ${group.pageNumbers.join(',')}) failed QC: ${qc.issues.join(', ')} — retrying with feedback`);
                   const fixHint = qc.visionFeedback
@@ -4842,9 +4848,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   }
                   imageGenHeartbeat();
                   if (retryResult?.imageData) {
-                    // Validate retry (pixel only — same as the per-page retry,
-                    // skips the second vision call).
-                    const retryQc = await validateEmptyScene(retryResult.imageData, null, `vantage-${vantageId}-retry`, { skipVision: true });
+                    // The retry is judged exactly as the first plate was: a
+                    // pixel-only verdict "passed" a retry that fixed nothing the
+                    // vision check had failed.
+                    const retryQc = await validateEmptyScene(retryResult.imageData, null, `vantage-${vantageId}-retry`, plateQcOpts);
                     if (retryQc.pass || retryQc.issues.length < qc.issues.length) {
                       plateQcRecord = { v1ImageData: plateImage, v1Issues: qc.issues, visionFeedback: qc.visionFeedback || null, retryPrompt };
                       plateImage = retryResult.imageData;
@@ -4884,11 +4891,51 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 if (!deriveInstruction) continue;
                 try {
                   const { editImageWithPrompt } = require('./server/lib/images');
-                  const derived = await editImageWithPrompt(
-                    plateImage, deriveInstruction, MODEL_DEFAULTS.emptyScenePlateModel, [], null, layoutAspect);
-                  if (derived?.imageData) {
-                    derivedPlates.set(cls, { imageData: derived.imageData, prompt: deriveInstruction });
-                    if (derived.usage) addUsage('gemini_image', derived.usage, 'page_images', derived.usage.model || MODEL_DEFAULTS.emptyScenePlateModel);
+                  // The book's art style goes to the edit (it went as null, and
+                  // the p12 aerial derive of dragon run 6 came back reading as a
+                  // photograph), and the derived plate is judged like the base:
+                  // same QC, its own camera, one re-derive with the feedback.
+                  const derive = async (instruction) => {
+                    const r = await editImageWithPrompt(
+                      plateImage, instruction, MODEL_DEFAULTS.emptyScenePlateModel, [], inputData.artStyle || null, layoutAspect);
+                    if (r?.usage) addUsage('gemini_image', r.usage, 'page_images', r.usage.model || MODEL_DEFAULTS.emptyScenePlateModel);
+                    return r?.imageData || null;
+                  };
+                  // Judged on what the derive was told: its camera, the medium,
+                  // the place. Not the base's SHOT line, and not the page's
+                  // geometry facts or placements, which the edit never saw.
+                  const derivedQcOpts = {
+                    sceneDescription: shotPrefix && emptySceneDesc.startsWith(shotPrefix) ? emptySceneDesc.slice(shotPrefix.length) : emptySceneDesc,
+                    storyEra: plateQcOpts.storyEra || null,
+                    artStyle: artStyleDesc,
+                    shot: cls,
+                  };
+                  let derivedImage = await derive(deriveInstruction);
+                  let derivedPrompt = deriveInstruction;
+                  let derivedQcRecord = null;
+                  if (derivedImage) {
+                    const dqc = await validateEmptyScene(derivedImage, null, `vantage-${vantageId}-${cls}`, derivedQcOpts);
+                    if (!dqc.pass) {
+                      genLog.warn('vantage_plate_qc_failed', `Derived ${cls} plate for ${vantageId} failed QC: ${dqc.issues.join(', ')} — re-deriving with feedback`);
+                      const retryInstruction = dqc.visionFeedback
+                        ? `${deriveInstruction} The previous attempt had this problem: ${dqc.visionFeedback}. Fix this in the new version.`
+                        : deriveInstruction;
+                      const retryImage = await derive(retryInstruction);
+                      const rqc = retryImage
+                        ? await validateEmptyScene(retryImage, null, `vantage-${vantageId}-${cls}-retry`, derivedQcOpts)
+                        : null;
+                      derivedQcRecord = { v1ImageData: derivedImage, v1Issues: dqc.issues, visionFeedback: dqc.visionFeedback || null, retryPrompt: retryInstruction };
+                      if (rqc && (rqc.pass || rqc.issues.length < dqc.issues.length)) {
+                        derivedImage = retryImage;
+                        derivedPrompt = retryInstruction;
+                        genLog.info('vantage_plate_qc_retry', `Derived ${cls} plate for ${vantageId}: re-derive ${rqc.pass ? 'passed QC' : `has ${rqc.issues.length} issue(s), fewer than ${dqc.issues.length} — kept`}`);
+                      } else {
+                        genLog.warn('vantage_plate_qc_retry', `Derived ${cls} plate for ${vantageId}: re-derive did not improve${rqc ? ` (${rqc.issues.join(', ')})` : ' (no image)'} — keeping the first derive`);
+                      }
+                    }
+                  }
+                  if (derivedImage) {
+                    derivedPlates.set(cls, { imageData: derivedImage, prompt: derivedPrompt, qcRecord: derivedQcRecord });
                     log.info(`🏛️ [VANTAGE] ${vantageId}: derived a ${cls} plate from the ${baseShotForDerive || 'base'} one`);
                   } else {
                     log.error(`❌ [VANTAGE] ${vantageId}: ${cls} plate derive returned no image — those pages keep the base plate, drawn for a camera that cannot hold them`);
@@ -4919,8 +4966,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   vantageId,
                   vantageName: v.name,
                   locationName: v.locationName,
-                  // Same QC-history shape the per-page path stores (dev panel).
-                  ...(plateQcRecord || {}),
+                  // Same QC-history shape the per-page path stores (dev panel):
+                  // the derived plate's own history when it has one.
+                  ...((derivedForPage ? derivedForPage.qcRecord : plateQcRecord) || {}),
                 };
               }
               log.info(`🏛️ [VANTAGE] ${vantageId} ${v.locationName} – ${v.name}: 1 canvas → pages [${group.pageNumbers.join(',')}]`);
@@ -5176,12 +5224,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   const themeBits = [inputData.storyTheme, inputData.storyTopic, inputData.storyType].filter(Boolean).join(' / ');
                   storyEra = themeBits ? `${costumedTypes[0]} (${themeBits})` : costumedTypes[0];
                 }
-                const qc = await validateEmptyScene(result.imageData, textPos, `P${pageData.pageNumber}`, {
+                const pageQcOpts = {
                   sceneDescription: emptySceneDesc,
                   characterPlacements: placements.length > 0 ? placements : null,
                   mainScenePrompt: pageData.scene?.sceneDescription || null,
                   storyEra,
-                });
+                  artStyle: artStyleDesc,
+                  shot: shotForCamera || null,
+                };
+                const qc = await validateEmptyScene(result.imageData, textPos, `P${pageData.pageNumber}`, pageQcOpts);
                 if (!qc.pass) {
                   // Retry with Gemini's feedback appended to the description.
                   // The text-area instruction is rebuilt with the SAME shared
@@ -5221,14 +5272,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     pageContext: `empty-P${pageData.pageNumber}-retry`,
                   });
                   if (retryResult?.imageData) {
-                    // Validate retry (pixel only — skip vision to avoid double API cost)
-                    const retryQc = await validateEmptyScene(retryResult.imageData, textPos, `P${pageData.pageNumber}-retry`, { skipVision: true });
+                    // Judged exactly as the first attempt was (vision included).
+                    const retryQc = await validateEmptyScene(retryResult.imageData, textPos, `P${pageData.pageNumber}-retry`, pageQcOpts);
                     if (retryQc.pass) {
                       log.info(`✅ [EMPTY SCENE] P${pageData.pageNumber} retry passed QC`);
                       // Return both versions so they can be compared in dev mode
                       return { pageNumber: pageData.pageNumber, imageData: retryResult.imageData, prompt: retryPrompt, grokRefImages: retryResult.grokRefImages || null, v1ImageData: result.imageData, v1Issues: qc.issues, visionFeedback: qc.visionFeedback, retryPrompt, textAreaMask, emptySceneVbGrid: emptySceneVbGridDataUrl };
                     }
-                    log.warn(`⚠️ [EMPTY SCENE] P${pageData.pageNumber} retry also failed pixel QC — picking best of v1/v2`);
+                    log.warn(`⚠️ [EMPTY SCENE] P${pageData.pageNumber} retry also failed QC — picking best of v1/v2`);
                     // Pick whichever version has fewer issues
                     const bestImage = retryQc.issues.length < qc.issues.length ? retryResult.imageData : result.imageData;
                     return { pageNumber: pageData.pageNumber, imageData: bestImage, prompt: retryPrompt, grokRefImages: (retryQc.issues.length < qc.issues.length ? retryResult.grokRefImages : result.grokRefImages) || null, v1ImageData: result.imageData, v1Issues: qc.issues, visionFeedback: qc.visionFeedback, retryPrompt, textAreaMask, emptySceneVbGrid: emptySceneVbGridDataUrl };

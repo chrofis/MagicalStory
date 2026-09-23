@@ -607,7 +607,7 @@ function buildPlateDeriveInstruction(baseShot, targetShot) {
   const fromPhrase = from ? `painted as a ${from} shot` : 'painted at eye level';
   const move = DERIVE_CAMERA_MOVE[target.id] || `Re-paint the same place as a ${target.id} shot. ${target.definition}`;
   return `This backdrop is ${fromPhrase} of a place. ${move} `
-    + 'The buildings, walls, roofs, trees, paths and surfaces keep their shape, material and colour and their arrangement relative to each other; the palette and the season stay identical, and the light keeps the same direction and time of day. The camera moves; the place stays as it is.';
+    + 'The buildings, walls, roofs, trees, paths and surfaces keep their shape, material and colour and their arrangement relative to each other; the palette and the season stay identical, and the light keeps the same direction and time of day. The camera moves; the place stays as it is, and no one is added to it.';
 }
 
 module.exports = {

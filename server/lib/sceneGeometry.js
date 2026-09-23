@@ -185,14 +185,22 @@ function selectGeometryFacts(opts = {}) {
   const facts = [];
   const foundDims = new Set();
   const taken = new Set();
+  // A dimension is FOUND only by a fact that names a direction or position:
+  // every author line says "from the direction named above", and on staging
+  // job_1790100385959_1nitlympp p14 the only lighting fact was "The harsh
+  // yellow streetlamp light cuts through the dark autumn night" — the line
+  // pointed at a direction nobody named, and the judge graded it. Such a fact
+  // is still listed; it just earns no author line and no judge check.
+  const directed = (c) => DIRECTION_RE.test(c.text);
   const take = (c) => {
     if (!c || taken.has(c.text) || facts.length >= maxFacts) return;
     taken.add(c.text);
     facts.push(c.text);
-    for (const k of c.dims) foundDims.add(k);
+    if (directed(c)) for (const k of c.dims) foundDims.add(k);
   };
   for (const key of SELECTION_ORDER) {
-    take(candidates.find(c => !taken.has(c.text) && c.dims.includes(key)));
+    const open = candidates.filter(c => !taken.has(c.text) && c.dims.includes(key));
+    take(open.find(directed) || open[0]);
   }
   for (const c of candidates) take(c);
 

@@ -126,7 +126,20 @@ describe('the pipeline honours it', () => {
   });
 
   it('derives from the base plate image, not from a fresh generation', () => {
-    expect(src).toMatch(/editImageWithPrompt\(\s*\n?\s*plateImage, deriveInstruction/);
+    expect(src).toMatch(/editImageWithPrompt\(\s*\n?\s*plateImage, instruction/);
+  });
+
+  // Dragon run 6 (2026-09-23): the derive went out with no art style and its
+  // result was never judged; the base plate's retry was judged on pixels only.
+  it('the derive carries the book art style', () => {
+    expect(src).toMatch(/plateImage, instruction, MODEL_DEFAULTS\.emptyScenePlateModel, \[\], inputData\.artStyle/);
+  });
+  it('a derived plate is QC-judged at its own camera', () => {
+    expect(src).toMatch(/validateEmptyScene\(derivedImage, null, `vantage-\$\{vantageId\}-\$\{cls\}`, derivedQcOpts\)/);
+    expect(src).toMatch(/shot: cls,/);
+  });
+  it('no plate retry is judged on pixels only', () => {
+    expect(src).not.toMatch(/validateEmptyScene\([^)]*skipVision: true/);
   });
 
   it('falls back to the base plate when the derive fails', () => {

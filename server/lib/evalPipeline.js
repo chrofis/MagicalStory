@@ -405,7 +405,7 @@ function largestInteriorUniformFraction(mask, rows, cols) {
  * asserted without a paid vision call, and so the plate generator/critic pair
  * names two file paths instead of this module.
  */
-function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, characterPlacements = null, mainScenePrompt = '' } = {}) {
+function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, characterPlacements = null, mainScenePrompt = '', artStyle = '', shot = '' } = {}) {
   const sceneCtx = sceneDescription
     ? `\nEXPECTED SCENE: "${sceneDescription.substring(0, 300)}"`
     : '';
@@ -465,8 +465,24 @@ function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, chara
         castNames: Array.isArray(characterPlacements) ? characterPlacements.map(c => c && c.name).filter(Boolean) : [],
       }).dims)
     : '';
+  // THE PLATE IS JUDGED ON WHAT ITS AUTHOR WAS TOLD (2026-09-23). The plate
+  // prompt opens with ART STYLE and carries a SHOT line; the judge had
+  // neither, so a photographic plate or a wrong camera passed (staging
+  // job_1790100385959_1nitlympp: the p12 aerial derive read as a photograph,
+  // the LOC002.4/.5 plates came back eye-level medium-wide).
+  const styleCheck = String(artStyle || '').trim()
+    ? `\n${fillTemplate(qc.STYLE_CHECK, { ART_STYLE: String(artStyle).trim() })}` : '';
+  // `shot` is a shot id, or the base plate class ('eye-level'): a vantage's
+  // base plate is shared by every close-up, medium and wide page on it, so it
+  // is held to its height and angle only, never to one page's distance.
+  const shotId = String(shot || '').trim();
+  const { PLATE_BASE_CLASS } = require('./shotVocabulary');
+  const cameraCheck = shotId
+    ? `\n${fillTemplate(qc.CAMERA_CHECK, { SHOT: shotId === PLATE_BASE_CLASS ? 'at eye level' : `as the ${shotId} shot` })}` : '';
   return fillTemplate(qc.BODY, {
     SCENE_CTX: sceneCtx,
+    STYLE_CHECK: styleCheck,
+    CAMERA_CHECK: cameraCheck,
     ERA_BLOCK: eraBlock,
     PLACEMENTS_BLOCK: placementsBlock,
     MAIN_SCENE_BLOCK: mainSceneBlock,
@@ -491,7 +507,7 @@ function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, chara
  * @returns {{ pass: boolean, issues: string[], calmnessScore: number, visionFeedback: string|null }}
  */
 async function validateEmptyScene(imageData, textPosition, pageContext = '', options = {}) {
-  const { sceneDescription = null, skipVision = false, characterPlacements = null, mainScenePrompt = null, storyEra = null } = options;
+  const { sceneDescription = null, skipVision = false, characterPlacements = null, mainScenePrompt = null, storyEra = null, artStyle = null, shot = null } = options;
   try {
     const base64 = r2Lib.stripDataUriPrefix(imageData);
     const buf = Buffer.from(base64, 'base64');
@@ -605,7 +621,7 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
           const base64ForVision = r2Lib.stripDataUriPrefix(imageData);
           const mimeType = imageData.match(/^data:(image\/\w+);/)?.[1] || 'image/jpeg';
 
-          const qcPrompt = buildEmptySceneQcPrompt({ sceneDescription, storyEra, characterPlacements, mainScenePrompt });
+          const qcPrompt = buildEmptySceneQcPrompt({ sceneDescription, storyEra, characterPlacements, mainScenePrompt, artStyle, shot });
 
           const visionUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
           const visionResp = await fetch(visionUrl, {

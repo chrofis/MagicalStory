@@ -57292,3 +57292,47 @@ sources.
 **Touched:** `prompts/feedback-consolidator.txt`, `server/lib/feedbackConsolidator.js`,
 `scripts/analysis/qwen-eval-ab.js`, `docs/prompt-inventory.md`.
 **Status:** ✅ active on staging.
+
+## 2026-09-23 — The plate is judged on what its author was told: one camera, a medium and a figure check, no pixel-only retry, derived plates judged
+
+**Context.** Dragon run 6 (staging `job_1790100385959_1nitlympp`), audit 08 S9/S10. (1) The vantage plate
+prompt named three cameras: a SHOT line from the representative page (`close-up`), a FRAMING paragraph the
+Art Director wrote for the vantage ("downward-looking aerial view"), and the sentence "The FRAMING
+paragraph decides the camera position", while `empty-scene.txt` ends "Use the camera angle named in the
+SHOT line". (2) The geometry block's lighting line said "take the light from the direction named above"
+when the only lighting fact named no direction. (3) Both plate retries were judged with `skipVision: true`,
+so a retry that fixed nothing the vision check had failed still won. (4) Derived plates (angled pages,
+2026-09-21) were never judged, and the derive edit went out with `artStyle: null`; the p12 aerial derive
+read as a photograph and carried small people. (5) The QC said "small background figures, animals and
+distant people are fine" while the generator says to add no figure the description does not name, and the
+QC had no medium or camera check although the plate prompt opens with ART STYLE and carries a SHOT line.
+
+**Decision.**
+- One camera source: the SHOT line decides height, angle and distance; FRAMING decides composition and
+  foreground, and a camera it names gives way (with no SHOT line FRAMING keeps the camera).
+- A geometry dimension counts as found only through a fact that names a direction or position; such a
+  fact is preferred when a dimension has several. An undirected fact is still listed, but earns no
+  "named above" author line and no judge check (one source, `sceneGeometry.selectGeometryFacts`).
+- The QC is given `artStyle` and `shot` and asks a medium check (photograph = FAIL) and a camera check. A
+  vantage base plate is shared by every close-up, medium and wide page on it, so it is held to its plate
+  class (eye level), never to one page's distance; a derived plate to its own shot; a per-page plate to
+  its page's shot. The figure line now matches the generator: people, animals or figures the scene does
+  not name FAIL; a crowd or passers-by it names is fine (the plate-population design of 5beac7c16 stands).
+- Every retry is judged with the first judgement's options (vision included), base and per-page.
+- A derived plate is edited with the book's art style and judged by the same QC (its own shot, the
+  place, the medium; not the page's geometry facts or placements, which the edit never saw), with one
+  re-derive on the QC feedback, the fewer-issues version kept — the same shape as the base plate. The
+  derive instruction adds "no one is added to it". The Lab's `edit_image` plate mode and `empty_scene`
+  stage pass the same style and shot.
+
+**Replay (rung 2, two gemini-2.5-flash calls, < $0.01):** the new QC on the stored run-6 plates — the p12
+aerial derive FAILS on medium and figures (both confirmed in the audit's pixel read); the p14 vantage base
+plate PASSES at eye level. (At `close-up` it failed the camera check, which is why the base plate is held
+to its class.) No plate was re-rendered.
+
+**Touched:** `storyJobPipeline.js`, `server/lib/evalPipeline.js`, `server/lib/sceneGeometry.js`,
+`server/lib/shotVocabulary.js`, `server/lib/testlab.js`, `prompts/empty-scene-qc.txt`,
+`tests/unit/empty-scene-qc-extraction.test.ts`, `tests/unit/empty-scene-geometry.test.ts`,
+`tests/unit/plate-derive-for-angle.test.ts`, `docs/image-routing.md`, `docs/prompt-inventory.md`.
+**Status:** ✅ active on staging. Cost: one more gemini-2.5-flash call per plate retry and one or two per
+derived plate.
