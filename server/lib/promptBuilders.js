@@ -7744,6 +7744,9 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // The generator's half of the cast contract; PLAN_LINE_CAST_RULE is the
     // consumer's half, in both Art Director templates and the scene review.
     PLAN_LINE_FIELDS: PLAN_LINE_FIELD_CONTRACT,
+    // Sizes and looks are the Art Director's: the same string the arc
+    // ({TELLING_RULES}) and every prose pass (STYLE_RULEBOOK) carry.
+    SIZE_LOOK_RULE,
     // The fourth field's contract, shared with plan-check.txt check 9.
     PAGE_CHANGE: PAGE_CHANGE_DEF,
     // The camera positions, from the one vocabulary the counters read — the
@@ -8730,6 +8733,19 @@ const RISK_FRAMING_RULE = '- Where a child does something with real physical ris
 const PAGE_OPENING_VARIETY_RULE = "Vary how each page begins: not always with a character's name — open some pages with time, place, speech, sound or action, and never start consecutive pages the same way";
 
 /**
+ * SIZES AND LOOKS BELONG TO THE PICTURES (owner, 2026-09-23). ONE string for
+ * every stage that writes the story: the arc ({TELLING_RULES}), the page plan
+ * ({SIZE_LOOK_RULE} in story-beats.txt) and every prose pass (STYLE_RULEBOOK).
+ * The Art Director sizes every Visual Bible element itself (`scaleClass`,
+ * SCALE_CLASS_SPEC); the story stages spend words on a size or a look only
+ * where the plot turns on it. On staging job_1790100385959_1nitlympp the arc
+ * wrote "a young dragon the size of a handcart", "a scale as big as a plate",
+ * "as big as a cat" unasked, the plan copied them into its lines and the
+ * writer turned each into a sentence the owner struck.
+ */
+const SIZE_LOOK_RULE = 'A size or a look is stated only where the plot turns on it: a thing too heavy for one child to lift, too big to hide, small enough to pocket. It is stated as that plot fact, never as a comparison with another thing ("as big as a …", "the size of a …"). Every other size and look is left to the pictures, which size everything themselves; leaving it out drops no fact.';
+
+/**
  * THE STYLE RULEBOOK (owner, 2026-09-23): one block for every pass that
  * writes page prose, filled into the {STYLE_RULEBOOK} placeholder each
  * declares — the beats writer, the trial writer, the text repair
@@ -8742,16 +8758,16 @@ const PAGE_OPENING_VARIETY_RULE = "Vary how each page begins: not always with a 
  * repair's framing say "write/rewrite to these"; the diff pass and the lector
  * say "a correction never breaks these" and stay out of style otherwise.
  *
- * The size/look rule is here, not in the writer alone: the arc states sizes
- * and looks for the image stages, and a repair or diff pass that treats a
- * dropped size as a dropped fact puts it back.
+ * The size/look line is SIZE_LOOK_RULE, the same string the arc and the plan
+ * get: a repair or diff pass that treats a dropped size as a dropped fact
+ * would put it back.
  */
 const STYLE_RULEBOOK = [
   'Every sentence is complete and finishes: no sentence broken off for effect, no bare fragment standing as a sentence, no caption-style line describing the scene like a stage direction. The story is told aloud.',
   'No rhetorical set-pieces: no paired negations ("Nobody answered. Nobody argued."), no coined sayings or incantations, no one-sentence paragraph for drama. Plain narration carries the story.',
   'No sentence tells what an event meant or sums up who the characters have become ("they had become something else", "he had done his part"). The telling shows the event and moves on.',
   'The narrator never justifies, excuses or explains an action to the reader ("he had given his share, so now he could eat too"). A reason the story needs comes through a character\'s words, thoughts or feelings in the moment.',
-  'A size or a look is stated only where the story uses it: a thing too heavy to lift alone, too big to hide, small enough to hold. Otherwise it belongs to the pictures: the text leaves it out, and leaving it out drops no fact.',
+  SIZE_LOOK_RULE,
   'The last page ends on the concrete act or spoken line the story ends with and lands one feeling, plainly and warmly. A string of short solemn sentences is not an ending, and neither is a closing sentence that sums up the story.',
 ].map(r => `- ${r}`).join('\n');
 
@@ -8925,6 +8941,7 @@ function buildTellingRulesSection(inputData = {}) {
     `- ${ARC_ENTRANCE_RULE}`,
     `- ${ARC_GIVEN_RULE}`,
     `- ${ARC_SENSE_RULE}`,
+    `- ${SIZE_LOOK_RULE} A size or a look the commission itself gives is kept once, in its words, where the thing first appears.`,
     '- Each named character speaks with a distinctive voice — word choice and rhythm a child could tell apart with eyes closed.',
     '- An animal or creature that travels with the children is named by them where they decide to help it, and goes by that name after.',
     '- Names the commission gives stand as written; every other vessel, vehicle or place name is invented fresh and distinctive — never a variant of a given name, and two vessels never share a word.',
@@ -11108,6 +11125,7 @@ module.exports = {
   ARC_ENTRANCE_RULE,
   ARC_GIVEN_RULE,
   ARC_SENSE_RULE,
+  SIZE_LOOK_RULE,
   CENTRAL_FIGURE_DEF,
   EVERY_CHILD_ACTS_RULE,
   GUIDE_USE_RULE,

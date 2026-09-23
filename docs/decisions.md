@@ -57504,3 +57504,49 @@ cannot drift apart.
 `server/lib/promptBuilders.js` (`buildTextAuditBlindPrompt`), `server/lib/textRefine.js` (comment),
 `server/lib/testlab.js` (`runAuditReplayStage`), `tests/unit/text-audit-style.test.ts`,
 `tests/unit/text-audit-rules-reach-writer.test.ts`, `docs/prompt-inventory.md`.
+
+## 2026-09-23 — Sizes and looks leave the arc and the plan: one SIZE_LOOK_RULE for arc, plan and prose; the Visual Bible author decides sizes
+
+**Context.** Owner, reading dragon run 6 (staging `job_1790100385959_1nitlympp`): "why are sizes in the arc
+… sizes are needed only for the images, the art director must create them". The arc prompts never asked
+for sizes, but the arc model wrote them anyway ("a young dragon the size of a handcart", "a scale as big
+as a plate", "Flämmli climbs out as big as a cat"; the user's commission itself said "so gross wie ein
+Fussball"). The plan copied them into its lines ("the football-sized egg", "as big as a cat") and the
+writer turned each into a sentence. The same-day STYLE_RULEBOOK line removed them at the last stage
+only; every earlier stage still paid for them.
+
+**Consumer trace (stored run 6).** The only consumer of a size is the Visual Bible, written by the
+all-pages Art Director (scene-expansion-all.txt), which reads `{FINAL_ARC}` and the plan lines but not
+the commission. Its `scaleClass` is required and was chosen by the author itself: the egg is
+`melon-sized` (arc "football"), the dragon `waist-high` (arc "handcart"), the hatchling `forearm-sized`
+(arc "cat"), the scale `melon-sized` (arc "plate"). The words leaked into two `description`s
+("football-sized oval egg", "plate-sized … scale") although the template already says no entry gives a
+size of its own. No check reads an arc or plan size: the plan counters count cast and shots, the SENSE
+lens and the arc critique reason about sizes the story made true (kept), plan-check has no size
+question, and objectScaleAudit reads the bible's declared size. The clothing contract
+(story-bible-from-beats.txt) takes no sizes.
+
+**Decision.**
+- `SIZE_LOOK_RULE` (promptBuilders.js): a size or a look is stated only where the plot turns on it (too
+  heavy for one child to lift, too big to hide, small enough to pocket), as that plot fact, never as a
+  comparison with another thing; every other size and look is left to the pictures. ONE string, in
+  `{TELLING_RULES}` (arc-create and arc-retell), in story-beats.txt as `{SIZE_LOOK_RULE}` (with "a plan
+  line names each thing plainly; the Art Director sizes it"), and as the size line of STYLE_RULEBOOK
+  (replacing its own wording).
+- The arc keeps a size or look the COMMISSION gives, once, where the thing first appears — the Art
+  Director does not read the commission, so this is how a user's "egg the size of a football" reaches
+  the pictures. The plan and the prose drop it unless the plot turns on it.
+- `ARC_SENSE_RULE` unchanged: the arc still reasons about how big things are.
+- `SCALE_CLASS_SPEC` (visualBible.js) tells the author to decide the band from what the story has the
+  element do, since the story states a size only where its plot turns on one. It reaches both live
+  VB-authoring sites (Art Director, trial writer) through the existing placeholder.
+- plan-check.txt unchanged: it does not judge plan-line wording for sizes, and a generator-only rule
+  needs no critic twin.
+
+**Rationale.** Sizes are image staging; the words spent on them in the arc, plan and prose bought
+nothing the `scaleClass` enum does not already carry. One constant means the three story stages cannot
+drift (fix the mirror class, not the instance).
+
+**Touched:** `server/lib/promptBuilders.js` (`SIZE_LOOK_RULE`, `STYLE_RULEBOOK`,
+`buildTellingRulesSection`, `buildBeatsPrompt`), `server/lib/visualBible.js` (`SCALE_CLASS_SPEC`),
+`prompts/story-beats.txt`, `tests/unit/size-look-rule.test.ts`, `docs/prompt-inventory.md`.
