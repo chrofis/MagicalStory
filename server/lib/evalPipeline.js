@@ -1951,6 +1951,36 @@ function buildEvalClothingContract({
   }
 }
 
+/**
+ * The style-gate observations copied out of the ART STYLE block.
+ *
+ * A field counts as copied when any four consecutive words of it sit verbatim in
+ * the art style and NOT in the evaluation template itself — the template lists
+ * its own example answers ("no outlines at all, forms defined by paint edges"),
+ * and picking one of those is an answer, not an echo. Four words, not the whole
+ * value: run 6 also returned the style's face clause with one word spliced in
+ * ("loose paint washes with visible brushstroke texture"). Structured comparison
+ * of the gate's fields against the input it was given; no finding text is read.
+ *
+ * @returns {string[]} the echoed field names, e.g. ['faces']
+ */
+const STYLE_ECHO_SPAN = 4;
+function styleGateEchoedFields(styleGate, artStyleText, templateText = '') {
+  const norm = (t) => String(t || '').normalize('NFKC').toLowerCase()
+    .replace(/[^\p{L}\p{N}\s-]/gu, ' ').replace(/\s+/g, ' ').trim();
+  const style = ` ${norm(artStyleText)} `;
+  if (!style.trim() || !styleGate || typeof styleGate !== 'object') return [];
+  const template = ` ${norm(templateText)} `;
+  return ['observed', 'linework', 'faces'].filter((k) => {
+    const words = norm(styleGate[k]).split(' ').filter(Boolean);
+    for (let i = 0; i + STYLE_ECHO_SPAN <= words.length; i++) {
+      const span = ` ${words.slice(i, i + STYLE_ECHO_SPAN).join(' ')} `;
+      if (style.includes(span) && !template.includes(span)) return true;
+    }
+    return false;
+  });
+}
+
 async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene', qualityModelOverride = null, pageContext = '', storyText = null, sceneHint = null, sceneCharacters = null, evalOptions = {}) {
   // evalOptions.evalTemplateOverride / .semanticTemplateOverride: Test Lab A/B
   // variants — full replacement template strings used instead of the loaded
@@ -2941,7 +2971,19 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         const faces = String(styleGate.faces || '').trim();
         const seen = [observed, linework && `linework: ${linework}`, faces && `faces: ${faces}`]
           .filter(Boolean).join(' | ');
-        if (styleGate.matches_style === false) {
+        // AN OBSERVATION COPIED OUT OF THE ART STYLE IS NOT AN OBSERVATION
+        // (2026-09-23). On dragon run 6 all six quality responses read returned
+        // `faces` as the ART STYLE's own face clause, verbatim, with
+        // matches_style true, while the book-level style check found the faces
+        // smooth and digitally rendered. Same guard as the avatar sheet judges
+        // (isEchoedJudgeVerdict): the echo is detected in code and the gate's
+        // agreement is recorded as no verdict, never as a pass. A `false` stands.
+        const echoed = styleGateEchoedFields(styleGate, artStyleForEval, evaluationTemplate);
+        if (echoed.length > 0 && styleGate.matches_style !== false) {
+          styleGate.echoed = echoed;
+          styleGate.matches_style = null;
+          log.warn(`🎨 [EVAL] ${pageContext ? `[${pageContext}] ` : ""}style gate ECHOED the ART STYLE in ${echoed.join(', ')} — saw [${seen}] — no style verdict for this page`);
+        } else if (styleGate.matches_style === false) {
           // Gate wins over a mis-severitied STEP 4 finding — same precedence as
           // the coherence gate, and the same failure it exists to prevent.
           const already = fixableIssues.some(i => /style_consistency/i.test(String(i.type || '')));
@@ -3670,6 +3712,7 @@ module.exports = {
   runVisualInventory,
   validateEmptyScene,
   buildEmptySceneQcPrompt,
+  styleGateEchoedFields,
   largestInteriorUniformFraction,
   capComplianceIdentitySeverity,
   evaluateThreeStage,

@@ -57336,3 +57336,30 @@ to its class.) No plate was re-rendered.
 `tests/unit/plate-derive-for-angle.test.ts`, `docs/image-routing.md`, `docs/prompt-inventory.md`.
 **Status:** ✅ active on staging. Cost: one more gemini-2.5-flash call per plate retry and one or two per
 derived plate.
+
+## 2026-09-23 — A style-gate observation copied from the ART STYLE is no verdict
+
+**Context.** Dragon run 6 (staging `job_1790100385959_1nitlympp`), audit 08 S11. The quality judge's style
+gate asks for three observations "before you read the ART STYLE", but the ART STYLE is in the same prompt.
+All six stored quality responses for p12/p14/p17 returned `faces` as the style's own face clause ("loose
+washes with visible brushstroke texture", once with "paint" spliced in), each with `matches_style: true`;
+the book-level style check called the faces "smooth and digitally rendered". The gate could only agree.
+
+**Decision.** The avatar-sheet echo guard's idea (isEchoedJudgeVerdict, 86d6ff4a7), applied to the page
+gate without a re-ask (a re-ask is a full quality call per page, and the next answer reads the same ART
+STYLE): `styleGateEchoedFields` flags a gate field when four consecutive words of it sit verbatim in the
+art style and not in the template's own example answers. A flagged gate that did not say `false` is
+recorded as `styleGate.echoed = [fields]`, `matches_style: null`, and logged — no verdict, never a pass. A
+`false` stands. Nothing is charged or uncharged: only `false` ever produced a finding, so no severity moves.
+Style repair stays OFF (SETTLED, 2026-09-19); this only stops a copied answer from reading as a check.
+
+**Proposal (owner):** make the gate genuinely blind by moving the three observations into the blind
+inventory call (image only, no ART STYLE; runs on every page already) and letting the quality judge
+compare those against the ART STYLE. Touches the inventory schema set and the "P1 is blind" contract
+(SETTLED line 34 stays true: the inventory still names nobody).
+
+**Replay (rung 1, stored responses, no calls):** 6/6 run-6 gates flagged on `faces`; `linework` ("no
+outlines at all, forms defined by paint edges", a template option) is never flagged.
+
+**Touched:** `server/lib/evalPipeline.js`, `tests/unit/style-gate-echo.test.ts`.
+**Status:** ✅ active on staging.
