@@ -86,14 +86,17 @@ describe('the floors are tiered, so a short book is not asked for a long book sp
 
   it.each([
     [8, { 'close-up': 1 }, 0],
-    [9, { 'close-up': 2, 'ultra-wide': 1, aerial: 1, 'over-the-shoulder': 1 }, 2],
-    [13, { 'close-up': 2, 'ultra-wide': 1, aerial: 1, 'over-the-shoulder': 1 }, 2],
-    [14, { 'close-up': 2, 'ultra-wide': 1, aerial: 1, 'over-the-shoulder': 2 }, 3],
-    [18, { 'close-up': 2, 'ultra-wide': 1, aerial: 1, 'over-the-shoulder': 2 }, 3],
-    [24, { 'close-up': 2, 'ultra-wide': 1, aerial: 1, 'over-the-shoulder': 2 }, 4],
+    [9, { 'close-up': 2, 'ultra-wide': 1, 'over-the-shoulder': 1 }, 2],
+    [13, { 'close-up': 2, 'ultra-wide': 1, 'over-the-shoulder': 1 }, 2],
+    [14, { 'close-up': 2, 'ultra-wide': 1, 'over-the-shoulder': 2 }, 3],
+    [18, { 'close-up': 2, 'ultra-wide': 1, 'over-the-shoulder': 2 }, 3],
+    [24, { 'close-up': 2, 'ultra-wide': 1, 'over-the-shoulder': 2 }, 4],
   ])('%i pages: the tier boundary holds', (n, floors, positions) => {
     const f = shotFloors(n as number);
     expect(f.floors).toEqual(floors);
+    // Removing the aerial floor (owner, 2026-09-23) must not remove angled
+    // pages: the position total per tier is exactly what it was.
+    expect(f.requiredPositions).toBe(positions);
     expect(f.requiredPositions).toBe(positions);
   });
 
@@ -180,8 +183,12 @@ describe('the people-free page rides the ultra-wide page', () => {
     // ultra-wide satisfy each other, and the phrase says so out loud.
     expect(shotDistributionPhrase(18)).toContain('No two shot words ever share a page');
     const f18 = shotFloors(18);
-    expect(f18.mandatedPages).toBe(
-      Object.values(f18.floors).reduce((a: number, b: any) => a + Number(b), 0));
+    // The people-free page costs nothing: what is owed is the named floors plus
+    // any position pages the TOTAL asks for beyond the named position floors.
+    // Since the aerial floor went (2026-09-23) that remainder is one page.
+    const named = Object.values(f18.floors).reduce((a: number, b: any) => a + Number(b), 0);
+    expect(f18.mandatedPages).toBe(named + (f18.requiredPositions - f18.floors['over-the-shoulder']));
+    expect(f18.mandatedPages).toBe(6);
   });
 });
 
@@ -189,23 +196,21 @@ describe('each floored shot has its own code, so a re-plan is told which one is 
   const eighteen = (extra: string[] = []) =>
     codesFor([...extra, ...fill(18 - extra.length, 'close-up')]);
 
-  it('an 18-page book of close-ups is short of ultra-wide, aerial and over-the-shoulder', () => {
+  it('an 18-page book of close-ups is short of ultra-wide and over-the-shoulder — never of aerial', () => {
     const codes = eighteen();
     expect(codes).toContain('SHOT_ULTRAWIDE_COUNT');
-    expect(codes).toContain('SHOT_AERIAL_COUNT');
+    // The aerial view is artificial (owner, 2026-09-23): allowed, never owed.
+    expect(codes).not.toContain('SHOT_AERIAL_COUNT');
     expect(codes).toContain('SHOT_OTS_COUNT');
     expect(codes).toContain('SHOT_NO_CAMERA_POSITION');
     expect(codes).not.toContain('SHOT_CLOSEUP_COUNT');
   });
 
-  it('ultra-wide is a DISTANCE and aerial a POSITION — one never satisfies the other', () => {
+  it('ultra-wide is a DISTANCE and aerial a POSITION — aerials never pay the ultra-wide floor', () => {
     const withAerials = eighteen(['aerial', 'aerial', 'aerial']);
-    expect(withAerials).not.toContain('SHOT_AERIAL_COUNT');
     expect(withAerials).toContain('SHOT_ULTRAWIDE_COUNT');
-
-    const withUltraWides = eighteen(['ultra-wide', 'ultra-wide']);
-    expect(withUltraWides).not.toContain('SHOT_ULTRAWIDE_COUNT');
-    expect(withUltraWides).toContain('SHOT_AERIAL_COUNT');
+    // ...but an aerial still counts toward the camera-position TOTAL it is part of.
+    expect(withAerials).not.toContain('SHOT_NO_CAMERA_POSITION');
   });
 
   it('the ultra-wide floor is one, not two — a floor enforced beats a floor ignored', () => {
@@ -221,7 +226,7 @@ describe('each floored shot has its own code, so a re-plan is told which one is 
     expect(shots).toHaveLength(18);
     const codes = codesFor(shots);
     for (const c of ['SHOT_MEDIUM_WIDE_EXCESS', 'SHOT_CLOSEUP_COUNT', 'SHOT_ULTRAWIDE_COUNT',
-      'SHOT_AERIAL_COUNT', 'SHOT_OTS_COUNT', 'SHOT_NO_CAMERA_POSITION', 'SHOT_VARIETY']) {
+      'SHOT_OTS_COUNT', 'SHOT_NO_CAMERA_POSITION', 'SHOT_VARIETY']) {
       expect(codes, c).not.toContain(c);
     }
   });
@@ -230,26 +235,24 @@ describe('each floored shot has its own code, so a re-plan is told which one is 
     const codes = codesFor([...fill(3, 'medium'), ...fill(3, 'close-up')]);
     expect(codes).not.toContain('SHOT_NO_CAMERA_POSITION');
     expect(codes).not.toContain('SHOT_OTS_COUNT');
-    expect(codes).not.toContain('SHOT_AERIAL_COUNT');
     expect(codes).not.toContain('SHOT_ULTRAWIDE_COUNT');
     expect(codes).not.toContain('SHOT_CLOSEUP_COUNT');
   });
 
   it('a long book short of the positions TOTAL is told so even with each angle present', () => {
-    // 24 pages owe 4 positions; aerial 1 + over-the-shoulder 2 is only 3.
+    // 24 pages owe 4 positions; an aerial + over-the-shoulder 2 is only 3.
     const shots = [...fill(2, 'close-up'), 'ultra-wide', 'aerial',
       'over-the-shoulder', 'over-the-shoulder', ...fill(12, 'medium'), ...fill(6, 'wide')];
     expect(shots).toHaveLength(24);
     const codes = codesFor(shots);
     expect(codes).toContain('SHOT_NO_CAMERA_POSITION');
     expect(codes).not.toContain('SHOT_OTS_COUNT');
-    expect(codes).not.toContain('SHOT_AERIAL_COUNT');
   });
 });
 
 describe('a re-plan is OBLIGED to answer the spread', () => {
   it.each([
-    'SHOT_MEDIUM_WIDE_EXCESS', 'SHOT_ULTRAWIDE_COUNT', 'SHOT_AERIAL_COUNT',
+    'SHOT_MEDIUM_WIDE_EXCESS', 'SHOT_ULTRAWIDE_COUNT',
     'SHOT_OTS_COUNT', 'SHOT_CLOSEUP_COUNT', 'SHOT_NO_CAMERA_POSITION',
   ])('%s ranks must-fix', (code) => {
     expect(replanRank({ code })).toBe('must');
@@ -267,7 +270,9 @@ describe('the planner is asked for the same table the counters measure', () => {
     expect(phrase).toContain('2 close-up pages');
     expect(phrase).toContain('1 ultra-wide page');
     expect(phrase).toContain('2 over-the-shoulder pages');
-    expect(phrase).toContain('1 aerial page');
+    // Allowed, never owed (owner, 2026-09-23): offered as a word, not floored.
+    expect(phrase).not.toContain('aerial page');
+    expect(phrase).toMatch(/camera position \([^)]*`aerial`/);
     expect(phrase).toContain('3 pages in total leave eye level');
   });
 

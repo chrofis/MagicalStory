@@ -55374,3 +55374,45 @@ one that would have caught run 5's p6, which is the page that started this.
 **Touched:** no code. Lab 1403; run 6 captured to scratch before anything could
 delete it.
 **Status:** ✅ active
+
+## 2026-09-23 — The aerial shot is allowed, never owed
+
+**Context:** the shot distribution (2026-09-20) floored `aerial: 1` on every book
+over eight pages. The owner, reviewing dragon run 6: "the aerial view is
+artificial — remove this as mandatory one aerial per story." A page that
+genuinely wants a bird's-eye view (a search across a whole square, a map-like
+reveal) still earns one; a book forced to find a page for it produces a
+contrived one.
+
+**Decision:** `aerial` leaves `SHOT_FLOOR_TIERS` in `server/lib/shotVocabulary.js`
+and `SHOT_AERIAL_COUNT` is deleted (from `SHOT_FLOOR_CODE` and
+`REPLAN_CONVERGENCE_EXEMPT_CODES`) — a code that can no longer be raised is dead.
+`aerial` stays in the shot vocabulary and in the planner's list of camera
+positions.
+
+**The number of angled pages is deliberately unchanged.** Removing the mandate
+must not quietly remove variety:
+- 14+ pages: the tier already asks for `ceil(pages/6)` camera-position pages in
+  total, so an 18-page book still owes 3 — now any mix of over-the-shoulder,
+  high-angle, low-angle or aerial.
+- 9–13 pages: that tier had no total; its two position pages were aerial 1 +
+  over-the-shoulder 1. It now carries an explicit `positionsTotal: 2`.
+
+`mandatedPages` is identical at every length (12 pages: 5, 18 pages: 6).
+
+**Rationale:** one table feeds both the planner's sentence
+(`shotDistributionPhrase`, injected as `{SHOT_DISTRIBUTION}` into
+`story-beats.txt`) and the counter (`planCounters.js`), so the prompt and the
+check move together by construction. Replayed over both stored dragon plans: no
+shot finding under the new table; the change can only remove a finding.
+
+**Also measured the same day:** run 6 planned five non-medium framings and the
+render delivered two. Aerial (p12) and high-angle (p15) came out; low-angle (p3)
+was in the prompt and ignored, the ultra-wide (p2) was undermined by its own
+brief ("the boys' backs fill the bottom center of the ultra-wide frame"), and the
+over-the-shoulder (p10) rendered as a side two-shot. Shots from above work;
+shots that put the camera low or behind a figure do not. Not addressed here.
+
+**Touched:** `server/lib/shotVocabulary.js`, `server/lib/promptBuilders.js`,
+tests `shot-distribution-floors`, `plan-counters`, `replan-convergence-class`.
+**Status:** ✅ active

@@ -269,7 +269,6 @@ const SHOT_FLOOR_CODE = {
   'close-up': 'SHOT_CLOSEUP_COUNT',
   'ultra-wide': 'SHOT_ULTRAWIDE_COUNT',
   'over-the-shoulder': 'SHOT_OTS_COUNT',
-  'aerial': 'SHOT_AERIAL_COUNT',
 };
 
 /**
@@ -279,14 +278,21 @@ const SHOT_FLOOR_CODE = {
  */
 const SHOT_FLOOR_TIERS = [
   { maxPages: 8, floors: { 'close-up': 1 }, positionsTotal: null },
+  // NO AERIAL FLOOR (owner, 2026-09-23): "the aerial view is artificial".
+  // It stays in the vocabulary and a page that earns one may take it; it is
+  // no longer owed. The camera-POSITION total is kept where it was: the
+  // mid tier's two position pages used to be aerial 1 + over-the-shoulder 1,
+  // so it now carries an explicit total of 2, and the long tier's
+  // ceil(pages/6) already covered it. Removing the mandate must not quietly
+  // remove angled pages from the book.
   {
     maxPages: 13,
-    floors: { 'close-up': 2, 'ultra-wide': 1, 'aerial': 1, 'over-the-shoulder': 1 },
-    positionsTotal: null,
+    floors: { 'close-up': 2, 'ultra-wide': 1, 'over-the-shoulder': 1 },
+    positionsTotal: () => 2,
   },
   {
     maxPages: Infinity,
-    floors: { 'close-up': 2, 'ultra-wide': 1, 'aerial': 1, 'over-the-shoulder': 2 },
+    floors: { 'close-up': 2, 'ultra-wide': 1, 'over-the-shoulder': 2 },
     positionsTotal: (pages) => Math.ceil(pages / 6),
   },
 ];

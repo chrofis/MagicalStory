@@ -620,11 +620,12 @@ describe('the roster decides, not the shape of the sentence (replaces the acts-l
     // was widened — the shot field had no other word to take.
     // The distribution table joined 2026-09-20. This real 16-page book is a fair
     // sample of what it costs: 10 of its pages are medium or wide against a cap
-    // of 8, and it has no aerial and no over-the-shoulder page, so it declares
-    // no camera position at all. Its 2 ultra-wides and 4 close-ups already clear
-    // their floors, which is why neither count appears below.
+    // of 8, and it has no over-the-shoulder page, so it declares no camera
+    // position at all. Its 2 ultra-wides and 4 close-ups already clear their
+    // floors, which is why neither count appears below. It has no aerial either,
+    // and since 2026-09-23 that is not a finding: the aerial is allowed, never owed.
     expect(res.findings.map((f: any) => f.code)).toEqual([
-      'SHOT_MEDIUM_WIDE_EXCESS', 'SHOT_AERIAL_COUNT', 'SHOT_OTS_COUNT',
+      'SHOT_MEDIUM_WIDE_EXCESS', 'SHOT_OTS_COUNT',
       'SHOT_NO_CAMERA_POSITION',
       'MAIN_UNDER_HALF', 'NO_COMMISSIONED_ON_PAGE', 'UNDER_COVERED_CHARACTER', 'CONSECUTIVE_SAME_SHOT_CAST',
     ]);

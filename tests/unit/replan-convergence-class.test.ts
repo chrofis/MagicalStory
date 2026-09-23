@@ -98,7 +98,7 @@ describe('the three verdicts the classed count produces', () => {
 
   it('reduces cast/focal while shot findings RISE → kept', () => {
     const before = [counter('NO_FOCAL_PAGE'), check(8)];
-    const after = [check(8), counter('SHOT_CLOSEUP_COUNT'), counter('SHOT_AERIAL_COUNT'),
+    const after = [check(8), counter('SHOT_CLOSEUP_COUNT'), counter('SHOT_ULTRAWIDE_COUNT'),
       counter('SHOT_OTS_COUNT'), counter('SHOT_NO_CAMERA_POSITION')];
     expect(convergenceMustFixCount({ findings: before })).toBe(2);
     expect(convergenceMustFixCount({ findings: after })).toBe(1);
