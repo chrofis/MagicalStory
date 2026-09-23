@@ -21,6 +21,62 @@ superseded and link forward.
 
 ---
 
+## 2026-09-24 — `landmark_view_missing` is deleted; the plan's shot wins over the review and over `shot_off_plate`
+
+**Context.** Test Lab experiment **1433** (`scene_review_replay` on staging
+`job_1790100385959_1nitlympp`, deepseek-v4-pro, $0.16) replayed the scene review with the two checks
+4994fe530 added (entry below, item 2). `landmark_view_missing` was sent on **18 of 18** pages and the
+review rewrote all 18. Every page came back `landmarkView: "exterior"` — on pages 1, 3 and 15 that
+field was the ONLY change. The rewrite also introduced faults the re-check caught:
+- **p8** `shot_widened`: the plan line asks for a close-up; the reviewer set `shot: medium` under its own
+  `[closeup_below_waist]` (7b "Rewrite that page's `shot` to `medium`"; 10 offered the same). The code
+  check reports exactly that widening. The critic and the code said opposite things.
+- **p9** `cast_unlisted`: check 9e (element_stranded) had the reviewer add the paper bag with "one prose
+  clause placing it where it was left" — it wrote "where Julian pressed it", naming a character the
+  plan line does not put in that frame. (The `vb_cite_offpage` the replay shows beside it is a Lab
+  artefact: production rebuilds the page table from the briefs after the review, `applyBriefUsage`.)
+- `shot_off_plate` told p13/p14 — close-ups the plan asks for — to become `aerial` / `high-angle`, the
+  same contradiction as p8.
+
+**Why the landmark field could not be derived instead.** A missing `landmarkView` is read as the
+exterior accept-list (`landmarkPhotos.pickVariantForView`: exterior → distant → close), which is the
+right photo for any page that sees the landmark from outside. The values that change the photo —
+`interior`, `view-from`, `underwater`/`none` — say where the camera stands relative to the building,
+which no structured field carries; `shot` does not (a close-up of a child in front of a tower is not a
+`close` detail of the tower). So a code-derived value either equals the default or is a guess. And on
+17 of the 18 pages the brief cites a dotted id (`LOC002.3`), which `getLandmarkPhotosForScene` reads as
+an explicit photo variant BEFORE `landmarkView` — the stored story served variant 2 on p3-5, 3 on
+p6-11 and 1 elsewhere, whatever the field said (separate finding, `tasks/BACKLOG.md`).
+
+**Decision.**
+1. `landmark_view_missing` and `checkLandmarkView` are deleted — no derivation, no diagnostic. The
+   Art Director's field rule stays; a missing value keeps its exterior default.
+2. `shotVocabulary.CLOSEUP_KEPT_RULE` is ONE rule for everyone who may change a planned close-up: AD 11c
+   (both templates), scene-review 7b and 10 (`{CLOSEUP_KEPT}`), and the `shot_widened` detail. A
+   close-up the plan asks for is restaged waist-up; only a plan whose own words put the subject below
+   the frame line makes it `medium`. 7b / 10 may still widen a close-up the plan did NOT ask for.
+3. `shot_off_plate` reads the plan line: when the page's shot is the plan's, the fault is the VANTAGE's
+   shot, so the finding offers only a vantage that can hold it, and with none says the page stands (the
+   review cannot edit a vantage `shot`). The "set `shot` to the plate's" fix is kept only for a shot the
+   plan did not ask for. p16 (a planned `medium` on the `high-angle` LOC002.5) stays open by design: the
+   vantages offered are other parts of the place, and the real fix — the vantage's own shot — is an
+   Art-Director-side change, logged in the backlog.
+4. 9e and AD C7: the clause places a left element by the place, never by a character the plan line
+   does not put in the frame.
+
+**Validation.** Brief checks replayed over Lab 1433's stored input briefs (free): pages the code sends
+to the review drop from 18 to 10 (`landmark_view_missing` gone; the 10 carry interaction, bible-table
+and `shot_off_plate` findings). Lab re-run of the same stage: see the commit / report.
+
+**Touched files.** `server/lib/sceneBriefCheck.js`, `server/lib/shotVocabulary.js`,
+`server/lib/promptBuilders.js`, `prompts/scene-review.txt`, `prompts/scene-expansion-all.txt`,
+`prompts/scene-expansion.txt`, `tests/unit/art-director-audit-2026-09-23.test.ts`,
+`tests/unit/iterate-rewrite-checked-like-authored.test.ts`, `docs/prompt-inventory.md`,
+`tasks/bugs.json`, `tasks/BACKLOG.md`. Supersedes the `landmark_view_missing` half of item 2 below.
+**Status:** ✅ active.
+
+---
+
 ## 2026-09-23 — The trial front cover is rendered on a people-free plate, never on the raw landmark photo; it shares buildCoverReferences with the full-account cover
 
 **Context:** Owner-reported, prod trial `job_1790169018278_n57xpnufo`. The front cover's packed slot 0

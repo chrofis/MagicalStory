@@ -127,10 +127,9 @@ describe('which sceneBriefCheck types reach a rewrite', () => {
       // unanswerable finding on a paid round is the shape this file exists to
       // keep out. It reaches the scene REVIEW, which authors `shot` itself.
       'shot_widened',
-      // The same holds for `landmarkView` and for the `shot` a plate must hold
-      // (2026-09-23): both are carried over from the parent in code, so a
-      // rewrite cannot answer either finding.
-      'landmark_view_missing', 'shot_off_plate',
+      // The same holds for the `shot` a plate must hold (2026-09-23): it is
+      // carried over from the parent in code, so a rewrite cannot answer it.
+      'shot_off_plate',
       'textzone_character_collision', 'textzone_fullwidth_floor', 'textzone_top_floor',
       'textzone_bottom_floor', 'textzone_half_streak'];
     for (const t of SBC.REVIEWABLE) {

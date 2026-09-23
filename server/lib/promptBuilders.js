@@ -18,7 +18,7 @@ const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = requi
 // exported from visualBible.js for coverIterate.js, which still uses it.
 const { REQUIRED_TEXT_AUTHORING_RULE, declaredText } = require('./requiredText');
 const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote } = require('./visualBible');
-const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE } = require('./shotVocabulary');
+const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { castCoverage, castCoverageRule, castActionRule } = require('./castCoverage');
 // REQUIRED IN-IMAGE TEXT: one source for the generator block, the repair
@@ -2884,6 +2884,9 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // The below-waist verbs a close-up may not stage, from the one constant the
     // plan counter and the brief check read (shotVocabulary).
     CLOSEUP_BELOW_WAIST: CLOSEUP_BELOW_WAIST_PHRASE,
+    // 11c: a planned close-up is restaged, never widened — the scene review's
+    // 7b / 10 and `shot_widened` state the same constant.
+    CLOSEUP_KEPT: CLOSEUP_KEPT_RULE,
     // The over-the-shoulder near figure is a crop, and never on a contact page
     // (owner, 2026-09-23) — the same constant at all four brief-authoring sites.
     OTS_NEAR_FIGURE: OTS_NEAR_FIGURE_RULE,
@@ -3194,6 +3197,9 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // The below-waist verbs a close-up may not stage, from the one constant the
     // plan counter and the brief check read (shotVocabulary).
     CLOSEUP_BELOW_WAIST: CLOSEUP_BELOW_WAIST_PHRASE,
+    // 11c: a planned close-up is restaged, never widened — the scene review's
+    // 7b / 10 and `shot_widened` state the same constant.
+    CLOSEUP_KEPT: CLOSEUP_KEPT_RULE,
     // The over-the-shoulder near figure is a crop, and never on a contact page
     // (owner, 2026-09-23) — the same constant at all four brief-authoring sites.
     OTS_NEAR_FIGURE: OTS_NEAR_FIGURE_RULE,
@@ -10287,6 +10293,9 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
     // still spelling the list out by hand, which is how the critic went on
     // naming poses after the rule stopped forbidding them.
     CLOSEUP_BELOW_WAIST: CLOSEUP_BELOW_WAIST_PHRASE,
+    // 7b / 10: the plan's close-up wins — the constant the Art Director gets
+    // as 11c and `shot_widened` states (shotVocabulary.CLOSEUP_KEPT_RULE).
+    CLOSEUP_KEPT: CLOSEUP_KEPT_RULE,
   });
 }
 

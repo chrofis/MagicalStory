@@ -1827,6 +1827,18 @@
       "fixedAt": "2026-09-23",
       "fixedIn": "c55871cbf",
       "fix": "DB: 5854 (prod) / 2149 (staging) descriptions rewritten from the photos. Code: LANDMARK_PHOTO_AUTHORITY in buildLandmarkFidelityBlock and the new LANDMARK_CHECK of empty-scene-qc.txt; the landmark photo is attached to the plate judge at every call site; era lines aligned with the generator. Pinned by tests/unit/landmark-photo-authority.test.ts. Model-level effect of the final wording not yet replayed (docs/decisions.md 2026-09-23)."
+    },
+    {
+      "id": "landmark-view-check-rewrites-every-page",
+      "title": "landmark_view_missing made the scene review rewrite 18 of 18 pages to set the default value, and the rewrite widened a planned close-up (p8) and named an absent character (p9)",
+      "reportedAt": "2026-09-24",
+      "source": "Test Lab experiment 1433 (scene_review_replay, staging job_1790100385959_1nitlympp): BRIEF FAULTS carried landmark_view_missing on all 18 pages; changedPages 1-18; every page came back landmarkView exterior (pages 1, 3, 15 changed nothing else). Re-check after: p8 shot_widened (reviewer set shot medium under its own 7b), p9 cast_unlisted (9e clause 'where Julian pressed it'), p16 shot_off_plate open.",
+      "rootCause": "4994fe530 made a field whose absence already resolves to the exterior photo a REVIEWABLE page fault; scene-review 7b / 10 told the reviewer to widen close-ups that shot_widened forbids widening; shot_off_plate offered 'set shot to the plate's' on planned shots; 9e's clause invited naming who left an element.",
+      "impact": "Every story citing a real landmark: a full-book review rewrite for no change, with planned close-ups lost and new cast faults introduced.",
+      "status": "fixed",
+      "fixedAt": "2026-09-24",
+      "fixedIn": "pending",
+      "fix": "landmark_view_missing deleted (no derivation: the default is the exterior photo and the views that differ are not in any structured field). shotVocabulary.CLOSEUP_KEPT_RULE shared by AD 11c, scene-review 7b / 10 and shot_widened; shot_off_plate keeps a planned shot and offers only a vantage; 9e / C7 place by the place. Pinned by tests/unit/art-director-audit-2026-09-23.test.ts. docs/decisions.md 2026-09-24."
     }
   ]
 }
