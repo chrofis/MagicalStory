@@ -55621,3 +55621,9 @@ arc has already made true (size, what things give off, distance, who is watching
 do). The lost thing stays as one example among several. `arcCritiqueSpec()` names the same fault in general words.
 Supersedes the 2026-09-23 lost-thing entry's wording; its Lab 1406 result stays the baseline to beat.
 **Touched:** prompts/arc-panel.txt, server/lib/promptBuilders.js.
+**Result (2026-09-23, Lab 1414, run 6's arc, $0.10):** deepseek-v4-pro and gpt-5.6-luna-pro raise SENSE faults
+beyond the lost egg: an egg that "vanishes into the Lindenhof leaves" after the arc carried it down to the
+Bahnhofstrasse, a dragon on a busy shopping street that hundreds would see, children who could plainly ask an
+adult or a shopkeeper. The egg's loss is still named by both. grok-4.6 raised none under SENSE.
+Lettering, same day (Lab 1415, qwen3-vl): p1's TAXI / BUTTERCUP signs came back `fits`/`correct` (no finding);
+p6's "TENSE BUT QUIET STANDOFF" came back `overlay` → CRITICAL.
