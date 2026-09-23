@@ -57394,3 +57394,23 @@ from the judge block, Julian keeps "away".
 **Touched:** `server/lib/promptBuilders.js`, `server/lib/vbIdGuard.js`, `server/lib/faceRepair.js`,
 `tests/unit/page-prompt-self-consistency.test.ts`.
 **Status:** ✅ active on staging.
+
+## 2026-09-23 — A crop artefact takes no repair route
+
+**Context.** Dragon run 6 (staging `job_1790100385959_1nitlympp`) p14, audit 08 S7. The entity grid cut
+Julian out with his SAM silhouette; the paper bag he held was half outside the mask, so the grid cell showed
+a dithered white block over the bag and arm. The entity judge filed it correctly as `cutout_artifact`
+MAJOR, which costs nothing (ZERO_POINT_TYPES, owner 2026-09-01: "an artifact of our crop extraction, not of
+the page"), but the consolidator then planned `per_character_fixes[{types:["cutout_artifact"]}]`:
+"Remove the white pixelated artifact from the right arm and the chestnut" — a repair slot and a paid edit
+for a defect the page does not have. A CRITICAL one would also have routed a char-fix.
+
+**Decision.** Keyed on the declared type (type or subType), never on text: `CROP_ARTIFACT_TYPES`
+(`cutout_artifact`) is added to `NOT_INPAINTABLE_TYPES`, so a fix whose types are all crop artefacts is
+blocked at the inpaint executor, and both entity char-fix gates (`decideRepairMethod`,
+`selectCharRepairTasks`) skip it. The finding stays reported in full; only its route is closed, the same
+contract as the other entries of that set. The crop itself is unchanged: cutting to the silhouette is what
+keeps neighbours out of the cell; a mask that keeps held objects is an open improvement (BACKLOG).
+
+**Touched:** `server/lib/repairLogic.js`, `tests/unit/crop-artifact-no-repair.test.ts`.
+**Status:** ✅ active on staging.
