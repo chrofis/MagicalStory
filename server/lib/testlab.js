@@ -8174,11 +8174,11 @@ async function runWriterCompareStage(target, { params = {} }) {
  *
  * params: { efforts, model, judgeModels, stage, promptFrom }   target: { storyId }
  *
- * params.stage      'create' (default) | 'retell'. Retell replays the story's
- *   STORED round-1 retellPrompt (arcReviewReport.rounds[0].retellPrompt) — the
- *   exact bytes production sent: that job's committed arc, its panel's
- *   solutions and its challenge draw. Every arm re-tells the same thing, and
- *   the re-told FINAL ARC is scored by the same judges as a created arc.
+ * params.stage      'create' (default) sweeps params.efforts over the create
+ *   call. 'pipeline' runs production's arc machine once: create at
+ *   params.createEffort, production's panel on THAT committed arc, then one
+ *   re-telling per params.retellEfforts against the identical panel output,
+ *   each committed arc (created and re-told) scored by the same judges.
  * params.promptFrom a Lab experiment id: reuse the create prompt that run
  *   SENT (its sentPrompts) instead of building a fresh one. A fresh build draws
  *   the challenge ideas anew, so this is the only way a later model's arms see
@@ -8187,7 +8187,7 @@ async function runWriterCompareStage(target, { params = {} }) {
 async function runArcEffortStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
-  const { buildArcCreatePrompt, parseArcCreate, parseArcRetell, drawChallengeIdeas } = require('./storyHelpers');
+  const { buildArcCreatePrompt, buildArcPanelPrompt, buildArcRetellPrompt, parseArcCreate, parseArcRetell, drawChallengeIdeas } = require('./storyHelpers');
   const { callTextModelStreaming } = require('./textModels');
   const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
   const sc = require('./storyScorecard');
@@ -8214,19 +8214,17 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
   // never sends. Drawn ONCE so every effort arm sees the identical prompt —
   // the arms differ in effort and nothing else.
   const stage = params.stage || 'create';
-  if (!['create', 'retell'].includes(stage)) throw new Error(`Unknown stage "${stage}" (create | retell)`);
-  if (stage === 'retell' && (promptOverride || params.promptFrom)) throw new Error('retell replays the stored production prompt verbatim — promptOverride/promptFrom do not apply');
+  if (!['create', 'pipeline'].includes(stage)) throw new Error(`Unknown stage "${stage}" (create | pipeline)`);
   let prompt;
   let promptSource;
-  if (stage === 'retell') {
-    const round1 = (storyData.arcReviewReport?.rounds || [])[0];
-    prompt = String(round1?.retellPrompt || '');
-    if (!prompt) throw new Error('story has no stored arcReviewReport.rounds[0].retellPrompt to replay');
-    promptSource = `stored retellPrompt, round 1 (production model ${round1.retellModel || '?'})`;
-  } else if (params.promptFrom) {
+  // The drawn section itself — the pipeline's re-telling must be handed the
+  // SAME draw the creator saw (production passes one `challengeIdeas` to both).
+  let challengeIdeas;
+  if (params.promptFrom) {
+    if (promptOverride) throw new Error('promptFrom and promptOverride are exclusive');
     const { dbQuery } = require('../services/database');
     const expId = parseInt(params.promptFrom, 10);
-    const rows = await dbQuery('SELECT stage, targets, results FROM testlab_experiments WHERE id = $1', [expId]);
+    const rows = await dbQuery('SELECT stage, results FROM testlab_experiments WHERE id = $1', [expId]);
     if (!rows.length) throw new Error(`promptFrom ${expId}: not found`);
     if (rows[0].stage !== 'arc_effort') throw new Error(`promptFrom ${expId}: stage is ${rows[0].stage}, not arc_effort`);
     const out = (rows[0].results || []).find(r => r.storyId === target.storyId);
@@ -8235,20 +8233,30 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
     if (!sent.length) throw new Error(`promptFrom ${expId}: no untruncated create prompt stored`);
     if (new Set(sent.map(sp => sp.text)).size !== 1) throw new Error(`promptFrom ${expId}: its arms sent different prompts`);
     prompt = sent[0].text;
-    promptSource = `create prompt sent by Lab #${expId}`;
+    promptSource = `create prompt sent by Lab #${expId}, verbatim`;
+    // Recover that run's draw: the create template's text up to
+    // {CHALLENGE_IDEAS} is fixed, and the section ends where the template's
+    // next fixed text begins. Both anchors must match or this throws.
+    const SENTINEL = '@@CHALLENGE_IDEAS_SENTINEL@@';
+    const [pre, post] = buildArcCreatePrompt(storyData, pageCount, { challengeIdeas: SENTINEL }).split(SENTINEL);
+    if (!prompt.startsWith(pre)) throw new Error(`promptFrom ${expId}: the text ahead of the challenge section no longer matches today's template — cannot recover its draw`);
+    const end = prompt.indexOf(post.slice(0, 300), pre.length);
+    if (end < 0) throw new Error(`promptFrom ${expId}: the text after the challenge section no longer matches today's template — cannot recover its draw`);
+    challengeIdeas = prompt.slice(pre.length, end);
   } else {
     const draw = drawChallengeIdeas(storyData, {});
+    challengeIdeas = draw.section;
     // withTemplates, not `PROMPT_TEMPLATES.x = override` + finally: that global
     // mutation is what kept the Lab single-flight, because a second experiment's
     // override is what this builder would read (prompts.js, 2026-08-25).
     const { withTemplates } = require('../services/prompts');
     prompt = withTemplates(
       { arcCreate: promptOverride },
-      () => buildArcCreatePrompt(storyData, pageCount, { challengeIdeas: draw.section }),
+      () => buildArcCreatePrompt(storyData, pageCount, { challengeIdeas }),
     );
     promptSource = 'built fresh (new challenge draw)';
   }
-  if (!prompt) throw new Error('arc prompt could not be built');
+  if (!prompt) throw new Error('arc-create prompt could not be built');
 
   const judgeTemplate = PROMPT_TEMPLATES.storyArcJudge;
   if (!judgeTemplate) throw new Error('story-arc-judge template unavailable');
@@ -8271,52 +8279,97 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
     return { draws, mean: ok.length ? ok.reduce((s, d) => s + d.score, 0) / ok.length : null };
   };
 
-  // Serial: these are large Opus calls and the point is a clean per-arm cost.
-  const arms = [];
-  for (const effort of efforts) {
+  // One arc call at one effort, committed the way production commits that
+  // phase (parseArcCreate for a create, parseArcRetell's FINAL ARC for a
+  // re-telling), then scored. A failed arm is recorded, never thrown.
+  const runArm = async (phase, armPrompt, effort) => {
     const t = Date.now();
     try {
-      const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: stage === 'retell' ? 'testlab_arc_effort_retell' : 'testlab_arc_effort', effort });
+      const res = await callTextModelStreaming(armPrompt, null, null, model, { usageLabel: phase === 'retell' ? 'testlab_arc_effort_retell' : 'testlab_arc_effort', effort });
       const visible = String(res.text || '');
       let commit = null, parseError = null;
-      // Committed the way production commits each stage: parseArcCreate for a
-      // create, parseArcRetell (its FINAL ARC) for a re-telling.
-      try { commit = stage === 'retell' ? parseArcRetell(visible) : parseArcCreate(visible); } catch (e) { parseError = String(e.message || e); }
-      const arcText = stage === 'retell' ? (commit?.finalArc || visible) : (commit?.arc || commit?.chosen || visible);
+      try { commit = phase === 'retell' ? parseArcRetell(visible) : parseArcCreate(visible); } catch (e) { parseError = String(e.message || e); }
+      const arcText = phase === 'retell' ? (commit?.finalArc || visible) : (commit?.arc || commit?.chosen || visible);
       const scored = commit ? await scoreArc(arcText) : { draws: [], mean: null };
       const out = res.usage?.output_tokens || 0;
       // The gap IS the finding: billed output minus what came back as text.
       const visibleTokens = Math.round(visible.length / 3.5);
-      arms.push({
-        effort, ok: true, parseError,
-        cost: costOf(res), elapsedMs: Date.now() - t,
-        inputTokens: res.usage?.input_tokens || 0,
-        outputTokens: out,
-        visibleChars: visible.length,
-        visibleTokensApprox: visibleTokens,
-        invisibleShare: out ? Number((1 - visibleTokens / out).toFixed(2)) : null,
-        score: scored.mean,
-        judgeDraws: scored.draws,
-        judgeCost: scored.draws.reduce((s, d) => s + (d.cost || 0), 0),
-        arc: arcText,
-      });
+      return {
+        arm: {
+          phase, effort, ok: true, parseError,
+          cost: costOf(res), elapsedMs: Date.now() - t,
+          inputTokens: res.usage?.input_tokens || 0,
+          outputTokens: out,
+          visibleChars: visible.length,
+          visibleTokensApprox: visibleTokens,
+          invisibleShare: out ? Number((1 - visibleTokens / out).toFixed(2)) : null,
+          score: scored.mean,
+          judgeDraws: scored.draws,
+          judgeCost: scored.draws.reduce((s, d) => s + (d.cost || 0), 0),
+          arc: arcText,
+        },
+        commit,
+      };
     } catch (err) {
-      arms.push({ effort, ok: false, error: String(err.message || err), elapsedMs: Date.now() - t });
+      return { arm: { phase, effort, ok: false, error: String(err.message || err), elapsedMs: Date.now() - t }, commit: null };
     }
+  };
+
+  // Serial: these are large Opus calls and the point is a clean per-arm cost.
+  const arms = [];
+  let panel = null;
+  if (stage === 'create') {
+    for (const effort of efforts) arms.push((await runArm('create', prompt, effort)).arm);
+  } else {
+    // PIPELINE: one create at params.createEffort, then production's panel on
+    // THAT committed arc, then one re-telling per params.retellEfforts — every
+    // re-telling answers the identical panel output, so they differ in effort
+    // alone. Same panel models, temperature and letter labels as production
+    // (beatsPipeline.js, PANEL + RE-TELL).
+    const createEffort = params.createEffort || 'high';
+    const retellEfforts = String(params.retellEfforts || 'high,low').split(',').map(s => s.trim()).filter(Boolean);
+    const created = await runArm('create', prompt, createEffort);
+    arms.push(created.arm);
+    if (!created.commit) throw new Error(`create at ${createEffort} did not commit: ${created.arm.parseError || created.arm.error}`);
+    const panelPrompt = buildArcPanelPrompt(storyData, created.commit.committed);
+    if (!panelPrompt) throw new Error('arc-panel template unavailable');
+    const panelModels = MODEL_DEFAULTS.arcPanelModels || [];
+    const tempFor = (m, temp) => (temp == null || TEXT_MODELS[m]?.provider === 'anthropic') ? {} : { temperature: temp };
+    const settled = await Promise.allSettled(panelModels.map(async (m) => {
+      const res = await callTextModelStreaming(panelPrompt, null, null, m, { usageLabel: 'testlab_arc_effort_panel', ...tempFor(m, MODEL_DEFAULTS.arcPanelTemperature) });
+      const text = String(res?.text || '').trim();
+      if (!text) throw new Error('empty panel response');
+      return { model: res.modelId || m, text, cost: costOf(res) };
+    }));
+    panel = settled.map((r, i) => (r.status === 'fulfilled'
+      ? { ok: true, ...r.value }
+      : { ok: false, model: panelModels[i], error: String(r.reason?.message || r.reason) }));
+    const voices = panel.filter(p => p.ok);
+    if (!voices.length) throw new Error('every panelist failed — nothing to re-tell against');
+    voices.forEach((p, i) => { p.letter = String.fromCharCode(65 + i); });
+    const solutionsText = voices.map(p => `## PANELIST ${p.letter}\n${p.text}`).join('\n\n');
+    const retellPrompt = buildArcRetellPrompt(storyData, pageCount, created.commit.committed, solutionsText, { challengeIdeas });
+    if (!retellPrompt) throw new Error('arc-retell template unavailable');
+    for (const effort of retellEfforts) arms.push((await runArm('retell', retellPrompt, effort)).arm);
   }
 
-  const base = arms.find(a => a.effort === 'high' && a.ok);
+  const panelCost = (panel || []).reduce((s, p) => s + (p.cost || 0), 0);
+  const base = arms.find(a => a.phase === 'create' && a.effort === 'high' && a.ok);
   return {
     storyId: target.storyId, model, stage, promptSource, judges, pageCount, promptChars: prompt.length,
     arms,
-    summary: arms.map(a => a.ok
-      ? `${a.effort}: $${a.cost.toFixed(4)} | out ${a.outputTokens} tok (${a.invisibleShare != null ? Math.round(a.invisibleShare * 100) : '?'}% not returned) | score ${a.score == null ? 'n/a' : a.score.toFixed(2)}`
-        + (base && a !== base ? ` | ${(((a.cost - base.cost) / base.cost) * 100).toFixed(0)}% cost vs high` : '')
-        + (a.parseError ? ` | PARSE FAILED: ${a.parseError}` : '')
-      : `${a.effort}: FAILED ${a.error}`),
+    panel,
+    totalCost: Number((arms.reduce((s, a) => s + (a.cost || 0) + (a.judgeCost || 0), 0) + panelCost).toFixed(4)),
+    summary: [
+      ...arms.map(a => (a.ok
+        ? `${a.phase} ${a.effort}: $${a.cost.toFixed(4)} | out ${a.outputTokens} tok (${a.invisibleShare != null ? Math.round(a.invisibleShare * 100) : '?'}% not returned) | score ${a.score == null ? 'n/a' : a.score.toFixed(2)}`
+          + (stage === 'create' && base && a !== base ? ` | ${(((a.cost - base.cost) / base.cost) * 100).toFixed(0)}% cost vs high` : '')
+          + (a.parseError ? ` | PARSE FAILED: ${a.parseError}` : '')
+        : `${a.phase} ${a.effort}: FAILED ${a.error}`)),
+      ...(panel ? [`panel: ${panel.filter(p => p.ok).length}/${panel.length} voices, $${panelCost.toFixed(4)}`] : []),
+    ],
   };
 }
-
 /**
  * arc_amend — the bake-off for repairing the arc in place.
  *
