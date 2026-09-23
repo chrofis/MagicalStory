@@ -1645,7 +1645,7 @@
       "impact": "Every styled sheet: the head cells the pages crop as face references carry half-length figures. Staging and production.",
       "status": "fixed",
       "fixedAt": "2026-09-23",
-      "fixedIn": "4d075efdb",
+      "fixedIn": "7a9e8f0f3",
       "fix": "Head row framed \"like a passport photo\", cut off at the upper chest; heads judge TASK 5 CROP keyed to visible hands/waistband/legwear, folded into the code-computed final. One paid run: true head-and-shoulders row, cropScore 9. Pinned by tests/unit/avatar-sheet-audit-2026-09-23.test.ts."
     },
     {
@@ -1657,7 +1657,7 @@
       "impact": "Invented collars and plackets become the character's shirt on every page. Staging and production.",
       "status": "fixed",
       "fixedAt": "2026-09-23",
-      "fixedIn": "4d075efdb",
+      "fixedIn": "7a9e8f0f3",
       "fix": "buildUnnamedTrimRule(redress) in both live rows; the head row takes its neckline from the body row; bodies judge TASK 3 counts invented trim as a wrong item. Validation: 1 of 2 paid runs still drew a polo in the body row (tracked in BACKLOG). Pinned by tests/unit/avatar-sheet-audit-2026-09-23.test.ts."
     },
     {
@@ -1669,7 +1669,7 @@
       "impact": "Painted washes ride into every page as part of the character reference cell. Staging and production.",
       "status": "fixed",
       "fixedAt": "2026-09-23",
-      "fixedIn": "4d075efdb",
+      "fixedIn": "7a9e8f0f3",
       "fix": "SHEET_GROUND_RULE stated in the pass-2 prompt and filled into the style judge (TASK 8 backgroundScore). Cell splitting does not depend on drawn dividers (replay: 6/6 shipped sheets split within bounds). Two paid runs: dividers kept, plain ground, faint foot shadows only. Pinned by tests/unit/avatar-sheet-audit-2026-09-23.test.ts."
     },
     {
@@ -1681,7 +1681,7 @@
       "impact": "Any Lab A/B of an avatar judge prompt measured something production never runs. Lab only.",
       "status": "fixed",
       "fixedAt": "2026-09-23",
-      "fixedIn": "4d075efdb",
+      "fixedIn": "7a9e8f0f3",
       "fix": "params.evalPrompt names the one judge the override replaces (heads|bodies|identity|style), prefill is that template, a stray override throws; avatar_style prefills the built buildStyleTransferPrompt; the test-version path runs evaluateAvatarSheet. Pinned by tests/unit/avatar-sheet-audit-2026-09-23.test.ts."
     }
   ]
