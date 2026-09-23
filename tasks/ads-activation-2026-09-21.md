@@ -92,11 +92,16 @@ serves immediately; the three new campaigns ramp as Google reviews their ads (~2
       (CHF 0.29-0.47, e.g. trotzphase 0.38, kinderängste 0.32, geschenke 6 jährige 0.47); cheap keywords keep the
       0.20 default; 23 above the ceiling stay at 0.20. Re-run verified a no-op. Re-run the script later in the
       week - estimates move, and it resets stale keyword bids.
-- [ ] **Measurement gap 1:** attribution-report.js counts visits/trials/buyers per campaign and keyword but pulls
-      NO spend - add the Ads cost join for cost-per-trial. Offered to owner.
-- [ ] **Measurement gap 2:** Search-Deutschschweiz-v1 ads send `utm_campaign=zurich` without `utm_term` - the
-      expensive arm cannot be read per keyword. Fix = campaign-level final_url_suffix `utm_term={keyword}`.
-      Offered to owner (touches the campaign they said to leave as is).
+- [x] **Measurement gap 1 CLOSED 2026-09-23 (owner: "fix both").** `attribution-report.js` now joins Google
+      Ads spend for the same WHOLE Swiss days: impressions / clicks / spend / CHF-per-trial / CHF-per-buyer per
+      campaign, and clicks / spend / CHF-per-trial per (campaign, keyword). Campaigns that spent but produced no
+      visit are listed too. The utm_campaign <-> Ads campaign link is read from the live ads
+      (`scripts/ads/lib/ads-spend.js`), never hand-kept - `zurich` resolves to Search-Deutschschweiz-v1.
+      Spend failure stops the report with exit 1 and the fix (authorize.js); `--no-spend` is the explicit
+      opt-out; `--staging` never pulls spend. All four paths exercised against production data.
+- [x] **Measurement gap 2 CLOSED 2026-09-23.** `scripts/ads/set-keyword-suffix.js` set Search-Deutschschweiz-v1's
+      final URL suffix to `utm_term={keyword}` - no ad rebuild. Verified after: suffix live, campaign ENABLED,
+      all 3 ads still APPROVED/REVIEWED (the tracking change did not send them back to review).
 - [ ] First real paid click: verify it lands in prod `trial_events` with its utm_term (chain unproven end to end).
 - [ ] End of week: `node scripts/ads/attribution-report.js --days=7`.
 
