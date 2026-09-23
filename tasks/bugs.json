@@ -1494,6 +1494,39 @@
       "fixedAt": "2026-09-23",
       "fixedIn": "f25a51f3f",
       "fix": "rounds[].retellRaw; arcReviewReport.hintsModel / hintsPrompt / hintsRaw, kept even when the pass fails to parse. Pinned by tests/unit/arc-prompt-audit-2026-09-23.test.ts."
+    },
+    {
+      "id": "wardrobe-bible-report-and-replies-not-stored",
+      "title": "The wardrobe-vs-Visual-Bible report was built and dropped, and neither the wardrobe call's prompt/raw reply nor the review's raw reply was stored",
+      "reportedAt": "2026-09-23",
+      "source": "Prompt audit docs/audits/prompt-audit-2026-09-23/03-wardrobe.md (F1 diagnostics, F3, BLIND section) on staging job_1790100385959_1nitlympp: stories.data has no wardrobeBibleReport key (beatsPipeline built it locally and never returned it); the only copy of the bible reply was the transcript section the review and the bible check rewrite; a stray review entry's text reached only a log line.",
+      "impact": "Every beats story: the wardrobe stage could not be audited from stored data, only rebuilt at the run's commit.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "8dbe8d28b",
+      "fix": "beatsPipeline returns storyBibleReport (model, duration, prompt, rawResponse) and wardrobeBibleReport; clothingReviewReport gains rawResponse; storyJobPipeline stores both in stories.data; the saved-story metadata route strips the review's rawResponse like its prompt. Pinned by tests/unit/wardrobe-prompt-inputs.test.ts."
+    },
+    {
+      "id": "wardrobe-bible-stored-clothing-pointer-dead",
+      "title": "The wardrobe writer was told to start from the character's stored clothing, which was never in its prompt; its output format said checks 1-10 of 11",
+      "reportedAt": "2026-09-23",
+      "source": "Audit 03-wardrobe F6/F8: the rebuilt bible prompt of job_1790100385959_1nitlympp has no Wearing: line for any character (extractCharacterVisualProfile reads char.clothing; these characters store structuredClothing / avatars.clothing); clothing-review.txt:48 asked for checks 1-10 of 11.",
+      "impact": "Every beats story: an instruction pointing at nothing, and a stale check count.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "8dbe8d28b",
+      "fix": "Owner 2026-09-23: the wardrobe is per story and never starts from the saved outfit - the sentence is deleted and the appearance block asks for no clothing (decisions.md 'The wardrobe calls: no saved clothing...'). The review format asks for every check by number. Pinned by tests/unit/wardrobe-prompt-inputs.test.ts."
+    },
+    {
+      "id": "lab-clothing-review-wrong-model",
+      "title": "The Lab wardrobe-review replay ran on the outline reviewer, not production's clothing reviewer",
+      "reportedAt": "2026-09-23",
+      "source": "server/lib/testlab.js runClothingReviewStage defaulted to MODEL_DEFAULTS.outlineReview; beatsPipeline uses MODEL_DEFAULTS.clothingReviewModel (deepseek-v4-pro).",
+      "impact": "Any Lab wardrobe-review replay without an explicit model measured a different model than production.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "8dbe8d28b",
+      "fix": "Default is MODEL_DEFAULTS.clothingReviewModel."
     }
   ]
 }
