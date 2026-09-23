@@ -1599,6 +1599,42 @@
       "rootCause": "classifyOverlap: `if (!meta.slot || !segSlot) return \"duplicate\"` - an artifact with no body slot fell to the old loose-match behaviour.",
       "impact": "Any cover where a held prop shares a colour or material word with the holder's outfit: a garment silently leaves the clothing text.",
       "fix": "An artifact with no worn slot is \"unrelated\" to every outfit segment; replayed on the stored bible - boots kept."
+    },
+    {
+      "id": "replan-noted-finding-deletes-ending-event",
+      "title": "A noted (advisory) two-heights line made the re-plan delete the ending's own event from the last page",
+      "reportedAt": "2026-09-23",
+      "source": "Reproduced from stored data, staging job_1790100385959_1nitlympp (dragon run 6), prompt audit docs/audits/prompt-audit-2026-09-23/02-page-plan.md. Round-1 declared change 'Page 18: cast out Turi, Flämmli, Julian — CHECK[10]' (07 json); the recheck then raised Q8 and Q4 against page 18; no round 2 ran and the book shipped without the parting.",
+      "rootCause": "Q10 is advisory by decision, but RE-DIVIDE handed every ALSO NOTED line over as actionable and nothing protected the last page; the review had no rule against a change answering a noted finding.",
+      "impact": "Any book whose ending event is a flight or landing beside the cast loses its ending picture to an advisory line.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "094052d45",
+      "fix": "replanKeepPages names the last page (plus WANTED, ACTION and only-focal pages) in RE-DIVIDE; reviewPlanChanges refuses any change on a kept page answering a noted or untagged finding (rule 'protected'); the one-level rule keeps the level the page's event happens on."
+    },
+    {
+      "id": "replan-takes-another-characters-only-focal-page",
+      "title": "The re-plan answered one boy's missing focal page by taking another boy's only focal page",
+      "reportedAt": "2026-09-23",
+      "source": "Reproduced from stored data, staging job_1790100385959_1nitlympp (dragon run 6), prompt audit docs/audits/prompt-audit-2026-09-23/02-page-plan.md. Round-1 'Page 5: cast out Max, Nia — PLAN[NO_FOCAL_PAGE]' (Kiaan's finding) removed Max from his only focal page; the recheck raised NO_FOCAL_PAGE for Max.",
+      "rootCause": "The re-plan's stay list protected only obstacle-holders and figures under two pages; the review never compared a character's focal pages before and after a cast-out; its refusals were not sent back to the next round.",
+      "impact": "Must-fix focal findings trade places between characters every round instead of converging.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "094052d45",
+      "fix": "reviewPlanChanges rule 'focal' refuses a cast-out that takes a listed character's last focal page; rule 'action' refuses casting a character out of their ACTION page; the next round gets '## UNDONE LAST ROUND' with each refusal."
+    },
+    {
+      "id": "plan-counters-charge-supplied-and-unnamed-figures",
+      "title": "The invented-cast counters charged a pet from a character's saved details and an unnamed one-page mother against the invented allowance",
+      "reportedAt": "2026-09-23",
+      "source": "Reproduced from stored data, staging job_1790100385959_1nitlympp (dragon run 6), prompt audit docs/audits/prompt-audit-2026-09-23/02-page-plan.md. 05 json: ARC_INVENTED_UNDECLARED 'their mother, Nia', ARC_INVENTED_OVER_ALLOWANCE 4 vs 2, while the arc wrote '(Nia is supplied by the commissioned cast and is not counted; the mother dragon is unnamed.)'; the re-plan cut the mother from page 1 citing the false over-allowance.",
+      "rootCause": "The counters' commissioned set was the character list plus the arc's premise-only list, and nothing applied the arc's unnamed-figure exemption.",
+      "impact": "False over-allowance findings on any story whose family entered a pet in saved details or whose plan has an unnamed background parent; the re-plan acts on them.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "094052d45",
+      "fix": "Counters read castCoverage.commissionedCast (the arc stage's COMMISSIONED_CAST_DEF puts saved-detail figures on the Premise figures list, f25a51f3f); UNNAMED_FIGURE_EXEMPT (no name, one page) is one string stated in the arc budget and applied by the counter via isNamedFigure; an unnamed figure across pages still counts."
     }
   ]
 }
