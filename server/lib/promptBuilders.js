@@ -33,7 +33,7 @@ const { frameColorForName } = require('./characterFrames');
 const { getLanguageNote, getLanguageInstruction, getLanguageNameEnglish } = require('./languages');
 const { getEventById } = require('./historicalEvents');
 const { getSwissStoryResearch, getSwissCityById } = require('./swissStories');
-const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata, resolveTextStagePictureSpec, buildTextStagePictureSpecs, characterLookSignature, dropAppearanceAppositive, SHARED_GRIP_RULE } = require('./sceneMetadata');
+const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata, resolveTextStagePictureSpec, buildTextStagePictureSpecs, SHARED_GRIP_RULE } = require('./sceneMetadata');
 const { resolveClothingForPage, buildUsedClothingText, buildAvailableAvatarsForPrompt } = require('./clothingResolve');
 const { seasonLabel, buildSeasonNote, buildSeasonInstruction } = require('./season');
 const { isNotSetRelationship, isStrangersRelationship } = require('./relationships');
@@ -1798,7 +1798,10 @@ const LANGUAGE_LEVELS = {
     description: 'Simple words and very short sentences for early readers',
     wordsPerPageMin: 25,
     wordsPerPageMax: 70,
-    sentencesPerPage: '3-6',
+    // 4-9, not 3-6 (owner 2026-09-23: "rather lift the limit or give it more
+    // space"). Run 6's writer ran 6-13 a page, median 8.5; the counter's +50%
+    // flags only a page past 13.
+    sentencesPerPage: '4-9',
     pacing: 'Small amount of variation is fine — some pages can sit at the low end (a quiet beat), others near the top. Don\'t aim for a uniform word count. The extra room buys more sentences, never longer ones: keep sentences short, one idea each.',
   },
   'standard': {
@@ -1846,8 +1849,62 @@ function measurePageText(text) {
   const t = String(text || '').trim();
   if (!t) return { words: 0, sentences: 0, paragraphs: 0 };
   const paragraphs = t.split(/\n\s*\n/).filter(p => p.trim());
-  const sentences = paragraphs.reduce((n, p) => n + Math.max(1, (p.trim().match(SENTENCE_END_RE) || []).length), 0);
-  return { words: t.split(/\s+/).filter(Boolean).length, sentences, paragraphs: paragraphs.length };
+  return { words: t.split(/\s+/).filter(Boolean).length, sentences: pageSentences(t).length, paragraphs: paragraphs.length };
+}
+
+/** How many quotations are still open at the end of `s` («» „“ “” and straight "). */
+function openQuoteDepth(s) {
+  let depth = 0;
+  let straight = 0;
+  for (const ch of String(s)) {
+    if (ch === '«' || ch === '„') depth += 1;
+    else if (ch === '“') depth += depth > 0 ? -1 : 1;   // German close, English open
+    else if ((ch === '»' || ch === '”') && depth > 0) depth -= 1;
+    else if (ch === '"') straight ^= 1;
+  }
+  return depth + straight;
+}
+
+/**
+ * A page's sentences with their offsets in the page text — the unit the
+ * counter counts and the grammar check edits (a numbered sentence is the only
+ * thing that pass may change, and it can only be replaced or re-inserted).
+ * A paragraph break ends a sentence; an unterminated tail is a sentence.
+ * @param {string} text
+ * @returns {Array<{text:string, start:number, end:number, paragraph:number}>}
+ */
+function pageSentences(text) {
+  const t = String(text || '');
+  const out = [];
+  const paraRe = /\S[\s\S]*?(?=\n\s*\n|\s*$)/g;
+  let pm;
+  let paragraph = 0;
+  while ((pm = paraRe.exec(t)) !== null) {
+    const pStart = pm.index;
+    const para = pm[0];
+    let cursor = 0;
+    const endRe = new RegExp(SENTENCE_END_RE.source, SENTENCE_END_RE.flags);
+    let em;
+    while ((em = endRe.exec(para)) !== null) {
+      const end = em.index + em[0].length;
+      // A spoken line is one unit: «Halt. Bleib hier.» is never cut inside the
+      // quote, so no edit can take one half of it and leave its mark unpaired.
+      if (openQuoteDepth(para.slice(0, end)) > 0) continue;
+      const raw = para.slice(cursor, end);
+      const lead = raw.length - raw.trimStart().length;
+      if (raw.trim()) out.push({ text: raw.trim(), start: pStart + cursor + lead, end: pStart + end, paragraph });
+      cursor = end;
+      if (em[0].length === 0) endRe.lastIndex += 1;
+    }
+    const rest = para.slice(cursor);
+    if (rest.trim()) {
+      const lead = rest.length - rest.trimStart().length;
+      out.push({ text: rest.trim(), start: pStart + cursor + lead, end: pStart + cursor + lead + rest.trim().length, paragraph });
+    }
+    paragraph += 1;
+    if (pm[0].length === 0) paraRe.lastIndex += 1;
+  }
+  return out;
 }
 
 // ============================================================================
@@ -9651,11 +9708,25 @@ function buildTextProofreadPrompt(inputData, pages = []) {
 }
 
 /**
- * The post-repair DIFF review (2026-09-06). Same quoted-span output contract as
- * buildTextProofreadPrompt above — parseLectorFindings/applyLectorFindings read
- * it unchanged — but the unit of judgement is a CHANGE, not a page: each
- * repaired page is rendered as its BEFORE and its AFTER, and only pages the
- * repair pass actually rewrote are passed in.
+ * A page as numbered sentences (`A1: …`), a blank line between paragraphs —
+ * the grammar check edits by number (pageSentences is the one splitter).
+ */
+function numberedSentences(text, prefix) {
+  const sentences = pageSentences(text);
+  if (!sentences.length) return '(empty)';
+  return sentences
+    .map((x, i) => `${i > 0 && x.paragraph !== sentences[i - 1].paragraph ? '\n' : ''}${prefix}${i + 1}: ${x.text}`)
+    .join('\n');
+}
+
+/**
+ * The post-repair GRAMMAR CHECK (was "the diff review", 2026-09-06). Owner,
+ * 2026-09-23: "No new sentences, the last pass is a grammar check." Each
+ * rewritten page is rendered as its BEFORE and AFTER as NUMBERED SENTENCES,
+ * and the pass answers in edits against those numbers only — FIX A<k> (the
+ * same sentence, corrected) or RESTORE B<j> AFTER A<k> (a writer sentence put
+ * back word for word). parseDiffEdits / applyDiffEdits (textRefine.js) apply
+ * them; the lector's free quote/correction contract is no longer shared.
  *
  * THE FINDINGS EACH PAGE WAS ANSWERING (owner decision 2026-09-23). The pass
  * used to see BEFORE and AFTER only, so a deliberate fix read as a dropped
@@ -9684,7 +9755,7 @@ function buildTextDiffPrompt(inputData, pairs = []) {
       const answered = (p.findings || [])
         .map(f => `- p${f.pageNumber} [${f.category || 'UNTAGGED'}] ${String(f.text || '').trim()}`)
         .join('\n');
-      return `--- Page ${p.pageNumber} ---\nFINDINGS THE REWRITE ANSWERED:\n${answered || '(none)'}\n\nBEFORE:\n${String(p.before || '').trim()}\n\nAFTER:\n${String(p.after || '').trim()}`;
+      return `--- Page ${p.pageNumber} ---\nFINDINGS THE REWRITE ANSWERED:\n${answered || '(none)'}\n\nBEFORE:\n${numberedSentences(p.before, 'B')}\n\nAFTER:\n${numberedSentences(p.after, 'A')}`;
     })
     .join('\n\n');
   return fillTemplate(template, { LANGUAGE: lang, PAGES: body, STYLE_RULEBOOK });
@@ -9773,6 +9844,11 @@ function buildTextAuditPrompt(inputData, pages = [], arc = '', { arcHints = '' }
     PULL_QUESTION: simpleBand
       ? 'skip this question — this book is built from self-contained moments, so a page that leaves nothing open is correct.'
       : 'does anything remain open at the end of the page that the next page answers? The last page is exempt.',
+    // Owner 2026-09-23: a hint the writer dropped is a finding the refine
+    // fixes. Asked only when the story has hints.
+    HINT_QUESTION: String(arcHints || '').trim()
+      ? '15. HINT: is every hint under HINTS applied on the pages it concerns? Name each hint no page follows, on the page where it belongs.'
+      : '',
     PAGES: body,
   });
 }
@@ -10271,16 +10347,16 @@ function doNotWriteListBody({ forChecker = false } = {}) {
  *   scene briefs, post scene-review. Text is written to match the picture that
  *   will actually be drawn; see the ordering note in beatsPipeline.
  */
-function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], arc = '', { arcHints = '' } = {}) {
+function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], arc = '', { arcHints = '', visualBible = null, clothingRequirements = null } = {}) {
   const template = PROMPT_TEMPLATES.storyTextFromBeats;
   if (!template) {
     log.error('[PROMPT] storyTextFromBeats template not loaded — beats text writing unavailable');
     return null;
   }
-  // Brief per page, as every text-stage reader gets it (buildTextStagePictureSpecs,
-  // sceneMetadata.js): METADATA, Visual-Bible ids and repeated looks removed.
-  // The audit and the refine read the same specs.
-  const briefByPage = buildTextStagePictureSpecs(expansions);
+  // The compact picture spec per page (buildTextStagePictureSpecs,
+  // sceneMetadata.js — owner 2026-09-23): where, what happens, who wears what in
+  // short form, what else is in view. The audit and the refine read the same.
+  const briefByPage = buildTextStagePictureSpecs(expansions, { visualBible, clothingRequirements });
   const blocks = beats
     .map(b => {
       const brief = briefByPage.get(b.pageNumber);
@@ -11074,6 +11150,7 @@ module.exports = {
   PAGE_PARAGRAPHS,
   paragraphShapeRule,
   measurePageText,
+  pageSentences,
   getReadingLevel,
   getTokensPerPage,
   NONE_WORDS,
@@ -11251,8 +11328,6 @@ module.exports = {
   buildSceneReviewBibleBlock,
   buildDoNotWriteSection,
   buildStoryTextFromBeatsPrompt,
-  characterLookSignature,
-  dropAppearanceAppositive,
   buildTitleRule,
   buildStoryBibleFromBeatsPrompt,
   buildTrialStoryPrompt,

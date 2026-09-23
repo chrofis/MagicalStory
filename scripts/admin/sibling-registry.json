@@ -89,7 +89,7 @@
     {
       "id": "lector-and-diff-pass",
       "axis": "lector prompt vs diff-pass prompt",
-      "reason": "story-text-proofread.txt (the lector) and story-text-diff.txt (the diff pass) feed the SAME parser and applier (parseLectorFindings / applyLectorFindings, textRefine.js:996-999), so a change to the quoting or span contract on one breaks the other's output against the shared applier.",
+      "reason": "story-text-proofread.txt (the lector) and story-text-diff.txt (the grammar check after the repair) are the two language passes over the finished text: a rule about what counts as a language fault, or what a correction may change, belongs on both. Since 2026-09-23 they no longer share an output contract - the grammar check edits numbered sentences (parseDiffEdits / applyDiffEdits) and cannot write a sentence neither version had; the lector keeps quoted spans (parseLectorFindings / applyLectorFindings).",
       "members": [
         "prompts/story-text-proofread.txt",
         "prompts/story-text-diff.txt"

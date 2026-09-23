@@ -20,13 +20,14 @@
  *           nothing else)
  *   2. MERGE + DEDUPE the two fault lists in code (mergeAuditFindings)
  *   3. ONE REPAIR PASS over the merged findings (textRefineModel)
- *   4. ONE DIFF PASS over the pages the repair rewrote — BEFORE/AFTER, judging
- *      only what the rewrite damaged (textDiffModel, 2026-09-06)
+ *   4. ONE GRAMMAR CHECK over the pages the repair rewrote — BEFORE/AFTER as
+ *      numbered sentences; it may only FIX a sentence or RESTORE a writer
+ *      sentence word for word (textDiffModel; grammar check since 2026-09-23)
  *   5. ONE LECTOR PASS emitting quoted-span findings, applied by
  *      code-side substitution of its quoted spans (applyLectorFindings)
  *
- * Steps 4 and 5 share ONE output contract and ONE applier; they differ only in
- * what they see. The diff pass exists because "a fault the repair pass
+ * Step 4 has its own sentence-numbered contract (parseDiffEdits /
+ * applyDiffEdits) since 2026-09-23; step 5 keeps the quoted-span one. The diff pass exists because "a fault the repair pass
  * introduces has nothing reading its output" (below) turned out to be a real,
  * measured cost, not a theoretical one — the cold-read lector missed two
  * rewrite-introduced corruptions that the diff caught for a tenth of the price.
@@ -275,28 +276,126 @@ function unresolvedFindings(ledger = []) {
   return (ledger || []).filter(f => f.outcome !== FINDING_OUTCOME.PAGE_REWRITTEN);
 }
 
+// ─────────── THE GRAMMAR CHECK: EDITS AGAINST NUMBERED SENTENCES ───────────
+
 /**
- * The sentences of one diff correction that the WRITER's page carried and the
- * rewrite it corrected did not — i.e. what the correction restored. Provenance
- * only, by verbatim containment (whitespace-normalised); it says nothing about
- * whether restoring was right.
+ * Owner, 2026-09-23: "No new sentences, the last pass is a grammar check." The
+ * pass after the repair sees each rewritten page as numbered sentences and may
+ * only FIX one of the AFTER sentences or RESTORE one of the BEFORE sentences
+ * word for word. It never hands back free text to splice in, so it cannot place
+ * a sentence neither version had — the failure it had on run 6 p11 (a sentence
+ * written by the pass itself).
  *
- * @param {string} correction  the diff pass's replacement text
- * @param {string} writerText  the page before any whole-page pass (BEFORE)
- * @param {string} rewritten   the page as the diff pass read it (AFTER)
- * @returns {string[]}
+ * A FIX is held to what a grammar fix is, by counting, never by reading its
+ * meaning: it stays ONE sentence (pageSentences), and at most
+ * GRAMMAR_EDIT_MAX_WORDS words change (word-level edit distance, punctuation
+ * ignored). Measured on the 93 lector corrections stored on staging (the last 60
+ * refined stories): every one changes 4 words or fewer (63 change 1); the diff
+ * pass's damaging rewrites on run 6 changed 7-15.
  */
-function restoredSentences(correction, writerText, rewritten) {
-  const norm = s => String(s || '').replace(/\s+/g, ' ').trim();
-  const before = norm(writerText);
-  const after = norm(rewritten);
-  const whole = norm(correction);
-  if (!whole) return [];
-  if (before.includes(whole) && !after.includes(whole)) return [whole];
-  return whole
-    .split(/(?<=[.!?…»“”"])\s+/)
-    .map(s => s.trim())
-    .filter(s => s.split(' ').length >= 3 && before.includes(s) && !after.includes(s));
+const GRAMMAR_EDIT_MAX_WORDS = 4;
+
+const DIFF_FIX_RE = /^(?:[-*]\s*)?PAGE\s+(\d+)\s+FIX\s+A(\d+)\s*:\s*(.+)$/i;
+const DIFF_RESTORE_RE = /^(?:[-*]\s*)?PAGE\s+(\d+)\s+RESTORE\s+B(\d+)\s+AFTER\s+A(\d+)\s*\.?\s*$/i;
+
+/**
+ * Parse the grammar check's reply. A line that starts like an edit and fits
+ * neither shape is returned as unparsed, never skipped in silence.
+ * @param {string} raw
+ * @returns {{edits: Array<Object>, unparsed: Array<{line:string, reason:string}>}}
+ */
+function parseDiffEdits(raw) {
+  const edits = [];
+  const unparsed = [];
+  for (const line of String(raw || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean)) {
+    let m = line.match(DIFF_FIX_RE);
+    if (m) {
+      let text = m[3].trim();
+      // A reply that wraps the sentence in plain quotes: the wrapper is not part of it.
+      if (text.length > 1 && (text[0] === "'" || text[0] === '"') && text[text.length - 1] === text[0]) text = text.slice(1, -1).trim();
+      edits.push({ kind: 'fix', pageNumber: Number(m[1]), afterIndex: Number(m[2]), text });
+      continue;
+    }
+    m = line.match(DIFF_RESTORE_RE);
+    if (m) {
+      edits.push({ kind: 'restore', pageNumber: Number(m[1]), beforeIndex: Number(m[2]), afterIndex: Number(m[3]) });
+      continue;
+    }
+    if (/^(?:[-*]\s*)?PAGE\s+\d+/i.test(line)) unparsed.push({ line, reason: 'not a FIX or RESTORE line' });
+  }
+  return { edits, unparsed };
+}
+
+/** Word-level edit distance, case and punctuation ignored. */
+function wordEditDistance(a, b) {
+  const tok = s => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean);
+  const x = tok(a);
+  const y = tok(b);
+  let prev = Array.from({ length: y.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= x.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= y.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (x[i - 1] === y[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[y.length];
+}
+
+/**
+ * Apply the grammar check's edits. Every edit is checked against the page's
+ * own numbered sentences; one that does not fit is dropped with its reason.
+ *
+ * @param {Array<{pageNumber:number,text:string}>} pages  the text the pass read (AFTER)
+ * @param {Map<number,string>} beforeByPage               the writer's text (BEFORE)
+ * @param {Array<Object>} edits                           parseDiffEdits().edits
+ * @returns {{pages: Array, applied: Array, dropped: Array}}
+ *   applied/dropped entries carry {pageNumber, kind, quote, correction}; a
+ *   restore also carries `restored: [sentence]` (settleLedgerAfterDiff reads it).
+ */
+function applyDiffEdits(pages = [], beforeByPage = new Map(), edits = []) {
+  const { pageSentences } = require('./promptBuilders');
+  const applied = [];
+  const dropped = [];
+  const out = pages.map(p => ({ ...p }));
+  const byPage = new Map();
+  for (const e of edits || []) byPage.set(e.pageNumber, [...(byPage.get(e.pageNumber) || []), e]);
+  for (const [pageNumber, list] of byPage) {
+    const page = out.find(p => p.pageNumber === pageNumber);
+    const drop = (e, reason, quote = '', correction = '') => dropped.push({ pageNumber, kind: e.kind, quote, correction, reason });
+    if (!page) { for (const e of list) drop(e, 'no-such-page'); continue; }
+    const after = pageSentences(page.text);
+    const before = pageSentences(beforeByPage.get(pageNumber) || '');
+    const ops = [];
+    const fixed = new Set();
+    for (const e of list) {
+      if (e.kind === 'fix') {
+        const target = after[e.afterIndex - 1];
+        if (!target) { drop(e, 'no-such-sentence', `A${e.afterIndex}`, e.text); continue; }
+        if (fixed.has(e.afterIndex)) { drop(e, 'overlap', target.text, e.text); continue; }
+        if (e.text === target.text) { drop(e, 'unchanged', target.text, e.text); continue; }
+        if (pageSentences(e.text).length !== 1) { drop(e, 'not-one-sentence', target.text, e.text); continue; }
+        if (wordEditDistance(target.text, e.text) > GRAMMAR_EDIT_MAX_WORDS) { drop(e, 'rewrites-the-sentence', target.text, e.text); continue; }
+        fixed.add(e.afterIndex);
+        ops.push({ at: target.start, end: target.end, insert: e.text });
+        applied.push({ pageNumber, kind: 'fix', quote: target.text, correction: e.text, restored: [] });
+      } else {
+        const source = before[e.beforeIndex - 1];
+        if (!source) { drop(e, 'no-such-sentence', `B${e.beforeIndex}`); continue; }
+        if (e.afterIndex < 0 || e.afterIndex > after.length) { drop(e, 'no-such-sentence', `A${e.afterIndex}`, source.text); continue; }
+        if (after.some(a => a.text === source.text)) { drop(e, 'already-present', '', source.text); continue; }
+        const at = e.afterIndex === 0 ? (after[0] ? after[0].start : 0) : after[e.afterIndex - 1].end;
+        ops.push({ at, end: at, insert: e.afterIndex === 0 ? `${source.text} ` : ` ${source.text}` });
+        applied.push({ pageNumber, kind: 'restore', quote: '', correction: source.text, restored: [source.text] });
+      }
+    }
+    let text = page.text;
+    for (const op of ops.sort((a, b) => b.at - a.at || b.end - a.end)) {
+      text = text.slice(0, op.at) + op.insert + text.slice(op.end);
+    }
+    page.text = text;
+  }
+  return { pages: out, applied, dropped };
 }
 
 /**
@@ -1477,9 +1576,9 @@ async function refineStoryText(storyData, pages, opts = {}) {
   // invalidate its own quotes and every finding would drop as `quote-absent`.
   // Running it first also gives the lector the corrected text to proof.
   //
-  // NO CONFLICT LOGIC IS ADDED. Each pass applies its own findings in its own
-  // applyLectorFindings call, so an overlap can only happen INSIDE one pass, and
-  // that path already answers it: first finding wins, second dropped as
+  // NO CONFLICT LOGIC IS ADDED. Each pass applies its own edits in its own
+  // applier, so an overlap can only happen INSIDE one pass, and that path
+  // already answers it: first edit of a sentence wins, a second is dropped as
   // `overlap`. Across passes the lector prompt is built from the already-
   // corrected text, so it cannot quote a span this pass has replaced.
   //
@@ -1529,33 +1628,23 @@ async function refineStoryText(storyData, pages, opts = {}) {
       // the catch below, which keeps the text as the repair pass left it.
       if (dr.truncation?.suspected) throw new Error(`diff reply ${describeTruncation(dr.truncation)} — findings unusable`);
       diffReview = String(dr.text || '').trim();
-      // The SAME parser and the SAME applier as the lector — the output contract
-      // is identical by design, so there is no parallel apply path.
-      const diffParse = parseLectorLines(diffReview);
-      diffFindings = diffParse.findings;
+      // THE GRAMMAR CHECK'S OWN CONTRACT (owner 2026-09-23): edits against the
+      // numbered sentences only — FIX A<k> or RESTORE B<j> — never free text.
+      // Each edit is checked against the page's own sentences (applyDiffEdits).
+      const diffParse = parseDiffEdits(diffReview);
       diffUnparsed = diffParse.unparsed;
       for (const u of diffUnparsed) {
-        log.warn(`⚠️ [TEXT-DIFF] unreadable finding line — ${u.reason}: ${u.line}`);
+        log.warn(`⚠️ [TEXT-DIFF] unreadable edit line — ${u.reason}: ${u.line}`);
       }
-      const result = applyLectorFindings(current, diffFindings);
-      // What each applied correction put back from the writer's page — the
-      // input settleLedgerAfterDiff needs to keep the ledger true.
-      diffApplied = result.applied.map(a => ({
-        ...a,
-        restored: restoredSentences(
-          a.correction,
-          original.find(o => o.pageNumber === a.pageNumber)?.text,
-          current.find(c => c.pageNumber === a.pageNumber)?.text,
-        ),
-      }));
+      const beforeByPage = new Map(original.map(o => [o.pageNumber, o.text]));
+      const result = applyDiffEdits(current, beforeByPage, diffParse.edits);
+      diffFindings = [...result.applied, ...result.dropped].map(f => ({ pageNumber: f.pageNumber, kind: f.kind, quote: f.quote, correction: f.correction }));
+      // A restore carries the writer sentence it put back — the input
+      // settleLedgerAfterDiff needs to keep the ledger true.
+      diffApplied = result.applied;
       diffDropped = result.dropped;
       for (const d of diffDropped) {
-        const why = d.reason === 'quote-absent'
-          ? `the quoted words are not on page ${d.pageNumber}`
-          : d.reason === 'overlap'
-            ? `its span overlaps a correction already applied to page ${d.pageNumber}`
-            : `page ${d.pageNumber} is not in this story`;
-        log.warn(`⚠️ [TEXT-DIFF] dropped "${d.quote}" — ${why}`);
+        log.warn(`⚠️ [TEXT-DIFF] dropped ${d.kind} on page ${d.pageNumber} — ${d.reason}: "${d.quote}" -> "${d.correction}"`);
       }
       const next = result.pages;
       const diffChanged = next.filter((p, idx) => p.text !== current[idx].text).map(p => p.pageNumber);
@@ -1574,7 +1663,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
         findings: diffFindings.map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
         appliedCount: diffApplied.length,
         droppedCount: diffDropped.length,
-        droppedFindings: diffDropped.map(d => ({ pageNumber: d.pageNumber, quote: d.quote, reason: d.reason })),
+        droppedFindings: diffDropped.map(d => ({ pageNumber: d.pageNumber, kind: d.kind, quote: d.quote, correction: d.correction, reason: d.reason })),
         // Same tripwire as the lector: a finding-shaped line the parser could
         // not read is counted, never skipped in silence.
         unparsedCount: diffUnparsed.length,
@@ -1769,14 +1858,15 @@ async function refineStoryText(storyData, pages, opts = {}) {
  * Works on both shapes: a stored story (sceneImages[]) and the in-flight
  * pipeline's expanded scenes.
  */
-function extractRefinablePages(sceneLike = []) {
-  // The brief as every text-stage reader gets it — the SAME specs the writer
-  // was given (sceneMetadata.buildTextStagePictureSpecs, 2026-09-23). Built over
-  // the whole book at once: a repeated look is only recognised in page order.
+function extractRefinablePages(sceneLike = [], { visualBible = null, clothingRequirements = null } = {}) {
+  // The picture spec every text-stage reader gets — the SAME compact spec the
+  // writer was given (sceneMetadata.buildTextStagePictureSpecs, owner 2026-09-23),
+  // built from the brief's METADATA, the Visual Bible and the wardrobe contract.
   const { buildTextStagePictureSpecs } = require('./sceneMetadata');
   const withText = (sceneLike || []).filter(s => s && (s.text || '').trim());
   const specByPage = buildTextStagePictureSpecs(
-    withText.map(s => ({ pageNumber: s.pageNumber, brief: s.sceneDescription || s.description || '' }))
+    withText.map(s => ({ pageNumber: s.pageNumber, brief: s.sceneDescription || s.description || '' })),
+    { visualBible, clothingRequirements },
   );
   return withText
     .map(s => {
@@ -1797,9 +1887,9 @@ function extractRefinablePages(sceneLike = []) {
       //
       // The stage's founding invariant (decisions.md 2026-08-05) is "rewrites
       // page prose only, never events" — it cannot honour that while blind to
-      // what the events are. The brief arrives trimmed (METADATA, ids, repeated
-      // looks) and the template is explicit that appearance
-      // and staging are not the prose's business.
+      // what the events are. The compact spec carries them (WHAT HAPPENS), and
+      // the template is explicit that appearance and staging are not the
+      // prose's business.
       const sceneBrief = specByPage.get(s.pageNumber) || '';
       // The page's own LOCKED PLAN LINE (beats pipeline only). outlineExtract
       // holds "PLAN: …" in beats mode and the scene expansion's own JSON in
@@ -2054,9 +2144,9 @@ function projectTextRefineReport(usable, beforeByPage = new Map()) {
     // returned by the chain and projected by nobody, so the pass that catches
     // rewrite damage was the one pass whose output could not be read back.
     diffReview: usable.diffReview || '',
-    diffFindings: (usable.diffFindings || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
-    diffApplied: (usable.diffApplied || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction, restored: f.restored || [] })),
-    diffDropped: (usable.diffDropped || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction, reason: f.reason })),
+    diffFindings: (usable.diffFindings || []).map(f => ({ pageNumber: f.pageNumber, kind: f.kind || null, quote: f.quote, correction: f.correction })),
+    diffApplied: (usable.diffApplied || []).map(f => ({ pageNumber: f.pageNumber, kind: f.kind || null, quote: f.quote, correction: f.correction, restored: f.restored || [] })),
+    diffDropped: (usable.diffDropped || []).map(f => ({ pageNumber: f.pageNumber, kind: f.kind || null, quote: f.quote, correction: f.correction, reason: f.reason })),
     durationMs: usable.rounds.reduce((n, r) => n + (r.elapsedMs || 0), 0),
     model: usable.rounds[0]?.modelId || usable.rounds[0]?.modelKey || null,
     prompt: usable.rounds.find(r => r.kind === 'repair' && r.prompt)?.prompt || '',
@@ -2088,7 +2178,10 @@ module.exports = {
   FINDING_OUTCOME,
   resolveFindingOutcomes,
   unresolvedFindings,
-  restoredSentences,
+  GRAMMAR_EDIT_MAX_WORDS,
+  parseDiffEdits,
+  applyDiffEdits,
+  wordEditDistance,
   settleLedgerAfterDiff,
   countPageWords,
   measurePages,

@@ -37427,6 +37427,8 @@ per arm.
 ### The diff pass does NOT invent prose, and must never get a length guard (correction, 2026-09-06)
 
 > → corrected 2026-09-23 (the "never invents" finding is refuted by run 6), see "2026-09-23 — Prompt audit of job_1790100385959: corrections to earlier entries", item 4.
+>
+> 🗄 **Superseded 2026-09-23** (owner: "No new sentences, the last pass is a grammar check") — the pass edits numbered sentences only; see "Text stage, owner round 2".
 
 **Context.** The diff pass added in the 2026-09-06 entry above sometimes emits a
 "correction" whose replacement is LONGER than the span it quotes. That was initially
@@ -57777,3 +57779,58 @@ EXPECTED SCENE / MAIN SCENE PROSE), which is an owner call.
 `storyJobPipeline.js`, `server/lib/testlab.js`, `docs/prompt-inventory.md`,
 `tests/unit/landmark-photo-authority.test.ts`, `tests/unit/empty-scene-qc-extraction.test.ts`.
 **Status:** 🟡 on staging, model-level effect partly unproven.
+
+## 2026-09-23 — Text stage, owner round 2: the pass after the repair is a grammar check, the audit checks hints, the text stage reads a compact picture spec, the 1st-grade sentence band is 4-9
+
+**Context.** Owner decisions on the open items of prompt audit 05 (previous entry, "Text stage after
+prompt audit 05"), staging `job_1790100385959_1nitlympp`.
+
+**Decision.**
+1. **"No new sentences, the last pass is a grammar check."** `story-text-diff.txt` is rewritten as a
+   grammar check. It sees each rewritten page's BEFORE and AFTER as numbered sentences
+   (`numberedSentences`, one splitter `pageSentences`) and answers only `PAGE n FIX A<k>: <sentence>` or
+   `PAGE n RESTORE B<j> AFTER A<k>` (`parseDiffEdits`). `applyDiffEdits` checks each edit against the
+   page's own sentences: a FIX must stay one sentence and change at most `GRAMMAR_EDIT_MAX_WORDS` = 4 words
+   (word-level edit distance, punctuation ignored — every one of the 93 lector corrections stored on
+   staging's last 60 refined stories changes 4 or fewer, 63 change 1; run 6's damaging diff rewrites changed
+   7-15); a RESTORE inserts the writer's sentence verbatim and is refused if already on the page. So the
+   pass can no longer place a sentence neither version had. The splitter never cuts inside a quotation
+   («…», „…“, “…”, "…"): the first replay showed a fix to half a spoken line closing it early. The
+   free quote/correction contract the diff shared with the lector is deleted for this pass
+   (`restoredSentences` deleted; a RESTORE carries its sentence, which `settleLedgerAfterDiff` reads).
+   The lector keeps its own contract. Supersedes "The diff pass does NOT invent prose, and must never get
+   a length guard" (2026-09-06) and the BACKLOG owner question on a code provenance guard.
+2. **The audit checks each arc hint was applied.** story-text-audit.txt gains `{HINT_QUESTION}` — "15.
+   HINT: is every hint under HINTS applied on the pages it concerns?" — filled only when the story has
+   hints. A dropped hint becomes a finding the refine fixes; the writer and the refine already get the hints.
+3. **Clothing kept, shrunk.** Owner: "worst thing someone wears green and the writer invents red". The
+   writer, the arc-informed audit and the refine read one compact spec per page
+   (`buildTextStagePictureSpecs`, sceneMetadata.js) instead of the Art Director's prose: WHERE (Visual
+   Bible location and vantage), WHAT HAPPENS (the brief's `sceneIntent`; its interaction rows restated it on
+   run 6 and are not repeated), WHO (each character's outfit version for that page from the wardrobe
+   contract, worn rows applied through `resolveGeneratedOutfit`, garment + colour only; creatures by their
+   bible look; the face), ALSO IN VIEW (other elements with their state on the page). Replaces the prose trim
+   of the previous entry (`characterLookSignature` / `dropAppearanceAppositive` deleted). A brief without
+   METADATA gets no spec and an error log. **Measured on run 6:** spec 16.8k → 11.7k chars; writer LOCKED
+   ILLUSTRATIONS section 21.7k → 18.6k (plan lines and section rules stay); refine SCENE OUTLINES 19.4k →
+   14.6k.
+4. **Sentence band lifted.** Owner: "keep it, we cannot compress it that much, rather lift the limit or give
+   it more space; some pages short, others a bit longer is ok." `1st-grade` `sentencesPerPage` 3-6 → **4-9**
+   (run 6's writer ran 6-13, median 8.5); the counter keeps the words' +50% tolerance, so a page draws a
+   sentence LENGTH finding only past 13. On run 6's writer text: no sentence finding (was 6 pages); p4 still
+   draws its word finding, and p4/p16/p18 their paragraph findings (5 paragraphs, at most 4).
+
+**Validation.** Rung 1 (free): all prompts rebuilt from the stored row, no unfilled placeholder. Rung 2
+($0.271): the grammar check on run 6's stored diff input made 1 edit (the stored diff made 11, incl. the
+invented «… blieb auf der Mauer.»); after the quote fix ($0.019 rerun) it is a two-word fix inside one whole
+spoken line. The arc-informed audit with the HINT question on the stored writer text: 9 faults, including
+**HINT p6** — the hint the writer dropped, named in the audit — and ENDING p18.
+
+**Touched:** `prompts/story-text-diff.txt`, `prompts/story-text-audit.txt`,
+`prompts/story-text-from-beats.txt`, `prompts/text-refine.txt`, `server/lib/promptBuilders.js`,
+`server/lib/sceneMetadata.js`, `server/lib/textRefine.js`, `server/lib/beatsPipeline.js`,
+`storyJobPipeline.js`, `server/lib/testlab.js`, `server/lib/beatsReplayInputs.js`,
+`scripts/admin/sibling-registry.json`, tests (`text-stage-counter-and-specs`, `text-audit-picture-spec`,
+`text-chain-hints-and-ledger`, `beats-replay-inputs`, `lector-span-parity`; `writer-brief-wardrobe-dedupe`
+deleted with the helpers it pinned).
+**Status:** ✅ active on staging.

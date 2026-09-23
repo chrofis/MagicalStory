@@ -3759,7 +3759,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     let textRefinePartial = null;
     if (refineEnabled) {
       const { extractRefinablePages, startBackgroundRefine } = require('./server/lib/textRefine');
-      const refinablePages = extractRefinablePages(expandedScenes);
+      const refinablePages = extractRefinablePages(expandedScenes, { visualBible, clothingRequirements });
       if (refinablePages.length > 0) {
         genLog.info('text_refine_start', `Refining text for ${refinablePages.length} page(s) in parallel with images`);
         // THE BIBLE RIDES ALONG (A7, 2026-09-21). `inputData` is the job's
@@ -6704,7 +6704,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // The pages as they SHIP: expandedScenes carries the refined text
             // (the join above wrote it there) and the scene briefs the refine
             // template reads.
-            const finalPages = extractRefinablePages(expandedScenes);
+            const finalPages = extractRefinablePages(expandedScenes, { visualBible, clothingRequirements });
             genLog.info('text_post_audit_start', `The book audit routed ${auditTextFaults.length} fault(s) to TEXT — one corrective text round on the pages they name`);
             const postAudit = await runPostAuditTextRound(
               { ...inputData, visualBible },

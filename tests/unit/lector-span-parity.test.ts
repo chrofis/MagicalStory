@@ -5,13 +5,14 @@ import path from 'path';
 const ROOT = path.resolve(__dirname, '../..');
 
 /**
- * The cold-read pass (story-text-proofread.txt) and the diff pass
- * (story-text-diff.txt) hand their findings to the SAME parser and applier
- * (textRefine.js parseLectorFindings / applyLectorFindings). A shortest-span
- * quote on either path leaves agreement broken around the fix, so both
- * templates must ask for the whole sentence.
+ * The cold-read pass (story-text-proofread.txt) hands its findings to
+ * parseLectorFindings / applyLectorFindings. A shortest-span quote leaves
+ * agreement broken around the fix, so the template asks for the whole
+ * sentence. The pass after the repair (story-text-diff.txt) left this contract
+ * on 2026-09-23: it edits numbered sentences whole (parseDiffEdits, pinned in
+ * text-stage-counter-and-specs.test.ts).
  */
-const LECTOR_TEMPLATES = ['prompts/story-text-proofread.txt', 'prompts/story-text-diff.txt'];
+const LECTOR_TEMPLATES = ['prompts/story-text-proofread.txt'];
 
 describe('lector quoting span parity', () => {
   for (const rel of LECTOR_TEMPLATES) {

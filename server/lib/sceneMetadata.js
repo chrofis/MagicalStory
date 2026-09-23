@@ -2425,90 +2425,137 @@ function resolveEvalSceneDescription({ compressedScene = null, sceneDescription 
 }
 
 /**
- * What one character is wearing on one page, as a value that changes when the
- * outfit does: the clothing category plus the on/off state of every garment
- * the brief hangs on them. Two pages with the same signature are two pages the
- * reader sees the same clothes on.
- *
- * @param {Object} sceneMetadata - extractSceneMetadata() result for the page
- * @param {string} name - character name as characterClothing keys it
+ * A garment list in short form: each clause of the outfit, cut before its
+ * describing tail ("with a high collar", "— the jacket has…"), article and list
+ * "and" dropped. What stays is the garment and its colour, which is what a
+ * writer needs so it never names a different colour.
+ * @param {string} outfit
  * @returns {string}
  */
-function characterLookSignature(sceneMetadata, name) {
-  const category = (sceneMetadata && sceneMetadata.characterClothing && sceneMetadata.characterClothing[name]) || '';
-  const worn = (sceneMetadata && Array.isArray(sceneMetadata.wornItems) ? sceneMetadata.wornItems : [])
-    .filter(w => w && w.owner === name)
-    .map(w => `${w.id || ''}:${w.state || ''}`)
-    .sort()
-    .join(',');
-  return `${category}|${worn}`;
+function shortOutfit(outfit) {
+  const { splitClauses } = require('./wornItems');
+  return splitClauses(String(outfit || '')).flatMap(c => c.split(/,\s*and\s+/i))
+    .map(c => c
+      .split(/\s+(?:with|—|–)\s+/i)[0]
+      .replace(/^\s*(?:and\s+)?(?:an?|the)\s+/i, '')
+      .replace(/^\s*and\s+/i, '')
+      .replace(/[.;]+\s*$/, '')
+      .trim())
+    .filter(Boolean)
+    .join(', ')
+    .replace(/,\s*and\s+(?:(?:an?|the)\s+)?/gi, ', ');
 }
 
 /**
- * Remove one character's appearance appositive — `Name — a preschooler …
- * wearing a red jacket … — kneels` — leaving `Name kneels`. Only an appositive
- * that actually describes a look is taken: one naming hair, eyes, build or a
- * worn garment. An em-dash aside that says what someone is doing or feeling is
- * story, not staging, and stays.
- *
- * @param {string} prose - the brief's prose half
- * @param {string} name
- * @returns {string}
+ * The outfit one character wears on one page, short form: the contract version
+ * the page selects (`characterClothing`), with the page's worn rows applied by
+ * the same resolver the image prompt and the judges use.
+ * @returns {string|null} null when the contract has no outfit for that version
  */
-function dropAppearanceAppositive(prose, name) {
-  if (!prose || !name) return prose;
-  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  // The briefs write the appositive both spaced (`Name — … — verb`) and
-  // unspaced (`Name—…—verb`), so the whitespace on both sides is part of the
-  // match and one space is put back: dropping it welds the name to the verb.
-  return prose.replace(
-    new RegExp(`(${escaped})\\s*[—–]\\s*([^—–]*?)\\s*[—–]\\s*`, 'g'),
-    (whole, who, inner) => (/\b(wearing|hair|eyes|build|heads tall)\b/i.test(inner) ? `${who} ` : whole)
-  );
+function pageOutfitShort(name, category, clothingRequirements, visualBible, meta, pageNumber) {
+  const { resolveCharacterReqs } = require('./clothingCategories');
+  const { resolveGeneratedOutfit } = require('./wornItems');
+  const reqs = clothingRequirements ? resolveCharacterReqs(clothingRequirements, name) : null;
+  const key = String(category || 'standard').split(':')[0];
+  const outfit = String(reqs?.[key]?.description || '').trim();
+  if (!outfit) return null;
+  return shortOutfit(resolveGeneratedOutfit(outfit, name, { visualBible, sceneMetadata: meta, pageNumber }));
+}
+
+/** A Visual Bible entry by id, the state suffix (`ART002.1`) read as its entry. */
+function vbEntry(visualBible, id) {
+  const base = String(id || '').split('.')[0];
+  const lists = ['locations', 'artifacts', 'animals', 'vehicles', 'genericObjects', 'secondaryCharacters', 'clothing'];
+  for (const k of lists) {
+    const list = Array.isArray(visualBible?.[k]) ? visualBible[k] : Object.values(visualBible?.[k] || {});
+    const hit = list.find(e => e && e.id === base);
+    if (hit) return { kind: k, entry: hit };
+  }
+  return null;
+}
+
+/** One object id, as the text needs it: its name, and what makes it look as it does on this page. */
+function vbShort(visualBible, id) {
+  const hit = vbEntry(visualBible, id);
+  if (!hit) return null;
+  const { kind, entry } = hit;
+  const state = (entry.states || []).find(s => s && s.id === id);
+  const vantage = (entry.vantages || []).find(v => v && v.id === id);
+  if (kind === 'animals') return [entry.name, [entry.species, entry.coloring].filter(Boolean).join(', ')].filter(Boolean).join(' — ');
+  if (kind === 'locations') return vantage ? `${entry.name} (${vantage.name})` : entry.name;
+  return state && state.delta ? `${entry.name} — ${state.delta}` : entry.name;
+}
+
+/** An animal or story-made figure by name, with its look from the bible. */
+function figureShort(visualBible, name) {
+  const lists = ['animals', 'secondaryCharacters'];
+  for (const k of lists) {
+    const list = Array.isArray(visualBible?.[k]) ? visualBible[k] : Object.values(visualBible?.[k] || {});
+    const hit = list.find(e => e && String(e.name || '').toLowerCase() === String(name).toLowerCase());
+    if (hit) return vbShort(visualBible, hit.id);
+  }
+  return null;
 }
 
 /**
- * THE PICTURE SPEC EVERY TEXT-STAGE READER GETS, built once per book.
+ * THE PICTURE SPEC EVERY TEXT-STAGE READER GETS, built once per book (owner,
+ * 2026-09-23: "worst thing someone wears green and the writer invents red").
  *
- * The writer, the arc-informed audit and the refine all read each page's brief.
- * Only the writer's copy was trimmed (2026-09-23 audit: the refine's outlines
- * were 19.4k of a 53.7k prompt, the full brief with every character's outfit
- * on every page), so the critics read longer, different specs than the text was
- * written from. One builder, three readers:
- *   - METADATA goes (machine data for the image call);
- *   - Visual-Bible ids go (grounding handles the writer is never told about);
- *   - a character's appearance appositive goes on every page after the first
- *     where their look (outfit + worn garments) is unchanged — a change of look
- *     is an event and keeps its description.
- * Camera sentences stay: in the briefs they also carry the place ("wide shot of
- * a courtyard at dusk"), and the place is the text's business.
- * Who is there, where it is and what happens all stay. Needs page order: the
- * look is compared with the LAST one seen per character.
+ * The writer, the arc-informed audit and the refine read the same compact spec
+ * per page instead of the Art Director's prose, which is written for the image
+ * model: every character's full look on every page (the refine's outlines were
+ * 19.4k of a 53.7k prompt on run 6). Built from the brief's METADATA and the
+ * story's own records, never from the prose:
+ *   WHERE          the page's location (and vantage) by Visual Bible name
+ *   WHAT HAPPENS   the Art Director's sceneIntent (its interaction rows restate it,
+ *                  measured on run 6, so they are not repeated)
+ *   WHO            each character, the outfit version this page selects in short
+ *                  form (garment + colour, worn rows applied), and their face
+ *   ALSO IN VIEW   every other element by name, with its state on this page
+ * A brief with no METADATA gets no spec, loudly: nothing else can say what the
+ * picture shows without the wardrobe prose this replaces.
  *
  * @param {Array<{pageNumber:number, brief:string}>} briefs raw briefs, METADATA included
+ * @param {{visualBible?:Object, clothingRequirements?:Object}} story
  * @returns {Map<number,string>}
  */
-function buildTextStagePictureSpecs(briefs = []) {
-  const lastLookByCharacter = new Map();
-  return new Map(
-    (briefs || [])
-      .filter(x => x && x.pageNumber != null && String(x.brief || '').trim())
-      .sort((a, b) => a.pageNumber - b.pageNumber)
-      .map(x => {
-        const raw = String(x.brief || '');
-        let prose = raw
-          .split(/---\s*METADATA/i)[0]
-          .replace(/\s*[([]\s*[A-Z]{2,3}\d{3}(?:\.\d+)?\s*[)\]]/g, '')
-          .trim();
-        const meta = extractSceneMetadata(raw);
-        for (const name of Object.keys((meta && meta.characterClothing) || {})) {
-          const look = characterLookSignature(meta, name);
-          if (lastLookByCharacter.get(name) === look) prose = dropAppearanceAppositive(prose, name);
-          else lastLookByCharacter.set(name, look);
-        }
-        return [x.pageNumber, prose];
-      })
-  );
+function buildTextStagePictureSpecs(briefs = [], { visualBible = null, clothingRequirements = null } = {}) {
+  const out = new Map();
+  for (const x of (briefs || []).filter(b => b && b.pageNumber != null && String(b.brief || '').trim())) {
+    const meta = extractSceneMetadata(String(x.brief));
+    const full = meta?.fullData || {};
+    if (!meta || !meta.sceneIntent) {
+      log.error(`❌ [TEXT-SPEC] p${x.pageNumber}: the brief has no METADATA sceneIntent — the text stage gets no picture spec for this page`);
+      out.set(x.pageNumber, '(no picture spec recorded for this page)');
+      continue;
+    }
+    const objects = Array.isArray(meta.objects) ? meta.objects : [];
+    const wornIds = new Set((meta.wornItems || []).map(w => String(w.id || '').split('.')[0]));
+    const where = objects.filter(id => /^LOC/i.test(id)).map(id => vbShort(visualBible, id)).filter(Boolean);
+    const cast = (Array.isArray(full.characters) ? full.characters : []).filter(c => c && c.name);
+    const who = cast.map(c => {
+      const category = c.clothing || meta.characterClothing?.[c.name];
+      // A creature in the cast list wears nothing the contract records ("none").
+      const dressed = category && String(category).toLowerCase() !== 'none';
+      const outfit = dressed ? pageOutfitShort(c.name, category, clothingRequirements, visualBible, meta, x.pageNumber) : null;
+      if (dressed && !outfit) log.warn(`⚠️ [TEXT-SPEC] p${x.pageNumber}: no contract outfit for ${c.name} (${c.clothing || 'standard'}) — the spec names no clothing for them`);
+      // A creature or story-made figure is named with its look from the bible.
+      const figure = !dressed ? figureShort(visualBible, c.name) : null;
+      return `- ${figure || c.name}${outfit ? `: wears ${outfit}` : ''}${c.expression ? `. Face: ${c.expression}` : ''}`;
+    });
+    const inView = objects
+      .filter(id => !/^LOC/i.test(id) && !wornIds.has(String(id).split('.')[0]))
+      .map(id => vbShort(visualBible, id))
+      .filter(Boolean);
+    out.set(x.pageNumber, [
+      where.length ? `WHERE: ${where.join('; ')}` : null,
+      `WHAT HAPPENS: ${String(meta.sceneIntent).trim()}`,
+      who.length ? 'WHO:' : null,
+      ...who,
+      inView.length ? `ALSO IN VIEW: ${inView.join('; ')}` : null,
+    ].filter(Boolean).join('\n'));
+  }
+  return out;
 }
 
 /**
@@ -2746,8 +2793,7 @@ module.exports = {
   resolveEvalSceneDescription,
   resolveTextStagePictureSpec,
   buildTextStagePictureSpecs,
-  characterLookSignature,
-  dropAppearanceAppositive,
+  shortOutfit,
   resolveSceneCastEntries,
   collectSceneCharacterNames,
   collectSceneObjectFigureNames,

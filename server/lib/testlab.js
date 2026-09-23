@@ -3636,7 +3636,7 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
     // copy this replaced carried the untrimmed brief and no plan line, so the
     // replay audited against a longer spec and "(no page plan was recorded)".
     const { extractRefinablePages } = require('./textRefine');
-    const pages = extractRefinablePages(storyData.sceneImages || []);
+    const pages = extractRefinablePages(storyData.sceneImages || [], { visualBible: storyData.visualBible, clothingRequirements: storyData.clothingRequirements });
     if (!pages.length) throw new Error('story has no page text to audit');
     // params.fromExperiment (2026-09-23): audit the page text a stored Lab
     // writer run produced (story_text_replay's results[i].pages) instead of the
@@ -4501,7 +4501,7 @@ async function runTextRefineStage(target, { params = {}, promptOverride = null }
 
   // Delegates to the SAME loop production runs (textRefine.js), so a Lab result
   // is evidence about the real thing rather than about a copy of it.
-  const pages = extractRefinablePages(storyData.sceneImages || []);
+  const pages = extractRefinablePages(storyData.sceneImages || [], { visualBible: storyData.visualBible, clothingRequirements: storyData.clothingRequirements });
   if (pages.length === 0) throw new Error(`Story ${target.storyId} has no page text to refine`);
 
   // EXACT REPLAY — params.fromWriterText restores the text the refiner actually
@@ -7949,7 +7949,7 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
     const prior = parsePageBlocks(params.fromText);
     if (!prior.length) throw new Error('fromText has no parseable pages');
     const priorBy = new Map(prior.map(p => [p.pageNumber, p.text]));
-    const basePages = extractRefinablePages(storyData.sceneImages || []);
+    const basePages = extractRefinablePages(storyData.sceneImages || [], { visualBible: storyData.visualBible, clothingRequirements: storyData.clothingRequirements });
     const pages = (basePages.length ? basePages : prior.map(p => ({ pageNumber: p.pageNumber, text: p.text, sceneIntent: '', sceneBrief: '' })))
       .map(p => ({ ...p, text: priorBy.get(p.pageNumber) || p.text }));
     const t = Date.now();
@@ -7991,7 +7991,7 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
   let prompt;
   try {
     prompt = buildStoryTextFromBeatsPrompt(
-      storyData, textArgs.beats, textArgs.expansions, textArgs.arc, { arcHints: textArgs.arcHints });
+      storyData, textArgs.beats, textArgs.expansions, textArgs.arc, { arcHints: textArgs.arcHints, visualBible: storyData.visualBible, clothingRequirements: storyData.clothingRequirements });
   } finally { PROMPT_TEMPLATES.storyTextFromBeats = orig; }
   if (!prompt) throw new Error('story-text-from-beats template unavailable');
 
@@ -8155,7 +8155,7 @@ async function runWriterCompareStage(target, { params = {} }) {
           // Production: buildStoryTextFromBeatsPrompt(inputData, beats, finalExpansions,
           // approvedArc, { arcHints }) — beatsPipeline.js:2327.
           const r = await call(SH.buildStoryTextFromBeatsPrompt(
-            storyData, beats, textArgs.expansions, textArgs.arc, { arcHints: textArgs.arcHints }), model, 'text');
+            storyData, beats, textArgs.expansions, textArgs.arc, { arcHints: textArgs.arcHints, visualBible: storyData.visualBible, clothingRequirements: storyData.clothingRequirements }), model, 'text');
           // Same parse production uses (beatsPipeline.js:3126). Without TITLE
           // named as a trailing marker the last page swallows the whole
           // ---TITLE--- block, and every arm was scored on a final page
