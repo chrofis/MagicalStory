@@ -55627,3 +55627,33 @@ Bahnhofstrasse, a dragon on a busy shopping street that hundreds would see, chil
 adult or a shopkeeper. The egg's loss is still named by both. grok-4.6 raised none under SENSE.
 Lettering, same day (Lab 1415, qwen3-vl): p1's TAXI / BUTTERCUP signs came back `fits`/`correct` (no finding);
 p6's "TENSE BUT QUIET STANDOFF" came back `overlay` → CRITICAL.
+
+## 2026-09-23 — The over-the-shoulder near figure is a crop, and never on a contact page
+
+**Context:** Dragon run 6 p10 (staging `job_1790100385959_1nitlympp`) declared `shot: over-the-shoulder` and
+rendered a full figure seen from behind. The built v0 prompt asked for the whole body three times: the Art
+Director gave the near figure `perspective: "back view, glancing over the shoulder toward right shoulder"`, which
+fired the builder's back-view directive ("shoulders, hips, and both feet turned away"); the AGE & PROPORTIONS
+line gave him a height ("about 4.5 heads tall"); and the prose dressed him down to jeans and sneakers. Even the
+builder's own `over-the-shoulder` directive said "feet turned away from camera". The AD templates allowed
+`perspective` only "for back view or side profile", so `over-the-shoulder` was never offered as a value. On top,
+the near figure pressed a palm on the creature the shot puts "small and deep in the opposite corner".
+**Decision (owner, 2026-09-23):** (1) The near figure is a CROP: back of the head, one shoulder and the upper arm,
+large in a front corner and cut by the frame edge; nothing below the shoulder blades. One phrase,
+`OTS_NEAR_FIGURE_CROP` in `shotVocabulary.js`, feeds the shot definition, the builder's perspective directive, the
+four brief-authoring templates (`OTS_NEAR_FIGURE_RULE` via `{OTS_NEAR_FIGURE}`) and `GAP_ACTION_FRAMING_RULE`.
+It never says "back view" (Grok anchors on the pose-category word). (2) On an OTS page the AD gives the near figure
+`perspective: over-the-shoulder`, never `back view` or a glance, and its prose names no legs, trousers, footwear or
+stance. (3) For a figure whose structured perspective is over-the-shoulder the image builder drops the AGE &
+PROPORTIONS entry and the HEIGHT ORDER entry, and the prose-dress check (`missingGarments`) requires only `top`.
+The page's garments live in the AD prose, so they are removed at the author, not by the builder. (4) No OTS on
+contact: "small and deep" stays; `OTS_NO_CONTACT_RULE` tells the planner (`story-beats.txt` `{OTS_NO_CONTACT}`)
+and, inside `OTS_NEAR_FIGURE_RULE`, the four brief authors that a page whose near figure touches what they face
+takes another shot. (5) `image-generation.txt`'s "complete down to both feet" composition line exempts the OTS
+near figure alongside the close-up. Plates untouched (the base plate has foreground room).
+**Rationale:** Every whole-body cue won over the one-line shot word. Contact is a reading of prose (the plan line
+has no structured contact field), so the no-contact rule lives in the prompts only; no counter or critic checks
+it, and plan-check.txt checks no shots, so no critic needed a copy.
+**Touched:** server/lib/shotVocabulary.js, server/lib/promptBuilders.js, prompts/story-beats.txt,
+prompts/scene-expansion.txt, prompts/scene-expansion-all.txt, prompts/scene-iteration.txt,
+prompts/scene-iteration-free.txt, prompts/image-generation.txt, tests/unit/ots-near-figure-crop.test.ts.

@@ -18,7 +18,7 @@ const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = requi
 // exported from visualBible.js for coverIterate.js, which still uses it.
 const { REQUIRED_TEXT_AUTHORING_RULE, declaredText } = require('./requiredText');
 const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote } = require('./visualBible');
-const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, shotDistributionPhrase, buildShotDefinitions } = require('./shotVocabulary');
+const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 // REQUIRED IN-IMAGE TEXT: one source for the generator block, the repair
 // clause and the judges' TEXT RULES block. Safe as a top-level require --
@@ -2757,6 +2757,9 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // The below-waist verbs a close-up may not stage, from the one constant the
     // plan counter and the brief check read (shotVocabulary).
     CLOSEUP_BELOW_WAIST: CLOSEUP_BELOW_WAIST_PHRASE,
+    // The over-the-shoulder near figure is a crop, and never on a contact page
+    // (owner, 2026-09-23) — the same constant at all four brief-authoring sites.
+    OTS_NEAR_FIGURE: OTS_NEAR_FIGURE_RULE,
     // C4 names the two axes separately — the eight-word SHOT_ENUM is not a
     // list of distances, and where the camera stands is no longer the vantage's
     // business but the shot word's own.
@@ -3056,6 +3059,9 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // The below-waist verbs a close-up may not stage, from the one constant the
     // plan counter and the brief check read (shotVocabulary).
     CLOSEUP_BELOW_WAIST: CLOSEUP_BELOW_WAIST_PHRASE,
+    // The over-the-shoulder near figure is a crop, and never on a contact page
+    // (owner, 2026-09-23) — the same constant at all four brief-authoring sites.
+    OTS_NEAR_FIGURE: OTS_NEAR_FIGURE_RULE,
     // C4 names the two axes separately — the eight-word SHOT_ENUM is not a
     // list of distances, and where the camera stands is no longer the vantage's
     // business but the shot word's own.
@@ -3506,6 +3512,9 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       // The below-waist verbs a close-up may not stage, from the one constant the
       // plan counter and the brief check read (shotVocabulary).
       CLOSEUP_BELOW_WAIST: CLOSEUP_BELOW_WAIST_PHRASE,
+      // The over-the-shoulder near figure is a crop, and never on a contact page
+      // (owner, 2026-09-23) — the same constant at all four brief-authoring sites.
+      OTS_NEAR_FIGURE: OTS_NEAR_FIGURE_RULE,
       // C4 names the two axes separately — the eight-word SHOT_ENUM is not a
       // list of distances, and where the camera stands is no longer the vantage's
       // business but the shot word's own.
@@ -3893,18 +3902,31 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   // Strip JSON metadata block from scene description (not needed in image prompt)
   let cleanSceneDescription = stripSceneMetadata(sceneDescription);
 
+  // THE OVER-THE-SHOULDER NEAR FIGURE (owner, 2026-09-23). A figure whose
+  // structured `perspective` is over-the-shoulder is a CROP — back of the head,
+  // one shoulder, the upper arm — so every block below that asks for the whole
+  // body (the height line, the height order, the below-shoulder garment check)
+  // leaves that figure out. Read from the brief's structured field only.
+  const otsFigures = {};
+  for (const [name, ann] of Object.entries(metadata?.characterPerspectives || {})) {
+    if (isOverTheShoulderPerspective(ann?.perspective)) otsFigures[name] = true;
+  }
+  const isOtsFigure = (name) => !!require('./castResolver').lookupByName(otsFigures, name, null);
+
   // Append per-character perspective directives if scene-iteration assigned any.
   if (metadata?.characterPerspectives) {
     const lines = [];
     for (const [name, ann] of Object.entries(metadata.characterPerspectives)) {
-      if (ann.perspective === 'back view' || ann.perspective === 'back-view') {
+      if (isOverTheShoulderPerspective(ann.perspective)) {
+        // Never the words "back view" here: Grok anchors on the pose-category
+        // word and draws the full figure it names, whatever follows it.
+        lines.push(`- ${name}: over-the-shoulder — the camera sits just behind ${name}, who is a crop: ${OTS_NEAR_FIGURE_CROP}.`);
+      } else if (ann.perspective === 'back view' || ann.perspective === 'back-view') {
         lines.push(`- ${name}: back view — shoulders, head, hips, and both feet turned away from the camera. Back of head visible, heels visible, toes pointing away. No twisting; feet and body face the same direction.`);
       } else if (String(ann.perspective || '').startsWith('back view')) {
         lines.push(`- ${name}: ${ann.perspective} — shoulders, hips, and both feet turned away from the camera, but the head turns toward the named shoulder so a cheek, one eye or a brow is visible.`);
       } else if (ann.perspective === 'side' || ann.perspective === 'profile') {
         lines.push(`- ${name}: side profile — shoulders, hips, and feet all line up sideways. Nose points to one edge, not at the camera.`);
-      } else if (ann.perspective === 'over-the-shoulder') {
-        lines.push(`- ${name}: over-the-shoulder — camera sits behind one shoulder; back of head and shoulder visible in near foreground, feet turned away from camera.`);
       }
     }
     if (lines.length > 0) {
@@ -4044,7 +4066,10 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         const pageLabel = pageNumber != null ? `page ${pageNumber}` : 'page';
         for (const photo of effectiveReferencePhotos) {
           if (!photo?.name || !photo?.clothingDescription) continue;
-          const missing = missingGarments(photo.clothingDescription, cleanSceneDescription || '', undefined, photo.name);
+          // The over-the-shoulder crop shows the upper garment only; trousers
+          // and shoes are below the frame and the prose rightly names neither.
+          const requiredSlots = isOtsFigure(photo.name) ? ['top'] : undefined;
+          const missing = missingGarments(photo.clothingDescription, cleanSceneDescription || '', requiredSlots, photo.name);
           if (missing.length > 0) {
             log.error(`👕 [CLOTHING] ${pageLabel}: the scene prose does not dress ${photo.name} — missing ${missing.join(', ')}. The prose is the only description the image model gets; fix the brief, nothing downstream will.`);
           }
@@ -4054,7 +4079,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       }
     }
 
-    const heightDescription = buildRelativeHeightDescription(sceneCharacters);
+    const heightDescription = buildRelativeHeightDescription((sceneCharacters || []).filter(c => !isOtsFigure(c?.name)));
     if (heightDescription) {
       characterReferenceList += `\n${heightDescription}\n`;
       log.debug(`[IMAGE PROMPT] Added relative heights: ${heightDescription}`);
@@ -4078,6 +4103,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     // age still reaches the model through the appearance line below.
     const ageCueGroups = new Map(); // markers text -> [names]
     for (const c of [...(sceneCharacters || []), ...secondaryAgeCues(secondaryCast)]) {
+      if (isOtsFigure(c?.name)) continue; // a crop has no height to state
       const ageMarkers = extractCharacterVisualProfile(c).ageMarkers;
       if (!ageMarkers) continue;
       if (!ageCueGroups.has(ageMarkers)) ageCueGroups.set(ageMarkers, []);
@@ -7465,6 +7491,9 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // so the spread can only be decided here — and it is page-count aware, so a
     // six-page trial is never asked for two over-the-shoulder pages.
     SHOT_DISTRIBUTION: shotDistributionPhrase(pageCount),
+    // No over-the-shoulder on a page whose near figure touches what they face —
+    // the same sentence the Art Director templates carry inside OTS_NEAR_FIGURE.
+    OTS_NO_CONTACT: OTS_NO_CONTACT_RULE,
     // The same below-waist verb list the Art Director templates are given and
     // planCounters.SHOT_CLOSEUP_BELOW_WAIST measures — the generator/critic pair
     // for the waist-up rule is one constant, not two hand-kept sentences.
@@ -8090,7 +8119,7 @@ const CONTACT_VERB_RULE = "An interaction's `where` opens with the verb the char
  * text in a children's pipeline. What it is actually about is a SENT THING and
  * a RECEIVER, and in this product that is a snowball far more often than a bow.
  */
-const GAP_ACTION_FRAMING_RULE = "When the page has one figure act on another across a gap — sending, throwing, aiming, rolling or kicking something toward them, or calling or gesturing across to them — the page is framed one of two ways, and the prose says which. OVER THE SHOULDER (set `shot` to `over-the-shoulder`): the acting figure's back fills one front corner, seen from behind, large and close; the receiving figure stands small and deep in the opposite back corner, about a tenth of the frame's height; the line of the throw, the call or the look runs down the diagonal between them. Take this one by default — the camera axis IS the line of the action, so the direction holds whether or not the picture understood the verb. ULTRA-WIDE (set `shot` to `ultra-wide`): take it when the page needs both faces readable, which the over-the-shoulder framing spends on the actor's back. Then the gap itself must be written — how far apart they stand, measured against something in the frame — because a gap left to the words alone is drawn as two figures almost touching however many paces the sentence claims. Either way the interaction's `where` carries the separation phrase ('across the square', 'a few paces apart', 'down the lane'). What is never allowed is the flat middle: both figures the same size at opposite edges of an ordinary shot, which states neither the direction nor the distance.";
+const GAP_ACTION_FRAMING_RULE = `When the page has one figure act on another across a gap — sending, throwing, aiming, rolling or kicking something toward them, or calling or gesturing across to them — the page is framed one of two ways, and the prose says which. OVER THE SHOULDER (set \`shot\` to \`over-the-shoulder\`): the acting figure is the near crop — ${OTS_NEAR_FIGURE_CROP}; the receiving figure stands small and deep in the opposite back corner, about a tenth of the frame's height; the line of the throw, the call or the look runs down the diagonal between them. Take this one by default — the camera axis IS the line of the action, so the direction holds whether or not the picture understood the verb. ULTRA-WIDE (set \`shot\` to \`ultra-wide\`): take it when the page needs both faces readable, which the over-the-shoulder framing spends on the actor's back. Then the gap itself must be written — how far apart they stand, measured against something in the frame — because a gap left to the words alone is drawn as two figures almost touching however many paces the sentence claims. Either way the interaction's \`where\` carries the separation phrase ('across the square', 'a few paces apart', 'down the lane'). What is never allowed is the flat middle: both figures the same size at opposite edges of an ordinary shot, which states neither the direction nor the distance.`;
 
 const REACHABLE_CONTACT_RULE = "An object more than one character touches: ask first whether moving it would change what the page is about. If it would not — a thing held, carried, passed or examined — stage it where every one of them can reach it: out on open ground, at the mouth of a recess rather than down inside it, never enclosed by or sunk below something a named toucher would have to reach through, and the prose puts it in that same open spot. If it would — an object whose position is the point, blocking, wedged, stuck fast, buried, sealed in or out of reach — it stays exactly where the plan line and the page text put it, still held by whatever holds it there, and the composition gives way instead: fewer characters in contact at once, the rest in frame straining, bracing or watching; an angle that shows the object's position and the hands in one view; the touchers ranged along the side they can actually reach. On such a page every toucher's `where` names the object together with what holds it in place — that is naming the object, not pose detail. Either way each toucher's `where` names the object itself, never another character's hands or hold.";
 
