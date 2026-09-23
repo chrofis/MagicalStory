@@ -1791,6 +1791,18 @@
       "fixedAt": "2026-09-23",
       "fixedIn": "63aecbdf8",
       "fix": "styleGateEchoedFields flags a four-word span of the art style that is not a template option; such a gate is stored as echoed with matches_style null. Replay: 6/6 flagged. Pinned by tests/unit/style-gate-echo.test.ts."
+    },
+    {
+      "id": "scene-review-fenced-brief-loses-prose",
+      "title": "A scene-review rewrite in the fenced-JSON shape lost all Art Director prose before image generation",
+      "reportedAt": "2026-09-23",
+      "source": "Production job_1790107559778_fcmlfa8kn, stories.data.sceneReviewReport.pages[].after: pages 2,3,5,6,7,8,10 returned as prose + trailing ```json fence; stripSceneMetadata turned p7 into \"Objects:\" and p3 into \"- Manuel:, center midground, ...\".",
+      "rootCause": "parseProseMetadataFormat recognised only the ---METADATA--- carrier, so a prose + fenced-JSON brief fell to the bare-JSON path and buildTextFromJson rebuilt the scene from its metadata alone. Eight other readers split on the delimiter by hand. iterateBriefGuard accepts the fenced shape, so nothing flagged it.",
+      "impact": "Every page the scene review (or an iterate round) returned in the fenced or bare-object carrier rendered with no scene prose and the legacy JSON prompt wrapping.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "747058ae9",
+      "fix": "sceneMetadata.splitBrief: one split recognising delimiter, trailing fence and trailing bare object, read by every brief consumer; stripSceneMetadata throws rather than rebuild a brief with prose from its JSON. Pinned by tests/unit/brief-carrier-split.test.ts."
     }
   ]
 }
