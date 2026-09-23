@@ -180,6 +180,9 @@ describe('runPlanCounters', () => {
       page(1, line('close-up', 'Ana')),
       page(2, line('wide', 'Ana, Ben and Cara walk')),
       page(3, line('medium', 'Ana and Cara talk')),
+      // A fourth page makes room for a focal page each (castCoverage: three
+      // characters need two focal pages, at most half the book).
+      page(4, line('wide', 'Ana, Ben and Cara wave')),
     ];
     const r = runPlanCounters({ roster: rosterFor(pages), pages, commissionedNames: CAST });
     const noFocal = r.findings.filter((f: any) => f.code === 'NO_FOCAL_PAGE').map((f: any) => f.detail);
@@ -627,8 +630,11 @@ describe('the roster decides, not the shape of the sentence (replaces the acts-l
     expect(res.findings.map((f: any) => f.code)).toEqual([
       'SHOT_MEDIUM_WIDE_EXCESS', 'SHOT_OTS_COUNT',
       'SHOT_NO_CAMERA_POSITION',
-      'MAIN_UNDER_HALF', 'NO_COMMISSIONED_ON_PAGE', 'UNDER_COVERED_CHARACTER', 'CONSECUTIVE_SAME_SHOT_CAST',
+      'MAIN_UNDER_HALF', 'NO_COMMISSIONED_ON_PAGE', 'UNDER_COVERED_CHARACTER', 'UNDER_COVERED_CHARACTER', 'CONSECUTIVE_SAME_SHOT_CAST',
     ]);
+    // Five children in sixteen pages owe 3 pages in frame each since 2026-09-23
+    // (castCoverage, owner: "ideally each one is on 3-4 images"); the floor was 2.
+    expect(res.stats.castCoverage.appearances).toEqual({ min: 3, max: 4 });
   });
 });
 

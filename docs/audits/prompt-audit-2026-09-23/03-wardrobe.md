@@ -1,5 +1,16 @@
 # 03 — STORY BIBLE + WARDROBE: judge findings
 
+## Status 2026-09-23
+
+Checked against staging `31fd7db0c` (after the evening fix round). FIXED = the commit that fixes it; OPEN = no fix yet, no ruling needed to start; OWNER CALL = touches a decision, a SETTLED line or has options the owner picks. Stale-doc and registry items listed at the end of each file were corrected in `a25ecb865` unless listed below.
+
+- FIXED (part of F1): a same-garment same-colour restatement re-renders no avatar — `ee8890278`; joiner and declared slot — `6a2b0e121`.
+- FIXED F1 direction (owner ruling 2026-09-23: the contract owns garment wording): `reconcile` deleted; a linked same garment `adopt`s the contract clause, the contract is untouched, no re-render; the AD's clothing list carries each version's outfit — `8dbe8d28b`. Replay on this run: 3 adopt, 0 re-renders.
+- FIXED F2 (prompt side): review prompt 12,708 → 11,627 chars (wardrobe brief + cast, no binding paragraph / strengths / flaws) — `8dbe8d28b`. Reasoning effort: Lab `noReasoning` knob added; measurement in decisions.md.
+- FIXED F3 (check 9 scoped to listed characters), F4 (base layers in bible rule + check 11), F5 (bible gets the arc; new check 12 plot garments), F6 (owner: no saved clothing; dead sentence deleted), F7 (colour words alone, both sides), F8, F9; `wardrobeBibleReport`, bible prompt + raw reply and review raw reply stored — `8dbe8d28b`.
+- OWNER CALL: a `conflict` (a DIFFERENT garment in a filled slot) still rewrites the contract and re-renders; under the ruling it either becomes an error or a new wardrobe version (who creates versions mid-pipeline). Also the cover dedupe's slot-conflict branch (same question). J1 (reviewer blind to appearance / art style), J3 (STYLE_WARDROBE VB line), J4, J5 open.
+---
+
 Run: staging `job_1790100385959_1nitlympp` ("Das Ei im Laub", 18 pp, de-ch, 4 boys aged 3-5, watercolor), built at `b03c64b0`.
 Stages: `beats_story_bible` (claude-sonnet-4-6, 8.1 s) → `beats_clothing_review` (deepseek-v4-pro, **185.9 s**, 0 rewrites) → avatar kickoff → Art Director → `applyWardrobeBibleCorrections` (clothingCheck.js) → **final contract**.
 

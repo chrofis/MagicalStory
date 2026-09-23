@@ -3625,23 +3625,16 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
   } else {
     const blind = level === 'text-blind';
     templateKey = blind ? 'storyTextAuditBlind' : 'storyTextAudit';
-    // Same fields production's extractRefinablePages carries, so the replay's
-    // THE PICTURE SHOWS is resolved from the same sources by the same resolver
-    // (sceneMetadata.resolveTextStagePictureSpec). Handing `sceneIntent` the
-    // full sceneDescription made the replay's spec LONGER than the run's — the
-    // opposite truncation — which broke comparability the other way.
-    const pages = (storyData.sceneImages || [])
-      .map(p => ({
-        pageNumber: p.pageNumber,
-        text: p.text,
-        sceneBrief: p.sceneDescription || null,
-        sceneIntent: p.sceneIntent || null,
-      }))
-      .filter(p => String(p.text || '').trim());
+    // Production's own page extractor, so the replay's THE PICTURE SHOWS and
+    // PLAN_LINES come from the same sources by the same code. The hand-built
+    // copy this replaced carried the untrimmed brief and no plan line, so the
+    // replay audited against a longer spec and "(no page plan was recorded)".
+    const { extractRefinablePages } = require('./textRefine');
+    const pages = extractRefinablePages(storyData.sceneImages || []);
     if (!pages.length) throw new Error('story has no page text to audit');
     prompt = blind
       ? H.buildTextAuditBlindPrompt(storyData, pages)
-      : H.buildTextAuditPrompt(storyData, pages, arc);
+      : H.buildTextAuditPrompt(storyData, pages, arc, { arcHints: resolveReplayArcHints(storyData) });
   }
   if (!prompt) throw new Error(`${templateKey} template unavailable`);
 
@@ -3899,8 +3892,12 @@ function applyReviewerPages(sceneExpansions, sceneReviews) {
     if (!r || r.ok === false || !Array.isArray(r._pages)) return;
     const byPage = new Map(r._pages.map(x => [x.pageNumber, x.text]));
     for (const x of sceneExpansions) {
-      const fixed = byPage.get(x.pageNumber);
-      if (!fixed) continue;
+      const reviewed = byPage.get(x.pageNumber);
+      if (!reviewed) continue;
+      // Production's rule (beatsPipeline keepDeclaredWornRows): a reviewed
+      // brief keeps every worn-state row the raw expansion declared.
+      const carry = require('./wornItems').carryForwardWornItemsInBrief(reviewed, x.fromBeats);
+      const fixed = carry ? carry.brief : reviewed;
       if (i === 0) { x.reviewedBrief = fixed; x.reviewRewrote = true; }
       else { (x.reviewedBriefs = x.reviewedBriefs || {})[r.modelKey] = fixed; }
     }
@@ -4512,6 +4509,7 @@ async function runTextRefineStage(target, { params = {}, promptOverride = null }
 
   const res = await refineStoryText(storyData, pages, {
     arc: storyData.arcReviewReport?.finalArc || storyData.beatsReviewReport?.arc || '',
+    arcHints: resolveReplayArcHints(storyData),
     model: params.model,
     auditModel: params.auditModel,
     blindAuditModel: params.blindAuditModel,
@@ -4825,6 +4823,7 @@ async function runInpaintStage(ctx, { experimentId, params = {} }) {
     era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
   });
 
+  const coverTextContract = buildEvalReplayOptions(ctx, { detectedFigures: null }).options;
   const t0 = Date.now();
   const result = await inpaintPage(imageData, evaluation, {
     consolidatedPlan: params.consolidatedPlan || consolidated.plan || null,
@@ -4842,6 +4841,10 @@ async function runInpaintStage(ctx, { experimentId, params = {} }) {
     landmarkPhotos: ctx.scene.landmarkPhotos || null,
     era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
     sceneMetadata: ctx.scene.sceneMetadata || null,
+    // A cover target's text contract, from the same resolver the Lab evals use,
+    // so a baked title is kept through the edit exactly as in production.
+    expectedText: coverTextContract.expectedText,
+    textMode: coverTextContract.textMode,
   });
   const elapsedMs = Date.now() - t0;
   if (!result?.repaired || !result?.imageData) {
@@ -7301,10 +7304,13 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
       perCharClothing: stored.perCharClothing
         || (storyData.pageClothing?.pageClothing || {})[String(x.pageNumber)]
         || meta.characterClothing || {},
+      // Production's inputs (beatsPipeline): without the rows and the bible,
+      // removal_unstated — the one SENT clothing type — can never fire here.
+      wornItems: meta.wornItems || [],
     };
   });
   const artifacts = (storyData.visualBible || {}).artifacts;
-  const before = checkScenes(checkPages, storyData.clothingRequirements, { artifacts });
+  const before = checkScenes(checkPages, storyData.clothingRequirements, { artifacts, visualBible: storyData.visualBible });
   const findingsBlock = renderFindingsBlock(before.byPage);
 
   // Beats for check 5, recovered from the stored outline's ---BEATS--- section
@@ -7407,19 +7413,24 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
     const byPage = new Map((parsed.pages || []).map(x => [x.pageNumber, x.text]));
 
     // Merge onto a COPY — the next model in the fan-out must see the same input.
-    const merged = scenes.map(x => ({
-      pageNumber: x.pageNumber,
-      brief: (byPage.get(x.pageNumber) || '').trim() || x.brief,
-    }));
+    // A reviewed brief keeps every worn-state row the stored brief declared —
+    // production's rule (beatsPipeline keepDeclaredWornRows).
+    const merged = scenes.map((x) => {
+      const reviewed = (byPage.get(x.pageNumber) || '').trim();
+      if (!reviewed) return { pageNumber: x.pageNumber, brief: x.brief };
+      const carry = require('./wornItems').carryForwardWornItemsInBrief(reviewed, x.brief);
+      return { pageNumber: x.pageNumber, brief: carry ? carry.brief : reviewed };
+    });
     const diffs = merged
       .filter((m, i) => m.brief !== scenes[i].brief)
       .map(m => ({ pageNumber: m.pageNumber, before: scenes.find(x => x.pageNumber === m.pageNumber).brief, after: m.brief }));
 
     const afterPages = checkPages.map(cp => {
       const m = merged.find(x => x.pageNumber === cp.pageNumber);
-      return { ...cp, prose: String(m.brief).split('---METADATA---')[0] };
+      const mMeta = extractSceneMetadata(m.brief) || {};
+      return { ...cp, prose: String(m.brief).split('---METADATA---')[0], wornItems: mMeta.wornItems || [] };
     });
-    const after = checkScenes(afterPages, storyData.clothingRequirements, { artifacts });
+    const after = checkScenes(afterPages, storyData.clothingRequirements, { artifacts, visualBible: storyData.visualBible });
     const REVIEWABLE = new Set(['outfit_misattributed', 'removal_unstated']);
     const sentBefore = before.findings.filter(f => REVIEWABLE.has(f.type));
     const leftAfter = after.findings.filter(f => REVIEWABLE.has(f.type));
@@ -7711,7 +7722,7 @@ function resolveStoryBeats(storyData, helpers) {
 async function runStoryBibleReplayStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
-  const { buildStoryBibleFromBeatsPrompt, getPageText, extractSceneMetadata } = require('./storyHelpers');
+  const { buildStoryBibleFromBeatsPrompt, getPageText, extractSceneMetadata, parseBeats } = require('./storyHelpers');
   const { callTextModelStreaming } = require('./textModels');
   const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
   const { UnifiedStoryParser } = require('./outlineParser/unified');
@@ -7725,7 +7736,8 @@ async function runStoryBibleReplayStage(target, { params = {}, promptOverride = 
   if (promptOverride) PROMPT_TEMPLATES.storyBibleFromBeats = promptOverride;
   let prompt;
   try {
-    prompt = buildStoryBibleFromBeatsPrompt(storyData, beats);
+    // Same arc production hands the wardrobe writer (beatsPipeline: approvedArc).
+    prompt = buildStoryBibleFromBeatsPrompt(storyData, beats, { arc: resolveReplayArc(storyData, { parseBeats }) });
   } finally {
     PROMPT_TEMPLATES.storyBibleFromBeats = orig;
   }
@@ -7812,11 +7824,19 @@ async function runClothingReviewStage(target, { params = {}, promptOverride = nu
   }
   if (!prompt) throw new Error('clothing-review template unavailable, or no used outfit in this story');
 
-  const model = params.reviewModel || MODEL_DEFAULTS.outlineReview || MODEL_DEFAULTS.outline;
+  // Production's reviewer (beatsPipeline: MODEL_DEFAULTS.clothingReviewModel),
+  // not the outline reviewer — a replay on a different model measures nothing.
+  const model = params.reviewModel || MODEL_DEFAULTS.clothingReviewModel;
   if (!TEXT_MODELS[model]) throw new Error(`Unknown model "${model}"`);
 
   const t = Date.now();
-  const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_clothing_review' });
+  // `noReasoning`: measures the reviewer with reasoning off (OpenRouter
+  // {enabled:false}) against production's default — the review is the slow
+  // call in front of the avatars (audit 2026-09-23 F2).
+  const res = await callTextModelStreaming(prompt, null, null, model, {
+    usageLabel: 'testlab_clothing_review',
+    ...(params.noReasoning === true || params.noReasoning === 'true' ? { reasoning: { enabled: false } } : {}),
+  });
   if (!String(res.text || '').trim() || res.usage?.output_tokens === 0) {
     throw new Error(`review model ${model} returned an empty response — provider failure, not a result`);
   }
@@ -7897,7 +7917,7 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
     const pages = (basePages.length ? basePages : prior.map(p => ({ pageNumber: p.pageNumber, text: p.text, sceneIntent: '', sceneBrief: '' })))
       .map(p => ({ ...p, text: priorBy.get(p.pageNumber) || p.text }));
     const t = Date.now();
-    const rr = await refineStoryText(storyData, pages, { rounds: 1, model, usageLabel: 'testlab_text_branch', arc: storyData.arcReviewReport?.finalArc || storyData.beatsReviewReport?.arc || '' });
+    const rr = await refineStoryText(storyData, pages, { rounds: 1, model, usageLabel: 'testlab_text_branch', arc: storyData.arcReviewReport?.finalArc || storyData.beatsReviewReport?.arc || '', arcHints: resolveReplayArcHints(storyData) });
     const genMs = Date.now() - t;
     const genCost = (rr.rounds || []).reduce((s, r) => s + (r.cost || 0), 0);
     const storyText = rr.pages.map(p => `--- Page ${p.pageNumber} ---\n${p.text}`).join('\n\n');
@@ -8084,7 +8104,7 @@ async function runWriterCompareStage(target, { params = {} }) {
           const parsed = SH.parsePlanResponse(r.text, []);
           arm.stages.plan = { ...WC.scorePlan(parsed.pages || [], expectedPages), cost: r.cost, elapsedMs: r.elapsedMs, outTok: r.usage?.output_tokens };
         } else if (stage === 'bible') {
-          const r = await call(SH.buildStoryBibleFromBeatsPrompt(storyData, beats), model, 'bible');
+          const r = await call(SH.buildStoryBibleFromBeatsPrompt(storyData, beats, { arc: textArgs.arc }), model, 'bible');
           const p = new UnifiedStoryParser(r.text);
           arm.stages.bible = { ...WC.scoreBible(p.extractClothingRequirements(), p.extractVisualBible(), expectedChars), cost: r.cost, elapsedMs: r.elapsedMs, outTok: r.usage?.output_tokens };
         } else if (stage === 'scenes') {
@@ -9761,7 +9781,8 @@ async function runBeatsReplanStage(target, { params = {} }) {
   // Production's counter inputs, as far as a stored story carries them (see the
   // header: the arc machine's premise figures and invented allowance do not
   // survive into the row).
-  const commissionedNames = (storyData?.characters || []).map(c => c && c.name).filter(Boolean);
+  const commission = require('./castCoverage').commissionedCast(storyData);
+  const commissionedNames = commission.all;
   const placeNames = collectPlaceNames(storyData, [
     ...(storyData?.storyCategory === 'historical'
       ? [...getHistoricalLocations(storyData.storyTopic), ...getHistoricalObjects(storyData.storyTopic)].map(e => e && e.name)
@@ -9785,7 +9806,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
   const roster = parsePlanCheckRoster(checkRes.text || '');
   const obstacles = parsePlanCheckObstacles(checkRes.text || '');
   const counters = runPlanCounters({
-    pages: standing, commissionedNames, placeNames, maxCharactersPerScene: maxCast, roster,
+    pages: standing, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, roster,
   });
   const findings = [
     ...counters.findings.map((f, i) => ({ kind: 'counter', code: f.code, line: counters.lines[i] })),

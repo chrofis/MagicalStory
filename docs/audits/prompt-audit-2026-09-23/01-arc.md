@@ -1,5 +1,16 @@
 # 01-ARC — judge findings (job_1790100385959_1nitlympp, "Das Ei im Laub", built at b03c64b0)
 
+## Status 2026-09-23
+
+Checked against staging `31fd7db0c` (after the evening fix round). FIXED = the commit that fixes it; OPEN = no fix yet, no ruling needed to start; OWNER CALL = touches a decision, a SETTLED line or has options the owner picks. Stale-doc and registry items listed at the end of each file were corrected in `a25ecb865` unless listed below.
+
+- FIXED: #1 "(none" parsed as a character — `86d6ff4a7` (open-bracket sentinel in `parseFigureList`; the create spec and arc-retell say an empty list is the heading alone).
+- FIXED (arc-audit commit, decisions.md "Arc prompts after the prompt audit", 2026-09-23): #2 one commissioned-cast definition incl. saved details (`COMMISSIONED_CAST_DEF`, owner chose the prompt route); #3 owner ruling "every child acts" replaces "No moment of their own" / "at most two carry a book" (`EVERY_CHILD_ACTS_RULE`; the "(main character)" label still differs from STORY SHAPE's mains — see OPEN); #4 language line on panel and hints; #5 central figure defined; #6 ENTRANCE / ASSUMED / SENSE are telling rules, one string each with the panel; #7 a view the commission describes stands; #8 topic guide is material, never wording, and its COSTUME field is dropped; #9 hints carry sentence anchors; #11 persona is the book's reader; B arc_hints prompt + raw reply and retell raw reply stored; C panel landmark list without DESCRIPTION lines, the two stay-together lines are one.
+- OPEN: #10 commission walk, #14 "therefore" connector, the "(main character)" label in CHARACTER DETAILS (all four) vs STORY SHAPE's two mains, the `noSplit` branch that no book can leave since the 2026-09-14 band split (tasks/BACKLOG.md).
+- OWNER CALL: #12 size-of-change exception — owner reaffirmed the 2026-09-06 restraint on 2026-09-23, no change; #13 permitting parent closing the loop; C landmark-list relevance cut (the 20-entry limit is an owner ruling of 2026-09-19); C rules stated in both the age-band file and TELLING_RULES.
+
+---
+
 Stages: arc_create (claude-opus-5, default effort) → arc_panel ×3 (grok-4.6 / deepseek-v4-pro / gpt-5.6-luna-pro, same prompt) → arc_retell (claude-opus-5) → arc_hints (grok-4.6, prompt NOT stored; rebuilt from `prompts/arc-hints.txt` + `buildArcHintsPrompt` promptBuilders.js:8646).
 Prompts as sent: create 32.7k chars, panel 23.2k, retell 53.1k, hints ≈6.5k (brief 1.8k + final arc 4.3k + source rule 0.4k + char details 2.4k).
 Create committed Arc 2 ("Turi"); retell rebuilt it (shop-window trip cut); final critique = 5 × MINOR.

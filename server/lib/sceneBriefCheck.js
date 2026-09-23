@@ -534,6 +534,12 @@ function citedBaseIds(metadata) {
  * A figure carried in `characters[]` counts as cited: a secondary character on
  * the roster is in the frame already, and `objects[]` is not where they belong.
  * Compared with `isSameFigureName`, for the same reason check A is.
+ *
+ * A garment with a `wornItems` row on this page counts as present too
+ * (2026-09-23): the row IS the page's declaration of it, worn or off, and a
+ * garment lives in `wornItems`, not `objects[]`. Without this, every page of a
+ * worn outer layer faulted — 11 of 11 `vb_page_uncited` findings on staging
+ * job_1790100385959_1nitlympp — and the review padded `objects[]` to match.
  */
 function checkBiblePageTable(page, metadata, visualBible) {
   const n = Number(page && page.pageNumber);
@@ -543,6 +549,8 @@ function checkBiblePageTable(page, metadata, visualBible) {
   const { vbEntityCoversPage } = require('./iterateBeat');
   const { elementDisplayLabel } = require('./vbIdGuard');
   const cited = citedBaseIds(metadata);
+  const { wornItemsFromMetadata } = require('./wornItems');
+  const declaredWorn = new Set(wornItemsFromMetadata(metadata).map(w => String(w.id).toUpperCase()));
   const onCast = ((metadata && Array.isArray(metadata.characters)) ? metadata.characters : [])
     .map(c => String(typeof c === 'string' ? c : (c && c.name) || '').trim()).filter(Boolean);
   const uncited = [];
@@ -557,7 +565,7 @@ function checkBiblePageTable(page, metadata, visualBible) {
       // against a cast entry "Mother" is one name under isSameFigureName, and
       // reading that as a citation reported the creature off-page on a page it
       // was never on (staging job_1789163494908_kc2joi4ax p2).
-      if (!cited.has(id) && !onCast.some(name => isSameFigureName(name, entry.name))) uncited.push({ id, entry });
+      if (!cited.has(id) && !declaredWorn.has(id) && !onCast.some(name => isSameFigureName(name, entry.name))) uncited.push({ id, entry });
     } else if (cited.has(id)) {
       offpage.push({ id, entry, handle: cited.get(id) });
     }
@@ -747,7 +755,8 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
   }
 
   // G — the VB element budget (owner, 2026-09-06; FOUR since 2026-09-11,
-  // VB_ELEMENT_BUDGET): packable Visual Bible elements on a page. Counted and ranked in
+  // VB_ELEMENT_BUDGET): packable Visual Bible elements on a page — a garment
+  // its owner's avatar wears is not one. Counted and ranked in
   // vbElementBudget.js against the same set and the same priority order the
   // reference selection uses, so the finding names exactly the elements the
   // packer would keep and drop.

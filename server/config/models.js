@@ -939,6 +939,10 @@ const MODEL_DEFAULTS = {
   // correctness wins. Set SHEET_EVAL_MODEL=qwen3-vl to trade it back for cost.
   // Must be a TEXT_MODELS key.
   sheetEvalModel: process.env.SHEET_EVAL_MODEL || 'gemini-2.5-flash',
+  // The independent second look at every CRITICAL/MAJOR absence claim before it
+  // may take a repair slot (absenceCheck.secondLookAbsenceClaims, 2026-09-23).
+  // Sees the image and the claims only. Must be a Gemini model id.
+  absenceSecondLookModel: 'gemini-2.5-flash',
   // The BODY-row head check is NOT done by Gemini at all: any VLM hallucinates a
   // head on a headless torso because head+body co-occur in training (POPE-
   // adversarial object hallucination — verified deterministically, even

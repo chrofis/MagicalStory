@@ -1469,11 +1469,36 @@ function parseFixableIssues(parsedJson) {
       // The quality judge's declared landmark subject, passed through when it
       // answered; absent stays absent, which the guard reads as UNDECLARED.
       ...(i.landmark_element === undefined ? {} : { landmark_element: i.landmark_element }),
+      // The judge's own "this is not in the picture" flag — read by the absence
+      // second look (absenceCheck.js), never inferred from the description.
+      ...(i.absent === true ? { absent: true } : {}),
     }));
 }
 
 /** Stamped on every finding this file's arithmetic authored (see derivePresenceFinding). */
 const PRESENCE_DERIVED_MARKER = 'presence-arithmetic';
+
+// The absence second look's vision call (absenceCheck.js). Gemini only, same
+// generation settings as the quality judge; the reply is returned raw.
+async function callAbsenceJudge(parts, modelId, apiKey) {
+  const resp = await withRetry(() => fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: { temperature: EVAL_TEMPERATURE, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: EVAL_THINKING_BUDGET } },
+        safetySettings: require('./images').GEMINI_SAFETY_SETTINGS,
+      }),
+    }), { maxRetries: 2, baseDelay: 2000 });
+  if (!resp.ok) throw new Error(`second look HTTP ${resp.status}`);
+  const j = await resp.json();
+  const text = j?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '';
+  if (!text) throw new Error(`second look returned no text (finishReason ${j?.candidates?.[0]?.finishReason || 'none'})`);
+  const um = j?.usageMetadata || {};
+  return { text, usage: { input_tokens: um.promptTokenCount || 0, output_tokens: um.candidatesTokenCount || 0 } };
+}
 
 /** The presence types the derivation owns outright once it has spoken. */
 const PRESENCE_COUNT_TYPES = new Set(['missing_character', 'extra_character']);
@@ -1581,6 +1606,29 @@ function presenceCounterName(presence, spoke) {
   return spoke ? `presence_${presence?.outcome}${reason}` : `presence_declined${reason}`;
 }
 
+// Is this roster name a non-human entry? The roster's own list first, then the
+// resolver for a short-form token the list spells out in full. Without an index
+// the canonical match is the whole answer. Shared by the presence derivation and
+// the duplicate cap (castPeopleCount) so both count people the same way.
+function castNonHumanTest(cast, castIndex = null) {
+  const { canonicalName, resolveEntity, isNonHuman } = getCastResolver();
+  const nonHumanSet = new Set((Array.isArray(cast?.nonHumanNames) ? cast.nonHumanNames : [])
+    .map(n => canonicalName(n)).filter(Boolean));
+  return (n) => {
+    const k = canonicalName(n);
+    if (!k) return false;
+    if (nonHumanSet.has(k)) return true;
+    return castIndex ? isNonHuman(resolveEntity(n, castIndex)) : false;
+  };
+}
+
+// People on the declared roster; null when the roster was not declared.
+function castPeopleCount(cast, castIndex = null) {
+  if (!cast || cast.declared !== true) return null;
+  const isNH = castNonHumanTest(cast, castIndex);
+  return (Array.isArray(cast.names) ? cast.names : []).filter(n => !isNH(n)).length;
+}
+
 function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, detectorFigures = null, referenceNames, castIndex = null } = {}) {
   // RESOLVE (castIndex, when the caller has one) + COMPARE (everything else:
   // both sides of every name test below are strings this same run produced).
@@ -1617,17 +1665,7 @@ function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, de
   //
   // There is deliberately no non-human presence check to replace this: a
   // missing fairy simply stops being arithmetic evidence (owner).
-  const nonHumanSet = new Set((Array.isArray(cast.nonHumanNames) ? cast.nonHumanNames : [])
-    .map(n => canonicalName(n)).filter(Boolean));
-  // Tolerant: the roster's own list first, then the resolver for a short-form
-  // token the list spells out in full. Without an index the canonical match is
-  // the whole answer, exactly as before.
-  const isNonHumanName = (n) => {
-    const k = canonicalName(n);
-    if (!k) return false;
-    if (nonHumanSet.has(k)) return true;
-    return castIndex ? isNonHuman(resolveEntity(n, castIndex)) : false;
-  };
+  const isNonHumanName = castNonHumanTest(cast, castIndex);
   const refOf = (m) => canonicalName(m?.reference || '');
   const isUnnamed = (r) => !r || r === 'unmatched' || r === 'unknown';
   const evaluatorPeople = figs.length - mts.filter(m => isNonHumanName(m?.reference)).length;
@@ -1960,13 +1998,49 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // not defects. Tell the fidelity evaluators so they don't penalize those,
     // while still catching placement / text / identity problems.
     const coverEvalNote = '\n\nCOVER: a book-cover portrait. Characters facing or looking at the viewer is intended — do not deduct for gaze direction or for facing the camera. A flat 2D title is acceptable — do not deduct for the title not being three-dimensional. Still flag implausible placement (a figure on a surface that cannot support it), wrong or garbled text on objects, and missing, extra, or mismatched characters.';
+
+    // THE COVER TEXT CONTRACT, resolved ONCE, before any judge launches. It
+    // arrives STRUCTURED (evalOptions.expectedText / textMode) from the
+    // pipeline's cover pseudo-page record and the cover iterate path. The
+    // prompt-regex read remains for callers that evaluate against the raw
+    // generation prompt (`Paint "<title>" in the upper third`) — without it a
+    // misspelled painted title ("gelhen") once sailed through at score 85.
+    // The resolved string becomes a REQUIRED TEXT item below, so every judge
+    // (quality, semantic, compliance) and the consolidator see the title as
+    // required lettering. It used to reach the quality judge alone, as a note
+    // outside its TEXT RULES slot: the semantic judge then filed a correctly
+    // painted title as unrequested text and the repair erased it (staging
+    // job_1790100385959_1nitlympp front cover).
+    const coverTextMode = isCover ? (evalOptions.textMode || null) : null;
+    let coverExpectedText = isCover ? (evalOptions.expectedText || null) : null;
+    if (isCover && !coverExpectedText && coverTextMode !== 'appOverlay' && originalPrompt) {
+      const titleMatch = originalPrompt.match(/MUST include this exact (?:title |dedication )?text:\s*"([^"]+)"/i);
+      const magicalMatch = originalPrompt.match(/MUST include this exact text:\s*"(magicalstory\.ch)"/i);
+      const paintMatch = originalPrompt.match(/Paint\s+"([^"]+)"\s+(?:in|as)\b/i);
+      coverExpectedText = titleMatch?.[1] || magicalMatch?.[1] || paintMatch?.[1] || null;
+      if (coverExpectedText) coverExpectedText = coverExpectedText.replace(/<\/?user_input>/g, '').trim();
+    }
+    // The three cover notes live in prompts/cover-evaluation-notes.txt
+    // (sections COVER_NOTE / TEXT_NOTE_APP_OVERLAY / COVER_TEXT) so the cover
+    // generator/critic pair is a registry set over file paths.
+    const coverNotes = isCover ? promptSections(PROMPT_TEMPLATES.coverEvaluationNotes) : {};
+    const coverHasPaintedText = isCover && coverTextMode !== 'appOverlay' && !!coverExpectedText;
+    // Loud, not "undefined": these are interpolated straight into the judges'
+    // prompts, so a missing section would put the literal string "undefined"
+    // in front of the evaluator.
+    if (coverHasPaintedText && !coverNotes.COVER_TEXT) {
+      throw new Error('evaluateImageQuality: cover-evaluation-notes template has no COVER_TEXT section');
+    }
+    const coverTextNote = coverHasPaintedText ? coverNotes.COVER_TEXT : '';
+
     // A cover has no story prose, so its fidelity reference is the raw cover
     // brief — metadata block, VB ids and all. Pages get theirs stripped above;
-    // this branch never did.
+    // this branch never did. A cover with painted lettering also carries the
+    // COVER_TEXT note, the same one the quality judge is given.
     const fidelityRef = storyText || (isCover && sceneHint
       ? require('./vbIdGuard').scrubVbIds(
           getStoryHelpers().stripSceneMetadata(sceneHint) || sceneHint,
-          evalOptions.visualBible || null) + coverEvalNote
+          evalOptions.visualBible || null) + coverEvalNote + (coverTextNote ? `\n\n${coverTextNote}` : '')
       : null);
     const runFidelity = !!fidelityRef && (evaluationType === 'scene' || isCover);
 
@@ -2041,14 +2115,22 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // below compares the blind inventory against exactly this, never a
     // second derivation of what the page asked for.
     let declaredTexts = [];
+    // ...and the items themselves, returned on the result so the consolidator
+    // is told the same required lettering the judges were.
+    let requiredTextItems = [];
     try {
       const requiredTextLib = require('./requiredText');
       const ids = Array.isArray(evalOptions.sceneMetadata?.objects) ? evalOptions.sceneMetadata.objects : [];
-      const required = requiredTextLib.collectRequiredTexts({
+      // A cover's painted title / dedication / brand line is one more
+      // required string (coverRequiredTexts), on the same channel.
+      const required = requiredTextLib.collectImageRequiredTexts({
         objectIds: ids,
         visualBible: evalOptions.visualBible || null,
         language: evalOptions.language || evalOptions.storyMeta?.language || 'en',
+        expectedText: coverExpectedText,
+        textMode: coverTextMode,
       });
+      requiredTextItems = required;
       declaredTexts = required.map(r => r.text).filter(Boolean);
       requiredTextBlock = requiredTextLib.buildRequiredTextRulesBlock(required);
     } catch (err) {
@@ -2317,52 +2399,30 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // artStyleForEval / clothingContractBlock: built above, before the
     // parallel evals started, so all three evaluators receive them.
 
-    // For cover evaluations: strip art style noise and prepend expected text prominently
+    // For cover evaluations: strip art style noise and prepend the cover notes.
+    // The contract (coverTextMode / coverExpectedText / coverTextNote) was
+    // resolved once above, before the parallel judges launched.
     if (evaluationType === 'cover' && promptForEval) {
-      // Expected text arrives STRUCTURED (evalOptions.expectedText / textMode)
-      // from the pipeline's cover pseudo-page record. Prompt-regex extraction
-      // remains as fallback for callers that evaluate against the raw
-      // generation prompt (the templates say `Paint "{STORY_TITLE}" in the
-      // upper third` etc.) — without the Paint pattern a misspelled painted
-      // title ("gelhen") once sailed through at score 85.
-      const textMode = evalOptions.textMode || null;
-      let expectedText = evalOptions.expectedText || null;
-      if (!expectedText && textMode !== 'appOverlay') {
-        const titleMatch = promptForEval.match(/MUST include this exact (?:title |dedication )?text:\s*"([^"]+)"/i);
-        const magicalMatch = promptForEval.match(/MUST include this exact text:\s*"(magicalstory\.ch)"/i);
-        const paintMatch = promptForEval.match(/Paint\s+"([^"]+)"\s+(?:in|as)\b/i);
-        expectedText = titleMatch?.[1] || magicalMatch?.[1] || paintMatch?.[1];
-        if (expectedText) expectedText = expectedText.replace(/<\/?user_input>/g, '').trim();
-      }
-
       // Strip art style description (noise for evaluator)
       promptForEval = promptForEval.replace(/\*\*ART STYLE[^*]*\*\*[^*]*(?=\*\*|$)/s, '');
 
-      // The three cover notes live in prompts/cover-evaluation-notes.txt
-      // (sections COVER_NOTE / TEXT_NOTE_APP_OVERLAY / TEXT_RULES) so the
-      // cover generator/critic pair is a registry set over two file paths.
-      const coverNotes = promptSections(PROMPT_TEMPLATES.coverEvaluationNotes);
-      // Loud, not "undefined": these are interpolated straight into the judge's
-      // prompt, so a missing template would put the literal string "undefined"
-      // in front of the evaluator. Same guard the plate judge carries.
       if (!coverNotes.COVER_NOTE) throw new Error('evaluateImageQuality: cover-evaluation-notes template not loaded (COVER_NOTE)');
 
       // Cover portraits: viewer-gaze and a flat title are intended, not defects.
       promptForEval = `${coverNotes.COVER_NOTE}\n\n${promptForEval}`;
 
-      if (textMode === 'appOverlay' && !coverNotes.TEXT_NOTE_APP_OVERLAY) {
+      if (coverTextMode === 'appOverlay' && !coverNotes.TEXT_NOTE_APP_OVERLAY) {
         throw new Error('evaluateImageQuality: cover-evaluation-notes template has no TEXT_NOTE_APP_OVERLAY section');
       }
-      if (textMode !== 'appOverlay' && expectedText && !coverNotes.TEXT_RULES) {
-        throw new Error('evaluateImageQuality: cover-evaluation-notes template has no TEXT_RULES section');
-      }
-      if (textMode === 'appOverlay') {
+      if (coverTextMode === 'appOverlay') {
         // Mode B: art is textless; title/dedication/branding composited by the
         // app after persistence. Was previously appended to the pseudo-page's
         // sceneDescription as string surgery (server.js pipeline entry).
         promptForEval = `${coverNotes.TEXT_NOTE_APP_OVERLAY}\n\n${promptForEval}`;
-      } else if (expectedText) {
-        promptForEval = `${fillTemplate(coverNotes.TEXT_RULES, { EXPECTED_TEXT: expectedText })}\n\n${promptForEval}`;
+      } else if (coverTextNote) {
+        // Painted cover lettering: the string itself rides {TEXT_RULES}
+        // (requiredTextBlock); this note says what it is and what missing it costs.
+        promptForEval = `${coverTextNote}\n\n${promptForEval}`;
       }
     }
 
@@ -3202,7 +3262,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             // it sees; anything readable the page did not declare is a
             // rendered_text finding. Its old reader, the blind compliance judge,
             // is switched off, and the sighted judge missed a full-width caption
-            // on dragon run 6 p6. Scenes only: a cover's title has its own path.
+            // on dragon run 6 p6. Scenes only: covers are judged pre-typography
+            // in appOverlay mode, and a painted cover title is a REQUIRED TEXT
+            // item (declaredTexts) the judges check through D-33.
             try {
               const lettering = evaluationType !== 'scene' ? [] : require('./letteringCheck').checkUndeclaredLettering({
                 lettering: p1Result.lettering, declared: declaredTexts,
@@ -3286,6 +3348,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // never repaired despite -30 worth of real visual defects).
       let threeStageResult = null;
       let visualScore = score; // Quality score AFTER any three-stage merge
+      let secondLook = null;
       if (threeStagePromise) {
         try {
           threeStageResult = await threeStagePromise;
@@ -3327,6 +3390,31 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         }
       }
 
+      // TWO SEVERITY GUARDS ON "IT IS NOT THERE" (owner, 2026-09-23; see
+      // absenceCheck.js). Both run before the score below and before the
+      // consolidator picks repair slots, and both change a severity only.
+      // (1) duplicate_character is advisory when the detector counted no more
+      //     people than the cast holds.
+      // (2) every CRITICAL/MAJOR absence claim, from the quality and semantic
+      //     judges, gets one independent look at the picture; unconfirmed →
+      //     advisory. Detector-derived presence findings are not re-asked.
+      if (evaluationType === 'scene' || evaluationType === 'cover') {
+        const absence = require('./absenceCheck');
+        const pageLabel = pageContext ? `[${pageContext}] ` : '';
+        const capped = absence.capDuplicatesByDetector(fixableIssues, {
+          detectedPeopleCount, castPeopleCount: castPeopleCount(expectedCast, castIdx),
+        });
+        if (capped) log.info(`👥 [DUPLICATE-CAP] ${pageLabel}${capped} duplicate_character finding(s) capped to advisory — detector people ${detectedPeopleCount} ≤ cast ${castPeopleCount(expectedCast, castIdx)}`);
+        const secondLookModel = MODEL_DEFAULTS.absenceSecondLookModel;
+        secondLook = await absence.secondLookAbsenceClaims({
+          imageData,
+          lists: [fixableIssues, semanticResult?.semanticIssues],
+          presenceMarker: PRESENCE_DERIVED_MARKER,
+          pageLabel,
+          callJudge: (parts) => callAbsenceJudge(parts, secondLookModel, apiKey),
+        });
+      }
+
       // THE SCORE DERIVES FROM THE CURRENT ISSUE LIST — recomputed here, once,
       // over whatever `fixableIssues` finally holds. It used to be recomputed
       // only inside the three-stage merge branch, which was fine while that
@@ -3353,8 +3441,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       const semanticUsage = semanticResult?.usage || {};
       const threeStageUsage = threeStageResult?.usage || {};
       const totalUsage = {
-        input_tokens: qualityInputTokens + (p1Usage?.inputTokens || 0) + (semanticUsage.input_tokens || 0) + (threeStageUsage.threeStage_input_tokens || 0),
-        output_tokens: qualityOutputTokens + (p1Usage?.outputTokens || 0) + (semanticUsage.output_tokens || 0) + (threeStageUsage.threeStage_output_tokens || 0),
+        input_tokens: qualityInputTokens + (p1Usage?.inputTokens || 0) + (semanticUsage.input_tokens || 0) + (threeStageUsage.threeStage_input_tokens || 0) + (secondLook?.usage?.input_tokens || 0),
+        output_tokens: qualityOutputTokens + (p1Usage?.outputTokens || 0) + (semanticUsage.output_tokens || 0) + (threeStageUsage.threeStage_output_tokens || 0) + (secondLook?.usage?.output_tokens || 0),
         thinking_tokens: qualityThinkingTokens,
         p1_input_tokens: p1Usage?.inputTokens || 0,
         p1_output_tokens: p1Usage?.outputTokens || 0,
@@ -3385,6 +3473,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         reasoning,
         rawOutput: responseText,              // Full unparsed API response (for dev testing)
         evalTemplateHash,                     // Template version that produced this score
+        // The required lettering every judge was told about (VB strings + a
+        // painted cover title). The consolidator reads it so a repair plan never
+        // removes a string the page must show.
+        requiredTexts: requiredTextItems,
         issuesSummary: combinedIssuesSummary,
         textIssue,
         fixTargets: jsonFixTargets,       // Legacy format with bboxes (backwards compat)
@@ -3409,6 +3501,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         styleGate,
         semanticResult,                   // Full semantic evaluation result (if available)
         threeStageResult,                 // Full three-stage evaluation result (if available)
+        secondLook,                       // absence second look {checked, capped, confirmed, error} (null = not run)
         usage: totalUsage,
         modelId: modelId
       };
@@ -3499,6 +3592,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         reasoning,
         rawOutput: responseText,              // Full unparsed API response
         evalTemplateHash,                     // Template version that produced this score
+        // The required lettering every judge was told about (VB strings + a
+        // painted cover title). The consolidator reads it so a repair plan never
+        // removes a string the page must show.
+        requiredTexts: requiredTextItems,
         issuesSummary,
         fixTargets,
         semanticResult,
@@ -3570,6 +3667,8 @@ module.exports = {
   reconcileDetectorCast,
   parseFixableIssues,
   derivePresenceFinding,
+  castPeopleCount,
+  callAbsenceJudge,
   supersedePresenceFindings,
   PRESENCE_DERIVED_MARKER,
   PRESENCE_COUNT_TYPES,

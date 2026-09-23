@@ -90,6 +90,8 @@ Tag every `fixable_issues[]` entry with a severity — the pipeline computes the
 - Wrong main action: MAJOR
 - Missing key object: MAJOR
 - A named object the scene has one of, rendered twice or more: MAJOR
+
+A missing claim names in `description` the figure or region you looked at, and sets `absent: true`. An item missing from your own `visible` summary is not evidence it is missing from the picture.
 - Wrong proportions / age band for a named character (grade-school / teenage / adult / senior mismatch): MAJOR
 - Wrong gaze (TWO characters declared as interacting turned fully away from each other, OR character declared as watching a specific named object looking clearly elsewhere): MODERATE. Per-figure gaze drift is not a deduction
 - Wrong clothing type on a character: MODERATE
@@ -111,7 +113,7 @@ Return JSON only. Put every issue you find in the `fixable_issues` array. Do not
 
 **Output rules (strict):**
 - Every `fixable_issues[]` entry MUST also carry `landmark_element` whenever LANDMARK CONTEXT above is not `(none)`. That block defines the field — answer it there, never omit it.
-- Every `fixable_issues[]` entry MUST carry `type`, `severity`, `description`, `fix`, `character` and `element`: the id from PAGE ELEMENTS the finding is about, copied exactly, or null when it is about none of them. A finding that an object is missing, wrong, misplaced or not being handled as declared names that object's id — the repair is handed the picture of that element and can paint nothing it has not been shown. `type` MUST come from this closed list — it routes the repair, and an unlisted value is discarded as unroutable:
+- Every `fixable_issues[]` entry MUST carry `type`, `severity`, `description`, `fix`, `character`, `absent` (`true` when it says something is not in the picture, else `false`) and `element`: the id from PAGE ELEMENTS the finding is about, copied exactly, or null when it is about none of them. A finding that an object is missing, wrong, misplaced or not being handled as declared names that object's id — the repair is handed the picture of that element and can paint nothing it has not been shown. `type` MUST come from this closed list — it routes the repair, and an unlisted value is discarded as unroutable:
   `action_interaction` (wrong or missing declared interaction, wrong main action, wrong pose, and ORIENTATION — a figure turned away from the person or object it is engaging; never an axis, never left vs right) · `missing_character` · `duplicate_identity` (unnamed extras rendered with a named character's own hair, face and contract garments; never for uniformed or costumed groups) · `missing_element` (a named object, animal or landmark absent) · `object_presence` (present but wrong, misplaced, or unrequested) · `object_count` · `duplicate_object` (a prop the scene has ONE of rendered twice or more) · `setting` (wrong location, background, weather or time of day) · `character_identity` (wrong person, age or hair) · `clothing` (which garment TYPE it is) · `garment_colour` (right garment type, wrong main colour) · `clothing_detail` (right garment, different cut: sleeve length, collar, cuff, hem) · `scale` · `figure_completeness` · `anatomy` · `rendered_text` · `required_text` (a string TEXT RULES requires is absent, misspelled or out of order; skip when TEXT RULES is empty) · `viewer_address` (posing for the camera when the beat or a declared interaction needs the figure's attention) · `naturalness` (anything else)
   Use ONE type per entry. Never invent a value, never join two with an underscore, comma or slash.
 - `character` names WHICH FIGURE the finding is about, on every finding that belongs to one — clothing, proportions, gaze, viewer address, pose, orientation, a declared interaction, an object a figure is handling. Use the name exactly as the SCENE_HINT writes it; for a figure the hint leaves unnamed, use a stable two-or-three-word description (`the guard`, `the older sibling`). Spell one figure identically on every entry. Two figures with the same defect are two entries with different `character` values; one figure's defect is never split across entries. Null only when the finding belongs to no figure — the setting, the weather, the frame as a whole.
@@ -140,8 +142,9 @@ Return JSON only. Put every issue you find in the `fixable_issues` array. Do not
       "severity": "MAJOR",
       "character": null,
       "element": "ART001",
-      "description": "Map not visible — girl should be giving it to boy",
-      "fix": "Add the folded map into the girl's outstretched hands."
+      "description": "Map not visible in the girl's hands or anywhere around the pair",
+      "fix": "Add the folded map into the girl's outstretched hands.",
+      "absent": true
     }
   ],
   "verdict": "PASS"

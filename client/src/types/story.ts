@@ -1078,6 +1078,8 @@ export interface ArcRound {
   /** Dev-mode inspection: what this round actually asked (2026-09-11). */
   panelPrompt?: string | null;
   retellPrompt?: string | null;
+  /** The re-telling's raw reply, before parsing (2026-09-23). */
+  retellRaw?: string | null;
 }
 
 /**
@@ -1109,6 +1111,10 @@ export interface ArcReviewReport {
   keeping?: string;
   maxSeverity?: string | null;
   arcHints?: string;
+  /** The hint pass: model, the prompt it was sent and its raw reply (2026-09-23). */
+  hintsModel?: string;
+  hintsPrompt?: string | null;
+  hintsRaw?: string | null;
 }
 
 /**

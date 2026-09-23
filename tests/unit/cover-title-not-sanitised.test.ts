@@ -29,7 +29,7 @@ describe('sanitizeVbIdsInPrompt: baked cover title is never rewritten', () => {
   it('keeps the quoted title and the prose verbatim', () => {
     const prompt = [
       'Noah holds a sleeve of Crackers, his Pirate hat tipped forward.',
-      '**TITLE:**',
+      '**REQUIRED TEXT:**',
       TITLE_LINE,
     ].join('\n');
     const out = sanitizeVbIdsInPrompt(prompt, visualBible, -1);

@@ -21,6 +21,178 @@ superseded and link forward.
 
 ---
 
+## 2026-09-23 — Absence findings: a duplicate needs the detector's room for it, a CRITICAL/MAJOR "missing" needs a second look, a false-finding drop is never charged
+
+**Context:** Staging `job_1790100385959_1nitlympp` p12 v0. The quality judge listed a figure on empty
+ground (box x .29-.49, y .38-.62), matched it to Max and filed `duplicate_character` CRITICAL; it filed
+Kiaan's boots (`clothing` MAJOR) and the gilet (`missing_element` MAJOR) as missing — all three are drawn.
+The detector saw exactly the four boys. The three false findings took the repair slots, the semantic
+judge's real findings were capped out, the inpaint changed nothing, and v0 shipped with a stored
+"unrepaired CRITICAL". The consolidator dropped the gilet as a false finding and kept it in
+`deduped_issues` (the scoring source) in the same plan.
+
+**Decision (owner chose both shapes):**
+1. Prompts. `image-evaluation.txt` D-03: a duplicate cites two `figures` ids with non-overlapping
+   `body_bbox`, each matched to that name, or there is none. N-07b: an item missing from your own
+   `figures` entry is not evidence it is missing from the picture. Every finding carries `absent`
+   (true when it says something is not in the picture) and a missing claim names the figure or region
+   looked at. `image-semantic.txt` gets the same absence rule and field. The compliance judge already
+   files every absence as `unverified_absence` (MINOR cap) and is off; not changed.
+2. Code, severity only (`server/lib/absenceCheck.js`, called in `evaluateImageQuality` before the score
+   and before consolidation): `duplicate_character` → MINOR when the detector's people count is at or
+   below the roster's people count (`castPeopleCount`, same non-human test as the presence
+   derivation). Every CRITICAL/MAJOR absence claim (type `missing_element` / `missing_character` /
+   `accessory_missing`, or `absent: true`; detector-derived presence findings excluded) from the
+   quality and semantic judges gets ONE independent Gemini call per page (`absence-second-look.txt`,
+   image + claims only, `MODEL_DEFAULTS.absenceSecondLookModel`); anything but a confirmed "no" →
+   MINOR. Original severity kept as `severityBeforeCap`, the answer as `secondLook`. A failed call
+   leaves the claims at their severity and records the error on each (logged as ERROR).
+3. Consolidator. Rule 2a `finding_contradicts_brief`; a rule-2/2a drop never appears in
+   `deduped_issues`, and every drop carries `type` + `character`. `enforceNotADefectDrops` removes a
+   deduped entry of the same type+subject when the model keeps one anyway (reason CODE, not text).
+
+**Evidence:** Replay on p12's stored eval + stored detection: detector people 4 (Max, Levin, Julian,
+Kiaan; Turi, Nia non-human) vs cast 4 → the duplicate becomes MINOR. One paid second look on the stored
+v0 image (gemini-2.5-flash, 524 in / 65 out tokens): boots "yes — Kiaan is wearing brown lace-up boots",
+gilet "yes — lying on the ground next to the lamppost" → both MINOR. All three false findings leave the
+repair slots; the two real semantic MAJORs remain. The stored plan's drops carry no type (pre-contract),
+so the consolidator guard is a no-op on it; with a typed drop it removes the gilet.
+
+**Rationale:** Classification stays in the prompts; code reads a type, a detector count, a second
+judge's yes/no and the consolidator's own reason code — never a description. "Unclear" is capped
+because a claim that takes a paid repair must be confirmed, not merely not refuted.
+
+**Touched:** `server/lib/absenceCheck.js` (new), `server/lib/evalPipeline.js`,
+`server/lib/feedbackConsolidator.js`, `server/config/models.js`, `server/services/prompts.js`,
+`prompts/absence-second-look.txt` (new), `prompts/image-evaluation.txt`, `prompts/image-semantic.txt`,
+`prompts/feedback-consolidator.txt`, `tests/unit/absence-severity-guards.test.ts`.
+
+**Status:** ✅ active.
+
+## 2026-09-23 — Every avatar-sheet judge rejects a copied verdict; the cell-4/8 rear turn is one constant for generator and judges
+
+**Context:** Staging `job_1790100385959_1nitlympp` (dragon run 6). The three pass-1 row judges (heads,
+bodies, identity, gemini-2.5-flash) returned their template's worked example on 6 of 6 sheets — every
+reason string and every score (9/9/9/10) — over sheets with a duplicated profile in cells 3/4 and an
+invented polo collar that their own rules score 1-3. Pass 1 had no working quality gate. The pass-2
+style judge had been fixed for this on 2026-08-12 (placeholder example + `isEchoedStyleVerdict`), but the
+fix never reached the row templates, and the same run showed a second shape the old guard missed: the
+pass-2 layout reason was TASK 1's own sentences on 5 of 6 sheets, including a sheet whose top row is
+knee-length figures. Separately, the row generators ask cell 4 for a REAR TURN (one eye and cheek
+toward camera) while the bodies, identity and style judges were told the cell is a plain "back", and the
+style judge that "cell 8 needs no face" — so flat backs and second profiles passed.
+
+**Decision:** (1) All four sheet templates (`sheet-row-heads-eval`, `sheet-row-bodies-eval`,
+`sheet-row-identity-eval`, `sheet-2x4-style-eval`) show `<placeholder>` examples only, and ask for
+per-cell observations (angles and pass-2 layout: "cellN: <facing>"). (2) One guard,
+`isEchoedJudgeVerdict(verdict, promptSent)` in `character2x4Sheet.js`, behind one call helper
+`askSheetJudge` used by all four judges: a verdict is unjudged when any reason carries a placeholder,
+opens with a pre-2026-09-23 example string, or consists of two or more sentences all taken from the prompt
+sent. Unjudged → re-ask once → throw; the pass-1 caller keeps the sheet and records `evalFailed`
+(existing contract), pass 2 counts the attempt as unjudged (existing contract). (3) `REAR_TURN_POSE` is
+one constant filled into both live row generators and all four judges; the style judge now checks that
+cell 8 keeps the eye and cheek Image 2 shows (pass 2 is judged on preservation, not on a pose it cannot
+change).
+
+**Rationale:** An eval that can hand back its own example is no gate, and the guard has to be shared or
+the next judge added misses it again (the 2026-08-12 fix proves the hazard). A single restated criterion
+is not flagged: that is too close to an honest one-line pass to fail a sheet over. Paraphrased echoes
+still pass the guard; the per-cell reason shape is what makes those hard to produce without looking.
+
+**Evidence:** Replay of the guard over the run's stored verdicts: heads 6/6 and bodies 6/6 flagged,
+identity 5/6 (the sixth paraphrased "apparent age"), pass-2 style 4/6 against the template it was sent
+(the two misses are paraphrases). One paid re-run of the three pass-1 judges with the new templates on
+Kiaan's stored pass-1 sheet (gemini-2.5-flash, ~5k tokens): no echo, no re-ask, per-cell angle and
+head/feet reasons that differ from any template text, scores 10/10/9.
+
+**Touched:** `server/lib/character2x4Sheet.js`, `prompts/sheet-row-heads-eval.txt`,
+`prompts/sheet-row-bodies-eval.txt`, `prompts/sheet-row-identity-eval.txt`,
+`prompts/sheet-2x4-style-eval.txt`, `scripts/admin/sibling-registry.json` (new set
+`avatar-sheet-generator-vs-critic`), `tests/unit/sheet-judge-echo-guard.test.ts`.
+
+**Status:** ✅ active. Supersedes the guard half of 2026-08-12 "de-echoed style eval" (now shared).
+
+## 2026-09-23 — A figure list's "none" is recognised in any bracket; the arc is told how an empty list is written
+
+**Context:** Same run. The arc critique wrote its empty premise list as `- (none — the premise supplies no
+named figure …)`. `parseFigureList` split on " — " and kept `(none`, because `isNegativeFigureAnswer`
+only removed a CLOSED trailing parenthetical (the 2026-09-17 fix for `- none (…)`). "(none" became a
+commissioned character and drew `NO_FOCAL_PAGE` and `UNDER_COVERED_CHARACTER` against itself on both plan
+rounds — two unclearable MUST-FIX lines that biased the re-plan convergence test.
+
+**Decision:** The sentinel is tested on the answer's head: a leading "(" is dropped and the text is cut
+at the first "(", ",", ";" or ":". Both lists (premise and invented) share the parser. `arcCritiqueSpec`
+and `arc-retell.txt` now say an empty list is the heading alone, with no dash line.
+
+**Evidence:** Replay on the stored arc create reply and the retell prompt: premise names `["(none"]` →
+`[]`; invented lists unchanged (`[Fünkli]`, `[Turi, Flämmli]`).
+
+**Touched:** `server/lib/promptBuilders.js`, `prompts/arc-retell.txt`,
+`tests/unit/arc-invented-figures.test.ts`.
+
+**Status:** ✅ active.
+
+---
+
+## 2026-09-23 — A painted cover title is REQUIRED TEXT on every side: all judges, the consolidator and the repair are told it
+
+**Context:** Staging `job_1790100385959_1nitlympp` shipped its front cover with no title. v0 had
+"Das Ei im Laub" painted correctly. The semantic judge flagged it as CRITICAL unrequested
+`rendered_text`: its IMAGE_PROMPT carried the "No lettering" preamble, and its TEXT RULES allow-list
+was empty. The consolidator had been told only the scene, so it wrote "Remove the text '…'". The
+inpaint erased the title, and the titleless v1 then scored 100 from both judges. The cause was that
+the cover's text contract (`expectedText` / `textMode`) reached only the quality judge, and only as
+a note prepended to USER_PROMPT. The structured `{TEXT_RULES}` slot is built from Visual Bible text,
+and it was empty on every cover, so D-33 skipped. The judges' ORIGINAL_PROMPT is the pre-tail
+`compressedScene`, which keeps the preamble and drops the title block, because the title block sits
+in the protected tail on purpose. The inpaint's required-text clause was built from VB ids only. The
+comment claiming covers "render textless and are restamped" had been stale since SETTLED
+"model-baked title everywhere". The generator prompt also contradicted itself: the preamble allows
+lettering only in "a REQUIRED TEXT block below", but the title arrived as `**TITLE:**`.
+
+**Decision:** The cover's lettering rides the same channel as a page's declared strings (the
+2026-09-21 REQUIRED TEXT mechanism). This goes into structured inputs; no finding text is matched
+in code.
+- `requiredText.coverRequiredTexts({expectedText, textMode})` turns the structured contract into an
+  item. `collectImageRequiredTexts` joins it with the VB strings.
+- `evaluateImageQuality` resolves the contract once, before any judge launches, and folds the item
+  into the one `{TEXT_RULES}` block that quality, semantic and compliance all receive.
+- The eval result carries the items as `requiredTexts`, passed through `carryEvalEvidence` and
+  regeneration's rebuilt evalResult. The consolidator renders them as "Required lettering — PRESENT
+  BY DESIGN (never remove)".
+- `inpaintPage` adds them to its repair clause. `repairPipeline` passes the contract unless it is
+  repainting a textless art layer that gets restamped. The Lab inpaint stage passes it from
+  `buildEvalReplayOptions`.
+- In `cover-evaluation-notes.txt`, the old TEXT_RULES allow-list (it had a second copy of the
+  string) is replaced by COVER_TEXT. COVER_TEXT says what the required string is on a cover, and
+  that a missing or misspelled one is `required_text` at CATASTROPHIC, not D-33's page-level MAJOR.
+  This keeps the cover's previous severity. Both the quality and the semantic judge get it.
+- The generator's title block is headed `**REQUIRED TEXT:**`, the exception its own preamble names.
+  It stays at the absolute end of the prompt, and the title wording is unchanged.
+- App-overlay covers (textless art) require nothing, so their behaviour is unchanged.
+
+**Rationale:** A rule a judge can deduct for must be a rule the generator was given, and every
+judge must be given the same allow-list. That is the one-channel shape the page path already has.
+The title is structured input (the contract), so classification stays in the prompts. D-23 already
+says a string TEXT RULES names is permitted and goes to D-33.
+Validation: a rung-1 replay rebuilt the judge inputs from the stored cover (the title is now in
+item 11 and in the semantic TEXT_RULES). A capped paid re-judge of the stored images gave v0 100
+with no text finding, and v1 a semantic `[CATASTROPHIC] required_text` "missing from the cover",
+score 40. In that one sample the quality judge did not fire D-33 on v1; the semantic judge carried
+the verdict.
+
+**Out of scope (owner call):** the cover cast backfill (findings C4), and the appOverlay note that
+excuses painted lettering on textless covers (C6).
+
+**Touched:** `server/lib/requiredText.js`, `server/lib/evalPipeline.js`, `server/lib/images.js`
+(carryEvalEvidence, inpaintPage), `server/lib/feedbackConsolidator.js`, `server/lib/repairPipeline.js`,
+`server/lib/testlab.js`, `server/routes/regeneration.js`, `server/lib/promptBuilders.js`
+(buildCoverPrompt), `prompts/cover-evaluation-notes.txt`, `tests/unit/cover-title-required-text.test.ts`.
+
+**Status:** ✅ active
+
+---
+
 ## 2026-09-23 — Char-fix: no judge text. A character-repair prompt carries the finding's TYPE as a fixed phrase, never the judge's sentence
 
 **Context:** Staging `job_1790100385959_1nitlympp` (dragon run 6) p14. The entity grid judge wrote a
@@ -32975,7 +33147,7 @@ Per-ruling detail:
   no life skill, and an unconditional question would manufacture faults. The
   "never stated as a moral" tail composes with the existing ending-craft rule
   that already bans stated morals.
-- **R20 — coverage floor, alongside the focal page.** `NO_FOCAL_PAGE` (every
+- **R20 — coverage floor, alongside the focal page.** (Floor superseded 2026-09-23 by castCoverage(), see "Every commissioned child gets a moment".) `NO_FOCAL_PAGE` (every
   commissioned character alone in frame once, or the subject of a close-up) is
   a different property, not a replacement: a character can own one close-up and
   be absent from the rest of the book. Both counters now run.
@@ -47382,6 +47554,8 @@ QC retry), `server/lib/evalPipeline.js` (comment), `tests/unit/empty-scene-geome
 
 ## 2026-09-15 — The Visual Bible outranks the wardrobe contract when they dress the same body slot
 
+> → superseded 2026-09-23 (the wardrobe contract owns garment wording; the Art Director selects versions), see "2026-09-23 — The wardrobe contract owns garment wording".
+
 > → corrected 2026-09-23 (its reconcile half runs opposite to the same-day plot-critical-object entry), see "2026-09-23 — Prompt audit of job_1790100385959: corrections to earlier entries", item 7.
 
 **Context:** staging `job_1789420511893_zly5rcdej` drew Captain Sarah in a pirate tricorn on the back
@@ -47428,6 +47602,8 @@ NOT built: that is an eval classification change and the owner's call.
 **Status:** ✅ active — staging only, not on master
 
 ## 2026-09-15 — A plot-critical worn object is described IN FULL in the outfit, not left out of it
+
+> → direction confirmed 2026-09-23 (owner: the wardrobe contract owns garment wording); the `reconcile` mechanism it names is replaced by `adopt`, see "2026-09-23 — The wardrobe contract owns garment wording".
 
 > → corrected 2026-09-23 (the code copies the Visual Bible's words into the outfit, the reverse of "the Visual Bible can then copy that"), see "2026-09-23 — Prompt audit of job_1790100385959: corrections to earlier entries", item 7.
 
@@ -51949,6 +52125,9 @@ left is the repair round's prompt, which is also the report's top-level `prompt`
 that the shared panel reads: 55.7 KB, left in place so the per-round shape is
 symmetric, and flagged in the backlog as the remaining trim.
 
+> 🗄 **Raw-reply trim superseded 2026-09-23** — every round now keeps its raw reply (owner order;
+> "Text stage after prompt audit 05").
+
 **Validation:** rung 1 — the projection replayed over the stored shape of
 `job_1789853503332_riqncqg1i`: the repair round's returned pages round-trip, the
 diff and lector prompts are stored, the diff's four fields land, and a synthetic
@@ -56123,7 +56302,8 @@ to, and which prompts are not stored, is in `docs/prompt-inventory.md` ("What ea
 3. **"The text chain is TWO PARALLEL AUDITS…" (2026-09-03)** lists the arc-informed audit's inputs as
    "back cover + final arc + page plan + pages + what each picture shows". The template has no back-cover
    placeholder; it gets the arc, the plan lines and each page's WHOLE brief
-   (`resolveTextStagePictureSpec`), and no commission and no arc hints. The same entry names the repair
+   (`resolveTextStagePictureSpec`), and no commission and no arc hints (the hints were added the same
+   day — see "Text chain after dragon run 6" below). The same entry names the repair
    model `deepseek-v4-pro`; "The chain's single repair pass runs on claude-opus" (2026-09-03, later the
    same day) replaced it, and `textRefineModel` is `claude-opus` (models.js:473). The stale "back cover"
    also sat in the `textRefine.js` header and in a misplaced docblock above `buildTextProofreadPrompt`;
@@ -56182,6 +56362,429 @@ stays readable.
 `server/lib/promptBuilders.js`, `server/lib/evalPipeline.js`, `storyJobPipeline.js`.
 **Status:** ✅ documentation only; no behaviour change.
 
+## 2026-09-23 — Text chain after dragon run 6: the ledger is settled after the diff, the shipped text is counted, the sighted critics read the arc hints, the refine's scope is one rule
+
+**Context.** Staging `job_1790100385959_1nitlympp` (18 pages, de-ch). Builds on the same-day entry
+"The diff pass sees the findings the repair answered" (5a4672c7a), which gave the diff pass the
+findings each rewritten page answered and told it never to write a sentence neither text says. Four
+defects remained:
+1. **The ledger and the counter spoke for text that did not ship.** `findingLedger` was resolved when
+   the whole-page passes settled and the word counter re-measured before the diff; the diff then put
+   the writer's sentences back on p4, p11 and p16. The stored ledger still said `page-rewritten` for
+   the four findings those sentences had been removed to close.
+2. **The arc hints reached the writer only.** The writer applied a hint (p15, who searches where); the
+   arc-informed audit, shown only the unamended arc, filed a LOADBEARING fault against it, and the
+   refine obeyed and rebuilt the arc's contradiction. Set `arc-hint-handoff` listed neither critic.
+3. **`buildOutlineReviewPrompt` assigned to a `const`** on its missing-template path, so that path
+   threw a TypeError instead of reaching its notice.
+4. **`text-refine.txt` contradicted itself on scope.** "Rewritable only when AUDIT FINDINGS names it,
+   plus four cases" against "Rewrite any page with…" (three rules) and "A page that contradicts its
+   scene outline … is rewritable on that ground alone" (a fifth case). And its DO-NOT-WRITE section
+   carried the writer's "the analysis pass does NOT need to re-check them" beside its own check 18,
+   the re-check — the outline reviewer already stripped that line; the refine did not.
+
+**Decision.**
+1. *Ledger after the diff.* Each applied diff correction records `restored`: its sentences that the
+   writer's page carried and the rewrite did not (`restoredSentences`, verbatim containment, provenance
+   only). `settleLedgerAfterDiff` re-marks a `page-rewritten` finding whose page got a restoration as
+   `rewrite-restored`, with the restored sentences as its reason; `unresolvedFindings` counts it and
+   the dev panel shows it with no client change. The ledger no longer claims the fix stands — nor
+   that it fell: a restoration can be the right call (a fact the rewrite dropped). Replayed on the
+   stored run-6 diff: exactly p4 LENGTH, p11 LOADBEARING and both p16 findings flip; p12's
+   «oder widersprach» (new words, no restoration) does not.
+2. *Counter on the shipped text.* `wordBudget.shipped` holds the counts and remaining LENGTH lines
+   after the diff and the lector, with a WARN per line. Measured only: no further pass.
+3. *Hints to the sighted critics.* `story-text-audit.txt` and `text-refine.txt` gain `{ARC_HINTS}`,
+   filled by one builder (`buildCriticArcHintsSection`): the hints as changes to the story, "read the
+   story with them applied", plus the same `HINT_VS_ARC_RULE` the planner and writer carry. Threaded
+   through `refineStoryText`/`runPostAuditTextRound` (`opts.arcHints`, from
+   `arcReviewReport.arcHints`) and the three Lab call sites (`resolveReplayArcHints`). **The blind
+   audit gets nothing**: it is denied the arc by design (2026-09-03 owner ruling), and a hint is an
+   arc amendment. Both critics joined `arc-hint-handoff`.
+4. *Refine scope.* The outline contradiction is the fifth listed case; the three "Rewrite any page…"
+   rules now say what a rewrite of a rewritable page also fixes; Step 2 rewrites "the rewritable pages".
+   `buildDoNotWriteSection({ forChecker: true })` / `doNotWriteListBody` strip the writer-only line for
+   the refine and the outline reviewer; the writer's list is unchanged. The const bug goes with it.
+
+**Still owner calls (not built).** A code guard on invented prose — measured in the 5a4672c7a entry
+as unable to tell a grammar fix from an invented sentence; BACKLOG option (b), a restore-only diff
+pass, stands. `rewrite-restored` is visibility, not a guard: nothing blocks a restoration.
+
+**The "no length guard" ruling (2026-09-06) is touched additively only.** No rule on replacement
+length is added; a verbatim restoration of any length is still applied. What is new is that the
+ledger records it.
+
+**Validation.** Rung 1 (free): the audit, blind audit, refine and diff prompts rebuilt from the stored
+row — hints in the audit and refine, absent from the blind audit; the writer-only DNW line absent from
+the refine. Rung 2 (one paid call, $0.0213): the diff pass (gpt-5.6-luna-pro, temperature 0) re-run on
+the stored BEFORE/AFTER with the findings ledger: 2 corrections instead of 11; p11 and p16 keep the
+refine's fixes (no «Turi blieb auf der Mauer.», nest and fleece stay as rewritten); one p4 restoration
+of a dropped line, correctly re-marked `rewrite-restored`. One run, one story.
+
+**Touched.** `server/lib/textRefine.js`, `server/lib/promptBuilders.js`, `storyJobPipeline.js`,
+`server/lib/testlab.js`, `prompts/story-text-audit.txt`, `prompts/text-refine.txt`,
+`scripts/admin/sibling-registry.json`, `tests/unit/text-chain-hints-and-ledger.test.ts` (new),
+`tests/unit/text-audit-picture-spec.test.ts`, `tasks/bugs.json`.
+
+## 2026-09-23 — A worn garment is not a budget element; a reviewed brief keeps its declared worn rows; a same-garment rewording rebuilds no avatar
+
+> → in part superseded 2026-09-23 (the wardrobe contract owns garment wording; the Art Director selects versions), see "2026-09-23 — The wardrobe contract owns garment wording".
+
+**Context.** Dragon run 6 (staging `job_1790100385959_1nitlympp`), p12 scored 10: Max drawn twice, both in
+the purple sweatshirt the page had taken off him. The chain, from stored data: (1)
+`vbElementBudget.rankPageElements` counted every artifact on the page, including a `wornAs` outer layer
+worn by its own owner — exactly what `getElementReferenceImagesForPage` drops, because the avatar wears it.
+All 4 `vb_element_overflow` findings (p9, p11, p12, p16) and all 11 `vb_page_uncited` findings were
+garment noise. (2) The scene review, told to "drop purple hooded sweatshirt (ART005)", deleted its
+`wornItems` rows on p11 and p12 (and every row on p18, ART004 on p16, ART006 on p9). A missing row on a
+linked garment resolves to `worn`, so the p12 prompt said "Max IS wearing this … Draw it on Max". (3) The
+post-review clothing re-check ran only `if (clothingByPage.size > 0)`; the pre-review check found
+nothing, so the seven review-introduced `removal_unstated` faults were never seen and the worn-state
+round never ran. Separately, `applyWardrobeBibleCorrections` restated Levin's and Kiaan's outer layers in
+the bible's words ("fleece jacket" → "forest green long-sleeve zip-up fleece jacket with a high collar")
+and `onWardrobeCorrected` rebuilt both sheets from photos — about $0.15 and a visibly re-rolled Levin face
+and hair, for garments the first sheet already showed.
+
+**Decision.**
+1. ONE predicate, `wornItems.carriedByReference` (worn + `referenceCarriesItem`), decides both what the
+   picker drops and what the budget counts (`idsCarriedByReferences` in `rankPageElements`). An OFF or
+   handed-over garment still counts — its plate IS packed. `checkBiblePageTable` treats a page's
+   `wornItems` row as that garment's page presence (a garment lives in `wornItems`, not `objects[]`).
+2. A rewrite changes a worn state by RESTATING the row, never by omission: `carryForwardWornItems` merges
+   per id (a saved row the rewrite omits is carried) and `carryForwardWornItemsInBrief` applies it to brief
+   text. Used at both scene-review adopt points in `beatsPipeline` (logged `beats_worn_rows_carried`), on
+   the iterate path (already through `carryForwardWornItems`), and in the Lab's two mirrors
+   (`applyReviewerPages`, the scene-review replay — which now also feeds rows + bible so
+   `removal_unstated` can fire there at all).
+3. The post-review clothing re-check runs on every reviewed run, so a review-introduced fault reaches the
+   worn-state round.
+4. `checkWardrobeAgainstBible` marks a `reconcile` as `rewording` when the element's slot noun is in the
+   clause, the replacement names no slot noun the clause lacks, and the plain colour words match. The
+   contract text is still rewritten to the bible's words; only non-rewording corrections reach
+   `onWardrobeCorrected`.
+
+**Rationale.** Counter and packer answering the same question from two predicates is what made the
+budget fault fake, and the fake fault is what made the reviewer delete state. The per-id carry is the
+same "context the rewriter never re-decides" rule the iterate path already had, completed. "The Visual
+Bible outranks the wardrobe contract" is NOT reversed — the words still move toward the bible — only a
+rewording stops counting as a visible change. **Open contradiction for the owner:** the two 2026-09-15
+entries disagree on direction — "The Visual Bible outranks the wardrobe contract" (bible words win,
+`reconcile` restates the contract) vs "A plot-critical worn object is described IN FULL in the outfit"
+(the wardrobe authors the words and the bible copies them; `scene-expansion-all.txt` "in the same
+words"). This change works under either; picking one needs the reversal protocol.
+
+**Replay (rung 1, stored run-6 artefacts, no model calls):** pre-review briefs with the page table the
+checker saw — overflow pages 4 → 1 (p16 remains: two OFF garments are packed, a real overflow);
+`vb_page_uncited` pages 12 → 1 (p14 ART001, a real one); counter == picker on 18/18 pages. Reviewed briefs
+as returned: seven `removal_unstated` (p9, p11, p12, p16, p18×3) the old gate never looked for; after the
+carry, zero, and the p11/p12/p18 prompts say "Max is NOT wearing this … lies on the ground" instead of
+"Max IS wearing this". The 20:39 reconcile over the stored contract + AD bible: both findings
+`rewording: true`; `onWardrobeCorrected` fires for nobody (was Levin, Kiaan).
+
+**Touched:** `server/lib/wornItems.js`, `server/lib/vbElementBudget.js`, `server/lib/visualBible.js`,
+`server/lib/sceneBriefCheck.js`, `server/lib/clothingCheck.js`, `server/lib/beatsPipeline.js`,
+`server/lib/testlab.js`, `storyJobPipeline.js` (comment), `tests/unit/worn-garment-review-chain.test.ts`,
+`tests/unit/wardrobe-vs-bible.test.ts`.
+**Status:** ✅ active on staging.
+
+## 2026-09-23 — The wardrobe-vs-bible check reads a garment's declared slot and finds its clause by its own words
+
+> → in part superseded 2026-09-23 (the wardrobe contract owns garment wording; the Art Director selects versions), see "2026-09-23 — The wardrobe contract owns garment wording".
+
+**Context.** Dragon run 6 (staging `job_1790100385959_1nitlympp`). `checkWardrobeAgainstBible` decided an
+element's slot from its `type` only when the type was literally a slot name, else from its name through
+the slot-noun list, and located the outfit clause through the same list. ART005 — typed `outerwear`,
+linked `Max.outer layer`, named "purple hooded sweatshirt" — got no slot (neither "outerwear" nor
+"sweatshirt" is in a list), so Max's hoodie was never compared. And a restated clause lost its joiner:
+"…sneakers, and a forest green zip-up fleece jacket" became "…sneakers, forest green long-sleeve … jacket".
+
+**Decision.** The slot comes from declared fields first: the `wornAs` link's slot, then the entry's `type`
+through the one type map (`wornItems.slotFromType`), the name's slot nouns last. A linked element's own
+clause is found by its own declared words (`wornItems.indexOfElementAmong` over name/label/aliases — the
+same identity locator the off-state strip uses; the description is left out because cut words like
+"long-sleeve" recur across garments). Only when those words single out no clause is the clause that
+occupies the slot taken, which is then a different garment (never a rewording). The replacement keeps the
+clause's joiner and article (`spliceClause`), and "already in the same words" compares bodies without
+them, so a second pass finds nothing. Wording ownership (bible vs wardrobe) is untouched — owner's call.
+
+**Replay (rung 1, stored contract + AD bible, no model calls):** Max/outer layer ART005 is now compared
+(reconcile, rewording); the three restated outfits read "…white sneakers, and a purple long-sleeve hooded
+sweatshirt…", "…sneakers, and a forest green long-sleeve zip-up fleece jacket…", "…boots, and a rust-brown
+sleeveless front-zip body warmer…"; a second pass finds 0; no avatar re-render.
+
+**Touched:** `server/lib/clothingCheck.js`, `tests/unit/worn-garment-review-chain.test.ts`.
+**Status:** ✅ active on staging.
+
+## 2026-09-23 — Every commissioned child gets a moment: one castCoverage() for the arc, the planner and the counters
+
+**Context.** Owner decision on the main-cast conflict, verbatim: "Every child gets a moment. And ideally
+we have them in multiple images. Depends on the story length and amount of characters, ideally each one is
+on 3-4 images. Fine for up to 2-3 characters and long books, but for 7 characters in 10 pages it will not
+work." The book held every commissioned character to a fixed floor of two pages in frame
+(`UNDER_COVERED_CHARACTER`, R20 above) and a focal page each (`NO_FOCAL_PAGE`) whatever the book's size, the
+planner was told neither number, and the arc prompt said "at most two carry a book".
+
+**Decision.** One function, `castCoverage({ pageCount, castCount })` in `server/lib/castCoverage.js`,
+gives the numbers from the page count and the size of the commission's character list:
+- a focal page each (alone or with one companion) whenever ceil(cast/2) such pages fit in half the book;
+  otherwise the cast shares group moments and nobody is dropped;
+- a target of 3-4 pages in frame each, scaled down as the cast grows or the book shrinks: two named
+  characters per peopled page, one page people-free, the main character taking half the book, the rest
+  shared; the counter floor is 3 when the target reaches 4, else the target itself.
+Measured on the three owner cases: 4 children / 18 pages → focal each, 3-4 pages; 7 / 10 → focal each,
+at least 2 pages; 2 / 24 → focal each, 3-4 pages; 12 / 10 → group moments, at least 1.
+`castCoverageRule(cov)` states it to the planner (`{CAST_COVERAGE}` in story-beats.txt, page form) and to
+the arc (story form, wired by the arc stage in place of "at most two carry a book"). The plan counters call
+the same function on the plan (`NO_FOCAL_PAGE` only when focal-each holds, `UNDER_COVERED_CHARACTER` at the
+`min` floor), so generator and critic hold one number. The duties apply to the commission's character list
+(`commissionedCast().listed`); a figure the commission supplies elsewhere (premise, saved details) is
+commissioned, never invented, and owes no page — before this a premise pet drew `NO_FOCAL_PAGE`.
+Supersedes the fixed two-page floor of R20 (2026-09 "coverage floor, alongside the focal page") and the
+"at most two carry a book" line. plan-check.txt asks no coverage question; the counters own it.
+
+**Touched:** `server/lib/castCoverage.js` (new), `server/lib/planCounters.js`, `server/lib/promptBuilders.js`
+(`buildBeatsPrompt`), `prompts/story-beats.txt`, `server/lib/beatsPipeline.js`, `server/lib/testlab.js`
+(beats_replan replay), `tests/unit/cast-coverage.test.ts`, `tests/unit/plan-counters.test.ts`.
+**Status:** ✅ active on staging.
+
+## 2026-09-23 — Arc prompts after the prompt audit: one commissioned-cast definition, every child acts, the panel's rules are the creator's rules, hints carry sentence anchors
+
+**Context.** Audit `docs/audits/prompt-audit-2026-09-23/01-arc.md` of staging `job_1790100385959_1nitlympp`
+(dragon run 6), plus two owner decisions the same evening. Every item below was checked against the stored
+prompts and replies of that run and rebuilt from its stored story row with the new builders (no paid call).
+
+**Decisions.**
+1. **Who is commissioned — one definition** (`COMMISSIONED_CAST_DEF`, promptBuilders.js): the character list
+   plus any named figure the premise supplies *or a character's saved details name*. It fills the budgets'
+   "Not counted" line, the "Premise figures:" list spec (`PREMISE_FIGURES_SPEC`, now one string for arc-create's
+   critique and arc-retell's output, which carried a hand copy) and the panel's CAST lens. The plan counters
+   already count the character list plus the arc's "Premise figures:" names (`commissionedCast()`,
+   castCoverage.js, same definition in its doc), so a pet named only in saved details is now listed by the arc
+   and never charged as invented. Evidence: the run's dog, named only in one boy's saved details, drew
+   `ARC_INVENTED_UNDECLARED` and `ARC_INVENTED_OVER_ALLOWANCE` on both plan rounds. The owner's "prompt route,
+   not a code harvest of the saved details" follows the ban on reading meaning out of prose in code.
+2. **Every child acts** (owner, 2026-09-23: "Every child gets a moment"; clarified: the ARC rule is an action,
+   the PAGE PLAN rule is coverage). `EVERY_CHILD_ACTS_RULE`: every child on the character list does at least one
+   thing of their own that matters to the plot; only where the book is too short for its cast do several share
+   one action, and no child is left with nothing. It replaces STORY SHAPE's "Everyone else — … — is simply there
+   alongside the main character. No moment of their own, no arc." (arc variant and the three simple bands) and
+   the clause "at most two carry a book". Generator: STORY SHAPE. Critics: a sixth Check line ("Each child's
+   action", naming each child's sentence number — an enumeration, not a self-certified total) and a panel
+   ACTION lens. The arc does not use `castCoverageRule(…, { unit: 'story' })`: the picture count is the plan's
+   rule, not the arc's. Evidence: the run's critique called a moment-less boy removable and the counters
+   flagged the other two as having no focal page.
+3. **The panel's rules are the creator's rules.** ENTRANCE, ASSUMED and SENSE lenses now read one string each
+   (`ARC_ENTRANCE_RULE`, `ARC_GIVEN_RULE`, `ARC_SENSE_RULE`), and the same strings are telling rules for the
+   creator and the re-teller. Strangers learn each other's names before they act together; a possession
+   carries how they came by it; every turn holds against sizes, emissions, distances and witnesses. Evidence:
+   all three panelists caught unnamed strangers, an unexplained possession and an uncaused arrival the creator
+   was never told to avoid.
+4. **Central figure defined** (`CENTRAL_FIGURE_DEF`): the creature, title figure or object the story idea is
+   about, never the main character; one that cannot act yet acts through what it does to the others. The
+   Check names it or writes "none". Both critiques of the run answered it about the main character.
+5. **Critique persona is the book's reader**: "answered as <reader age> reader" from `readerAgeLabel`, the same
+   resolver as the budgets' read-aloud line. Replaces the fixed "eight-year-old listener" (2026-08-30, before
+   the age mode existed).
+6. **Language line** on arc-panel.txt and arc-hints.txt ("Answer in ENGLISH."). A panelist answered in German
+   and the reply went verbatim into the re-tell.
+7. **A view the commission describes stands** over the photo-vantage rule, in `buildAvailableLandmarksSection`
+   (every consumer) and the panel's LANDMARK lens; the landmark in it is drawn from what its photos show.
+   The run dropped the view the family's own idea named because no photo showed it.
+8. **Topic guide is material, never wording** (`GUIDE_USE_RULE` under the TOPIC GUIDE header): a turn it names
+   is acted out, never stated, and a world the commission names stands over the guide's settings. The guide's
+   `COSTUME:` field (an avatar-pipeline field) no longer reaches the story prompts. The run's book stated a
+   guide "What turns" line as a realisation.
+9. **Hints carry sentence anchors**: `ISSUE (s14-15): … → CHANGE: …`, parsed and kept by `parseArcHints`;
+   `HINT_ANCHOR_RULE` beside `HINT_VS_ARC_RULE` in all three hint headings (planner, writer, critics). A hint
+   was planned onto a page before the scene it changes existed.
+10. **Bloat**: the panel reads the landmark list without DESCRIPTION extracts (`descriptions: false`), and a
+    book gets one stay-together line instead of two that disagreed. Replayed on the run: panel 23.2k → 21.9k
+    chars despite the new lenses; create 32.7k → 35.1k (new rules), retell 53.1k → 55.5k.
+11. **Storage**: each round stores the re-telling's raw reply (`rounds[].retellRaw`); the report stores the
+    hint pass's `hintsModel`, `hintsPrompt` and `hintsRaw`, kept even when the pass fails to parse.
+
+**Reaffirmed, unchanged.** The owner reaffirmed the 2026-09-06 panel restraint ("change as little as
+possible"; audit #12). No change to the size-of-change rule.
+
+**Not changed, for the owner.** The 20-entry landmark list (owner, 2026-09-19) still reaches create and
+retell whole; a relevance cut is a landmark-pipeline decision. Rules stated in both the age-band file and
+TELLING_RULES (no adult rescue, low point, visible change) are left: the band files are shared with the
+idea and trial prompts and the 6+ books have no band file. `buildTellingRulesSection` keys `noSplit` on the
+SHAPE band, which has not returned `standard` since the 2026-09-14 band split, so no book can take the
+"reason to separate" branch any more (tasks/BACKLOG.md).
+
+**Touched:** `server/lib/promptBuilders.js`, `server/lib/beatsPipeline.js`, `prompts/arc-panel.txt`,
+`prompts/arc-retell.txt`, `prompts/arc-hints.txt`, `client/src/types/story.ts`,
+`tests/unit/arc-prompt-audit-2026-09-23.test.ts`, `tests/unit/arc-critique-spec-and-shape.test.ts`,
+`tests/unit/arc-invented-figures.test.ts`, `docs/prompt-inventory.md`, `docs/audits/prompt-audit-2026-09-23/01-arc.md`,
+`scripts/admin/sibling-registry.json`, `tasks/bugs.json`, `tasks/BACKLOG.md`.
+
+## 2026-09-23 — The wardrobe contract owns garment wording; the Art Director selects versions (supersedes the direction of both 2026-09-15 wardrobe/bible entries)
+
+**Context.** Two 2026-09-15 entries disagreed on direction: "A plot-critical worn object is described IN
+FULL in the outfit" (the wardrobe authors the words, the Visual Bible copies them) and "The Visual Bible
+outranks the wardrobe contract" (the code copied a `wornAs` entry's words into the contract). The prompt
+audit of staging `job_1790100385959_1nitlympp` (`docs/audits/prompt-audit-2026-09-23/03-wardrobe.md` F1;
+corrections entry item 7) found the reviewed contract overwritten after review by the Art Director's
+paraphrase for Levin and Kiaan (ART006 "…with a high collar", ART004 "…with diamond quilting"), both
+avatars re-rendered from photos, and Levin's second sheet re-rolled his face and hair (audit 06). Owner
+ruling, 2026-09-23: **the clothing plan wins.** The wardrobe contract defines the default outfit and any
+version a story needs; each version is its own avatar. The Art Director (and the scene review) only
+SELECTS which version a character wears on a page; it never rewrites garment wording.
+
+**Decision.**
+1. `checkWardrobeAgainstBible`'s `reconcile` kind is deleted (no fallback). A linked (`wornAs`) entry that
+   names the SAME garment as the outfit clause of its slot is an `adopt`: the entry's `description` becomes
+   the contract's clause (joiner and article stripped); a `name`/`label` that states a colour the clause does
+   not takes the clause too. The contract is not touched and no avatar is re-rendered. Same garment = the
+   clause found by the entry's own words (`indexOfElementAmong`) unless the two name different garment nouns
+   of the slot, or a shared slot noun.
+2. The `rewording` flag and `isRewording` (ee8890278) are deleted: they existed only to keep `reconcile`
+   restatements from re-rendering, and nothing restates the contract any more.
+3. The Art Director's `AVAILABLE CLOTHING PER CHARACTER` list now carries each used version's outfit
+   (`buildAvailableAvatarsForPrompt`, all callers: all-pages and per-page AD, iterate, regeneration, Lab), and
+   `scene-expansion-all.txt` says every garment a listed character wears is one those outfits name, its entry
+   repeats the outfit's words, and a page without a garment says so in a `wornItems` row. The "without a
+   garment" version is the existing per-state off-sheet (2026-09-19 "per-state wardrobe variants") — no
+   parallel mechanism.
+4. **Not changed, owner question open:** a `conflict` — a DIFFERENT garment in a slot the outfit already fills,
+   linked or attributed by name — still rewrites the outfit clause to the bible's garment and re-renders
+   that avatar (`onWardrobeCorrected`), and the cover dedupe (`applyCoverWornHeldDedupe`) still drops the
+   contradicting outfit segment. Under the ruling the Art Director cannot add a garment, so this path either
+   goes (the AD's different garment is an error, logged, contract stands), or becomes "a new version": the
+   wardrobe gains a variant with that slot replaced and a redressed sheet, the way off-states work. Who may
+   create a version mid-pipeline is the owner's call. The upstream fix makes the case rarer: the wardrobe
+   writer now sees the arc and the reviewer checks plot garments (next entry).
+
+**Replay (free, stored data).** `applyWardrobeBibleCorrections` over run 6's pre-review contract
+(`clothingReviewReport.outfitsIn`) and its final Visual Bible: 3 findings, all `adopt` (ART004 Kiaan,
+ART005 Max, ART006 Levin), 0 unresolved, contract byte-identical, 0 characters sent to re-render (the run
+itself re-rendered 2).
+
+**Touched:** `server/lib/clothingCheck.js`, `server/lib/beatsPipeline.js`, `server/lib/clothingResolve.js`,
+`prompts/scene-expansion-all.txt`, `tests/unit/wardrobe-vs-bible.test.ts`,
+`tests/unit/worn-garment-review-chain.test.ts`, `tests/unit/wardrobe-prompt-inputs.test.ts`.
+**Status:** ✅ active on staging.
+
+## 2026-09-23 — The wardrobe calls: no saved clothing, the arc for the writer, a trimmed brief, plot-garment and base-layer checks, everything stored
+
+**Context.** Audit `docs/audits/prompt-audit-2026-09-23/03-wardrobe.md` (F2-F9), run 6.
+
+**Decision.**
+1. **The wardrobe writer never gets the character's saved clothing** (owner, 2026-09-23). The template's
+   "Start from the character's stored clothing above" pointed at nothing: `extractCharacterVisualProfile`
+   reads `char.clothing`, and these characters store `structuredClothing` / `avatars.clothing`. The sentence
+   is deleted rather than the field wired: the wardrobe is written per story and the default outfit it
+   writes is what the avatars are drawn from; the saved outfit is not its starting point
+   (memory `feedback_clothing_is_per_story`). The appearance block no longer asks for clothing at all.
+2. **The writer gets the arc** (`{STORY_ARC}`, beatsPipeline `approvedArc`, Lab replay and bench too). Run 6's
+   plan said "his jacket" and "the bundled jacket"; only the arc said "Kiaan's jacket", and Max's outfit had a
+   sweatshirt, Kiaan's a sleeveless gilet (F5). Bible rule: a garment the arc or plan has someone hold, lend,
+   wrap, spread or lose goes in that character's outfit as the garment they name. The reviewer gets the
+   matching check 12 (plot garments) from the plan lines; it is deliberately NOT sent the arc — it is the
+   slow call in front of the avatars and the plan line names the garment.
+3. **Both wardrobe calls get a wardrobe-scoped brief and cast** (`wardrobeStoryBrief`,
+   `wardrobeCharacterDetails`): the brief body and the user-input line without the plot stages' binding
+   paragraph; age, gender and special details without strengths, flaws and challenges. The writer's
+   appearance block drops face geometry and age cues (`buildLabeledPhysicalParts` `includeFace`), and its
+   TARGET drops reading level and story language. Rebuilt on run 6: review prompt 12,708 → 11,627 chars
+   (with check 12 and the colour rule added); bible 15,423 → 16,991 including the 4,445-char arc.
+4. **Check 9 is scoped to the listed characters**: animals, creatures and other plan figures get no
+   wardrobe (run 6 dressed the dragon, the dog and the hatchling; `beats_clothing_review_stray` in 6 of the
+   last 40 staging stories).
+5. **Base-layer variety.** Bible rule and check 11 now cover the garments left once a page takes an outer
+   layer off (run 6: three boys in the same long-sleeve shirt / trousers / shoes, recoloured, from p16).
+6. **Colours**: every colour is one of the ten words, alone — no shade name, modifier (dark, light, pale)
+   or compound — in the bible rule and check 3. Run 6 shipped forest green, navy blue, mid-blue,
+   rust-brown, dark grey, dark brown and the reviewer called them allowed.
+7. Stale text removed: "checks 1-10" (there are 12 now; the format asks for every check by number), and the
+   bible's cover rule (covers are the Art Director's; `scene-expansion-all.txt` carries it).
+8. **Stored with the story:** `storyBibleReport` (model, duration, prompt, raw reply — the transcript's
+   CLOTHING section is rewritten by the review and the bible check, so it is not the reply),
+   `clothingReviewReport.rawResponse` (a stray entry's text was otherwise lost), and `wardrobeBibleReport`
+   (built since 2026-09-15, never returned). The saved-story metadata route strips `rawResponse` from the
+   review report like its prompt.
+9. The Lab wardrobe-review replay now defaults to production's reviewer (`clothingReviewModel`, it used the
+   outline reviewer) and takes `noReasoning` to measure the reviewer with reasoning off.
+
+**Touched:** `prompts/story-bible-from-beats.txt`, `prompts/clothing-review.txt`,
+`server/lib/promptBuilders.js`, `server/lib/beatsPipeline.js`, `storyJobPipeline.js`,
+`server/routes/stories.js`, `server/lib/testlab.js`, `tests/unit/wardrobe-prompt-inputs.test.ts`,
+`tests/unit/beats-dropped-fill-keys.test.ts`.
+
+## 2026-09-23 — Text stage after prompt audit 05: the missing audit questions, a narrower blind exemption, sentences and paragraphs counted, the lector at the reading level, one picture spec, prompts and replies stored
+
+**Context.** Prompt audit `docs/audits/prompt-audit-2026-09-23/05-story-text.md` on staging
+`job_1790100385959_1nitlympp` (18 pp, de-ch, 1st-grade). Owner order: "fix the eight audits". Builds on
+5a4672c7a / e47a513f0 (diff sees findings, ledger after diff, hints to the sighted critics, refine scope).
+Five plot faults shipped that no judge named: a deadline broken (the egg must be warm before dark, it is
+dark, it hatches with no word why), a refusal reversed with no stated reason, a fear stated that no page
+showed, a "the whole time" contradiction (added by the refine), a vague ending. The blind audit returned
+FAULTS: 0; five of the sighted audit's ten findings were LOADBEARING, two of them misfires (the ages
+inserted on p1, a hint-blind p15). Pages ran 6-13 sentences against 3-6 with nothing counting them. The
+lector had no reading level and made 2 of its 4 changes worse.
+
+**Decision.**
+1. **Audit questions (prompts, generic).** story-text-audit.txt: ASSUMED also covers a feeling a page says
+   someone had that no earlier page showed; CAUSE covers letting happen what one had refused; LIMIT covers a
+   stated time passed with no page saying why the limit still holds; new CONTRADICTION (a page states as true
+   what an earlier page told otherwise, "the whole time" claims included) and ENDING (last page: one feeling,
+   every claim true of the pages). Fourteen questions. The blind audit's CONFUSION/CONTRADICTION gain the
+   same two cases and it gains ENDING (six questions). The writer (story-text-from-beats.txt) was given each
+   rule first: deadline, feeling shown, no contradiction, and the ending line it already had.
+2. **LOADBEARING is what the plot turns on** — a cause, a uniqueness, a limitation, a spoken line a later
+   page depends on; "a detail the plot never uses — an age, a colour, a look — is never load-bearing". Same
+   wording on the writer side.
+3. **Blind exemption narrowed, blindness kept** (2026-09-03 ruling stands: pages only). "Never fault a page
+   for something a picture could be showing" became: never fault what its picture shows at that instant —
+   where someone stands, how someone or something looks, an object in view. What the words tell across
+   pages stays faultable.
+4. **Sentences and paragraphs counted in code.** `measurePageText` (promptBuilders.js) counts words,
+   sentences and blank-line paragraphs; `buildWordBudgetFindings` adds a page past the level's sentence
+   ceiling by the SAME +50% OVER tolerance the words have (1st-grade: above 9), or past
+   `PAGE_PARAGRAPHS.maxPerPage` (4), to that page's ONE `FAULT[LENGTH]` line. Over only. The word tolerance
+   (2026-09-08, owner: 0.5 stays) is untouched. The paragraph shape is one constant filled into the writer
+   and the refine (`{PARAGRAPH_SHAPE}`) and read by the counter. The refine gets every page's counts
+   (`{PAGE_MEASURES}`, its own section — a count in the `## Page N` heading would break the reply parser).
+   The existing re-measure + one fed-back `length_fix` pass and the shipped-text count carry the new numbers
+   with no new loop.
+5. **Lector at the reading level** (`{READING_LEVEL}`, short form): plainest word, never a change of
+   meaning, a sentence that breaks no rule is not a fault. Effort and model unchanged (medium verdict stands).
+6. **One picture spec for writer, audit and refine.** `buildTextStagePictureSpecs` (sceneMetadata.js,
+   moved there with `characterLookSignature` / `dropAppearanceAppositive`) is the writer's old trim —
+   METADATA, VB ids, a character's appearance appositive where the look did not change — and
+   `extractRefinablePages` now stores it as `sceneBrief`, so the critics stop reading a longer, different
+   spec than the text was written from. The Lab audit replay uses `extractRefinablePages` too (its
+   hand-built pages had the untrimmed brief and NO plan line). Camera sentences are kept: in the briefs they
+   also carry the place. The refine's checks A–E are answered for the rewritable pages only; other pages are
+   scanned for the five extra cases.
+7. **Storage.** Each audit's prompt is stored (`textRefineReport.audits[].prompt`), and every round keeps
+   its raw reply, the whole-page passes included — superseding the 2026-09-20 trim ("rawResponse is NOT
+   stored … ~27 KB of pure duplication"): the parsed analysis and pages are what the parser KEPT, so a page
+   under an unreadable heading existed nowhere. Owner order.
+
+**Validation.** Rung 1 (free) on the stored row: prompts rebuilt with no unfilled placeholder; the counter
+flags 6 writer pages (p4 13 sentences / 5 paragraphs, p6, p10, p15, p16, p18) where it flagged 1, and 6
+shipped pages; the spec shrinks 16.8k → 15.2k chars. Rung 2 ($0.354, one call per audit on the stored
+writer text): arc-informed 9 faults — LIMIT p17 (the broken deadline), CAUSE p14, CONTRADICTION p17/p18,
+and **0 LOADBEARING** (was 5, incl. the ages misfire); blind **2** (was 0) — CONFUSION p13 (fear never
+shown) and CONTRADICTION p16 (refusal reversed with no reason). 3 of the 4 listed faults present in the
+writer text were caught; the vague ending was not (the fifth, "the whole time", was added later by the
+refine).
+
+**Not done (owner calls, BACKLOG).** The brief bloat's remainder: the AD writes wardrobe as flowing prose,
+so no code trim removes it safely — the proper cut is a structured text-stage spec from the brief's
+METADATA (sceneIntent, interactions, expressions) plus object names, which changes what the writer and
+critics see. The 1st-grade sentence band itself: the writer produced 6-13 sentences on every page, the same
+pattern that led to the 2026-09-08 word re-calibration.
+
+**Touched:** `prompts/story-text-audit.txt`, `prompts/story-text-audit-blind.txt`,
+`prompts/story-text-from-beats.txt`, `prompts/story-text-proofread.txt`, `prompts/text-refine.txt`,
+`server/lib/promptBuilders.js`, `server/lib/sceneMetadata.js`, `server/lib/textRefine.js`,
+`server/lib/testlab.js`, `scripts/admin/sibling-registry.json`, `docs/prompt-inventory.md`, tests
+(`text-stage-counter-and-specs`, `text-audit-rules-reach-writer`, `text-audit-picture-spec`,
+`text-refine-join`, `text-chain-hints-and-ledger`, `text-refine-own-criteria`).
+**Status:** ✅ active on staging.
 ## 2026-09-23 — One style rulebook for every prose-writing pass; sizes and looks are image staging; the ending ends on the act; the motive comes at or before the act
 
 **Context.** The owner read the German text of dragon run 6 (staging `job_1790100385959_1nitlympp`) and
@@ -56219,23 +56822,26 @@ the Lab rerun of its text chain (Lab 1422). Four fault classes:
 - `MOTIVE_AT_THE_ACT_RULE`: where a character refuses, demands, flees, hides or lies for a reason the
   story reveals later, the reader gets a glimpse of it at or before the act without spoiling the reveal.
   A carried reason is not an invented turn. Filled into both writers and the repair.
-- story-text-audit.txt: question 13 **ENDING** (the last page ends on the concrete act or line; a
-  summing-up close, or one the pages do not bear out, is a fault); **INFERRED** widened from "where the
-  ending depends on it" to any act whose reason the reader needs on that page; **PAYOFF** also catches a
-  demand or order nothing answers; **LOADBEARING** says a size or look the plot never uses is not
-  load-bearing.
+- story-text-audit.txt (on top of the same-day "Text stage after prompt audit 05" entry, which added
+  CONTRADICTION and ENDING and the "an age, a colour, a look is never load-bearing" clause): **ENDING**
+  (q14) now also asks that the last page end on the concrete last act or spoken line, and a closing
+  sentence that sums up what the story meant or what the characters have become is a fault;
+  **INFERRED** widened from "where the ending depends on it" to any act (refuse, demand, flee, hide, lie)
+  whose reason the book gives only later or never; **PAYOFF** also catches a demand or order nothing
+  answers; **LOADBEARING** adds size to the unused details and says leaving one out drops nothing.
+  story-text-audit-blind.txt's ENDING gains the same summing-up clause, so the shared ENDING category
+  means the same on both sides.
 
 **Rationale.** One constant cannot drift (fix the mirror class, not the instance). Sizes and looks are
 image staging: the pictures show them, and the text needs one only when the plot turns on it. The
 ENDING check is on the audit side so the repair is given a finding to fix, and the rulebook carries the
-matching generator rule (generator-vs-critic). The blind audit is unchanged: ENDING is a new category
-on the sighted side only, so the merge's category dedupe cannot fold it with a blind finding.
+matching generator rule (generator-vs-critic).
 
 **Touched:** `server/lib/promptBuilders.js` (`STYLE_RULEBOOK`, `MOTIVE_AT_THE_ACT_RULE`, filled in
 `buildStoryTextFromBeatsPrompt`, `buildTrialStoryPrompt`, `buildTextRefinePrompt`,
 `buildTextDiffPrompt`, `buildTextProofreadPrompt`), `prompts/story-text-from-beats.txt`,
 `prompts/story-trial.txt`, `prompts/text-refine.txt`, `prompts/story-text-diff.txt`,
-`prompts/story-text-proofread.txt`, `prompts/story-text-audit.txt`,
+`prompts/story-text-proofread.txt`, `prompts/story-text-audit.txt`, `prompts/story-text-audit-blind.txt`,
 `tests/unit/text-style-rulebook.test.ts`, `tests/unit/text-audit-rules-reach-writer.test.ts`,
 `docs/prompt-inventory.md`.
 **Status:** ✅ active on staging. Validation: see below.

@@ -1,5 +1,15 @@
 # 02 PAGE PLAN — judge findings (job_1790100385959_1nitlympp, "Das Ei im Laub", built at b03c64b0)
 
+## Status 2026-09-23
+
+Checked against staging `31fd7db0c` (after the evening fix round). FIXED = the commit that fixes it; OPEN = no fix yet, no ruling needed to start; OWNER CALL = touches a decision, a SETTLED line or has options the owner picks. Stale-doc and registry items listed at the end of each file were corrected in `a25ecb865` unless listed below.
+
+- FIXED: W1 "(none" commissioned character — `86d6ff4a7`. W10 over-the-shoulder on a contact page was already fixed before the audit (`be213ec9a` / `50e150c21`).
+- OPEN: W2 page-order / hint placement unchecked (plan-check gets no hints), W5 replan fixes by swapping, W6 who-column completeness unchecked, W8 Q4 answer instability, W11 filler pages and the replan breaking a shot floor, W12 landmark vantage unchecked, W13 Q2 recall; plan_recheck prompt not stored.
+- OWNER CALL: W3 (b) TWO_HEIGHTS exemption for a flight (changes the 2026-09-10 Q10 ruling), W4 round 1 exempt from the discard test (doc gap or bug), W7 profile pets / unnamed parent counted as invented, W9 Q9 split and dropping advisory lines from the replan; BLOAT landmark list for a divide-only stage.
+
+---
+
 Stage group: beats_plan (sonnet-4-6) → plan_check (gpt-5.6-luna-pro) + planCounters → beats_replan r1 (sonnet-4-6) → plan_recheck (same builder, replanned PAGE_PLAN; rebuilt from `buildPlanCheckPrompt` promptBuilders.js:8922 + prompts/plan-check.txt — identical text to 03-plan_check.PROMPT.txt except the 18 plan lines, which equal `finalPagePlan` in 07). Only one re-plan round ran (round 1 did not converge → no round 2, beatsPipeline.js:1723-1735).
 
 HEAD = 28 commits past b03c64b0. Relevant changes since: OTS_NO_CONTACT_RULE into story-beats.txt (be213ec9a / 50e150c21), aerial floor retired (147ce6a96). Nothing else in story-beats.txt / plan-check.txt / planCounters.js / the replan section changed. Each finding says whether HEAD already fixes it.

@@ -1,6 +1,7 @@
 
 
 const { runPlanCounters, collectPlaceNames, castLostByReplan, reviewPlanChanges, refreshPlanShot } = require('./planCounters');
+const { commissionedCast } = require('./castCoverage');
 const { lookupByName } = require('./castResolver');
 const { textZoneRulesActive } = require('../config/runtime');
 const { commissionedChildBand, applySecondaryAgeBand } = require('./inventedAgeBand');
@@ -127,6 +128,22 @@ const {
   getHistoricalObjects,
 } = require('./storyHelpers');
 const { parseCastRemovals, diffCastRemovals, restoreUndeclaredRemovals } = require('./sceneReviewGuard');
+const { carryForwardWornItemsInBrief } = require('./wornItems');
+
+/**
+ * A reviewed brief keeps every worn-state row the brief it replaces declared
+ * (2026-09-23). A rewrite changes a state by restating the row; an omitted row
+ * would resolve to the default `worn` and paint a garment the page took off
+ * back on (wornItems.carryForwardWornItems). Loud: the omission is logged.
+ */
+function keepDeclaredWornRows(pageNumber, rewritten, previous, pass, gl) {
+  const carry = carryForwardWornItemsInBrief(rewritten, previous);
+  if (!carry) return rewritten;
+  const msg = `Page ${pageNumber}: the ${pass} dropped the declared wornItems row(s) ${carry.carried.join(', ')} — carried forward as declared`;
+  log.warn(`🎩 [BEATS] ${msg}`);
+  if (gl) gl.warn('beats_worn_rows_carried', msg, null, { pageNumber, carried: carry.carried, pass });
+  return carry.brief;
+}
 // The corrective loop's shared halves — the payload contract and the
 // introduced-vs-survived verdict. The rewrite path (images.js iteratePageCore)
 // reaches the same two through briefCorrection.correctFindings.
@@ -798,7 +815,7 @@ function shippedReplanState(rounds = []) {
  *   text (the kickoff is deliberately early — the Visual Bible does not exist
  *   yet at that point), so the caller re-renders exactly those and nothing else.
  *   Non-blocking, owns its own error handling.
- * @returns {Promise<{title, beats, pages, scenes, rawOutline, meta, beatsReviewReport, clothingReviewReport, sceneReviewReport}>}
+ * @returns {Promise<{title, beats, pages, scenes, rawOutline, meta, beatsReviewReport, storyBibleReport, clothingReviewReport, wardrobeBibleReport, sceneReviewReport}>}
  *   pages[]  mirrors UnifiedStoryParser.extractPages() output consumed by server.js
  *   scenes[] mirrors the resolved value of startSceneExpansion() (expandedScenes)
  *   *ReviewReport  {model, durationMs, changedPages[], analysis, pages:[{pageNumber,before,after}]},
@@ -1111,6 +1128,11 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         // already give their prompts (outlinePrompt, storyTextPrompts).
         panelPrompt,
         retellPrompt,
+        // The re-telling's raw reply (2026-09-23). The parsed fields below drop
+        // its "Premise figures:" / "Invented figures:" / "Challenges taken:"
+        // head and strip the [C###] tags, so without the raw nothing they were
+        // parsed from could be audited.
+        retellRaw: retellRes.text,
         retellModel: retellRes.modelId || arcCreatorModel,
         finalArc: retold.finalArc,
         used: retold.used,
@@ -1151,13 +1173,19 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // GROK HINT PASS (owner verdict 2026-09-01, lean flow): one outside look
     // at the final arc — the top remaining issues travel forward as hints,
     // never as another re-telling round. Advisory: failure skips, never blocks.
+    // Prompt and raw reply are kept whether or not the pass parses (2026-09-23):
+    // the prompt was built and sent but never stored, so a hint could not be
+    // traced to what the pass was shown.
+    let hintsPrompt = null;
+    let hintsRaw = null;
+    const hintsModel = MODEL_DEFAULTS.arcHintsModel || 'grok-4.6';
     try {
-      const hintsModel = MODEL_DEFAULTS.arcHintsModel || 'grok-4.6';
-      const hintsPrompt = buildArcHintsPrompt(inputData, approvedArc);
+      hintsPrompt = buildArcHintsPrompt(inputData, approvedArc);
       if (!hintsPrompt) throw new Error('arc-hints template unavailable');
       // null maxTokens = the model's own maximum; temp 0 on the non-Anthropic paths.
       const hintsRes = await textModels.callTextModelStreaming(hintsPrompt, null, onChunk, hintsModel, { usageLabel: 'arc_hints', ...tempFor(hintsModel, 0) });
-      arcHints = parseArcHints(hintsRes?.text || '');
+      hintsRaw = hintsRes?.text || '';
+      arcHints = parseArcHints(hintsRaw);
       if (!arcHints) throw new Error('no ISSUE → CHANGE lines parsed');
       gl.info('arc_hints', `Hint pass (${hintsRes.modelId || hintsModel}): ${arcHints.split('\n').length} hint(s) on the final arc`, null, {
         model: hintsRes.modelId || hintsModel, hints: arcHints.split('\n'),
@@ -1190,6 +1218,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       maxSeverity: roundReports.length ? roundReports[roundReports.length - 1].maxSeverity : null,
       critique: roundReports.length ? roundReports[roundReports.length - 1].critique : arcWeakPoints,
       arcHints,
+      hintsModel,
+      hintsPrompt,
+      hintsRaw,
     };
     gl.info('beats_arc', `Arc machine done: ${roundReports.length}/${arcRounds} round(s), final arc by ${arcCreatorModel} (${(meta.timings.arcMs / 1000).toFixed(1)}s)`, null, {
       rounds: roundReports.length, creatorModel: arcCreatorModel,
@@ -1274,10 +1305,13 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   let beatsReviewReport = null;
   // The character list PLUS the figures the premise supplied (the arc reports
   // them; see `arcPremiseNames`). A pet the commission named is commissioned.
-  const commissionedNames = [
-    ...(inputData?.characters || []).map(c => c && c.name).filter(Boolean),
-    ...arcPremiseNames.filter(n => n && String(n).trim()),
-  ];
+  //
+  // ONE definition, shared with the Test Lab replay (castCoverage.commissionedCast):
+  // `listed` is the character list — the characters that owe the book a focal
+  // page and the castCoverage() appearance floor — and `all` adds the figures
+  // the commission supplied elsewhere, which are never invented.
+  const commission = commissionedCast(inputData, arcPremiseNames);
+  const commissionedNames = commission.all;
   if (arcPremiseNames.length) log.info(`👪 [BEATS] Premise figures counted as commissioned: ${arcPremiseNames.join(', ')}`);
   // The counters must never read a PLACE as a person. The names come from the
   // same authoritative data the planner itself was given — the resolved
@@ -1368,7 +1402,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       log.error(`❌ [BEATS] Plan check (${label}) failed (${err.message}) — NO ROSTER, so the entire plan-counter layer is skipped this round`);
       gl.error(`${label}_failed`, `Plan check failed: ${err.message} — no roster, so every plan counter (cast, invented cast, shot variety, focal pages) is skipped this round`, null, { error: err.message, model: planCheckModel });
     }
-    const counters = runPlanCounters({ pages, commissionedNames, placeNames, maxCharactersPerScene: maxCast, declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit, roster, peoplelessPick });
+    const counters = runPlanCounters({ pages, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit, roster, peoplelessPick });
     // NO FALLBACK, NO SYNTHESIS. The finding degrades to its page-less
     // sentence when Q6 nominated nothing; code never picks the page itself.
     // The miss is loud so a checker that stops answering Q6 is visible.
@@ -1887,7 +1921,15 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // the clothing review, the avatar kickoff and expandOnePage all close over it.
   let visualBible = null;
   let clothingRequirements = null;
-  const biblePrompt = buildStoryBibleFromBeatsPrompt(inputData, beats);
+  // What the wardrobe call was sent and what it answered, verbatim — the
+  // transcript's CLOTHING section is rewritten by the review and by the
+  // wardrobe-vs-bible check, so it is not a copy of the reply.
+  let storyBibleReport = null;
+  // The wardrobe-vs-Visual-Bible check, filled once the Art Director has run.
+  let wardrobeBibleReport = null;
+  // The arc names whose garment the plot uses ("lift the egg in X's jacket");
+  // the plan line often says only "his jacket".
+  const biblePrompt = buildStoryBibleFromBeatsPrompt(inputData, beats, { arc: approvedArc });
   if (!biblePrompt) {
     log.warn('⚠️ [BEATS] story-bible-from-beats template unavailable — no clothing requirements');
     gl.warn('beats_story_bible_failed', 'Wardrobe template unavailable — story ships with no clothing contract');
@@ -1898,6 +1940,12 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       const bibleRes = await textModels.callTextModelStreaming(biblePrompt, null, onChunk, bibleModel, { usageLabel: 'beats_story_bible' });
       const sections = extractBibleSections(bibleRes.text || '', CLOTHING_MARKERS);
       meta.timings.storyBibleMs = Date.now() - t;
+      storyBibleReport = {
+        model: bibleRes.modelId || bibleModel,
+        durationMs: meta.timings.storyBibleMs,
+        prompt: biblePrompt,
+        rawResponse: bibleRes.text || '',
+      };
       if (!sections) {
         log.warn(`🚨 [BEATS] Wardrobe call returned no parseable section marker (${(bibleRes.text || '').length} chars)`);
         gl.warn('beats_story_bible_failed', `${bibleRes.modelId || bibleModel} emitted no ---CLOTHING REQUIREMENTS--- marker — story ships with no clothing contract`);
@@ -1982,6 +2030,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
           durationMs: meta.timings.clothingReviewMs,
           analysis: parsed.analysis || '',
           changed: rewrites,
+          // The whole reply: a stray entry (a creature the reviewer dressed)
+          // is dropped from `changed`, so this is the only copy of its text.
+          rawResponse: cRes.text || '',
           // Same dev-mode inspection as the other two reviews: the exact prompt
           // and every outfit as sent, not only the ones that moved.
           prompt: clothingPrompt,
@@ -2339,11 +2390,12 @@ ${bibleBody}` : bibleBody;
   // The two describe the same body and nothing compared them: a costume line
   // could put a hat on a character the bible already dresses with a different
   // one, on every page she appears (staging job_1789420511893_zly5rcdej,
-  // ART002). The bible wins — it has a rendered reference cell — so the outfit
-  // clause is rewritten here, the first moment both exist, and every swap is
-  // logged. Contained like every other check: a throw ships the contradiction
-  // rather than killing the run, but never silently.
-  let wardrobeBibleReport = null;
+  // ART002). The contract owns garment wording (owner, 2026-09-23): a linked
+  // entry naming the SAME garment takes the contract's words (`adopt`), the
+  // contract is untouched. Only a DIFFERENT garment in an occupied slot
+  // (`conflict`) rewrites the outfit clause. Contained like every other check:
+  // a throw ships the contradiction rather than killing the run, but never
+  // silently.
   if (visualBible && clothingRequirements && Object.keys(clothingRequirements).length > 0) {
     try {
       const { applyWardrobeBibleCorrections } = require('./clothingCheck');
@@ -2352,32 +2404,33 @@ ${bibleBody}` : bibleBody;
       // after every rewrite), so identity comparison against `findings` was
       // always false and every successful correction logged as uncorrected.
       // Compare on what identifies a finding instead.
-      const correctionKey = (f) => `${f.character} ${f.category} ${f.slot} ${f.elementId || ''}`;
+      const correctionKey = (f) => `${f.character} ${f.category} ${f.slot} ${f.elementId || ''}`;
       const appliedKeys = new Set(applied.map(correctionKey));
+      const contractChanges = applied.filter(f => f.kind === 'conflict');
       if (findings.length > 0) {
         wardrobeBibleReport = {
           conflicts: findings.map(f => ({
-            character: f.character, category: f.category, slot: f.slot,
-            elementId: f.elementId, elementLabel: f.elementLabel,
+            kind: f.kind, character: f.character, category: f.category, slot: f.slot,
+            elementId: f.elementId, elementLabel: f.elementLabel, elementText: f.elementText,
             wardrobeClause: f.wardrobeClause, corrected: appliedKeys.has(correctionKey(f)),
           })),
         };
-        gl.warn('beats_wardrobe_bible_conflict', `${findings.length} wardrobe/bible wardrobe conflict(s): ${findings.map(f => `${f.character}/${f.slot} "${f.wardrobeClause}" vs ${f.elementId || '?'} "${f.elementLabel}"`).join('; ')}`, null, {
+        gl.warn('beats_wardrobe_bible_conflict', `${findings.length} wardrobe/bible disagreement(s): ${findings.map(f => `${f.kind} ${f.character}/${f.slot} "${f.wardrobeClause}" vs ${f.elementId || '?'} "${f.elementLabel}"`).join('; ')}`, null, {
           conflicts: wardrobeBibleReport.conflicts,
         });
         // The transcript is what every later consumer re-parses the contract
         // out of; correcting only the object leaves them on the old outfit.
-        if (applied.length > 0 && bibleSections) {
+        if (contractChanges.length > 0 && bibleSections) {
           const rewritten = replaceClothingSection(bibleSections, clothingRequirements);
           if (rewritten === bibleSections) {
-            gl.warn('beats_wardrobe_bible_unmerged', `${applied.length} outfit(s) corrected against the Visual Bible but the transcript has no CLOTHING REQUIREMENTS section to update`);
+            gl.warn('beats_wardrobe_bible_unmerged', `${contractChanges.length} outfit(s) corrected against the Visual Bible but the transcript has no CLOTHING REQUIREMENTS section to update`);
           } else {
             bibleSections = rewritten;
           }
         }
         if (unresolved.length > 0) {
           wardrobeBibleReport.unresolved = unresolved.map(f => ({
-            character: f.character, category: f.category, slot: f.slot,
+            kind: f.kind, character: f.character, category: f.category, slot: f.slot,
             elementId: f.elementId, elementLabel: f.elementLabel, wardrobeClause: f.wardrobeClause,
           }));
         }
@@ -2385,12 +2438,11 @@ ${bibleBody}` : bibleBody;
       // THE AVATAR WAS RENDERED FROM THE PRE-CORRECTION TEXT. The styled-avatar
       // kickoff fires at the story-bible stage, long before the Visual Bible
       // this check needs exists — deliberately, because avatars are the long
-      // pole in front of every image. So page prompts would carry the corrected
-      // garment while the avatar reference cell still wore the old one: the
-      // words-vs-picture split, one layer upstream. The affected characters —
-      // and only those — are re-rendered by the caller.
-      if (applied.length > 0 && typeof onWardrobeCorrected === 'function') {
-        const names = [...new Set(applied.map(f => f.character).filter(Boolean))];
+      // pole in front of every image. Only a `conflict` changes the contract,
+      // so only its characters are re-rendered; an `adopt` changes the bible
+      // entry and leaves the avatar's outfit exactly as drawn.
+      if (contractChanges.length > 0 && typeof onWardrobeCorrected === 'function') {
+        const names = [...new Set(contractChanges.map(f => f.character).filter(Boolean))];
         try {
           onWardrobeCorrected(names, clothingRequirements);
         } catch (err) {
@@ -2660,8 +2712,9 @@ ${bibleBody}` : bibleBody;
       // Captured at the overwrite, the only moment both briefs exist.
       const sceneDiffs = [];
       for (const x of expansions) {
-        const fixed = byPage.get(x.pageNumber);
-        if (fixed && fixed.trim()) {
+        const reviewed = byPage.get(x.pageNumber);
+        if (reviewed && reviewed.trim()) {
+          const fixed = keepDeclaredWornRows(x.pageNumber, reviewed, x.brief, 'scene review', gl);
           if (fixed !== x.brief) sceneDiffs.push({ pageNumber: x.pageNumber, before: x.brief, after: fixed });
           x.brief = fixed;
           x.reviewRewrote = true;
@@ -2834,7 +2887,16 @@ ${bibleBody}` : bibleBody;
       // whether it acted on them is not a matter of trust. The check is free
       // and deterministic, so run it again on the rewritten briefs and say what
       // survived instead of shipping it quietly (owner rule: fail loudly).
-      if (clothingByPage && clothingByPage.size > 0) {
+      //
+      // ON EVERY REVIEWED RUN, not only when the pre-review check found
+      // something (2026-09-23). A rewrite can INTRODUCE a clothing fault on a
+      // page that was clean when it was handed over — the same failure mode the
+      // brief re-check below documents. Gated on pre-review findings, a
+      // review-introduced `removal_unstated` could never reach the worn-state
+      // round: on staging job_1790100385959_1nitlympp the pre-review check
+      // found nothing, the review deleted declared rows on p11, p12 and p18,
+      // and nothing looked again.
+      {
         try {
           const { checkScenes } = require('./clothingCheck');
           const after = checkScenes(expansions.map(x => {
@@ -2850,13 +2912,13 @@ ${bibleBody}` : bibleBody;
           const REVIEWABLE = new Set(['outfit_misattributed', 'removal_unstated']);
           const left = after.findings.filter(f => REVIEWABLE.has(f.type));
           clothingUnfixedList = left;
-          const before = [...clothingByPage.values()].flat().filter(f => REVIEWABLE.has(f.type)).length;
+          const before = clothingByPage ? [...clothingByPage.values()].flat().filter(f => REVIEWABLE.has(f.type)).length : 0;
           if (left.length > 0) {
             const pages = [...new Set(left.map(f => f.pageNumber))].sort((a, b) => a - b).join(', ');
-            log.warn(`⚠️ [BEATS] clothing check after review: ${left.length}/${before} fault(s) still present on page(s) ${pages}`);
+            log.warn(`⚠️ [BEATS] clothing check after review: ${left.length} fault(s) present on page(s) ${pages} (${before} handed to the review)`);
             gl.warn('beats_clothing_unfixed',
-              `Clothing faults survived the scene review on page(s) ${pages}: ${left.map(f => `p${f.pageNumber} ${f.type} (${f.character})`).join('; ')}`);
-          } else {
+              `Clothing faults present after the scene review on page(s) ${pages} (${before} were handed to it): ${left.map(f => `p${f.pageNumber} ${f.type} (${f.character})`).join('; ')}`);
+          } else if (before > 0) {
             log.info(`👕 [BEATS] clothing check after review: all ${before} fault(s) resolved`);
           }
 
@@ -2900,7 +2962,8 @@ ${bibleBody}` : bibleBody;
                 const wrParsed = parseRefinedText(wrRes.text || '', subset.map(x => x.pageNumber), 'SCENES', BRIEF_TRAILING_MARKERS);
                 const wrByPage = new Map(wrParsed.pages.map(pg => [pg.pageNumber, pg.text]));
                 for (const x of subset) {
-                  const fixed = wrByPage.get(x.pageNumber);
+                  const reworn = wrByPage.get(x.pageNumber);
+                  const fixed = reworn && reworn.trim() ? keepDeclaredWornRows(x.pageNumber, reworn, x.brief, 'worn-state round', gl) : reworn;
                   if (fixed && fixed.trim() && fixed !== x.brief) {
                     sceneDiffs.push({ pageNumber: x.pageNumber, before: x.brief, after: fixed, round: 'worn' });
                     x.brief = fixed;
@@ -3440,7 +3503,7 @@ ${bibleBody}` : bibleBody;
   // trimmed, age-clamped, landmark-linked. The caller prefers it over a
   // re-parse of rawOutline so the two can never diverge (the transcript is
   // kept in step by syncVisualBibleSection; the re-parse is the fallback).
-  return { title, titleJudge, beats, pages, scenes, rawOutline, visualBible, meta, challengeDrawIds, challengeTakenIds, challengeDraw, arcReviewReport, beatsReviewReport, clothingReviewReport, sceneExpansionReport, sceneReviewReport };
+  return { title, titleJudge, beats, pages, scenes, rawOutline, visualBible, meta, challengeDrawIds, challengeTakenIds, challengeDraw, arcReviewReport, beatsReviewReport, storyBibleReport, clothingReviewReport, wardrobeBibleReport, sceneExpansionReport, sceneReviewReport };
 }
 
 module.exports = { generateStoryViaBeats, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };

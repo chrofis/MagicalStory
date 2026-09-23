@@ -40,8 +40,8 @@ describe('the arc critique spec is one source', () => {
     const retell = buildArcRetellPrompt(input(), 18, 'ARC 1: ...', '');
     expect(create).not.toContain('{ARC_CRITIQUE_SPEC}');
     expect(retell).not.toContain('{ARC_CRITIQUE_SPEC}');
-    expect(create).toContain(arcCritiqueSpec());
-    expect(retell).toContain(arcCritiqueSpec({ retell: true }));
+    expect(create).toContain(arcCritiqueSpec({ inputData: input() }));
+    expect(retell).toContain(arcCritiqueSpec({ retell: true, inputData: input() }));
   });
 
   it('the questions are numbered and the count is honest', () => {

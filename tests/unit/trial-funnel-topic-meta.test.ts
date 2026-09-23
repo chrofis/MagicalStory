@@ -19,10 +19,12 @@ import { describe, it, expect } from 'vitest';
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret-trial-meta';
 const { sanitizeTrialEventMeta } = require('../../server/routes/trial.js');
 
+// Line endings normalised: a Windows checkout with core.autocrlf=true has CRLF
+// on disk, and metaFor() anchors on a newline inside the call.
 const WIZARD = fs.readFileSync(
   path.join(__dirname, '..', '..', 'client', 'src', 'pages', 'TrialWizard.tsx'),
   'utf8'
-);
+).split('\r\n').join('\n');
 
 /** The meta object literal passed to one trackTrialStep call, as source text. */
 function metaFor(step: string): string {

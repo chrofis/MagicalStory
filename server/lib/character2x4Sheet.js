@@ -109,6 +109,13 @@ async function styleTransferGenerate(prompt, pass1ImageData, backendOverride = n
 // (style transfer) → 1 + 1 = 2 attempts.
 const MAX_SHEET_RETRIES = 1;
 
+// The cell-4 / cell-8 pose, ONE definition. The live row generators
+// (buildBodyRowPrompt, buildHeadRowPrompt) and every sheet judge fill it from
+// here: until 2026-09-23 the generators asked for a rear turn while three of the
+// four judges were told the cell is a plain "back" view and the style judge that
+// "cell 8 needs no face", so a flat back or a second profile passed every gate.
+const REAR_TURN_POSE = 'shoulders and body fully away from camera, head rotated back over the right shoulder toward camera so one eye and the near cheek are visible';
+
 const ASSETS_DIR = path.resolve(__dirname, '..', 'assets');
 // The -axes variants overlay a 3-axis RGB gizmo (red X / green Y / blue Z)
 // on the face region of every cell instead of the original eye-dots + mouth
@@ -322,7 +329,7 @@ ${outfitRule}${readsAs}${buildSeasonOutfitBlock(seasonOutfit, redress)}${hairBlo
 Render every cell as a REALISTIC reference — the same visual style as the source face photo in Image 3. Photographic / lifelike, natural proportions${ageFromPhoto}. No cartoon, no anime, no watercolour. This sheet is an identity anchor.
 
 Output a 1×4 grid: ONE row, four cells side by side, thin black vertical dividers, pure white background, same cell layout as Image 1.
-Each cell shows the SAME PERSON as Image 3 rendered as a COMPLETE FULL BODY from the very top of the head to the figure's lowest point, wearing the costume. Cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 is a REAR TURN: shoulders and body fully away from camera, but the head rotates back over the right shoulder toward camera so one eye and the near cheek are visible. Cell 4 is never a profile and never a flat back view with no face showing — Image 1's cell 4 is a plain reference silhouette only, ignore its exact head angle. Normally that lowest point is both feet with shoes, and the whole figure — head, hair, face, torso, legs, feet — sits inside its cell. When the costume replaces the legs (a tail, a fin, a single fused lower body), the figure has NO legs, NO feet and NO footwear: it ends at the tip of that form, which is then the lowest point. Never crop the head and never crop the lowest point; if the figure does not fit, scale it down until the whole figure is inside the cell, with white margin above and below. ${proportionsRule}
+Each cell shows the SAME PERSON as Image 3 rendered as a COMPLETE FULL BODY from the very top of the head to the figure's lowest point, wearing the costume. Cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 is a REAR TURN: ${REAR_TURN_POSE}. Cell 4 is never a profile and never a flat back view with no face showing — Image 1's cell 4 is a plain reference silhouette only, ignore its exact head angle. Normally that lowest point is both feet with shoes, and the whole figure — head, hair, face, torso, legs, feet — sits inside its cell. When the costume replaces the legs (a tail, a fin, a single fused lower body), the figure has NO legs, NO feet and NO footwear: it ends at the tip of that form, which is then the lowest point. Never crop the head and never crop the lowest point; if the figure does not fit, scale it down until the whole figure is inside the cell, with white margin above and below. ${proportionsRule}
 ${buildFootwearRule(redress, seasonOutfit?.footwear)}
 ${buildGarmentRule()}
 The outfit is identical in all four cells, layers included. When the costume has an outer layer — vest, jacket, cardigan, coat, or overshirt — it stays on in the profile and back cells. Seen edge-on in the profile, its front opening runs as a vertical band down the side of the torso, with the shoulder seam, armhole, and the back panel visible behind the arm. No text, numbers, labels, arrows, or symbols anywhere.`;
@@ -344,7 +351,7 @@ Image 2 is the character's face photo — the identity; match this exact face.
 Image 3 is the character's full-body reference sheet — match the SAME face, hair colour, hairstyle, and skin tone shown there so the heads belong to that body.${outfitLine}
 ${buildGarmentRule()}${hairBlock}
 Output a 1×4 grid: ONE row, four cells side by side, thin black vertical dividers, pure white background. Each cell is a HEAD-AND-SHOULDERS close-up of the SAME PERSON — the head, neck, and the top of the shoulders wearing the costume; a little of the shoulders and collar showing is good, no bare skin below the neck. Never crop the top of the head. Cell 1 front, cell 2 three-quarter, cell 3 profile.
-Cell 4 is a REAR TURN, distinct from cell 3's profile: shoulders fully away from camera, head rotated back over the right shoulder toward camera so one eye and the near cheek are clearly visible. Cell 4 is never a second profile and never a flat back of the head with no face showing — Image 1's cell 4 is a plain placeholder silhouette, ignore its exact head angle entirely.
+Cell 4 is a REAR TURN, distinct from cell 3's profile: ${REAR_TURN_POSE}. Cell 4 is never a second profile and never a flat back of the head with no face showing — Image 1's cell 4 is a plain placeholder silhouette, ignore its exact head angle entirely.
 Photographic / lifelike; identity from Image 2; hair, skin tone, and costume consistent with Image 3.${declaredAgeBlock(character)} No text, numbers, labels, arrows, or symbols.`;
 }
 
@@ -1071,6 +1078,7 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
 
   let prompt = promptOverride || PROMPT_TEMPLATES.sheet2x4StyleEval;
   if (!prompt) throw new Error('sheet2x4StyleEval prompt template not loaded');
+  prompt = fillTemplate(prompt, { REAR_TURN: REAR_TURN_POSE });
   prompt = prompt.replace(/REQUESTED_STYLE/g, `REQUESTED_STYLE: ${styleLabel}`);
   // TASK 6 age gate — style transfer is where kids drift younger (the art
   // style's cute prior). Unknown age disables the task (prompt scores it 10).
@@ -1090,41 +1098,93 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
     toInlinePart(styledSheet),
     { text: prompt },
   ];
-  // Degenerate-judge guard: the model sometimes returns the prompt's example
-  // JSON verbatim instead of judging (Noah, job_1786484554633 — a sheet full of
-  // ghost anchor-figures shipped with all-9s whose outfit reason was the
-  // example's "Navy shirt + tan pants"). The template's example now uses
-  // <placeholder> reasons, so an echoed verdict is detectable; re-ask once,
-  // then fail the eval so the retry loop treats the attempt as unjudged.
+  return askSheetJudge({ model, parts, prompt, label: 'style-eval', usageTracker, usageFn: 'character_2x4_style_eval', apiKey: geminiApiKey });
+}
+
+// ── Degenerate-judge guard, shared by EVERY sheet judge ──────────────────────
+// A sheet judge sometimes returns text it was shown instead of a verdict. Three
+// shapes are measured: the template's worked example verbatim (pass 2, Noah,
+// job_1786484554633: all-9s over a sheet full of ghost figures), the same for
+// all three pass-1 row judges (staging job_1790100385959_1nitlympp: 6/6 sheets,
+// every reason string and every score the example's, over sheets with a
+// duplicated profile and an invented collar), and TASK sentences lifted into the
+// reason (the same run's pass-2 layout reason was TASK 1's text on 5 of 6
+// sheets, over a sheet whose top row is not head cells at all). Every template
+// now shows `<placeholder>` examples and asks for per-cell observations; a
+// verdict still carrying a placeholder, a pre-2026-09-23 example string, or a
+// reason made only of the prompt's own sentences was never judged. It is
+// re-asked once, then the eval throws so the caller records it as unjudged.
+const LEGACY_EXAMPLE_REASONS = ([
+  // pass-2 style eval, before 2026-08-12
+  'Same 4×2 grid as Image 2, no figure crosses gutters',
+  'Only the target character appears; no other or extra people in any cell',
+  // pass-1 row evals, before 2026-09-23
+  'Front, three-quarter, profile, back left to right',
+  'No arrows or stray marks on any head',
+  'Visible shoulders are clothed in the requested garment in every cell',
+  'One head per cell, four separate heads, no extra or ghosted person',
+  'Every figure wears the requested items, consistent across cells',
+  'Reads as the requested costume; 10 when none was requested',
+  'One figure per cell, four separate figures, no extra or ghosted person',
+  'Proportions match the stated age',
+  'Plain white background in every cell',
+  'All 4 heads match the reference person in face structure, hair, skin tone, and age',
+]).map(x => x.toLowerCase());
+
+function judgeReasons(verdict) {
+  if (!verdict || typeof verdict !== 'object') return [];
+  const out = [];
+  if (typeof verdict.reason === 'string') out.push(verdict.reason);
+  for (const v of Object.values(verdict)) {
+    if (v && typeof v === 'object' && typeof v.reason === 'string') out.push(v.reason);
+  }
+  return out;
+}
+
+const normEcho = (t) => String(t).normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim();
+
+// True when the reason is two or more sentences and every one of them is a
+// sentence of the prompt. A reason that adds one observation of its own is not
+// an echo, however much task wording it repeats; a single restated criterion is
+// left to the judge (too close to an honest one-line pass to fail a sheet on).
+function isLiftedFromPrompt(reason, promptText) {
+  const prompt = normEcho(promptText);
+  const sentences = normEcho(reason).split(/(?<=[.!?])\s+|;\s*/)
+    .map(x => x.replace(/^[-–•*\s]+|[.!?,;:\s]+$/g, ''))
+    .filter(Boolean);
+  return sentences.length >= 2 && sentences.every(x => prompt.includes(x));
+}
+
+function isEchoedJudgeVerdict(verdict, promptText) {
+  const reasons = judgeReasons(verdict);
+  if (reasons.length === 0) return false;
+  return reasons.some(r => r.includes('<') || isLegacyExample(r) || isLiftedFromPrompt(r, promptText));
+}
+
+// The run's identity judge returned the example with a full stop, or with one
+// clause appended ("… and age. The character appears to be around 3."), so a
+// long example string is matched as the reason's opening, a short one exactly.
+function isLegacyExample(reason) {
+  const r = normEcho(reason).replace(/[.!?\s]+$/, '');
+  return LEGACY_EXAMPLE_REASONS.some(ex => r === ex || (ex.length >= 40 && r.startsWith(ex)));
+}
+
+// One call to a sheet judge with the echo guard: re-ask once, then throw.
+async function askSheetJudge({ model, parts, prompt, label, usageTracker, usageFn, apiKey }) {
   for (let evalTry = 1; evalTry <= 2; evalTry++) {
-    const { text, usageMetadata } = await callSheetJudge(model, parts, null, geminiApiKey);
-    if (!text) throw new Error(`style-eval (${model}) returned no text`);
+    const { text, usageMetadata } = await callSheetJudge(model, parts, null, apiKey);
+    if (!text) throw new Error(`${label} (${model}) returned no text`);
     if (usageTracker && usageMetadata) {
       usageTracker('gemini_quality', {
         input_tokens: usageMetadata.promptTokenCount || 0,
         output_tokens: usageMetadata.candidatesTokenCount || 0,
-      }, 'character_2x4_style_eval', model);
+      }, usageFn, model);
     }
     const verdict = parseJudgeJson(text);
-    if (!isEchoedStyleVerdict(verdict)) return verdict;
-    log.warn(`[CHARACTER 2×4] style-eval returned the template example verbatim (try ${evalTry}/2) — ${evalTry < 2 ? 're-asking' : 'failing the eval'}`);
+    if (!isEchoedJudgeVerdict(verdict, prompt)) return verdict;
+    log.warn(`[CHARACTER 2×4] ${label} returned text from its own prompt instead of a verdict (try ${evalTry}/2) — ${evalTry < 2 ? 're-asking' : 'failing the eval'}`);
   }
-  throw new Error('style-eval echoed the template example twice — degenerate judge response');
-}
-
-// A verdict whose reasons are the template's own example/placeholder strings was
-// never judged. Two signatures: an unfilled "<placeholder>" (current template)
-// or the pre-2026-08-12 worked example's distinctive reason strings.
-const LEGACY_EXAMPLE_REASONS = [
-  'Same 4×2 grid as Image 2, no figure crosses gutters',
-  'Only the target character appears; no other or extra people in any cell',
-];
-function isEchoedStyleVerdict(verdict) {
-  const reasons = ['layout', 'identity', 'style', 'clean', 'bodyFace', 'age', 'solo']
-    .map(k => verdict?.[k]?.reason)
-    .filter(r => typeof r === 'string');
-  if (reasons.length === 0) return false;
-  return reasons.some(r => r.includes('<') || LEGACY_EXAMPLE_REASONS.some(ex => r.trim() === ex));
+  throw new Error(`${label} echoed its prompt twice — degenerate judge response`);
 }
 
 // Split a 2×4 sheet into its top (4 heads) and bottom (4 bodies) rows. The head
@@ -1227,6 +1287,7 @@ async function evaluateSheetRow(rowImageData, which, opts = {}) {
   // style evals. Unknown age → the prompt falls back to apparent age.
   const ageNum = parseInt(declaredAge, 10);
   prompt = fillTemplate(prompt, {
+    REAR_TURN: REAR_TURN_POSE,
     REQUESTED_OUTFIT: costumeDescription ? `REQUESTED_OUTFIT: ${costumeDescription}` : '',
     ...(which === 'bodies'
       ? {
@@ -1238,12 +1299,8 @@ async function evaluateSheetRow(rowImageData, which, opts = {}) {
   const parts = [inlinePartOf(rowImageData), { text: prompt }];
   // No cap (owner rule: no output caps): a 4000 cap once truncated the bodies
   // JSON mid-string, and the throw cost three characters their whole ref sheet.
-  const { text, usageMetadata } = await callSheetJudge(model, parts, null, process.env.GEMINI_API_KEY);
-  if (!text) throw new Error(`row eval (${which}, ${model}) returned no text`);
-  if (usageTracker && usageMetadata) {
-    usageTracker('gemini_quality', { input_tokens: usageMetadata.promptTokenCount || 0, output_tokens: usageMetadata.candidatesTokenCount || 0 }, `character_2x4_${which}_eval`, model);
-  }
-  return { report: parseJudgeJson(text), promptUsed: prompt };
+  const report = await askSheetJudge({ model, parts, prompt, label: `row eval (${which})`, usageTracker, usageFn: `character_2x4_${which}_eval`, apiKey: process.env.GEMINI_API_KEY });
+  return { report, promptUsed: prompt };
 }
 
 // IDENTITY eval — reference faces (photo + avatar faces) + the HEADS crop only.
@@ -1257,19 +1314,16 @@ async function evaluateIdentity(headsCrop, opts = {}) {
   // Fiona/Lorena avatar sheets read 40-45 vs stated 25 and 35-40 vs 22 — this
   // check passed both because nothing asked about age).
   const ageNum = parseInt(declaredAge, 10);
-  prompt = prompt.replace(/CHARACTER_AGE/g, Number.isFinite(ageNum) ? `${ageNum} years old` : 'unknown');
+  prompt = fillTemplate(prompt, { REAR_TURN: REAR_TURN_POSE })
+    .replace(/CHARACTER_AGE/g, Number.isFinite(ageNum) ? `${ageNum} years old` : 'unknown');
   const parts = [];
   if (sourcePhoto) parts.push(inlinePartOf(sourcePhoto));
   if (avatarFaces) parts.push(inlinePartOf(avatarFaces));
   parts.push(inlinePartOf(headsCrop));
   parts.push({ text: prompt });
   // No cap (owner rule: no output caps) — a low cap truncated the JSON.
-  const { text, usageMetadata } = await callSheetJudge(model, parts, null, process.env.GEMINI_API_KEY);
-  if (!text) throw new Error(`identity eval (${model}) returned no text`);
-  if (usageTracker && usageMetadata) {
-    usageTracker('gemini_quality', { input_tokens: usageMetadata.promptTokenCount || 0, output_tokens: usageMetadata.candidatesTokenCount || 0 }, 'character_2x4_identity_eval', model);
-  }
-  return { report: parseJudgeJson(text), promptUsed: prompt };
+  const report = await askSheetJudge({ model, parts, prompt, label: 'identity eval', usageTracker, usageFn: 'character_2x4_identity_eval', apiKey: process.env.GEMINI_API_KEY });
+  return { report, promptUsed: prompt };
 }
 
 // Shared split evaluator — the SINGLE implementation used by BOTH production
@@ -1938,5 +1992,5 @@ module.exports = {
   resolveFacePhoto,
   buildStyleTransferPrompt,
   // exposed for tests
-  _internal: { parseJudgeJson, buildPrompt, buildBodyRowPrompt, buildHeadRowPrompt, buildFootwearRule, buildGarmentRule, buildSeasonOutfitBlock, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateSheetWithGemini, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit, evaluateAvatarSheet },
+  _internal: { parseJudgeJson, buildPrompt, buildBodyRowPrompt, buildHeadRowPrompt, buildFootwearRule, buildGarmentRule, buildSeasonOutfitBlock, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateSheetWithGemini, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit, evaluateAvatarSheet, isEchoedJudgeVerdict, REAR_TURN_POSE },
 };

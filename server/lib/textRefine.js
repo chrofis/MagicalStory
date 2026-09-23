@@ -13,9 +13,9 @@
  * round."):
  *
  *   1. TWO AUDITS, in parallel, on the writer's text
- *        a. arc-informed  — gemini-3.1-pro, story-text-audit.txt (final arc,
- *           page plan, page text, each page's whole picture brief; no back
- *           cover, no commission, no arc hints — corrected 2026-09-23)
+ *        a. arc-informed  — gemini-3.1-pro, story-text-audit.txt (final arc
+ *           and its hints, page plan, page text, each page's whole picture
+ *           brief; no back cover, no commission — corrected 2026-09-23)
  *        b. blind         — grok-4.6, story-text-audit-blind.txt (page text and
  *           nothing else)
  *   2. MERGE + DEDUPE the two fault lists in code (mergeAuditFindings)
@@ -223,6 +223,12 @@ const FINDING_OUTCOME = {
   NO_PAGE_NAMED: 'no-page-named',
   /** The pass itself failed, so no finding it held was answered. */
   PASS_FAILED: 'pass-failed',
+  /**
+   * The pass rewrote the page, and the diff pass then put the writer's own
+   * sentences back on it. Whether the fix survived is not knowable in code, so
+   * the ledger stops claiming it (settleLedgerAfterDiff).
+   */
+  REWRITE_RESTORED: 'rewrite-restored',
 };
 
 /**
@@ -267,6 +273,64 @@ function unresolvedFindings(ledger = []) {
   return (ledger || []).filter(f => f.outcome !== FINDING_OUTCOME.PAGE_REWRITTEN);
 }
 
+/**
+ * The sentences of one diff correction that the WRITER's page carried and the
+ * rewrite it corrected did not — i.e. what the correction restored. Provenance
+ * only, by verbatim containment (whitespace-normalised); it says nothing about
+ * whether restoring was right.
+ *
+ * @param {string} correction  the diff pass's replacement text
+ * @param {string} writerText  the page before any whole-page pass (BEFORE)
+ * @param {string} rewritten   the page as the diff pass read it (AFTER)
+ * @returns {string[]}
+ */
+function restoredSentences(correction, writerText, rewritten) {
+  const norm = s => String(s || '').replace(/\s+/g, ' ').trim();
+  const before = norm(writerText);
+  const after = norm(rewritten);
+  const whole = norm(correction);
+  if (!whole) return [];
+  if (before.includes(whole) && !after.includes(whole)) return [whole];
+  return whole
+    .split(/(?<=[.!?…»“”"])\s+/)
+    .map(s => s.trim())
+    .filter(s => s.split(' ').length >= 3 && before.includes(s) && !after.includes(s));
+}
+
+/**
+ * THE LEDGER AFTER THE DIFF PASS (2026-09-23). The ledger is resolved when the
+ * whole-page passes settle, and the diff pass runs after them. On
+ * job_1790100385959_1nitlympp the diff put the writer's sentences back on p11
+ * and p16 — the very text the repair had removed to close three findings — and
+ * the stored ledger still said `page-rewritten` for all of them.
+ *
+ * A finding whose page received a restoring diff correction is re-marked
+ * `rewrite-restored`, with the restored sentences as its reason. That is a
+ * provenance fact, not a verdict: the restoration may be the right call (a fact
+ * the rewrite dropped) or it may undo the fix. The ledger no longer claims
+ * either way, so `unresolvedFindings` counts it.
+ *
+ * @param {Array<Object>} ledger
+ * @param {Array<{pageNumber:number,restored?:string[]}>} diffApplied
+ * @returns {Array<Object>}
+ */
+function settleLedgerAfterDiff(ledger = [], diffApplied = []) {
+  const restoredOn = new Map();
+  for (const a of diffApplied || []) {
+    if (!a.restored?.length) continue;
+    restoredOn.set(a.pageNumber, [...(restoredOn.get(a.pageNumber) || []), ...a.restored]);
+  }
+  return (ledger || []).map((f) => {
+    const restored = f.outcome === FINDING_OUTCOME.PAGE_REWRITTEN ? restoredOn.get(f.pageNumber) : null;
+    if (!restored) return f;
+    return {
+      ...f,
+      outcome: FINDING_OUTCOME.REWRITE_RESTORED,
+      reason: `the diff pass put the writer's words back on page ${f.pageNumber}: ${restored.map(s => `"${s}"`).join('; ')}`,
+    };
+  });
+}
+
 // ──────────── WORD-BUDGET COUNTER: THE DETERMINISTIC THIRD AUDITOR ────────────
 
 /**
@@ -281,7 +345,13 @@ const WORD_BUDGET_TOLERANCE_UNDER = 0.2;
 
 /** Whitespace-token word count — deterministic, no model involved. */
 function countPageWords(text) {
-  return String(text || '').trim().split(/\s+/).filter(Boolean).length;
+  return require('./promptBuilders').measurePageText(text).words;
+}
+
+/** Words, sentences and paragraphs of every page, for the stored report. */
+function measurePages(pages = []) {
+  const { measurePageText } = require('./promptBuilders');
+  return pages.map(p => ({ pageNumber: p.pageNumber, ...measurePageText(p.text) }));
 }
 
 /**
@@ -315,24 +385,40 @@ function countPageWords(text) {
  * (buildArcBudgetSection) — so this stage no longer forces the impossible cut;
  * it may overrun by a few words rather than delete an action.
  *
+ * SENTENCES AND PARAGRAPHS (2026-09-23). The reading level also sets a
+ * sentence count and the page a paragraph shape, and nothing counted either:
+ * on job_1790100385959_1nitlympp (1st-grade, 3-6 sentences) most pages ran
+ * 6-12 sentences and p18 had five paragraphs, with no finding. A page past the
+ * sentence ceiling by the same OVER tolerance the words get, or past the
+ * paragraph maximum, is reported in the SAME one line per page, so the merge
+ * and the ledger see one length fault per page, never two. Over only: a short
+ * page is judged on its words.
+ *
  * @param {Array<{pageNumber:number,text:string}>} pages
  * @param {string} languageLevel
  * @returns {string} newline-joined FAULT[LENGTH] lines ('' when all pages fit)
  */
 function buildWordBudgetFindings(pages = [], languageLevel) {
-  const { LANGUAGE_LEVELS } = require('./promptBuilders');
+  const { LANGUAGE_LEVELS, PAGE_PARAGRAPHS, measurePageText } = require('./promptBuilders');
   const level = LANGUAGE_LEVELS[languageLevel] || LANGUAGE_LEVELS['standard'];
   const min = level.wordsPerPageMin;
   const max = level.wordsPerPageMax;
   const hi = max * (1 + WORD_BUDGET_TOLERANCE_OVER);
   const lo = min * (1 - WORD_BUDGET_TOLERANCE_UNDER);
+  const sentenceRange = String(level.sentencesPerPage);
+  const sentenceMax = Number(sentenceRange.split('-').pop());
+  const sentenceHi = sentenceMax * (1 + WORD_BUDGET_TOLERANCE_OVER);
   const lines = [];
   for (const p of pages) {
-    const n = countPageWords(p.text);
-    if (n > hi) {
-      lines.push(`FAULT[LENGTH]: p${p.pageNumber} — page has ${n} words, budget ${min}-${max} — tighten the wording; keep every action, line of dialogue and feeling. Losing one is a fault.`);
-    } else if (n < lo) {
-      lines.push(`FAULT[LENGTH]: p${p.pageNumber} — page has ${n} words, budget ${min}-${max} — expand without padding`);
+    const m = measurePageText(p.text);
+    const over = [];
+    if (m.words > hi) over.push(`${m.words} words, budget ${min}-${max}`);
+    if (m.sentences > sentenceHi) over.push(`${m.sentences} sentences, budget ${sentenceRange}`);
+    if (m.paragraphs > PAGE_PARAGRAPHS.maxPerPage) over.push(`${m.paragraphs} paragraphs, at most ${PAGE_PARAGRAPHS.maxPerPage}`);
+    if (over.length) {
+      lines.push(`FAULT[LENGTH]: p${p.pageNumber} — page has ${over.join('; ')} — tighten the wording; keep every action, line of dialogue and feeling. Losing one is a fault.`);
+    } else if (m.words < lo) {
+      lines.push(`FAULT[LENGTH]: p${p.pageNumber} — page has ${m.words} words, budget ${min}-${max} — expand without padding`);
     }
   }
   return lines.join('\n');
@@ -702,7 +788,7 @@ const POST_AUDIT_SCOPE_NOTE = [
  * @param {Array<{pageNumber:number,text:string}>} pages  the FINAL pages (extractRefinablePages)
  * @param {Array<{page:number|null,severity:string|null,line:string}>} textFaults
  *        the audit's TEXT route, verbatim (bookAudit.parseRoutes)
- * @param {Object} [opts] {model, arc, usageLabel}
+ * @param {Object} [opts] {model, arc, arcHints, usageLabel}
  * @returns {Promise<{pages:Array, entry:Object}|null>} null when there is nothing to do
  */
 async function runPostAuditTextRound(storyData, pages, textFaults = [], opts = {}) {
@@ -746,7 +832,7 @@ async function runPostAuditTextRound(storyData, pages, textFaults = [], opts = {
   // pages around it established if it is shown alone. What is scoped is the
   // REWRITE, not the reading.
   const findingsText = `${POST_AUDIT_SCOPE_NOTE}\n\n${lines.join('\n')}`;
-  const prompt = buildTextRefinePrompt(storyData, pages, findingsText, String(opts.arc || '').trim());
+  const prompt = buildTextRefinePrompt(storyData, pages, findingsText, String(opts.arc || '').trim(), { arcHints: opts.arcHints });
   if (!prompt) {
     log.error('❌ [TEXT-POST-AUDIT] text-refine template unavailable — the TEXT route goes unanswered');
     return fail('text-refine template unavailable');
@@ -899,6 +985,9 @@ async function refineStoryText(storyData, pages, opts = {}) {
   // repair judge each page against the arc the beats divided, never against
   // staging alone.
   const arc = String(opts.arc || '').trim();
+  // The arc's hints — amendments the writer applied. The arc-informed audit and
+  // the repair read the story with them applied (buildCriticArcHintsSection).
+  const arcHints = String(opts.arcHints || '').trim();
 
   const original = pages.map(p => ({ ...p }));
   let current = pages.map(p => ({ ...p }));
@@ -910,7 +999,8 @@ async function refineStoryText(storyData, pages, opts = {}) {
   let mergedFindings = [];
   let mergeStats = { bySource: {}, duplicates: 0 };
   // One entry per merged finding, filled the moment the repair pass settles —
-  // see resolveFindingOutcomes. Empty only while that pass has not run.
+  // see resolveFindingOutcomes — and re-settled after the diff pass
+  // (settleLedgerAfterDiff). Empty only while the repair pass has not run.
   let findingLedger = [];
   let proofread = '';
   let lectorFindings = [];
@@ -1016,20 +1106,20 @@ async function refineStoryText(storyData, pages, opts = {}) {
       if (r.truncation?.suspected) {
         const error = `audit reply ${describeTruncation(r.truncation)} — findings unusable`;
         log.warn(`⚠️ [TEXT-AUDIT/${source}] ${modelKey}: ${error}`);
-        return { source, modelKey, ok: false, error, modelId: r.modelId || TEXT_MODELS[modelKey].modelId, raw, elapsedMs, truncation: r.truncation,
+        return { source, modelKey, ok: false, error, modelId: r.modelId || TEXT_MODELS[modelKey].modelId, raw, prompt, elapsedMs, truncation: r.truncation,
           usage: { input_tokens: r.usage?.input_tokens || 0, output_tokens: r.usage?.output_tokens || 0 } };
       }
       log.info(`🔎 [TEXT-AUDIT/${source}] ${modelKey}: ${countFaults(raw)} fault(s) ${JSON.stringify(faultsByCategory(raw))} in ${(elapsedMs / 1000).toFixed(0)}s`);
       return {
         source, modelKey, ok: raw.length > 0,
         modelId: r.modelId || TEXT_MODELS[modelKey].modelId,
-        raw, faults: countFaults(raw), byCategory: faultsByCategory(raw), elapsedMs,
+        raw, prompt, faults: countFaults(raw), byCategory: faultsByCategory(raw), elapsedMs,
         usage: { input_tokens: r.usage?.input_tokens || 0, output_tokens: r.usage?.output_tokens || 0 },
         cost: r.usage?.direct_cost ?? calculateTextCost(r.modelId || TEXT_MODELS[modelKey].modelId, r.usage || {}),
       };
     } catch (e) {
       log.warn(`⚠️ [TEXT-AUDIT/${source}] failed (${e.message}) — its findings are missing from the merge`);
-      return { source, modelKey, ok: false, error: e.message, elapsedMs: Date.now() - t0 };
+      return { source, modelKey, ok: false, error: e.message, prompt, elapsedMs: Date.now() - t0 };
     }
   };
 
@@ -1076,7 +1166,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     return Promise.race([p, deadline]).finally(() => clearTimeout(timer));
   };
   audits = await Promise.all([
-    withDeadline(runAudit('arc-informed', auditModel, buildTextAuditPrompt(storyData, current, arc), 'text_audit'), 'arc-informed'),
+    withDeadline(runAudit('arc-informed', auditModel, buildTextAuditPrompt(storyData, current, arc, { arcHints }), 'text_audit'), 'arc-informed'),
     withDeadline(runAudit('blind', blindAuditModel, buildTextAuditBlindPrompt(storyData, current), 'text_audit_blind'), 'blind'),
   ]);
   for (const a of audits) {
@@ -1111,7 +1201,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     // is what lets the ledger below name each finding's outcome: a pass handed
     // a blob of text can count its lines and nothing else.
     const findingsText = findings.map(f => f.line).join('\n');
-    let prompt = buildTextRefinePrompt(storyData, base, findingsText, arc);
+    let prompt = buildTextRefinePrompt(storyData, base, findingsText, arc, { arcHints });
     if (!prompt) throw new Error('text-refine template unavailable');
     if (opts.promptOverride) prompt = opts.promptOverride;
     const t0 = Date.now();
@@ -1325,7 +1415,6 @@ async function refineStoryText(storyData, pages, opts = {}) {
   // is never killed for length, and forcing the cut is what deleted causality
   // before (2026-09-07).
   {
-    const countWords = pages => pages.map(p => ({ pageNumber: p.pageNumber, words: countPageWords(p.text) }));
     const stillRaw = buildWordBudgetFindings(current, storyData?.languageLevel);
     wordBudget = {
       before: parseFaultLines(counterRaw || '').length,
@@ -1333,7 +1422,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
       correctivePassRan: false,
       resolved: !stillRaw,
       remaining: [],
-      counts: countWords(current),
+      counts: measurePages(current),
       cost: 0,
     };
     if (stillRaw) {
@@ -1355,7 +1444,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
       wordBudget.after = parseFaultLines(afterRaw || '').length;
       wordBudget.remaining = afterRaw ? afterRaw.split(/\n/) : [];
       wordBudget.resolved = !afterRaw;
-      wordBudget.counts = countWords(current);
+      wordBudget.counts = measurePages(current);
       for (const line of wordBudget.remaining) {
         log.warn(`⚠️ [TEXT-COUNTER] STILL OUTSIDE the budget after the corrective pass: ${line} — shipping as is`);
       }
@@ -1447,7 +1536,16 @@ async function refineStoryText(storyData, pages, opts = {}) {
         log.warn(`⚠️ [TEXT-DIFF] unreadable finding line — ${u.reason}: ${u.line}`);
       }
       const result = applyLectorFindings(current, diffFindings);
-      diffApplied = result.applied;
+      // What each applied correction put back from the writer's page — the
+      // input settleLedgerAfterDiff needs to keep the ledger true.
+      diffApplied = result.applied.map(a => ({
+        ...a,
+        restored: restoredSentences(
+          a.correction,
+          original.find(o => o.pageNumber === a.pageNumber)?.text,
+          current.find(c => c.pageNumber === a.pageNumber)?.text,
+        ),
+      }));
       diffDropped = result.dropped;
       for (const d of diffDropped) {
         const why = d.reason === 'quote-absent'
@@ -1489,6 +1587,10 @@ async function refineStoryText(storyData, pages, opts = {}) {
         })),
       });
       current = next;
+      findingLedger = settleLedgerAfterDiff(findingLedger, diffApplied);
+      for (const f of findingLedger.filter(x => x.outcome === FINDING_OUTCOME.REWRITE_RESTORED)) {
+        log.warn(`🧾 [TEXT-DIFF] [${f.category}] p${f.pageNumber} is no longer counted as answered — ${f.reason}`);
+      }
       publish();
       log.info(`🔬 [TEXT-DIFF] ${diffModel}: ${pairs.length} rewritten page(s) reviewed, ${diffFindings.length} finding(s), ${diffApplied.length} applied to page(s) ${diffChanged.join(', ') || 'none'}, ${diffDropped.length} dropped${diffUnparsed.length ? `, ${diffUnparsed.length} unreadable` : ''}, in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
     } else if (!pairs.length) {
@@ -1609,6 +1711,22 @@ async function refineStoryText(storyData, pages, opts = {}) {
     publish();   // clears the in-flight flag the join's grace period reads
   }
 
+  // THE COUNTER, ON THE TEXT THAT SHIPS (2026-09-23). The re-measure above runs
+  // before the diff and the lector, and both edit pages: on
+  // job_1790100385959_1nitlympp the diff put back p4's cut sentences (69 → 92
+  // words) after the last count. Measured only — no further pass; a page out of
+  // budget here ships with a WARN like every other length outcome.
+  if (wordBudget) {
+    const shippedRaw = buildWordBudgetFindings(current, storyData?.languageLevel);
+    wordBudget.shipped = {
+      counts: measurePages(current),
+      remaining: shippedRaw ? shippedRaw.split(/\n/) : [],
+    };
+    for (const line of wordBudget.shipped.remaining) {
+      log.warn(`⚠️ [TEXT-COUNTER] SHIPS OUTSIDE the budget after the diff and the lector: ${line}`);
+    }
+  }
+
   const changed = current
     .map((p, idx) => (p.text !== original[idx].text ? p.pageNumber : null))
     .filter(n => n !== null);
@@ -1650,8 +1768,15 @@ async function refineStoryText(storyData, pages, opts = {}) {
  * pipeline's expanded scenes.
  */
 function extractRefinablePages(sceneLike = []) {
-  return sceneLike
-    .filter(s => s && (s.text || '').trim())
+  // The brief as every text-stage reader gets it — the SAME specs the writer
+  // was given (sceneMetadata.buildTextStagePictureSpecs, 2026-09-23). Built over
+  // the whole book at once: a repeated look is only recognised in page order.
+  const { buildTextStagePictureSpecs } = require('./sceneMetadata');
+  const withText = (sceneLike || []).filter(s => s && (s.text || '').trim());
+  const specByPage = buildTextStagePictureSpecs(
+    withText.map(s => ({ pageNumber: s.pageNumber, brief: s.sceneDescription || s.description || '' }))
+  );
+  return withText
     .map(s => {
       // sceneMetadata.sceneIntent is where the one-line picture summary lives
       // (sceneMetadata.js). The old outlineExtract JSON.parse never matched —
@@ -1670,10 +1795,10 @@ function extractRefinablePages(sceneLike = []) {
       //
       // The stage's founding invariant (decisions.md 2026-08-05) is "rewrites
       // page prose only, never events" — it cannot honour that while blind to
-      // what the events are. METADATA is stripped here and the template is
-      // explicit that appearance and staging are not the prose's business.
-      const briefRaw = String(s.sceneDescription || s.description || '');
-      const sceneBrief = briefRaw.split(/---\s*METADATA/i)[0].trim();
+      // what the events are. The brief arrives trimmed (METADATA, ids, repeated
+      // looks) and the template is explicit that appearance
+      // and staging are not the prose's business.
+      const sceneBrief = specByPage.get(s.pageNumber) || '';
       // The page's own LOCKED PLAN LINE (beats pipeline only). outlineExtract
       // holds "PLAN: …" in beats mode and the scene expansion's own JSON in
       // unified mode (storyScorecard.js finalBeats() draws the same
@@ -1838,14 +1963,11 @@ function isTotalTextAuditLoss(partial) {
 function projectTextRefineReport(usable, beforeByPage = new Map()) {
   if (!usable) throw new Error('projectTextRefineReport: no chain result to project');
   const changed = usable.changed || [];
-  // WHOLE-PAGE PASSES vs FINDING-LIST PASSES — the reason `rawResponse` is not
-  // stored for every round. A repair / repetition_fix / length_fix reply IS its
-  // analysis block plus the rewritten page blocks, and both are already stored
-  // verbatim (`analysis`, `pages[].after`): keeping the raw reply as well was
-  // measured at ~27KB of pure duplication per story. A diff or lector reply is
-  // a finding list — a few hundred bytes, and the only place the lines the
-  // parser rejected can be read back. So: pages for the rewriters, raw for the
-  // finding lists, nothing duplicated.
+  // EVERY ROUND KEEPS ITS RAW REPLY (owner order 2026-09-23, superseding the
+  // 2026-09-20 trim). A whole-page pass's reply was dropped as a duplicate of
+  // `analysis` + `pages[].after`, but those are what the PARSER kept: a page
+  // block under a heading it could not read, or analysis past the 15k cut,
+  // existed nowhere after the run. ~27KB per story, capped at 40k per round.
   return {
     rounds: usable.rounds.length,
     roundTrace: usable.rounds.map(r => ({
@@ -1877,7 +1999,7 @@ function projectTextRefineReport(usable, beforeByPage = new Map()) {
       // Only the repair round's prompt was ever stored, so the diff's and the
       // lector's inputs were unreadable after the run.
       prompt: r.prompt || '',
-      rawResponse: WHOLE_PAGE_PASS_KINDS.has(r.kind) ? '' : String(r.rawResponse || ''),
+      rawResponse: String(r.rawResponse || ''),
       // WHAT THE ROUND RETURNED, per page. `before` is not stored: for round N
       // it is round N-1's `after`, and for round 1 it is `briefsIn` — storing
       // it would double the bytes for no information.
@@ -1902,6 +2024,9 @@ function projectTextRefineReport(usable, beforeByPage = new Map()) {
       cost: a.cost ?? null,
       error: a.error || null,
       raw: (a.raw || '').slice(0, 40000),
+      // THE PROMPT THIS AUDIT WAS SENT (2026-09-23) — the audits were the one
+      // text-chain call whose input could not be read back after a run.
+      prompt: a.prompt || '',
     })),
     mergedFindings: (usable.mergedFindings || []).map(f => ({
       pageNumber: f.pageNumber,
@@ -1928,7 +2053,7 @@ function projectTextRefineReport(usable, beforeByPage = new Map()) {
     // rewrite damage was the one pass whose output could not be read back.
     diffReview: usable.diffReview || '',
     diffFindings: (usable.diffFindings || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
-    diffApplied: (usable.diffApplied || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
+    diffApplied: (usable.diffApplied || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction, restored: f.restored || [] })),
     diffDropped: (usable.diffDropped || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction, reason: f.reason })),
     durationMs: usable.rounds.reduce((n, r) => n + (r.elapsedMs || 0), 0),
     model: usable.rounds[0]?.modelId || usable.rounds[0]?.modelKey || null,
@@ -1961,7 +2086,10 @@ module.exports = {
   FINDING_OUTCOME,
   resolveFindingOutcomes,
   unresolvedFindings,
+  restoredSentences,
+  settleLedgerAfterDiff,
   countPageWords,
+  measurePages,
   buildWordBudgetFindings,
   parseLectorFindings,
   parseLectorLines,

@@ -11,7 +11,6 @@
  * allowance, and no code re-counted anything.
  */
 import { describe, it, expect } from 'vitest';
-import fs from 'fs';
 
 // @ts-ignore — CommonJS lib
 import pb from '../../server/lib/promptBuilders.js';
@@ -146,7 +145,9 @@ describe('the list must not inflate critiqueMaxSeverity', () => {
     // rather than written into arc-create.txt, so reading the file tested where
     // the words live instead of whether the model is told.
     const { arcCritiqueSpec } = require('../../server/lib/promptBuilders');
-    for (const spec of [arcCritiqueSpec(), fs.readFileSync('prompts/arc-retell.txt', 'utf8')]) {
+    // The re-tell template fills the same INVENTED_FIGURES_SPEC string
+    // (2026-09-23), so the constant is what the re-tell is told.
+    for (const spec of [arcCritiqueSpec(), (pb as any).INVENTED_FIGURES_SPEC]) {
       expect(spec).toMatch(/Invented figures:/);
       expect(spec).toMatch(/"- <name> — <what it is in the story, three words>"/);
     }
@@ -160,7 +161,10 @@ describe('the source-based definition', () => {
     expect(txt).toMatch(/the story gives it a name and the commission did not/);
     expect(txt).toMatch(/parent, grandparent, teacher, shopkeeper or neighbour/);
     expect(txt).toMatch(/never speaks/);
-    expect(txt).toMatch(/including any animal or companion it supplied/);
+    // Commissioned = character list + premise figures + figures a character's
+    // saved details name (2026-09-23, one definition for every arc stage).
+    expect(txt).toContain((pb as any).COMMISSIONED_CAST_DEF);
+    expect(txt).toMatch(/saved details name/);
     expect(txt).toMatch(/places, buildings, landmarks, rivers, mountains, vehicles and objects/);
     expect(txt).toMatch(/taking its name away is not a way off it/);
   });
@@ -249,5 +253,39 @@ describe('Part 5 — the beats cross-check is reporting only', () => {
   it('stays silent when nothing is passed (old callers unaffected)', () => {
     const c: any = runPlanCounters({ pages, commissionedNames: ['Levin'], placeNames: [] });
     expect(c.findings.some((x: any) => String(x.code).startsWith('ARC_INVENTED'))).toBe(false);
+  });
+});
+
+// Staging job_1790100385959_1nitlympp: the arc wrote its empty premise list as
+// one wholly parenthesised line. The " — " split left "(none", which passed the
+// sentinel test (it only stripped a CLOSED trailing parenthetical), became a
+// commissioned character, and drew NO_FOCAL_PAGE + UNDER_COVERED_CHARACTER
+// against itself on both plan rounds. Sibling of the 2026-09-17 "- none (...)" fix.
+describe('a negative answer written as an open parenthetical is an empty list', () => {
+  const RUN_BLOCK = [
+    'Premise figures:',
+    '- (none — the premise supplies no named figure beyond the four listed children)',
+    '',
+    'Invented figures:',
+    '- Rufus — a fox cub',
+    '- Pip — a firefly',
+    'Allowed: 2. Written: 2.',
+  ].join('\n');
+
+  it('the run\'s real line yields no premise figure, and the invented list is untouched', () => {
+    expect(parsePremiseFigures(RUN_BLOCK)).toMatchObject({ present: true, names: [] });
+    expect(parseInventedFigures(RUN_BLOCK).names).toEqual(['Rufus', 'Pip']);
+  });
+
+  it('every parenthesised or qualified negative is empty, on both lists', () => {
+    for (const line of ['- (none)', '- (None.)', '- (nobody — nothing to add)', '- none, the premise names nobody else', '- keine: nichts', '- (none']) {
+      expect(parsePremiseFigures(`Premise figures:\n${line}\n`).names, line).toEqual([]);
+      expect(parseInventedFigures(`Invented figures:\n${line}\nAllowed: 2. Written: 0.`).names, line).toEqual([]);
+    }
+  });
+
+  it('NEGATIVE CONTROL — real figures keep their names, qualifier and all', () => {
+    const parsed = parsePremiseFigures("Premise figures:\n- Nia (the hero's dog)\n- (unnamed) crow — a bird\n");
+    expect(parsed.names).toEqual(["Nia (the hero's dog)", '(unnamed) crow']);
   });
 });

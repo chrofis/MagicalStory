@@ -85,7 +85,7 @@ describe('text-refine carries its own criteria (A7)', () => {
     const p2 = PB.buildTextRefinePrompt({ ...storyData, visualBible: {} }, pages, '', '');
     // the page TEXT still names him — it is the CAST LINE and the details
     // block that must not invent him.
-    expect(p2).toContain('For EACH of Levin, Julian write');
+    expect(p2).toContain('For EACH of Levin, Julian who appears on a rewritable page write');
     expect(p2).not.toContain('**Silvan**');
   });
 

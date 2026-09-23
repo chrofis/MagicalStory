@@ -35,6 +35,7 @@ const {
   SHOT_PATTERNS, SHOT_AXIS, POSITION_SHOTS, MID_DISTANCE_SHOTS, SHOT_FLOOR_CODE,
   shotFloors, MAX_MEDIUM_WIDE_SHARE, closeUpBelowWaistVerbs, PEOPLELESS_SHARED_SHOT,
 } = require('./shotVocabulary');
+const { castCoverage } = require('./castCoverage');
 
 /** Words that look like names but never are, in the who-column's grammar. */
 const NAME_STOPWORDS = new Set([
@@ -570,7 +571,7 @@ function consecutiveRuns(sorted) {
  *   is the names a page reaches without naming them (`coveredNames`).
  * @returns {{findings: Array, lines: string[], stats: Object, cast: Object|null, skipped?: string}}
  */
-function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], maxCharactersPerScene = 3, declaredInvented = null, inventedAllowance = null, roster = null, peoplelessPick = null } = {}) {
+function runPlanCounters({ pages = [], commissionedNames = [], listedNames = null, placeNames = [], maxCharactersPerScene = 3, declaredInvented = null, inventedAllowance = null, roster = null, peoplelessPick = null } = {}) {
   const findings = [];
   const add = (code, pageList, detail) => findings.push({ code, pages: pageList, detail });
 
@@ -881,23 +882,37 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
     .filter(r => (r.present.length <= 2 && r.present.includes(name))
       || (r.shot === 'close-up' && r.present[0] === name))
     .map(r => r.pageNumber);
+  //
+  //    THE NUMBERS ARE THE PLANNER'S (owner, 2026-09-23). Whether every
+  //    character owes a focal page, and how many pages each is in frame on,
+  //    come from castCoverage() — the same object buildBeatsPrompt states to
+  //    the planner as {CAST_COVERAGE} — so the counter never holds the book to
+  //    a floor the planner was not given. Both rules apply to the commission's
+  //    CHARACTER LIST (`listedNames`): a pet or companion the premise or a
+  //    profile supplies is commissioned, never invented, but owes no page.
+  const listedLower = new Set((Array.isArray(listedNames) ? listedNames : commissionedNames)
+    .map(n => String(n || '').trim().toLowerCase()).filter(Boolean));
+  const listed = cast.commissioned.filter(n => listedLower.has(n.toLowerCase()));
+  const coverageRule = castCoverage({ pageCount, castCount: listed.length });
   const focal = {};
-  for (const name of cast.commissioned) {
+  for (const name of listed) {
     focal[name] = focalOf(name);
-    if (focal[name].length === 0) {
+    if (coverageRule && coverageRule.focalEach && focal[name].length === 0) {
       add('NO_FOCAL_PAGE', [], `${name} never has a focal page — never in frame with at most one companion, never the subject of a close-up`);
     }
   }
 
-  // 8. Coverage floor: a commissioned character is in frame on at least two
-  //    pages. Separate property from the focal page above — a character can own
-  //    one close-up and still be absent from the rest of the book.
+  // 8. Coverage floor: a commissioned character is in frame on at least the
+  //    number of pages castCoverage() gives this book. Separate property from
+  //    the focal page above — a character can own one close-up and still be
+  //    absent from the rest of the book.
   const coverage = {};
-  for (const name of cast.commissioned) {
+  const floor = coverageRule ? coverageRule.appearances.min : 0;
+  for (const name of listed) {
     coverage[name] = rows.filter(r => r.present.includes(name)).map(r => r.pageNumber);
-    if (coverage[name].length < 2) {
+    if (coverage[name].length < floor) {
       add('UNDER_COVERED_CHARACTER', coverage[name],
-        `${name} is in frame on ${coverage[name].length} page(s) — every commissioned character belongs in at least two`);
+        `${name} is in frame on ${coverage[name].length} page(s) — this book puts every commissioned character in frame on at least ${floor}`);
     }
   }
 
@@ -935,6 +950,7 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
       inventedDominantPages: dominant,
       focalPages: focal,
       coveragePages: coverage,
+      castCoverage: coverageRule,
     },
   };
 }

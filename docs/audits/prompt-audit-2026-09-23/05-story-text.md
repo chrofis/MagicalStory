@@ -1,5 +1,16 @@
 # 05 — STORY TEXT stage group: findings
 
+## Status 2026-09-23
+
+Checked against staging `31fd7db0c` (after the evening fix round). FIXED = the commit that fixes it; OPEN = no fix yet, no ruling needed to start; OWNER CALL = touches a decision, a SETTLED line or has options the owner picks. Stale-doc and registry items listed at the end of each file were corrected in `a25ecb865` unless listed below.
+
+- FIXED: #1 the diff reverting the refine's fixes — `5a4672c7a` (the diff sees the findings each rewrite answered) + `e47a513f0` (ledger settled after the diff, `restoredSentences`; the word counter also measures the shipped text). #2 arc hints now reach the arc-informed audit and the refine (`{ARC_HINTS}`, `HINT_VS_ARC_RULE`) and both are in the `arc-hint-handoff` set — `e47a513f0`. #5 refine scope is one rule and the refine gets the checker form of DO-NOT-WRITE — `e47a513f0`. D outline-reviewer const assignment — `e47a513f0`.
+- FIXED (text-stage round, see decisions.md 2026-09-23 "Text stage after prompt audit 05"; commit in that entry's log line): #3 audit questions — LIMIT covers deadlines, ASSUMED a named feeling never shown, CAUSE a refusal let go, new CONTRADICTION + ENDING, LOADBEARING scoped to what the plot turns on (writer told each rule; blind gains the same cases + ENDING). Replay on the stored writer text ($0.354): deadline, reversed refusal and unshown fear caught, LOADBEARING 5 → 0; the vague ending not caught. #4 blind exemption narrowed to what a picture shows at that instant (owner order; blindness kept). #6 sentences + paragraphs counted in the same counter and fed to the refine (`PAGE_MEASURES`, one `PARAGRAPH_SHAPE` constant). #7 lector gets the reading level. B/05: critics read the writer's brief spec (one builder), refine checks scoped to rewritable pages. C storage: audit prompts and the refine raw reply stored.
+- OPEN: #8 wording (Tüte, heavy words); the vague ending (ENDING question did not fire in the replay). Backlog: rough-text lines (run 6).
+- OWNER CALL: B wardrobe in the text-stage spec — only a METADATA-built spec removes it safely (BACKLOG); the 1st-grade sentence band (writer runs 6-13 on every page); a Lab recall check of the blind slot; #1 (b) a code guard on restored spans was not built (decisions: "no code provenance guard").
+
+---
+
 Run: job_1790100385959_1nitlympp, "Das Ei im Laub", 18 pp, de-ch, 1st-grade (budget 25-70 words, 3-6 sentences), cast 3-5, commit b03c64b0.
 Chain: writer (sonnet-4-6) -> audits (arc-informed gemini-3.1-pro: 10 faults; blind grok-4.6: 0) + word counter (1) -> text_refine (claude-opus-5, rewrote 9 pages) -> text_diff (gpt-5.6-luna-pro, **11 corrections applied**) -> lector (gemini-3.1-pro, 4 applied).
 Since b03c64b0, **no text-stage template or builder has changed** (`git diff b03c64b0 HEAD` touches only OTS/shot code in promptBuilders.js and arc effort in beatsPipeline.js). So none of the findings below is fixed yet.

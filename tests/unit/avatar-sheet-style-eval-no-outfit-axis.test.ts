@@ -157,9 +157,10 @@ describe('Pass-2 style eval — the outfit axis is gone', () => {
     }
   });
 
-  it('the echoed-judge guard no longer keys on the removed axis', () => {
-    const fn = extractFunction(SRC, 'isEchoedStyleVerdict');
+  it('the echoed-judge guard reads the reasons the verdict carries, not a fixed axis list', () => {
+    // One guard for all four sheet judges (tests/unit/sheet-judge-echo-guard.test.ts):
+    // it collects every `.reason`, so a removed axis cannot linger in it.
+    const fn = extractFunction(SRC, 'judgeReasons');
     expect(fn).not.toMatch(/'outfit'/);
-    expect(fn).toMatch(/'identity'/);
   });
 });

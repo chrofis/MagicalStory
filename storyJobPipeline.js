@@ -2048,9 +2048,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Bible correction can only run once the bible exists, several stages later
     // (beatsPipeline). The early kickoff is deliberate — avatars are the long
     // pole in front of every image — so the fix is not to delay it but to
-    // re-render exactly the characters whose outfit text actually changed.
-    // NOT rare (2026-09-23 audit): a 'reconcile' finding re-renders on a mere
-    // re-wording of the same garment. One render per corrected character.
+    // re-render exactly the characters whose outfit VISIBLY changed — a
+    // different garment or other colours in the slot. A same-garment rewording
+    // (the bible restating the clause in its own words) never reaches this hook
+    // (beatsPipeline, 2026-09-23): the rebuild starts from the photos and
+    // re-rolls the face for a garment the sheet already shows.
     const onWardrobeCorrectedReady = (characterNames, requirements) => {
       if (inputData.trialMode || skipImages) return;
       const names = (characterNames || []).filter(Boolean);
@@ -3742,6 +3744,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // The whole story, read-only, for the refiner's judgment (beats mode
           // only — the unified path records no arc).
           arc: beatsResult?.arcReviewReport?.finalArc || beatsResult?.beatsReviewReport?.arc || '',
+          // The hints the writer was told to apply — the critics read the story
+          // with them applied.
+          arcHints: beatsResult?.arcReviewReport?.arcHints || '',
           // No `rounds`: the chain is fixed at two parallel audits → one repair
           // → one lector (owner ruling 2026-09-03). There is no loop to bound.
           usageLabel: 'text_refine',
@@ -4117,6 +4122,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const challengeTakenIds = beatsResult?.challengeTakenIds || null;
     const challengeDraw = beatsResult?.challengeDraw || null;
     const clothingReviewReport = beatsResult?.clothingReviewReport || null;
+    // The wardrobe call's prompt + raw reply, and the wardrobe-vs-Visual-Bible
+    // check's findings (adopt / conflict) — diagnostics, stored with the story.
+    const storyBibleReport = beatsResult?.storyBibleReport || null;
+    const wardrobeBibleReport = beatsResult?.wardrobeBibleReport || null;
     const sceneReviewReport = beatsResult?.sceneReviewReport || null;
     // The prompt that WROTE the briefs, next to the one that reviewed them.
     // Beats contributes the timings and which pages fell back to a per-page
@@ -6615,6 +6624,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               auditTextFaults,
               {
                 arc: beatsResult?.arcReviewReport?.finalArc || beatsResult?.beatsReviewReport?.arc || '',
+                arcHints: beatsResult?.arcReviewReport?.arcHints || '',
                 usageLabel: 'text_refine_post_audit',
               }
             );
@@ -7376,7 +7386,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       challengeTakenIds, // which of them the arc built on, by catalogue id
       challengeDraw, // the random catalogue menu the arc plan was offered (beats mode)
       beatsReviewReport, // per-page before/after from the beats review (beats mode)
+      storyBibleReport, // wardrobe contract call: prompt + raw reply (beats mode)
       clothingReviewReport, // per-outfit before/after from the wardrobe review (beats mode)
+      wardrobeBibleReport, // wardrobe contract vs Visual Bible: adopt / conflict findings (beats mode)
       // The Art Director's own prompt(s), rolled up by distinct prompt with the
       // pages each produced — so "what was this book's brief actually asked for"
       // is a query, not a worktree rebuild at the run's commit.

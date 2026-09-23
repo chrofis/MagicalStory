@@ -1,5 +1,15 @@
 # Judge 08: page images, recreation and final checks
 
+## Status 2026-09-23
+
+Checked against staging `31fd7db0c` (after the evening fix round). FIXED = the commit that fixes it; OPEN = no fix yet, no ruling needed to start; OWNER CALL = touches a decision, a SETTLED line or has options the owner picks. Stale-doc and registry items listed at the end of each file were corrected in `a25ecb865` unless listed below.
+
+- FIXED: S1 invented "missing" items and duplicate taking the repair slots — `2e36a6636` (evidence rules in both judges, `duplicate_character` capped when detector people ≤ roster, one second look at CRITICAL/MAJOR absence claims, a rule-2/2a drop never charged). S4 iterate cast from a name scan and dropped parent citations — `32dce4da9`. S6 judge text ordering the trait in char-fix — `319fa6054` (no judge text). S8 garment off by design charged as missing — `17bbd887a`.
+- OPEN: S1 bbox coordinates in an inpaint instruction (BACKLOG line); S3 shrinker drops parity-anchor blocks (reach pinned on the BUILT prompt, not the sent one); S4 "shallow depth of field" and the rewrite's self-report; S5 char-fix reads retired `pose/action/holding/gaze` fields and loses the held prop; S7 entity-grid crop artefacts become findings; S9 plates: three cameras in one prompt, dangling light direction, pixel-only retry, derive never QC'd and carries no style; S10 plate QC has no style/camera check; S12 generator-side contradictions; S13 consolidator audit-only score section; S14; unstored eval prompts (improve 9).
+- OWNER CALL: S2 version selection between near-identical renders (second sample, costs cents); S6 upstream (AD writes a stored eye colour the avatar may not show); S10 figures-allowed vs people-free plate QC; S11 per-page style gate parrots ART STYLE (style repair stays OFF); S1 cap ranking by verified × severity.
+
+---
+
 Run: staging `job_1790100385959_1nitlympp` ("Das Ei im Laub", dragon run 6), built at `b03c64b0`. Pages 12, 14 and 17, every version downloaded and viewed.
 Pixels I looked at: `scene/p12/v0,v1`, `scene/p14/v0,v1`, `scene/p17/v0,v1`, `empty_scene/p12,p13,p14`, plate-QC v1 images (`aux/sceneImages-11…`, `-13…`), the p14 blend mask, and the Julian entity grids `entity-history/r0/grid-3,4` and `r1/grid-2,3`. Local copies are in `scratchpad/lastrun/imgs/`.
 Shipped versions: p12 **v0** (score 10), p14 **v0** (83), p17 **v1** (45).

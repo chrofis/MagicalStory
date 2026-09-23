@@ -96,6 +96,6 @@ describe('the arc-informed audit carries the ending check and the widened INFERR
   });
 
   it('LOADBEARING never counts an unused size or look as a dropped fact', () => {
-    expect(question('LOADBEARING')).toMatch(/size or a look the plot never uses/);
+    expect(question('LOADBEARING')).toMatch(/a size, a colour, a look\W+is never load-bearing, and a page that leaves it out drops nothing/);
   });
 });

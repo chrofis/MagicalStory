@@ -649,6 +649,38 @@ function referenceCarriesItem(r) {
 }
 
 /**
+ * Is this resolved item carried by an attached avatar reference on this page,
+ * so that it takes NO element cell of its own? (2026-09-23)
+ *
+ * ONE predicate for the two sides that must agree on it: the page-gen reference
+ * picker (visualBible.getElementReferenceImagesForPage, which drops exactly
+ * these) and the element budget counter (vbElementBudget.rankPageElements,
+ * which used to count them anyway). On staging job_1790100385959_1nitlympp the
+ * counter charged every worn outer layer as an element — all four
+ * `vb_element_overflow` findings were garments the picker never packs — and
+ * the scene review, told to "drop" them, deleted their `wornItems` rows.
+ */
+function carriedByReference(r) {
+  return !!(r && r.state === 'worn' && referenceCarriesItem(r));
+}
+
+/**
+ * Upper-case ids of the page's Visual Bible elements an avatar reference
+ * already carries (`carriedByReference`). The cast is the brief's own
+ * `characters[]`, the same list the picker resolves against.
+ */
+function idsCarriedByReferences(visualBible, sceneMetadata, options = {}) {
+  const castNames = ((sceneMetadata && sceneMetadata.characters) || [])
+    .map(c => (typeof c === 'string' ? c : c && c.name)).filter(Boolean);
+  const out = new Set();
+  if (!visualBible || !sceneMetadata) return out;
+  for (const r of resolveWornItemsForPage(visualBible, castNames, sceneMetadata, options)) {
+    if (carriedByReference(r)) out.add(String(r.id).toUpperCase());
+  }
+  return out;
+}
+
+/**
  * Is this item OFF the named character on this page?
  *
  * Two ways, and the second is the handover: state `off` takes it off everyone,
@@ -723,23 +755,62 @@ function carryForwardWornItems(newSceneMetadata, savedSceneMetadata) {
       ? savedRows
       : (Array.isArray(newSceneMetadata && newSceneMetadata.wornItems) ? newSceneMetadata.wornItems : []);
   }
+  const idOf = (r) => String((r && r.id) || '').trim().toUpperCase();
   // A non-empty emission wins the STATE — but a rewriter that re-states the row
   // and drops `redressNote` would delete the authored wardrobe instruction for
   // the rest of that page's life (the class of loss docs/decisions.md:3049
   // records). Per id, an absent note inherits the saved one.
   const savedNotes = new Map();
   for (const r of savedRows) {
-    const id = String((r && r.id) || '').trim().toUpperCase();
+    const id = idOf(r);
     const note = String((r && r.redressNote) || '').trim();
     if (id && note) savedNotes.set(id, note);
   }
-  if (savedNotes.size === 0) return fresh;
-  return fresh.map((r) => {
+  const merged = savedNotes.size === 0 ? fresh.slice() : fresh.map((r) => {
     if (!r || typeof r !== 'object') return r;
     if (String(r.redressNote || '').trim()) return r;
-    const note = savedNotes.get(String(r.id || '').trim().toUpperCase());
+    const note = savedNotes.get(idOf(r));
     return note ? { ...r, redressNote: note } : r;
   });
+  // PER ID, NOT PER ARRAY (2026-09-23). A rewrite changes a state by
+  // RESTATING the row; omitting it is not a declaration. A saved row the
+  // rewrite left out is carried as it was — otherwise the omission resolves to
+  // the default `worn`, and a garment the page took off is painted back on. On
+  // staging job_1790100385959_1nitlympp the scene review kept p12's other rows
+  // and dropped Max's `off` sweatshirt row; the prompt then said "Max IS
+  // wearing this" against prose in a white shirt, and Max was drawn twice.
+  const freshIds = new Set(merged.map(idOf).filter(Boolean));
+  for (const r of savedRows) {
+    const id = idOf(r);
+    if (id && !freshIds.has(id)) merged.push(r);
+  }
+  return merged;
+}
+
+/**
+ * The same carry, applied to a rewritten brief's TEXT — the form the scene
+ * review returns. Re-serialises the `---METADATA---` block only when a row was
+ * actually carried, so an untouched brief stays byte-identical.
+ *
+ * @returns {{brief: string, carried: string[]}|null}  null when nothing was carried
+ *   or either brief has no parseable metadata block
+ */
+function carryForwardWornItemsInBrief(newBrief, savedBrief) {
+  const { parseProseMetadataFormat } = require('./sceneMetadata');
+  const after = parseProseMetadataFormat(String(newBrief || ''));
+  const before = parseProseMetadataFormat(String(savedBrief || ''));
+  if (!after || !before) return null;
+  const freshRows = Array.isArray(after.metadata.wornItems) ? after.metadata.wornItems : [];
+  const rows = carryForwardWornItems(after.metadata, before.metadata);
+  const idOf = (r) => String((r && r.id) || '').trim().toUpperCase();
+  const freshIds = new Set(freshRows.map(idOf));
+  const carried = rows.map(idOf).filter(id => id && !freshIds.has(id));
+  if (carried.length === 0) return null;
+  const metadata = { ...after.metadata, wornItems: rows };
+  return {
+    brief: `${after.prose}\n\n---METADATA---\n${JSON.stringify(metadata, null, 2)}`,
+    carried,
+  };
 }
 
 function buildWornStateLines(resolved) {
@@ -1573,11 +1644,14 @@ module.exports = {
   missingWornRows,
   isOffForCharacter,
   referenceCarriesItem,
+  carriedByReference,
+  idsCarriedByReferences,
   resolveWearer,
   resolveWornItemsForPage,
   wornStateById,
   wornItemLook,
   carryForwardWornItems,
+  carryForwardWornItemsInBrief,
   splitClauses,
   splitClausesDetailed,
   buildWornStateLines,

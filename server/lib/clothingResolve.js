@@ -898,6 +898,12 @@ function buildUsedClothingText(char, clothingRequirements) {
 
 /**
  * Build available avatars list for scene expansion prompt
+ *
+ * With clothingRequirements, each used category is listed WITH the outfit its
+ * avatar wears (2026-09-23): the wardrobe contract owns garment wording, and
+ * the Art Director selects among these versions rather than describing its
+ * own. A second category's outfit was otherwise invisible to it.
+ *
  * @param {Array} characters - Character array with avatars
  * @param {Object} clothingRequirements - Optional: only show categories with used=true
  * @returns {string} Formatted string showing available clothing per character
@@ -914,14 +920,16 @@ function buildAvailableAvatarsForPrompt(characters, clothingRequirements = null)
       const charReqs = resolveCharacterReqs(clothingRequirements, char.name);  // RESOLVE
 
       if (charReqs) {
-        const usedCategories = Object.entries(charReqs)
+        const used = Object.entries(charReqs)
           .filter(([cat, config]) => config?.used)
-          .map(([cat, config]) => cat === 'costumed' && config?.costume
-            ? `costumed:${config.costume}`
-            : cat);
+          .map(([cat, config]) => ({
+            key: cat === 'costumed' && config?.costume ? `costumed:${config.costume}` : cat,
+            outfit: String(config?.description || '').trim(),
+          }));
 
-        if (usedCategories.length > 0) {
-          return `- ${char.name}: ${usedCategories.join(', ')}`;
+        if (used.length > 0) {
+          const outfits = used.filter(u => u.outfit).map(u => `\n  - ${u.key}: ${u.outfit}`).join('');
+          return `- ${char.name}: ${used.map(u => u.key).join(', ')}${outfits}`;
         }
       }
       // No entry (or no used category) for this character in clothingRequirements.

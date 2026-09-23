@@ -12,8 +12,9 @@ The outfit is not scored here — it is judged on the pass that produced Image 2
 Your job: rate Image 3 on the checks below and return a JSON verdict. If ANY check fails, the styled sheet is rejected and Pass 2 is regenerated.
 
 TASK 1: LAYOUT PRESERVED
-- Image 3 is a 4-column × 2-row grid like Image 2. Top row = 4 head-and-neck cells. Bottom row = 4 full-body cells. Same cell order: front, three-quarter, profile, back.
-- Score 1-10. A wrecked layout (figures crossing the row gutter, cells merged, wrong cell count) must score 1-3.
+- Image 3 keeps Image 2's grid: 4 columns × 2 rows, head cells on top, full-body cells below, each cell facing the way the same cell of Image 2 faces (front, three-quarter, profile, rear turn).
+- In `layout.reason`, say per cell what Image 3 shows: facing, and how much of the figure is in the cell.
+- Score 1-10. A wrecked layout (figures crossing the row gutter, cells merged, wrong cell count) must score 1-3. A cell whose facing differs from Image 2's same cell scores 4-6.
 - `layoutScore` is the score.
 
 TASK 2: IDENTITY PRESERVED VS SOURCE PHOTO
@@ -36,8 +37,9 @@ TASK 4: CLEAN RENDER
 - `cleanScore` is the score.
 
 TASK 5: FACES IN BODY CELLS
-- Each front, three-quarter, and profile full-body cell (5, 6, 7) must show a coherent face on the head — eyes, nose, and mouth present and matching the identity, not blank, empty, smeared, or a featureless blob. Cell 8 shows the back of the head and needs no face.
-- Score 1-10. Any of cells 5, 6, 7 with a missing, blank, or smeared face scores 1-3.
+- Each front, three-quarter, and profile full-body cell (5, 6, 7) must show a coherent face on the head — eyes, nose, and mouth present and matching the identity, not blank, empty, smeared, or a featureless blob.
+- Cell 8 is the rear turn ({REAR_TURN}). Where Image 2's cell 8 shows an eye and cheek, Image 3's cell 8 shows them too, coherent and not smeared.
+- Score 1-10. Any of cells 5, 6, 7 with a missing, blank, or smeared face, or a cell 8 that lost the eye and cheek Image 2 shows, scores 1-3.
 - `bodyFaceScore` is the score.
 
 TASK 6: AGE MATCH
@@ -58,11 +60,11 @@ TASK 7: SINGLE SUBJECT — NO OTHER PEOPLE
 Return EXACTLY this JSON shape. Every score and reason must come from what you see in Image 3 — never return this template's placeholders:
 
 {
-  "layout":   {"score": <1-10>, "reason": "<what you observed>"},
+  "layout":   {"score": <1-10>, "reason": "cell1: <facing, crop>; cell2: <facing, crop>; and so on to cell8"},
   "identity": {"score": <1-10>, "reason": "<what you observed>"},
   "style":    {"score": <1-10>, "reason": "<what you observed>"},
   "clean":    {"score": <1-10>, "reason": "<per-cell colour regions and verdict>"},
-  "bodyFace":  {"score": <1-10>, "reason": "<what you observed in cells 5-7>"},
+  "bodyFace":  {"score": <1-10>, "reason": "<what you observed in cells 5-8>"},
   "age":      {"score": <1-10>, "reason": "<what you observed>"},
   "solo":     {"score": <1-10>, "reason": "<what you observed — name any extra figure and where>"},
   "layoutScore": <1-10>,
