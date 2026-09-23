@@ -143,7 +143,8 @@ describe('a reversed decision is a rule on both sides', () => {
   it('the arc-informed auditor asks it under CAUSE, not under a new type', () => {
     const p = sighted();
     expect(p).toContain('takes back, demands or acts on a thing they had refused, given up or discarded');
-    expect(p.match(/^\d+\. [A-Z]+:/gm)).toHaveLength(12);
+    // Twelve questions plus ENDING (2026-09-23); the reclaim rule added none.
+    expect(p.match(/^\d+\. [A-Z]+:/gm)).toHaveLength(13);
   });
 
   it('the blind auditor asks it under CONTRADICTION, not under a new type', () => {
@@ -156,8 +157,10 @@ describe('a reversed decision is a rule on both sides', () => {
     const types = (p: string) => (p.match(/^\d+\. ([A-Z]+):/gm) || []).map(m => m.replace(/^\d+\. /, '').replace(':', ''));
     expect(types(sighted())).toEqual([
       'ASSUMED', 'UNFORCED', 'DEVICE', 'TRANSITION', 'CAUSE', 'ENTRANCE',
-      'LANGUAGE', 'LIMIT', 'PAYOFF', 'PULL', 'INFERRED', 'LOADBEARING',
+      'LANGUAGE', 'LIMIT', 'PAYOFF', 'PULL', 'INFERRED', 'LOADBEARING', 'ENDING',
     ]);
+    // ENDING (2026-09-23) is the writer's own rule: the rulebook's last-page line.
+    expect(beats()).toContain('The last page ends on the concrete act or spoken line the story ends with');
     expect(types(blind())).toEqual(['CONFUSION', 'CONTRADICTION', 'IDLE', 'TRANSITION', 'PAYOFF']);
   });
 });

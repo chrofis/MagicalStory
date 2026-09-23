@@ -19,7 +19,7 @@ Characters: {CHARACTER_NAMES}
 
 {CHARACTER_DETAILS}
 
-# THE STORY (final — this arc IS the story; every fact, cause and spoken line it states belongs on some page, in its specific form)
+# THE STORY (final — this arc IS the story; every fact, cause and spoken line it states belongs on some page, in its specific form; a size or a look is not such a fact, and belongs on a page only where the story uses it)
 
 {STORY_ARC}
 
@@ -65,9 +65,11 @@ Do not rewrite a page for small stylistic preference. Rewrite it when it has a r
 
 Never use an em-dash (—) or an en-dash (–), anywhere, for any purpose. Replace every one you find with a comma, a full stop, a colon, or parentheses, and recast the sentence if none of those fit.
 
-Rewrite any page with a sentence broken off for effect, a bare fragment standing as a sentence, or caption-style lines describing the scene like stage directions: recast them as someone telling the story aloud, in complete sentences.
+Rewrite any page that breaks a style rule below, and every page you rewrite keeps them all:
 
-No rhetorical set-pieces: no paired negations, no coined sayings or incantations, no one-sentence paragraphs for drama. Rewrite every occurrence as plain narration.
+{STYLE_RULEBOOK}
+
+A fault that a character acts on a reason the page has not given is closed this way: {MOTIVE_AT_THE_ACT}.
 
 Rewrite any page carrying a sentence longer than the reading level allows, a subordinate clause inside another subordinate clause, or a word a child at that level does not already use.
 

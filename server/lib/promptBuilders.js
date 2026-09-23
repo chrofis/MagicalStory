@@ -5566,6 +5566,8 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     CURRENT_TEXT: currentText,
     AUDIT_FINDINGS: String(auditFindings || '').trim() || '(no audit ran)',
     DO_NOT_WRITE_SECTION: doNotWriteSection,
+    STYLE_RULEBOOK,
+    MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
   });
 }
 
@@ -8404,6 +8406,43 @@ const RISK_FRAMING_RULE = '- Where a child does something with real physical ris
 const PAGE_OPENING_VARIETY_RULE = "Vary how each page begins: not always with a character's name — open some pages with time, place, speech, sound or action, and never start consecutive pages the same way";
 
 /**
+ * THE STYLE RULEBOOK (owner, 2026-09-23): one block for every pass that
+ * writes page prose, filled into the {STYLE_RULEBOOK} placeholder each
+ * declares — the beats writer, the trial writer, the text repair
+ * (text-refine.txt, also its repetition_fix / length_fix rounds), the diff
+ * pass and the lector. Before it, the writer and the repair each held a
+ * hand-kept copy of the fragment and set-piece rules (already drifted: only
+ * the repair banned one-sentence drama paragraphs) and the diff pass and the
+ * lector held none, so a lector split one sentence into a paired negation
+ * (staging job_1790100385959_1nitlympp, Lab 1422). The writer's and the
+ * repair's framing say "write/rewrite to these"; the diff pass and the lector
+ * say "a correction never breaks these" and stay out of style otherwise.
+ *
+ * The size/look rule is here, not in the writer alone: the arc states sizes
+ * and looks for the image stages, and a repair or diff pass that treats a
+ * dropped size as a dropped fact puts it back.
+ */
+const STYLE_RULEBOOK = [
+  'Every sentence is complete and finishes: no sentence broken off for effect, no bare fragment standing as a sentence, no caption-style line describing the scene like a stage direction. The story is told aloud.',
+  'No rhetorical set-pieces: no paired negations ("Nobody answered. Nobody argued."), no coined sayings or incantations, no one-sentence paragraph for drama. Plain narration carries the story.',
+  'No sentence tells what an event meant or sums up who the characters have become ("they had become something else", "he had done his part"). The telling shows the event and moves on.',
+  'The narrator never justifies, excuses or explains an action to the reader ("he had given his share, so now he could eat too"). A reason the story needs comes through a character\'s words, thoughts or feelings in the moment.',
+  'A size or a look is stated only where the story uses it: a thing too heavy to lift alone, too big to hide, small enough to hold. Otherwise it belongs to the pictures: the text leaves it out, and leaving it out drops no fact.',
+  'The last page ends on the concrete act or spoken line the story ends with and lands one feeling, plainly and warmly. A string of short solemn sentences is not an ending, and neither is a closing sentence that sums up the story.',
+].map(r => `- ${r}`).join('\n');
+
+/**
+ * Motive at or before the act (owner, 2026-09-23). The arc gives characters
+ * reasons; when the reader learns them is the text stage's call. A refusal
+ * whose reason the book reveals pages later reads senseless on the page of
+ * the refusal (job_1790100385959_1nitlympp p10, reason given p13/p18). A
+ * carried reason is not an invented turn, so this does not collide with the
+ * writer's no-invention rule. Filled into both live writers and the repair,
+ * which closes the audit's widened INFERRED findings.
+ */
+const MOTIVE_AT_THE_ACT_RULE = 'Where a character refuses, demands, flees, hides or lies for a reason the story reveals only later, the reader gets a glimpse of that reason at or before the act (a look, a half-said word, a feeling named) without giving the later reveal away. The reason is the story\'s own, so this invents nothing';
+
+/**
  * The Art Director composition rules for a writer that authors its own scene
  * hints without an Art Director stage: trial and both unified variants. The
  * six bullets were reworded for a scene hint from scene-expansion(-all).txt
@@ -9126,7 +9165,7 @@ function buildTextProofreadPrompt(inputData, pages = []) {
     ? getLanguageNameEnglish(inputData.language)
     : 'the language of the pages';
   const body = pages.map(p => `--- Page ${p.pageNumber} ---\n${String(p.text || '').trim()}`).join('\n\n');
-  return fillTemplate(template, { LANGUAGE: lang, PAGES: body });
+  return fillTemplate(template, { LANGUAGE: lang, PAGES: body, STYLE_RULEBOOK });
 }
 
 /**
@@ -9166,7 +9205,7 @@ function buildTextDiffPrompt(inputData, pairs = []) {
       return `--- Page ${p.pageNumber} ---\nFINDINGS THE REWRITE ANSWERED:\n${answered || '(none)'}\n\nBEFORE:\n${String(p.before || '').trim()}\n\nAFTER:\n${String(p.after || '').trim()}`;
     })
     .join('\n\n');
-  return fillTemplate(template, { LANGUAGE: lang, PAGES: body });
+  return fillTemplate(template, { LANGUAGE: lang, PAGES: body, STYLE_RULEBOOK });
 }
 
 /**
@@ -9775,6 +9814,8 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     AGE: readerAge(inputData),
     DO_NOT_WRITE_SECTION: buildDoNotWriteSection(inputData),
     PAGE_OPENING_VARIETY: PAGE_OPENING_VARIETY_RULE,
+    STYLE_RULEBOOK,
+    MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
   });
 }
 
@@ -10032,6 +10073,8 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       // framing rule can reach a trial story.
       RISK_FRAMING: RISK_FRAMING_RULE,
       PAGE_OPENING_VARIETY: PAGE_OPENING_VARIETY_RULE,
+      STYLE_RULEBOOK,
+      MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
       // Trial has no Art Director either: the scene-hint composition rules
       // reach a trial page only through the writer prompt.
       AD_COMPOSITION: AD_COMPOSITION_RULE,
@@ -10575,6 +10618,8 @@ module.exports = {
   NO_CHARACTER_MARKING_RULE,
   HANDS_HOLD_ONLY_NAMED_RULE,
   PAGE_OPENING_VARIETY_RULE,
+  STYLE_RULEBOOK,
+  MOTIVE_AT_THE_ACT_RULE,
   AD_COMPOSITION_RULE,
   parseArcHints,
   parseArcCreate,

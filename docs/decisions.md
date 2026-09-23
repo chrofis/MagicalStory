@@ -56181,3 +56181,61 @@ stays readable.
 `server/lib/sceneBriefCheck.js`, `server/lib/images.js`, `server/lib/textRefine.js`,
 `server/lib/promptBuilders.js`, `server/lib/evalPipeline.js`, `storyJobPipeline.js`.
 **Status:** ✅ documentation only; no behaviour change.
+
+## 2026-09-23 — One style rulebook for every prose-writing pass; sizes and looks are image staging; the ending ends on the act; the motive comes at or before the act
+
+**Context.** The owner read the German text of dragon run 6 (staging `job_1790100385959_1nitlympp`) and
+the Lab rerun of its text chain (Lab 1422). Four fault classes:
+1. **Sizes and looks in the prose** (p4 a scale "as big as a plate", p6 a dragon "no bigger than a
+   handcart", p17 "as big as a cat"). The arc states sizes and looks for the image stages; the writer
+   was told every fact the arc states "finds its home on some page, in its specific form", which
+   overrode the later "Naming it does not license describing it". The repair template carried the same
+   "specific form" clause, and the audit's LOADBEARING counts a fact of the story no page carries as a
+   fault, so a dropped size could be filed and put back.
+2. **Style rules held by the writer only.** The writer and the repair each kept a hand copy of the
+   fragment / set-piece rules (already drifted: only the repair banned one-sentence drama paragraphs);
+   the diff pass and the lector held none. In Lab 1422 the lector split «Niemand antwortete ihm oder
+   widersprach ihm.» into the paired negation «Keiner antwortete. Keiner widersprach ihm.» Run 6 p14
+   also carried narrator justification («Seinen Teil hatte er gegeben. Jetzt durfte er auch essen.»).
+3. **A summing-up ending.** p18 closed on «…war aus vier fremden Buben etwas anderes geworden.»
+   (also wrong: two of them are brothers). The arc's ending is concrete: a boy says his own name and
+   asks the others to come back tomorrow.
+4. **Motive after the act.** p10: a character refuses a plea for a reason the arc gives, but the book
+   reveals it only on p13/p18, so the refusal reads senseless. Owner: the arc's job is characters with
+   reasons; when the reader learns them is the text stage's call.
+
+**Decision (owner, 2026-09-23).**
+- `STYLE_RULEBOOK` (promptBuilders.js): ONE block, filled via `{STYLE_RULEBOOK}` into
+  story-text-from-beats.txt, story-trial.txt, text-refine.txt (so also repetition_fix / length_fix),
+  story-text-diff.txt and story-text-proofread.txt. Rules: complete sentences; no set-pieces or paired
+  negations; no sentence telling what an event meant or summing up who the characters have become; the
+  narrator never justifies or explains an action; a size or look only where the story uses it (too heavy
+  to lift, too big to hide, small enough to hold), and leaving it out drops no fact; the last page ends on
+  the concrete act or spoken line and lands one feeling. The hand copies in the writer and the repair
+  are deleted (the writer's final-page line moved into the rulebook). Writers and repair write to it;
+  the diff pass treats a rule the AFTER broke and the BEFORE kept as damage and never writes a
+  correction that breaks one; the lector keeps it in every correction and does not list style faults.
+- The "specific form" clause in the writer and the repair now says a size or a look is not such a fact.
+- `MOTIVE_AT_THE_ACT_RULE`: where a character refuses, demands, flees, hides or lies for a reason the
+  story reveals later, the reader gets a glimpse of it at or before the act without spoiling the reveal.
+  A carried reason is not an invented turn. Filled into both writers and the repair.
+- story-text-audit.txt: question 13 **ENDING** (the last page ends on the concrete act or line; a
+  summing-up close, or one the pages do not bear out, is a fault); **INFERRED** widened from "where the
+  ending depends on it" to any act whose reason the reader needs on that page; **PAYOFF** also catches a
+  demand or order nothing answers; **LOADBEARING** says a size or look the plot never uses is not
+  load-bearing.
+
+**Rationale.** One constant cannot drift (fix the mirror class, not the instance). Sizes and looks are
+image staging: the pictures show them, and the text needs one only when the plot turns on it. The
+ENDING check is on the audit side so the repair is given a finding to fix, and the rulebook carries the
+matching generator rule (generator-vs-critic). The blind audit is unchanged: ENDING is a new category
+on the sighted side only, so the merge's category dedupe cannot fold it with a blind finding.
+
+**Touched:** `server/lib/promptBuilders.js` (`STYLE_RULEBOOK`, `MOTIVE_AT_THE_ACT_RULE`, filled in
+`buildStoryTextFromBeatsPrompt`, `buildTrialStoryPrompt`, `buildTextRefinePrompt`,
+`buildTextDiffPrompt`, `buildTextProofreadPrompt`), `prompts/story-text-from-beats.txt`,
+`prompts/story-trial.txt`, `prompts/text-refine.txt`, `prompts/story-text-diff.txt`,
+`prompts/story-text-proofread.txt`, `prompts/story-text-audit.txt`,
+`tests/unit/text-style-rulebook.test.ts`, `tests/unit/text-audit-rules-reach-writer.test.ts`,
+`docs/prompt-inventory.md`.
+**Status:** ✅ active on staging. Validation: see below.

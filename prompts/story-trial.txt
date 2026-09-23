@@ -15,6 +15,8 @@ SHORT story — {PAGES} scenes. Keep it focused:
 - 100-140 words per page, flowing paragraphs
 - Page 1 starts with action, not weather or waking up
 - {PAGE_OPENING_VARIETY}
+{STYLE_RULEBOOK}
+- {MOTIVE_AT_THE_ACT}
 - The text never asserts a position, an action or an object the scene hint does not stage: a figure the hint leaves out of frame does nothing visible on that page, and an action the hint stages as its aftermath is told as its aftermath
 - Show character personality through actions
 - A character who refuses, gives up or discards a thing stays done with it; where a later scene has them want it back or take it up again, that scene says what changed

@@ -19,7 +19,7 @@ Characters: {CHARACTER_NAMES}
 
 {CHARACTER_DETAILS}
 
-# THE STORY (final — this arc is the story in summary, and the text is the telling of it. Every fact, cause, feeling and spoken line it states finds its home on some page, in its specific form. The stake is said early and again later, the change is visible at the end, and nothing the story closes is left unsaid or unshown. A summary skips the ordinary business between its turns; the text writes it back in.)
+# THE STORY (final — this arc is the story in summary, and the text is the telling of it. Every fact, cause, feeling and spoken line it states finds its home on some page, in its specific form; a size or a look is not such a fact, and reaches the text only where the story uses it. The stake is said early and again later, the change is visible at the end, and nothing the story closes is left unsaid or unshown. A summary skips the ordinary business between its turns; the text writes it back in.)
 
 {STORY_ARC}
 
@@ -45,16 +45,17 @@ Each page covers its own stretch of the story and nothing that belongs to a late
 The illustration already shows the instant, so write what it cannot show: the interior, the dialogue, the turn, the causes, the move that got them there.
 Never contradict a page's illustration, and never mention pages, plans or illustrations.
 Never use an em-dash or an en-dash, except where the LANGUAGE block above names one use for it. Use a comma, a full stop, a colon or parentheses.
-Every sentence is complete and finishes: no sentence broken off for effect, no bare fragments standing as sentences. Write as someone telling the story aloud, never as captions or stage directions describing a scene.
-No rhetorical set-pieces: no paired negations, no coined sayings or incantations. Plain narration carries the story.
+Style, on every page:
+{STYLE_RULEBOOK}
 {PAGE_OPENING_VARIETY}.
 The story's stake — what must happen and why — is stated plainly in the text: early, in words a small child knows, and again later. A listening child must never wonder what the book is about. Saying it plainly beats leaving it unsaid, even where no picture shows it.
 What the story establishes as load-bearing — a cause, a uniqueness, a limitation — appears in the text in its specific form, never genericized.
 Nothing is leaned on before the book establishes it: a character knows only what an earlier page or picture gave them, so where a page needs them to know a thing, an earlier page tells them; a first appearance carries the stated cause that puts them there, and arriving by chance exactly where they are needed is not one; an object, sign, mechanism or rule earns its meaning on the page it first appears; a limit the plot leans on is stated in the text, and no later page breaks it; a character who refuses, gives up or discards a thing stays done with it, and a later page that has them want it back or take it up again says what changed; every reveal a page promises is answered on a later page, and every price paid leaves a mark a later page shows.
+{MOTIVE_AT_THE_ACT}.
 No phrase is repeated from a neighbouring sentence.
 The text gives each page its feeling and its suspense, and fills what the summary leaves out: feelings, dialogue, and the ordinary business between the story's turns — going somewhere and arriving, waiting, approaching people, asking, being answered, a greeting, names given and heard, a thing tried and let go. That is filler, and the text invents it freely wherever the story jumps.
 Event is not filler, and what is fixed is what the story is made of: invent no character, creature, object, place or turn of the plot the story does not carry, and nothing that changes what happens, to whom, or what it costs. The moves between the story's states — a climb, a crossing, a getting there — are told plainly as they happen, never already finished when a page opens. A change of place, of what someone holds, or of the company they are among carries its path on the page.
-The final page gets the same care as the first sentence: land one feeling, plainly and warmly. A string of short solemn sentences is not an ending.
+The final page gets the same care as the first sentence.
 Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone.
 No onomatopoeia or sound-effect words (clang-clang, whoosh, boom) and no baby-talk. The register follows the reading level, never a character's age: a story about a toddler is not written in toddler speech.
 Every word must be one a child at the reading level above already uses. Name a thing plainly instead of reaching for a rare compound or an unusual colour or material word, and keep a sentence to one idea when the word count is tight.
