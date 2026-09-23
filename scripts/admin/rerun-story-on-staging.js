@@ -34,7 +34,7 @@
  * the run also exercises today's idea prompt. The pair is sent along, so the
  * story records the premise as ours rather than user-written.
  *
- *   node scripts/admin/rerun-story-on-staging.js <storyId> [--pages=N] [--season=S] [--source=prod|staging] [--regenerate-idea[=location|fantasy]] [--yes]
+ *   node scripts/admin/rerun-story-on-staging.js <storyId> [--pages=N] [--season=S] [--source=prod|staging] [--regenerate-idea[=location|fantasy] | --details-file=<path>] [--yes]
  */
 'use strict';
 
@@ -55,7 +55,15 @@ const sourceFlag = args.find((a) => a.startsWith('--source='));
 const SOURCE = sourceFlag ? sourceFlag.split('=')[1] : 'prod';
 const ideaFlag = args.find((a) => a.startsWith('--regenerate-idea'));
 const IDEA_WORLD_WANTED = ideaFlag && ideaFlag.includes('=') ? ideaFlag.split('=')[1] : 'location';
-const USAGE = 'Usage: node scripts/admin/rerun-story-on-staging.js <storyId> [--pages=N] [--season=spring|summer|autumn|winter] [--source=prod|staging] [--regenerate-idea[=location|fantasy]] [--yes]';
+// --details-file=<path>: launch with a HAND-CORRECTED premise instead of the
+// source job's. For when the stored premise is itself the defect (the dragon
+// commission was generated before the 2026-09-19 relationship-sentinel fix and
+// made four friends into strangers) but the run must stay comparable to the
+// ones before it. Mutually exclusive with --regenerate-idea.
+const detailsFlag = args.find((a) => a.startsWith('--details-file='));
+const DETAILS_FILE = detailsFlag ? detailsFlag.slice('--details-file='.length) : null;
+if (DETAILS_FILE && ideaFlag) { console.error('--details-file and --regenerate-idea are two different premises; pick one.'); process.exit(1); }
+const USAGE = 'Usage: node scripts/admin/rerun-story-on-staging.js <storyId> [--pages=N] [--season=spring|summer|autumn|winter] [--source=prod|staging] [--regenerate-idea[=location|fantasy] | --details-file=<path>] [--yes]';
 if (ideaFlag && !['location', 'fantasy'].includes(IDEA_WORLD_WANTED)) {
   console.error(`--regenerate-idea="${IDEA_WORLD_WANTED}" is not a world. Use location (the reader's real city) or fantasy.`);
   process.exit(1);
@@ -234,6 +242,16 @@ const token = () => execFileSync('node', [path.join(__dirname, 'get-admin-token.
     inputs.ideaWorld = worlds[pick];
     inputs.ideaGeneration = { output: ideas, selectedIndex: pick, model: ib.model };
     console.log(`\nIdea regenerated (${ib.model}) — keeping idea ${pick + 1} of ${ideas.length}, world "${IDEA_WORLD_WANTED}":\n${inputs.storyDetails}\n`);
+  }
+
+  if (DETAILS_FILE) {
+    const fs = require('fs');
+    const text = fs.readFileSync(path.resolve(DETAILS_FILE), 'utf8').replace(/\r\n/g, '\n').trim();
+    if (!text) { console.error(`--details-file ${DETAILS_FILE} is empty — refusing to launch with no premise.`); process.exit(1); }
+    inputs.storyDetails = text;
+    console.log(`
+Premise replaced from ${DETAILS_FILE} (${text.length} chars).
+`);
   }
 
   const withAvatars = characters.filter((c) => c.avatars?.standardUrl || c.avatars?.summerUrl || c.avatars?.winterUrl).length;
