@@ -629,6 +629,15 @@ measurement, is lost).
 ---
 
 ## Decisions waiting on the owner
+- [ ] Repair ties keep the older version (`repairPipeline.js:41-56` earliest wins) — dragon run 6 P7 lost a real fix at 85=85. Options: tie goes to the repair, or a pairwise before/after judge (~$0.01/repair). Not picked 2026-09-23.
+- [ ] Consolidator issues an inpaint for a restaging it also marks `requires_char_fix_not_inpaint` (run 6 P8, feedback-consolidator.txt rule 7); inpaint turned a close-up into a full-body shot.
+- [ ] Quality judge `duplicate_character` CRITICAL routes a repair without checking the detector's figure count (run 6 P12: invented second boy; repair instruction carried bbox coordinates Grok cannot read).
+- [ ] Consolidator atomic-instruction rule strips constraints (run 6 P13 lost 'snout low', P16 'plate-sized scale' became a dish): move dropped parts to `preserve`, no size-comparison nouns in edit instructions.
+- [ ] Rough text, writer/lector (run 6): non-idiomatic German the lector missed (p9, p13), picture-describing pages (p2), night with no dusk (p12). Candidate: Lab A/B lector idiom recall. Writer model is settled (decisions 'Writers stay sonnet').
+- [ ] Rough text, audit gets the arc but not the arc HINTS (story-text-audit.txt) — restored a hint-swapped assignment and patched it (run 6 p15). Pass {ARC_HINTS} or fold hints into finalArc.
+- [ ] Rough text, repair rules: a TRANSITION fix may not state a fact an earlier page contradicts (p14); a LENGTH cut may not remove a reaction beat (p4, p16).
+- [ ] Plan: a hint anchored to a later event goes on that event's page (p14 chestnut snack during the despair); time of day monotonic on the last page (p18); planCounters counts an unnamed parent / commissioned dog as invented figures (planCounters.js:826-859).
+- [ ] Arc retell: a stated deadline or limit is either kept or its breaking is on the page (run 6 'warm before dark' broken silently).
 
 Nothing below should be coded until it is answered.
 
