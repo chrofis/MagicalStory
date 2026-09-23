@@ -54,6 +54,7 @@ Check every candidate finding against this list BEFORE reporting it. These are n
 - **N-05 Prose pose detail.** Pose details in prose but NOT in DECLARED INTERACTIONS — "hands drawn in tight", "fingers curled", "chin tucked", "jaw set".
 - **N-06 Inferred motion.** Direction of travel of a mid-motion figure. A still frame cannot prove which way it moves — judge visible contact and pose only.
 - **N-07 Hidden parts.** Occluded or cropped anything. If the body part an item attaches to is outside the rendered area, the item is not missing.
+- **N-07b Your own summary.** An item missing from your `figures` entry is not evidence it is missing from the picture.
 - **N-08 Back views.** No face is expected.
 - **N-09 Background people.** The `SETTING POPULATION` line in EXPECTED CAST decides this, not your own reading of the USER_PROMPT. On `crowd`, unnamed background figures are the page and are never extras. On `ambient`, distant background people belong to the setting and are never extras — only a figure drawn at the same scale as the EXPECTED CAST can be one; a passer-by across the square, someone on a bench, a figure by a wall is correct and is not reported, however many of them there are. On `cast-only`, the page holds its roster and nobody else, so any additional person is D-04b — a fifth child beside four named ones. The exception is D-03b: an extra carrying a named character's own reference features is never covered by this rule, at any size or population.
 - **N-10 Brushwork.** Loose stylistic brushwork consistent with the rest of the artwork.
@@ -115,7 +116,7 @@ Always output `coherence_gate: {applied, reason}`. When applied, also emit one `
 ## Identity and appearance
 
 **D-02 `character_identity` → CRITICAL.** Wrong reference matched, or the character is unrecognisable from face and build.
-**D-03 `duplicate_character` → CRITICAL.** Two figures in the cast match the same named character's reference. When the repeated figures are unnamed extras rather than the cast, it is D-03b instead — one of the two, never both.
+**D-03 `duplicate_character` → CRITICAL.** Two figures in the cast match the same named character's reference. Cite both: two `figures` ids whose `body_bbox` do not overlap, each matched to that name in `matches`, named in `description`. Without two such entries there is no duplicate. When the repeated figures are unnamed extras rather than the cast, it is D-03b instead — one of the two, never both.
 **D-03b `duplicate_identity` → CRITICAL.** Unnamed background or crowd figures rendered as copies of a named character: the same hair colour AND length, the same face, and the garment set the CLOTHING CONTRACT gives that character. Judge each extra against THAT character's reference and contract, never against the other extras. A group in matching uniform, costume, kit or livery is not a duplicate, and neither is a crowd sharing a palette or an era's dress — the test is whether the extras wear one named character's specific features. Fires however populated the scene is and however many extras repeat the character. ONE entry per page, naming the copied character and roughly how many figures repeat them. `fix`: "Redraw the background figures with their own hair colours, lengths, heights, ages and garments, distinct from the named character."
 **D-04 absent cast member — observe, do not emit.** An EXPECTED CAST entry no figure matches is reported by its absence from `matches[]`. Emit no code for it.
 **D-04b `extra_character` → CRITICAL.** A person or animal figure that matches no EXPECTED CAST entry and that N-09 does not excuse for this page's `SETTING POPULATION`. A person never satisfies an animal entry, nor an animal a person's. Skip this code only when EXPECTED CAST is blank; a roster of "(0): none" means every person or animal present is one. Never bind such a figure to a cast name to make the count fit: the roster is the count. ONE entry per surplus figure, `character` set to its figure id (`figure 5`), `fix`: "Redraw this figure as the EXPECTED CAST entry it should be, matching that entry's reference and CLOTHING CONTRACT."
@@ -222,7 +223,8 @@ Return JSON only, no other text. Emit exactly these keys.
       "severity": "MAJOR",
       "character": "CharacterA",
       "description": "What is wrong, naming the character or object.",
-      "fix": "The single concrete change required."
+      "fix": "The single concrete change required.",
+      "absent": false
     }
   ]
 }
@@ -233,6 +235,8 @@ Return JSON only, no other text. Emit exactly these keys.
 `matches` carries exactly one entry per figure in `figures`, using the same ids and order. `reference` is an EXPECTED CAST name (or a reference-photo label when no cast was supplied) or the literal `unmatched` with `confidence: 0` — never a name that appears in neither, and never a missing entry. An `unmatched` person or animal that N-09 does not excuse for this page's `SETTING POPULATION` is D-04b. Every entry carries `body_bbox`. Weigh age, gender, hair and clothing together, with each character's declared position and action as a supporting hint; no single trait decides. A character can be wearing the wrong outfit, so never let clothing alone override hair, build and age — when traits disagree, follow the majority and drop `confidence` below 0.5. `rendering` carries the booleans the pipeline reads plus a plain-text `issues` list for physics detail; `composite_seam` is true when a straight or jagged boundary crosses the picture and the rendering, lighting or background changes across it.
 
 `character` names WHICH FIGURE the finding is about and is required on every finding that belongs to one — clothing, garment colour, clothing detail, hair, age, identity, accessories, anatomy, pose, orientation, and an object a figure is wearing, holding or handling. Copy the EXPECTED CAST name exactly as that block writes it; for a figure matching no cast entry use its `figures` id (`figure 3`). Spell one figure identically on every entry. Two figures with the same defect are two entries with different `character` values; one figure's defect is never split across entries. `character` is null only when the finding belongs to no figure — the setting, the weather, rendered text, the frame as a whole.
+
+`absent` is `true` on a finding that says something is not in the picture — a person, an animal, an object, a worn or held item — and `false` otherwise. Such a finding names in `description` the figure or region you looked at.
 
 Every finding also carries `landmark_element` whenever LANDMARK CONTEXT (input 10) is not `(none)`. That block defines the field — answer it there, never omit it.
 

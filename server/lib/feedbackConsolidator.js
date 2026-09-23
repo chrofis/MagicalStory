@@ -312,6 +312,41 @@ function medianSeverity(severities) {
   return votes[Math.floor((votes.length - 1) / 2)];
 }
 
+/**
+ * A DROP THAT SAYS "NOT A DEFECT" LEAVES THE SCORING LIST TOO (2026-09-23).
+ *
+ * `dropped_issues` holds two kinds of drop: ones that only keep an issue out of
+ * this round's PLAN (capped at 3, needs a char-fix) — the defect is real and
+ * stays in `deduped_issues`, which is the scoring source — and ones that say the
+ * finding is FALSE (rule 2 `profile_says_trait_is_correct`, rule 2a
+ * `finding_contradicts_brief`). The model wrote the second kind and still kept
+ * the issue in `deduped_issues` (staging job_1790100385959_1nitlympp p12: the
+ * gilet the brief takes off was dropped as a false finding and charged MAJOR in
+ * the same plan). The reason CODE is the consolidator's own closed vocabulary;
+ * the entry to remove is found by its `type` and `character`, never by text.
+ */
+const NOT_A_DEFECT_DROPS = ['profile_says_trait_is_correct', 'finding_contradicts_brief'];
+
+function enforceNotADefectDrops(plan, pageNumber = null) {
+  if (!plan || !Array.isArray(plan.dropped_issues) || !Array.isArray(plan.deduped_issues)) return 0;
+  const key = (v) => (typeof v === 'string' ? v.trim().toLowerCase() : '');
+  let removed = 0;
+  for (const d of plan.dropped_issues) {
+    const reason = String(d?.reason || '').replace(/^["'`\s]+/, '').toLowerCase();
+    if (!NOT_A_DEFECT_DROPS.some(code => reason.startsWith(code))) continue;
+    if (!d.type) {
+      log.warn(`[FEEDBACK-CONSOLIDATOR] page ${pageNumber}: a "${reason.split(/[\s—-]/)[0]}" drop carries no type — cannot remove it from deduped_issues`);
+      continue;
+    }
+    const before = plan.deduped_issues.length;
+    plan.deduped_issues = plan.deduped_issues.filter(i =>
+      !(key(i.type) === key(d.type) && key(i.character) === key(d.character)));
+    removed += before - plan.deduped_issues.length;
+  }
+  if (removed) log.info(`🧠 [FEEDBACK-CONSOLIDATOR] page ${pageNumber}: ${removed} deduped issue(s) removed — dropped as not a defect`);
+  return removed;
+}
+
 async function consolidateFeedback({
   sceneDescription,
   evaluation = {},
@@ -596,6 +631,7 @@ async function consolidateFeedback({
         }));
     }
 
+    enforceNotADefectDrops(plan, pageNumber);
     applyRule7SceneFixGuard(plan, pageNumber);
 
     // Enforce the 3-fix cap even if the consolidator slipped past the prompt.
@@ -886,6 +922,7 @@ async function consolidateEvaluation({
 
 module.exports = {
   applyRule7SceneFixGuard,
+  enforceNotADefectDrops, // exported for testing
   consolidateFeedback,
   medianSeverity, // exported for testing
   consolidateEvaluation,

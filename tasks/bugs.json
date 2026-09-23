@@ -1458,6 +1458,18 @@
       "fixedAt": "2026-09-23",
       "fixedIn": "6a2b0e121",
       "fix": "spliceClause keeps the clause joiner and article (dropping a leading article from the replacement when the clause had one); the same-words check compares bodies, so a second pass finds nothing. Replay: all three outfits read \", and a <garment>\". Pinned by tests/unit/worn-garment-review-chain.test.ts."
+    },
+    {
+      "id": "p12-invented-absence-and-duplicate-take-repair-slots",
+      "title": "The quality judge's invented duplicate and 'missing' findings took the repair slots, and the consolidator charged a finding it had dropped as false",
+      "reportedAt": "2026-09-23",
+      "source": "Reproduced from stored data, dragon run 6 (staging job_1790100385959_1nitlympp) p12 v0: quality fixable_issues duplicate_character CRITICAL (figure 1 on empty ground), clothing MAJOR 'Kiaan missing brown lace-up boots', missing_element MAJOR gilet - all three drawn in the pixels; stored bboxDetection holds exactly Max, Levin, Julian, Kiaan (+Turi, Nia). consolidatedPlan.dropped_issues drops the gilet ('spec conflict ... evaluator misread spec', 'profile_says_trait_is_correct') while deduped_issues keeps it MAJOR. Inpaint round 1 spent on the invented figure; stored unrepairedCritical duplicate_character.",
+      "rootCause": "No second witness gated the quality judge's absence/duplicate claims before consolidation: the presence derivation declined (witnesses_disagree, the judge's phantom figure made 5 vs the detector's 4), so duplicate_character stood; missing items were asserted from the judge's own incomplete figure summary. The consolidator had no rule keeping a false-finding drop out of its scoring list.",
+      "impact": "Any page where the quality judge hallucinates a duplicate or an absence: CRITICAL/MAJOR deductions on correct pixels, wasted paid repair rounds, real findings starved by the 3-fix cap, false 'unrepaired CRITICAL' records. Staging and production.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "this commit",
+      "fix": "Owner chose prompt + code. Prompts: D-03 cites two non-overlapping matched figures; N-07b own summary is not evidence; `absent` field + region named on quality and semantic findings; consolidator rule 2a and typed drops. Code (severity only): absenceCheck.capDuplicatesByDetector (detector people <= cast people -> MINOR) and secondLookAbsenceClaims (one independent Gemini look per page at CRITICAL/MAJOR absence claims; unconfirmed -> MINOR), wired in evaluateImageQuality before scoring; feedbackConsolidator.enforceNotADefectDrops. Replay + one paid look on stored p12 v0: duplicate -> MINOR, boots 'yes', gilet 'yes' -> MINOR. Pinned by tests/unit/absence-severity-guards.test.ts."
     }
   ]
 }

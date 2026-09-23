@@ -21,6 +21,54 @@ superseded and link forward.
 
 ---
 
+## 2026-09-23 — Absence findings: a duplicate needs the detector's room for it, a CRITICAL/MAJOR "missing" needs a second look, a false-finding drop is never charged
+
+**Context:** Staging `job_1790100385959_1nitlympp` p12 v0. The quality judge listed a figure on empty
+ground (box x .29-.49, y .38-.62), matched it to Max and filed `duplicate_character` CRITICAL; it filed
+Kiaan's boots (`clothing` MAJOR) and the gilet (`missing_element` MAJOR) as missing — all three are drawn.
+The detector saw exactly the four boys. The three false findings took the repair slots, the semantic
+judge's real findings were capped out, the inpaint changed nothing, and v0 shipped with a stored
+"unrepaired CRITICAL". The consolidator dropped the gilet as a false finding and kept it in
+`deduped_issues` (the scoring source) in the same plan.
+
+**Decision (owner chose both shapes):**
+1. Prompts. `image-evaluation.txt` D-03: a duplicate cites two `figures` ids with non-overlapping
+   `body_bbox`, each matched to that name, or there is none. N-07b: an item missing from your own
+   `figures` entry is not evidence it is missing from the picture. Every finding carries `absent`
+   (true when it says something is not in the picture) and a missing claim names the figure or region
+   looked at. `image-semantic.txt` gets the same absence rule and field. The compliance judge already
+   files every absence as `unverified_absence` (MINOR cap) and is off; not changed.
+2. Code, severity only (`server/lib/absenceCheck.js`, called in `evaluateImageQuality` before the score
+   and before consolidation): `duplicate_character` → MINOR when the detector's people count is at or
+   below the roster's people count (`castPeopleCount`, same non-human test as the presence
+   derivation). Every CRITICAL/MAJOR absence claim (type `missing_element` / `missing_character` /
+   `accessory_missing`, or `absent: true`; detector-derived presence findings excluded) from the
+   quality and semantic judges gets ONE independent Gemini call per page (`absence-second-look.txt`,
+   image + claims only, `MODEL_DEFAULTS.absenceSecondLookModel`); anything but a confirmed "no" →
+   MINOR. Original severity kept as `severityBeforeCap`, the answer as `secondLook`. A failed call
+   leaves the claims at their severity and records the error on each (logged as ERROR).
+3. Consolidator. Rule 2a `finding_contradicts_brief`; a rule-2/2a drop never appears in
+   `deduped_issues`, and every drop carries `type` + `character`. `enforceNotADefectDrops` removes a
+   deduped entry of the same type+subject when the model keeps one anyway (reason CODE, not text).
+
+**Evidence:** Replay on p12's stored eval + stored detection: detector people 4 (Max, Levin, Julian,
+Kiaan; Turi, Nia non-human) vs cast 4 → the duplicate becomes MINOR. One paid second look on the stored
+v0 image (gemini-2.5-flash, 524 in / 65 out tokens): boots "yes — Kiaan is wearing brown lace-up boots",
+gilet "yes — lying on the ground next to the lamppost" → both MINOR. All three false findings leave the
+repair slots; the two real semantic MAJORs remain. The stored plan's drops carry no type (pre-contract),
+so the consolidator guard is a no-op on it; with a typed drop it removes the gilet.
+
+**Rationale:** Classification stays in the prompts; code reads a type, a detector count, a second
+judge's yes/no and the consolidator's own reason code — never a description. "Unclear" is capped
+because a claim that takes a paid repair must be confirmed, not merely not refuted.
+
+**Touched:** `server/lib/absenceCheck.js` (new), `server/lib/evalPipeline.js`,
+`server/lib/feedbackConsolidator.js`, `server/config/models.js`, `server/services/prompts.js`,
+`prompts/absence-second-look.txt` (new), `prompts/image-evaluation.txt`, `prompts/image-semantic.txt`,
+`prompts/feedback-consolidator.txt`, `tests/unit/absence-severity-guards.test.ts`.
+
+**Status:** ✅ active.
+
 ## 2026-09-23 — Every avatar-sheet judge rejects a copied verdict; the cell-4/8 rear turn is one constant for generator and judges
 
 **Context:** Staging `job_1790100385959_1nitlympp` (dragon run 6). The three pass-1 row judges (heads,

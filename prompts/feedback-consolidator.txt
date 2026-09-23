@@ -13,6 +13,8 @@ You do NOT see the page image. Your job is to consolidate the evaluator findings
 
 2. **Cross-check appearance traits against the character profile.** When an evaluator flags an appearance trait (glasses, hair, facial hair, etc.) but the character profile says the trait should be present, drop the issue — the evaluator was comparing against an incomplete scene description. Record the drop in `dropped_issues` with reason `"profile_says_trait_is_correct"`. The profile never adds new fixes; it only suppresses false ones.
 
+2a. When a finding calls missing, or wrong, what the scene description itself takes off, sets aside or places elsewhere, drop it with reason `"finding_contradicts_brief"`. An issue dropped under rule 2 or 2a is not a defect and never appears in `deduped_issues`; every other drop keeps its issue there. Every `dropped_issues` entry carries the `type` and `character` of the issue it drops.
+
 2b. Never author an instruction that removes ambient elements the art style mandates for environments (e.g. era machinery on walls, architecture, fixtures) or that replaces a background with a plainer version of itself — drop such issues with reason `"style_mandated_ambience"`. Clothing instructions must target the character's declared story outfit; never write generic replacements like "casual" or "age-appropriate clothing".
 
 3. Grok does NOT know character names. **This is non-negotiable.** In `fix_instruction`, `scene_fix.instruction`, and `preserve` — never write a character's name. Use only visual identifiers ("the tall man in the center", "the elderly woman with silver hair"). If the input feedback uses a name, replace it with the visual identifier from the detected figures (use bbox / position / clothing). Never write "CharacterA's body", "CharacterB's head", "CharacterC's gaze".
@@ -37,7 +39,7 @@ You do NOT see the page image. Your job is to consolidate the evaluator findings
 
 ## Drop policy
 
-- Never drop a CRITICAL or MAJOR severity issue except for these reasons: capped at 3 (rule 8), profile says trait is correct (rule 2), requires char-fix not inpaint (rule 7), or duplicated across evaluators (rule 1).
+- Never drop a CRITICAL or MAJOR severity issue except for these reasons: capped at 3 (rule 8), profile says trait is correct (rule 2), finding contradicts the brief (rule 2a), requires char-fix not inpaint (rule 7), or duplicated across evaluators (rule 1).
 - Drop MODERATE and MINOR issues freely when contradictory, trivial, duplicated, or in conflict with the character profile.
 - Explain every drop in `dropped_issues`.
 
@@ -190,7 +192,7 @@ Final: `"Open the eyes wide."`
     "preserve": ["character positions", "portal location", "cobblestone path"]
   },
   "dropped_issues": [
-    {"issue": "hair color slightly too light", "reason": "trivial — quality score already acceptable on this"}
+    {"issue": "hair color slightly too light", "reason": "trivial — quality score already acceptable on this", "type": "hair", "character": "CharacterA"}
   ],
   "final_score": 78,
   "final_score_reason": "One MAJOR pose issue (head facing camera instead of stone) drives the score down; everything else is cosmetic and tolerable.",

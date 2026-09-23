@@ -1469,11 +1469,36 @@ function parseFixableIssues(parsedJson) {
       // The quality judge's declared landmark subject, passed through when it
       // answered; absent stays absent, which the guard reads as UNDECLARED.
       ...(i.landmark_element === undefined ? {} : { landmark_element: i.landmark_element }),
+      // The judge's own "this is not in the picture" flag — read by the absence
+      // second look (absenceCheck.js), never inferred from the description.
+      ...(i.absent === true ? { absent: true } : {}),
     }));
 }
 
 /** Stamped on every finding this file's arithmetic authored (see derivePresenceFinding). */
 const PRESENCE_DERIVED_MARKER = 'presence-arithmetic';
+
+// The absence second look's vision call (absenceCheck.js). Gemini only, same
+// generation settings as the quality judge; the reply is returned raw.
+async function callAbsenceJudge(parts, modelId, apiKey) {
+  const resp = await withRetry(() => fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: { temperature: EVAL_TEMPERATURE, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: EVAL_THINKING_BUDGET } },
+        safetySettings: require('./images').GEMINI_SAFETY_SETTINGS,
+      }),
+    }), { maxRetries: 2, baseDelay: 2000 });
+  if (!resp.ok) throw new Error(`second look HTTP ${resp.status}`);
+  const j = await resp.json();
+  const text = j?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '';
+  if (!text) throw new Error(`second look returned no text (finishReason ${j?.candidates?.[0]?.finishReason || 'none'})`);
+  const um = j?.usageMetadata || {};
+  return { text, usage: { input_tokens: um.promptTokenCount || 0, output_tokens: um.candidatesTokenCount || 0 } };
+}
 
 /** The presence types the derivation owns outright once it has spoken. */
 const PRESENCE_COUNT_TYPES = new Set(['missing_character', 'extra_character']);
@@ -1581,6 +1606,29 @@ function presenceCounterName(presence, spoke) {
   return spoke ? `presence_${presence?.outcome}${reason}` : `presence_declined${reason}`;
 }
 
+// Is this roster name a non-human entry? The roster's own list first, then the
+// resolver for a short-form token the list spells out in full. Without an index
+// the canonical match is the whole answer. Shared by the presence derivation and
+// the duplicate cap (castPeopleCount) so both count people the same way.
+function castNonHumanTest(cast, castIndex = null) {
+  const { canonicalName, resolveEntity, isNonHuman } = getCastResolver();
+  const nonHumanSet = new Set((Array.isArray(cast?.nonHumanNames) ? cast.nonHumanNames : [])
+    .map(n => canonicalName(n)).filter(Boolean));
+  return (n) => {
+    const k = canonicalName(n);
+    if (!k) return false;
+    if (nonHumanSet.has(k)) return true;
+    return castIndex ? isNonHuman(resolveEntity(n, castIndex)) : false;
+  };
+}
+
+// People on the declared roster; null when the roster was not declared.
+function castPeopleCount(cast, castIndex = null) {
+  if (!cast || cast.declared !== true) return null;
+  const isNH = castNonHumanTest(cast, castIndex);
+  return (Array.isArray(cast.names) ? cast.names : []).filter(n => !isNH(n)).length;
+}
+
 function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, detectorFigures = null, referenceNames, castIndex = null } = {}) {
   // RESOLVE (castIndex, when the caller has one) + COMPARE (everything else:
   // both sides of every name test below are strings this same run produced).
@@ -1617,17 +1665,7 @@ function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, de
   //
   // There is deliberately no non-human presence check to replace this: a
   // missing fairy simply stops being arithmetic evidence (owner).
-  const nonHumanSet = new Set((Array.isArray(cast.nonHumanNames) ? cast.nonHumanNames : [])
-    .map(n => canonicalName(n)).filter(Boolean));
-  // Tolerant: the roster's own list first, then the resolver for a short-form
-  // token the list spells out in full. Without an index the canonical match is
-  // the whole answer, exactly as before.
-  const isNonHumanName = (n) => {
-    const k = canonicalName(n);
-    if (!k) return false;
-    if (nonHumanSet.has(k)) return true;
-    return castIndex ? isNonHuman(resolveEntity(n, castIndex)) : false;
-  };
+  const isNonHumanName = castNonHumanTest(cast, castIndex);
   const refOf = (m) => canonicalName(m?.reference || '');
   const isUnnamed = (r) => !r || r === 'unmatched' || r === 'unknown';
   const evaluatorPeople = figs.length - mts.filter(m => isNonHumanName(m?.reference)).length;
@@ -3310,6 +3348,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // never repaired despite -30 worth of real visual defects).
       let threeStageResult = null;
       let visualScore = score; // Quality score AFTER any three-stage merge
+      let secondLook = null;
       if (threeStagePromise) {
         try {
           threeStageResult = await threeStagePromise;
@@ -3351,6 +3390,31 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         }
       }
 
+      // TWO SEVERITY GUARDS ON "IT IS NOT THERE" (owner, 2026-09-23; see
+      // absenceCheck.js). Both run before the score below and before the
+      // consolidator picks repair slots, and both change a severity only.
+      // (1) duplicate_character is advisory when the detector counted no more
+      //     people than the cast holds.
+      // (2) every CRITICAL/MAJOR absence claim, from the quality and semantic
+      //     judges, gets one independent look at the picture; unconfirmed →
+      //     advisory. Detector-derived presence findings are not re-asked.
+      if (evaluationType === 'scene' || evaluationType === 'cover') {
+        const absence = require('./absenceCheck');
+        const pageLabel = pageContext ? `[${pageContext}] ` : '';
+        const capped = absence.capDuplicatesByDetector(fixableIssues, {
+          detectedPeopleCount, castPeopleCount: castPeopleCount(expectedCast, castIdx),
+        });
+        if (capped) log.info(`👥 [DUPLICATE-CAP] ${pageLabel}${capped} duplicate_character finding(s) capped to advisory — detector people ${detectedPeopleCount} ≤ cast ${castPeopleCount(expectedCast, castIdx)}`);
+        const secondLookModel = MODEL_DEFAULTS.absenceSecondLookModel;
+        secondLook = await absence.secondLookAbsenceClaims({
+          imageData,
+          lists: [fixableIssues, semanticResult?.semanticIssues],
+          presenceMarker: PRESENCE_DERIVED_MARKER,
+          pageLabel,
+          callJudge: (parts) => callAbsenceJudge(parts, secondLookModel, apiKey),
+        });
+      }
+
       // THE SCORE DERIVES FROM THE CURRENT ISSUE LIST — recomputed here, once,
       // over whatever `fixableIssues` finally holds. It used to be recomputed
       // only inside the three-stage merge branch, which was fine while that
@@ -3377,8 +3441,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       const semanticUsage = semanticResult?.usage || {};
       const threeStageUsage = threeStageResult?.usage || {};
       const totalUsage = {
-        input_tokens: qualityInputTokens + (p1Usage?.inputTokens || 0) + (semanticUsage.input_tokens || 0) + (threeStageUsage.threeStage_input_tokens || 0),
-        output_tokens: qualityOutputTokens + (p1Usage?.outputTokens || 0) + (semanticUsage.output_tokens || 0) + (threeStageUsage.threeStage_output_tokens || 0),
+        input_tokens: qualityInputTokens + (p1Usage?.inputTokens || 0) + (semanticUsage.input_tokens || 0) + (threeStageUsage.threeStage_input_tokens || 0) + (secondLook?.usage?.input_tokens || 0),
+        output_tokens: qualityOutputTokens + (p1Usage?.outputTokens || 0) + (semanticUsage.output_tokens || 0) + (threeStageUsage.threeStage_output_tokens || 0) + (secondLook?.usage?.output_tokens || 0),
         thinking_tokens: qualityThinkingTokens,
         p1_input_tokens: p1Usage?.inputTokens || 0,
         p1_output_tokens: p1Usage?.outputTokens || 0,
@@ -3437,6 +3501,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         styleGate,
         semanticResult,                   // Full semantic evaluation result (if available)
         threeStageResult,                 // Full three-stage evaluation result (if available)
+        secondLook,                       // absence second look {checked, capped, confirmed, error} (null = not run)
         usage: totalUsage,
         modelId: modelId
       };
@@ -3602,6 +3667,8 @@ module.exports = {
   reconcileDetectorCast,
   parseFixableIssues,
   derivePresenceFinding,
+  castPeopleCount,
+  callAbsenceJudge,
   supersedePresenceFindings,
   PRESENCE_DERIVED_MARKER,
   PRESENCE_COUNT_TYPES,

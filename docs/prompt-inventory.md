@@ -130,6 +130,7 @@ Sizes measured 2026-08-09.
 |---|---|---|---|---|
 | image-evaluation.txt | 18,511 | 180 | images.js `evaluateImageQuality`; regeneration.js evaluate-single | Quality eval (fix_targets need gemini-2.5-flash) |
 | image-semantic.txt | 16,061 | 151 | images.js `evaluateThreeStage`; sceneValidator.js `evaluateSemanticFidelity` | Semantic fidelity eval |
+| absence-second-look.txt | 786 | 15 | evalPipeline.js `evaluateImageQuality` via absenceCheck.js `secondLookAbsenceClaims` (image + claims only) | Independent second look at every CRITICAL/MAJOR absence claim before it may take a repair slot; unconfirmed → advisory (2026-09-23) |
 | image-vision-inventory.txt | 2,039 | 32 | images.js `evaluateThreeStage` | Three-stage eval: vision inventory |
 | image-prompt-compliance.txt | 15,268 | 155 | images.js `evaluateThreeStage` | Three-stage eval: prompt compliance (never sees the image) |
 | image-inventory-unified.txt | 6,644 | 81 | evalPipeline.js `runVisualInventory` (:98; image only, blind by design) | Per-figure inventory the blind compliance judge consumes; its `emotion` / `gaze` / `lettering` also feed the code checks (emotionCheck.js, gazeCheck.js, letteringCheck.js). `{EMOTION_ENUM}` filled at load |

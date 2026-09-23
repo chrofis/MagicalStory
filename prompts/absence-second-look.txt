@@ -1,0 +1,15 @@
+Each numbered line below is a claim that something is missing from this illustration: a person, an animal, an object, or an item a person should be wearing or holding.
+
+Check each claim against the picture yourself. Find where the thing would be — the person it belongs to, the place it is said to lie — and look there.
+
+- "yes": the thing the claim calls missing is visible in the picture. Say where.
+- "no": you looked where it would be, that place is clearly visible, and it is not there.
+- "unclear": the place is hidden, too small, or you cannot tell.
+
+A thing drawn in another colour or shape than expected is still visible.
+
+CLAIMS:
+{CLAIMS}
+
+Return only this JSON:
+{"claims": [{"id": <claim number>, "visible": "<yes|no|unclear>", "where": "<where you see it, or empty>"}]}

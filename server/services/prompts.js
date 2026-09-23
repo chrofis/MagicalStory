@@ -237,6 +237,7 @@ async function loadPromptTemplates() {
     ['imageInventoryUnified', 'image-inventory-unified.txt'],
     ['imagePromptCompliance', 'image-prompt-compliance.txt'],
     ['imageSemantic', 'image-semantic.txt'],
+    ['absenceSecondLook', 'absence-second-look.txt'],
     // coverImageEvaluation: removed in commit 0f408228 (May 9 2026). The
     // file was deleted but the load-line stayed, which cascaded a load
     // failure across every entry below it. Fall back to imageEvaluation
