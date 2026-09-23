@@ -74,10 +74,15 @@ describe('the eval is given a figure count wherever a detection exists', () => {
     // evaluateImageQuality of its own but still needs the count for its
     // EXPECTED CAST roster. So: every resolver call states a count, and there
     // are at least as many resolver calls as evaluator calls.
+    //
+    // The feed is counted INSIDE the resolver call's options object: the Lab
+    // inpaint stage also passes `detectedFigures:` to inpaintPage (dbdc6b1c2,
+    // the repair-subject helper), which is not an eval feed, so a file-wide
+    // count of the key over-counts.
     const src = read('server/lib/testlab.js');
     const evals = (src.match(/await evaluateImageQuality\(/g) || []).length;
     const replays = (src.match(/buildEvalReplayOptions\(/g) || []).length;
-    const feeds = (src.match(/detectedFigures:/g) || []).length;
+    const feeds = (src.match(/buildEvalReplayOptions\(ctx,\s*\{[^}]*?detectedFigures:/g) || []).length;
     expect(evals).toBeGreaterThan(0);
     expect(replays).toBeGreaterThanOrEqual(evals);
     expect(feeds).toBe(replays);

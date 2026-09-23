@@ -91,9 +91,12 @@ describe('every evaluator resolves it the same way', () => {
     }
   });
 
-  it('all three call sites go through the resolver', () => {
-    // quality judge + batch evaluator in evalPipeline, semantic judge in sceneValidator
-    expect((SRC('server/lib/evalPipeline.js').match(/gazeCharacters\(/g) || []).length).toBe(2);
+  it('every call site goes through the resolver', () => {
+    // quality judge + batch evaluator in evalPipeline, semantic judge in sceneValidator,
+    // plus the two code comparisons against the blind inventory that read the same
+    // declared characters[]: the gaze check (a13848faa) and the emotion check
+    // (3d8f4871d). Both are further resolver uses, not a new way of resolving.
+    expect((SRC('server/lib/evalPipeline.js').match(/gazeCharacters\(/g) || []).length).toBe(4);
     expect((SRC('server/lib/sceneValidator.js').match(/gazeCharacters\(/g) || []).length).toBe(1);
   });
 });
