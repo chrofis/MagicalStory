@@ -2,10 +2,11 @@
  * UNDECLARED LETTERING — a comparison, not a judge.
  *
  * The prompt-blind inventory already lists every piece of writing it can see
- * (`lettering[]`: the quoted text, the surface, the position, and whether it
- * spells real words). The page already knows which strings it ASKED for: the
- * Visual Bible elements it stages that declare `text` (requiredText.js). Any
- * readable string the inventory saw that the page did not ask for is a defect.
+ * (`lettering[]`: the quoted text, the surface, the position, where it sits and
+ * how it is spelled). The page already knows which strings it ASKED for: the
+ * Visual Bible elements it stages that declare `text` (requiredText.js). Writing
+ * the page did not ask for is a defect unless it is correctly spelled writing on
+ * an object that carries such writing in the real world.
  *
  * WHY IT IS CODE (owner, 2026-09-23: "text must be captured and become
  * feedback"). The detector used to be the blind compliance judge, switched off
@@ -15,19 +16,33 @@
  * inventory recorded it exactly ("white rectangular label in bottom-right
  * corner"). The observation was there on every page; nothing read it.
  *
- * SEVERITY maps onto the evaluator's own D-23 using only the inventory's
- * structured `readable` flag — no prose is classified here:
- *   readable, undeclared   -> CRITICAL. D-23 puts prominent lettering at
- *                             CATASTROPHIC; code cannot measure prominence, so
- *                             it takes the level that always reaches a repair
- *                             without forcing a full regeneration.
- *   unreadable scribble    -> MINOR, D-23's own class for garbled signage.
- *   declared               -> nothing. An ABC book asks for its letters.
+ * SEVERITY. The inventory classifies each string on two axes (the prompt does
+ * the classifying; this file only maps the pair to a severity):
+ *   placement: overlay (caption/watermark on top of the picture) | fits (on an
+ *              object that carries writing of that kind in the real world) |
+ *              misplaced (on something that would not carry it)
+ *   spelling:  correct | misspelled | scribble
  *
- * Text is no longer forbidden outright (owner): a page that declares a string
- * may show it. What it may not show is writing nobody asked for.
+ *   declared                    -> nothing. An ABC book asks for its letters.
+ *   overlay                     -> CRITICAL, whatever it says.
+ *   misspelled, anywhere        -> CRITICAL. A misspelled sign reads as a mistake.
+ *   misplaced, legible          -> CRITICAL.
+ *   scribble (fits / misplaced) -> MINOR, D-23's class for garbled signage.
+ *   fits + correct              -> nothing. A taxi may say TAXI (owner, 2026-09-23:
+ *                                  "text on signs I would allow").
+ *   unclassified                -> logged, no finding: the inventory did not
+ *                                  answer the question this check needs.
  */
 'use strict';
+
+const { log } = require('../utils/logger');
+
+/** placement -> spelling -> severity; null = allowed. */
+const SEVERITY = {
+  overlay:   { correct: 'CRITICAL', misspelled: 'CRITICAL', scribble: 'CRITICAL' },
+  misplaced: { correct: 'CRITICAL', misspelled: 'CRITICAL', scribble: 'MINOR' },
+  fits:      { correct: null,       misspelled: 'CRITICAL', scribble: 'MINOR' },
+};
 
 /** Letters and digits only, lower-cased — "A B C", "a-b-c" and "ABC" are one string. */
 const squash = (s) => String(s == null ? '' : s).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
@@ -45,7 +60,7 @@ function isDeclared(seen, declaredSquashed) {
 
 /**
  * @param {Object}   args
- * @param {Array}    args.lettering  inventory `lettering[]`: {text, surface, position, readable}
+ * @param {Array}    args.lettering  inventory `lettering[]`: {text, surface, position, placement, spelling}
  * @param {string[]} args.declared   strings the page declares (requiredText.collectRequiredTexts().map(r => r.text))
  * @returns {Array} findings, each {type:'rendered_text', severity, character:null, source, description, fix}
  */
@@ -56,17 +71,28 @@ function checkUndeclaredLettering({ lettering, declared } = {}) {
   for (const l of seen) {
     const text = String(l?.text || '').trim();
     if (!text || isDeclared(text, declaredSquashed)) continue;
-    const readable = l?.readable !== false;
+    const severity = SEVERITY[l?.placement]?.[l?.spelling];
+    if (severity === undefined) {
+      log.error(`[LETTERING] unclassified lettering "${text}" (placement=${l?.placement}, spelling=${l?.spelling}) — no finding`);
+      continue;
+    }
+    if (!severity) continue;
     const where = [l?.surface, l?.position].filter(Boolean).join(', ');
+    const at = where ? ` (${where})` : '';
+    const description = l.placement === 'overlay'
+      ? `A caption "${text}" is laid over the picture${at}; nothing on the page asks for it.`
+      : l.spelling === 'misspelled'
+        ? `Misspelled lettering "${text}"${at}.`
+        : l.spelling === 'scribble'
+          ? `Scribble that reads as writing${at}; it spells nothing.`
+          : `Lettering "${text}" is painted on something that would not carry it${at}.`;
     findings.push({
       type: 'rendered_text',
-      severity: readable ? 'CRITICAL' : 'MINOR',
+      severity,
       character: null,
       source: 'lettering-check',
-      description: readable
-        ? `Unrequested lettering "${text}" is painted into the picture${where ? ` (${where})` : ''}; the page asks for no such text.`
-        : `Unreadable scribble that reads as writing${where ? ` (${where})` : ''}; the page asks for no text there.`,
-      fix: `Paint over the lettering${where ? ` on the ${l?.surface || 'surface'}` : ''} as continuous scene material — no readable writing.`,
+      description,
+      fix: `Paint over the lettering${l?.surface ? ` on the ${l.surface}` : ''} as continuous scene material — no readable writing.`,
     });
   }
   return findings;

@@ -55568,3 +55568,34 @@ cannot echo a brief it never saw, which the semantic judge structurally could.
 `prompts/scene-iteration-free.txt`, `tests/unit/emotion-check.test.ts` (11),
 `tests/unit/ad-iterate-parity.test.ts`. Lab 1411, 1412.
 **Status:** ✅ active — generator and reader verified; CRITICAL precision open.
+
+## 2026-09-23 — Lettering: signs that belong are allowed, misspelled or floating text is not; the mood-caption source removed
+
+**Context:** Dragon run 6 p6 carried a painted caption "TENSE BUT QUIET STANDOFF". Source traced: it is the last
+sentence of the Art Director's `sceneIntent`, which production puts at the top of the image prompt as the
+**THIS IMAGE DEPICTS** headline. That sentence is a verbless mood tag. The field rule already says "the mood as it
+shows … never as a mood word", but the example `sceneIntent` in all four brief templates (scene-expansion,
+scene-expansion-all, scene-iteration, scene-iteration-free) ended on such a tag ("…, calm weekday mood." /
+"Winter afternoon light, cold and still."). Measured over 11 recent staging stories: 36 of 177 pages (20%) end their
+sceneIntent on a mood noun; 8 of 18 in run 6.
+Owner, same day: "text on signs I would allow. A taxi with taxi written on it is probably ok even if not requested
+… However wrongly spelled taxxi should be critical."
+
+**Decision:**
+1. The four example sceneIntents end on a sentence with a verb that shows the mood in light and posture.
+2. The blind inventory classifies each lettering item: `placement` overlay | fits | misplaced, `spelling`
+   correct | misspelled | scribble (replaces `readable`). `letteringCheck.js` maps the pair to severity:
+   overlay → CRITICAL; misspelled → CRITICAL; misplaced legible → CRITICAL; scribble → MINOR; fits + correct →
+   nothing; declared text → nothing; unclassified → error log, no finding.
+3. D-23 (quality judge), the compliance judge's Lettering clause and the plate QC text check say the same:
+   correctly spelled writing on an object that carries such writing is not a defect.
+4. The image-generation prompt stays strict ("No lettering on any surface" unless REQUIRED TEXT): a judge that is
+   more lenient than the generator is harmless, the reverse is not.
+
+**Rationale:** Classification stays in the prompt, code only sets the severity. The earlier fixture
+(`readable` shape) was deleted with the field.
+
+**Touched:** prompts/image-inventory-unified.txt, prompts/image-evaluation.txt, prompts/image-prompt-compliance.txt,
+prompts/empty-scene-qc.txt, prompts/scene-expansion.txt, prompts/scene-expansion-all.txt,
+prompts/scene-iteration.txt, prompts/scene-iteration-free.txt, server/lib/letteringCheck.js,
+tests/unit/lettering-check.test.ts, tests/unit/empty-scene-qc-extraction.test.ts.

@@ -26,7 +26,9 @@ For EACH human figure:
 
 `setting`: indoor or outdoor, key visual elements, lighting direction and quality, camera angle.
 
-`lettering`: every visible letter, number, word or symbol painted anywhere — signs, walls, paper, garments, banners, captions or watermarks. Quote each exactly, name the surface and position, and say whether it spells real words or unreadable scribble. Empty when there is none.
+`lettering`: every visible letter, number, word or symbol painted anywhere — signs, walls, paper, garments, banners, captions or watermarks. Quote each exactly, letter for letter, and name the surface and position. Empty when there is none.
+- `placement`: `overlay` when it sits on top of the picture and belongs to nothing in the scene — a caption, title, label box or watermark. `fits` when it is on an object that carries writing of that kind in the real world — a word on a taxi, a shop name on its sign, a title on a book cover. `misplaced` when it is on something that would not carry it — a name on an animal or a person, words across a wall, a tree or the sky.
+- `spelling`: `correct` when every word is a real word spelled right, `misspelled` when the letters read clearly but a word has a wrong, doubled, missing or swapped letter, `scribble` when the marks look like letters but spell nothing.
 
 `rendering`: `extra_limbs` true only for a third arm, third hand or extra leg. `physics_ok` false for floating figures, impossible poses or detached limbs. `composite_seam` true when a straight or jagged boundary crosses the picture and the background, lighting or brushwork does not continue across it. `issues` lists any other visible anatomy or physics fault. Hidden or occluded parts are not faults; minor finger problems are not faults.
 
@@ -75,7 +77,7 @@ Return JSON only, no other text. Emit exactly these keys.
   ],
   "setting": { "indoor_outdoor": "outdoor", "elements": "narrow street, stone buildings, shuttered windows", "lighting": "low warm light from the left", "camera": "eye-level, medium" },
   "lettering": [
-    { "text": "BAKERY", "surface": "a hanging wooden sign", "position": "left-midground", "readable": true }
+    { "text": "BAKERY", "surface": "a hanging wooden sign", "position": "left-midground", "placement": "fits", "spelling": "correct" }
   ],
   "rendering": { "extra_limbs": false, "physics_ok": true, "composite_seam": false, "issues": [] },
   "scene_summary": "The young boy in green extends a lantern with arm raised toward the woman in the red coat, who stands with hands cupped to receive it, on a cobblestone street at dusk.",

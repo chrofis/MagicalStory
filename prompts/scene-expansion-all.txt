@@ -379,7 +379,7 @@ Then a single-line JSON object:
 
 ```
 {
-  "sceneIntent": "CharacterA kneels in the open doorway and reaches for a package on the floor. CharacterB stands beside the table and watches, head tilted. Bright midday light through the doorway, calm weekday mood.",
+  "sceneIntent": "CharacterA kneels in the open doorway and reaches for a package on the floor. CharacterB stands beside the table and watches, head tilted. Bright midday light falls through the doorway, and CharacterB's shoulders hang loose.",
   "characters": [
     {"name": "CharacterA", "clothing": "standard", "position": "left foreground", "depth": "foreground", "looksAt": "CharacterB", "expression": "wide-eyed, mouth half open, brows lifted", "emotion": "surprised"},
     {"name": "CharacterB", "clothing": "costumed", "position": "center background", "perspective": "back view, head turned toward right shoulder", "depth": "background", "looksAt": "ART001", "expression": "one eye and cheek visible, calm, faint smile", "emotion": "happy"}

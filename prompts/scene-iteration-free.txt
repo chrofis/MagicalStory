@@ -221,7 +221,7 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
 
 ```
 {
-  "sceneIntent": "CharacterA reaches up toward the clock tower while CharacterB watches from a few paces back in the snowy plaza. She reaches for the tower door, and both look at the tower. Winter afternoon light, cold and still.",
+  "sceneIntent": "CharacterA reaches up toward the clock tower while CharacterB watches from a few paces back in the snowy plaza. She reaches for the tower door, and both look at the tower. Low winter light lies across the plaza, and their breath hangs in the cold air.",
   "previewMismatches": ["Intent: CharacterA pointing LEFT. Preview: arm extended RIGHT."],
   "checks": {
     "check1_scaleFeasibility": "MEDIUM shot, expressions OK. YES",
