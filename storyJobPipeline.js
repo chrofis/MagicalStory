@@ -727,6 +727,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Measured on staging job_1787762276985_rog82sfh7: 6 plates generated
     // ($0.12), 0 used, 4 pages still carrying a raw landmark photo.
     const trialEmptyScenePromises = new Map();
+    // LOC id → { promise, page } of the first trial plate rendered at that
+    // location. The trial front cover reuses it as its people-free plate
+    // instead of rendering on the raw landmark photograph.
+    const trialPlatesByLoc = new Map();
 
     // Track parallel tasks started during streaming
     const streamingSceneExpansionPromises = new Map(); // pageNum -> promise
@@ -2298,6 +2302,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // Every page in the group awaits the SAME promise — the one render
               // that fills all their slots.
               for (const pn of bg.pages) trialEmptyScenePromises.set(pn, platePromise);
+              const plateLocId = String(plateGroup.vantageId || '').match(/^LOC\d+/i)?.[0]?.toUpperCase();
+              if (plateLocId && !trialPlatesByLoc.has(plateLocId)) {
+                trialPlatesByLoc.set(plateLocId, { promise: platePromise, page: pageNum });
+              }
               bgPromises.push(platePromise);
             }
           }
@@ -2461,29 +2469,51 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               characters: coverScene.characters || [],
               setting: coverScene.setting || null,
             };
-            const coverLandmarkPhotos = await getLandmarkPhotosForScene(streamingVisualBible, sceneMetadata);
-
-            // Build VB grid (page number -1 = front cover convention)
-            let elementRefs = getElementReferenceImagesForPage(streamingVisualBible, -1, 6);
-            // Also match by IDs from cover scene objects
-            if (coverScene.objects?.length > 0) {
-              const sceneIds = coverScene.objects
-                .map(obj => typeof obj === 'string' ? obj.match(/((?:ART|OBJ|CHR|VEH|LOC)\d+)/i)?.[1] : null)
-                .filter(Boolean);
-              if (sceneIds.length > 0) {
-                const idBasedRefs = getElementReferenceImagesByIds(streamingVisualBible, sceneIds.filter(id => !id.startsWith('LOC')));
-                const existingIds = new Set(elementRefs.map(r => r.id));
-                const newRefs = idBasedRefs.filter(r => !existingIds.has(r.id));
-                if (newRefs.length > 0) elementRefs = [...elementRefs, ...newRefs].slice(0, 6);
-              }
+            // Landmark photos, people-free plate and VB grid come from the SAME
+            // helper every full-account cover uses. The plate is the one the
+            // trial pages already rendered for this location when there is one
+            // (no extra call); otherwise the helper renders a cover plate from
+            // the setting alone. requirePlate: a landmark photo never reaches
+            // this render as its scene anchor — packReferences would promote it
+            // and the cover became an edit of the photograph, strangers
+            // included (prod job_1790169018278_n57xpnufo).
+            const {
+              buildCoverReferences: buildTrialCoverReferences,
+              trialCoverLocationId,
+              trialCoverPlateDescription,
+            } = require('./server/lib/coverIterate');
+            const coverLocId = trialCoverLocationId(coverScene);
+            const pagePlate = coverLocId ? trialPlatesByLoc.get(coverLocId) : null;
+            let reusedPlate = null;
+            if (pagePlate) {
+              await pagePlate.promise;
+              reusedPlate = sceneBackgrounds[pagePlate.page]?.imageData || null;
+              log.info(`🎬 [TRIAL-COVER] ${coverLocId}: ${reusedPlate ? `reusing the page ${pagePlate.page} plate` : `page ${pagePlate.page} plate unavailable — rendering a cover plate`}`);
             }
-            const secondaryLandmarks = coverLandmarkPhotos.slice(1);
-            let coverVbGrid = null;
-            if (elementRefs.length > 0 || secondaryLandmarks.length > 0) {
-              coverVbGrid = await buildVisualBibleGrid(elementRefs, secondaryLandmarks);
-            }
+            const coverRefs = await buildTrialCoverReferences({
+              coverKey: 'frontCover',
+              visualBible: streamingVisualBible,
+              artStyle,
+              sceneDescription,
+              coverHint: {
+                objects: trialCoverIds,
+                characters: coverCharacters.map(c => c.name).filter(Boolean),
+              },
+              sceneMetadata,
+              emptyScenePromptOverride: trialCoverPlateDescription(coverScene),
+              sceneBackground: reusedPlate,
+              requirePlate: true,
+              usageTracker: (usage, modelId) => {
+                const isGrok = modelId?.startsWith('grok-imagine');
+                addUsage(isGrok ? 'grok' : 'gemini_image', usage, 'trial_empty_scene', modelId);
+              },
+              logLabel: 'TRIAL FRONT COVER',
+            });
+            const coverLandmarkPhotos = coverRefs.landmarkPhotos;
+            const coverVbGrid = coverRefs.visualBibleGrid;
+            const coverSceneBackground = coverRefs.sceneBackground;
 
-            log.info(`[TRIAL-COVER] Starting title page generation (title: "${coverTitle}", ${coverCharacters.length} chars, ${coverLandmarkPhotos.length} landmarks${coverVbGrid ? ', VB grid' : ''})`);
+            log.info(`[TRIAL-COVER] Starting title page generation (title: "${coverTitle}", ${coverCharacters.length} chars, ${coverLandmarkPhotos.length} landmarks${coverSceneBackground ? ', plate' : ''}${coverVbGrid ? ', VB grid' : ''})`);
             const startTime = Date.now();
 
             // Generate the image using simplePageImage model (same as trial pages)
@@ -2494,6 +2524,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               ...(trialCoverTitleMode.baked ? {} : { imageBackendOverride: pageImageBackend }),
               landmarkPhotos: coverLandmarkPhotos,
               visualBibleGrid: coverVbGrid,
+              sceneBackground: coverSceneBackground,
               aspectRatio: MODEL_DEFAULTS.coverAspect,
               pageNumber: -1
             });
@@ -2531,12 +2562,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               modelId: result.modelId,
               referencePhotos: coverPhotos,
               landmarkPhotos: coverLandmarkPhotos,
+              emptySceneImage: coverSceneBackground || null,
               grokRefImages: result.grokRefImages || null,
               titleBaked: trialCoverTitleMode.baked
             };
           } catch (err) {
-            log.warn(`[TRIAL-COVER] Title page generation failed: ${err.message}`);
-            return null;
+            // Rethrown: the cover-await allSettled logs it and writes it to the
+            // stored genLog (cover_failed) — a swallowed null left no record.
+            log.error(`[TRIAL-COVER] Title page generation failed: ${err.message}`);
+            throw err;
           }
         })();
 

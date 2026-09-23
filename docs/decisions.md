@@ -21,6 +21,39 @@ superseded and link forward.
 
 ---
 
+## 2026-09-23 — The trial front cover is rendered on a people-free plate, never on the raw landmark photo; it shares buildCoverReferences with the full-account cover
+
+**Context:** Owner-reported, prod trial `job_1790169018278_n57xpnufo`. The front cover's packed slot 0
+(`debug/frontCover/v0/grok-ref-0.jpg`) was the raw Wikimedia photo of its landmark (Parvis Notre-Dame
+variant 2: a silhouette artist cutting a man's profile) and the cover painted those two men beside the child.
+`onCoverScene` resolved the photo with `getLandmarkPhotosForScene` and passed it to `generateImageOnly` with
+no `sceneBackground`; `packReferences` promotes `landmarkPhotos[0]` to the scene slot whenever no plate is
+given. Every trial page's slot 0 was the painted plate of that square (vantage `LOC001.1`), and the
+full-account cover always plated inside `buildCoverReferences`. The trial cover also hand-rolled its own VB
+grid, a copy of the helper's.
+**Decision:** The trial cover calls `buildCoverReferences` — one helper for every first-render cover. Two new
+inputs: `sceneBackground` (an existing plate; no plate render) and `requirePlate` (plate whatever
+`singlePassScene` says, and THROW when a landmark photo resolved but no plate exists). The trial passes the
+plate its pages already rendered for the cover's LOC (`trialPlatesByLoc`, filled in the trial plate loop,
+first vantage per LOC wins); when that plate is missing or failed, the helper renders a cover-aspect plate
+from the scene's `setting` only (`trialCoverPlateDescription` — no `imageSummary`, no characters). The raw
+photo path and the hand-rolled grid are deleted. The trial cover's catch now logs an error and rethrows, so
+the failure lands in the stored genLog (`cover_failed`) instead of a silent `null`.
+**Rationale:** Reusing the page plate costs no call and no latency beyond awaiting a plate that started at
+Visual Bible time, and it keeps the cover in the same painted place as the pages. The square page plate is
+brought to the 3:4 cover aspect by the same slot-0 magenta extension that used to extend the landscape raw
+photo. No fallback to the photo: a cover without a plate is not rendered (NO FALLBACKS).
+**Not changed (open, owner call):** the full-account callers (streaming cover, `iterateCover`,
+regeneration.js) do not pass `requirePlate`, so a failed plate there still leaves the raw photo to be promoted
+to slot 0. Trial PAGES do the same when their plate fails (`plate unavailable (rendering without it)` then the
+raw photo is packed). Gemini's branch of `generateImageOnly` adds the primary landmark photo as its own part
+even beside a `[Background]` plate (only reached on a Grok failure for Grok-routed covers).
+**Touched:** `storyJobPipeline.js` (`trialPlatesByLoc`, `onCoverScene`), `server/lib/coverIterate.js`
+(`buildCoverReferences` `sceneBackground`/`requirePlate`, `trialCoverLocationId`,
+`trialCoverPlateDescription`), `tests/unit/trial-cover-plate-not-raw-photo.test.ts`,
+`docs/image-routing.md`, `docs/image-generation-methods.html`.
+**Status:** ✅ active on staging.
+
 ## 2026-09-23 — The all-pages Art Director and the scene review see no page text and no art style; the review gets the checks the Art Director was given
 
 **Context:** Prompt audit 04 (`docs/audits/prompt-audit-2026-09-23/04-art-director.md`) over staging
