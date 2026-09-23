@@ -80,8 +80,24 @@ serves immediately; the three new campaigns ramp as Google reviews their ads (~2
 
 - [ ] **`Die Schnullerfee kommt` headline** (Schnuller group). Flagged to the owner as asserting story content
       the generator does not guarantee; owner chose to launch as-is. Revisit if the group underperforms.
-- [ ] Mid-week check (~day 3): did the CHF 0.20 arms actually spend their budget, or does the bid bind?
-      Owner chose 0.20 knowing this risk. Report, do not silently raise.
+- [x] Mid-week check done 2026-09-23. Two full days: 24 impressions, 0 clicks, CHF 0.00 across all four.
+      The three cheap arms showed impression share <10% and >90% lost to RANK on both days (budget-lost 0%):
+      the flat CHF 0.20 cap binds. Per-keyword read: 34 keywords estimated <= 0.20 had ZERO impressions (most
+      likely no searches - 10-40/mo tails; not provable, a zero-impression keyword returns no row); 37 keywords
+      have a real estimate above 0.20; 106 carry Google's CHF 1.16 no-data FILLER (identical value, not an
+      auction price). Deutschschweiz is different: serving (22 impr) but its 0.95/1.20 bids sit under page-1
+      estimates of CHF 1.22-2.86 (June it cleared ~0.87-1.00).
+- [x] **Owner decision 2026-09-23: per-keyword bids, ceiling CHF 0.50; Deutschschweiz left as is.**
+      `scripts/ads/set-keyword-bids.js --ceiling=0.50 --apply` raised 14 keywords to their own first-page estimate
+      (CHF 0.29-0.47, e.g. trotzphase 0.38, kinderängste 0.32, geschenke 6 jährige 0.47); cheap keywords keep the
+      0.20 default; 23 above the ceiling stay at 0.20. Re-run verified a no-op. Re-run the script later in the
+      week - estimates move, and it resets stale keyword bids.
+- [ ] **Measurement gap 1:** attribution-report.js counts visits/trials/buyers per campaign and keyword but pulls
+      NO spend - add the Ads cost join for cost-per-trial. Offered to owner.
+- [ ] **Measurement gap 2:** Search-Deutschschweiz-v1 ads send `utm_campaign=zurich` without `utm_term` - the
+      expensive arm cannot be read per keyword. Fix = campaign-level final_url_suffix `utm_term={keyword}`.
+      Offered to owner (touches the campaign they said to leave as is).
+- [ ] First real paid click: verify it lands in prod `trial_events` with its utm_term (chain unproven end to end).
 - [ ] End of week: `node scripts/ads/attribution-report.js --days=7`.
 
 ## Expectation stated to the owner up front
