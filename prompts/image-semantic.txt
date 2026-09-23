@@ -47,7 +47,6 @@ Only check these things (using SCENE_HINT + IMAGE_PROMPT as the source of truth)
 - One of each named object? A prop the scene has ONE of appears twice or more — one worn or held and a second copy lying elsewhere, or two identical copies in different places. Use `type: duplicate_object`. Skip when the prompt names a count or a plural, and skip generic set dressing (leaves, cobbles, cups on a shelf). `fix`: "Inpaint the stray copy out, leaving only the one the scene calls for." — **[MAJOR]**
 - Character-object plausibility? (character "at a table" must be beside it, not merged/sunk into the surface; character "on a bridge" must stand on it, not clip through it) — **[MAJOR]**
 - Correct weather/lighting? (night = dark, snow = snow) — **[MODERATE]**
-- Emotion matches the scene? Flag ONLY a **gross** contradiction: the render shows a broad smile / laughter / cheer where the beat is fear, sadness, danger, crying, or shock — or a scared / crying face where the beat is plainly happy. A neutral, mild, calm, or gently-pleasant expression **SATISFIES** the beat and is a non-deduction — do NOT flag "mild smile vs uncertain", "neutral vs focused", "pleasant vs reluctant", or any nuance between two low-intensity states. When a gross contradiction IS present: **[CRITICAL]** when the beat's emotion is in the image HEADLINE (the opening `THIS IMAGE DEPICTS` sentence / first sentence of SCENE_HINT — the point of the page) AND the render shows the OPPOSITE valence — a broad smile, laughter or cheer where the beat is fear, sadness, danger, crying or shock, or the reverse. **[MAJOR]** for any other gross contradiction on the headline beat, **[MODERATE]** off it. One emotion issue per CHARACTER whose face contradicts the beat: three children smiling through the same loss is three issues, not one. Body language follows the same gross-only rule. Use `type: emotion`.
 - Gaze direction matches a DECLARED INTERACTION? Flag ONLY when TWO named characters, declared as physically interacting, are turned fully back-to-back / facing directly opposite ways so the interaction cannot read at all. A head angled slightly off, or gaze "not directly at" an object, is NEVER a deduction; image models cannot stage mutual gaze among three or more figures. — **[MODERATE]** when flagged
 - A figure looking at the VIEWER — posing for the camera — is a defect in exactly two cases: the beat's emotion is anything other than happy, or that figure has a declared interaction needing their attention. Otherwise facing the viewer is fine and is never a deduction. Use `type: viewer_address`, **[MODERATE]**, at most one per figure. Never on a cover.
 - **Declared interactions placement** (overrides the "ignore spatial arrangement" rule below — declared interactions ARE spatial requirements that matter):
@@ -73,7 +72,7 @@ Only check these things (using SCENE_HINT + IMAGE_PROMPT as the source of truth)
 - Background characters or extras.
 - Extra objects beyond what the story beat requires — except a second copy of an object the scene names one of, checked above.
 - Camera angle, shot type, framing, perspective.
-- Subtle expression differences (thoughtful vs focused, slightly worried vs neutral).
+- Facial expression and emotion. Another stage compares each face against the brief; never report a face's feeling here.
 - Exact pose, gesture, body language.
 - Motion verbs in the scene prose (walking, running, approaching, scanning). A still image cannot show motion; any frozen pose satisfies them.
 - Internal-state phrases ("appears thoughtful", "looks distracted").
@@ -92,7 +91,6 @@ Tag every `fixable_issues[]` entry with a severity — the pipeline computes the
 - Missing key object: MAJOR
 - A named object the scene has one of, rendered twice or more: MAJOR
 - Wrong proportions / age band for a named character (grade-school / teenage / adult / senior mismatch): MAJOR
-- Wrong emotion: CRITICAL when the HEADLINE beat's emotion is contradicted in the OPPOSITE valence (a broad smile where the beat is fear, sadness, danger, crying or shock, or the reverse); MAJOR for any other gross contradiction of the HEADLINE beat (the THIS IMAGE DEPICTS / first-sentence beat); a secondary prose expression detail is a non-deduction
 - Wrong gaze (TWO characters declared as interacting turned fully away from each other, OR character declared as watching a specific named object looking clearly elsewhere): MODERATE. Per-figure gaze drift is not a deduction
 - Wrong clothing type on a character: MODERATE
 - MINOR is available and expected for small deviations that still read as the right scene: a prop resting in a different orientation or spot, a limb at a different angle, one hand used where two were described, a garment sub-detail, a lighting nuance. Use it rather than pushing such a deviation up to MODERATE.
@@ -114,12 +112,12 @@ Return JSON only. Put every issue you find in the `fixable_issues` array. Do not
 **Output rules (strict):**
 - Every `fixable_issues[]` entry MUST also carry `landmark_element` whenever LANDMARK CONTEXT above is not `(none)`. That block defines the field — answer it there, never omit it.
 - Every `fixable_issues[]` entry MUST carry `type`, `severity`, `description`, `fix`, `character` and `element`: the id from PAGE ELEMENTS the finding is about, copied exactly, or null when it is about none of them. A finding that an object is missing, wrong, misplaced or not being handled as declared names that object's id — the repair is handed the picture of that element and can paint nothing it has not been shown. `type` MUST come from this closed list — it routes the repair, and an unlisted value is discarded as unroutable:
-  `action_interaction` (wrong or missing declared interaction, wrong main action, wrong pose, and ORIENTATION — a figure turned away from the person or object it is engaging; never an axis, never left vs right) · `missing_character` · `duplicate_identity` (unnamed extras rendered with a named character's own hair, face and contract garments; never for uniformed or costumed groups) · `missing_element` (a named object, animal or landmark absent) · `object_presence` (present but wrong, misplaced, or unrequested) · `object_count` · `duplicate_object` (a prop the scene has ONE of rendered twice or more) · `setting` (wrong location, background, weather or time of day) · `character_identity` (wrong person, age or hair) · `clothing` (which garment TYPE it is) · `garment_colour` (right garment type, wrong main colour) · `clothing_detail` (right garment, different cut: sleeve length, collar, cuff, hem) · `scale` · `figure_completeness` · `anatomy` · `rendered_text` · `required_text` (a string TEXT RULES requires is absent, misspelled or out of order; skip when TEXT RULES is empty) · `emotion` (the beat's feeling contradicted) · `viewer_address` (posing for the camera when the beat or a declared interaction needs the figure's attention) · `naturalness` (anything else)
+  `action_interaction` (wrong or missing declared interaction, wrong main action, wrong pose, and ORIENTATION — a figure turned away from the person or object it is engaging; never an axis, never left vs right) · `missing_character` · `duplicate_identity` (unnamed extras rendered with a named character's own hair, face and contract garments; never for uniformed or costumed groups) · `missing_element` (a named object, animal or landmark absent) · `object_presence` (present but wrong, misplaced, or unrequested) · `object_count` · `duplicate_object` (a prop the scene has ONE of rendered twice or more) · `setting` (wrong location, background, weather or time of day) · `character_identity` (wrong person, age or hair) · `clothing` (which garment TYPE it is) · `garment_colour` (right garment type, wrong main colour) · `clothing_detail` (right garment, different cut: sleeve length, collar, cuff, hem) · `scale` · `figure_completeness` · `anatomy` · `rendered_text` · `required_text` (a string TEXT RULES requires is absent, misspelled or out of order; skip when TEXT RULES is empty) · `viewer_address` (posing for the camera when the beat or a declared interaction needs the figure's attention) · `naturalness` (anything else)
   Use ONE type per entry. Never invent a value, never join two with an underscore, comma or slash.
-- `character` names WHICH FIGURE the finding is about, on every finding that belongs to one — clothing, proportions, emotion, gaze, viewer address, pose, orientation, a declared interaction, an object a figure is handling. Use the name exactly as the SCENE_HINT writes it; for a figure the hint leaves unnamed, use a stable two-or-three-word description (`the guard`, `the older sibling`). Spell one figure identically on every entry. Two figures with the same defect are two entries with different `character` values; one figure's defect is never split across entries. Null only when the finding belongs to no figure — the setting, the weather, the frame as a whole.
+- `character` names WHICH FIGURE the finding is about, on every finding that belongs to one — clothing, proportions, gaze, viewer address, pose, orientation, a declared interaction, an object a figure is handling. Use the name exactly as the SCENE_HINT writes it; for a figure the hint leaves unnamed, use a stable two-or-three-word description (`the guard`, `the older sibling`). Spell one figure identically on every entry. Two figures with the same defect are two entries with different `character` values; one figure's defect is never split across entries. Null only when the finding belongs to no figure — the setting, the weather, the frame as a whole.
 - The `verdict` field must be exactly "PASS" or "FAIL" (uppercase, no other values).
 - Do not add explanatory text before or after the JSON. Plain JSON only — markdown code fences are tolerated by the parser but unnecessary.
-- **Do NOT emit `issues_summary`, `notes`, `comments`, or any other prose field.** Every observation — including emotion/tone mismatches, posture mismatches, gaze defects — goes in `fixable_issues[]` as a structured entry with `description`, `severity`, `type` and `fix`. Prose fields are silently dropped by the downstream repair pipeline; an issue you describe in prose but not in `fixable_issues[]` will never trigger a fix.
+- **Do NOT emit `issues_summary`, `notes`, `comments`, or any other prose field.** Every observation — including posture mismatches and gaze defects — goes in `fixable_issues[]` as a structured entry with `description`, `severity`, `type` and `fix`. Prose fields are silently dropped by the downstream repair pipeline; an issue you describe in prose but not in `fixable_issues[]` will never trigger a fix.
 
 ```json
 {
@@ -144,22 +142,9 @@ Return JSON only. Put every issue you find in the `fixable_issues` array. Do not
       "element": "ART001",
       "description": "Map not visible — girl should be giving it to boy",
       "fix": "Add the folded map into the girl's outstretched hands."
-    },
-    {
-      "type": "emotion",
-      "severity": "MODERATE",
-      "character": "boy",
-      "element": null,
-      "description": "Boy shows a broad smile; the beat is alarm as he shouts 'STOP!'",
-      "fix": "Repaint the boy's expression as alarmed — mouth open, brows raised."
     }
   ],
   "verdict": "PASS"
 }
 ```
 
-**Examples of emotion/tone problems — all go into `fixable_issues[]`:**
-- `"CharacterA shows a neutral/serious expression; scene expects a smiling expression (STORY_TEXT describes a warm greeting)"` — severity MODERATE
-- `"CharacterB is smiling broadly; scene expects alarmed/concerned (STORY_TEXT: shouts 'NO!' as kids run into danger)"` — severity MODERATE
-- `"CharacterC looks bored; scene expects excited (STORY_TEXT: 'jumped up clapping hands')"` — severity MODERATE
-- `"CharacterD's body posture is relaxed; scene expects tense/scared (STORY_TEXT: presses herself against the wall)"` — severity MODERATE

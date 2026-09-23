@@ -3177,6 +3177,24 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
               log.warn(`⚠️ [GAZE] ${pageContext || 'page'}: comparison failed — ${e.message}`);
             }
 
+            // DECLARED vs OBSERVED EMOTION (owner, 2026-09-23). The brief and
+            // the blind inventory both answer from emotionVocabulary.js; code
+            // only maps the pair to a severity. Replaces the semantic judge's
+            // prose emotion rule. Same pairing and scene-only scope as gaze.
+            try {
+              const emotion = evaluationType !== 'scene' ? [] : require('./emotionCheck').checkDeclaredEmotion({
+                declared: require('./vbIdGuard').gazeCharacters(declaredSceneMeta),
+                inventory: p1Result,
+                matches,
+              });
+              for (const f of emotion) {
+                fixableIssues.push(f);
+                log.info(`🙂 [EMOTION] ${pageContext || 'page'}: [${f.severity}] ${f.description}`);
+              }
+            } catch (e) {
+              log.warn(`⚠️ [EMOTION] ${pageContext || 'page'}: comparison failed — ${e.message}`);
+            }
+
             // UNDECLARED LETTERING (owner, 2026-09-23: text must be captured and
             // become feedback). The blind inventory lists every piece of writing
             // it sees; anything readable the page did not declare is a

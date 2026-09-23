@@ -595,6 +595,9 @@ function checkRewrittenBrief({ pageNumber, brief, parentBrief = null, planLine =
 const CARRIED_ROW_FIELDS = [
   { list: 'characters', field: 'depth' },
   { list: 'characters', field: 'looksAt' },
+  // `emotion` (2026-09-23) is the brief half of emotionCheck.js; a rewrite
+  // that drops it switches that comparison off for the rest of the page's life.
+  { list: 'characters', field: 'emotion' },
   { list: 'interactions', field: 'action' },
 ];
 

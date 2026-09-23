@@ -441,6 +441,16 @@ async function loadPromptTemplates() {
     });
   }
 
+  // The emotion list the blind inventory answers from. Filled at load because
+  // runVisualInventory sends the template without fillTemplate; the Art Director
+  // gets the same list through EXPRESSION_FIELD_RULE (emotionVocabulary.js).
+  const { EMOTION_ENUM_PHRASE } = require('../lib/emotionVocabulary');
+  for (const k of Object.keys(PROMPT_TEMPLATES)) {
+    if (typeof PROMPT_TEMPLATES[k] === 'string' && PROMPT_TEMPLATES[k].includes('{EMOTION_ENUM}')) {
+      PROMPT_TEMPLATES[k] = PROMPT_TEMPLATES[k].replace(/\{EMOTION_ENUM\}/g, EMOTION_ENUM_PHRASE);
+    }
+  }
+
   if (failures.length > 0) {
     log.error(`❌ Prompt template load: ${failures.length} file(s) failed:`);
     for (const f of failures) {

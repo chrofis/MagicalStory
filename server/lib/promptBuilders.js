@@ -8217,7 +8217,11 @@ const LOOKS_AT_FIELD_RULE = "Every foreground or midground character carries `lo
  * listening, re-measured in arm FO. What is contracted is that the face is
  * stated at all.
  */
-const EXPRESSION_FIELD_RULE = "Every foreground or midground character carries `expression`, and a rewrite carries it through. A page whose beat is a character sensing something — listening, feeling, watching, smelling — states that in the eyes and mouth as much as in the pose.";
+// `emotion` (2026-09-23, owner): the one feeling the face shows, from the SAME
+// closed list the blind inventory answers in (emotionVocabulary.js), so the
+// eval compares two enum values in code (emotionCheck.js) and never prose.
+const EXPRESSION_FIELD_RULE = "Every foreground or midground character carries `expression`, and a rewrite carries it through. A page whose beat is a character sensing something — listening, feeling, watching, smelling — states that in the eyes and mouth as much as in the pose. "
+  + `Every such character also carries \`emotion\`: the one feeling that expression shows, exactly one of ${require('./emotionVocabulary').EMOTION_ENUM_PHRASE}. A calm or attentive face is \`neutral\`. It names the feeling the page gives that character; the \`expression\` still draws it.`;
 
 /**
  * ONE `wornItems[]` contract for all FOUR page-brief authoring sites

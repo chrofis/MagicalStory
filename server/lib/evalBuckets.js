@@ -97,7 +97,13 @@ const BUCKETS = {
   // the count is one finding per CHARACTER, because three children smiling
   // through the same loss is three faces to repaint, not one. The narrow
   // trigger and the wide repaint are separate decisions and were conflated.
-  emotion:              { owner: 'semantic', kind: 'graded', repair: 'inpaint' },
+  //
+  // SINCE 2026-09-23 NO JUDGE WRITES THIS TYPE. The semantic judge's prose rule
+  // is deleted; findings come from emotionCheck.js, which compares the brief's
+  // `emotion` with the blind inventory's, both from emotionVocabulary.js —
+  // opposite tone CRITICAL, a different feeling of the same tone MINOR, and
+  // neutral or unreadable never a finding.
+  emotion:             { owner: 'semantic', kind: 'graded', repair: 'inpaint' },
   // Posing for the camera instead of engaging the scene — the owner's
   // "position / facing" (2026-08-19). Measured over the last 40 stories, 89
   // findings across 43 pages in 19 stories describe exactly this, filed

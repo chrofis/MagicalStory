@@ -246,7 +246,7 @@ describe('the rewrite emits the fields the brief it replaces carried', () => {
 
   it('the rewrite is asked for the per-character and per-interaction sub-fields too', () => {
     for (const [name, text] of [['strict', read('prompts/scene-iteration.txt')], ['free', read('prompts/scene-iteration-free.txt')]]) {
-      for (const sub of ['"depth"', '"looksAt"', '"action"']) {
+      for (const sub of ['"depth"', '"looksAt"', '"emotion"', '"action"']) {
         expect(text.includes(sub), `${name} iterate never asks for ${sub}`).toBe(true);
       }
       expect(/`hands`/.test(text), `${name} iterate never asks for hands`).toBe(true);
