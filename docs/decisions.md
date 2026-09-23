@@ -55496,3 +55496,75 @@ first thing to revisit if it proves too eager.
 **Touched:** `server/lib/letteringCheck.js` (new), `server/lib/evalPipeline.js`,
 `tests/unit/lettering-check.test.ts` (8), fixture from Lab 1405.
 **Status:** ✅ active
+
+## 2026-09-23 — Emotion is ONE enum on both sides, and code compares it
+
+**Context:** the 2026-09-22 entries left one thing unbuilt: the blind inventory
+already named each figure's feeling in a closed list, but the Art Director wrote
+only prose (`expression`), so the only comparison in the pipeline was the
+semantic judge reading the brief's prose against its own reading of a picture it
+had the brief for. On dragon run 6 (`job_1790100385959_1nitlympp`) that judge
+charged a CRITICAL on p13 and a MAJOR on p7 for Turi, the dragon — a creature
+with no `characters[]` row and no declared expression — and a MODERATE on p9
+for a nuance. Owner, 2026-09-23: "why not have emotion as enum output of both
+generator and evaluator", and for severity "opposite + near miss".
+
+**Decision:**
+- `server/lib/emotionVocabulary.js` holds the list — `happy`, `sad`, `angry`,
+  `afraid`, `surprised`, `disgusted`, `neutral` — a tone map (happy positive;
+  sad, angry, afraid, disgusted negative; surprised and neutral none) and
+  `compareEmotion(intended, seen)`: opposite tone **CRITICAL**; two different
+  negatives, or surprised against anything else, **MINOR**; same, neutral on
+  either side, `unreadable`, missing or off-list → no finding.
+- Generator: `EXPRESSION_FIELD_RULE` (the `{EXPRESSION_FIELD}` placeholder all
+  four brief-authoring templates already declare) asks every foreground or
+  midground character for `emotion` from that list. The `expression` prose stays
+  and still draws the face; the image model never sees the enum word. A rewrite
+  that drops `emotion` is reported like `depth`/`looksAt` (`CARRIED_ROW_FIELDS`).
+- Evaluator: `image-inventory-unified.txt` reads the list from `{EMOTION_ENUM}`,
+  filled at template load (the inventory is sent without `fillTemplate`), and
+  answers `unreadable` where it used to say `cannot tell at this size`.
+- `server/lib/emotionCheck.js` pairs figure to character with the gaze check's
+  position assignment (`pairInventoryFiguresToNames`; no figure is renamed) and
+  emits the existing `emotion` type, `source: 'emotion-check'`, with a fix that
+  names the intended feeling and carries the brief's expression cue. It runs in
+  the P1 merge beside the gaze and lettering checks, scenes only.
+- **Deleted:** the semantic judge's emotion check, its severity line, the
+  `emotion` vocabulary entry, the JSON example and the emotion/tone examples.
+  The judge is now told a face's feeling is checked elsewhere. No fallback.
+  Unchanged: `viewer_address` still reads "the beat's emotion" in prose, and
+  the (disabled) compliance judge still caps expression at MODERATE.
+
+**Measured (rung 2, staging, commit 3d8f4871d):**
+- Lab **1411** (`inventory_ab`, qwen3-vl, p7/p11/p12/p18 of run 6): the unified
+  inventory returned `emotion` on **11 of 11** figures, **0 off-list**
+  (p11 three `surprised`; p12 `happy`, `angry`, `afraid`, `sad`; p18 three
+  `happy`).
+- Lab **1412** (`scene_expansion`, the per-page Art Director, claude-sonnet-4-6,
+  p12/p18): **7 of 7** character rows carried an in-list `emotion` beside their
+  prose (p12 four `sad`; p18 `neutral`, `happy`, `happy`).
+- Replay of `checkDeclaredEmotion` over those two, with the page's own stored
+  `matches` (v0, the shipped version): p18 **no finding**; p12 Levin MINOR
+  (sad/angry), Kiaan MINOR (sad/afraid), **Max CRITICAL (sad/happy)**.
+- **Checked against the pixels, the p12 CRITICAL is false.** The child in purple
+  is wailing with his mouth wide open, not smiling; qwen3-vl read the open mouth
+  as `happy`. One figure, one page — not yet a rate, but it is exactly the
+  expensive error (a CRITICAL buys a repair). The two MINORs are fair reads.
+  Open item in the backlog: measure the reader's `happy` precision on
+  open-mouthed distress before trusting the CRITICAL in production.
+- Turi's p7/p13 findings cannot recur: a creature without a `characters[]` row
+  declares no emotion and is not compared.
+
+**Rationale:** classification belongs to the two prompts; code only maps a pair
+of enum values to a severity, so no prose is pattern-matched. The blind reader
+cannot echo a brief it never saw, which the semantic judge structurally could.
+
+**Touched:** `server/lib/emotionVocabulary.js` (new), `server/lib/emotionCheck.js`
+(new), `server/lib/evalPipeline.js`, `server/services/prompts.js`,
+`server/lib/promptBuilders.js`, `server/lib/iterateBeat.js`,
+`server/lib/evalBuckets.js` (comment), `prompts/image-inventory-unified.txt`,
+`prompts/image-semantic.txt`, `prompts/scene-expansion.txt`,
+`prompts/scene-expansion-all.txt`, `prompts/scene-iteration.txt`,
+`prompts/scene-iteration-free.txt`, `tests/unit/emotion-check.test.ts` (11),
+`tests/unit/ad-iterate-parity.test.ts`. Lab 1411, 1412.
+**Status:** ✅ active — generator and reader verified; CRITICAL precision open.
