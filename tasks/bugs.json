@@ -8,10 +8,10 @@
       "source": "Owner-reported, production trial story job_1790169018278_n57xpnufo (6 pages, LOC001 \"Parvis Notre-Dame - Place Jean-Paul II\" on every page). Read back from stories.data: coverImages.frontCover has modelId grok-imagine-image-2.0, landmarkPhotos = [Parvis Notre-Dame variant 2], NO emptySceneImage, and its packed slot 0 (debug/frontCover/v0/grok-ref-0.jpg) is the raw 800x450 photograph of a bearded man having his silhouette cut by an older man. Every page's slot 0 (e.g. p1 grok-ref-0) is instead the painted, people-free plate of the cathedral square (vantage LOC001.1).",
       "rootCause": "storyJobPipeline.js onCoverScene (trial front cover) resolved the landmark with getLandmarkPhotosForScene and handed it straight to generateImageOnly as landmarkPhotos with no sceneBackground. packReferences (grok.js) promotes landmarkPhotos[0] to the scene-anchor slot whenever no plate is supplied, so the cover was an edit of the photograph - people and all. Trial pages turn that photo into a people-free plate first and send only the plate; the full-account cover plates it inside buildCoverReferences. The trial cover was the one path that never did.",
       "impact": "Every trial whose cover location is a real landmark shipped a cover rendered on top of a real photograph: strangers from the photo copied into the book's marketing image, photographic framing instead of the book's art style.",
-      "status": "open",
-      "fixedAt": null,
-      "fixedIn": null,
-      "fix": null
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "8c1a6b4b3",
+      "fix": "The trial cover calls buildCoverReferences (shared with every full-account cover) with sceneBackground = the plate the trial pages rendered for the cover LOC (trialPlatesByLoc) and requirePlate: true; with no page plate the helper renders a cover plate from the setting only, and a landmark with no plate throws. The raw-photo path and hand-rolled VB grid are deleted. Pinned by tests/unit/trial-cover-plate-not-raw-photo.test.ts; replayed over the stored story (slot 0 = page plate, photo not packed) plus one $0.04 render."
     },
     {
       "id": "trial-page-prompt-drops-scene-and-cast-blocks",
