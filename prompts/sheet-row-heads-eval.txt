@@ -1,6 +1,6 @@
 You are evaluating one row (the top row) of a character reference sheet.
 
-You receive ONE image: the sheet row — 4 cells left to right: front, three-quarter, profile, rear turn ({REAR_TURN}). Some shoulder or a bit of torso in a cell is fine — do not penalise it. Judge only this image.
+You receive ONE image: the sheet row — 4 cells left to right: front, three-quarter, profile, rear turn ({REAR_TURN}). Each cell is a head-and-shoulders close-up. Judge only this image.
 
 TASK 1: FACING ANGLES
 Say what each cell actually shows, then compare it to front, three-quarter, profile, rear turn, left to right. Cell 4 duplicating cell 3's profile, or showing a flat back-of-head with no visible eye or cheek, scores 1-3. Score 1-10.
@@ -15,7 +15,10 @@ Where clothing shows, it is the garment REQUESTED_OUTFIT names, in that colour a
 TASK 4: SINGLE SUBJECT — ONE HEAD PER CELL
 Each cell shows exactly ONE head: the same single character in every cell. Any second head or figure anywhere in the row — another person, a face in the margin, a head of a different age or sex — is a defect, including faint, ghosted or semi-transparent ones and heads overlapping or blended into the character. Cells must read as four separate heads with space between them. Any extra head, or heads merged across cells = 1-3; one clean head per cell = 9-10. soloScore 1-10.
 
-finalScore = lowest of angles.score, cleanScore, coverageScore, soloScore. valid = finalScore ≥ 6.
+TASK 5: CROP
+Name the lowest part of the figure visible in each cell. Upper chest or higher in every cell = 9-10. Down to the elbows = 6-7. Any cell showing a hand, a waistband, a belt, the hem of a top or any of the legwear = 1-3. cropScore 1-10.
+
+finalScore = lowest of angles.score, cleanScore, coverageScore, soloScore, cropScore. valid = finalScore ≥ 6.
 
 Return EXACTLY this JSON shape. Every score and reason comes from what you see in this image — never return this template's placeholders:
 {
@@ -23,6 +26,7 @@ Return EXACTLY this JSON shape. Every score and reason comes from what you see i
   "cleanRender": {"cleanScore": <1-10>, "reason": "<marks you see, and in which cell, or none>"},
   "coverage": {"coverageScore": <1-10>, "reason": "<the garment, colour and neckline you see, per cell>"},
   "solo": {"soloScore": <1-10>, "reason": "<heads you count per cell; name any extra one and where>"},
+  "crop": {"cropScore": <1-10>, "reason": "cell1: <lowest visible part>; cell2: <lowest part>; cell3: <lowest part>; cell4: <lowest part>"},
   "finalScore": <1-10>,
   "valid": <true|false>,
   "failureReasons": []

@@ -2,7 +2,7 @@
 COVER NOTE: a book-cover portrait. Do not deduct for characters facing or looking at the viewer, or for the title being flat 2D rather than three-dimensional.
 
 ### TEXT_NOTE_APP_OVERLAY
-TEXT NOTE: The title, dedication, and "magicalstory.ch" branding on this cover are handled by the app as a typographic overlay, not painted by the image model. Never flag missing/absent title/dedication/branding text as a defect, and if such text IS present treat it as the intended app-composited overlay — never flag it as unrequested rendered text.
+TEXT NOTE: The app adds this cover's title, dedication and "magicalstory.ch" line as a typographic overlay. Never flag any of those three missing, and never flag them present. Any other lettering in the image — a sign, a label, letters on an object or a building — was painted by the image model and is judged by the text rules like on any page.
 
 ### COVER_TEXT
 COVER TEXT: the string the TEXT RULES block requires is this cover's own lettering — its title, dedication or brand line. It is required, never unrequested text, and a flat 2D rendering of it is fine. On this cover that string absent, or misspelled by any character, is `required_text` at CATASTROPHIC, not MAJOR. Other prominent unrequested text on the cover (labels, captions, watermarks, extra words) → MAJOR. Small incidental in-world signage in the background → do not flag; if garbled → MINOR.

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 // @ts-ignore — CommonJS lib
-const { declaredAgeBlock, buildPrompt, buildBodyRowPrompt, buildHeadRowPrompt } = require('../../server/lib/character2x4Sheet.js');
+const { declaredAgeBlock, buildBodyRowPrompt, buildHeadRowPrompt } = require('../../server/lib/character2x4Sheet.js');
 
 /**
  * THE DEFECT THIS PINS (prod job_1789227389389_z18dmvnt6, 2026-09-14).
@@ -21,8 +21,8 @@ const { declaredAgeBlock, buildPrompt, buildBodyRowPrompt, buildHeadRowPrompt } 
  */
 describe('the identity sheet is anchored on the DECLARED age', () => {
   it('THE REGRESSION: a declared 5-year-old and a declared 11-year-old no longer share a prompt', () => {
-    const five = buildPrompt('anime', 'a yellow coat', { age: 5, name: 'A' });
-    const eleven = buildPrompt('anime', 'a yellow coat', { age: 11, name: 'A' });
+    const five = buildBodyRowPrompt('a yellow coat', { age: 5, name: 'A' });
+    const eleven = buildBodyRowPrompt('a yellow coat', { age: 11, name: 'A' });
     expect(five).not.toBe(eleven);
   });
 
@@ -37,8 +37,9 @@ describe('the identity sheet is anchored on the DECLARED age', () => {
   });
 
   it('reaches BOTH the head row and the full-body row of the prompt', () => {
-    const p = buildPrompt('anime', 'a red hoodie', { age: 8, name: 'Ayan' });
-    expect((p.match(/8 years old/g) || [])).toHaveLength(2);
+    const c = { age: 8, name: 'Ayan' };
+    expect((buildBodyRowPrompt('a red hoodie', c).match(/8 years old/g) || [])).toHaveLength(1);
+    expect((buildHeadRowPrompt(c, 'a red hoodie').match(/8 years old/g) || [])).toHaveLength(1);
   });
 
   it('head-heights rise with age across the child buckets', () => {
@@ -56,8 +57,8 @@ describe('the identity sheet is anchored on the DECLARED age', () => {
     expect(declaredAgeBlock({ age: null })).toBe('');
     expect(declaredAgeBlock({ age: 'not a number' })).toBe('');
     expect(declaredAgeBlock({ age: -2 })).toBe('');
-    const withAge = buildPrompt('anime', 'x', { age: 5 });
-    const without = buildPrompt('anime', 'x', {});
+    const withAge = buildBodyRowPrompt('x', { age: 5 });
+    const without = buildBodyRowPrompt('x', {});
     expect(without.length).toBeLessThan(withAge.length);
   });
 

@@ -20,12 +20,13 @@ const { REQUIRED_TEXT_AUTHORING_RULE, declaredText } = require('./requiredText')
 const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote } = require('./visualBible');
 const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
-const { castCoverage, castCoverageRule } = require('./castCoverage');
+const { castCoverage, castCoverageRule, castActionRule } = require('./castCoverage');
 // REQUIRED IN-IMAGE TEXT: one source for the generator block, the repair
 // clause and the judges' TEXT RULES block. Safe as a top-level require --
 // requiredText.js requires promptBuilders LAZILY.
 const requiredTextLib = require('./requiredText');
 const { baseVbId } = require('./vbIdGuard');
+const { COVER_PAGE_NUMBERS } = require('./coverKeys');
 const { getPhysical } = require('./characterPhysical');
 const { getTraits } = require('./characterTraits');
 const { frameColorForName } = require('./characterFrames');
@@ -2388,7 +2389,7 @@ function buildReferenceCardColours(chars, referencePhotos) {
     if (col) frameLines.push(`- ${col.label} frame = ${c.name}`);
   }
   if (frameLines.length === 0) return '';
-  return `\nREFERENCE CARD COLOURS (each character's reference card has a coloured frame — match each person to their card):\n${frameLines.join('\n')}\nThe frame colours are identifiers ONLY. Never paint a coloured frame, border, or these colours onto any character, clothing, prop, or surface in the scene.\n`;
+  return `\nREFERENCE CARD COLOURS (each character's reference card has a coloured frame — match each person to their card):\n${frameLines.join('\n')}\nThe frame colours are identifiers ONLY. Never paint a coloured frame or border into the scene, and never recolour a character, garment, prop or surface to match a frame — each keeps the colours described for it.\n`;
 }
 
 function buildCharacterReferenceList(photos, characters = null, { includeClothing = false } = {}) {
@@ -4653,10 +4654,20 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       // job_1789292742265_mgxmrkfpd declared ONE artifact bearing ONE device
       // and a split state, and two pages rendered the device complete on each
       // half. It sits here rather than in the template head so it rides the
-      // protected tail through shrinkPromptForModel, and costs prompt budget
-      // only on pages that actually state an object.
-      requiredObjectsSection += `A state that divides, opens or breaks an object does not multiply its markings: a device, emblem or pattern on the surface is one marking, and the split runs through it — each part shows only its share.
-`;
+      // protected tail through shrinkPromptForModel.
+      //
+      // ONLY WHEN A LISTED ELEMENT HAS STATES (2026-09-23). It was emitted on
+      // every page that listed any object — 202 chars on staging
+      // job_1790100385959_1nitlympp p12 (a dog, a dragon and a gilet, nothing
+      // that divides) while that page's over-cap prompt lost REQUIRED CAST and
+      // Composition to the shrink. An element can only be divided, opened or
+      // broken on a page through a declared bible state, so the element's own
+      // `states` decide — the whole list, not this page's resolved one, because
+      // a state the page's instant contradicts is dropped from the line while
+      // the split it describes is still drawn.
+      if (promptObjects.some(o => o.entry && objectStates(o.entry).length > 0)) {
+        requiredObjectsSection += `${SPLIT_STATE_MARKINGS_RULE}\n`;
+      }
       // A HEADER WITH NOTHING UNDER IT IS NOT A CHECKLIST (2026-09-17). The
       // old test was `promptObjects.length === 0` — "every entry was a
       // location" — and it missed the other way an entry disappears: the
@@ -4723,11 +4734,22 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   // (it writes "Medium shot of …" into the brief). Neither resolving is a real
   // defect — nothing downstream can tell the model what its framing means — so
   // it is logged, not papered over with all eight definitions.
-  const shotBlock = buildShotDefinitions(
-    metadata?.shot || metadata?.fullData?.shot || null,
-    cleanSceneDescription || null
-  );
-  if (!shotBlock.text) {
+  //
+  // A COVER DECLARES NO SHOT (2026-09-23). Its framing is the cover
+  // composition's (whole figures, feet on the ground, the title band), and its
+  // prose opens "A wide group portrait" / "A portrait of …" — which the prose
+  // fallback read as `close-up` ("portrait" is a close-up word), so every cover
+  // of staging job_1790100385959_1nitlympp was told its legs and feet "cannot
+  // appear" beside a composition demanding visible feet, and paid ~220 chars
+  // of an over-cap prompt for the contradiction.
+  const isCoverRender = Object.values(COVER_PAGE_NUMBERS).includes(pageNumber);
+  const shotBlock = isCoverRender
+    ? { text: '', shot: null }
+    : buildShotDefinitions(
+      metadata?.shot || metadata?.fullData?.shot || null,
+      cleanSceneDescription || null
+    );
+  if (!shotBlock.text && !isCoverRender) {
     log.warn(`[IMAGE PROMPT] Page ${pageNumber}: no shot declared and none readable from the scene prose — the illustrator gets no framing rule`);
   }
   const sceneIntentLine = metadata?.sceneIntent
@@ -6987,7 +7009,11 @@ function buildChallengeIdeasSection(inputData, count = 25) {
  * advisory for the same reason as Q9: the planner detects reliably and a forced
  * repair has destroyed pages before.
  */
-const REPLAN_MUST_FIX_CHECKS = new Set([4, 8]);
+//
+// Q12 (each commissioned character's own action staged, owner 2026-09-23)
+// joined as must-fix: it names a picture the book needs, the same kind of
+// finding as Q4 and Q8.
+const REPLAN_MUST_FIX_CHECKS = new Set([4, 8, 12]);
 
 /**
  * THE SHOT-DISTRIBUTION BLOCK, declared ONCE (2026-09-20).
@@ -7017,6 +7043,10 @@ const REPLAN_MUST_FIX_CHECKS = new Set([4, 8]);
 const REPLAN_CONVERGENCE_EXEMPT_CODES = new Set([
   'SHOT_MEDIUM_WIDE_EXCESS', 'SHOT_CLOSEUP_COUNT', 'SHOT_ULTRAWIDE_COUNT',
   'SHOT_OTS_COUNT', 'SHOT_NO_CAMERA_POSITION',
+  // A figure the instant names and the who column leaves out (2026-09-23). It
+  // is cleared by writing one name into one column, or deleting it from the
+  // instant — cheap like a shot relabel, so it may not buy a lost picture.
+  'CAST_NOT_IN_WHO_COLUMN',
 ]);
 
 /**
@@ -7184,6 +7214,35 @@ function findingPages(finding) {
 }
 
 /**
+ * The pages a re-plan round must keep, from DATA only (2026-09-23): the last
+ * page (its ending's event, ENDING_EVENT_DEF), each act's WANTED picture and
+ * each character's ACTION page from the check that raised the findings, and a
+ * listed character's only focal page from the counters. The same map feeds the
+ * RE-DIVIDE text and the review's `protected` rule, so what the planner is told
+ * stays is exactly what the review holds it to.
+ *
+ * @param {Object} args
+ * @param {number} args.pageCount
+ * @param {Array<{key:string,page:number|null}>} [args.wanted]
+ * @param {Array<{key:string,page:number|null}>} [args.actions]
+ * @param {Object<string,number[]>} [args.focalPages] counters.stats.focalPages
+ * @returns {Array<{page:number, why:string}>}
+ */
+function replanKeepPages({ pageCount, wanted = [], actions = [], focalPages = {} } = {}) {
+  const out = [];
+  const n = Number(pageCount);
+  // A line answering "page none" carries page null, and Number(null) is 0.
+  const isPage = v => v != null && Number.isInteger(Number(v)) && Number(v) > 0;
+  if (isPage(n)) out.push({ page: n, why: "the last page, the ending's event" });
+  for (const w of (wanted || [])) if (w && isPage(w.page)) out.push({ page: Number(w.page), why: `the ${w.key}'s most wanted picture` });
+  for (const a of (actions || [])) if (a && isPage(a.page)) out.push({ page: Number(a.page), why: `${a.key}'s own action` });
+  for (const [name, pages] of Object.entries(focalPages || {})) {
+    if (Array.isArray(pages) && pages.length === 1) out.push({ page: Number(pages[0]), why: `${name}'s only focal page` });
+  }
+  return out;
+}
+
+/**
  * THE RE-DIVIDE BLOCK — declare, review, apply (owner design, 2026-09-18).
  *
  * What it replaced, and why. The block used to carry three structural rules in
@@ -7224,8 +7283,13 @@ function findingPages(finding) {
  * @param {Object} [opts]
  * @param {number} [opts.pageCount] the book's page count; derived from the plan
  *   when absent so the two can never disagree
+ * @param {Array<{page:number, why:string}>} [opts.keep] pages that keep their
+ *   instant and cast (`replanKeepPages`): the last page, the check's WANTED and
+ *   ACTION pages, a character's only focal page (2026-09-23)
+ * @param {Array<{pageNumber:number, rule:string, detail:string, line:string}>} [opts.refused]
+ *   the previous round's declared changes the review refused and undid
  */
-function buildReplanSection(pagePlan, findingLines, { pageCount = null } = {}) {
+function buildReplanSection(pagePlan, findingLines, { pageCount = null, keep = [], refused = [] } = {}) {
   const items = (Array.isArray(findingLines) ? findingLines : String(findingLines || '').split('\n'))
     .map(f => (f && typeof f === 'object' ? { ...f, line: String(f.line || '').trim() } : { line: String(f || '').trim() }))
     .filter(f => f.line);
@@ -7240,6 +7304,28 @@ function buildReplanSection(pagePlan, findingLines, { pageCount = null } = {}) {
     ? Number(pageCount)
     : Math.max(planned.size, ...[0, ...planned.keys()]);
   const span = count > 0 ? `its ${count} pages, numbered 1 to ${count}` : 'its pages and their numbers';
+  // WHAT A FIX MAY NOT TAKE (2026-09-23). On job_1790100385959_1nitlympp the
+  // round answered a missing focal page by taking another boy's only focal
+  // page, answered a Q4 finding by overwriting the page of the hero's turning
+  // idea, and answered a NOTED two-heights line by deleting the ending's own
+  // event from the last page. The pages the book must keep are named here
+  // from DATA (the check's WANTED/ACTION lines, the counters' focal pages, the
+  // page count) and the review refuses a change on them that answers a noted
+  // finding (planCounters.reviewPlanChanges, rule `protected`).
+  const keepByPage = new Map();
+  for (const k of (Array.isArray(keep) ? keep : [])) {
+    const n = Number(k && k.page);
+    if (!Number.isFinite(n)) continue;
+    keepByPage.set(n, [...(keepByPage.get(n) || []), String(k.why || '').trim()].filter(Boolean));
+  }
+  const keepList = [...keepByPage.entries()].sort((a, b) => a[0] - b[0])
+    .map(([n, whys]) => `page ${n} (${whys.join('; ')})`).join(', ');
+  // THE REVIEW'S REFUSALS GO BACK TO THE PLANNER (2026-09-23). A refused change
+  // is undone and its page restored; the finding it answered survives to the
+  // recheck. Unless the next round is told, it proposes the same change again.
+  const refusedLines = (Array.isArray(refused) ? refused : [])
+    .filter(r => r && r.line)
+    .map(r => `${String(r.line).trim()} — refused (${r.rule}): ${String(r.detail || '').trim()}`);
   return [
     '# RE-DIVIDE',
     '',
@@ -7247,6 +7333,8 @@ function buildReplanSection(pagePlan, findingLines, { pageCount = null } = {}) {
     `The book keeps ${span}. No number is added and none is retired. A moment that earns a picture of its own takes an existing number: that page's material joins a neighbouring page, and the freed number stages the moment. Return both pages.`,
     'A finding is answered by adding or by removing, whichever that finding asks for. A page holding none of the commissioned characters gains one. A page past the cast ceiling loses one, or a page holding more than one action keeps the first alone and what follows from it goes to "what is true after" or to a page of its own. A name, an action or a page goes only where a finding asks for less in frame, never where one asks for more.',
     'Two figures stay wherever they are: the character whose action a page\'s instant works against, and a character the division would leave with fewer than two pages in the book.',
+    ...(keepList.length ? [`These pages keep their instant and their cast, and change only for a must-fix finding that names them: ${keepList}.`] : []),
+    'A noted finding is answered only where the answer removes nothing the story\'s sentences stage.',
     'A finding that names a page names a candidate, not an order. A finding asking the book for a page with no people in frame names the page best suited to give up its cast: empty that one, unless a figure on it is one of the two that stay — then empty another page and say in the declaration why that one could not.',
     'Declare every change you make under ---CHANGES---, with the finding it answers and why. A change you do not declare is undone.',
     '',
@@ -7254,7 +7342,8 @@ function buildReplanSection(pagePlan, findingLines, { pageCount = null } = {}) {
     String(pagePlan || '').trim() || '(none)',
     '',
     ...(must.length ? ['## MUST FIX', must.join('\n'), ''] : []),
-    ...(also.length ? ['## ALSO NOTED', also.join('\n')] : []),
+    ...(also.length ? ['## ALSO NOTED', also.join('\n'), ''] : []),
+    ...(refusedLines.length ? ['## UNDONE LAST ROUND', 'These changes were refused and the pages restored; answer their findings another way.', refusedLines.join('\n')] : []),
   ].join('\n').trimEnd();
 }
 
@@ -7537,6 +7626,35 @@ function parsePlanCheckPeoplelessPick(raw) {
   return null;
 }
 
+/**
+ * The plan check's WANTED and ACTION lines (2026-09-23) — the pictures the
+ * book must keep, as DATA. WANTED names each act's most wanted picture (Q4),
+ * ACTION each commissioned character's own action (Q12); both by arc sentence
+ * and page. The re-plan is told these pages stay (`buildReplanSection`) and the
+ * review refuses a removal on them that answers a noted finding
+ * (`reviewPlanChanges`), so a fix for one page cannot quietly take a wanted
+ * picture off another.
+ *
+ * "WANTED ending: sentence 18 — page 18" → [{ key: 'ending', sentence: 18, page: 18 }]
+ * "ACTION Ana: sentence 5 — page none" → [{ key: 'Ana', sentence: 5, page: null }]
+ *
+ * @returns {Array<{key: string, sentence: number|null, page: number|null}>}
+ */
+function parsePlanCheckAnchors(raw, label) {
+  const out = [];
+  const re = new RegExp(`^${label}\\s+(.+?)\\s*:\\s*(.*)$`, 'i');
+  for (const line of String(raw || '').split('\n')) {
+    const m = line.trim().replace(/\*\*/g, '').match(re);
+    if (!m) continue;
+    const sm = m[2].match(/sentence\s+(\d+)/i);
+    const pm = m[2].match(/page\s+(\d+)/i);
+    out.push({ key: m[1].trim(), sentence: sm ? parseInt(sm[1], 10) : null, page: pm ? parseInt(pm[1], 10) : null });
+  }
+  return out;
+}
+const parsePlanCheckWanted = raw => parsePlanCheckAnchors(raw, 'WANTED');
+const parsePlanCheckActions = raw => parsePlanCheckAnchors(raw, 'ACTION');
+
 // A HINT MAY NOT CONTRADICT THE SETTLED ARC (2026-09-19).
 // One constant, injected into BOTH hint headings — the planner's and the text
 // writer's — which form one contract (docs/sibling-paths.md). The hint pass
@@ -7646,6 +7764,8 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     TWO_HEIGHTS_DEF,
     NAMING_DEF,
     ENDING_EVENT_DEF,
+    // The same act spans the checker's question 4 is given (arcActSpans).
+    ACT_SPANS: arcActSpans(finalArc),
     FINAL_ARC: String(finalArc || '').trim() || '(no final arc was recorded — divide the story the idea below describes)',
     // A HINT IS A STORY CHANGE, NOT A LICENCE TO BREAK A PICTURE RULE
     // (2026-09-19).
@@ -7693,7 +7813,12 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // in, the setting, and who the cast are to each other. That stays.
     STORY_PREMISE: buildStoryBriefBody(inputData, { worldOnly: true }),
     AGE_MODE: buildAgeModeSection(inputData),
-    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote),
+    // A divider gets the landmarks the settled arc uses and their photos, never
+    // the author's block (buildDividerLandmarksSection). Without an arc the
+    // planner is dividing the idea itself, so it is the author and gets that block.
+    AVAILABLE_LANDMARKS_SECTION: String(finalArc || '').trim()
+      ? buildDividerLandmarksSection(inputData.availableLandmarks, finalArc)
+      : buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote),
   });
 }
 
@@ -7938,7 +8063,7 @@ function buildArcBudgetSection(inputData, pageCount) {
     ...(lvl === '1st-grade' ? [`- This book is read aloud to ${readerAgeLabel(inputData, band)} and must be simple to follow: one question open at a time, one thread, and every turn traceable to something already shown on the page.`] : []),
     `- Invented named figures: this book has room for ${allowance} beyond the commissioned cast; each one past that carries one line of justification on its own line before the numbered arc, never inside a numbered sentence.`,
     '- A figure counts when the story gives it a name and the commission did not: persons, animals and creatures alike, including one who appears on a single page, one who never speaks, and any adult who frames a scene — a parent, grandparent, teacher, shopkeeper or neighbour who sets a rule, waits, permits or welcomes. Standing in the background does not take a figure off the list.',
-    `- Not counted: the commissioned cast, which is ${COMMISSIONED_CAST_DEF}; places, buildings, landmarks, rivers, mountains, vehicles and objects, however named; a group named collectively; a figure given no name and referred to only by what it is.`,
+    `- Not counted: the commissioned cast, which is ${COMMISSIONED_CAST_DEF}; places, buildings, landmarks, rivers, mountains, vehicles and objects, however named; a group named collectively; ${UNNAMED_FIGURE_EXEMPT}.`,
     '- A figure the story needs and cannot drop stays on the list; taking its name away is not a way off it.',
   ].join('\n');
 }
@@ -7989,6 +8114,10 @@ const NO_CHARACTER_MARKING_RULE = "**NO MARKS ON A CHARACTER:** No arrow, symbol
 // the body is not an invitation to the hands.
 const HANDS_HOLD_ONLY_NAMED_RULE = "**HANDS:** A character's hands hold only what the scene names for that character. Never substitute an unnamed prop for a named one, and never fill an empty hand with an invented object — a hand with nothing assigned to it rests or gestures, and never joins a contact the scene gives to another part of that character's body.";
 
+// MARKINGS DO NOT MULTIPLY WITH THE OBJECT — emitted in REQUIRED OBJECTS only
+// when a listed element has declared states (see the emission site).
+const SPLIT_STATE_MARKINGS_RULE = 'A state that divides, opens or breaks an object does not multiply its markings: a device, emblem or pattern on the surface is one marking, and the split runs through it — each part shows only its share.';
+
 /**
  * COUNTING — one string for both Art Director templates (owner, 2026-09-15:
  * "For the count increase limit to three. Judge also just gets more than three
@@ -8015,7 +8144,7 @@ const HANDS_HOLD_ONLY_NAMED_RULE = "**HANDS:** A character's hands hold only wha
  * Each constant is ONE sentence of definition with no framing, so a rule can
  * precede it with an imperative and an audit with "name every page whose…".
  */
-const DEED_AND_EFFECT_DEF = 'A deed, its effect, and where the effect goes are three actions. Watching, standing and being present are not actions.';
+const DEED_AND_EFFECT_DEF = 'A deed, its effect, and where the effect goes are three actions. Watching, standing and being present are not actions, and an effect that is the deed itself made visible at the same instant is part of the deed.';
 
 /**
  * ONE definition of what the plan line's FOURTH field owes, for the planner that
@@ -8036,10 +8165,37 @@ const DEED_AND_EFFECT_DEF = 'A deed, its effect, and where the effect goes are t
  * picture does not already show.
  */
 const PAGE_CHANGE_DEF = 'What is true after is a change in the story’s state, not the instant in other words: something now held, moved, opened, broken, learned, decided or agreed that was not true before this page. A fourth field that only redescribes the picture states no change.';
+// The unnamed-figure exemption, stated once for the arc budget and applied by
+// planCounters (ARC_INVENTED_*): no name, and on a single page.
+const UNNAMED_FIGURE_EXEMPT = 'a figure given no name, referred to only by what it is, on a single page';
+
 const TWO_HEIGHTS_DEF = 'two named characters at different heights — deck and water, ledge and ground, roof and street. A whole cast carried together on one back or one boat is one level.';
 // No leading article: the planner says "stages THEIR arrival", the checker "stages AN arrival", and both wordings are pinned by tests.
 const NAMING_DEF = 'arrival or a naming by someone present; a badge, a garment, a title or an epithet is not a naming.';
 const ENDING_EVENT_DEF = "When the story's ending has an event of its own, the last page stages that event as its instant.";
+/**
+ * THE ACTS BY SENTENCE NUMBER (2026-09-23). Q4 asks for the most wanted picture
+ * of each act, and the acts were never defined: on staging
+ * job_1790100385959_1nitlympp the check put the hatching — sentence 17 of 18 —
+ * in the MIDDLE and the recheck, on a nearly unchanged plan, put a different
+ * picture there. Q4 is must-fix, so the answer drove a forced edit that
+ * overwrote another key page. The acts are now the arc's numbered sentences in
+ * thirds, computed here and stated identically to the planner (question 6) and
+ * the checker (question 4); the model only picks the picture inside each act.
+ *
+ * @param {string} finalArc the numbered arc
+ * @returns {string} '' when the arc carries fewer than three numbered sentences
+ */
+function arcActSpans(finalArc) {
+  let n = 0;
+  for (const m of String(finalArc || '').matchAll(/^\s*(\d{1,3})[.)]\s+\S/gm)) n = Math.max(n, parseInt(m[1], 10));
+  if (n < 3) return '';
+  const a = Math.round(n / 3);
+  const b = Math.round((2 * n) / 3);
+  const span = (x, y) => (x === y ? `${x}` : `${x}–${y}`);
+  return `The acts are the story's sentences in thirds: setup ${span(1, a)}, middle ${span(a + 1, b)}, ending ${span(b + 1, n)}.`;
+}
+
 const WANTED_PICTURE_DEF = "For each act — setup, middle, ending — the picture a child most wants to see there, and the page whose plan line stages it as its instant. The ending's own event — the reunion, the goodbye, the parting — is always one of them.";
 
 const COUNTING_RULE = 'Counting rule: an exact number for a group of like things may be stated only up to three, and then it is drawn exactly. Above three the group is staged as more than three, a cluster, a row, a few or several — never an exact number, in the prose, `sceneIntent` or `emptyScenePrompt`. A group that recurs across pages holds the same size impression, role and placement.';
@@ -9197,7 +9353,7 @@ function critiqueMaxSeverity(critique) {
  * here so the signature states the contract: this prompt's inputs are the arc
  * and the page plan, and the counting happens downstream of its answer.
  */
-function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '') {
+function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHints = '' } = {}) {
   const template = PROMPT_TEMPLATES.planCheck;
   if (!template) {
     log.error('[PROMPT] planCheck template not loaded — plan check unavailable');
@@ -9211,6 +9367,21 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '') {
     NAMING_DEF,
     ENDING_EVENT_DEF,
     WANTED_PICTURE_DEF,
+    // Question 4's acts, by sentence number — the planner's question 6 gets the same line.
+    ACT_SPANS: arcActSpans(arc),
+    // Question 12: the ACTION half of the page plan's cast rule — the same
+    // sentence the planner is told (castActionRule, owner 2026-09-23). The
+    // appearance counts stay with the counters: shown "3 to 4 pages", the
+    // checker read the range as a cap and faulted every child above it.
+    CAST_ACTION: castActionRule(castCoverage({ pageCount: beats.length, castCount: (inputData?.characters || []).filter(c => c && c.name).length })),
+    // THE HINTS THE DIVISION WAS ASKED TO APPLY (2026-09-23). The planner gets
+    // them under FIX WHILE DIVIDING; the checker never saw them, so a hint put
+    // on the wrong page could not be judged — on job_1790100385959_1nitlympp a
+    // hint anchored "before the shell knocks" landed on a page before the egg
+    // was even found, and neither check nor recheck noticed. Same heading and
+    // rule the text critics read (buildCriticArcHintsSection); question 13
+    // checks where each landed.
+    ARC_HINTS: buildCriticArcHintsSection(arcHints),
 
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: beats.length,
@@ -9251,7 +9422,15 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '') {
  * exactly as it did before, and a `things` value carrying its own semicolon
  * still lands whole in `things`.
  *
- * @returns {Map<number, {people: string[], things: string[], covers: string[]}>}
+ * FOURTH FIELD, `unlisted` (2026-09-23): the characters the INSTANT names that
+ * the who column does not carry. The planner is told the who column is the
+ * complete cast ("every person the instant stages … belongs in that field, or
+ * is not written into the instant at all"), and nothing checked it: the roster
+ * reads the who column alone by design, so a figure named only in the instant
+ * was invisible to every check. `people` / `covers` are unchanged; this field
+ * feeds one counter (CAST_NOT_IN_WHO_COLUMN) and nothing else. Optional.
+ *
+ * @returns {Map<number, {people: string[], things: string[], covers: string[], unlisted: string[]}>}
  */
 function parsePlanCheckRoster(raw) {
   const out = new Map();
@@ -9263,9 +9442,9 @@ function parsePlanCheckRoster(raw) {
     .map(n => n.trim().replace(/^(?:the|a|an)\s+/i, '').replace(/(?:'s|’s|s'|s’)$/i, '').trim())
     .filter(n => n && !/^none$/i.test(n));
   for (const line of String(raw || '').split('\n')) {
-    const m = line.trim().match(/^ROSTER\s+(\d+)\s*:\s*people\s*=\s*([^;]*)(?:;\s*things\s*=\s*(.*?))?(?:;\s*covers\s*=\s*(.*))?$/i);
+    const m = line.trim().match(/^ROSTER\s+(\d+)\s*:\s*people\s*=\s*([^;]*)(?:;\s*things\s*=\s*(.*?))?(?:;\s*covers\s*=\s*(.*?))?(?:;\s*unlisted\s*=\s*(.*))?$/i);
     if (!m) continue;
-    out.set(parseInt(m[1], 10), { people: names(m[2]), things: names(m[3]), covers: names(m[4]) });
+    out.set(parseInt(m[1], 10), { people: names(m[2]), things: names(m[3]), covers: names(m[4]), unlisted: names(m[5]) });
   }
   return out;
 }
@@ -10432,6 +10611,61 @@ function shortLandmarkDescription(extract) {
   return window.slice(0, LANDMARK_DESCRIPTION_MAX).replace(/\s+\S*$/, '').trim() + '…';
 }
 
+// Two lines per landmark. DESCRIPTION is the Wikipedia extract — what the
+// landmark IS, for the story. PHOTOS is what we can actually show of it: one
+// clause per reference photo, its kind and a short description. The writer
+// used to get only the first, and authored viewpoints no photo shows —
+// "distant aerial view" of a station whose only exterior is a street-level
+// façade — so the page rendered the landmark from words. The photos ARE the
+// landmark as far as the pictures are concerned, and the bible may only
+// name a viewpoint one of them shows.
+const LANDMARK_VANTAGE_RULE = "A landmark is drawn from one of its PHOTOS. Name a location or a vantage of it only from a viewpoint one of its photos shows — an exterior is seen from the street or the square, an interior from inside, a distant or view-from photo from afar. If no photo shows the view a page needs (a skyline from a hilltop, a bird's-eye, the far side), that landmark is not available for that page: use one whose photos fit, or none. A view the commission's own words describe is the exception: it stands, and the landmark in it is drawn from what its photos show";
+
+function landmarkPhotoLine(l) {
+  const variants = Array.isArray(l.photoVariants) ? l.photoVariants : [];
+  const clauses = variants
+    // A variant with no stored description said "(medium) reference photo" —
+    // a clause that tells the model nothing about what the photo shows, which
+    // is the only reason this line exists. Drop it instead.
+    .map(v => ({ kind: v.kind || v.vantage || 'exterior', d: String(v.description || '').replace(/^\[[^\]]*\]\s*/, '').trim() }))
+    .filter(v => v.d)
+    .map(v => `(${v.kind}) ${v.d}`)
+    .map(c => c.length > 110 ? c.slice(0, 107).replace(/\s+\S*$/, '') + '…' : c);
+  return clauses.length ? `\n  PHOTOS: ${clauses.join('; ')}` : '';
+}
+
+/**
+ * THE LANDMARKS A DIVIDER NEEDS (2026-09-23). The beats planner divides a
+ * settled arc; it was handed the author's block — every offered landmark, its
+ * description, and "build at least two of them in, woven into the story's
+ * action" — ≈8.3k chars on staging job_1790100385959_1nitlympp, whose arc had
+ * already chosen two. What a divider needs is which landmarks the story uses
+ * and what their photos can show, so a page names only a vantage one of them
+ * shows. The arc's choice is read off the arc by the landmark's own NAME (the
+ * list's data, never a prose pattern); an arc that names none gets no block,
+ * which is what the planner's landmark requirement already says it has chosen.
+ *
+ * @param {Array} landmarks inputData.availableLandmarks
+ * @param {string} finalArc the settled arc
+ * @returns {string}
+ */
+function buildDividerLandmarksSection(landmarks, finalArc) {
+  const arc = String(finalArc || '');
+  if (!landmarks || landmarks.length === 0 || !arc.trim()) return '';
+  const esc = t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const named = landmarks.filter((l) => {
+    const full = String(l.name || '').trim();
+    const base = full.replace(/\s*\([^)]*\)\s*$/, '').trim();
+    return [full, base].filter(Boolean).some(n => new RegExp(`(^|[^\\p{L}])${esc(n)}`, 'iu').test(arc));
+  });
+  if (!named.length) return '';
+  const list = named.map(l => `- ${l.name}${l.type ? ` [${l.type}]` : ''}${landmarkPhotoLine(l)}`).join('\n');
+  const hasPhotos = named.some(l => Array.isArray(l.photoVariants) && l.photoVariants.length > 0);
+  return `**REAL LANDMARKS the story above uses:**
+${list}
+${hasPhotos ? `\n- ${LANDMARK_VANTAGE_RULE}` : ''}`;
+}
+
 /**
  * @param {Object} opts
  *   forArtDirector  the Art Director's variant (2026-09-23). The AD writes no
@@ -10455,27 +10689,7 @@ function buildAvailableLandmarksSection(landmarks, retryNote = '', { forArtDirec
   if (!landmarks || landmarks.length === 0) {
     return '';
   }
-
-  // Two lines per landmark. DESCRIPTION is the Wikipedia extract — what the
-  // landmark IS, for the story. PHOTOS is what we can actually show of it: one
-  // clause per reference photo, its kind and a short description. The writer
-  // used to get only the first, and authored viewpoints no photo shows —
-  // "distant aerial view" of a station whose only exterior is a street-level
-  // façade — so the page rendered the landmark from words. The photos ARE the
-  // landmark as far as the pictures are concerned, and the bible may only
-  // name a viewpoint one of them shows.
-  const photoLine = (l) => {
-    const variants = Array.isArray(l.photoVariants) ? l.photoVariants : [];
-    const clauses = variants
-      // A variant with no stored description said "(medium) reference photo" —
-      // a clause that tells the model nothing about what the photo shows, which
-      // is the only reason this line exists. Drop it instead.
-      .map(v => ({ kind: v.kind || v.vantage || 'exterior', d: String(v.description || '').replace(/^\[[^\]]*\]\s*/, '').trim() }))
-      .filter(v => v.d)
-      .map(v => `(${v.kind}) ${v.d}`)
-      .map(c => c.length > 110 ? c.slice(0, 107).replace(/\s+\S*$/, '') + '…' : c);
-    return clauses.length ? `\n  PHOTOS: ${clauses.join('; ')}` : '';
-  };
+  const photoLine = landmarkPhotoLine;
   const landmarkList = landmarks
     .map(l => {
       let entry = `- ${l.name}`;
@@ -10489,7 +10703,8 @@ function buildAvailableLandmarksSection(landmarks, retryNote = '', { forArtDirec
 
   const hasDescriptions = descriptions && landmarks.some(l => l.wikipediaExtract || l.wikipedia_extract);
   const hasPhotos = landmarks.some(l => Array.isArray(l.photoVariants) && l.photoVariants.length > 0);
-  const photoRule = hasPhotos ? `- A landmark is drawn from one of its PHOTOS. Name a location or a vantage of it only from a viewpoint one of its photos shows — an exterior is seen from the street or the square, an interior from inside, a distant or view-from photo from afar. If no photo shows the view a page needs (a skyline from a hilltop, a bird's-eye, the far side), that landmark is not available for that page: use one whose photos fit, or none. A view the commission's own words describe is the exception: it stands, and the landmark in it is drawn from what its photos show` : '';
+  // One vantage rule for every reader, the divider included (LANDMARK_VANTAGE_RULE).
+  const photoRule = hasPhotos ? `- ${LANDMARK_VANTAGE_RULE}` : '';
 
   // THE ONE STATEMENT OF THE LANDMARK RULE (owner, 2026-09-19). The telling
   // rules used to carry a second, contradictory one ("at most on the opening
@@ -10742,6 +10957,12 @@ function buildTrialIdeaPrompts({
 }
 
 module.exports = {
+  buildDividerLandmarksSection,
+  arcActSpans,
+  replanKeepPages,
+  parsePlanCheckWanted,
+  parsePlanCheckActions,
+  UNNAMED_FIGURE_EXEMPT,
   OBJECT_ID_STABILITY_RULE,
   wrapUserInput,
   getPhysicalFromChar,
@@ -10904,6 +11125,7 @@ module.exports = {
   TRUE_RELATIVE_SIZE_RULE,
   NO_CHARACTER_MARKING_RULE,
   HANDS_HOLD_ONLY_NAMED_RULE,
+  SPLIT_STATE_MARKINGS_RULE,
   PAGE_OPENING_VARIETY_RULE,
   STYLE_RULEBOOK,
   MOTIVE_AT_THE_ACT_RULE,

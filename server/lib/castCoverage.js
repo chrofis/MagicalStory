@@ -22,7 +22,7 @@
  *                characters — on every page but the one people-free page the
  *                book owes, after the main character takes half the book.
  *
- * The planner is told these numbers (`castCoverageRule`), and the counters
+ * The planner and the plan check are told these numbers (`castCoverageRule`), and the counters
  * measure against the SAME object (planCounters `NO_FOCAL_PAGE`,
  * `UNDER_COVERED_CHARACTER`), so the generator and its critic can never hold
  * the book to two different floors — the doctrine in
@@ -68,29 +68,37 @@ function castCoverage({ pageCount, castCount } = {}) {
 const pagesWord = n => `${n} page${n === 1 ? '' : 's'}`;
 
 /**
- * The rule as a stage is told it. `unit: 'page'` is the planner's form (it
- * divides into pages and knows what a focal page is); `unit: 'story'` is the
- * arc's form (it writes numbered sentences, not pages, so it is told the
- * moment each character owes and never a page count).
+ * The ACTION half of the page plan's cast rule — the link to the arc's own rule
+ * (every child does something of their own, owner 2026-09-23): the planner is
+ * told each character's action is a page's instant, and the plan check (Q12)
+ * asks the same sentence. It carries no page count on purpose: given "in frame
+ * on 3 to 4 pages", the checker read the range as a CAP and filed a must-fix
+ * finding against every child who appeared more often (validation call on
+ * job_1790100385959_1nitlympp, 2026-09-23). The counts are the counters' job.
  *
  * @param {ReturnType<typeof castCoverage>} cov
- * @param {{unit?: 'page'|'story'}} [opts]
- * @returns {string} '' when there is no coverage to state
+ * @returns {string} '' when there is no cast, or one character
  */
-function castCoverageRule(cov, { unit = 'page' } = {}) {
-  if (!cov) return '';
-  const { min, max } = cov.appearances;
-  if (unit === 'story') {
-    if (cov.castCount === 1) return '';
-    return cov.focalEach
-      ? 'Every commissioned character gets a moment of their own — something they do that counts — and takes part in more than one scene.'
-      : 'The cast is large for this book: the characters share group moments, and every one of them takes part — nobody is left out.';
-  }
-  const span = min === max ? `at least ${pagesWord(min)}` : `${min} to ${max} pages`;
-  if (cov.castCount === 1) return '';
+function castActionRule(cov) {
+  if (!cov || cov.castCount === 1) return '';
   return cov.focalEach
-    ? `Every commissioned character gets a focal page of their own and is in frame on ${span}.`
-    : `This cast is too large for a focal page each: the characters share group moments, and every commissioned character is in frame on ${span}.`;
+    ? 'Every commissioned character gets a focal page of their own whose instant is the action the story gives them.'
+    : 'This cast is too large for a focal page each: the characters share group moments, and each character\'s own action from the story is the instant of some page.';
+}
+
+/**
+ * The whole rule as the PLANNER is told it ({CAST_COVERAGE} in story-beats.txt):
+ * the action half above plus the appearance floor the counters measure
+ * (UNDER_COVERED_CHARACTER at `appearances.min`). Stated as a floor — "at least"
+ * — never as a range a reader could take for a ceiling.
+ *
+ * @param {ReturnType<typeof castCoverage>} cov
+ * @returns {string}
+ */
+function castCoverageRule(cov) {
+  const action = castActionRule(cov);
+  if (!action) return '';
+  return `${action} Every commissioned character is in frame on at least ${pagesWord(cov.appearances.min)}.`;
 }
 
 /**
@@ -129,6 +137,7 @@ function commissionedCast(inputData, suppliedNames = []) {
 module.exports = {
   commissionedCast,
   castCoverage,
+  castActionRule,
   castCoverageRule,
   PAGE_CAST_TYPICAL,
   APPEARANCES_TARGET_MAX,

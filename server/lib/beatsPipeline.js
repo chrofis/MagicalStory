@@ -1,7 +1,7 @@
 
 
 const { runPlanCounters, collectPlaceNames, castLostByReplan, reviewPlanChanges, refreshPlanShot } = require('./planCounters');
-const { commissionedCast } = require('./castCoverage');
+const { commissionedCast, castCoverage } = require('./castCoverage');
 const { lookupByName } = require('./castResolver');
 const { textZoneRulesActive } = require('../config/runtime');
 const { commissionedChildBand, applySecondaryAgeBand } = require('./inventedAgeBand');
@@ -104,6 +104,9 @@ const {
   parsePlanCheckRoster,
   parsePlanCheckObstacles,
   parsePlanCheckPeoplelessPick,
+  parsePlanCheckWanted,
+  parsePlanCheckActions,
+  replanKeepPages,
   buildReplanSection,
   parsePlanChanges,
   replanRank,
@@ -762,6 +765,7 @@ function shippedReplanState(rounds = []) {
   const declaredChanges = [];
   const changeRefusals = [];
   const replanPrompts = [];
+  const replanReplies = [];
   for (const r of (rounds || [])) {
     if (!r) continue;
     if (r.kept) {
@@ -774,6 +778,7 @@ function shippedReplanState(rounds = []) {
       // buildReplanSection at the run's commit. Same gap `plannerPrompt` closed,
       // one level down. Shaped like `declaredChanges`: one entry per kept round.
       if (r.replanPrompt) replanPrompts.push({ round: r.round, prompt: r.replanPrompt });
+      if (r.replanReply) replanReplies.push({ round: r.round, reply: r.replanReply });
       for (const ref of (r.changeRefusals || [])) changeRefusals.push({ round: r.round, ...ref });
       // The recheck that measured the division now standing. A later kept round
       // supersedes an earlier one; a discarded round never does.
@@ -787,10 +792,11 @@ function shippedReplanState(rounds = []) {
         // A discarded round is the diagnostic evidence for why the loop
         // stopped, so it keeps the prompt it was given like a kept round does.
         replanPrompt: r.replanPrompt || '',
+        replanReply: r.replanReply || '',
       });
     }
   }
-  return { changedPages: [...changed].sort((a, b) => a - b), recheck, discardedRounds, declaredChanges, changeRefusals, replanPrompts };
+  return { changedPages: [...changed].sort((a, b) => a - b), recheck, discardedRounds, declaredChanges, changeRefusals, replanPrompts, replanReplies };
 }
 
 /**
@@ -1267,6 +1273,10 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   const planRes = await textModels.callTextModelStreaming(planPrompt, null, onChunk, planModel, { usageLabel: 'beats_plan' });
   meta.timings.planMs = Date.now() - t;
   const first = readPlan(planRes.text);
+  // The planner's reply verbatim (2026-09-23): the report kept only the parsed
+  // division, so what the model actually wrote — a line the parser dropped, a
+  // preamble — was unrecoverable.
+  const plannerReply = String(planRes.text || '');
   const plan = first.parsed;
   let pagePlan = first.pagePlan;
   if (pagePlan) log.info(`📐 [BEATS] page plan: ${pagePlan.split('\n').filter(Boolean).length} line(s)`);
@@ -1353,6 +1363,10 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // same way the OBSTACLES block is — picking the page in code was built and
     // rejected on measurement (docs/decisions.md, 2026-09-20).
     let peoplelessPick = null;
+    // The check's WANTED (Q4) and ACTION (Q12) lines: the pictures the next
+    // round must keep, read as DATA like OBSTACLES (2026-09-23).
+    let wanted = [];
+    let actions = [];
     let checkModelId = null;
     let prompt = null;
     // THE REPLY IS EVIDENCE, NOT A BYPRODUCT (2026-09-19).
@@ -1371,7 +1385,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     try {
       // No counter findings ride in: they do not exist yet. See the builder's
       // header — the counters read this call's ROSTER, so they run below.
-      prompt = buildPlanCheckPrompt(inputData, pages, approvedArc, planText);
+      prompt = buildPlanCheckPrompt(inputData, pages, approvedArc, planText, { arcHints });
       if (!prompt) throw new Error('plan-check template unavailable');
       const res = await textModels.callTextModelStreaming(prompt, null, onChunk, planCheckModel, {
         usageLabel: label,
@@ -1384,6 +1398,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       roster = parsePlanCheckRoster(res.text || '');
       obstacles = parsePlanCheckObstacles(res.text || '');
       peoplelessPick = parsePlanCheckPeoplelessPick(res.text || '');
+      wanted = parsePlanCheckWanted(res.text || '');
+      actions = parsePlanCheckActions(res.text || '');
       // The roster AS PARSED, page by page. The raw reply above carries the
       // same lines verbatim; this is the form every counter actually reasons
       // on, so a reader can see what the arithmetic was given — including a
@@ -1427,7 +1443,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     gl.info(label, `Plan check by ${checkModelId || planCheckModel}: ${counters.lines.length} counter finding(s), ${modelFindings.length} model finding(s)`, null, {
       counterFindings: counters.lines, modelFindings, model: checkModelId, stats: counters.stats, cast: counters.cast,
     });
-    return { counters, modelFindings, findings: structured, lines: all, checkModelId, prompt, obstacles, reply, rosterLines };
+    return { counters, modelFindings, findings: structured, lines: all, checkModelId, prompt, obstacles, reply, rosterLines, wanted, actions };
   };
 
   // ONE shape for a recheck wherever it is recorded — the canonical `recheck`
@@ -1446,6 +1462,12 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // one would most want to see what the model actually said.
     reply: c.reply || '',
     rosterLines: c.rosterLines || [],
+    // THE RECHECK'S OWN PROMPT (2026-09-23). Only the first check's prompt was
+    // stored, so a recheck could be read only by rebuilding it at the run's
+    // commit — a reconstruction, not the bytes sent.
+    prompt: c.prompt || '',
+    wanted: c.wanted || [],
+    actions: c.actions || [],
   } : null);
 
   t = Date.now();
@@ -1491,13 +1513,25 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       let bestBeats = beats;
       let bestPagePlan = pagePlan;
       let bestMustFix = convergenceMustFixCount(check1);
+      // The review's refusals from the round before, told to the next round.
+      let lastRefusals = [];
+      const coverageRule = castCoverage({ pageCount: beats.length, castCount: commission.listed.length });
       for (let round = 1; round <= MAX_REPLAN_ROUNDS; round++) {
         await checkCancellation();
         await stage(5, 'Re-dividing the named pages...', { next: 18, ms: 45000 });
+        // WHAT THIS ROUND MUST KEEP (2026-09-23): the last page, the check's
+        // WANTED and ACTION pages, and a character's only focal page — one list
+        // for the prompt and for the review's `protected` rule below.
+        const keep = replanKeepPages({
+          pageCount: beats.length,
+          wanted: pendingCheck.wanted,
+          actions: pendingCheck.actions,
+          focalPages: (pendingCheck.counters.stats && pendingCheck.counters.stats.focalPages) || {},
+        });
         const replanPrompt = buildBeatsPrompt(inputData, pageCount, {
           finalArc: approvedArc,
           arcHints,
-          replan: buildReplanSection(pagePlan, pendingCheck.findings, { pageCount: beats.length }),
+          replan: buildReplanSection(pagePlan, pendingCheck.findings, { pageCount: beats.length, keep, refused: lastRefusals }),
         });
         if (!replanPrompt) throw new Error('story-beats template unavailable');
         const rpRes = await textModels.callTextModelStreaming(replanPrompt, null, onChunk, planModel, { usageLabel: 'beats_replan' });
@@ -1630,8 +1664,13 @@ async function generateStoryViaBeats(inputData, opts = {}) {
             aliases: guardAliases,
             maxCast,
             obstacles: pendingCheck.obstacles,
+            focalNames: coverageRule && coverageRule.focalEach ? commission.listed : [],
+            protectedPages: new Map(keep.map(k => [Number(k.page), k.why])),
+            actions: pendingCheck.actions,
+            rankOf: replanRank,
           });
           reviewRefusals = review.refusals;
+          lastRefusals = review.refusals;
           if (review.notes.length) {
             gl.info('beats_replan_change_notes', `Round ${round}: ${review.notes.length} declared change(s) could not be tied to a finding or a cast name`, null, { round, notes: review.notes });
           }
@@ -1663,7 +1702,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
           if (dupe) {
             log.warn(`[BEATS] Round ${round} returned two pages with the same line - discarding it, the previous division stands`);
             gl.warn('beats_replan_duplicate', `Round ${round} produced two pages with an identical plan line; the round was discarded and the previous division stands`, null, { round, line: dupe.slice(0, 160) });
-            replanRounds.push({ round, changedPages: [], recheck: null, kept: false, replanPrompt, discardReason: 'two pages returned with an identical plan line' });
+            replanRounds.push({ round, changedPages: [], recheck: null, kept: false, replanPrompt, replanReply: String(rpRes.text || ''), discardReason: 'two pages returned with an identical plan line' });
             beats = bestBeats;
             pagePlan = bestPagePlan;
             break;
@@ -1679,7 +1718,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         if (second.parsed.pages.length !== beats.length) {
           log.warn(`[BEATS] Round ${round} returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book - discarding it, the previous division stands`);
           gl.warn('beats_replan_page_count', `Round ${round} returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book; the round was discarded and the previous division stands`, null, { round, returned: second.parsed.pages.length, expected: beats.length });
-          replanRounds.push({ round, changedPages: [], recheck: null, kept: false, replanPrompt, discardReason: `returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book` });
+          replanRounds.push({ round, changedPages: [], recheck: null, kept: false, replanPrompt, replanReply: String(rpRes.text || ''), discardReason: `returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book` });
           beats = bestBeats;
           pagePlan = bestPagePlan;
           break;
@@ -1687,7 +1726,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         if (second.parsed.missing.length > 0) {
           log.warn(`⚠️ [BEATS] Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — previous division kept`);
           gl.warn('beats_replan_incomplete', `Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — previous division kept`);
-          replanRounds.push({ round, changedPages: [], recheck: null, kept: false, replanPrompt, discardReason: `omitted page(s) ${second.parsed.missing.join(', ')}` });
+          replanRounds.push({ round, changedPages: [], recheck: null, kept: false, replanPrompt, replanReply: String(rpRes.text || ''), discardReason: `omitted page(s) ${second.parsed.missing.join(', ')}` });
           break;
         }
         const before = new Map(beats.map(p => [p.pageNumber, p.planLine || '']));
@@ -1717,6 +1756,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
           // prompt in the stage that carries the findings (## MUST FIX / ##
           // ALSO NOTED). Text, additive, read by nothing.
           replanPrompt,
+          // The re-plan's reply verbatim (2026-09-23): the stored round kept
+          // only the merged pages and the parsed changes.
+          replanReply: String(rpRes.text || ''),
           recheck: recheckRecord(check2),
           kept: true,
           // WHAT THE ROUND SAID IT DID, AND WHAT THE REVIEW MADE OF IT. Before
@@ -1871,12 +1913,17 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // reconstruction, not the bytes sent. The arc stage has kept its
       // creator prompt (`arcReviewReport.createPrompt`) since it was written.
       plannerPrompt: planPrompt || '',
+      plannerReply,
       // …and the RE-PLAN prompts, one per kept round. `plannerPrompt` is the
       // FIRST division's; the re-plan request is the only prompt in this stage
       // that carries the findings (## MUST FIX / ## ALSO NOTED), so it is the
       // only one that answers "what was this round asked to fix". A discarded
       // round keeps its own under `discardedRounds[].replanPrompt`.
       replanPrompts: shipped.replanPrompts,
+      replanReplies: shipped.replanReplies,
+      // The first check's WANTED and ACTION lines (2026-09-23).
+      wanted: check1.wanted || [],
+      actions: check1.actions || [],
       // The checker's reply verbatim, and the roster as the counters received
       // it. See the comment in runCheck: `modelFindings: []` is otherwise
       // unreadable.

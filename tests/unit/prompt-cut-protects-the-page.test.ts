@@ -165,8 +165,16 @@ describe('shrinkPromptForModel — a drop is confined to the block it names', ()
       PROMPT, PROMPT.length - 400, 'TEST confinement', null
     );
 
-    const droppable = ['**COUNTS:**', '**DEPTH AND SIZE:**', '**REQUIRED CAST:**', '**Composition:**'];
-    const spent = droppable.filter((d) => !out.includes(d));
+    // The units are whole paragraphs and, for Composition, single bullets
+    // (2026-09-23): a unit is spent when its exact text is gone.
+    const composition = templateParagraph('**Composition:**').split('\n');
+    const units = [
+      templateParagraph('**COUNTS:**'),
+      templateParagraph('**DEPTH AND SIZE:**'),
+      templateParagraph('**REQUIRED CAST:**'),
+      ...composition.slice(1),
+    ];
+    const spent = units.filter((u) => !out.includes(u));
     expect(spent.length).toBeGreaterThan(0);
 
     // Removing exactly what was named from the INPUT reproduces the output,
@@ -174,7 +182,8 @@ describe('shrinkPromptForModel — a drop is confined to the block it names', ()
     // production failure this difference was thousands of characters of page.
     const squeeze = (s: string) => s.replace(/\s+/g, ' ').trim();
     let rebuilt = PROMPT;
-    for (const prefix of spent) rebuilt = rebuilt.split(templateParagraph(prefix)).join('');
+    for (const u of spent) rebuilt = rebuilt.split(u).join('');
+    if (composition.slice(1).every((b) => spent.includes(b))) rebuilt = rebuilt.split(composition[0]).join('');
     expect(squeeze(out)).toBe(squeeze(rebuilt));
 
     // And the page itself is untouched by a drop this small.

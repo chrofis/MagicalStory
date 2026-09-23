@@ -89,6 +89,40 @@ describe('generator-side counterparts of judge rules reach the built image promp
     expect(unfilled(build())).toEqual([]);
   });
 
+  // REACH IS MEASURED ON THE SENT PROMPT (2026-09-23). The built prompt is not
+  // what the illustrator receives once it is over the model cap: the shrink
+  // listed both anchors as droppable blocks, and staging
+  // job_1790100385959_1nitlympp p12 and all three covers were judged for D-24
+  // and D-16b with neither rule in the prompt that was sent. A built-prompt
+  // assertion stayed green through all of it.
+  it('both rules survive the shrink of an over-cap page and an over-cap cover', async () => {
+    // @ts-expect-error - JS module without types
+    const { shrinkPromptForModel } = await import('../../server/lib/images.js');
+    const CAP = 7900;
+    const longBrief = () => {
+      const prose = 'The main character kneels beside the lantern on the wet planks of the pier, both hands cupped around its glass. '.repeat(70);
+      return `${prose}\n\n---METADATA---\n${JSON.stringify({
+        sceneIntent: 'the lamp is lit',
+        characters: [{ name: 'Mira', position: 'center', depth: 'midground' }],
+        shot: 'wide',
+        objects: ['ART001'],
+        textPosition: 'bottom-left',
+      })}`;
+    };
+    const page = String(PB.buildImagePrompt(longBrief(), inputData, null, VISUAL_BIBLE, 1, null, {}));
+    const cover = String(PB.buildCoverPrompt('initialPage', {
+      sceneDescription: 'A wide group portrait set before the pier. '.repeat(160),
+      inputData, visualBible: VISUAL_BIBLE, referencePhotos: [],
+    }));
+    for (const built of [page, cover]) {
+      expect(built.length, 'the fixture must be over the cap or it proves nothing').toBeGreaterThan(CAP);
+      const sent = String(await shrinkPromptForModel(built, CAP, 'TEST reach', null));
+      expect(sent.length).toBeLessThanOrEqual(CAP);
+      expect(sent).toContain(NO_CHARACTER_MARKING_RULE);
+      expect(sent).toContain(HANDS_HOLD_ONLY_NAMED_RULE);
+    }
+  });
+
   it('both rules sit in the protected tail, after REQUIRED OBJECTS', () => {
     // shrinkPromptForModel splits the prompt at the REQUIRED OBJECTS block and
     // hands only the HEAD to a compressor. A must-survive rule placed above

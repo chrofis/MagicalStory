@@ -91,9 +91,21 @@ describe('cover worn/held dedupe — duplicate vs slot conflict', () => {
     expect(out.excludeElementIds).not.toContain('ART002');
   });
 
-  it('leaves an unmappable artifact on the old behaviour', () => {
+  it('an artifact with no worn slot is never a worn garment — both sides stay', () => {
     const rope = { id: 'ART003', name: 'heavy mooring rope', label: 'stern line', type: 'nautical rope', description: 'a thick navy-blue three-strand rope, wool-wrapped' };
     const out = applyCoverWornHeldDedupe(photos('a navy-blue rope belt'), { characterDetails: {} }, { artifacts: [rope] });
     expect(out.photos[0].clothingDescription).toBe('a navy-blue rope belt');
+    expect(out.excludeElementIds).not.toContain('ART003');
+  });
+
+  // Staging job_1790100385959_1nitlympp title page (2026-09-23 audit, C5): the
+  // held bag shared the colour word "brown" with the boots, and the boots were
+  // dropped from the holder's outfit line as a "duplicate" of a paper bag.
+  it('a held slotless prop does not delete a garment that shares a colour word', () => {
+    const bag = { id: 'ART001', name: 'brown paper bag of chestnuts', label: 'paper bag', type: 'artifact', description: 'a small rectangular brown paper bag' };
+    const hint = { characterDetails: { a: { name: 'Sarah', holds: 'ART001' } } };
+    const outfit = 'a yellow long-sleeve shirt, olive green corduroy trousers, brown ankle boots';
+    const out = applyCoverWornHeldDedupe(photos(outfit), hint, { artifacts: [bag] });
+    expect(out.photos[0].clothingDescription).toBe(outfit);
   });
 });

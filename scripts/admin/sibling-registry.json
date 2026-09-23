@@ -522,20 +522,32 @@
     {
       "id": "arc-hint-handoff",
       "axis": "who applies an arc hint the other side could not",
-      "reason": "The SAME arcHints string is injected into two stages under two headings that form one contract: the beats planner applies what a picture can hold, and the text writer applies 'what the beats have not'. If one heading changes without the other, a hint is either dropped by both or honoured twice. Both headings are built in promptBuilders.js (buildBeatsPrompt's ARC_HINTS and the text builder's ARC_HINTS), not in the templates. The planner's half was a bare imperative until 2026-09-19: measured over the 42 CHANGE lines stored across 14 staging runs, 16 mandate a figure's continued presence against the three-named cast cap and 10 mandate simultaneity against 'two characters given different actions at one instant lose one of them', so the planner honoured hints by breaking its own picture rules. The two critics that judge the hinted text read the same hints (2026-09-23): story-text-audit.txt (arc-informed) and text-refine.txt, under one heading built by buildCriticArcHintsSection with the same HINT_VS_ARC_RULE. Shown only the unamended arc, the audit faulted a page for following a hint and the refine rebuilt the contradiction the hint had removed (staging job_1790100385959_1nitlympp p15). The blind audit is denied the arc by design and so gets no hints.",
+      "reason": "The SAME arcHints string is injected into two stages under two headings that form one contract: the beats planner applies what a picture can hold, and the text writer applies 'what the beats have not'. If one heading changes without the other, a hint is either dropped by both or honoured twice. Both headings are built in promptBuilders.js (buildBeatsPrompt's ARC_HINTS and the text builder's ARC_HINTS), not in the templates. The planner's half was a bare imperative until 2026-09-19: measured over the 42 CHANGE lines stored across 14 staging runs, 16 mandate a figure's continued presence against the three-named cast cap and 10 mandate simultaneity against 'two characters given different actions at one instant lose one of them', so the planner honoured hints by breaking its own picture rules. The two critics that judge the hinted text read the same hints (2026-09-23): story-text-audit.txt (arc-informed) and text-refine.txt, under one heading built by buildCriticArcHintsSection with the same HINT_VS_ARC_RULE. Shown only the unamended arc, the audit faulted a page for following a hint and the refine rebuilt the contradiction the hint had removed (staging job_1790100385959_1nitlympp p15). The blind audit is denied the arc by design and so gets no hints. The plan check (plan-check.txt) joined as a THIRD critic on 2026-09-23 under the same buildCriticArcHintsSection heading: its question 13 asks whether each hint landed where its own words place it — on job_1790100385959_1nitlympp a hint anchored after an event was planned onto a page before the event existed, and the checker, never shown the hints, could not see it.",
       "members": [
         "server/lib/promptBuilders.js",
         "prompts/story-beats.txt",
         "prompts/story-text-from-beats.txt",
         "prompts/story-text-audit.txt",
-        "prompts/text-refine.txt"
+        "prompts/text-refine.txt",
+        "prompts/plan-check.txt"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "commissioned-cast-arc-vs-plan-counters",
+      "axis": "who counts as invented: the arc's counting rule vs the plan counters",
+      "reason": "The arc decides who is invented (its budget rule and its \"Premise figures:\" / \"Invented figures:\" lists, built from COMMISSIONED_CAST_DEF and UNNAMED_FIGURE_EXEMPT in promptBuilders.js and filled into arc-create.txt / arc-retell.txt), and planCounters.js re-counts the plan against it (ARC_INVENTED_UNDECLARED / ARC_INVENTED_OVER_ALLOWANCE) through castCoverage.commissionedCast. On staging job_1790100385959_1nitlympp the two disagreed twice: a dog named in a character's saved details and an unnamed one-page mother were both 'not counted' by the arc and charged by the counters, and the re-plan cut the mother citing the false over-allowance. A change to who counts must land on both sides.",
+      "members": [
+        "prompts/arc-create.txt",
+        "server/lib/planCounters.js",
+        "server/lib/castCoverage.js"
       ],
       "severity": "block"
     },
     {
       "id": "beats-planner-vs-plan-check",
       "axis": "generator-vs-critic",
-      "reason": "story-beats.txt states each page rule as an imperative and plan-check.txt audits the same rule as a question — the generator/critic pair for page division. The FRAMING is deliberately different and is not shared; the DEFINITION inside each was written out twice by hand, and a definition that drifts between the rule and the audit is a generator that cannot satisfy the judge grading it. Four of them are now single constants in promptBuilders.js (DEED_AND_EFFECT_DEF, TWO_HEIGHTS_DEF, NAMING_DEF, ENDING_EVENT_DEF) filled into both templates. WANTED_PICTURE_DEF is the exception: it reaches plan-check.txt only, story-beats.txt hand-states the equivalent as a planning question, and the pair is pinned clause-by-clause by tests/unit/plan-shared-definitions.test.ts. This set stops a further pair being hand-copied instead.",
+      "reason": "story-beats.txt states each page rule as an imperative and plan-check.txt audits the same rule as a question — the generator/critic pair for page division. The FRAMING is deliberately different and is not shared; the DEFINITION inside each was written out twice by hand, and a definition that drifts between the rule and the audit is a generator that cannot satisfy the judge grading it. Four of them are now single constants in promptBuilders.js (DEED_AND_EFFECT_DEF, TWO_HEIGHTS_DEF, NAMING_DEF, ENDING_EVENT_DEF) filled into both templates. WANTED_PICTURE_DEF is the exception: it reaches plan-check.txt only, story-beats.txt hand-states the equivalent as a planning question, and the pair is pinned clause-by-clause by tests/unit/plan-shared-definitions.test.ts. This set stops a further pair being hand-copied instead. Since 2026-09-23 two more are code-built and filled into both: the act spans by arc sentence number (arcActSpans, planner question 6 / checker question 4) and each character's own-action rule (castCoverage.castActionRule, the planner's {CAST_COVERAGE} / checker question 12); the appearance floor reaches the planner and the counters only, never the checker, which read a stated range as a cap.",
       "members": [
         "prompts/story-beats.txt",
         "prompts/plan-check.txt"

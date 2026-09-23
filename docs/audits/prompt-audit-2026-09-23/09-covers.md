@@ -5,10 +5,23 @@
 Checked against staging `31fd7db0c` (after the evening fix round). FIXED = the commit that fixes it; OPEN = no fix yet, no ruling needed to start; OWNER CALL = touches a decision, a SETTLED line or has options the owner picks. Stale-doc and registry items listed at the end of each file were corrected in `a25ecb865` unless listed below.
 
 - FIXED: C1 title erased by title-blind judges — `c9484709c` (the cover text contract is a required-text item in the one `{TEXT_RULES}` block all three judges get; COVER_TEXT replaces the prepended TEXT_RULES; the generator's title block is headed `**REQUIRED TEXT:**`). C2 repair path protecting a painted title — `c9484709c` (the consolidator renders required lettering as never-remove; `inpaintPage` adds the title to its required-text clause when the cover is not restamped). The stale `images.js` comment and image-routing rows — `a25ecb865`.
-- OPEN: C3 cover shrink drops REQUIRED CAST / DEPTH AND SIZE while keeping SHOT and non-cover rules, C5 `classifyOverlap` drops an unrelated garment, C6 painted lettering on textless covers excused by the app-overlay note, C7 false entity finding (crop artefact, same class as 08 S7), C8 height order vs age words, C9 one missing prop counted twice, C10 cover layout rules never judged, C11 the root `prompt` holds the inpaint text, C12 reference-card colour rule vs outfits.
-- OWNER CALL: C4 backfill fills to 5 even when nothing was dropped; C3 item 3 (touches the 2026-08-26 unified cover template decision).
+- FIXED by the commit "fix(shrink, covers): the cut is ranked…" (decisions.md 2026-09-23 "The shrink ranks its cuts…" and "Covers follow the Art Director's cast…"):
+  - C3: NO MARKS and HANDS are never cut; cuts go in rank order with Composition cut per bullet; covers get no SHOT block (the "portrait" prose had been read as close-up); the duplicate ground bullet is gone. The landmark-photo part of C3 is NOT A FINDING: all three covers carried `landmarkPhotos`.
+  - C4, on the owner's decision "follow the Art Director": the refill is deleted.
+  - C5: a slotless prop never dedupes a garment.
+  - C6: the app-overlay note excuses only the app's three strings.
+  - C9: the consolidator makes one cause one entry (prompt).
+  - C12: the card legend forbids recolouring to a frame, not the outfit colours.
+- OPEN: C9's semantic `element` field carries prose instead of an id, so the inpaint has no reference image.
+- OWNER CALL:
+  - C7: the entity check typed a crop artefact `figure_completeness`. Fix it in the entity prompt, or with a code ceiling for entity-sourced `figure_completeness`.
+  - C8: the age label disagrees with HEIGHT ORDER. This touches the "description must match avatar" doctrine.
+  - C10: the layout bands have no critic. Adding one adds a judged rule. The "bottom band without a dedication" part is NOT A FINDING: `PUT /dedication` can add a dedication and restamp later.
+  - C11: the root `prompt` is the inpaint text. The 2026-09-19 decision chose the shipped version's prompt.
+  - Covers are still over the cap. The face-feature text in CHARACTERS IN THIS IMAGE is the remaining lever, and it touches the 2026-08-26 "covers identical to pages" decision.
 
 ---
+
 Run: job_1790100385959_1nitlympp "Das Ei im Laub" (staging, built at b03c64b0). Judge: covers group (creation → judges → consolidation → inpaint as one system).
 
 ## What I looked at

@@ -59,16 +59,17 @@ Machine-checkable lines are enforced by `scripts/admin/check-settled.js` (runs i
 - **Cover gaze is code-owned: always at the viewer**; `gazes at:` is banned from cover hints.
 - **Cover title text: model-baked EVERYWHERE — `coverTitleMode` = 'baked' (2026-09-06, supersedes the 2026-08-29 per-environment split).** The front cover renders the title INTO the artwork in ONE call on `coverTitleBakedModel` (`grok-imagine-2`); back and initial covers stay textless art. The flag reads through ONE resolver (`resolveCoverTitleMode`) so first generation, trials and every later repaint agree. Promotion to production was the owner's reversal call under the rule "production equals staging except repair rounds", with evidence: the 2026-08-29 5-story/5-style sample and the nine 2026-09-06 staging trial covers, all spelled correctly incl. umlauts and possessives (decisions.md 2026-09-06). `composited` (app-painted from a real font, spelling safe by construction) remains available as the fallback mode; returning production to it is a reversal and needs the full protocol.
 - **Test Lab sets are generic, never per-stage** (a parallel title_sets mechanism was reverted).
-- **Three Visual Bible elements per page — and LOCATIONS ARE NOT ELEMENTS** (owner, 2026-09-08, superseding the
-  2026-09-06 count that included invented locations: "Do not count it as it is the empty scene not an artifact").
-  `VB_ELEMENT_BUDGET` counts secondary characters, animals, artifacts and vehicles; a LOC, real or invented, never
-  counts — the location is the plate the cast is composited into. The page's location cell rides LAST, at most one,
-  3 + 1 = Grok's `VB_SLOT_MAX_ELEMENTS` of 4. The budget is enforced where the BRIEFS exist — the scene review's
-  `rankPageElements` / `truncateBriefToBudget`, then the page-gen reference selection; do not re-add locations to
-  `ELEMENT_COLLECTIONS` or to the AD's "all count" line. (The bible-time `trimVbAssignments` enforcer was removed
-  2026-09-11: it decided from plan-line prose before any brief existed and emptied a story's central prop — see
-  decisions.md "Visual Bible page assignment comes from the FINAL scene briefs". The COUNT and the
-  locations-don't-count rule are unchanged and stay settled.)
+- **Four Visual Bible elements per page — and LOCATIONS ARE NOT ELEMENTS** (owner: four since 2026-09-11, up from
+  three; locations ruling 2026-09-08, superseding the 2026-09-06 count that included invented locations: "Do not
+  count it as it is the empty scene not an artifact"). `VB_ELEMENT_BUDGET` (= 4, `vbElementBudget.js`) counts
+  secondary characters, animals, artifacts and vehicles; a LOC, real or invented, never counts — the location is the
+  plate the cast is composited into. The page's location cell rides LAST and is the cell that gives way when a page
+  uses all four elements (Grok's `VB_SLOT_MAX_ELEMENTS` = 4). The budget is a PROMPT rule — the Art Director is given
+  it and the scene review is handed each overflow as a fault; no code trims a brief (every code-side enforcer was
+  removed 2026-09-11), an overflow is reported (`vbElementOverflow`) and ships. Do not re-add locations to
+  `ELEMENT_COLLECTIONS` or to the AD's "all count" line, and do not re-add a code enforcer. (Line refreshed
+  2026-09-23 with owner approval — factual, not a reversal: decisions.md "SETTLED.md's Visual Bible element line
+  says FOUR and names no enforcer" and "VB element budget raised to FOUR; the location cell is what gives way".)
 
 ## Data & infrastructure
 

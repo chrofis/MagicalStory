@@ -1563,6 +1563,126 @@
       "status": "fixed",
       "fixedAt": "2026-09-23",
       "fixedIn": "4994fe530"
+    },
+    {
+      "id": "shrink-cuts-generator-critic-parity-anchors",
+      "title": "The image-prompt shrink deleted NO MARKS and HANDS - the generator halves of judge rules D-24 / D-16b - so over-cap pages were judged for rules the illustrator never received",
+      "reportedAt": "2026-09-23",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "769c655ff",
+      "source": "Stored prompt_shrink events, staging job_1790100385959_1nitlympp: p12 (10,097 -> 6,834) and initialPage / frontCover / backCover (9,849 / 10,615 / 9,819 -> 7,764 / 7,351 / 7,734) all dropped COUNTS, DEPTH AND SIZE, HANDS, NO MARKS, REQUIRED CAST (+ the whole Composition block on p12 and the front cover). Audit 08 S3, 09 C3.",
+      "rootCause": "sectionAwareCut listed HANDS and NO MARKS as droppable blocks 3 and 4; Composition went as one 1,176-char block; the reach test checked the built prompt, not the sent one.",
+      "impact": "Every page or cover over the 7,900 Grok cap: the judges deduct for marks and invented props the generator was never forbidden; a page ~110 chars over lost all its composition rules.",
+      "fix": "Anchors are not drop units (cutBlocks throws if one ever would be); units in rank order with Composition cut per bullet; reach tested on the sent prompt of an over-cap page and cover."
+    },
+    {
+      "id": "cover-shot-block-reads-portrait-as-closeup",
+      "title": "Every cover was told \"a close-up ends at the waist: feet cannot appear\" because the prose fallback read \"group portrait\" as close-up, beside a composition demanding visible feet",
+      "reportedAt": "2026-09-23",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "769c655ff",
+      "source": "Stored cover prompts, staging job_1790100385959_1nitlympp: all three end with the close-up SHOT definition; buildShotDefinitions(null, \"A wide group portrait set before ...\") -> close-up (shotVocabulary close-up match includes \"portrait\", ranked before \"wide\").",
+      "rootCause": "Covers declare no shot, so buildImagePrompt fell back to reading the shot word from the prose, and buildCoverSceneFromHint writes \"portrait\".",
+      "impact": "Every cover: a self-contradicting framing instruction (~220 chars) in an over-cap prompt.",
+      "fix": "buildImagePrompt builds no SHOT block for a cover page number (COVER_PAGE_NUMBERS); the cover composition owns the framing."
+    },
+    {
+      "id": "cover-worn-held-dedupe-drops-garment-on-colour-word",
+      "title": "The cover worn/held dedupe deleted \"brown ankle boots\" from a character holding a \"brown paper bag\" - a slotless prop was classified a duplicate of a garment",
+      "reportedAt": "2026-09-23",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "769c655ff",
+      "source": "Stored initialPage prompt, staging job_1790100385959_1nitlympp: Julian's outfit line lacks the boots the front cover keeps; ART001 \"brown paper bag of Marroni\" (type bag, no worn slot) token-matched the segment on \"brown\"; classifyOverlap returned duplicate for any artifact without a slot (coverIterate.js).",
+      "rootCause": "classifyOverlap: `if (!meta.slot || !segSlot) return \"duplicate\"` - an artifact with no body slot fell to the old loose-match behaviour.",
+      "impact": "Any cover where a held prop shares a colour or material word with the holder's outfit: a garment silently leaves the clothing text.",
+      "fix": "An artifact with no worn slot is \"unrelated\" to every outfit segment; replayed on the stored bible - boots kept."
+    },
+    {
+      "id": "replan-noted-finding-deletes-ending-event",
+      "title": "A noted (advisory) two-heights line made the re-plan delete the ending's own event from the last page",
+      "reportedAt": "2026-09-23",
+      "source": "Reproduced from stored data, staging job_1790100385959_1nitlympp (dragon run 6), prompt audit docs/audits/prompt-audit-2026-09-23/02-page-plan.md. Round-1 declared change 'Page 18: cast out Turi, Flämmli, Julian — CHECK[10]' (07 json); the recheck then raised Q8 and Q4 against page 18; no round 2 ran and the book shipped without the parting.",
+      "rootCause": "Q10 is advisory by decision, but RE-DIVIDE handed every ALSO NOTED line over as actionable and nothing protected the last page; the review had no rule against a change answering a noted finding.",
+      "impact": "Any book whose ending event is a flight or landing beside the cast loses its ending picture to an advisory line.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "094052d45",
+      "fix": "replanKeepPages names the last page (plus WANTED, ACTION and only-focal pages) in RE-DIVIDE; reviewPlanChanges refuses any change on a kept page answering a noted or untagged finding (rule 'protected'); the one-level rule keeps the level the page's event happens on."
+    },
+    {
+      "id": "replan-takes-another-characters-only-focal-page",
+      "title": "The re-plan answered one boy's missing focal page by taking another boy's only focal page",
+      "reportedAt": "2026-09-23",
+      "source": "Reproduced from stored data, staging job_1790100385959_1nitlympp (dragon run 6), prompt audit docs/audits/prompt-audit-2026-09-23/02-page-plan.md. Round-1 'Page 5: cast out Max, Nia — PLAN[NO_FOCAL_PAGE]' (Kiaan's finding) removed Max from his only focal page; the recheck raised NO_FOCAL_PAGE for Max.",
+      "rootCause": "The re-plan's stay list protected only obstacle-holders and figures under two pages; the review never compared a character's focal pages before and after a cast-out; its refusals were not sent back to the next round.",
+      "impact": "Must-fix focal findings trade places between characters every round instead of converging.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "094052d45",
+      "fix": "reviewPlanChanges rule 'focal' refuses a cast-out that takes a listed character's last focal page; rule 'action' refuses casting a character out of their ACTION page; the next round gets '## UNDONE LAST ROUND' with each refusal."
+    },
+    {
+      "id": "plan-counters-charge-supplied-and-unnamed-figures",
+      "title": "The invented-cast counters charged a pet from a character's saved details and an unnamed one-page mother against the invented allowance",
+      "reportedAt": "2026-09-23",
+      "source": "Reproduced from stored data, staging job_1790100385959_1nitlympp (dragon run 6), prompt audit docs/audits/prompt-audit-2026-09-23/02-page-plan.md. 05 json: ARC_INVENTED_UNDECLARED 'their mother, Nia', ARC_INVENTED_OVER_ALLOWANCE 4 vs 2, while the arc wrote '(Nia is supplied by the commissioned cast and is not counted; the mother dragon is unnamed.)'; the re-plan cut the mother from page 1 citing the false over-allowance.",
+      "rootCause": "The counters' commissioned set was the character list plus the arc's premise-only list, and nothing applied the arc's unnamed-figure exemption.",
+      "impact": "False over-allowance findings on any story whose family entered a pet in saved details or whose plan has an unnamed background parent; the re-plan acts on them.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "094052d45",
+      "fix": "Counters read castCoverage.commissionedCast (the arc stage's COMMISSIONED_CAST_DEF puts saved-detail figures on the Premise figures list, f25a51f3f); UNNAMED_FIGURE_EXEMPT (no name, one page) is one string stated in the arc budget and applied by the counter via isNamedFigure; an unnamed figure across pages still counts."
+    },
+    {
+      "id": "avatar-head-row-not-head-and-shoulders",
+      "title": "The avatar head row came back waist/hip/knee-length and the heads judge was told torso is fine",
+      "reportedAt": "2026-09-23",
+      "source": "Reproduced from stored data and pixels, dragon run 6 (staging job_1790100385959_1nitlympp), docs/audits/prompt-audit-2026-09-23/06-avatars.md S2-3: 5/6 head rows cropped at waist, hip or knee.",
+      "rootCause": "The head-row wording did not move Grok off filling its tall 20:9 cells, and sheet-row-heads-eval.txt waived torso (\"do not penalise it\"), so nothing scored the crop.",
+      "impact": "Every styled sheet: the head cells the pages crop as face references carry half-length figures. Staging and production.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "7a9e8f0f3",
+      "fix": "Head row framed \"like a passport photo\", cut off at the upper chest; heads judge TASK 5 CROP keyed to visible hands/waistband/legwear, folded into the code-computed final. One paid run: true head-and-shoulders row, cropScore 9. Pinned by tests/unit/avatar-sheet-audit-2026-09-23.test.ts."
+    },
+    {
+      "id": "avatar-sheet-invented-collar-no-generator-rule",
+      "title": "The live avatar row generators never got the \"no collar the costume does not name\" rule the heads judge scores",
+      "reportedAt": "2026-09-23",
+      "source": "Reproduced from stored data and pixels, dragon run 6 (staging job_1790100385959_1nitlympp), docs/audits/prompt-audit-2026-09-23/06-avatars.md S2-4: \"a red/blue long-sleeve shirt\" drawn as a buttoned polo on both sheets of two characters; the generator line lived only in the dead buildPrompt.",
+      "rootCause": "The rule was written into the single-call buildPrompt, which production stopped calling on 2026-08-08; buildBodyRowPrompt/buildHeadRowPrompt never carried it, and the bodies judge did not score invented trim.",
+      "impact": "Invented collars and plackets become the character's shirt on every page. Staging and production.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "7a9e8f0f3",
+      "fix": "buildUnnamedTrimRule(redress) in both live rows; the head row takes its neckline from the body row; bodies judge TASK 3 counts invented trim as a wrong item. Validation: 1 of 2 paid runs still drew a polo in the body row (tracked in BACKLOG). Pinned by tests/unit/avatar-sheet-audit-2026-09-23.test.ts."
+    },
+    {
+      "id": "avatar-pass2-backdrop-and-dividers-unjudged",
+      "title": "Pass-2 style transfer painted washes behind the figures and dropped the dividers, and no prompt or judge covered it",
+      "reportedAt": "2026-09-23",
+      "source": "Reproduced from stored data and pixels, dragon run 6 (staging job_1790100385959_1nitlympp), docs/audits/prompt-audit-2026-09-23/06-avatars.md S2-5: 6/6 shipped styled sheets.",
+      "rootCause": "buildStyleTransferPrompt said only \"keep the content\"; the style line carries \"depth from atmospheric haze\"; sheet-2x4-style-eval.txt had no background or divider task.",
+      "impact": "Painted washes ride into every page as part of the character reference cell. Staging and production.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "7a9e8f0f3",
+      "fix": "SHEET_GROUND_RULE stated in the pass-2 prompt and filled into the style judge (TASK 8 backgroundScore). Cell splitting does not depend on drawn dividers (replay: 6/6 shipped sheets split within bounds). Two paid runs: dividers kept, plain ground, faint foot shadows only. Pinned by tests/unit/avatar-sheet-audit-2026-09-23.test.ts."
+    },
+    {
+      "id": "testlab-avatar-eval-override-replaces-two-judges",
+      "title": "The Test Lab avatar_eval override replaced both row-judge templates at once and prefilled a judge production never runs",
+      "reportedAt": "2026-09-23",
+      "source": "Code reading confirmed by grep (audit 06 S4): character2x4Sheet.js passed one promptOverride to both evaluateSheetRow calls; routes/admin/testlab.js prefilled sheet2x4Evaluation (dead) and avatar_style prefilled styledCostumedAvatar (never loaded by production).",
+      "rootCause": "The override plumbing predates the split row judges; nobody re-keyed it per judge.",
+      "impact": "Any Lab A/B of an avatar judge prompt measured something production never runs. Lab only.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "7a9e8f0f3",
+      "fix": "params.evalPrompt names the one judge the override replaces (heads|bodies|identity|style), prefill is that template, a stray override throws; avatar_style prefills the built buildStyleTransferPrompt; the test-version path runs evaluateAvatarSheet. Pinned by tests/unit/avatar-sheet-audit-2026-09-23.test.ts."
     }
   ]
 }

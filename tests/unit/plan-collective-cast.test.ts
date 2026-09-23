@@ -78,17 +78,17 @@ describe('the ROSTER contract', () => {
 
   it('parses covers as a third field', () => {
     const r = parsePlanCheckRoster('ROSTER 4: people = A, B; things = the lamp; covers = C, D');
-    expect(r.get(4)).toEqual({ people: ['A', 'B'], things: ['lamp'], covers: ['C', 'D'] });
+    expect(r.get(4)).toEqual({ people: ['A', 'B'], things: ['lamp'], covers: ['C', 'D'], unlisted: [] });
   });
 
   it('reads a line without covers exactly as before', () => {
     const r = parsePlanCheckRoster('ROSTER 4: people = A, B; things = the lamp');
-    expect(r.get(4)).toEqual({ people: ['A', 'B'], things: ['lamp'], covers: [] });
+    expect(r.get(4)).toEqual({ people: ['A', 'B'], things: ['lamp'], covers: [], unlisted: [] });
   });
 
   it('reads "none" in any field as nobody', () => {
     const r = parsePlanCheckRoster('ROSTER 7: people = none; things = none; covers = none');
-    expect(r.get(7)).toEqual({ people: [], things: [], covers: [] });
+    expect(r.get(7)).toEqual({ people: [], things: [], covers: [], unlisted: [] });
   });
 
   it('leaves a things value carrying its own semicolon whole, with and without covers', () => {

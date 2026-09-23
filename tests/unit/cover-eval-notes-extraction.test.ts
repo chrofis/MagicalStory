@@ -32,8 +32,18 @@ describe('cover critic notes — extraction is a move, not an edit', () => {
     expect(sections.COVER_NOTE).toBe(PRE_COVER_NOTE);
   });
 
-  it('TEXT_NOTE_APP_OVERLAY is byte-identical to the pre-extraction literal', () => {
-    expect(sections.TEXT_NOTE_APP_OVERLAY).toBe(PRE_TEXT_NOTE);
+  // TEXT_NOTE_APP_OVERLAY was REWRITTEN on 2026-09-23 (no longer a move): it
+  // excused ANY lettering on a textless cover as "the intended app-composited
+  // overlay", but the judge sees the art before the overlay is stamped, so what
+  // it excused was lettering the image model painted — a shop sign, a road sign
+  // and garbled letters on a cart on staging job_1790100385959_1nitlympp's title
+  // page (docs/audits/prompt-audit-2026-09-23/09-covers.md C6). The note now
+  // excuses only the app's own three strings.
+  it('TEXT_NOTE_APP_OVERLAY no longer excuses lettering the image model painted', () => {
+    expect(sections.TEXT_NOTE_APP_OVERLAY).not.toBe(PRE_TEXT_NOTE);
+    expect(sections.TEXT_NOTE_APP_OVERLAY).not.toMatch(/if such text IS present treat it as the intended/);
+    expect(sections.TEXT_NOTE_APP_OVERLAY).toMatch(/magicalstory\.ch/);
+    expect(sections.TEXT_NOTE_APP_OVERLAY).toMatch(/other lettering/i);
   });
 
   // TEXT_RULES (the allow-list with {EXPECTED_TEXT}) was replaced by COVER_TEXT on

@@ -3,6 +3,11 @@ import { describe, it, expect } from 'vitest';
 // @ts-expect-error - JS module without types
 import { validateCoverHintCast } from '../../server/lib/coverIterate.js';
 
+// The cover cast is the Art Director's (owner, 2026-09-23): a phantom the hint
+// declares is dropped, and nobody the AD did not place is ever added. The
+// refill that padded every cover up to MAX_COVER_CHARACTERS is deleted
+// (docs/audits/prompt-audit-2026-09-23/09-covers.md C4).
+
 const cast = [
   { id: 'c1', name: 'Lily', isMainCharacter: true },
   { id: 'c2', name: 'Ethan', isMainCharacter: true },
@@ -22,57 +27,59 @@ const hintWith = (names: string[]) => ({
 });
 
 describe('validateCoverHintCast', () => {
-  it('drops a phantom and backfills the missing real character', () => {
+  it('drops a phantom from every hint container and adds nobody in its place', () => {
     const hints = {
       backCover: hintWith(['Lily', 'Ethan', 'James', 'Rachel', 'The smallest girl (centre front, facing viewer)']),
     };
-    const res = validateCoverHintCast(hints, cast, { mainIds: ['c1', 'c2'] });
+    const res = validateCoverHintCast(hints, cast, {});
     expect(res.dropped.map((d: any) => d.name)).toEqual(['The smallest girl']);
-    expect(res.backfilled.map((d: any) => d.name)).toEqual(['Margaret']);
+    expect(res).not.toHaveProperty('backfilled');
     const h: any = hints.backCover;
-    expect(h.characters).toEqual(['Lily', 'Ethan', 'James', 'Rachel', 'Margaret']);
+    expect(h.characters).toEqual(['Lily', 'Ethan', 'James', 'Rachel']);
     for (const key of ['characterDetails', 'characterClothing', 'characterPerspectives']) {
       expect(Object.keys(h[key]).some(k => /smallest/i.test(k))).toBe(false);
+      expect(Object.keys(h[key])).not.toContain('Margaret');
     }
-    expect(h.characterDetails.Margaret.name).toBe('Margaret');
   });
 
   it('leaves a valid cast untouched', () => {
     const hints = { backCover: hintWith(['Lily', 'Ethan', 'James', 'Rachel', 'Margaret']) };
-    const res = validateCoverHintCast(hints, cast, { mainIds: ['c1', 'c2'] });
+    const res = validateCoverHintCast(hints, cast, {});
     expect(res.dropped).toEqual([]);
-    expect(res.backfilled).toEqual([]);
     expect((hints.backCover as any).characters).toHaveLength(5);
   });
 
-  it('does not backfill past the 5-character cap', () => {
-    const bigCast = [...cast, { id: 'c6', name: 'Noah' }];
-    const hints = { backCover: hintWith(['Lily', 'Ethan', 'James', 'Rachel', 'Margaret']) };
-    const res = validateCoverHintCast(hints, bigCast, { mainIds: ['c1', 'c2'] });
-    expect(res.backfilled).toEqual([]);
+  it('keeps a two-character cover at two — the AD cast is not padded to the cap', () => {
+    // The shape of staging job_1790100385959_1nitlympp's title page: two
+    // children cast by the AD, three more in the story.
+    const hints = { initialPage: hintWith(['Lily (center)', 'James (right foreground)']) };
+    const res = validateCoverHintCast(hints, cast, {});
+    expect(res.dropped).toEqual([]);
+    expect((hints.initialPage as any).characters).toEqual(['Lily (center)', 'James (right foreground)']);
+    expect(Object.keys((hints.initialPage as any).characterDetails)).toEqual(['Lily', 'James']);
   });
 
-  it('title page backfills mains only', () => {
+  it('a front cover missing a main character is not given one', () => {
     const hints = { frontCover: hintWith(['Lily']) };
-    const res = validateCoverHintCast(hints, cast, { mainIds: ['c1', 'c2'] });
-    expect(res.backfilled.map((d: any) => d.name)).toEqual(['Ethan']);
-    expect((hints.frontCover as any).characters).toEqual(['Lily', 'Ethan']);
+    validateCoverHintCast(hints, cast, {});
+    expect((hints.frontCover as any).characters).toEqual(['Lily']);
   });
 
   it('resolves a hint name that carries an honorific', () => {
     const hints = { backCover: hintWith(['Grossvater James', 'Lily', 'Ethan']) };
-    const res = validateCoverHintCast(hints, cast, { mainIds: ['c1', 'c2'] });
+    const res = validateCoverHintCast(hints, cast, {});
     expect(res.dropped).toEqual([]);
-    expect(res.backfilled.map((d: any) => d.name)).toEqual(['Rachel', 'Margaret']);
+    expect((hints.backCover as any).characters).toEqual(['Grossvater James', 'Lily', 'Ethan']);
   });
 
-  it('seeds backfilled clothing from clothingRequirements', () => {
-    const hints = { backCover: hintWith(['Lily', 'Ethan']) };
-    validateCoverHintCast(hints, cast, {
-      mainIds: ['c1', 'c2'],
-      clothingRequirements: { Margaret: { winter: { used: true } } },
-    });
-    expect((hints.backCover as any).characterClothing.Margaret).toBe('winter');
+  it('a hint that names nobody real is an ERROR, and stays empty', () => {
+    const errors: string[] = [];
+    const logger = { error: (m: string) => errors.push(m), warn: () => {} };
+    const hints = { backCover: hintWith(['The smallest girl', 'A tall stranger']) };
+    const res = validateCoverHintCast(hints, cast, { logger });
+    expect(res.dropped).toHaveLength(2);
+    expect((hints.backCover as any).characters).toEqual([]);
+    expect(errors.length).toBe(1);
   });
 
   it('is a no-op without a cast', () => {

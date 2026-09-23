@@ -70,6 +70,211 @@ age bucket (A9); trimming the landmark list (the AD decides which places are lan
 server/lib/promptBuilders.js, server/lib/sceneBriefCheck.js, server/lib/shotVocabulary.js,
 server/lib/beatsPipeline.js, scripts/admin/sibling-registry.json, tests/unit/art-director-audit-2026-09-23.test.ts.
 
+## 2026-09-23 — SETTLED.md's Visual Bible element line says FOUR and names no enforcer (factual refresh, owner-approved)
+**Context:** The 2026-09-23 prompt audit (docs/audits/prompt-audit-2026-09-23/04-art-director.md, "Stale docs") found `docs/SETTLED.md` still saying "Three Visual Bible elements per page", enforced by `rankPageElements` / `truncateBriefToBudget`. The code has been FOUR since 2026-09-11 (`VB_ELEMENT_BUDGET`, server/lib/vbElementBudget.js; entry "VB element budget raised to FOUR; the location cell is what gives way (2026-09-11)"), and every code-side enforcer was removed that day: the budget is a rule the Art Director is given and a fault the scene review is handed; an overflow is reported (`vbElementOverflow`) and ships.
+**Decision:** Owner approved 2026-09-23 updating the SETTLED line to FOUR and deleting the named enforcers. The verdict itself — a per-page element budget, and locations are never elements — is unchanged.
+**Rationale:** Not a reversal: the line described code that no longer exists; the evidence is the 2026-09-11 entry and the vbElementBudget.js header. A settled line that states the wrong number invites the next session to "restore" three.
+**Touched:** docs/SETTLED.md
+**Status:** ✅ active
+
+## 2026-09-23 — The Art Director is not given the art style
+**Decision:** Owner reason: the style is added in the image prompt next; the Art Director gains nothing from it. The scene-expansion template's "must render in the named illustration style" line is stale. **Status:** ✅ active (docs/prompt-inventory.md, *What each call sees*)
+
+## 2026-09-23 — The story bible is not given the stored clothing
+**Decision:** Owner reason: clothing is per story; the bible writes the story's default outfit, from which the avatars are drawn. The bible template's "Start from the character's stored clothing above" is stale. **Status:** ✅ active (docs/prompt-inventory.md, *What each call sees*)
+
+## 2026-09-23 — The scene review is not given the page text
+**Decision:** Owner reason: the images are made before the text is written; the reviewer's job is drawability. **Status:** ✅ active (docs/prompt-inventory.md, *What each call sees*)
+
+## 2026-09-23 — The avatar style anchor keeps its figures
+**Decision:** Owner reason: a figure-free anchor was tested and does not work; the 2026-08-12 decision ("Style-anchor people bleed: swatch wording + de-echoed style eval" — anchors keep their family figures on purpose) stands. Audit 06 S2-2 is closed on that basis. **Status:** ✅ active
+
+---
+
+## 2026-09-23 — The shrink ranks its cuts, never cuts a parity anchor, and a render is not built with rules it cannot use
+
+**Context:** Staging `job_1790100385959_1nitlympp` (audit 08 S3, 09 C3). p12 and all three covers
+were built at 9.8-10.6k characters against the 7,900 Grok cap. `sectionAwareCut` removed COUNTS,
+DEPTH AND SIZE, HANDS, NO MARKS, REQUIRED CAST, and on p12 and the front cover the whole
+1,176-character Composition block, which was only ~110 characters over when its turn came. HANDS and
+NO MARKS are the generator halves of judge rules D-16b and D-24, so those pages were judged for two
+rules the illustrator never received. `generator-critic-rule-reach.test.ts` checked the BUILT prompt,
+which still had them. Text that did not apply survived the cut. On every cover a SHOT block said "A
+close-up ends at the waist: legs, knees and feet … cannot appear", because the prose fallback read
+the cover's "group portrait" as `close-up`. That sat beside a cover composition that demands visible
+feet. Each cover's own composition also repeated the page's ground bullet (484 characters), and a
+split-state markings rule (202 characters) rode every page that listed any object.
+
+**Decision:**
+1. **Parity anchors are never cut.** HANDS and NO MARKS are no longer drop units. REQUIRED TEXT and
+   SHOT never were. `cutBlocks()` throws if a unit would ever remove an anchor.
+2. **Cuts are units in rank order, and Composition goes one bullet at a time.** The order is
+   COUNTS, then the Composition size bullet, the facing bullet, DEPTH AND SIZE, the ground bullet and
+   REQUIRED CAST, then the page facts (HEIGHT ORDER, AGE, the reference-photo rule, the frame rule) as
+   the 2026-09-21 entry ranked them. The rank goes by what else in the prompt already carries the
+   rule: the scale riders on REQUIRED OBJECTS, EXACT POSES / EXPRESSIONS AND EYES, and a cover's
+   "eyes on the viewer". The header goes with the last bullet. Every unit reports the extent it
+   removed, so the confinement guard still has a number to check.
+3. **Inapplicable text is not built at all.**
+   - A cover gets no SHOT block. `buildImagePrompt` recognises a cover by its `COVER_PAGE_NUMBERS`
+     page number.
+   - The markings rule is emitted only when a listed element has bible `states` (the whole list,
+     because a state the page's instant contradicts is dropped from the line while the split is
+     still drawn).
+   - The cover ground bullet is cut to what is cover-specific: one shared ground, feet level, and
+     the water/air case (242 characters).
+4. **Reach is tested on the SENT prompt.** An over-cap page and an over-cap cover are built with the
+   real builders, shrunk to 7,900, and must still contain both anchors
+   (`generator-critic-rule-reach.test.ts`). `prompt-shrink-rank.test.ts` pins the rank, the bullet
+   granularity, the orphan-header rule, the conditional markings rule and the cover's missing SHOT.
+
+**Evidence (rung 1, free):** the pre-shrink prompts were rebuilt from the stored sent prompts plus the
+logged dropped blocks. The rebuilt lengths match the logged `before` exactly (initialPage 9,849,
+backCover 9,819; frontCover 10,614 against a logged 10,615, a one-character title-block heading
+difference). Built as this commit builds them and cut by the new shrinker:
+
+| render | built | sent | kept | cut |
+|---|---|---|---|---|
+| p12 | 9,943 | 7,834 | REQUIRED CAST, NO MARKS, HANDS, SHOT, HEIGHT | COUNTS, DEPTH, all Composition |
+| initialPage | 9,437 | 7,885 | REQUIRED CAST, ground bullet, NO MARKS, HANDS, HEIGHT | COUNTS, DEPTH, facing, size |
+| backCover | 9,407 | 7,855 | REQUIRED CAST, ground bullet, NO MARKS, HANDS, HEIGHT | COUNTS, DEPTH, facing, size |
+| frontCover | 10,202 | 7,569 | NO MARKS, HANDS, HEIGHT | COUNTS, DEPTH, all Composition, REQUIRED CAST |
+
+Before this change all four lost both anchors, REQUIRED CAST, DEPTH and COUNTS.
+
+**Not solved here:** a four-child cover is still ~1.5-2.3k over the cap. The largest remaining block
+on covers is the per-character face description in CHARACTERS IN THIS IMAGE (~150 characters per
+child: jawline, chin, nose, cheekbones, lips), which the reference card already carries. Trimming it
+would change the 2026-08-26 "covers identical to pages" builder, so that is an owner decision.
+
+**Touched:** `server/lib/images.js` (`cutBlocks`, `paragraphUnit` / `regexUnit` / `bulletUnit`,
+`sectionAwareCut`), `server/lib/promptBuilders.js` (`SPLIT_STATE_MARKINGS_RULE`, the cover SHOT skip,
+the reference-card colour line, see the cover entry below), `prompts/cover-composition.txt`,
+`tests/unit/generator-critic-rule-reach.test.ts`, `tests/unit/prompt-shrink-rank.test.ts`,
+`tests/unit/prompt-cut-protects-the-page.test.ts`.
+
+**Status:** ✅ active
+
+---
+
+## 2026-09-23 — Covers follow the Art Director's cast; a slotless prop never dedupes a garment; painted lettering on textless covers is judged; one cause is one scored issue
+
+**Context:** The rest of the covers audit (`docs/audits/prompt-audit-2026-09-23/09-covers.md`) on
+staging `job_1790100385959_1nitlympp`.
+
+**Decision:**
+1. **C4 (owner decision 2026-09-23: "follow the Art Director").** `validateCoverHintCast` drops
+   phantom names and adds nobody. The refill that padded every cover up to `MAX_COVER_CHARACTERS` is
+   deleted, including the mains-only refill of the front cover and the clothing seeding for
+   backfilled characters. A hint that resolves to nobody at all logs an ERROR. On run 6 the AD's
+   two-child discovery on the title page had become a four-boy line-up. This SUPERSEDES "Cover hint
+   casts are validated against the real cast, phantoms dropped and slots refilled" (2026-09-06).
+   Phantom handling is unchanged: every unresolved name still leaves all four hint containers.
+2. **C5.** In `applyCoverWornHeldDedupe`, an artifact with no worn slot is `unrelated` to every
+   outfit segment. The held "brown paper bag" had deleted "brown ankle boots" from the holder's line
+   through the shared colour word. Replayed on the stored bible (`ART001`, type `bag`): the boots stay.
+   The page resolver reads declared `wornItems` rows and has no token matcher, so it has no
+   counterpart of this fault.
+3. **C6.** The app-overlay note (`cover-evaluation-notes.txt` TEXT_NOTE_APP_OVERLAY) now excuses only
+   the app's three strings: title, dedication and "magicalstory.ch". It used to excuse any lettering
+   as "the intended app-composited overlay", but the judge sees the art before the overlay is
+   stamped. Other lettering is judged by the page text rules (D-23). One paid re-judge of the stored
+   initialPage v0 (~$0.003) gave no text finding. That matches D-23 for this image: "TAXI" is
+   correctly spelled signage, and the garbled marks are small incidental signage (MINOR at most). So
+   the rule changed and this page's score did not.
+4. **C9.** `feedback-consolidator.txt` rule 11: a prop missing from the picture and its holder's
+   empty hand are ONE deduped entry at the higher severity. Rule 2a: a non-2/2a drop keeps its issue
+   "as its own entry, or inside the entry that shares its cause". On run 6 the consolidator dropped
+   the bag as "duplicate cause" but kept it in `deduped_issues`, so code scored 60 against its own
+   75. Not replayed: the consolidator model is OpenRouter-only and this machine has no key. The next
+   staging run shows it.
+5. **C12.** The reference-card legend no longer forbids "these colours" on characters or clothing,
+   which read literally banned the contract outfits (red shirt, green fleece and so on under RED and
+   GREEN frames). It now forbids a painted frame or border, and recolouring anything to match a
+   frame: "each keeps the colours described for it".
+
+**Checked and not changed:**
+- **C3's landmark-photo claim.** All three covers carried `landmarkPhotos` (Lindenhof square,
+  Bahnhofstrasse), so the reference-photo rule applied.
+- **C10's "bottom band with no dedication is bloat".** `PUT /api/stories/:id/dedication` can add a
+  dedication after generation and restamp, so the band is kept.
+
+**Touched:** `server/lib/coverIterate.js`, `storyJobPipeline.js`, `prompts/cover-evaluation-notes.txt`,
+`prompts/feedback-consolidator.txt`, `server/lib/promptBuilders.js` (`buildReferenceCardColours`),
+`tests/unit/cover-hint-cast.test.ts`, `tests/unit/cover-worn-held-slot-conflict.test.ts`,
+`tests/unit/cover-eval-notes-extraction.test.ts`.
+
+**Status:** ✅ active
+
+---
+
+## 2026-09-23 — Styled-avatar audit: head-and-shoulders crop, no invented trim, a plain ground on pass 2, every sheet judge's final computed in code, the Lab runs production's judges
+
+**Context:** `docs/audits/prompt-audit-2026-09-23/06-avatars.md`, staging `job_1790100385959_1nitlympp`,
+read on the pixels of all 6 pass-1 and 8 pass-2 sheets. Five generator↔critic gaps and one Lab mis-wiring:
+(S2-3) the head row came back waist/hip/knee-length on 5/6 sheets while the heads judge was told "some
+torso is fine"; (S2-4) a plain "long-sleeve shirt" was drawn as a buttoned polo on both Levin and both
+Kiaan sheets, and the only generator line forbidding it lived in the dead single-call `buildPrompt`;
+(S2-5) pass 2 painted washes and ground shadows behind the figures and removed the dividers on 6/6 sheets
+with no prompt line or judge task covering either; (S3-2) pass-2 hair shift and cheek blotches were judged
+against the PHOTO, not the approved pass-1 sheet; (S3-3) only the bodies judge's final was computed in
+code, the other three shipped the model's own number; (S2-2) the watercolour anchor is pencil-outlined
+while the style line says "no ink or pencil lines"; (S4) the Lab's `avatar_eval` override replaced BOTH
+row-judge templates at once and prefilled `sheet-2x4-evaluation.txt`, a whole-sheet judge production
+never ran; `avatar_style` prefilled `styled-costumed-avatar.txt`, which production never loads.
+
+**Decision:**
+- Head row: framed "like a passport photo", cut off at the upper chest. Heads judge TASK 5 CROP
+  (`cropScore`): a hand, waistband, belt, top hem or legwear in any cell scores 1-3. Bodies judge
+  TASK 3 counts a collar, placket, hood or trim the outfit does not name as a wrong item.
+- `buildUnnamedTrimRule(redress)` in both live rows: no collar, placket, hood or trim the costume does
+  not name (on a redress) / that neither the costume nor the body reference shows (otherwise). The head
+  row also takes its neckline from Image 3, the body row it is drawn to match.
+- `SHEET_GROUND_RULE`, one constant, stated in the pass-2 prompt and filled into the style judge as
+  `{SHEET_GROUND}` (TASK 8, `backgroundScore`; a wash, shape or scenery behind a figure, or dividers gone,
+  3-5). Pass 2 also keeps hair colour and skin tone as Image 1 with no new face patch; the style judge
+  compares hair/skin and colour regions to Image 2 (the pass-1 sheet) — consistency, not photo accuracy
+  (`feedback_eye_colour_consistency_not_accuracy`). A cheek flush clearly stronger than Image 2's is 4-5.
+- Every sheet judge's final is computed in code from its sub-scores: `scoreHeadsReport`,
+  `scoreStyleReport`, `scoreIdentityReport` (lowest cell), beside the existing `applyPoseHeadGate` for
+  bodies. A verdict with no sub-score throws (the callers' existing unjudged path); an axis that fails
+  without a reason gets one so the retry log names it.
+- Anchor vs style text: the anchor line now ends "where Image 2 and the style text above disagree, the
+  style text wins". The anchor asset is unchanged: the owner ruled 2026-09-23 that the anchor keeps its figures
+  (entry above); a pencil-free replacement asset is an owner call.
+- Deleted (no fallbacks): `buildPrompt`, `evaluateSheetWithGemini`, `buildCharacterDescription`,
+  `loadPhantom`, `prompts/sheet-2x4-evaluation.txt`, `scripts/analysis/avatar-grok-vs-gemini.js` (its
+  round 1 was the single-call builder). The whole-sheet cross-row check lived only in that deleted Lab
+  judge; production never ran it.
+- Lab: `avatar_eval` override names ONE judge via `params.evalPrompt` (heads | bodies | identity | style);
+  the prefill is that judge's template; an override for a judge the pass does not run throws. The
+  test-version path goes through `evaluateAvatarSheet` like production, and both Lab avatar stages pass
+  the character's declared age as production does. `avatar_style` prefills the exact
+  `buildStyleTransferPrompt` output for `params.artStyle`.
+- Stored: `passes.pass1.judgePrompts {bodies, heads, identity}` and `passes.pass2.judgePrompt` (text only).
+
+**Downstream check (S2-5):** cell cropping does not need drawn dividers. `cropAvatarCell` splits by the
+analyzer's lowest-variance columns and rejects a split whose columns deviate >25%. Replaying that
+algorithm over the run's shipped styled sheets: 6/6 split cleanly (max column deviation 1.2-9.4%); only the
+two contaminated, unshipped Kiaan attempts fell back to the fixed grid. So the washes are a content
+defect (they ride into each page's reference cell), not a splitter one — which is why the background
+axis fails at 3-5 rather than 1-3.
+
+**Validation:** prompts rebuilt locally (free). Paid: one full pass-1 + pass-2 for Levin (demo-b-hnecf,
+redress, watercolour) through `generateCharacter2x4Sheet`: two runs, 3 Grok + 4 judge calls each (~$0.07 each). Run 1 (first head-row wording, "head drawn large, crop ends at the upper chest"): head row still hip-length and the judge called it "mid-chest", 6 — the wording did not move Grok, and the judge's crop scale named no visible landmark. Run 2 ("framed like a passport photo" + a judge scale keyed to visible hands/waistband/legwear): head row a true head-and-shoulders crop in all four cells, rear turn correct, judged 9. Collars: run 1 plain crew neck; run 2's BODY row drew a buttoned polo again and no judge caught it (the heads row hides it under the jacket; the bodies judge had no trim rule) — so the bodies judge's TASK 3 now counts invented trim as a wrong item (not re-run: the two-attempt cap). Pass 2: both runs kept the dividers and a plain ground with only faint foot shadows (was a painted wash on 6/6). Still passing when it should not: run 2's styled sheet has blotchy red cheeks and hair shifted toward auburn; the judge saw "slightly darker hair, within range" and scored clean 9 — the colour tasks are aimed at the right reference now, but gemini-2.5-flash still reads these as shading. Left OPEN.
+
+**Rationale:** a rule a judge deducts for must be a rule the generator was given, and a rule the
+generator is given should be judged; the final score is arithmetic the prompt already defines, so code
+does it once for all four judges.
+
+**Touched files:** `server/lib/character2x4Sheet.js`, `server/lib/testlab.js`,
+`server/routes/admin/testlab.js`, `server/services/prompts.js`, `prompts/sheet-row-heads-eval.txt`,
+`prompts/sheet-row-bodies-eval.txt`, `prompts/sheet-2x4-style-eval.txt`, deleted
+`prompts/sheet-2x4-evaluation.txt`, `tests/unit/avatar-sheet-audit-2026-09-23.test.ts` + updated sheet tests.
+
+
+---
+
 ## 2026-09-23 — Absence findings: a duplicate needs the detector's room for it, a CRITICAL/MAJOR "missing" needs a second look, a false-finding drop is never charged
 
 **Context:** Staging `job_1790100385959_1nitlympp` p12 v0. The quality judge listed a figure on empty
@@ -36012,6 +36217,8 @@ members not yet present, mains first then the remaining characters in input orde
 backfilled character's clothing is seeded from the first `used: true` category so the
 later reconciliation and the avatar lookup both hit a pre-generated category. Drops and
 backfills are logged as one `⚠️ [COVER-CAST]` warning.
+> 🗄 **Refill SUPERSEDED 2026-09-23** (owner: covers follow the Art Director): the refill is deleted;
+> phantoms are still dropped. See "2026-09-23 — Covers follow the Art Director's cast…".
 **Rationale:** The prompt rule alone is unverifiable at runtime — the beats pipeline has
 no reviewer that sees cover hints. The mutation happens once, at the single point where
 the hints are parsed and before they are persisted to `stories.data.coverHints`, so every
@@ -36024,7 +36231,7 @@ completeness rather than firing on a name that can never be rendered.
 (`validateCoverHintCast`, module-level `MAX_COVER_CHARACTERS`),
 `server/lib/phantomCharacters.js` (exports `normalizeName` / `isKnownName`),
 `storyJobPipeline.js`, `tests/unit/cover-hint-cast.test.ts`
-**Status:**    ✅ active
+**Status:**    🗄 refill superseded 2026-09-23 (phantom drop still active)
 
 ## A CRITICAL non-clothing finding outranks a MAJOR clothing finding for one repair round (2026-09-06)
 **Context:**   Staging story `job_1788641639919_mpjwlzkf1`, page 5, `sceneImages[4].imageVersions[0]`.
@@ -56564,7 +56771,7 @@ sleeveless front-zip body warmer…"; a second pass finds 0; no avatar re-render
 **Touched:** `server/lib/clothingCheck.js`, `tests/unit/worn-garment-review-chain.test.ts`.
 **Status:** ✅ active on staging.
 
-## 2026-09-23 — Every commissioned child gets a moment: one castCoverage() for the arc, the planner and the counters
+## 2026-09-23 — Every commissioned child gets a moment: one castCoverage() for the planner, the plan check and the counters
 
 **Context.** Owner decision on the main-cast conflict, verbatim: "Every child gets a moment. And ideally
 we have them in multiple images. Depends on the story length and amount of characters, ideally each one is
@@ -56582,14 +56789,20 @@ gives the numbers from the page count and the size of the commission's character
   shared; the counter floor is 3 when the target reaches 4, else the target itself.
 Measured on the three owner cases: 4 children / 18 pages → focal each, 3-4 pages; 7 / 10 → focal each,
 at least 2 pages; 2 / 24 → focal each, 3-4 pages; 12 / 10 → group moments, at least 1.
-`castCoverageRule(cov)` states it to the planner (`{CAST_COVERAGE}` in story-beats.txt, page form) and to
-the arc (story form, wired by the arc stage in place of "at most two carry a book"). The plan counters call
-the same function on the plan (`NO_FOCAL_PAGE` only when focal-each holds, `UNDER_COVERED_CHARACTER` at the
-`min` floor), so generator and critic hold one number. The duties apply to the commission's character list
+The owner then split the decision in two (same evening): the ARC rule is narrative — every child does an
+action of their own in the story (`EVERY_CHILD_ACTS_RULE`, the arc stage's entry below) and carries no image
+count; the PAGE PLAN rule is this one, plus the link between them: each child's focal page stages that
+action. `castActionRule(cov)` is the action half, one sentence told to the planner and asked by plan-check
+question 12 (must-fix; the check emits one `ACTION <name>: sentence N — page M` line per child).
+`castCoverageRule(cov)` adds the appearance floor for the planner only (`{CAST_COVERAGE}` in
+story-beats.txt), stated as "at least N pages": shown "in frame on 3 to 4 pages", the checker read the range
+as a cap and filed four must-fix findings against children on more pages (validation call below). The plan
+counters call the same `castCoverage()` on the plan (`NO_FOCAL_PAGE` only when focal-each holds,
+`UNDER_COVERED_CHARACTER` at the `min` floor), so planner and counters hold one number. The duties apply to the commission's character list
 (`commissionedCast().listed`); a figure the commission supplies elsewhere (premise, saved details) is
 commissioned, never invented, and owes no page — before this a premise pet drew `NO_FOCAL_PAGE`.
-Supersedes the fixed two-page floor of R20 (2026-09 "coverage floor, alongside the focal page") and the
-"at most two carry a book" line. plan-check.txt asks no coverage question; the counters own it.
+Supersedes the fixed two-page floor of R20 (2026-09 "coverage floor, alongside the focal page"). The
+appearance count is the counters' alone; plan-check.txt asks only about the action.
 
 **Touched:** `server/lib/castCoverage.js` (new), `server/lib/planCounters.js`, `server/lib/promptBuilders.js`
 (`buildBeatsPrompt`), `prompts/story-beats.txt`, `server/lib/beatsPipeline.js`, `server/lib/testlab.js`
@@ -56756,6 +56969,16 @@ itself re-rendered 2).
 9. The Lab wardrobe-review replay now defaults to production's reviewer (`clothingReviewModel`, it used the
    outline reviewer) and takes `noReasoning` to measure the reviewer with reasoning off.
 
+**Measured (Test Lab, staging, run 6's stored contract, deepseek-v4-pro).** Exp **1425**, reasoning on:
+232 s, 21,538 reasoning tokens, $0.071; creatures left alone (0 strays), every off-list colour named and
+rewritten, check 12 caught Max's "jacket" vs his sweatshirt and turned Kiaan's body warmer into a quilted
+jacket, 4 outfits rewritten. Exp **1427**, `noReasoning`: 8 s, 0 reasoning tokens, $0.007; the analysis
+names the same colour and plot-garment faults but rewrites only Max and leaves every colour fault
+unrewritten (its Max rewrite still says "dark blue"). The trimmed prompt did not make the review faster —
+latency is reasoning, not input. Whether to trade that execution quality for ~3.5 minutes on the path
+before the avatars is an owner call; production is unchanged (reasoning on). Exp 1423 was killed by an
+unrelated staging deploy and carries no result.
+
 **Touched:** `prompts/story-bible-from-beats.txt`, `prompts/clothing-review.txt`,
 `server/lib/promptBuilders.js`, `server/lib/beatsPipeline.js`, `storyJobPipeline.js`,
 `server/routes/stories.js`, `server/lib/testlab.js`, `tests/unit/wardrobe-prompt-inputs.test.ts`,
@@ -56919,3 +57142,79 @@ exercised by a model.
 **Status:** ✅ active on staging. Open: the rulebook reaches a page only where the writer honours it or
 an audit files the page — fragments on an unfiled page (p3, p7, p15 above) reach the repair only if an
 auditor names them, and no audit question asks for style.
+
+
+## 2026-09-23 — Page plan after prompt audit 02: the check reads the hints, the acts are sentence thirds, a noted finding cannot take a kept picture, the who column is checked, the divider gets its landmarks only
+
+**Context.** Prompt audit of staging `job_1790100385959_1nitlympp` (`docs/audits/prompt-audit-2026-09-23/02-page-plan.md`).
+The shipped round-1 re-plan was worse than the first division: it answered a NOTED two-heights line by
+deleting the ending's own event from the last page (W3), answered one boy's missing focal page by casting
+another out of his only focal page and answered an unstable Q4 answer by overwriting the page of the hero's
+turning idea (W5, W8), and the code's refusals of its own changes went back to nobody. A hint anchored after
+an event was planned before it, unseen by the checker, which never gets the hints (W2). Figures named only
+in the instant were invisible to every check (W6). The counters charged a pet from a character's saved
+details and an unnamed one-page mother against the invented allowance, against the arc's own rule (W7).
+
+**Decision.**
+- **Plan check (plan-check.txt, 11 → 13 questions).** Reads the hints under the critics' heading
+  (`buildCriticArcHintsSection`, with the arc stage's sentence anchors). Q13 (order, noted): a page staging
+  a moment the story reaches only in a later sentence, and a hint placed away from where its words put it.
+  Q12 (each child's own action, MUST-FIX) with ACTION lines — see the castCoverage entry above. Q4 answers
+  each act from its own sentences: the acts are the arc's numbered sentences in thirds, computed in code
+  (`arcActSpans`) and stated identically to the planner's question 6; the check emits `WANTED <act>:
+  sentence N — page M`. Q9 names a page once, and `DEED_AND_EFFECT_DEF` (shared) says an effect that is the
+  deed itself made visible at the same instant is part of the deed. Q10 and the planner's one-level rule
+  keep "the level the page's event happens on" — which level to keep, not an exemption, so the 2026-09-10 Q10
+  ruling stands (the flight exemption, W3 b, remains an owner call).
+- **Roster `unlisted` field → `CAST_NOT_IN_WHO_COLUMN`.** The roster still reads the who column alone
+  (2026-09-20); a fourth field reports characters the instant names that the who column does not carry,
+  and the counter turns it into a finding. Must-fix but convergence-exempt: cleared by one name in one
+  column, like a shot relabel, so it may not buy a lost picture.
+- **What a re-plan may not take.** `replanKeepPages` (data only: the last page, the check's WANTED and
+  ACTION pages, a character's only focal page) is named in RE-DIVIDE ("change only for a must-fix finding
+  that names them") and enforced by `reviewPlanChanges`: `protected` refuses any change on a kept page that
+  answers a noted or untagged finding; `focal` refuses a cast-out that takes a listed character's last focal
+  page; `action` refuses casting a character out of their ACTION page. RE-DIVIDE also says a noted finding
+  is answered only where the answer removes nothing the story's sentences stage, and the next round gets
+  `## UNDONE LAST ROUND` — the previous round's refused changes with the rule that refused them.
+- **Counting who is invented (W7).** The counters read the arc's list through
+  `castCoverage.commissionedCast` (the arc stage's `COMMISSIONED_CAST_DEF` puts saved-detail pets on that
+  list), and the arc budget's unnamed-figure exemption is one string, `UNNAMED_FIGURE_EXEMPT` — "a figure
+  given no name, referred to only by what it is, on a single page" — applied by the counter (`isNamedFigure`
+  + one page). An unnamed figure kept across pages still counts: the 2026-09-19 raven that held three pages'
+  obstacles was unnamed, and "taking its name away is not a way off it".
+- **Divider landmarks (bloat).** `buildBeatsPrompt` gets `buildDividerLandmarksSection`: only the landmarks
+  the settled arc names (matched by the list's own names), their PHOTOS lines and the vantage rule — no
+  descriptions, no "build at least two in". Without an arc the planner is the author and keeps the full block.
+- **Storage.** `plannerReply`, `replanReplies[]` (and `replanReply` on discarded rounds), the recheck's own
+  `prompt`, and the check's `wanted` / `actions`.
+- Registry: plan-check.txt joined `arc-hint-handoff`; new set `commissioned-cast-arc-vs-plan-counters`.
+
+**Validation.** Rung 1 (free): rebuilt the planner and check prompts from the stored `input_data` and the
+stored arc/hints/landmarks — planner 31.0k → 24.9k (landmark block 8.3k → 1.1k, 2 of 20 landmarks), check
+15.4k → 18.2k, no unfilled placeholder. Counters over the stored roster: "their mother" and (with the arc
+listing it) Nia no longer charged; the "(none" lines gone. Review over the stored round-1 declared changes:
+the p5 cast-out (Max's only focal page) refused `focal`, both p18 changes (ending) refused `protected`.
+Rung 2 (one direct call, gpt-5.6-luna-pro, $0.03): the rebuilt check on the stored first division returned
+WANTED setup s4/p6, middle s12/p12, ending s18/p18 (no Q4 finding against the hatching), ACTION lines for all
+four boys (Levin s16 → p17, the nest page), `unlisted = Nia` on p5 → `CAST_NOT_IN_WHO_COLUMN`; with those
+lines the review also refuses the stored p17 overwrite (`action`) and the p6 two-heights edit (`protected`).
+It missed the hint placement on p14 (those hints carried no sentence anchor; the arc stage adds them) and
+read "in frame on 3 to 4 pages" as a cap — fixed by moving the count out of the checker (entry above).
+A second call ($0.03, count removed) raised no count finding under Q12, and `unlisted` caught p14's
+creature and p18's hatchling (both W6 cases) — but also listed characters a people-free page and a
+nameless instant never name. The counter now re-counts the claim: a name counts only when it is in the
+page's instant (`namesIn`), the `covers` rule. Still unstable between the two calls: Levin's ACTION page
+(p17 then p15), the ending's WANTED sentence (s18 then s17, "page none"), and one stray Q8 line. Stopped at
+two paid calls.
+
+**Not done (owner calls).** W4 round 1 exempt from the discard test; W3 (b) a flight exemption from Q10;
+dropping or capping advisory Q9 lines in the re-plan (W9, 2026-09-09 ruling); ranking Q13 must-fix.
+
+**Touched:** `prompts/plan-check.txt`, `prompts/story-beats.txt`, `server/lib/promptBuilders.js`,
+`server/lib/planCounters.js`, `server/lib/castCoverage.js`, `server/lib/beatsPipeline.js`,
+`server/lib/testlab.js` (beats_replan replay: hints, keep list, review arguments),
+`scripts/admin/sibling-registry.json`, `tests/unit/page-plan-audit-2026-09-23.test.ts`,
+`tests/unit/commissioned-figure-definition.test.ts`, `tests/unit/invented-allowance-counts-the-book.test.ts`,
+`tests/unit/plan-collective-cast.test.ts`.
+**Status:** ✅ active on staging.

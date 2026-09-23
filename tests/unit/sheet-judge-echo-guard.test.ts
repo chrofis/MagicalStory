@@ -109,6 +109,14 @@ describe('the row and identity judges re-ask once, then fail loudly', () => {
   });
 });
 
+// Every sheet judge's final is computed in code from its sub-scores
+// (2026-09-23), so the stub carries each judge's axes, not a bare finalScore.
+const STUB_SHEET_VERDICT = JSON.stringify({
+  angles: { score: 9, reason: 'cell1: front' }, cleanRender: { cleanScore: 9, reason: 'none' },
+  coverage: { coverageScore: 9, reason: 'red crew neck' }, solo: { soloScore: 9, reason: 'one per cell' },
+  crop: { cropScore: 9, reason: 'upper chest' }, perCell: { cell1: 9, cell2: 9, cell3: 9, cell4: 9 },
+  identityScore: 9, layoutScore: 9, styleScore: 9, cleanScore: 9, bodyFaceScore: 9, ageScore: 9, soloScore: 9, backgroundScore: 9,
+});
 describe('generator↔critic: the cell-4/8 pose is one definition', () => {
   const realFetch = globalThis.fetch;
   afterEach(() => { globalThis.fetch = realFetch; vi.restoreAllMocks(); });
@@ -120,7 +128,7 @@ describe('generator↔critic: the cell-4/8 pose is one definition', () => {
     globalThis.fetch = vi.fn(async (_u: any, init: any) => {
       const body = JSON.parse(init.body);
       sent.push(body.contents[0].parts.map((p: any) => p.text || '').join('\n'));
-      return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: '{"finalScore":10}' }] }, finishReason: 'STOP' }], usageMetadata: {} }), text: async () => '' };
+      return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: STUB_SHEET_VERDICT }] }, finishReason: 'STOP' }], usageMetadata: {} }), text: async () => '' };
     }) as any;
     return sent;
   };

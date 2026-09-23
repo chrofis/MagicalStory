@@ -35,6 +35,8 @@ describe('castCoverage scales with the book and the cast', () => {
     expect(c.focalEach).toBe(false);
     expect(c.appearances.min).toBeGreaterThanOrEqual(1);
     expect(castCoverageRule(c)).toMatch(/group moments/);
+    // A floor, never a range a reader could take for a cap.
+    expect(castCoverageRule(castCoverage({ pageCount: 18, castCount: 4 }))).toContain('at least 3 pages');
   });
   it('no cast, no rule', () => {
     expect(castCoverage({ pageCount: 10, castCount: 0 })).toBeNull();
