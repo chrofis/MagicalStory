@@ -3899,8 +3899,12 @@ function applyReviewerPages(sceneExpansions, sceneReviews) {
     if (!r || r.ok === false || !Array.isArray(r._pages)) return;
     const byPage = new Map(r._pages.map(x => [x.pageNumber, x.text]));
     for (const x of sceneExpansions) {
-      const fixed = byPage.get(x.pageNumber);
-      if (!fixed) continue;
+      const reviewed = byPage.get(x.pageNumber);
+      if (!reviewed) continue;
+      // Production's rule (beatsPipeline keepDeclaredWornRows): a reviewed
+      // brief keeps every worn-state row the raw expansion declared.
+      const carry = require('./wornItems').carryForwardWornItemsInBrief(reviewed, x.fromBeats);
+      const fixed = carry ? carry.brief : reviewed;
       if (i === 0) { x.reviewedBrief = fixed; x.reviewRewrote = true; }
       else { (x.reviewedBriefs = x.reviewedBriefs || {})[r.modelKey] = fixed; }
     }
@@ -7302,10 +7306,13 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
       perCharClothing: stored.perCharClothing
         || (storyData.pageClothing?.pageClothing || {})[String(x.pageNumber)]
         || meta.characterClothing || {},
+      // Production's inputs (beatsPipeline): without the rows and the bible,
+      // removal_unstated — the one SENT clothing type — can never fire here.
+      wornItems: meta.wornItems || [],
     };
   });
   const artifacts = (storyData.visualBible || {}).artifacts;
-  const before = checkScenes(checkPages, storyData.clothingRequirements, { artifacts });
+  const before = checkScenes(checkPages, storyData.clothingRequirements, { artifacts, visualBible: storyData.visualBible });
   const findingsBlock = renderFindingsBlock(before.byPage);
 
   // Beats for check 5, recovered from the stored outline's ---BEATS--- section
@@ -7408,19 +7415,24 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
     const byPage = new Map((parsed.pages || []).map(x => [x.pageNumber, x.text]));
 
     // Merge onto a COPY — the next model in the fan-out must see the same input.
-    const merged = scenes.map(x => ({
-      pageNumber: x.pageNumber,
-      brief: (byPage.get(x.pageNumber) || '').trim() || x.brief,
-    }));
+    // A reviewed brief keeps every worn-state row the stored brief declared —
+    // production's rule (beatsPipeline keepDeclaredWornRows).
+    const merged = scenes.map((x) => {
+      const reviewed = (byPage.get(x.pageNumber) || '').trim();
+      if (!reviewed) return { pageNumber: x.pageNumber, brief: x.brief };
+      const carry = require('./wornItems').carryForwardWornItemsInBrief(reviewed, x.brief);
+      return { pageNumber: x.pageNumber, brief: carry ? carry.brief : reviewed };
+    });
     const diffs = merged
       .filter((m, i) => m.brief !== scenes[i].brief)
       .map(m => ({ pageNumber: m.pageNumber, before: scenes.find(x => x.pageNumber === m.pageNumber).brief, after: m.brief }));
 
     const afterPages = checkPages.map(cp => {
       const m = merged.find(x => x.pageNumber === cp.pageNumber);
-      return { ...cp, prose: String(m.brief).split('---METADATA---')[0] };
+      const mMeta = extractSceneMetadata(m.brief) || {};
+      return { ...cp, prose: String(m.brief).split('---METADATA---')[0], wornItems: mMeta.wornItems || [] };
     });
-    const after = checkScenes(afterPages, storyData.clothingRequirements, { artifacts });
+    const after = checkScenes(afterPages, storyData.clothingRequirements, { artifacts, visualBible: storyData.visualBible });
     const REVIEWABLE = new Set(['outfit_misattributed', 'removal_unstated']);
     const sentBefore = before.findings.filter(f => REVIEWABLE.has(f.type));
     const leftAfter = after.findings.filter(f => REVIEWABLE.has(f.type));

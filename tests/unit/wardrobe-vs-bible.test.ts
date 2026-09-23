@@ -149,9 +149,12 @@ describe('a corrected outfit re-renders its avatar', () => {
       .toBeLessThan(beats.indexOf('applyWardrobeBibleCorrections(clothingRequirements, visualBible)'));
   });
 
-  it('the correction fires the re-render hook only for characters actually corrected', () => {
-    expect(beats).toContain("if (applied.length > 0 && typeof onWardrobeCorrected === 'function')");
-    expect(beats).toContain('applied.map(f => f.character)');
+  it('the correction fires the re-render hook only for characters VISIBLY corrected', () => {
+    // A same-garment rewording is not a change (2026-09-23) — see
+    // tests/unit/worn-garment-review-chain.test.ts.
+    expect(beats).toContain('const visibleChanges = applied.filter(f => !f.rewording);');
+    expect(beats).toContain("if (visibleChanges.length > 0 && typeof onWardrobeCorrected === 'function')");
+    expect(beats).toContain('visibleChanges.map(f => f.character)');
   });
 
   it('the caller wires it, invalidates those avatars and re-renders only them', () => {

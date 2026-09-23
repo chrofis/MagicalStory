@@ -3628,7 +3628,7 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
   const wornKeptOff = [];
   if (sceneMetadata) {
     try {
-      const { resolveWornItemsForPage, wornStateById, referenceCarriesItem } = require('./wornItems');
+      const { resolveWornItemsForPage, wornStateById, carriedByReference } = require('./wornItems');
       const castNames = (sceneMetadata.characters || [])
         .map(c => (typeof c === 'string' ? c : c && c.name)).filter(Boolean);
       const byId = wornStateById(resolveWornItemsForPage(visualBible, castNames, sceneMetadata));
@@ -3644,7 +3644,10 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
           // plate is then the only picture of the item that exists, and
           // dropping it is what made a found navy cap render as a navy TRICORN
           // on staging job_1789420511893_zly5rcdej p13/p14.
-          if (r.state === 'worn' && referenceCarriesItem(r)) {
+          // `carriedByReference` is the ONE predicate: the element budget
+          // (vbElementBudget.rankPageElements) excludes exactly these, so the
+          // counter and the packer cannot disagree about a garment.
+          if (carriedByReference(r)) {
             wornDropped.push(`${r.name} (${r.id}, on ${r.owner})`);
             relevantRefs.splice(i, 1);
           } else {

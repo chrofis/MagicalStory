@@ -2048,9 +2048,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Bible correction can only run once the bible exists, several stages later
     // (beatsPipeline). The early kickoff is deliberate — avatars are the long
     // pole in front of every image — so the fix is not to delay it but to
-    // re-render exactly the characters whose outfit text actually changed.
-    // NOT rare (2026-09-23 audit): a 'reconcile' finding re-renders on a mere
-    // re-wording of the same garment. One render per corrected character.
+    // re-render exactly the characters whose outfit VISIBLY changed — a
+    // different garment or other colours in the slot. A same-garment rewording
+    // (the bible restating the clause in its own words) never reaches this hook
+    // (beatsPipeline, 2026-09-23): the rebuild starts from the photos and
+    // re-rolls the face for a garment the sheet already shows.
     const onWardrobeCorrectedReady = (characterNames, requirements) => {
       if (inputData.trialMode || skipImages) return;
       const names = (characterNames || []).filter(Boolean);

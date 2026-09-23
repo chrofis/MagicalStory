@@ -127,6 +127,22 @@ const {
   getHistoricalObjects,
 } = require('./storyHelpers');
 const { parseCastRemovals, diffCastRemovals, restoreUndeclaredRemovals } = require('./sceneReviewGuard');
+const { carryForwardWornItemsInBrief } = require('./wornItems');
+
+/**
+ * A reviewed brief keeps every worn-state row the brief it replaces declared
+ * (2026-09-23). A rewrite changes a state by restating the row; an omitted row
+ * would resolve to the default `worn` and paint a garment the page took off
+ * back on (wornItems.carryForwardWornItems). Loud: the omission is logged.
+ */
+function keepDeclaredWornRows(pageNumber, rewritten, previous, pass, gl) {
+  const carry = carryForwardWornItemsInBrief(rewritten, previous);
+  if (!carry) return rewritten;
+  const msg = `Page ${pageNumber}: the ${pass} dropped the declared wornItems row(s) ${carry.carried.join(', ')} — carried forward as declared`;
+  log.warn(`🎩 [BEATS] ${msg}`);
+  if (gl) gl.warn('beats_worn_rows_carried', msg, null, { pageNumber, carried: carry.carried, pass });
+  return carry.brief;
+}
 // The corrective loop's shared halves — the payload contract and the
 // introduced-vs-survived verdict. The rewrite path (images.js iteratePageCore)
 // reaches the same two through briefCorrection.correctFindings.
@@ -2360,6 +2376,7 @@ ${bibleBody}` : bibleBody;
             character: f.character, category: f.category, slot: f.slot,
             elementId: f.elementId, elementLabel: f.elementLabel,
             wardrobeClause: f.wardrobeClause, corrected: appliedKeys.has(correctionKey(f)),
+            rewording: !!f.rewording,
           })),
         };
         gl.warn('beats_wardrobe_bible_conflict', `${findings.length} wardrobe/bible wardrobe conflict(s): ${findings.map(f => `${f.character}/${f.slot} "${f.wardrobeClause}" vs ${f.elementId || '?'} "${f.elementLabel}"`).join('; ')}`, null, {
@@ -2389,8 +2406,17 @@ ${bibleBody}` : bibleBody;
       // garment while the avatar reference cell still wore the old one: the
       // words-vs-picture split, one layer upstream. The affected characters —
       // and only those — are re-rendered by the caller.
-      if (applied.length > 0 && typeof onWardrobeCorrected === 'function') {
-        const names = [...new Set(applied.map(f => f.character).filter(Boolean))];
+      //
+      // A REWORDING IS NOT A CHANGE (2026-09-23). A `reconcile` finding whose
+      // bible entry names the same garment in the same colours only restates
+      // the clause in the bible's words — the avatar already wears that
+      // garment, so nothing visible moved and nothing is re-rendered. On
+      // staging job_1790100385959_1nitlympp two such restatements ("fleece
+      // jacket" → "forest green … fleece jacket with a high collar") rebuilt
+      // two sheets from photos and re-rolled Levin's face and hair.
+      const visibleChanges = applied.filter(f => !f.rewording);
+      if (visibleChanges.length > 0 && typeof onWardrobeCorrected === 'function') {
+        const names = [...new Set(visibleChanges.map(f => f.character).filter(Boolean))];
         try {
           onWardrobeCorrected(names, clothingRequirements);
         } catch (err) {
@@ -2660,8 +2686,9 @@ ${bibleBody}` : bibleBody;
       // Captured at the overwrite, the only moment both briefs exist.
       const sceneDiffs = [];
       for (const x of expansions) {
-        const fixed = byPage.get(x.pageNumber);
-        if (fixed && fixed.trim()) {
+        const reviewed = byPage.get(x.pageNumber);
+        if (reviewed && reviewed.trim()) {
+          const fixed = keepDeclaredWornRows(x.pageNumber, reviewed, x.brief, 'scene review', gl);
           if (fixed !== x.brief) sceneDiffs.push({ pageNumber: x.pageNumber, before: x.brief, after: fixed });
           x.brief = fixed;
           x.reviewRewrote = true;
@@ -2834,7 +2861,16 @@ ${bibleBody}` : bibleBody;
       // whether it acted on them is not a matter of trust. The check is free
       // and deterministic, so run it again on the rewritten briefs and say what
       // survived instead of shipping it quietly (owner rule: fail loudly).
-      if (clothingByPage && clothingByPage.size > 0) {
+      //
+      // ON EVERY REVIEWED RUN, not only when the pre-review check found
+      // something (2026-09-23). A rewrite can INTRODUCE a clothing fault on a
+      // page that was clean when it was handed over — the same failure mode the
+      // brief re-check below documents. Gated on pre-review findings, a
+      // review-introduced `removal_unstated` could never reach the worn-state
+      // round: on staging job_1790100385959_1nitlympp the pre-review check
+      // found nothing, the review deleted declared rows on p11, p12 and p18,
+      // and nothing looked again.
+      {
         try {
           const { checkScenes } = require('./clothingCheck');
           const after = checkScenes(expansions.map(x => {
@@ -2850,13 +2886,13 @@ ${bibleBody}` : bibleBody;
           const REVIEWABLE = new Set(['outfit_misattributed', 'removal_unstated']);
           const left = after.findings.filter(f => REVIEWABLE.has(f.type));
           clothingUnfixedList = left;
-          const before = [...clothingByPage.values()].flat().filter(f => REVIEWABLE.has(f.type)).length;
+          const before = clothingByPage ? [...clothingByPage.values()].flat().filter(f => REVIEWABLE.has(f.type)).length : 0;
           if (left.length > 0) {
             const pages = [...new Set(left.map(f => f.pageNumber))].sort((a, b) => a - b).join(', ');
-            log.warn(`⚠️ [BEATS] clothing check after review: ${left.length}/${before} fault(s) still present on page(s) ${pages}`);
+            log.warn(`⚠️ [BEATS] clothing check after review: ${left.length} fault(s) present on page(s) ${pages} (${before} handed to the review)`);
             gl.warn('beats_clothing_unfixed',
-              `Clothing faults survived the scene review on page(s) ${pages}: ${left.map(f => `p${f.pageNumber} ${f.type} (${f.character})`).join('; ')}`);
-          } else {
+              `Clothing faults present after the scene review on page(s) ${pages} (${before} were handed to it): ${left.map(f => `p${f.pageNumber} ${f.type} (${f.character})`).join('; ')}`);
+          } else if (before > 0) {
             log.info(`👕 [BEATS] clothing check after review: all ${before} fault(s) resolved`);
           }
 
@@ -2900,7 +2936,8 @@ ${bibleBody}` : bibleBody;
                 const wrParsed = parseRefinedText(wrRes.text || '', subset.map(x => x.pageNumber), 'SCENES', BRIEF_TRAILING_MARKERS);
                 const wrByPage = new Map(wrParsed.pages.map(pg => [pg.pageNumber, pg.text]));
                 for (const x of subset) {
-                  const fixed = wrByPage.get(x.pageNumber);
+                  const reworn = wrByPage.get(x.pageNumber);
+                  const fixed = reworn && reworn.trim() ? keepDeclaredWornRows(x.pageNumber, reworn, x.brief, 'worn-state round', gl) : reworn;
                   if (fixed && fixed.trim() && fixed !== x.brief) {
                     sceneDiffs.push({ pageNumber: x.pageNumber, before: x.brief, after: fixed, round: 'worn' });
                     x.brief = fixed;

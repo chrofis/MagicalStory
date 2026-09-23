@@ -593,6 +593,36 @@ function bibleEntrySlot(entry) {
   return deriveSlotFromName(entry?.label || entry?.name);
 }
 
+/** The plain colour words a text names, shades folded (`rust-brown` → brown). */
+function colourSet(text) {
+  const out = new Set();
+  for (const w of String(text || '').toLowerCase().split(/[^a-z]+/)) {
+    if (COLOUR_WORDS.has(w)) out.add(w === 'gray' ? 'grey' : w);
+  }
+  return out;
+}
+
+/**
+ * Does restating `clause` as `replacement` change what is DRAWN? (2026-09-23)
+ *
+ * A rewording keeps the garment — the element's own slot noun is in the clause,
+ * and the replacement names no slot noun the clause does not — and keeps
+ * its colours (the same plain colour words on both sides). Anything else — a
+ * different garment, a colour added, dropped or changed — is a visible change.
+ * Structured comparison over the contract's closed vocabularies (SLOT_NOUNS,
+ * COLOUR_WORDS), the ones this module already reads; unsure answers count as
+ * visible.
+ */
+function isRewording(slot, clause, replacement, elementText) {
+  const clauseNouns = slotNounsIn(slot, clause);
+  const elementNouns = slotNounsIn(slot, elementText);
+  if (!elementNouns.some(n => clauseNouns.includes(n))) return false;
+  if (slotNounsIn(slot, replacement).some(n => !clauseNouns.includes(n))) return false;
+  const a = colourSet(clause);
+  const b = colourSet(replacement);
+  return a.size === b.size && [...a].every(c => b.has(c));
+}
+
 /** Every wearable bible entry, across the pools that can hold one. */
 function wearableBibleEntries(visualBible) {
   const out = [];
@@ -655,6 +685,10 @@ function checkWardrobeAgainstBible(clothingRequirements, visualBible) {
         if (link && clause === replacement) continue;                 // already in the same words
         findings.push({
           kind,
+          // Same garment, same colours, other words: the contract text is
+          // restated but nothing an avatar shows has changed, so no caller may
+          // treat it as a wardrobe change (beatsPipeline onWardrobeCorrected).
+          rewording: !!link && isRewording(slot, clause, replacement, elText),
           character,
           category,
           slot,
@@ -692,7 +726,7 @@ function applyWardrobeBibleCorrections(clothingRequirements, visualBible, opts =
     entry.description = f.after;
     applied.push(f);
     if (f.kind === 'reconcile') {
-      logger.warn(`🧥 [WARDROBE-BIBLE] ${f.character}/${f.slot}: ${f.elementId || 'the bible'} "${f.elementLabel}" is declared worn in this slot — the outfit clause "${f.wardrobeClause}" is restated in the bible's words`);
+      logger.warn(`🧥 [WARDROBE-BIBLE] ${f.character}/${f.slot}: ${f.elementId || 'the bible'} "${f.elementLabel}" is declared worn in this slot — the outfit clause "${f.wardrobeClause}" is restated in the bible's words${f.rewording ? ' (same garment, same colours: a rewording, not a wardrobe change)' : ''}`);
     } else {
       logger.warn(`🧥 [WARDROBE-BIBLE] ${f.character}/${f.slot}: the wardrobe said "${f.wardrobeClause}" while ${f.elementId || 'the bible'} says "${f.elementLabel}" on the same body — the Visual Bible wins, outfit clause rewritten`);
     }
@@ -707,4 +741,4 @@ function applyWardrobeBibleCorrections(clothingRequirements, visualBible, opts =
 // slotStated + missingGarments are exported so the image-prompt clothing check
 // (storyHelpers buildImagePrompt) uses THIS definition of "is this garment in
 // the prose" rather than growing a second one.
-module.exports = { checkPage, checkWardrobeAgainstBible, applyWardrobeBibleCorrections, outfitClauses, checkScenes, renderFindingsBlock, splitSlots, slotStated, missingGarments, characterProse, characterWindow, tokens, contractPairs, colourBefore };
+module.exports = { checkPage, checkWardrobeAgainstBible, applyWardrobeBibleCorrections, isRewording, outfitClauses, checkScenes, renderFindingsBlock, splitSlots, slotStated, missingGarments, characterProse, characterWindow, tokens, contractPairs, colourBefore };

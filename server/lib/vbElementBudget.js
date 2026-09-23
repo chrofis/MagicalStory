@@ -25,6 +25,17 @@
  * the selection: the brief's own `objects[]` (an id the Art Director asked for)
  * and the bible entry's `appearsInPages` (the bible's own answer).
  *
+ * A GARMENT WORN BY ITS OWN AVATAR IS NOT AN ELEMENT (2026-09-23). The picker
+ * drops an item an attached avatar reference already carries — a `wornAs` item
+ * worn by its owner on the page — because the avatar wears it
+ * (wornItems.carriedByReference). The counter asks the same predicate, so it
+ * never charges a cell the packer never spends. Before this, every worn outer
+ * layer counted: on staging job_1790100385959_1nitlympp all four overflow
+ * findings were garments, the scene review "dropped" them by deleting their
+ * `wornItems` rows, and a deleted `off` row painted a sweatshirt back on Max.
+ * A garment that is OFF (lying, held, handed over) still counts: then its plate
+ * IS packed, as the only picture of it.
+ *
  * RANKING (the "least important" the ruling drops). Data, never prose:
  *   0. a recurring creature — pinned first, exactly as visualBible.js pins it.
  *   1. type: character < animal < artifact < vehicle. This is the priority
@@ -59,6 +70,7 @@
 
 const { extractSceneMetadata, parseProseMetadataFormat } = require('./sceneMetadata');
 const { getRecurringCreatureIds, entryNamedByRow } = require('./visualBible');
+const { idsCarriedByReferences } = require('./wornItems');
 
 /**
  * The owner's number. One source of truth for the prompts and the checks.
@@ -138,12 +150,15 @@ function rankPageElements(pageNumber, metadata, visualBible) {
   const asked = new Set(objectIds(metadata && metadata.objects));
   const fields = interactionFields(metadata);
   const recurring = new Set(getRecurringCreatureIds(visualBible).map(id => String(id).toUpperCase()));
+  // Worn on its owner's avatar: the picker packs no cell for it (header).
+  const carried = idsCarriedByReferences(visualBible, metadata, { pageNumber });
   const rows = [];
   for (const col of ELEMENT_COLLECTIONS) {
     const entries = visualBible[col.key];
     for (const entry of (Array.isArray(entries) ? entries : [])) {
       if (!entry || !entry.id) continue;
       const id = baseId(entry.id) || String(entry.id).trim().toUpperCase();
+      if (carried.has(id)) continue;
       const onPage = Array.isArray(entry.appearsInPages) && entry.appearsInPages.includes(pageNumber);
       const named = col.viaObjects && asked.has(id);
       if (!onPage && !named) continue;
@@ -220,7 +235,7 @@ function buildVbElementFindings(sceneDescriptions = [], visualBible = null) {
     const pageNumber = Number(sd.pageNumber ?? sd.page);
     if (!Number.isFinite(pageNumber)) continue;
     const metadata = sd.metadata
-      || (sd.objects ? { objects: sd.objects, interactions: sd.interactions } : null)
+      || (sd.objects ? { objects: sd.objects, interactions: sd.interactions, characters: sd.characters, wornItems: sd.wornItems } : null)
       || extractSceneMetadata(String(sd.brief || sd.sceneDescription || ''))
       || {};
     const f = checkVbElementBudget(pageNumber, metadata, visualBible);

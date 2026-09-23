@@ -56309,4 +56309,62 @@ of a dropped line, correctly re-marked `rewrite-restored`. One run, one story.
 `server/lib/testlab.js`, `prompts/story-text-audit.txt`, `prompts/text-refine.txt`,
 `scripts/admin/sibling-registry.json`, `tests/unit/text-chain-hints-and-ledger.test.ts` (new),
 `tests/unit/text-audit-picture-spec.test.ts`, `tasks/bugs.json`.
+
+## 2026-09-23 — A worn garment is not a budget element; a reviewed brief keeps its declared worn rows; a same-garment rewording rebuilds no avatar
+
+**Context.** Dragon run 6 (staging `job_1790100385959_1nitlympp`), p12 scored 10: Max drawn twice, both in
+the purple sweatshirt the page had taken off him. The chain, from stored data: (1)
+`vbElementBudget.rankPageElements` counted every artifact on the page, including a `wornAs` outer layer
+worn by its own owner — exactly what `getElementReferenceImagesForPage` drops, because the avatar wears it.
+All 4 `vb_element_overflow` findings (p9, p11, p12, p16) and all 11 `vb_page_uncited` findings were
+garment noise. (2) The scene review, told to "drop purple hooded sweatshirt (ART005)", deleted its
+`wornItems` rows on p11 and p12 (and every row on p18, ART004 on p16, ART006 on p9). A missing row on a
+linked garment resolves to `worn`, so the p12 prompt said "Max IS wearing this … Draw it on Max". (3) The
+post-review clothing re-check ran only `if (clothingByPage.size > 0)`; the pre-review check found
+nothing, so the seven review-introduced `removal_unstated` faults were never seen and the worn-state
+round never ran. Separately, `applyWardrobeBibleCorrections` restated Levin's and Kiaan's outer layers in
+the bible's words ("fleece jacket" → "forest green long-sleeve zip-up fleece jacket with a high collar")
+and `onWardrobeCorrected` rebuilt both sheets from photos — about $0.15 and a visibly re-rolled Levin face
+and hair, for garments the first sheet already showed.
+
+**Decision.**
+1. ONE predicate, `wornItems.carriedByReference` (worn + `referenceCarriesItem`), decides both what the
+   picker drops and what the budget counts (`idsCarriedByReferences` in `rankPageElements`). An OFF or
+   handed-over garment still counts — its plate IS packed. `checkBiblePageTable` treats a page's
+   `wornItems` row as that garment's page presence (a garment lives in `wornItems`, not `objects[]`).
+2. A rewrite changes a worn state by RESTATING the row, never by omission: `carryForwardWornItems` merges
+   per id (a saved row the rewrite omits is carried) and `carryForwardWornItemsInBrief` applies it to brief
+   text. Used at both scene-review adopt points in `beatsPipeline` (logged `beats_worn_rows_carried`), on
+   the iterate path (already through `carryForwardWornItems`), and in the Lab's two mirrors
+   (`applyReviewerPages`, the scene-review replay — which now also feeds rows + bible so
+   `removal_unstated` can fire there at all).
+3. The post-review clothing re-check runs on every reviewed run, so a review-introduced fault reaches the
+   worn-state round.
+4. `checkWardrobeAgainstBible` marks a `reconcile` as `rewording` when the element's slot noun is in the
+   clause, the replacement names no slot noun the clause lacks, and the plain colour words match. The
+   contract text is still rewritten to the bible's words; only non-rewording corrections reach
+   `onWardrobeCorrected`.
+
+**Rationale.** Counter and packer answering the same question from two predicates is what made the
+budget fault fake, and the fake fault is what made the reviewer delete state. The per-id carry is the
+same "context the rewriter never re-decides" rule the iterate path already had, completed. "The Visual
+Bible outranks the wardrobe contract" is NOT reversed — the words still move toward the bible — only a
+rewording stops counting as a visible change. **Open contradiction for the owner:** the two 2026-09-15
+entries disagree on direction — "The Visual Bible outranks the wardrobe contract" (bible words win,
+`reconcile` restates the contract) vs "A plot-critical worn object is described IN FULL in the outfit"
+(the wardrobe authors the words and the bible copies them; `scene-expansion-all.txt` "in the same
+words"). This change works under either; picking one needs the reversal protocol.
+
+**Replay (rung 1, stored run-6 artefacts, no model calls):** pre-review briefs with the page table the
+checker saw — overflow pages 4 → 1 (p16 remains: two OFF garments are packed, a real overflow);
+`vb_page_uncited` pages 12 → 1 (p14 ART001, a real one); counter == picker on 18/18 pages. Reviewed briefs
+as returned: seven `removal_unstated` (p9, p11, p12, p16, p18×3) the old gate never looked for; after the
+carry, zero, and the p11/p12/p18 prompts say "Max is NOT wearing this … lies on the ground" instead of
+"Max IS wearing this". The 20:39 reconcile over the stored contract + AD bible: both findings
+`rewording: true`; `onWardrobeCorrected` fires for nobody (was Levin, Kiaan).
+
+**Touched:** `server/lib/wornItems.js`, `server/lib/vbElementBudget.js`, `server/lib/visualBible.js`,
+`server/lib/sceneBriefCheck.js`, `server/lib/clothingCheck.js`, `server/lib/beatsPipeline.js`,
+`server/lib/testlab.js`, `storyJobPipeline.js` (comment), `tests/unit/worn-garment-review-chain.test.ts`,
+`tests/unit/wardrobe-vs-bible.test.ts`.
 **Status:** ✅ active on staging.
