@@ -1432,7 +1432,7 @@
       "impact": "Every baked front cover (coverTitleMode=baked, staging and production): a correct title could be flagged as unrequested text and erased by repair, and a titleless re-render scored clean.",
       "status": "fixed",
       "fixedAt": "2026-09-23",
-      "fixedIn": "recorded in the follow-up bug commit",
+      "fixedIn": "c9484709c",
       "fix": "requiredText.coverRequiredTexts turns the structured cover contract (expectedText/textMode) into a required-text item; evaluateImageQuality folds it into the one {TEXT_RULES} block all three judges get, returns it as result.requiredTexts (carried by carryEvalEvidence), and the consolidator renders it as lettering that must never be removed. inpaintPage adds it to its required-text clause (repairPipeline + Lab inpaint pass the contract). cover-evaluation-notes.txt TEXT_RULES allow-list replaced by COVER_TEXT (what the string is; missing/misspelled = required_text CATASTROPHIC), given to quality and semantic judges. Generator title block headed **REQUIRED TEXT:**, the exception its preamble names. Replay on stored v0/v1: v0 100 with no text finding; v1 semantic [CATASTROPHIC] required_text missing, score 40."
     }
   ]
