@@ -1311,6 +1311,18 @@
       "rootCause": "server/lib/images.js:4263 builds the iterate cast with getCharactersInScene(newSceneDescription, characters). The rewrite's metadata lists only non-photo-backed creatures, so the structured step matches nobody and it falls back to a name scan of the whole text incl. metadata (server/lib/sceneMetadata.js:1531-1545), which found the boys named in a garment/diagnosis line. Generation uses unionPageCast (storyJobPipeline.js:1231/4231), a different builder. The rewrite also dropped the creature ids from objects[].",
       "impact": "Any iterate repair on a page whose cast is creatures only (or whose rewrite text mentions an absent character) is rendered with the wrong people as references and scored against a wrong expected cast; the false CRITICAL can let a worse version win or block a good one. Staging and production.",
       "status": "open"
+    },
+    {
+      "id": "entity-grid-worn-state-lost-bible-key",
+      "title": "A garment the brief takes OFF was charged as missing by the entity grid (-15 MAJOR per page) because the grid never saw the page's worn state on the pipeline path",
+      "reportedAt": "2026-09-23",
+      "source": "Owner-reported, reproduced from stored data: dragon run 6 (staging job_1790100385959_1nitlympp). Briefs p11/p12 declare {id: ART004, owner: Kiaan, state: off}, p16 declares Levin ART006 off. finalChecksReport.entity: Kiaan byClothing only [standard] with pages 4,5,9,11,12,16,18; entity deductions \"Kiaan is missing the ... body warmer\" MAJOR on p11 v0 and p12 v1, \"Levin is missing the ... fleece jacket\" MAJOR on p16 v0 (entityPenalty 15 each).",
+      "rootCause": "f1a897765 (2026-09-19) moved per-page worn resolution into collectEntityAppearances reading storyData.visualBible only; the pipeline entity-check input (repairPipeline.js buildEntityCheckData) carries the bible as wornItemsVisualBible only. The line it replaced read both keys. No off row resolved, so off pages stayed in the grid judged against the sheet that wears the garment.",
+      "impact": "Every pipeline entity check since 2026-09-19 on a story whose brief takes a garment off: a false MAJOR per off page, which also drives character repair and pick-best between versions. Staging AND production (f1a897765 is on master).",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "17bbd887aa824bd32553d62db468f5ca85bbc022",
+      "fix": "wornItems.wornItemsBibleOf(storyData) reads either key; runEntityConsistencyChecks passes it to collectEntityAppearances as wornItemsVisualBible. Replay on stored run 6: Kiaan p11/p12 -> standard--off:ART004, Levin p16 -> standard--off:ART006, Max p9 -> standard--off:ART005; worn pages stay in the wearing grid."
     }
   ]
 }
