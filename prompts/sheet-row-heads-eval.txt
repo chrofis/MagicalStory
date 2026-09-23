@@ -1,9 +1,9 @@
 You are evaluating one row (the top row) of a character reference sheet.
 
-You receive ONE image: the sheet row — 4 cells left to right: front, three-quarter, profile, rear turn (shoulders away from camera, head rotated back to reveal one eye and cheek). Some shoulder or a bit of torso in a cell is fine — do not penalise it. Judge only this image.
+You receive ONE image: the sheet row — 4 cells left to right: front, three-quarter, profile, rear turn ({REAR_TURN}). Some shoulder or a bit of torso in a cell is fine — do not penalise it. Judge only this image.
 
 TASK 1: FACING ANGLES
-The 4 cells read front, three-quarter, profile, rear-turn, left to right; cell 4 duplicating cell 3's profile, or showing a flat back-of-head with no visible eye or cheek, scores 1-3. Score 1-10.
+Say what each cell actually shows, then compare it to front, three-quarter, profile, rear turn, left to right. Cell 4 duplicating cell 3's profile, or showing a flat back-of-head with no visible eye or cheek, scores 1-3. Score 1-10.
 
 TASK 2: CLEAN RENDER (no arrows or stray marks)
 Check every head for arrows, lines, pointers, symbols, letters, or graphics coming out of or drawn on the head, face, hair, or skin. Coloured axis arrows (red / green / blue) sticking out of a head are a leaked pose-marker and score 1. Any clear stray mark on a head scores 1-3; none = 9-10. cleanScore 1-10.
@@ -15,16 +15,16 @@ Where clothing shows, it is the garment REQUESTED_OUTFIT names, in that colour a
 TASK 4: SINGLE SUBJECT — ONE HEAD PER CELL
 Each cell shows exactly ONE head: the same single character in every cell. Any second head or figure anywhere in the row — another person, a face in the margin, a head of a different age or sex — is a defect, including faint, ghosted or semi-transparent ones and heads overlapping or blended into the character. Cells must read as four separate heads with space between them. Any extra head, or heads merged across cells = 1-3; one clean head per cell = 9-10. soloScore 1-10.
 
-finalScore = lowest of anglesScore, cleanScore, coverageScore, soloScore. valid = finalScore ≥ 6.
+finalScore = lowest of angles.score, cleanScore, coverageScore, soloScore. valid = finalScore ≥ 6.
 
-Return EXACTLY this JSON:
+Return EXACTLY this JSON shape. Every score and reason comes from what you see in this image — never return this template's placeholders:
 {
-  "angles": {"score": 9, "reason": "Front, three-quarter, profile, back left to right"},
-  "cleanRender": {"cleanScore": 9, "reason": "No arrows or stray marks on any head"},
-  "coverage": {"coverageScore": 9, "reason": "Visible shoulders are clothed in the requested garment in every cell"},
-  "solo": {"soloScore": 10, "reason": "One head per cell, four separate heads, no extra or ghosted person"},
-  "finalScore": 9,
-  "valid": true,
+  "angles": {"score": <1-10>, "reason": "cell1: <facing you see>; cell2: <facing>; cell3: <facing>; cell4: <facing, and whether an eye and cheek show>"},
+  "cleanRender": {"cleanScore": <1-10>, "reason": "<marks you see, and in which cell, or none>"},
+  "coverage": {"coverageScore": <1-10>, "reason": "<the garment, colour and neckline you see, per cell>"},
+  "solo": {"soloScore": <1-10>, "reason": "<heads you count per cell; name any extra one and where>"},
+  "finalScore": <1-10>,
+  "valid": <true|false>,
   "failureReasons": []
 }
 

@@ -21,6 +21,69 @@ superseded and link forward.
 
 ---
 
+## 2026-09-23 — Every avatar-sheet judge rejects a copied verdict; the cell-4/8 rear turn is one constant for generator and judges
+
+**Context:** Staging `job_1790100385959_1nitlympp` (dragon run 6). The three pass-1 row judges (heads,
+bodies, identity, gemini-2.5-flash) returned their template's worked example on 6 of 6 sheets — every
+reason string and every score (9/9/9/10) — over sheets with a duplicated profile in cells 3/4 and an
+invented polo collar that their own rules score 1-3. Pass 1 had no working quality gate. The pass-2
+style judge had been fixed for this on 2026-08-12 (placeholder example + `isEchoedStyleVerdict`), but the
+fix never reached the row templates, and the same run showed a second shape the old guard missed: the
+pass-2 layout reason was TASK 1's own sentences on 5 of 6 sheets, including a sheet whose top row is
+knee-length figures. Separately, the row generators ask cell 4 for a REAR TURN (one eye and cheek
+toward camera) while the bodies, identity and style judges were told the cell is a plain "back", and the
+style judge that "cell 8 needs no face" — so flat backs and second profiles passed.
+
+**Decision:** (1) All four sheet templates (`sheet-row-heads-eval`, `sheet-row-bodies-eval`,
+`sheet-row-identity-eval`, `sheet-2x4-style-eval`) show `<placeholder>` examples only, and ask for
+per-cell observations (angles and pass-2 layout: "cellN: <facing>"). (2) One guard,
+`isEchoedJudgeVerdict(verdict, promptSent)` in `character2x4Sheet.js`, behind one call helper
+`askSheetJudge` used by all four judges: a verdict is unjudged when any reason carries a placeholder,
+opens with a pre-2026-09-23 example string, or consists of two or more sentences all taken from the prompt
+sent. Unjudged → re-ask once → throw; the pass-1 caller keeps the sheet and records `evalFailed`
+(existing contract), pass 2 counts the attempt as unjudged (existing contract). (3) `REAR_TURN_POSE` is
+one constant filled into both live row generators and all four judges; the style judge now checks that
+cell 8 keeps the eye and cheek Image 2 shows (pass 2 is judged on preservation, not on a pose it cannot
+change).
+
+**Rationale:** An eval that can hand back its own example is no gate, and the guard has to be shared or
+the next judge added misses it again (the 2026-08-12 fix proves the hazard). A single restated criterion
+is not flagged: that is too close to an honest one-line pass to fail a sheet over. Paraphrased echoes
+still pass the guard; the per-cell reason shape is what makes those hard to produce without looking.
+
+**Evidence:** Replay of the guard over the run's stored verdicts: heads 6/6 and bodies 6/6 flagged,
+identity 5/6 (the sixth paraphrased "apparent age"), pass-2 style 4/6 against the template it was sent
+(the two misses are paraphrases). One paid re-run of the three pass-1 judges with the new templates on
+Kiaan's stored pass-1 sheet (gemini-2.5-flash, ~5k tokens): no echo, no re-ask, per-cell angle and
+head/feet reasons that differ from any template text, scores 10/10/9.
+
+**Touched:** `server/lib/character2x4Sheet.js`, `prompts/sheet-row-heads-eval.txt`,
+`prompts/sheet-row-bodies-eval.txt`, `prompts/sheet-row-identity-eval.txt`,
+`prompts/sheet-2x4-style-eval.txt`, `scripts/admin/sibling-registry.json` (new set
+`avatar-sheet-generator-vs-critic`), `tests/unit/sheet-judge-echo-guard.test.ts`.
+
+**Status:** ✅ active. Supersedes the guard half of 2026-08-12 "de-echoed style eval" (now shared).
+
+## 2026-09-23 — A figure list's "none" is recognised in any bracket; the arc is told how an empty list is written
+
+**Context:** Same run. The arc critique wrote its empty premise list as `- (none — the premise supplies no
+named figure …)`. `parseFigureList` split on " — " and kept `(none`, because `isNegativeFigureAnswer`
+only removed a CLOSED trailing parenthetical (the 2026-09-17 fix for `- none (…)`). "(none" became a
+commissioned character and drew `NO_FOCAL_PAGE` and `UNDER_COVERED_CHARACTER` against itself on both plan
+rounds — two unclearable MUST-FIX lines that biased the re-plan convergence test.
+
+**Decision:** The sentinel is tested on the answer's head: a leading "(" is dropped and the text is cut
+at the first "(", ",", ";" or ":". Both lists (premise and invented) share the parser. `arcCritiqueSpec`
+and `arc-retell.txt` now say an empty list is the heading alone, with no dash line.
+
+**Evidence:** Replay on the stored arc create reply and the retell prompt: premise names `["(none"]` →
+`[]`; invented lists unchanged (`[Fünkli]`, `[Turi, Flämmli]`).
+
+**Touched:** `server/lib/promptBuilders.js`, `prompts/arc-retell.txt`,
+`tests/unit/arc-invented-figures.test.ts`.
+
+**Status:** ✅ active.
+
 ## 2026-09-23 — Char-fix: no judge text. A character-repair prompt carries the finding's TYPE as a fixed phrase, never the judge's sentence
 
 **Context:** Staging `job_1790100385959_1nitlympp` (dragon run 6) p14. The entity grid judge wrote a

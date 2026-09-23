@@ -251,3 +251,37 @@ describe('Part 5 — the beats cross-check is reporting only', () => {
     expect(c.findings.some((x: any) => String(x.code).startsWith('ARC_INVENTED'))).toBe(false);
   });
 });
+
+// Staging job_1790100385959_1nitlympp: the arc wrote its empty premise list as
+// one wholly parenthesised line. The " — " split left "(none", which passed the
+// sentinel test (it only stripped a CLOSED trailing parenthetical), became a
+// commissioned character, and drew NO_FOCAL_PAGE + UNDER_COVERED_CHARACTER
+// against itself on both plan rounds. Sibling of the 2026-09-17 "- none (...)" fix.
+describe('a negative answer written as an open parenthetical is an empty list', () => {
+  const RUN_BLOCK = [
+    'Premise figures:',
+    '- (none — the premise supplies no named figure beyond the four listed children)',
+    '',
+    'Invented figures:',
+    '- Rufus — a fox cub',
+    '- Pip — a firefly',
+    'Allowed: 2. Written: 2.',
+  ].join('\n');
+
+  it('the run\'s real line yields no premise figure, and the invented list is untouched', () => {
+    expect(parsePremiseFigures(RUN_BLOCK)).toMatchObject({ present: true, names: [] });
+    expect(parseInventedFigures(RUN_BLOCK).names).toEqual(['Rufus', 'Pip']);
+  });
+
+  it('every parenthesised or qualified negative is empty, on both lists', () => {
+    for (const line of ['- (none)', '- (None.)', '- (nobody — nothing to add)', '- none, the premise names nobody else', '- keine: nichts', '- (none']) {
+      expect(parsePremiseFigures(`Premise figures:\n${line}\n`).names, line).toEqual([]);
+      expect(parseInventedFigures(`Invented figures:\n${line}\nAllowed: 2. Written: 0.`).names, line).toEqual([]);
+    }
+  });
+
+  it('NEGATIVE CONTROL — real figures keep their names, qualifier and all', () => {
+    const parsed = parsePremiseFigures("Premise figures:\n- Nia (the hero's dog)\n- (unnamed) crow — a bird\n");
+    expect(parsed.names).toEqual(["Nia (the hero's dog)", '(unnamed) crow']);
+  });
+});

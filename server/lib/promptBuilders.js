@@ -8563,9 +8563,9 @@ function arcCritiqueSpec({ retell = false } = {}) {
   // ask for them a second time inside the critique.
   const figureLists = retell ? [] : [
     'The critique opens with these two lists, ahead of everything else and never numbered:',
-    `"Premise figures:" then one dash line per named figure the commission's own premise supplies that its character list does not — a sibling, a friend, a pet, a companion — "- <name> — <what it is in the story, three words>". These are commissioned, never invented: they belong on this list and never on the next one. Write the heading even when no figure is on the list.`,
+    `"Premise figures:" then one dash line per named figure the commission's own premise supplies that its character list does not — a sibling, a friend, a pet, a companion — "- <name> — <what it is in the story, three words>". These are commissioned, never invented: they belong on this list and never on the next one. Write the heading even when no figure is on the list; an empty list is the heading alone, with no dash line.`,
     '',
-    '"Invented figures:" then one dash line per figure, "- <name> — <what it is in the story, three words>", then one line "Allowed: <N>. Written: <M>." Write the heading and the two counts even when no figure is on the list.',
+    '"Invented figures:" then one dash line per figure, "- <name> — <what it is in the story, three words>", then one line "Allowed: <N>. Written: <M>." Write the heading and the two counts even when no figure is on the list; an empty list has no dash line.',
     '',
   ];
   return [
@@ -8756,13 +8756,19 @@ function parseInventedFigures(raw) {
 
 /**
  * The explicit "there are none" answers a figure list may carry, tested on the
- * name with any trailing parenthetical qualifier removed.
+ * answer's head: the text before any qualifier. A qualifier opens with a
+ * parenthesis (closed or not — the " — " split cuts an unclosed one), a comma,
+ * a semicolon or a colon. A wholly parenthesised answer is tested on its
+ * content: `- (none)`, and `- (none — …)`, which the split leaves as "(none"
+ * (staging job_1790100385959_1nitlympp: "(none" became a commissioned character
+ * and drew two plan-counter findings against itself on both plan rounds).
  */
 const NEGATIVE_FIGURE_ANSWERS = new Set(['none', 'no one', 'noone', 'nobody', 'n/a', 'na', 'keine', 'aucun']);
 
 function isNegativeFigureAnswer(name) {
-  const bare = String(name || '').replace(/\s*\([^)]*\)\s*$/, '').replace(/[.,;:]+$/, '').trim().toLowerCase();
-  return bare === '' || NEGATIVE_FIGURE_ANSWERS.has(bare);
+  const s = String(name || '').trim().replace(/^\(\s*/, '');
+  const head = s.split(/\s*[(,;:]/)[0].replace(/[.)\s]+$/, '').trim().toLowerCase();
+  return head === '' || NEGATIVE_FIGURE_ANSWERS.has(head);
 }
 
 function parseFigureList(raw, heading) {
