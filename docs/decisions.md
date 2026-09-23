@@ -86,6 +86,39 @@ prompts/scene-review.txt, tests/unit/brief-carrier-split.test.ts.
 
 **Status:** ✅ active
 
+## 2026-09-23 — Height decides relative size; a shared grip is allowed when it is the page's only action
+
+**Supersedes:** 2026-08-23 "`hands`: one object, one pair of hands" — its **Known conflict, deliberately
+left in** (🟡, crew push flags like a hand-off). Owner decisions 2026-09-23 on audit 04 A3 and A9.
+
+**Context:** (A9) staging `job_1790100385959_1nitlympp`: Julian (3, 102 cm) was photo-read as a toddler,
+and his age cue said "clearly smaller than a preschooler" while HEIGHT ORDER put him above Max
+(3, 98 cm). The age buckets carried size comparisons read off the photo; the heights are entered data.
+(A3) the AD was told both "one object takes one pair of hands" and "several characters on ONE object emit
+ONE fused row"; the code guard flagged every fused row, and on p4 ("all four boys lift the egg") the review
+broke the plan line to answer it.
+
+**Decision:**
+1. **Height decides.** HEIGHT ORDER is built from the entered height; with none, from age and gender
+   (`estimateHeightFromAgeGender`, a WHO/CDC-averaged table). The photo's apparent-age bucket no longer
+   estimates a height, and no age marker (`getAgeMarkers` — AD cast block, page prompt AGE & PROPORTIONS,
+   covers, avatar and reference sheets) states a size against another bucket; the markers keep proportions
+   (heads tall) and look. The 2026-09-23 reorder by age category (b589e3443) was already reverted (586c7d95f).
+2. **Shared grip.** `SHARED_GRIP_RULE` (sceneMetadata.js): several characters may hold one object together
+   when that joint hold is the page's only action; otherwise one pair of hands per object. Filled into both
+   AD templates and scene-review check 8b, and stated in the finding. `forbiddenSharedGrips` is the one
+   reading for both counters (sceneBriefCheck D, sceneConsistencyCheck c3): it fires only when the page has
+   another non-passive `action` label or the object's rows carry a different one — structured fields only.
+   A row with no `action` is never the sole action. Replay over the stored briefs: 4 pages → 1 (p16, where
+   a joint push sits beside a digging dog).
+
+**Rationale:** entered data beats a look read off a photo; the measured failures (a hand-over, a grip beside
+another action) stay faulted while the crew push the owner wants is allowed.
+
+**Touched files:** server/lib/promptBuilders.js, server/lib/sceneMetadata.js, server/lib/sceneBriefCheck.js,
+server/lib/sceneConsistencyCheck.js, prompts/scene-expansion-all.txt, prompts/scene-expansion.txt,
+prompts/scene-review.txt, tests/unit/height-decides.test.ts, tests/unit/art-director-audit-2026-09-23.test.ts.
+
 ## 2026-09-23 — A place is never a one-grip object; the brief rewrite gets eyes-open and the creature face from the Art Director's constants
 
 **Context:** Staging `job_1790100385959_1nitlympp` p9 and p12: the hand-off guard reported "2 characters
@@ -25316,7 +25349,7 @@ has now failed to enforce "no body-part positioning" four separate times (exp 81
 p7, exp 818 p12, exp 825 p11, and every failing page of this story), while a named
 mechanical finding worked on its first attempt.
 
-**Known conflict, deliberately left in.** A fused row where several characters push
+**Known conflict, deliberately left in** (SUPERSEDED 2026-09-23 — a joint hold that is the page's only action is allowed; see the 2026-09-23 entry "Height decides…"). A fused row where several characters push
 one large object — the owner's "everyone pushes the ship" case — flags too, because
 mechanically it is indistinguishable from a hand-off: one fused row, hands on one
 object, differing only in whether the roles are complementary. Exempting fused rows

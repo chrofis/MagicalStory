@@ -215,7 +215,7 @@ Field shape: `{character, object, where, action, hands, storyRelevant, priority}
 
 An actor in the `character` slot is a name listed in `characters[]` or the id of a visual bible animal; an object, a vehicle or a place is never an actor, and a figure written by role rather than by its id resolves to nobody.
 
-`hands`: `true` when the character's hands are on the object. One object takes one pair of hands: when a second character reaches for the same object, one holds it out and the other reaches — their hands never share the grip.
+`hands`: `true` when the character's hands are on the object. {SHARED_GRIP}
 
 `action`: required on every row, in English whatever the story language. Name the physical activity — the verb and what it acts on ("pushing the cart", "climbing the ladder") — never the purpose it serves. Rows performing the same activity carry the same label, however many characters that is. Use `"watching"` for anyone who only looks on and `"standing"` for anyone merely present; neither counts as the page action.
 

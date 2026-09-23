@@ -2681,7 +2681,46 @@ function handsPerObject(interactions) {
   return perObject;
 }
 
+/**
+ * ONE OBJECT, SEVERAL HANDS — ONLY AS THE PAGE'S ONLY ACTION (owner, 2026-09-23).
+ * Supersedes the 2026-08-23 "known conflict, deliberately left in": a joint hold
+ * (everyone pushes the cart, all lift the chest) is allowed when it is the one
+ * thing happening on the page; a hand-over, or a shared grip beside any other
+ * action, is the shape that scored 10/20/30. Filled into both Art Director
+ * templates and scene-review check 8b, and stated in the finding the two
+ * counters below emit (generator vs critic).
+ */
+const SHARED_GRIP_RULE = 'One object takes one pair of hands, unless holding or moving it together is the page\'s only action: then several characters may share the grip, written as one fused row. Otherwise, when a second character reaches for the object, one holds it out and the other reaches — their hands never share the grip.';
+
+/**
+ * The shared grips a page may NOT have: objects with two or more pairs of
+ * hands (handsPerObject), except where every hands row on that object carries
+ * the page's one non-passive `action` label and the page has no other. Read
+ * from the structured `action` / `hands` / `object` fields only. A row with no
+ * `action` is never the sole action.
+ *
+ * @returns {Array<{obj:string, who:string[]}>}
+ */
+function forbiddenSharedGrips(interactions) {
+  const rows = (Array.isArray(interactions) ? interactions : []).filter(Boolean);
+  const PASSIVE = new Set(['watching', 'standing']);
+  const label = (r) => String(r.action || '').trim().toLowerCase();
+  const pageActions = new Set(rows.map(label).filter(a => a && !PASSIVE.has(a)));
+  const out = [];
+  for (const [obj, who] of handsPerObject(rows)) {
+    if (who.length < 2) continue;
+    const objActions = new Set(rows
+      .filter(r => r.hands === true && String(r.object || '').trim().toLowerCase() === obj)
+      .map(label));
+    const sole = pageActions.size === 1 && objActions.size === 1 && pageActions.has([...objActions][0]);
+    if (!sole) out.push({ obj, who });
+  }
+  return out;
+}
+
 module.exports = {
+  SHARED_GRIP_RULE,
+  forbiddenSharedGrips,
   handsPerObject,
   POPULATION_LEVELS,
   normalisePopulation,

@@ -173,8 +173,32 @@ describe('the hand-off counters never count a location id as a one-grip object',
     expect(typesD(rows)).not.toContain('interaction_object_shared_hands');
     expect(typesC3(rows)).not.toContain('interaction_object_shared_hands');
   });
-  it('both still fire on a shared grip on a real object', () => {
-    expect(typesD(shared)).toContain('interaction_object_shared_hands');
-    expect(typesC3(shared)).toContain('interaction_object_shared_hands');
+  // Owner, 2026-09-23: a joint hold is allowed when it is the page's ONLY action.
+  it('a joint hold that is the page\'s only action is allowed by both counters', () => {
+    expect(typesD(shared)).not.toContain('interaction_object_shared_hands');
+    expect(typesC3(shared)).not.toContain('interaction_object_shared_hands');
+    const withWatcher = [...shared, { character: 'Max', object: 'Levin', hands: false, action: 'watching' }];
+    expect(typesD(withWatcher)).not.toContain('interaction_object_shared_hands');
+  });
+  it('both fire when the joint hold sits beside another action', () => {
+    const busy = [...shared, { character: 'Max', object: 'ART003', hands: true, action: 'waving the scale' }];
+    expect(typesD(busy)).toContain('interaction_object_shared_hands');
+    expect(typesC3(busy)).toContain('interaction_object_shared_hands');
+  });
+  it('a hand-over (two rows, two actions) still fires', () => {
+    const handover = [
+      { character: 'Levin', object: 'ART002.1', hands: true, action: 'handing the egg' },
+      { character: 'Kiaan', object: 'ART002.1', hands: true, action: 'taking the egg' },
+    ];
+    expect(typesD(handover)).toContain('interaction_object_shared_hands');
+    expect(typesC3(handover)).toContain('interaction_object_shared_hands');
+  });
+  it('a row with no action label is never the sole action', () => {
+    expect(typesD([{ character: 'Levin + Kiaan', object: 'ART002.1', hands: true }])).toContain('interaction_object_shared_hands');
+  });
+  it('the Art Director and the reviewer carry the same rule', () => {
+    const { SHARED_GRIP_RULE } = require_('../../server/lib/sceneMetadata');
+    expect(String(PB.buildSceneExpansionAllPrompt({ language: 'en', characters: [{ id: 1, name: 'Mira' }], mainCharacters: [1] }, [{ pageNumber: 1, planLine: 'medium \u2014 Mira \u2014 x \u2014 y' }], {}))).toContain(SHARED_GRIP_RULE);
+    expect(String(PB.buildSceneReviewPrompt({ language: 'en', characters: [{ id: 1, name: 'Mira' }], mainCharacters: [1] }, [{ pageNumber: 1, brief: 'x' }], {}))).toContain(SHARED_GRIP_RULE);
   });
 });

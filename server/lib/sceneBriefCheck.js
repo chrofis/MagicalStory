@@ -736,15 +736,15 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
   // same story. Counted from the declared `hands` flag and the character names
   // already on the row — a fused "A + B" row is two pairs of hands on one
   // object, which is the hand-off shape. Rows without the flag never count.
-  // A location id is never a one-grip object (sceneMetadata.handsPerObject).
-  const perObject = require('./sceneMetadata').handsPerObject(interactions);
-  for (const [obj, who] of perObject) {
-    if (who.length < 2) continue;
+  // A location id is never a one-grip object, and a joint hold that is the
+  // page's only action is allowed (owner, 2026-09-23 — sceneMetadata).
+  const { forbiddenSharedGrips, SHARED_GRIP_RULE } = require('./sceneMetadata');
+  for (const { obj, who } of forbiddenSharedGrips(interactions)) {
     findings.push({
       pageNumber: page.pageNumber,
       type: 'interaction_object_shared_hands',
-      detail: `${who.length} characters (${who.join(', ')}) have hands on "${obj}" at once; one object takes one pair of hands. `
-        + `Draw the moment before or after the hand-over — one holds it out, the other reaches — or move the second character to watching.`,
+      detail: `${who.length} characters (${who.join(', ')}) have hands on "${obj}" at once, and that joint hold is not the page's only action. ${SHARED_GRIP_RULE} `
+        + `Make the joint hold the one action, or draw the moment before or after the hand-over, or move the second character to watching.`,
     });
   }
 

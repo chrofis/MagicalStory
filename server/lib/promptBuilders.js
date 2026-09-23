@@ -33,7 +33,7 @@ const { frameColorForName } = require('./characterFrames');
 const { getLanguageNote, getLanguageInstruction, getLanguageNameEnglish } = require('./languages');
 const { getEventById } = require('./historicalEvents');
 const { getSwissStoryResearch, getSwissCityById } = require('./swissStories');
-const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata, resolveTextStagePictureSpec, buildTextStagePictureSpecs, characterLookSignature, dropAppearanceAppositive } = require('./sceneMetadata');
+const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata, resolveTextStagePictureSpec, buildTextStagePictureSpecs, characterLookSignature, dropAppearanceAppositive, SHARED_GRIP_RULE } = require('./sceneMetadata');
 const { resolveClothingForPage, buildUsedClothingText, buildAvailableAvatarsForPrompt } = require('./clothingResolve');
 const { seasonLabel, buildSeasonNote, buildSeasonInstruction } = require('./season');
 const { isNotSetRelationship, isStrangersRelationship } = require('./relationships');
@@ -157,33 +157,41 @@ function getAgeMarkers(apparentAge) {
   // ignore adjectives but respect proportion numbers (same table the avatar
   // prompt uses: infant≈4, child≈6, teen≈7, adult≈8 head-heights).
   switch (apparentAge) {
-    // Every bucket is bounded on BOTH sides against its neighbours, and the
-    // head-heights rise monotonically with no ties. Merged buckets were the
+    // Every bucket is bounded against its neighbours by PROPORTION and LOOK, and
+    // the head-heights rise monotonically with no ties. Merged buckets were the
     // original defect: apparentAge is allowed to drift one bucket
     // (clampApparentAge), so a bucket phrased at its neighbour's age turns a
     // legal drift into a two-bucket error. That is how an 8-year-old was
     // described as a "very young child" — and how a preschooler reading one
     // young was described with "baby proportions, rounded baby features".
+    //
+    // NO SIZE COMPARISON (owner, 2026-09-23: "if we have height then height
+    // decides"). The buckets used to say "clearly smaller than a preschooler",
+    // "taller than a toddler" — a size claim read off the photo's age bucket,
+    // which contradicted the entered heights on staging
+    // job_1790100385959_1nitlympp (a toddler-looking 3-year-old at 102 cm listed
+    // above a 98 cm preschooler). Relative size comes from HEIGHT ORDER alone
+    // (buildRelativeHeightDescription); a marker states proportions and look.
     case 'infant':
-      return 'infant proportions about 3.5-4 heads tall, very large head relative to body, rounded baby features, not yet walking — clearly smaller than a toddler';
+      return 'infant proportions about 3.5-4 heads tall, very large head relative to body, rounded baby features, not yet walking';
     case 'toddler':
-      return 'toddler proportions about 4 heads tall, large head relative to body, soft rounded features and a rounded belly, walking but unsteady — no longer a baby, clearly smaller than a preschooler';
+      return 'toddler proportions about 4 heads tall, large head relative to body, soft rounded features and a rounded belly, walking but unsteady — no longer a baby';
     case 'preschooler':
-      return 'preschool-age proportions about 4.5 heads tall, large head relative to body, soft rounded features, clearly taller than a toddler and smaller than a kindergarten child';
+      return 'preschool-age proportions about 4.5 heads tall, large head relative to body, soft rounded features, steady on their feet';
     case 'kindergartner':
-      return 'kindergarten-age proportions about 5 heads tall, head still large relative to body but less than a toddler, softly rounded features, clearly older and taller than a preschooler and shorter than a grade-schooler';
+      return 'kindergarten-age proportions about 5 heads tall, head still large relative to body but less than a toddler, softly rounded features, clearly older than a preschooler';
     case 'young-school-age':
-      return 'early grade-school proportions about 5.5 heads tall, rounded child features, clearly taller than a kindergarten child and shorter than an older grade-schooler — NOT toddler proportions';
+      return 'early grade-school proportions about 5.5 heads tall, rounded child features, older than a kindergarten child — NOT toddler proportions';
     case 'school-age':
-      return 'grade-school proportions about 6 heads tall, child features starting to lengthen, clearly taller than an early grade-schooler and clearly not yet a preteen — NOT toddler proportions';
+      return 'grade-school proportions about 6 heads tall, child features starting to lengthen, clearly not yet a preteen — NOT toddler proportions';
     case 'preteen':
       return 'late-child proportions about 6.25 heads tall, slightly longer limbs than a grade-schooler, visibly older than grade-schoolers and clearly not yet a teenager';
     case 'young-teen':
-      return 'early adolescent proportions about 6.5 heads tall, longer limbs than a child, face more elongated than a child, taller than a preteen but not yet at full teenage height';
+      return 'early adolescent proportions about 6.5 heads tall, longer limbs than a child, face more elongated than a child';
     case 'teenager':
-      return 'teenage proportions about 7 heads tall, long limbs, clearly taller than a young teen and not yet at adult build — visibly NOT a child, render as a 15-16 year old';
+      return 'teenage proportions about 7 heads tall, long limbs, not yet at adult build — visibly NOT a child, render as a 15-16 year old';
     case 'young-adult':
-      return 'young adult proportions about 7.5-8 heads tall, full adult height, clearly taller and more developed than a teenager, mature face with defined bone structure and no adolescent softness, no signs of middle age';
+      return 'young adult proportions about 7.5-8 heads tall, full adult height, more developed than a teenager, mature face with defined bone structure and no adolescent softness, no signs of middle age';
     case 'adult':
       return 'adult proportions about 7.5-8 heads tall, full adult height, mature bone structure, clearly older than a young adult and not yet showing the age signs of middle age';
     case 'middle-aged':
@@ -2032,39 +2040,22 @@ function buildGroundingPrompt(char) {
  * height is set. Used purely for relative ordering — exact values don't
  * matter, only the rank preservation.
  *
- * @param {Object} char - Character with optional age, apparentAge, gender
- * @returns {number|null} Estimated height in cm, or null if no signal
+ * AGE AND GENDER ONLY (owner, 2026-09-23: "if we have height then height
+ * decides; if no height we estimate it based on age and gender"). The photo's
+ * apparent-age bucket was a fallback here and is gone: it is a read of how old
+ * someone looks, not of how tall they are. No numeric age means no estimate,
+ * and the character is left out of the order rather than placed by a guess.
+ *
+ * @param {Object} char - Character with optional age, gender
+ * @returns {number|null} Estimated height in cm, or null if no age
  */
 function estimateHeightFromAgeGender(char) {
   const gender = char?.gender;
   const isMale = gender === 'male';
   const isFemale = gender === 'female';
 
-  // Prefer numeric age when present
-  let age = parseInt(char?.age);
-  if (isNaN(age)) {
-    // Fall back to apparent age category → approximate years
-    const physical = getPhysicalFromChar(char) || {};
-    const apparent = physical.apparentAge || char?.apparentAge || char?.ageCategory;
-    const APPARENT_AGE_YEARS = {
-      infant: 0.5,
-      toddler: 2,
-      preschooler: 4,
-      kindergartner: 5,
-      'young-school-age': 7,
-      'school-age': 9,
-      preteen: 11,
-      'young-teen': 13,
-      teenager: 16,
-      'young-adult': 25,
-      adult: 35,
-      'middle-aged': 50,
-      senior: 70,
-      elderly: 80,
-    };
-    age = APPARENT_AGE_YEARS[apparent];
-  }
-  if (age == null || isNaN(age)) return null;
+  const age = parseInt(char?.age);
+  if (isNaN(age)) return null;
 
   // Growth curve in cm, averaged WHO/CDC references. Gender diverges from ~12.
   // Values are order-preserving approximations — not medically precise.
@@ -2789,6 +2780,7 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     GAP_ACTION_FRAMING: GAP_ACTION_FRAMING_RULE,
     // Rules 6d / 8l, shared with scene-review.txt check 6.
     EYES_OPEN: EYES_OPEN_RULE,
+    SHARED_GRIP: SHARED_GRIP_RULE,
     CREATURE_FACE: CREATURE_FACE_RULE,
     // SEVEN page-brief contracts, one constant each, filled at all FOUR sites
     // that author a page brief — see ONE_INSTANT_RULE and the block around it.
@@ -3102,6 +3094,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     GAP_ACTION_FRAMING: GAP_ACTION_FRAMING_RULE,
     // Rules 6d / 8l, shared with scene-review.txt check 6.
     EYES_OPEN: EYES_OPEN_RULE,
+    SHARED_GRIP: SHARED_GRIP_RULE,
     CREATURE_FACE: CREATURE_FACE_RULE,
     // SEVEN page-brief contracts, one constant each, filled at all FOUR sites
     // that author a page brief — see ONE_INSTANT_RULE and the block around it.
@@ -10198,6 +10191,7 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
     // drawability (owner, 2026-09-23).
     // Check 6, from the constants both Art Director templates state as 6d / 8l.
     EYES_OPEN: EYES_OPEN_RULE,
+    SHARED_GRIP: SHARED_GRIP_RULE,
     CREATURE_FACE: CREATURE_FACE_RULE,
     // ONE authoring contract for readable in-image lettering, shared with the
     // two Visual Bible authoring templates — see REQUIRED_TEXT_AUTHORING_RULE.

@@ -210,13 +210,12 @@ function checkSceneConsistency(pages, rawOutput = null, options = {}) {
     // "A + B" row with hands on one object is the hand-off shape, which scored
     // 10/20/30 on every instance in job_1787493968756_4fgr5nukroz while
     // one-character-one-object pages in the same story scored 70–100.
-    // The same reading as check D: a location id is never a one-grip object.
-    const perObj = require('./sceneMetadata').handsPerObject(interactions);
-    for (const [obj, who] of perObj) {
-      if (who.length < 2) continue;
+    // The same reading as check D: a location id is never a one-grip object,
+    // and a joint hold that is the page's only action is allowed.
+    for (const { obj, who } of require('./sceneMetadata').forbiddenSharedGrips(interactions)) {
       issues.push({
         type: 'interaction_object_shared_hands',
-        detail: `${who.length} characters (${who.join(', ')}) have hands on "${obj}" at once — one object takes one pair of hands; draw the moment before or after the hand-over, or move the second character to watching`,
+        detail: `${who.length} characters (${who.join(', ')}) have hands on "${obj}" at once and that joint hold is not the page's only action — ${require('./sceneMetadata').SHARED_GRIP_RULE}`,
       });
     }
 

@@ -2,6 +2,8 @@
 
 ## Status 2026-09-23
 
+- OWNER RULINGS IMPLEMENTED (late 2026-09-23): A3 shared grip allowed when it is the page's only action (SHARED_GRIP_RULE, one reading for both counters); A9 height decides, no age-bucket size comparisons, no photo-read height estimate. The LOC-as-grip bug and 6d/8l in the iterate templates are FIXED too (see tasks/bugs.json).
+
 Checked against staging `31fd7db0c` (after the evening fix round). FIXED = the commit that fixes it; OPEN = no fix yet, no ruling needed to start; OWNER CALL = touches a decision, a SETTLED line or has options the owner picks. Stale-doc and registry items listed at the end of each file were corrected in `a25ecb865` unless listed below.
 
 - FIXED: A1 review-deleted `off` row reverting to worn, and the post-review clothing re-check gated on pre-review findings — `ee8890278` (declared rows carried forward per id at both adopt points; the re-check runs on every reviewed run). A2 the element budget / page table counting garments the picker never packs — `ee8890278` (`wornItems.carriedByReference`, one predicate; a `wornItems` row is page presence). A12's p17 iterate cast — `32dce4da9`.
