@@ -32,7 +32,7 @@ const { frameColorForName } = require('./characterFrames');
 const { getLanguageNote, getLanguageInstruction, getLanguageNameEnglish } = require('./languages');
 const { getEventById } = require('./historicalEvents');
 const { getSwissStoryResearch, getSwissCityById } = require('./swissStories');
-const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata, resolveTextStagePictureSpec } = require('./sceneMetadata');
+const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata, resolveTextStagePictureSpec, buildTextStagePictureSpecs, characterLookSignature, dropAppearanceAppositive } = require('./sceneMetadata');
 const { resolveClothingForPage, buildUsedClothingText, buildAvailableAvatarsForPrompt } = require('./clothingResolve');
 const { seasonLabel, buildSeasonNote, buildSeasonInstruction } = require('./season');
 const { isNotSetRelationship, isStrangersRelationship } = require('./relationships');
@@ -1797,6 +1797,39 @@ const LANGUAGE_LEVELS = {
     pacing: 'Every page should land at similar length (250-300 words). Do NOT alternate short and long pages at this level — consistent density creates reading momentum for advanced readers. Aim for the middle of the range on every page. Use the full range of sentence lengths on every page: genuinely long sentences whose subordinate clauses connect cause, consequence and feeling, medium ones that carry the action, and an occasional short one for a moment that must land. Never string several short sentences in a row, and never repeat the same subject-verb opening in consecutive sentences.',
   }
 };
+
+/**
+ * The paragraph shape of a page — the same at every reading level. One constant
+ * filled into the writer and the refine as {PARAGRAPH_SHAPE} and read by the
+ * text counter (textRefine.buildWordBudgetFindings), so the rule the prose is
+ * written to and the number it is counted against cannot drift (2026-09-23).
+ */
+const PAGE_PARAGRAPHS = { sentencesPerParagraph: '2-4', maxPerPage: 4 };
+
+function paragraphShapeRule() {
+  return `Each paragraph runs ${PAGE_PARAGRAPHS.sentencesPerParagraph} sentences, a page holds at most ${PAGE_PARAGRAPHS.maxPerPage} paragraphs, and a blank line separates them.`;
+}
+
+// A sentence ends at . ! ? or … — with any closing quotes or brackets — when
+// the next word starts a new sentence: a capital, an opening quote, or the end.
+// «Komm!», rief sie. is one sentence (the comma keeps it going); «Nein!» Sie
+// ging. is two. Approximate by design: the counter only flags runaway pages.
+const SENTENCE_END_RE = /[.!?…]+[»«"“”„'’)\]]*(?=\s+[«»"“„'‘(\[]?\p{Lu}|\s*$)/gu;
+
+/**
+ * Words, sentences and paragraphs of one page — deterministic, no model
+ * (owner doctrine 2026-09-05: counting is code). The counter and the refine's
+ * PAGE MEASURES both read this, so they agree on every number.
+ * @param {string} text
+ * @returns {{words:number, sentences:number, paragraphs:number}}
+ */
+function measurePageText(text) {
+  const t = String(text || '').trim();
+  if (!t) return { words: 0, sentences: 0, paragraphs: 0 };
+  const paragraphs = t.split(/\n\s*\n/).filter(p => p.trim());
+  const sentences = paragraphs.reduce((n, p) => n + Math.max(1, (p.trim().match(SENTENCE_END_RE) || []).length), 0);
+  return { words: t.split(/\s+/).filter(Boolean).length, sentences, paragraphs: paragraphs.length };
+}
 
 // ============================================================================
 // LEVEL HELPERS
@@ -5503,6 +5536,16 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
   const currentText = pages
     .map(p => `## Page ${p.pageNumber}\n${p.text || '(empty)'}`)
     .join('\n\n');
+  // Every page's counts, measured by the same code the counter uses, so a
+  // rewrite is made against numbers rather than the model's estimate. Its own
+  // section, never in the `## Page N` heading: the reply parser reads that
+  // heading, and a copied count would make the page unparseable.
+  const pageMeasures = pages
+    .map(p => {
+      const m = measurePageText(p.text);
+      return `p${p.pageNumber}: ${m.words} words, ${m.sentences} sentences, ${m.paragraphs} paragraphs`;
+    })
+    .join('\n');
 
   // PSYCHOLOGICAL profile, not the visual one. buildCharacterPromptBlock emits
   // hair/eyes/face/head-height — that exists so an image model can draw the
@@ -5557,6 +5600,7 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     LANGUAGE_INSTRUCTION: getLanguageInstruction(language),
     LANGUAGE_NOTE: getLanguageNote(language),
     READING_LEVEL: getReadingLevel(inputData.languageLevel),
+    PARAGRAPH_SHAPE: paragraphShapeRule(),
     PAGE_COUNT: pages.length,
     CHARACTER_NAMES: cast.names.join(', '),
     CHARACTER_DETAILS: cast.details,
@@ -5570,6 +5614,7 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     PLAN_LINES: planLines || '(no page plan was recorded for this story — judge against the story and scene outlines only)',
     SCENE_OUTLINES: sceneOutlines,
     CURRENT_TEXT: currentText,
+    PAGE_MEASURES: pageMeasures,
     AUDIT_FINDINGS: String(auditFindings || '').trim() || '(no audit ran)',
     DO_NOT_WRITE_SECTION: doNotWriteSection,
   });
@@ -9276,7 +9321,15 @@ function buildTextProofreadPrompt(inputData, pages = []) {
     ? getLanguageNameEnglish(inputData.language)
     : 'the language of the pages';
   const body = pages.map(p => `--- Page ${p.pageNumber} ---\n${String(p.text || '').trim()}`).join('\n\n');
-  return fillTemplate(template, { LANGUAGE: lang, PAGES: body });
+  // The reader's level (2026-09-23): without it the lector cannot prefer the
+  // child's word, and on job_1790100385959_1nitlympp two of its four applied
+  // corrections lifted the register or changed the meaning. Short form — the
+  // pacing block belongs to prompts that WRITE pages.
+  return fillTemplate(template, {
+    LANGUAGE: lang,
+    READING_LEVEL: getReadingLevel(inputData?.languageLevel, { pacing: false }),
+    PAGES: body,
+  });
 }
 
 /**
@@ -9866,49 +9919,6 @@ function doNotWriteListBody({ forChecker = false } = {}) {
 }
 
 /**
- * What one character is wearing on one page, as a value that changes when the
- * outfit does: the clothing category plus the on/off state of every garment
- * the brief hangs on them. Two pages with the same signature are two pages the
- * reader sees the same clothes on.
- *
- * @param {Object} sceneMetadata - extractSceneMetadata() result for the page
- * @param {string} name - character name as characterClothing keys it
- * @returns {string}
- */
-function characterLookSignature(sceneMetadata, name) {
-  const category = (sceneMetadata && sceneMetadata.characterClothing && sceneMetadata.characterClothing[name]) || '';
-  const worn = (sceneMetadata && Array.isArray(sceneMetadata.wornItems) ? sceneMetadata.wornItems : [])
-    .filter(w => w && w.owner === name)
-    .map(w => `${w.id || ''}:${w.state || ''}`)
-    .sort()
-    .join(',');
-  return `${category}|${worn}`;
-}
-
-/**
- * Remove one character's appearance appositive — `Name — a preschooler …
- * wearing a red jacket … — kneels` — leaving `Name kneels`. Only an appositive
- * that actually describes a look is taken: one naming hair, eyes, build or a
- * worn garment. An em-dash aside that says what someone is doing or feeling is
- * story, not staging, and stays.
- *
- * @param {string} prose - the brief's prose half
- * @param {string} name
- * @returns {string}
- */
-function dropAppearanceAppositive(prose, name) {
-  if (!prose || !name) return prose;
-  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  // The briefs write the appositive both spaced (`Name — … — verb`) and
-  // unspaced (`Name—…—verb`), so the whitespace on both sides is part of the
-  // match and one space is put back: dropping it welds the name to the verb.
-  return prose.replace(
-    new RegExp(`(${escaped})\\s*[—–]\\s*([^—–]*?)\\s*[—–]\\s*`, 'g'),
-    (whole, who, inner) => (/\b(wearing|hair|eyes|build|heads tall)\b/i.test(inner) ? `${who} ` : whole)
-  );
-}
-
-/**
  * Page text written from the FINAL ARC and the locked PLAN LINES (beats-first
  * pipeline, step 5). The arc is the story; the plan lines divide it into
  * pictures. Beat prose used to stand between the two and was measured as the
@@ -9933,42 +9943,10 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     log.error('[PROMPT] storyTextFromBeats template not loaded — beats text writing unavailable');
     return null;
   }
-  // Brief per page, trimmed to the prose the writer needs. The METADATA block
-  // is machine data for the image call (zones, depths, bbox hints) — it would
-  // only invite the writer to narrate staging. Visual-Bible ids go for the same
-  // reason: `(ART001.1)`, `(VEH001)` and friends are grounding handles for the
-  // image call, the brief already names the thing in plain words beside them,
-  // and the writer is never told what they are. cleanPageText's output-side
-  // guard only matches the bracketed `[ART001]` form, so the parenthesised ids
-  // the briefs actually carry would reach the page unscrubbed.
-  // A character's full appearance is repeated on every page they appear on —
-  // twelve times over for a lead in an eighteen-page book, under a rule that
-  // forbids the writer narrating what anyone wears. It is repeated only where
-  // it CHANGED: the outfit a character is in is `characterClothing` (standard,
-  // winter, summer, costumed:X) and the garments on or off them are
-  // `wornItems`, both already parsed out of the brief's METADATA block. A
-  // change back to an earlier outfit is a change and gets the full description
-  // again, so the state is the LAST outfit seen per character, not a set.
-  const lastLookByCharacter = new Map();
-  const briefByPage = new Map(
-    (expansions || [])
-      .filter(x => x && x.pageNumber != null)
-      .sort((a, b) => a.pageNumber - b.pageNumber)
-      .map(x => {
-        const raw = String(x.brief || '');
-        let prose = raw
-          .split(/---\s*METADATA/i)[0]
-          .replace(/\s*[([]\s*[A-Z]{2,3}\d{3}(?:\.\d+)?\s*[)\]]/g, '')
-          .trim();
-        const meta = extractSceneMetadata(raw);
-        for (const name of Object.keys((meta && meta.characterClothing) || {})) {
-          const look = characterLookSignature(meta, name);
-          if (lastLookByCharacter.get(name) === look) prose = dropAppearanceAppositive(prose, name);
-          else lastLookByCharacter.set(name, look);
-        }
-        return [x.pageNumber, prose];
-      })
-  );
+  // Brief per page, as every text-stage reader gets it (buildTextStagePictureSpecs,
+  // sceneMetadata.js): METADATA, Visual-Bible ids and repeated looks removed.
+  // The audit and the refine read the same specs.
+  const briefByPage = buildTextStagePictureSpecs(expansions);
   const blocks = beats
     .map(b => {
       const brief = briefByPage.get(b.pageNumber);
@@ -9993,6 +9971,7 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     ...buildStoryContextFields(inputData),
     // Text stage: the full reading-level block, PACING rhythm included.
     READING_LEVEL: getReadingLevel(inputData.languageLevel),
+    PARAGRAPH_SHAPE: paragraphShapeRule(),
     PAGE_COUNT: beats.length,
     PLAN_LINES: blocks,
     TITLE_RULE: buildTitleRule(inputData),
@@ -10708,6 +10687,9 @@ module.exports = {
   resolveArtStyleForEmptyScene,
   resolveArtStyleForSheet,
   LANGUAGE_LEVELS,
+  PAGE_PARAGRAPHS,
+  paragraphShapeRule,
+  measurePageText,
   getReadingLevel,
   getTokensPerPage,
   NONE_WORDS,

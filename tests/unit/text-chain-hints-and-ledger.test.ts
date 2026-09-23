@@ -103,8 +103,8 @@ describe('refineStoryText — ledger and counter after the diff, hints to the si
     expect(TR.projectTextRefineReport(res).diffApplied[0].restored).toEqual(['Der Rand ist eingerissen.']);
     // The shipped text is counted.
     expect(res.wordBudget.shipped.counts).toEqual([
-      { pageNumber: 1, words: 8 },
-      { pageNumber: 2, words: 5 },
+      { pageNumber: 1, words: 8, sentences: 2, paragraphs: 1 },
+      { pageNumber: 2, words: 5, sentences: 1, paragraphs: 1 },
     ]);
     // Hints: both sighted critics, with the writer's arc-outranks-hint rule; never the blind audit.
     for (const label of ['text_audit', 'text_refine']) {

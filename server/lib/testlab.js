@@ -3625,19 +3625,12 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
   } else {
     const blind = level === 'text-blind';
     templateKey = blind ? 'storyTextAuditBlind' : 'storyTextAudit';
-    // Same fields production's extractRefinablePages carries, so the replay's
-    // THE PICTURE SHOWS is resolved from the same sources by the same resolver
-    // (sceneMetadata.resolveTextStagePictureSpec). Handing `sceneIntent` the
-    // full sceneDescription made the replay's spec LONGER than the run's — the
-    // opposite truncation — which broke comparability the other way.
-    const pages = (storyData.sceneImages || [])
-      .map(p => ({
-        pageNumber: p.pageNumber,
-        text: p.text,
-        sceneBrief: p.sceneDescription || null,
-        sceneIntent: p.sceneIntent || null,
-      }))
-      .filter(p => String(p.text || '').trim());
+    // Production's own page extractor, so the replay's THE PICTURE SHOWS and
+    // PLAN_LINES come from the same sources by the same code. The hand-built
+    // copy this replaced carried the untrimmed brief and no plan line, so the
+    // replay audited against a longer spec and "(no page plan was recorded)".
+    const { extractRefinablePages } = require('./textRefine');
+    const pages = extractRefinablePages(storyData.sceneImages || []);
     if (!pages.length) throw new Error('story has no page text to audit');
     prompt = blind
       ? H.buildTextAuditBlindPrompt(storyData, pages)

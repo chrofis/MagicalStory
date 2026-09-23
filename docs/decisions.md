@@ -52125,6 +52125,9 @@ left is the repair round's prompt, which is also the report's top-level `prompt`
 that the shared panel reads: 55.7 KB, left in place so the per-round shape is
 symmetric, and flagged in the backlog as the remaining trim.
 
+> 🗄 **Raw-reply trim superseded 2026-09-23** — every round now keeps its raw reply (owner order;
+> "Text stage after prompt audit 05").
+
 **Validation:** rung 1 — the projection replayed over the stored shape of
 `job_1789853503332_riqncqg1i`: the repair round's returned pages round-trip, the
 diff and lector prompts are stored, the diff's four fields land, and a synthetic
@@ -56708,4 +56711,77 @@ itself re-rendered 2).
 `server/lib/promptBuilders.js`, `server/lib/beatsPipeline.js`, `storyJobPipeline.js`,
 `server/routes/stories.js`, `server/lib/testlab.js`, `tests/unit/wardrobe-prompt-inputs.test.ts`,
 `tests/unit/beats-dropped-fill-keys.test.ts`.
+
+## 2026-09-23 — Text stage after prompt audit 05: the missing audit questions, a narrower blind exemption, sentences and paragraphs counted, the lector at the reading level, one picture spec, prompts and replies stored
+
+**Context.** Prompt audit `docs/audits/prompt-audit-2026-09-23/05-story-text.md` on staging
+`job_1790100385959_1nitlympp` (18 pp, de-ch, 1st-grade). Owner order: "fix the eight audits". Builds on
+5a4672c7a / e47a513f0 (diff sees findings, ledger after diff, hints to the sighted critics, refine scope).
+Five plot faults shipped that no judge named: a deadline broken (the egg must be warm before dark, it is
+dark, it hatches with no word why), a refusal reversed with no stated reason, a fear stated that no page
+showed, a "the whole time" contradiction (added by the refine), a vague ending. The blind audit returned
+FAULTS: 0; five of the sighted audit's ten findings were LOADBEARING, two of them misfires (the ages
+inserted on p1, a hint-blind p15). Pages ran 6-13 sentences against 3-6 with nothing counting them. The
+lector had no reading level and made 2 of its 4 changes worse.
+
+**Decision.**
+1. **Audit questions (prompts, generic).** story-text-audit.txt: ASSUMED also covers a feeling a page says
+   someone had that no earlier page showed; CAUSE covers letting happen what one had refused; LIMIT covers a
+   stated time passed with no page saying why the limit still holds; new CONTRADICTION (a page states as true
+   what an earlier page told otherwise, "the whole time" claims included) and ENDING (last page: one feeling,
+   every claim true of the pages). Fourteen questions. The blind audit's CONFUSION/CONTRADICTION gain the
+   same two cases and it gains ENDING (six questions). The writer (story-text-from-beats.txt) was given each
+   rule first: deadline, feeling shown, no contradiction, and the ending line it already had.
+2. **LOADBEARING is what the plot turns on** — a cause, a uniqueness, a limitation, a spoken line a later
+   page depends on; "a detail the plot never uses — an age, a colour, a look — is never load-bearing". Same
+   wording on the writer side.
+3. **Blind exemption narrowed, blindness kept** (2026-09-03 ruling stands: pages only). "Never fault a page
+   for something a picture could be showing" became: never fault what its picture shows at that instant —
+   where someone stands, how someone or something looks, an object in view. What the words tell across
+   pages stays faultable.
+4. **Sentences and paragraphs counted in code.** `measurePageText` (promptBuilders.js) counts words,
+   sentences and blank-line paragraphs; `buildWordBudgetFindings` adds a page past the level's sentence
+   ceiling by the SAME +50% OVER tolerance the words have (1st-grade: above 9), or past
+   `PAGE_PARAGRAPHS.maxPerPage` (4), to that page's ONE `FAULT[LENGTH]` line. Over only. The word tolerance
+   (2026-09-08, owner: 0.5 stays) is untouched. The paragraph shape is one constant filled into the writer
+   and the refine (`{PARAGRAPH_SHAPE}`) and read by the counter. The refine gets every page's counts
+   (`{PAGE_MEASURES}`, its own section — a count in the `## Page N` heading would break the reply parser).
+   The existing re-measure + one fed-back `length_fix` pass and the shipped-text count carry the new numbers
+   with no new loop.
+5. **Lector at the reading level** (`{READING_LEVEL}`, short form): plainest word, never a change of
+   meaning, a sentence that breaks no rule is not a fault. Effort and model unchanged (medium verdict stands).
+6. **One picture spec for writer, audit and refine.** `buildTextStagePictureSpecs` (sceneMetadata.js,
+   moved there with `characterLookSignature` / `dropAppearanceAppositive`) is the writer's old trim —
+   METADATA, VB ids, a character's appearance appositive where the look did not change — and
+   `extractRefinablePages` now stores it as `sceneBrief`, so the critics stop reading a longer, different
+   spec than the text was written from. The Lab audit replay uses `extractRefinablePages` too (its
+   hand-built pages had the untrimmed brief and NO plan line). Camera sentences are kept: in the briefs they
+   also carry the place. The refine's checks A–E are answered for the rewritable pages only; other pages are
+   scanned for the five extra cases.
+7. **Storage.** Each audit's prompt is stored (`textRefineReport.audits[].prompt`), and every round keeps
+   its raw reply, the whole-page passes included — superseding the 2026-09-20 trim ("rawResponse is NOT
+   stored … ~27 KB of pure duplication"): the parsed analysis and pages are what the parser KEPT, so a page
+   under an unreadable heading existed nowhere. Owner order.
+
+**Validation.** Rung 1 (free) on the stored row: prompts rebuilt with no unfilled placeholder; the counter
+flags 6 writer pages (p4 13 sentences / 5 paragraphs, p6, p10, p15, p16, p18) where it flagged 1, and 6
+shipped pages; the spec shrinks 16.8k → 15.2k chars. Rung 2 ($0.354, one call per audit on the stored
+writer text): arc-informed 9 faults — LIMIT p17 (the broken deadline), CAUSE p14, CONTRADICTION p17/p18,
+and **0 LOADBEARING** (was 5, incl. the ages misfire); blind **2** (was 0) — CONFUSION p13 (fear never
+shown) and CONTRADICTION p16 (refusal reversed with no reason). 3 of the 4 listed faults present in the
+writer text were caught; the vague ending was not (the fifth, "the whole time", was added later by the
+refine).
+
+**Not done (owner calls, BACKLOG).** The brief bloat's remainder: the AD writes wardrobe as flowing prose,
+so no code trim removes it safely — the proper cut is a structured text-stage spec from the brief's
+METADATA (sceneIntent, interactions, expressions) plus object names, which changes what the writer and
+critics see. The 1st-grade sentence band itself: the writer produced 6-13 sentences on every page, the same
+pattern that led to the 2026-09-08 word re-calibration.
+
+**Touched:** `prompts/story-text-audit.txt`, `prompts/story-text-audit-blind.txt`,
+`prompts/story-text-from-beats.txt`, `prompts/story-text-proofread.txt`, `prompts/text-refine.txt`,
+`server/lib/promptBuilders.js`, `server/lib/sceneMetadata.js`, `server/lib/textRefine.js`,
+`server/lib/testlab.js`, `scripts/admin/sibling-registry.json`, `docs/prompt-inventory.md`, tests
+(`text-stage-counter-and-specs`, `text-audit-rules-reach-writer`, `text-audit-picture-spec`,
+`text-refine-join`, `text-chain-hints-and-ledger`, `text-refine-own-criteria`).
 **Status:** ✅ active on staging.

@@ -228,7 +228,7 @@ describe('projectTextRefineReport: a run that changed nothing is still stored', 
       round({ round: 1, kind: 'repair', ok: false, error: 'the model threw', prompt: 'REPAIR PROMPT' }),
       round({ round: 2, kind: 'lector', ok: false, error: 'timed out', prompt: 'LECTOR PROMPT', rawResponse: '' }),
     ],
-    audits: [{ source: 'arc', ok: true, faults: 4, raw: 'FAULT p1 ...' }],
+    audits: [{ source: 'arc', ok: true, faults: 4, raw: 'FAULT p1 ...', prompt: 'AUDIT PROMPT' }],
     mergedFindings: [{ pageNumber: 1, category: 'MISMATCH', text: 'f', sources: ['arc'] }],
     mergeStats: { bySource: { arc: 4 }, duplicates: 0 },
     findingLedger: [
@@ -249,6 +249,8 @@ describe('projectTextRefineReport: a run that changed nothing is still stored', 
     const rep = projectTextRefineReport(zeroChange, new Map());
     expect(rep.findingLedger).toHaveLength(1);
     expect(rep.audits).toHaveLength(1);
+    // The prompt each audit was sent is stored with its reply (2026-09-23).
+    expect(rep.audits[0].prompt).toBe('AUDIT PROMPT');
     expect(rep.mergeStats).toEqual({ bySource: { arc: 4 }, duplicates: 0 });
     expect(rep.wordBudget).toEqual({ before: 2, after: 2 });
     expect(rep.roundTrace).toHaveLength(2);
@@ -314,10 +316,11 @@ describe('projectTextRefineReport: each round keeps what it was sent and what it
     expect(rep.roundTrace[1].pages).toEqual([{ pageNumber: 1, after: 'final' }]);
   });
 
-  it('keeps the finding-list replies raw and drops the redundant rewriter reply', () => {
+  it("keeps every round's raw reply, the rewriter's included", () => {
     const rep = projectTextRefineReport(usable, new Map([[1, 'draft']]));
-    // A repair reply IS its analysis plus the page blocks, both already stored.
-    expect(rep.roundTrace[0].rawResponse).toBe('');
+    // Owner order 2026-09-23: the parsed analysis and pages are what the parser
+    // KEPT; the raw reply is the only record of what it could not read.
+    expect(rep.roundTrace[0].rawResponse).toBe('ANALYSIS + PAGE BLOCKS');
     expect(rep.roundTrace[0].analysis).toBe('why');
     expect(rep.roundTrace[1].rawResponse).toBe('p1: "a" -> "b"');
     expect(rep.roundTrace[2].rawResponse).toBe('no findings');

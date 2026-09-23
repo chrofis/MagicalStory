@@ -11,7 +11,7 @@ Write in {LANGUAGE}. Keep the register of the current text. Never switch to a di
 # TARGET
 
 Reading level: {READING_LEVEL}
-A rewritten page keeps the paragraph shape: 2-4 sentences a paragraph, at most four paragraphs, a blank line between them.
+A rewritten page keeps the paragraph shape. {PARAGRAPH_SHAPE}
 Pages: {PAGE_COUNT}
 Characters: {CHARACTER_NAMES}
 
@@ -51,6 +51,10 @@ Nothing in the story or its pictures is dangerous enough that it could lead to d
 
 {CURRENT_TEXT}
 
+# PAGE MEASURES (counted in code, against the reading level above)
+
+{PAGE_MEASURES}
+
 # AUDIT FINDINGS (from two independent readers of the finished pages)
 
 {AUDIT_FINDINGS}
@@ -59,7 +63,7 @@ Nothing in the story or its pictures is dangerous enough that it could lead to d
 
 A page is rewritable when AUDIT FINDINGS names it, and otherwise not. Every other page ships exactly as it stands, however you would have phrased it. Five cases add a page to that set and no others: a MISMATCH move needs its destination page; no early page states plainly what must happen and why, which is fixed on the earliest fitting page; a page's text states the opposite of what its scene outline stages; a page carries an abbreviation or acronym, which is named the way a child says it; a page carries a banned dash. Closing a finding on a page the finding does not name is allowed only under these five, and the ledger says which one.
 
-The checks below are how you READ the pages, not a licence to rewrite them: a check that finds something on a page AUDIT FINDINGS does not name is reported in the analysis and the page is left alone. A clean analysis section is a real answer.
+The checks below are answered for the rewritable pages only, with their neighbours read as context; every other page is scanned for the five cases above and not analysed. A clean analysis section is a real answer.
 
 Return only the pages you rewrote. Omit every page you left alone. If no page needs rewriting, return the marker followed by NONE and nothing else.
 
@@ -77,7 +81,7 @@ Judge the text as a reader who has only the pages in front of them. They never s
 
 Work in two steps.
 
-Step 1 — write the analysis. Answer every check below in full, naming pages and quoting lines. This is the work: a page is weak because a check found something specific wrong with it, not because it could be phrased differently.
+Step 1 — write the analysis. Answer every check below for the rewritable pages, naming pages and quoting lines. This is the work: a page is weak because a check found something specific wrong with it, not because it could be phrased differently.
 
 Step 2 — rewrite the rewritable pages your analysis found problems on. Every other page stays exactly as it is. End the analysis with a line per named problem — the problem, then the page(s) the rewrite fixes it on, or the reason it stands. A named problem with neither is a failed review. Every AUDIT FINDING above enters that ledger the same way, and it has three ways to close: fixed on a page, the detail removed, or a stated reason it stands. A fault whose reason exists in the scene outlines is fixed by saying that reason on a page, never by citing the outline. Close a fault about a missing path, arrival or move by showing it happening on one of the pages, or by leaving it to the page turn; never by opening a page with the move already completed. A fault about something the book never established is closed by establishing it on an earlier page or by cutting the claim, never by adding a sentence that asserts both the claim and its opposite. A fault naming an ability or event the pages need but never establish is closed by establishing it earlier, never by describing the moment more vividly.
 
@@ -110,7 +114,7 @@ Priority: sections A and B first and at length, C after them, D and E last.
 
 **B. CHARACTER & DIALOGUE (per-character, by name)**
 
-For EACH of {CHARACTER_NAMES} write one line — none may be skipped, including a character the commission did not name who the pages carry anyway. If all five axes hold, write `none found`; never invent a weakness to fill the line.
+For EACH of {CHARACTER_NAMES} who appears on a rewritable page write one line — none of them may be skipped, including a character the commission did not name who the pages carry anyway. If all five axes hold, write `none found`; never invent a weakness to fill the line.
 
 Format A (all five axes hold):
 - **[Name]**: consistency ✓, voice ✓, show-not-tell ✓, motivation ✓, growth ✓ — none found.

@@ -2352,8 +2352,96 @@ function resolveEvalSceneDescription({ compressedScene = null, sceneDescription 
 }
 
 /**
+ * What one character is wearing on one page, as a value that changes when the
+ * outfit does: the clothing category plus the on/off state of every garment
+ * the brief hangs on them. Two pages with the same signature are two pages the
+ * reader sees the same clothes on.
+ *
+ * @param {Object} sceneMetadata - extractSceneMetadata() result for the page
+ * @param {string} name - character name as characterClothing keys it
+ * @returns {string}
+ */
+function characterLookSignature(sceneMetadata, name) {
+  const category = (sceneMetadata && sceneMetadata.characterClothing && sceneMetadata.characterClothing[name]) || '';
+  const worn = (sceneMetadata && Array.isArray(sceneMetadata.wornItems) ? sceneMetadata.wornItems : [])
+    .filter(w => w && w.owner === name)
+    .map(w => `${w.id || ''}:${w.state || ''}`)
+    .sort()
+    .join(',');
+  return `${category}|${worn}`;
+}
+
+/**
+ * Remove one character's appearance appositive — `Name — a preschooler …
+ * wearing a red jacket … — kneels` — leaving `Name kneels`. Only an appositive
+ * that actually describes a look is taken: one naming hair, eyes, build or a
+ * worn garment. An em-dash aside that says what someone is doing or feeling is
+ * story, not staging, and stays.
+ *
+ * @param {string} prose - the brief's prose half
+ * @param {string} name
+ * @returns {string}
+ */
+function dropAppearanceAppositive(prose, name) {
+  if (!prose || !name) return prose;
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // The briefs write the appositive both spaced (`Name — … — verb`) and
+  // unspaced (`Name—…—verb`), so the whitespace on both sides is part of the
+  // match and one space is put back: dropping it welds the name to the verb.
+  return prose.replace(
+    new RegExp(`(${escaped})\\s*[—–]\\s*([^—–]*?)\\s*[—–]\\s*`, 'g'),
+    (whole, who, inner) => (/\b(wearing|hair|eyes|build|heads tall)\b/i.test(inner) ? `${who} ` : whole)
+  );
+}
+
+/**
+ * THE PICTURE SPEC EVERY TEXT-STAGE READER GETS, built once per book.
+ *
+ * The writer, the arc-informed audit and the refine all read each page's brief.
+ * Only the writer's copy was trimmed (2026-09-23 audit: the refine's outlines
+ * were 19.4k of a 53.7k prompt, the full brief with every character's outfit
+ * on every page), so the critics read longer, different specs than the text was
+ * written from. One builder, three readers:
+ *   - METADATA goes (machine data for the image call);
+ *   - Visual-Bible ids go (grounding handles the writer is never told about);
+ *   - a character's appearance appositive goes on every page after the first
+ *     where their look (outfit + worn garments) is unchanged — a change of look
+ *     is an event and keeps its description.
+ * Camera sentences stay: in the briefs they also carry the place ("wide shot of
+ * a courtyard at dusk"), and the place is the text's business.
+ * Who is there, where it is and what happens all stay. Needs page order: the
+ * look is compared with the LAST one seen per character.
+ *
+ * @param {Array<{pageNumber:number, brief:string}>} briefs raw briefs, METADATA included
+ * @returns {Map<number,string>}
+ */
+function buildTextStagePictureSpecs(briefs = []) {
+  const lastLookByCharacter = new Map();
+  return new Map(
+    (briefs || [])
+      .filter(x => x && x.pageNumber != null && String(x.brief || '').trim())
+      .sort((a, b) => a.pageNumber - b.pageNumber)
+      .map(x => {
+        const raw = String(x.brief || '');
+        let prose = raw
+          .split(/---\s*METADATA/i)[0]
+          .replace(/\s*[([]\s*[A-Z]{2,3}\d{3}(?:\.\d+)?\s*[)\]]/g, '')
+          .trim();
+        const meta = extractSceneMetadata(raw);
+        for (const name of Object.keys((meta && meta.characterClothing) || {})) {
+          const look = characterLookSignature(meta, name);
+          if (lastLookByCharacter.get(name) === look) prose = dropAppearanceAppositive(prose, name);
+          else lastLookByCharacter.set(name, look);
+        }
+        return [x.pageNumber, prose];
+      })
+  );
+}
+
+/**
  * THE PICTURE SPEC for every text-stage consumer = the brief the WRITER was
- * given, whole.
+ * given (since 2026-09-23 trimmed for all of them by buildTextStagePictureSpecs,
+ * which extractRefinablePages stores as `sceneBrief`).
  *
  * The page text is written against the locked scene brief
  * (buildStoryTextFromBeatsPrompt, promptBuilders.js — METADATA stripped, no
@@ -2517,6 +2605,9 @@ module.exports = {
   resolveEvalImagePrompt,
   resolveEvalSceneDescription,
   resolveTextStagePictureSpec,
+  buildTextStagePictureSpecs,
+  characterLookSignature,
+  dropAppearanceAppositive,
   resolveSceneCastEntries,
   collectSceneCharacterNames,
   collectSceneObjectFigureNames,

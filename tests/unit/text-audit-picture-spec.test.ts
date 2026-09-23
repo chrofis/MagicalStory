@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { resolveTextStagePictureSpec } = require('../../server/lib/sceneMetadata.js');
+const { resolveTextStagePictureSpec, buildTextStagePictureSpecs } = require('../../server/lib/sceneMetadata.js');
 const { extractRefinablePages } = require('../../server/lib/textRefine.js');
 
 // BEHAVIOUR PINNED: the arc-informed text auditor judges a page against THE SAME
@@ -52,9 +52,9 @@ describe('resolveTextStagePictureSpec — auditor spec == writer spec', () => {
 
   it('the auditor, the writer and the repairer read one identical spec', () => {
     const [page] = extractRefinablePages([beatsScene]);
-    // What buildStoryTextFromBeatsPrompt hands the writer, and what
-    // buildStoryTextRefinePrompt hands the repairer: the brief, METADATA off.
-    const writerSpec = String(beatsScene.sceneDescription).split(/---\s*METADATA/i)[0].trim();
+    // What buildStoryTextFromBeatsPrompt hands the writer (one shared builder
+    // since 2026-09-23), and what the repairer reads through the same resolver.
+    const writerSpec = buildTextStagePictureSpecs([{ pageNumber: 4, brief: beatsScene.sceneDescription }]).get(4);
     expect(resolveTextStagePictureSpec(page)).toBe(writerSpec);
   });
 
@@ -76,17 +76,18 @@ describe('Lab audit replay == production', () => {
   // the opposite truncation — and it omitted the arc argument entirely, so
   // STORY_ARC read "(no story was recorded)" three lines after the arc was
   // fetched. Both directions made a prompt A/B read "fewer faults = better".
-  it('the replay resolves the same spec from the stored row that production does in flight', () => {
-    const stored = { pageNumber: 4, text: beatsScene.text, sceneDescription: WITH_METADATA, sceneIntent: 'a lantern, a dog' };
-    const replayPage = { pageNumber: stored.pageNumber, text: stored.text, sceneBrief: stored.sceneDescription || null, sceneIntent: stored.sceneIntent || null };
+  it('the replay resolves the same spec and plan line from the stored row that production does in flight', () => {
+    const stored = { ...beatsScene, sceneIntent: 'a lantern, a dog' };
+    const [replayPage] = extractRefinablePages([stored]);
     const [productionPage] = extractRefinablePages([beatsScene]);
     expect(resolveTextStagePictureSpec(replayPage)).toBe(resolveTextStagePictureSpec(productionPage));
+    expect(replayPage.planLine).toBe(productionPage.planLine);
   });
 
   it('the replay call site passes the arc, its hints and the brief-bearing fields', () => {
     const fs = require('node:fs');
     const src = fs.readFileSync(new URL('../../server/lib/testlab.js', import.meta.url), 'utf8');
     expect(src).toContain('H.buildTextAuditPrompt(storyData, pages, arc, { arcHints: resolveReplayArcHints(storyData) })');
-    expect(src).toContain('sceneBrief: p.sceneDescription || null');
+    expect(src).toContain("const pages = extractRefinablePages(storyData.sceneImages || []);");
   });
 });

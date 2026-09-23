@@ -36,8 +36,26 @@ describe('the text audit\'s questions reach the writer', () => {
   });
 
   it('Q8 LIMIT — the limit the plot leans on is stated and never broken', () => {
-    expect(prompt).toContain('a limit the plot leans on');
-    expect(prompt).toContain('no later page breaks it');
+    expect(prompt).toContain('a limit or deadline the plot leans on');
+    expect(prompt).toContain('no later page breaks it or lets the time pass without saying why it still holds');
+  });
+
+  // 2026-09-23 (prompt audit 05): the questions the audit gained are rules the
+  // writer was given first.
+  it('Q1 ASSUMED — a feeling a page names was shown earlier', () => {
+    expect(prompt).toContain('a feeling a page says someone had is one an earlier page showed');
+  });
+
+  it('Q13 CONTRADICTION — no page tells otherwise what an earlier page told', () => {
+    expect(prompt).toContain('no page states as true what an earlier page told otherwise');
+  });
+
+  it('Q14 ENDING — the last page lands one feeling', () => {
+    expect(prompt).toContain('land one feeling, plainly and warmly');
+  });
+
+  it('Q12 LOADBEARING is scoped to what the plot turns on, on both sides', () => {
+    expect(prompt).toContain('What the plot turns on — a cause, a uniqueness, a limitation, a spoken line a later page depends on');
   });
 
   it('Q9 PAYOFF — a promise is answered, a price leaves a mark', () => {
@@ -143,13 +161,13 @@ describe('a reversed decision is a rule on both sides', () => {
   it('the arc-informed auditor asks it under CAUSE, not under a new type', () => {
     const p = sighted();
     expect(p).toContain('takes back, demands or acts on a thing they had refused, given up or discarded');
-    expect(p.match(/^\d+\. [A-Z]+:/gm)).toHaveLength(12);
+    expect(p.match(/^\d+\. [A-Z]+:/gm)).toHaveLength(14);
   });
 
   it('the blind auditor asks it under CONTRADICTION, not under a new type', () => {
     const p = blind();
     expect(p).toContain('acting against a decision an earlier page had them state or carry out');
-    expect(p.match(/^\d+\. [A-Z]+:/gm)).toHaveLength(5);
+    expect(p.match(/^\d+\. [A-Z]+:/gm)).toHaveLength(6);
   });
 
   it('no auditor gained a fault type the writer was never given', () => {
@@ -157,7 +175,8 @@ describe('a reversed decision is a rule on both sides', () => {
     expect(types(sighted())).toEqual([
       'ASSUMED', 'UNFORCED', 'DEVICE', 'TRANSITION', 'CAUSE', 'ENTRANCE',
       'LANGUAGE', 'LIMIT', 'PAYOFF', 'PULL', 'INFERRED', 'LOADBEARING',
+      'CONTRADICTION', 'ENDING',
     ]);
-    expect(types(blind())).toEqual(['CONFUSION', 'CONTRADICTION', 'IDLE', 'TRANSITION', 'PAYOFF']);
+    expect(types(blind())).toEqual(['CONFUSION', 'CONTRADICTION', 'IDLE', 'TRANSITION', 'PAYOFF', 'ENDING']);
   });
 });

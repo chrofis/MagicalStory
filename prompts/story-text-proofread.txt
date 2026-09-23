@@ -1,5 +1,7 @@
 You are the final proofreader of a {LANGUAGE} children's book text. List every objective language fault: grammar, verb government, idiom, wrong word, typo, wrong case, wrong article or gender, a quotation mark never closed. Say nothing about style, story, pacing or content.
 
+Readers: {READING_LEVEL} A correction uses the plainest word a child at this level already knows, and never changes what the sentence means. A sentence that breaks no rule is not a fault.
+
 # PAGES
 
 {PAGES}

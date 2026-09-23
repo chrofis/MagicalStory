@@ -345,7 +345,13 @@ const WORD_BUDGET_TOLERANCE_UNDER = 0.2;
 
 /** Whitespace-token word count — deterministic, no model involved. */
 function countPageWords(text) {
-  return String(text || '').trim().split(/\s+/).filter(Boolean).length;
+  return require('./promptBuilders').measurePageText(text).words;
+}
+
+/** Words, sentences and paragraphs of every page, for the stored report. */
+function measurePages(pages = []) {
+  const { measurePageText } = require('./promptBuilders');
+  return pages.map(p => ({ pageNumber: p.pageNumber, ...measurePageText(p.text) }));
 }
 
 /**
@@ -379,24 +385,40 @@ function countPageWords(text) {
  * (buildArcBudgetSection) — so this stage no longer forces the impossible cut;
  * it may overrun by a few words rather than delete an action.
  *
+ * SENTENCES AND PARAGRAPHS (2026-09-23). The reading level also sets a
+ * sentence count and the page a paragraph shape, and nothing counted either:
+ * on job_1790100385959_1nitlympp (1st-grade, 3-6 sentences) most pages ran
+ * 6-12 sentences and p18 had five paragraphs, with no finding. A page past the
+ * sentence ceiling by the same OVER tolerance the words get, or past the
+ * paragraph maximum, is reported in the SAME one line per page, so the merge
+ * and the ledger see one length fault per page, never two. Over only: a short
+ * page is judged on its words.
+ *
  * @param {Array<{pageNumber:number,text:string}>} pages
  * @param {string} languageLevel
  * @returns {string} newline-joined FAULT[LENGTH] lines ('' when all pages fit)
  */
 function buildWordBudgetFindings(pages = [], languageLevel) {
-  const { LANGUAGE_LEVELS } = require('./promptBuilders');
+  const { LANGUAGE_LEVELS, PAGE_PARAGRAPHS, measurePageText } = require('./promptBuilders');
   const level = LANGUAGE_LEVELS[languageLevel] || LANGUAGE_LEVELS['standard'];
   const min = level.wordsPerPageMin;
   const max = level.wordsPerPageMax;
   const hi = max * (1 + WORD_BUDGET_TOLERANCE_OVER);
   const lo = min * (1 - WORD_BUDGET_TOLERANCE_UNDER);
+  const sentenceRange = String(level.sentencesPerPage);
+  const sentenceMax = Number(sentenceRange.split('-').pop());
+  const sentenceHi = sentenceMax * (1 + WORD_BUDGET_TOLERANCE_OVER);
   const lines = [];
   for (const p of pages) {
-    const n = countPageWords(p.text);
-    if (n > hi) {
-      lines.push(`FAULT[LENGTH]: p${p.pageNumber} — page has ${n} words, budget ${min}-${max} — tighten the wording; keep every action, line of dialogue and feeling. Losing one is a fault.`);
-    } else if (n < lo) {
-      lines.push(`FAULT[LENGTH]: p${p.pageNumber} — page has ${n} words, budget ${min}-${max} — expand without padding`);
+    const m = measurePageText(p.text);
+    const over = [];
+    if (m.words > hi) over.push(`${m.words} words, budget ${min}-${max}`);
+    if (m.sentences > sentenceHi) over.push(`${m.sentences} sentences, budget ${sentenceRange}`);
+    if (m.paragraphs > PAGE_PARAGRAPHS.maxPerPage) over.push(`${m.paragraphs} paragraphs, at most ${PAGE_PARAGRAPHS.maxPerPage}`);
+    if (over.length) {
+      lines.push(`FAULT[LENGTH]: p${p.pageNumber} — page has ${over.join('; ')} — tighten the wording; keep every action, line of dialogue and feeling. Losing one is a fault.`);
+    } else if (m.words < lo) {
+      lines.push(`FAULT[LENGTH]: p${p.pageNumber} — page has ${m.words} words, budget ${min}-${max} — expand without padding`);
     }
   }
   return lines.join('\n');
@@ -1084,20 +1106,20 @@ async function refineStoryText(storyData, pages, opts = {}) {
       if (r.truncation?.suspected) {
         const error = `audit reply ${describeTruncation(r.truncation)} — findings unusable`;
         log.warn(`⚠️ [TEXT-AUDIT/${source}] ${modelKey}: ${error}`);
-        return { source, modelKey, ok: false, error, modelId: r.modelId || TEXT_MODELS[modelKey].modelId, raw, elapsedMs, truncation: r.truncation,
+        return { source, modelKey, ok: false, error, modelId: r.modelId || TEXT_MODELS[modelKey].modelId, raw, prompt, elapsedMs, truncation: r.truncation,
           usage: { input_tokens: r.usage?.input_tokens || 0, output_tokens: r.usage?.output_tokens || 0 } };
       }
       log.info(`🔎 [TEXT-AUDIT/${source}] ${modelKey}: ${countFaults(raw)} fault(s) ${JSON.stringify(faultsByCategory(raw))} in ${(elapsedMs / 1000).toFixed(0)}s`);
       return {
         source, modelKey, ok: raw.length > 0,
         modelId: r.modelId || TEXT_MODELS[modelKey].modelId,
-        raw, faults: countFaults(raw), byCategory: faultsByCategory(raw), elapsedMs,
+        raw, prompt, faults: countFaults(raw), byCategory: faultsByCategory(raw), elapsedMs,
         usage: { input_tokens: r.usage?.input_tokens || 0, output_tokens: r.usage?.output_tokens || 0 },
         cost: r.usage?.direct_cost ?? calculateTextCost(r.modelId || TEXT_MODELS[modelKey].modelId, r.usage || {}),
       };
     } catch (e) {
       log.warn(`⚠️ [TEXT-AUDIT/${source}] failed (${e.message}) — its findings are missing from the merge`);
-      return { source, modelKey, ok: false, error: e.message, elapsedMs: Date.now() - t0 };
+      return { source, modelKey, ok: false, error: e.message, prompt, elapsedMs: Date.now() - t0 };
     }
   };
 
@@ -1393,7 +1415,6 @@ async function refineStoryText(storyData, pages, opts = {}) {
   // is never killed for length, and forcing the cut is what deleted causality
   // before (2026-09-07).
   {
-    const countWords = pages => pages.map(p => ({ pageNumber: p.pageNumber, words: countPageWords(p.text) }));
     const stillRaw = buildWordBudgetFindings(current, storyData?.languageLevel);
     wordBudget = {
       before: parseFaultLines(counterRaw || '').length,
@@ -1401,7 +1422,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
       correctivePassRan: false,
       resolved: !stillRaw,
       remaining: [],
-      counts: countWords(current),
+      counts: measurePages(current),
       cost: 0,
     };
     if (stillRaw) {
@@ -1423,7 +1444,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
       wordBudget.after = parseFaultLines(afterRaw || '').length;
       wordBudget.remaining = afterRaw ? afterRaw.split(/\n/) : [];
       wordBudget.resolved = !afterRaw;
-      wordBudget.counts = countWords(current);
+      wordBudget.counts = measurePages(current);
       for (const line of wordBudget.remaining) {
         log.warn(`⚠️ [TEXT-COUNTER] STILL OUTSIDE the budget after the corrective pass: ${line} — shipping as is`);
       }
@@ -1698,7 +1719,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
   if (wordBudget) {
     const shippedRaw = buildWordBudgetFindings(current, storyData?.languageLevel);
     wordBudget.shipped = {
-      counts: current.map(p => ({ pageNumber: p.pageNumber, words: countPageWords(p.text) })),
+      counts: measurePages(current),
       remaining: shippedRaw ? shippedRaw.split(/\n/) : [],
     };
     for (const line of wordBudget.shipped.remaining) {
@@ -1747,8 +1768,15 @@ async function refineStoryText(storyData, pages, opts = {}) {
  * pipeline's expanded scenes.
  */
 function extractRefinablePages(sceneLike = []) {
-  return sceneLike
-    .filter(s => s && (s.text || '').trim())
+  // The brief as every text-stage reader gets it — the SAME specs the writer
+  // was given (sceneMetadata.buildTextStagePictureSpecs, 2026-09-23). Built over
+  // the whole book at once: a repeated look is only recognised in page order.
+  const { buildTextStagePictureSpecs } = require('./sceneMetadata');
+  const withText = (sceneLike || []).filter(s => s && (s.text || '').trim());
+  const specByPage = buildTextStagePictureSpecs(
+    withText.map(s => ({ pageNumber: s.pageNumber, brief: s.sceneDescription || s.description || '' }))
+  );
+  return withText
     .map(s => {
       // sceneMetadata.sceneIntent is where the one-line picture summary lives
       // (sceneMetadata.js). The old outlineExtract JSON.parse never matched —
@@ -1767,10 +1795,10 @@ function extractRefinablePages(sceneLike = []) {
       //
       // The stage's founding invariant (decisions.md 2026-08-05) is "rewrites
       // page prose only, never events" — it cannot honour that while blind to
-      // what the events are. METADATA is stripped here and the template is
-      // explicit that appearance and staging are not the prose's business.
-      const briefRaw = String(s.sceneDescription || s.description || '');
-      const sceneBrief = briefRaw.split(/---\s*METADATA/i)[0].trim();
+      // what the events are. The brief arrives trimmed (METADATA, ids, repeated
+      // looks) and the template is explicit that appearance
+      // and staging are not the prose's business.
+      const sceneBrief = specByPage.get(s.pageNumber) || '';
       // The page's own LOCKED PLAN LINE (beats pipeline only). outlineExtract
       // holds "PLAN: …" in beats mode and the scene expansion's own JSON in
       // unified mode (storyScorecard.js finalBeats() draws the same
@@ -1935,14 +1963,11 @@ function isTotalTextAuditLoss(partial) {
 function projectTextRefineReport(usable, beforeByPage = new Map()) {
   if (!usable) throw new Error('projectTextRefineReport: no chain result to project');
   const changed = usable.changed || [];
-  // WHOLE-PAGE PASSES vs FINDING-LIST PASSES — the reason `rawResponse` is not
-  // stored for every round. A repair / repetition_fix / length_fix reply IS its
-  // analysis block plus the rewritten page blocks, and both are already stored
-  // verbatim (`analysis`, `pages[].after`): keeping the raw reply as well was
-  // measured at ~27KB of pure duplication per story. A diff or lector reply is
-  // a finding list — a few hundred bytes, and the only place the lines the
-  // parser rejected can be read back. So: pages for the rewriters, raw for the
-  // finding lists, nothing duplicated.
+  // EVERY ROUND KEEPS ITS RAW REPLY (owner order 2026-09-23, superseding the
+  // 2026-09-20 trim). A whole-page pass's reply was dropped as a duplicate of
+  // `analysis` + `pages[].after`, but those are what the PARSER kept: a page
+  // block under a heading it could not read, or analysis past the 15k cut,
+  // existed nowhere after the run. ~27KB per story, capped at 40k per round.
   return {
     rounds: usable.rounds.length,
     roundTrace: usable.rounds.map(r => ({
@@ -1974,7 +1999,7 @@ function projectTextRefineReport(usable, beforeByPage = new Map()) {
       // Only the repair round's prompt was ever stored, so the diff's and the
       // lector's inputs were unreadable after the run.
       prompt: r.prompt || '',
-      rawResponse: WHOLE_PAGE_PASS_KINDS.has(r.kind) ? '' : String(r.rawResponse || ''),
+      rawResponse: String(r.rawResponse || ''),
       // WHAT THE ROUND RETURNED, per page. `before` is not stored: for round N
       // it is round N-1's `after`, and for round 1 it is `briefsIn` — storing
       // it would double the bytes for no information.
@@ -1999,6 +2024,9 @@ function projectTextRefineReport(usable, beforeByPage = new Map()) {
       cost: a.cost ?? null,
       error: a.error || null,
       raw: (a.raw || '').slice(0, 40000),
+      // THE PROMPT THIS AUDIT WAS SENT (2026-09-23) — the audits were the one
+      // text-chain call whose input could not be read back after a run.
+      prompt: a.prompt || '',
     })),
     mergedFindings: (usable.mergedFindings || []).map(f => ({
       pageNumber: f.pageNumber,
@@ -2061,6 +2089,7 @@ module.exports = {
   restoredSentences,
   settleLedgerAfterDiff,
   countPageWords,
+  measurePages,
   buildWordBudgetFindings,
   parseLectorFindings,
   parseLectorLines,

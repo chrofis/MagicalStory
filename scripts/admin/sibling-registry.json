@@ -213,14 +213,15 @@
     {
       "id": "story-text-generator-vs-critic",
       "axis": "generator-vs-critic",
-      "reason": "story-text-proofread.txt and story-text-audit.txt judge prose written under story-text-from-beats.txt (the live writer on every full story) and story-trial.txt (the /try funnel); a style or structure rule the auditor enforces must be a rule the writer was given, or every story is corrected after the fact instead of written right. The generator was story-unified.txt until 2026-09-15, when that template was deleted as unreachable — it had not been the live prose writer since the beats pipeline shipped.",
+      "reason": "story-text-proofread.txt and story-text-audit.txt judge prose written under story-text-from-beats.txt (the live writer on every full story) and story-trial.txt (the /try funnel); a style or structure rule the auditor enforces must be a rule the writer was given, or every story is corrected after the fact instead of written right. story-text-audit-blind.txt joined 2026-09-23: it reads the same writer text and faults CONTRADICTION and ENDING, which the writer is told (prompt audit 05). The generator was story-unified.txt until 2026-09-15, when that template was deleted as unreachable — it had not been the live prose writer since the beats pipeline shipped.",
       "generators": [
         "prompts/story-text-from-beats.txt",
         "prompts/story-trial.txt"
       ],
       "critics": [
         "prompts/story-text-proofread.txt",
-        "prompts/story-text-audit.txt"
+        "prompts/story-text-audit.txt",
+        "prompts/story-text-audit-blind.txt"
       ],
       "severity": "block"
     },

@@ -11,19 +11,21 @@ You are a hostile editor auditing the child-facing text of a finished picture bo
 # THE BOOK
 {PAGES}
 
-Walk the pages in order and for every page answer twelve questions:
-1. ASSUMED: what does this page's text rely on that no earlier words or picture gave — knowledge a character could not have, a name nobody said in their hearing, an ability or possession never established, especially the rival's?
+Walk the pages in order and for every page answer fourteen questions:
+1. ASSUMED: what does this page's text rely on that no earlier words or picture gave — knowledge a character could not have, a name nobody said in their hearing, an ability or possession never established, especially the rival's, or a feeling it says someone had that no earlier page showed them having?
 2. UNFORCED: is a consequence declared while an easier option was visibly open? What closes the easier option — and did the book say it? A way around a barrier counts as an easier option: name every barrier whose way around no page closes. So does the obvious doer — where the one who needs the thing, or is plainly the most able to fetch it, stays behind while others go, the book says on some page what keeps them from going.
 3. DEVICE: does any object, sign, mechanism or rule do work whose meaning the book never gave when it first appeared?
 4. TRANSITION: is anyone in a place, holding something, or among people they were not among before, with no shown path from where the book last put them or it? A page turn carries travel and elapsed time, so a change of place between consecutive pages is a fault only where the words or the picture say they did not move; joining strangers is not travel, and the book shows them being joined.
-5. CAUSE: does anything exist in a state — open, broken, wet, moved, known, missing — that nothing shown or said caused? What a character wants is such a state: where someone takes back, demands or acts on a thing they had refused, given up or discarded, name the page that says what changed it.
+5. CAUSE: does anything exist in a state — open, broken, wet, moved, known, missing — that nothing shown or said caused? What a character wants is such a state: where someone takes back, demands or acts on a thing they had refused, given up or discarded, or lets happen what they had refused, name the page that says what changed it.
 6. ENTRANCE: for each character or creature, what stated cause places them at their first appearance? Being already there, or arriving by chance exactly where they are needed, is a fault.
 7. LANGUAGE: read the page aloud. Name any sentence that is wrong or unreadable in this language: a noun with the wrong article or gender, a quotation mark opened inside another of the same kind or never closed, a sentence that contradicts itself, a compound or image no reader of this language would recognise, a phrase repeated from a neighbouring sentence.
-8. LIMIT: name each limit the plot relies on — a thing that cannot happen, else the story collapses. Is each stated in the book, and does any later turn or page break it?
+8. LIMIT: name each limit the plot relies on — a thing that cannot happen, or must happen before a stated time, else the story collapses. Is each stated in the book, and does any later page break it or pass the stated time with no page saying why it still holds?
 9. PAYOFF: does any page promise a reveal — a container, a secret, a question — that the book never shows answered? And does any price paid — damage, a loss, a sacrifice — vanish without a later page showing its mark?
 10. PULL: {PULL_QUESTION}
 11. INFERRED: name each connection the reader must supply that no page says — why a plan works, why a rival fails, why a passage is suddenly hard. Where the ending depends on it, a page must say it.
-12. LOADBEARING: does the page keep every fact the story treats as load-bearing — a cause, a uniqueness, a limitation? A fact dropped or made generic (a named cause becoming "the map", an incomplete thing described as whole) is a fault, and so is a fact of the story that no page carries at all.
+12. LOADBEARING: does the page keep every fact the plot turns on — a cause, a uniqueness, a limitation, a spoken line a later page depends on? A fact dropped or made generic (a named cause becoming "the map", an incomplete thing described as whole) is a fault, and so is such a fact that no page carries at all. A detail the plot never uses — an age, a colour, a look — is never load-bearing.
+13. CONTRADICTION: does a page state as true something an earlier page told otherwise — where a thing is, who holds it, what someone did, or a claim that something held the whole time?
+14. ENDING: on the last page only, does it land one feeling in plain words, and is every claim it makes about the characters true of the pages?
 
 Also name every page whose text and picture tell different moments, tagged MISMATCH.
 
