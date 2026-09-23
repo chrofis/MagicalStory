@@ -584,8 +584,12 @@ function buildActionContext(sceneDescription, charName, visualBible = null) {
   const md = extractSceneMetadata(sceneDescription)?.fullData;
   if (!md) return '';
   const target = canonicalName(charName);
-  const charData = (Array.isArray(md.characters) ? md.characters : [])
+  const found = (Array.isArray(md.characters) ? md.characters : [])
     .find(c => c && canonicalName(c.name) === target) || null;
+  // Same gaze reader as the page prompt and the judges.
+  const charData = found
+    ? { ...found, looksAt: require('./vbIdGuard').gazeTarget(found.looksAt, md.objects || []) }
+    : null;
   // A row naming several actors reaches this character as its own line.
   const rows = (Array.isArray(md.interactions) ? md.interactions : [])
     .filter(i => i && splitInteractionActors(i.character).some(n => canonicalName(n) === target))

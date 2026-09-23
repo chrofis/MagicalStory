@@ -57363,3 +57363,34 @@ outlines at all, forms defined by paint edges", a template option) is never flag
 
 **Touched:** `server/lib/evalPipeline.js`, `tests/unit/style-gate-echo.test.ts`.
 **Status:** ✅ active on staging.
+
+## 2026-09-23 — One page prompt, one height order and no gaze at the page's own place
+
+**Context.** Dragon run 6 (staging `job_1790100385959_1nitlympp`) p12, audit 08 S12. The built page prompt
+contradicted itself twice. (1) HEIGHT ORDER, from stored centimetres, read "Max (shortest) → Julian
+(slightly taller)" (98 cm vs 102 cm) while AGE & PROPORTIONS drew Julian as a toddler "clearly smaller than
+a preschooler" (his apparentAge; the age-band clamp itself is settled and untouched). (2) Three children
+digging in Lindenhof square carried "eyes on Lindenhof square" — `looksAt: LOC002.4`, the page's own
+location, resolved into a gaze target — and the three judges were handed the same line.
+
+**Decision.** (1) `buildRelativeHeightDescription`: among children still growing (age categories up to
+`young-teen`), the age category decides the order and centimetres order within a category; everyone else
+keeps the centimetre order, and the children keep the slots they held in it. A step into an older
+category is at least "taller". (2) `vbIdGuard.gazeTarget`: a `looksAt` naming a LOC the page's `objects[]`
+cites is no gaze target. It is read once, through the reader every consumer already used for the judges
+(`gazeCharacters`), and the page prompt's EXACT POSES / EXPRESSIONS block and the character repair's
+state block read it through the same function.
+
+**Not changed (proposal for the Art Director owner):** the p12 interaction row
+"Max + Levin + Kiaan + Julian + ANI001 + ANI002: dig and rake" puts Julian in an action his own prose clause
+("stands nearby wiping his eyes") and expression ("eyes squeezed shut, crying") contradict. The builder
+cannot tell which of the AD's two statements is meant; the rule belongs in the AD templates (a row names
+only actors who do that action) and the brief check.
+
+**Replay (rung 1, stored story data):** the run's cast now builds "Julian (shortest) → Max (taller) →
+Kiaan (slightly taller) → Levin (slightly taller)"; the p12 gaze lines for Max, Levin and Kiaan are gone
+from the judge block, Julian keeps "away".
+
+**Touched:** `server/lib/promptBuilders.js`, `server/lib/vbIdGuard.js`, `server/lib/faceRepair.js`,
+`tests/unit/page-prompt-self-consistency.test.ts`.
+**Status:** ✅ active on staging.
