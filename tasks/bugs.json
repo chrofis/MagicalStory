@@ -1384,7 +1384,7 @@
       "impact": "Pass 1 of every avatar sheet ran with no working quality gate; bad angles, invented necklines and extra figures passed at 9. Staging and production.",
       "status": "fixed",
       "fixedAt": "2026-09-23",
-      "fixedIn": "this commit",
+      "fixedIn": "86d6ff4a7",
       "fix": "All four sheet templates use <placeholder> examples and per-cell reasons. One guard (isEchoedJudgeVerdict: placeholder, legacy example string, or a reason made only of prompt sentences) behind one call helper (askSheetJudge) serves all four judges: re-ask once, then throw. REAR_TURN_POSE is one constant filled into both live row generators and all four judges. Replay on the stored verdicts: heads 6/6, bodies 6/6, identity 5/6, style 4/6 flagged. One paid re-run of the three row judges on Kiaan's stored sheet: no echo, per-cell observations. Pinned by tests/unit/sheet-judge-echo-guard.test.ts."
     },
     {
@@ -1396,7 +1396,7 @@
       "impact": "Any arc whose premise/invented list is empty and written in brackets adds a phantom commissioned character; the plan counters then raise unclearable MUST-FIX findings that buy a re-plan and bias its convergence test. Staging and production.",
       "status": "fixed",
       "fixedAt": "2026-09-23",
-      "fixedIn": "this commit",
+      "fixedIn": "86d6ff4a7",
       "fix": "isNegativeFigureAnswer tests the answer's head: a leading '(' dropped, cut at the first '(', ',', ';' or ':'. Shared by both lists. arcCritiqueSpec and arc-retell.txt say an empty list is the heading alone, with no dash line. Replay on the stored arc: premise ['(none'] -> []; invented lists unchanged. Pinned by tests/unit/arc-invented-figures.test.ts."
     }
   ]
