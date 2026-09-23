@@ -1683,6 +1683,18 @@
       "fixedAt": "2026-09-23",
       "fixedIn": "7a9e8f0f3",
       "fix": "params.evalPrompt names the one judge the override replaces (heads|bodies|identity|style), prefill is that template, a stray override throws; avatar_style prefills the built buildStyleTransferPrompt; the test-version path runs evaluateAvatarSheet. Pinned by tests/unit/avatar-sheet-audit-2026-09-23.test.ts."
+    },
+    {
+      "id": "shared-hands-guard-counts-location-as-object",
+      "title": "The shared-hands guard counted a location id as a one-grip object",
+      "reportedAt": "2026-09-23",
+      "source": "Staging job_1790100385959_1nitlympp brief checks: p9 \"2 characters have hands on loc002.3\", p12 \"6 characters ... on loc002.4\" for banking and digging leaves on the ground; the scene review restaged both pages to answer it.",
+      "rootCause": "sceneBriefCheck check D and sceneConsistencyCheck c3 (two hand-kept copies) grouped every hands:true row by its object string, a LOC id included.",
+      "impact": "Any page where several characters work the ground or a place with their hands: a false hand-off finding and a destructive review rewrite.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "49adecaff",
+      "fix": "sceneMetadata.handsPerObject: one reading for both counters, skipping LOC ids (id shape only). Pinned by tests/unit/art-director-audit-2026-09-23.test.ts."
     }
   ]
 }
