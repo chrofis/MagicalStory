@@ -55610,3 +55610,14 @@ position, for every derived shot. Ultra-wide gets a sized pull-back (`DERIVE_CAM
 shrinks into the middle third of the new frame. Lab 1413 (p18 base plate): buildings about half their size, same
 place. high-angle / low-angle / aerial only lost the word "position"; they were not Lab-tested.
 **Touched:** server/lib/shotVocabulary.js, tests/unit/plate-derive-for-angle.test.ts.
+
+## 2026-09-23 — Arc panel: one general SENSE lens replaces the lost-thing clause
+
+**Context:** The lost-thing clause (a11662c21, Lab 1406) caught run 6's lost egg, but the owner judged it too
+narrow: "Anything that does not make sense should get flagged not just loosing something where it can easily be found."
+**Decision:** The REPLACEABLE lens goes back to its original scope. A tenth lens, SENSE, asks at every turn whether
+a reader would stop and ask "but why don't they just …?" or say "that could not happen", tested against what the
+arc has already made true (size, what things give off, distance, who is watching, what anyone present would plainly
+do). The lost thing stays as one example among several. `arcCritiqueSpec()` names the same fault in general words.
+Supersedes the 2026-09-23 lost-thing entry's wording; its Lab 1406 result stays the baseline to beat.
+**Touched:** prompts/arc-panel.txt, server/lib/promptBuilders.js.
