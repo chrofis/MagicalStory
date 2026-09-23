@@ -56902,6 +56902,16 @@ itself re-rendered 2).
 9. The Lab wardrobe-review replay now defaults to production's reviewer (`clothingReviewModel`, it used the
    outline reviewer) and takes `noReasoning` to measure the reviewer with reasoning off.
 
+**Measured (Test Lab, staging, run 6's stored contract, deepseek-v4-pro).** Exp **1425**, reasoning on:
+232 s, 21,538 reasoning tokens, $0.071; creatures left alone (0 strays), every off-list colour named and
+rewritten, check 12 caught Max's "jacket" vs his sweatshirt and turned Kiaan's body warmer into a quilted
+jacket, 4 outfits rewritten. Exp **1427**, `noReasoning`: 8 s, 0 reasoning tokens, $0.007; the analysis
+names the same colour and plot-garment faults but rewrites only Max and leaves every colour fault
+unrewritten (its Max rewrite still says "dark blue"). The trimmed prompt did not make the review faster —
+latency is reasoning, not input. Whether to trade that execution quality for ~3.5 minutes on the path
+before the avatars is an owner call; production is unchanged (reasoning on). Exp 1423 was killed by an
+unrelated staging deploy and carries no result.
+
 **Touched:** `prompts/story-bible-from-beats.txt`, `prompts/clothing-review.txt`,
 `server/lib/promptBuilders.js`, `server/lib/beatsPipeline.js`, `storyJobPipeline.js`,
 `server/routes/stories.js`, `server/lib/testlab.js`, `tests/unit/wardrobe-prompt-inputs.test.ts`,
