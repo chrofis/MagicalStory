@@ -54,6 +54,38 @@ even beside a `[Background]` plate (only reached on a Grok failure for Grok-rout
 `docs/image-routing.md`, `docs/image-generation-methods.html`.
 **Status:** ✅ active on staging.
 
+## 2026-09-23 — A scene brief has ONE prose/metadata split, three carriers; prose is never rebuilt from its JSON
+
+**Context:** Production `job_1790107559778_fcmlfa8kn`: the scene review was handed ten canonical briefs
+(prose + `---METADATA---` + JSON) and returned the seven it rewrote as prose + a trailing fenced ```json
+block. `parseProseMetadataFormat` knew only the delimiter, so `stripSceneMetadata` sent those briefs to the
+bare-JSON path, where `buildTextFromJson` rebuilds a scene from the metadata alone: page 7's image scene
+became the single word "Objects:", page 3's "- Manuel:, center midground, ...". The builder also chose the
+legacy JSON wrapping for them. Eight more readers split on the delimiter by hand. A read-only scan of 137
+staging + 66 production stories found three carriers in stored rows: delimiter (1,699), trailing fenced
+block (13), trailing bare object on its own line (7).
+
+**Decision:** `sceneMetadata.splitBrief` is the one split, recognising all three carriers (a fence or bare
+object only when it ENDS the text and follows real prose). `parseProseMetadataFormat`,
+`extractSceneMetadata`, `findCastMissingFromMetadata`, the clothing-check prose in beatsPipeline and the Lab,
+the composite scene text in storyJobPipeline, the cast-span locator in sceneReviewGuard and the eval-strip
+gate in evalPipeline all read it. `stripSceneMetadata` THROWS when a text carries prose before a JSON object
+in no recognised carrier, instead of rebuilding it from the JSON — the only stored example is one staging
+page with a `---VISUAL BIBLE---` section appended after its metadata (`job_1789681157795_wkt20ckod`, the
+older merge bug `BRIEF_TRAILING_MARKERS` fixed at source). scene-review.txt's output line now names the
+delimiter and "unfenced" explicitly.
+
+**Rationale:** the fenced and bare carriers are already in stored rows and the iterate round produces them
+too, so normalising only at the review merge would leave every other author and every stored brief on the
+lossy path; recognising the carriers in the one split fixes every reader at once. No brief is canonicalised
+on write — there is one parse, not a parse plus a rewriter.
+
+**Touched files:** server/lib/sceneMetadata.js, server/lib/storyHelpers.js, server/lib/beatsPipeline.js,
+server/lib/testlab.js, server/lib/sceneReviewGuard.js, server/lib/evalPipeline.js, storyJobPipeline.js,
+prompts/scene-review.txt, tests/unit/brief-carrier-split.test.ts.
+
+**Status:** ✅ active
+
 ## 2026-09-23 — A place is never a one-grip object; the brief rewrite gets eyes-open and the creature face from the Art Director's constants
 
 **Context:** Staging `job_1790100385959_1nitlympp` p9 and p12: the hand-off guard reported "2 characters
@@ -57579,3 +57611,89 @@ prod: "tas de feuilles ... posées à plat").
 **Touched:** `server/lib/visualBible.js`, `server/lib/coverIterate.js`, `server/routes/regeneration.js`,
 `storyJobPipeline.js` (page by-id refs pass their page), `tests/unit/cover-object-final-state.test.ts`.
 **Status:** ✅ active on staging.
+
+## 2026-09-23 — The blind text audit asks about style (STYLE, against the injected STYLE_RULEBOOK)
+
+**Context.** The text repair rewrites only the pages an audit names, and no audit question asked about
+style. The rulebook reached the writer, the repair, the diff pass and the lector, but none of them
+reports a breach the WRITER made: the repair never sees an unnamed page, the diff only judges what the
+repair changed, and the lector is told to stay out of style. So bare fragments survived the whole
+chain — writer reruns on staging `job_1790100385959_1nitlympp`: Lab 1426 p7 «Wieder nur Rauch.», p15
+«Hier. Da. Nichts.»; Lab 1428 p3 «Dünner weisser Dampf, genau wie über der Marroni-Tüte.»
+
+**Decision (owner, 2026-09-23: "Audit asks about style").**
+- `story-text-audit-blind.txt` gains question 7, **STYLE**: every sentence of every page is checked
+  against `{STYLE_RULEBOOK}` (the same constant, filled in `buildTextAuditBlindPrompt` — never a hand
+  copy), one `FAULT[STYLE]: p<N> — «<sentence>» <rule>` per breaching sentence, a sentence another
+  question already filed is not filed again.
+- **The blind reader carries it, the arc-informed audit does not.** Style is a property of the words as
+  heard; the blind reader reads the text cold with nothing else in its prompt, which is exactly how a
+  fragment or a paired negation lands. The arc-informed audit already asks fourteen plot questions
+  against arc, plan and pictures; a fifteenth of a different kind would compete for its attention, and
+  asking on both sides would only produce duplicates for the merge to fold. STYLE is the blind side's
+  own category (like CONFUSION/IDLE), so the category-tag dedupe gains no shared meaning.
+- `text-refine.txt`: a STYLE finding is closed by recasting the quoted sentence alone (or joining it
+  into the sentence beside it) and never licenses another change on its page; a page named only by
+  STYLE findings is not analysed under the checks. Routing needed no code: any finding with a page
+  makes that page rewritable, and the ledger/report carry the category as-is.
+- **No mechanical fragment check.** A sentence without a finite verb cannot be told apart in code, across
+  languages, from a legitimate short exclamation or a line of dialogue without classifying prose meaning
+  (a word-count or verb-list heuristic is exactly that); classification stays with the prompt.
+- Test Lab `audit_replay` gains `params.fromExperiment` (+ `fromResultIndex`): audit the page text a
+  stored `story_text_replay` result produced, with the story's own briefs and plan lines, so an audit
+  prompt change is measured on the writer output that motivated it.
+
+**Rationale.** A rule the generator is given and no critic reports is a rule nothing enforces once the
+writer misses it (generator-vs-critic). One constant means writer, repair, diff, lector and auditor
+cannot drift apart.
+
+**Touched:** `prompts/story-text-audit-blind.txt`, `prompts/text-refine.txt`,
+`server/lib/promptBuilders.js` (`buildTextAuditBlindPrompt`), `server/lib/textRefine.js` (comment),
+`server/lib/testlab.js` (`runAuditReplayStage`), `tests/unit/text-audit-style.test.ts`,
+`tests/unit/text-audit-rules-reach-writer.test.ts`, `docs/prompt-inventory.md`.
+
+## 2026-09-23 — Sizes and looks leave the arc and the plan: one SIZE_LOOK_RULE for arc, plan and prose; the Visual Bible author decides sizes
+
+**Context.** Owner, reading dragon run 6 (staging `job_1790100385959_1nitlympp`): "why are sizes in the arc
+… sizes are needed only for the images, the art director must create them". The arc prompts never asked
+for sizes, but the arc model wrote them anyway ("a young dragon the size of a handcart", "a scale as big
+as a plate", "Flämmli climbs out as big as a cat"; the user's commission itself said "so gross wie ein
+Fussball"). The plan copied them into its lines ("the football-sized egg", "as big as a cat") and the
+writer turned each into a sentence. The same-day STYLE_RULEBOOK line removed them at the last stage
+only; every earlier stage still paid for them.
+
+**Consumer trace (stored run 6).** The only consumer of a size is the Visual Bible, written by the
+all-pages Art Director (scene-expansion-all.txt), which reads `{FINAL_ARC}` and the plan lines but not
+the commission. Its `scaleClass` is required and was chosen by the author itself: the egg is
+`melon-sized` (arc "football"), the dragon `waist-high` (arc "handcart"), the hatchling `forearm-sized`
+(arc "cat"), the scale `melon-sized` (arc "plate"). The words leaked into two `description`s
+("football-sized oval egg", "plate-sized … scale") although the template already says no entry gives a
+size of its own. No check reads an arc or plan size: the plan counters count cast and shots, the SENSE
+lens and the arc critique reason about sizes the story made true (kept), plan-check has no size
+question, and objectScaleAudit reads the bible's declared size. The clothing contract
+(story-bible-from-beats.txt) takes no sizes.
+
+**Decision.**
+- `SIZE_LOOK_RULE` (promptBuilders.js): a size or a look is stated only where the plot turns on it (too
+  heavy for one child to lift, too big to hide, small enough to pocket), as that plot fact, never as a
+  comparison with another thing; every other size and look is left to the pictures. ONE string, in
+  `{TELLING_RULES}` (arc-create and arc-retell), in story-beats.txt as `{SIZE_LOOK_RULE}` (with "a plan
+  line names each thing plainly; the Art Director sizes it"), and as the size line of STYLE_RULEBOOK
+  (replacing its own wording).
+- The arc keeps a size or look the COMMISSION gives, once, where the thing first appears — the Art
+  Director does not read the commission, so this is how a user's "egg the size of a football" reaches
+  the pictures. The plan and the prose drop it unless the plot turns on it.
+- `ARC_SENSE_RULE` unchanged: the arc still reasons about how big things are.
+- `SCALE_CLASS_SPEC` (visualBible.js) tells the author to decide the band from what the story has the
+  element do, since the story states a size only where its plot turns on one. It reaches both live
+  VB-authoring sites (Art Director, trial writer) through the existing placeholder.
+- plan-check.txt unchanged: it does not judge plan-line wording for sizes, and a generator-only rule
+  needs no critic twin.
+
+**Rationale.** Sizes are image staging; the words spent on them in the arc, plan and prose bought
+nothing the `scaleClass` enum does not already carry. One constant means the three story stages cannot
+drift (fix the mirror class, not the instance).
+
+**Touched:** `server/lib/promptBuilders.js` (`SIZE_LOOK_RULE`, `STYLE_RULEBOOK`,
+`buildTellingRulesSection`, `buildBeatsPrompt`), `server/lib/visualBible.js` (`SCALE_CLASS_SPEC`),
+`prompts/story-beats.txt`, `tests/unit/size-look-rule.test.ts`, `docs/prompt-inventory.md`.

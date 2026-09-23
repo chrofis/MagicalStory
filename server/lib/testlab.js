@@ -3637,6 +3637,25 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
     const { extractRefinablePages } = require('./textRefine');
     const pages = extractRefinablePages(storyData.sceneImages || []);
     if (!pages.length) throw new Error('story has no page text to audit');
+    // params.fromExperiment (2026-09-23): audit the page text a stored Lab
+    // writer run produced (story_text_replay's results[i].pages) instead of the
+    // story's shipped text — so an audit prompt change is measured on the exact
+    // writer output whose faults motivated it. Briefs and plan lines stay the
+    // story's own; only the prose is swapped.
+    if (params.fromExperiment) {
+      const { dbQuery } = require('../services/database');
+      const expId = Number(params.fromExperiment);
+      const idx = Number(params.fromResultIndex || 0);
+      const rows = await dbQuery('SELECT results FROM testlab_experiments WHERE id = $1', [expId]);
+      const src = rows[0]?.results?.[idx];
+      if (!src) throw new Error(`fromExperiment: experiment #${expId} has no result #${idx}`);
+      if (src.storyId !== target.storyId) throw new Error(`fromExperiment: result #${idx} of #${expId} is story ${src.storyId}, not ${target.storyId}`);
+      const textOf = new Map((src.pages || []).filter(p => String(p?.text || '').trim()).map(p => [p.pageNumber, String(p.text)]));
+      if (!textOf.size) throw new Error(`fromExperiment: result #${idx} of #${expId} stored no page text`);
+      const missing = pages.filter(p => !textOf.has(p.pageNumber)).map(p => p.pageNumber);
+      if (missing.length) throw new Error(`fromExperiment: #${expId} has no text for page(s) ${missing.join(', ')}`);
+      for (const p of pages) p.text = textOf.get(p.pageNumber);
+    }
     prompt = blind
       ? H.buildTextAuditBlindPrompt(storyData, pages)
       : H.buildTextAuditPrompt(storyData, pages, arc, { arcHints: resolveReplayArcHints(storyData) });
@@ -7315,7 +7334,7 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
     const meta = stored.sceneMetadata || extractSceneMetadata(x.brief) || {};
     return {
       pageNumber: x.pageNumber,
-      prose: String(x.brief).split('---METADATA---')[0],
+      prose: require('./sceneMetadata').splitBrief(x.brief).prose,
       cast: (stored.sceneCharacters || meta.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
       perCharClothing: stored.perCharClothing
         || (storyData.pageClothing?.pageClothing || {})[String(x.pageNumber)]
@@ -7444,7 +7463,7 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
     const afterPages = checkPages.map(cp => {
       const m = merged.find(x => x.pageNumber === cp.pageNumber);
       const mMeta = extractSceneMetadata(m.brief) || {};
-      return { ...cp, prose: String(m.brief).split('---METADATA---')[0], wornItems: mMeta.wornItems || [] };
+      return { ...cp, prose: require('./sceneMetadata').splitBrief(m.brief).prose, wornItems: mMeta.wornItems || [] };
     });
     const after = checkScenes(afterPages, storyData.clothingRequirements, { artifacts, visualBible: storyData.visualBible });
     const REVIEWABLE = new Set(['outfit_misattributed', 'removal_unstated']);
@@ -7729,7 +7748,7 @@ function resolveStoryBeats(storyData, helpers) {
     const meta = sc.sceneMetadata || extractSceneMetadata(sc.sceneDescription || '') || {};
     return {
       pageNumber: sc.pageNumber,
-      planLine: (meta.sceneIntent || String(sc.sceneDescription || '').split('---METADATA---')[0].slice(0, 300)),
+      planLine: (meta.sceneIntent || require('./sceneMetadata').splitBrief(sc.sceneDescription || '').prose.slice(0, 300)),
     };
   });
   return { beats, source: 'reconstructed-from-prose' };

@@ -127,7 +127,9 @@ function wordOverlap(a, b) {
  * the question that found it, and the two question sets overlap exactly where
  * the audits overlap by design (TRANSITION, PAYOFF) and nowhere else — the
  * blind reader's CONFUSION/CONTRADICTION/IDLE and the arc-informed auditor's
- * nine others are each its own. So: SAME PAGE + SAME CATEGORY + DIFFERENT
+ * nine others are each its own. STYLE (2026-09-23) is the blind reader's
+ * alone: a STYLE_RULEBOOK breach quoted sentence by sentence, routed to the
+ * repair like any other finding — its page becomes rewritable. So: SAME PAGE + SAME CATEGORY + DIFFERENT
  * AUDITOR = one fault, and word overlap is only the fallback for a pair that
  * agrees on the page but filed it under different questions.
  *
