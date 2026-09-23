@@ -55657,3 +55657,90 @@ it, and plan-check.txt checks no shots, so no critic needed a copy.
 **Touched:** server/lib/shotVocabulary.js, server/lib/promptBuilders.js, prompts/story-beats.txt,
 prompts/scene-expansion.txt, prompts/scene-expansion-all.txt, prompts/scene-iteration.txt,
 prompts/scene-iteration-free.txt, prompts/image-generation.txt, tests/unit/ots-near-figure-crop.test.ts.
+
+## 2026-09-23 — Opus 5.5 on the arc machine: cheaper per token, but no create arm reached Opus 5 at high; the re-tell holds at low
+
+**Context:** Claude Opus 5.5 was released 2026-09-22. Vendor facts, read 2026-09-23:
+`claude-opus-5-5` (confirmed by one call and by `GET /v1/models/claude-opus-5-5`, max_tokens 128000),
+**$4 input / $20 output per 1M** vs Opus 5's $5 / $25
+(https://platform.claude.com/docs/en/about-claude/pricing). Thinking is always on and cannot be
+disabled, and the **default effort is `medium`**, where Opus 5's is `high`
+(https://platform.claude.com/docs/en/build-with-claude/effort). Every production call sends no
+effort, so pointing `arcCreatorModel` at 5.5 as it stands would run the arc at `medium` without
+anyone having picked that. The owner asked: (1) should the arc move to 5.5, and (2) do
+`arc_create` and `arc_retell` both need high thinking?
+
+**Measured.** Every arm used the same staging story (`job_1789853503332_riqncqg1i`) and
+**#1375's create prompt, byte for byte** (`params.promptFrom=1375`), so the challenge draw
+and template text match the Opus 5 sweep. Every re-telling was given that same draw. Each
+pipeline ran production's panel (grok-4.6, deepseek-v4-pro, gpt-5.6-luna-pro) on the arc it
+had just created, then re-told it. Both re-tellings in #1416 answered the same panel output.
+Every committed arc was scored by claude-sonnet + grok-4.6, the same judges and scorer as
+#1375; `story-arc-judge.txt` and `storyScorecard.js` are unchanged since that run. Costs are
+the Opus call alone, and the % not returned is 1 − (visible chars/3.5)/billed output.
+
+| Lab | model | stage | effort | cost | out tok | not returned | judged (sonnet / grok) | change (s/g) | attempts (s/g) |
+|---|---|---|---|---|---|---|---|---|---|
+| #1375 | Opus 5 | create | low | $0.264 | 8,862 | 66% | 5.68 (5.79 / 5.57) | 5 / 4 | 4 / 5 |
+| #1375 | Opus 5 | create | medium | $0.297 | 10,179 | 63% | 5.93 (6.57 / 5.29) | 7 / 2 | 5 / 4 |
+| #1375 | Opus 5 | create | **high (today)** | $0.779 | 29,451 | 84% | **6.39** (7.00 / 5.79) | 8 / 4 | 6 / 6 |
+| #1418 | Opus 5.5 | create | low | $0.154 | 5,986 | 55% | 6.18 (6.43 / 5.93) | 6 / 5 | 5 / 6 |
+| #1417 | Opus 5.5 | create | medium | $0.365 | 16,556 | 80% | 5.68 (5.64 / 5.71) | 6 / 4 | 5 / 4 |
+| #1416 | Opus 5.5 | create | high | $0.492 | 22,896 | 85% | 5.89 (6.14 / 5.64) | 7 / 5 | 4 / 4 |
+| #1416 A | Opus 5.5 | retell of high | high | $0.376 | 14,898 | 81% | 6.00 (6.14 / 5.86) | 7 / 4 | 5 / 5 |
+| #1416 B | Opus 5.5 | retell of high | low | $0.155 | 3,844 | 48% | 5.86 (6.50 / 5.21) | 7 / 4 | 5 / 5 |
+| #1417 C | Opus 5.5 | retell of medium | low | $0.128 | 3,199 | 45% | 5.79 (5.93 / 5.64) | 6 / 4 | 5 / 5 |
+| #1418 D | Opus 5.5 | retell of low | high | $0.401 | 16,542 | 85% | 5.64 (5.21 / 6.07) | 5 / 6 | 3 / 5 |
+
+Production baseline for the same job (Opus 5, no effort sent = high): arc_create $0.819 and
+arc_retell $0.575, so **$1.39 of Opus per story**. Opus cost per story for each combination:
+A $0.87 (−$0.53), B $0.65 (−$0.75), C $0.49 (−$0.90), D $0.56 (−$0.84), against a $4.57 story.
+The panel costs $0.10-0.19 in every case and does not change.
+
+**What the arcs say (read in full, not only scored).** Opus 5 at high is still the only arc
+whose ending *shows* the change. The shy hero wants to keep the hatchling, hands it back to its
+mother anyway, gives his cap to the raven, and then says his three friends' names aloud. Every
+Opus 5.5 arc ends on a named feeling: "Julian is proud, because he knocked first" (5.5 high,
+and A and B nearly word for word), "he feels brave" (C), "feels proud" (D). That is the
+told-not-shown ending #1375 found at *low* effort on Opus 5. The 5.5 middles are sound. The
+high create has a real self-caused error: the boys hide the egg from its own mother. C has a
+real three-try sequence: the root hole is a squirrel's home, the sun-warm wall goes cold, the
+leaf heap works. A (re-tell high) is the richest 5.5 arc. It adds a failed attempt to roll the
+egg back and Levin's own "We will be its nest!", which gives the older brother an act of his
+own. B (re-tell low) makes the same moves with one convenience: the lost scarf is lying at the
+roots. D (a high re-tell of a low create) mostly *adds incident*, a dog chasing the "ball" and
+a puddle. The sonnet judge marks it down (attempts 3), and it does not repair the create's
+told ending.
+
+**Recommendation, pending owner — no default changed:**
+- **arc_create: stay on Opus 5 at high.** No Opus 5.5 create arm reached it: 5.89 at 5.5 high
+  against 6.39. Both judges put Opus 5 high above 5.5 high. On grok the gap (5.79 vs 5.64) is
+  inside noise, but the ending difference above is not.
+- **arc_retell: effort can drop to `low`.** On 5.5 a low re-tell of the same panel output
+  scored within 0.14 of a high one (the judges split on which was better), with identical
+  change and attempts, at 41% of the cost. A re-telling is bounded by the committed arc and the
+  panel's solutions, and that appears to be why it does not need the thinking a create does.
+  The cheapest candidate is **Opus 5 create high + Opus 5.5 retell low**: $0.82 + ~$0.16 =
+  ~$0.98 of Opus per story, **~$0.42 cheaper (~9% of $4.57)**. It needs a separate
+  `arcRetellModel` key (both calls read `arcCreatorModel` today) and an explicit `effort` on
+  the call. Opus 5 re-tell at low was not measured (owner scope), so "Opus 5 retell low" is the
+  other way to take the same saving, and it is not yet evidenced.
+- **If the arc moves to 5.5 anyway, set `effort` explicitly.** Omitting it means `medium` on
+  5.5, and medium was the weakest 5.5 create here (5.68).
+- **A strong re-tell does not rescue a cheap create** (D: 6.18 → 5.64).
+
+**Caveats:** n=1 story, one arc per arm. The whole Opus 5.5 range (5.64-6.18) is narrower
+than the two judges' disagreement on a single arc (up to 1.29 on B), so no ordering *among*
+the 5.5 arms is evidence. Grok ranked D the best re-tell and sonnet ranked it the worst. 5.5 is
+not monotone in effort here (low 6.18 > high 5.89 > medium 5.68), unlike Opus 5 in #1375. That
+is a noise warning, not a finding. The create prompt is #1375's. Since then the arc critique
+spec gained the SENSE lens (`725a4cd45`), so today's production create prompt differs by that
+clause, while the re-tell prompts used today's template. No Opus 5 re-tell was scored, so A
+vs production is a create-level comparison only. The judged score measures the arc, never the
+finished book.
+
+**Touched:** `server/config/models.js` (`claude-opus-5-5` in TEXT_MODELS + MODEL_PRICING,
+Lab-only), `server/lib/testlab.js` (`arc_effort`: `model`, `stage: 'pipeline'`, `promptFrom`),
+`client/src/services/testlabService.ts` (label). Commits `175cc22bc`, `fd10b8af4`.
+
+**Status:** 🟡 recommendation pending owner
