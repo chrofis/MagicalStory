@@ -562,7 +562,7 @@ function missingGarments(clothingDescription, prose, requiredSlots = ['top', 'bo
  *     tricorn hat" is one hat, described twice).
  */
 
-const { WORN_SLOTS, SLOT_NOUNS, parseWornAs, deriveSlotFromName, sameName } = require('./wornItems');
+const { WORN_SLOTS, SLOT_NOUNS, parseWornAs, deriveSlotFromName, slotFromType, indexOfElementAmong, sameName } = require('./wornItems');
 
 // The slots this check arbitrates. See the scope note above.
 const ARBITRATED_SLOTS = ['headwear', 'footwear', 'outer layer'];
@@ -586,11 +586,36 @@ function slotNounsIn(slot, text) {
   return nouns.filter(n => new RegExp(`\\b${n}\\b`, 'i').test(lower));
 }
 
-/** Which slot a VB entry occupies — its declared `type` first, then its name. */
+/**
+ * Which slot a VB entry occupies — DECLARED fields first (2026-09-23): the
+ * `wornAs` link's own slot, then the entry's `type` through the one type map
+ * (wornItems.slotFromType), and only then its name through the slot nouns.
+ * This used to read `type` only when it was literally a slot name and otherwise
+ * guess from the name, so a garment typed "outerwear", linked `Max.outer layer`
+ * and named "hooded sweatshirt" (no slot noun) had no slot and was never
+ * compared at all (staging job_1790100385959_1nitlympp ART005).
+ */
 function bibleEntrySlot(entry) {
-  const declared = String(entry?.type || '').trim().toLowerCase();
-  if (WORN_SLOTS.includes(declared)) return declared;
-  return deriveSlotFromName(entry?.label || entry?.name);
+  const link = parseWornAs(entry?.wornAs);
+  if (link && link.slotKnown) return link.slot;
+  return slotFromType(entry?.type) || deriveSlotFromName(entry?.label || entry?.name);
+}
+
+/**
+ * Put `replacement` in place of `clause`, keeping the clause's own joiner and
+ * article (2026-09-23). "…sneakers, and a forest green zip-up fleece jacket"
+ * restated as "forest green long-sleeve … jacket" used to lose its "and a" and
+ * read "…sneakers, forest green long-sleeve … jacket". A replacement that brings
+ * its own article keeps it only when the clause had none.
+ */
+const CLAUSE_LEAD_RE = /^\s*(?:(?:and|or|plus)\s+)?(?:(?:a|an|the)\s+)?/i;
+const ARTICLE_RE = /^\s*(?:a|an|the)\s+/i;
+/** A clause without its joiner and article — what "the same words" compares. */
+const clauseBody = (text) => String(text || '').replace(CLAUSE_LEAD_RE, '').trim().toLowerCase();
+function spliceClause(description, clause, replacement) {
+  const lead = (clause.match(CLAUSE_LEAD_RE) || [''])[0];
+  const body = /\b(?:a|an|the)\s+$/i.test(lead) ? replacement.replace(ARTICLE_RE, '') : replacement;
+  return description.split(clause).join(lead + body);
 }
 
 /** The plain colour words a text names, shades folded (`rust-brown` → brown). */
@@ -605,18 +630,18 @@ function colourSet(text) {
 /**
  * Does restating `clause` as `replacement` change what is DRAWN? (2026-09-23)
  *
- * A rewording keeps the garment — the element's own slot noun is in the clause,
- * and the replacement names no slot noun the clause does not — and keeps
+ * A rewording keeps the garment — the clause IS the element (found by its own
+ * declared words, or sharing its slot noun), and the replacement names no slot
+ * noun the clause does not — and keeps
  * its colours (the same plain colour words on both sides). Anything else — a
  * different garment, a colour added, dropped or changed — is a visible change.
  * Structured comparison over the contract's closed vocabularies (SLOT_NOUNS,
  * COLOUR_WORDS), the ones this module already reads; unsure answers count as
  * visible.
  */
-function isRewording(slot, clause, replacement, elementText) {
+function isRewording(sameGarment, slot, clause, replacement) {
+  if (!sameGarment) return false;
   const clauseNouns = slotNounsIn(slot, clause);
-  const elementNouns = slotNounsIn(slot, elementText);
-  if (!elementNouns.some(n => clauseNouns.includes(n))) return false;
   if (slotNounsIn(slot, replacement).some(n => !clauseNouns.includes(n))) return false;
   const a = colourSet(clause);
   const b = colourSet(replacement);
@@ -668,12 +693,21 @@ function checkWardrobeAgainstBible(clothingRequirements, visualBible) {
           const hits = [...tokens(elText)].filter(t => outfitTokens.has(t)).length;
           if (hits < 2) continue;                                     // not this character's
         }
-        // The clause of THIS outfit that occupies the same slot.
-        const clause = clauses.find(c => deriveSlotFromName(c) === slot);
+        // A LINKED element's own clause is found by its own declared words
+        // (wornItems.indexOfElementAmong over name/label/aliases — never its
+        // description, which shares cut words like "long-sleeve" with other
+        // garments). That answers "which clause IS this garment" for any
+        // wording, including garments no slot noun names ("sweatshirt").
+        // Otherwise — no link, or its words do not single a clause out — the
+        // clause that OCCUPIES the slot is the one it would displace.
+        const own = link
+          ? indexOfElementAmong(clauses, { name: el.name, label: el.label, aliases: el.aliases })
+          : -1;
+        const clause = own >= 0 ? clauses[own] : clauses.find(c => deriveSlotFromName(c) === slot);
         if (!clause) continue;                                        // wardrobe silent — the bible just adds it
         const elNouns = slotNounsIn(slot, elText);
         const clauseNouns = slotNounsIn(slot, clause);
-        const sameGarment = elNouns.some(n => clauseNouns.includes(n));
+        const sameGarment = own >= 0 || elNouns.some(n => clauseNouns.includes(n));
         const replacement = String(el.description || elName).trim().replace(/\.\s*$/, '');
         // A DECLARED item (`wornAs`) owns its slot outright: the writer said
         // this prop IS that character's garment there, so the bible's words
@@ -682,13 +716,13 @@ function checkWardrobeAgainstBible(clothingRequirements, visualBible) {
         // to. Without a link, only a different garment is a fault.
         const kind = link ? 'reconcile' : 'conflict';
         if (sameGarment && !link) continue;                           // the same garment, twice
-        if (link && clause === replacement) continue;                 // already in the same words
+        if (link && clauseBody(clause) === clauseBody(replacement)) continue;   // already in the same words
         findings.push({
           kind,
           // Same garment, same colours, other words: the contract text is
           // restated but nothing an avatar shows has changed, so no caller may
           // treat it as a wardrobe change (beatsPipeline onWardrobeCorrected).
-          rewording: !!link && isRewording(slot, clause, replacement, elText),
+          rewording: !!link && isRewording(sameGarment, slot, clause, replacement),
           character,
           category,
           slot,
@@ -697,7 +731,7 @@ function checkWardrobeAgainstBible(clothingRequirements, visualBible) {
           elementText: replacement,
           wardrobeClause: clause,
           before: description,
-          after: description.split(clause).join(replacement),
+          after: spliceClause(description, clause, replacement),
         });
       }
     }

@@ -159,3 +159,46 @@ describe('a same-garment rewording is not a wardrobe change', () => {
     expect(src).toContain('const names = [...new Set(visibleChanges.map(f => f.character).filter(Boolean))];');
   });
 });
+
+describe('the wardrobe-vs-bible check finds a linked garment by its own words, and keeps the joiner', () => {
+  // Max's outfit and ART005 from the run: "sweatshirt" is in no slot-noun list
+  // and the entry is typed "outerwear", so it used to get no slot and was never
+  // compared.
+  const MAX = 'A white long-sleeve shirt, dark navy blue jogger trousers with a ribbed cuff at the ankle, white sneakers, and a purple hooded sweatshirt with a kangaroo pocket at the front.';
+  const reqs = () => ({ Max: { standard: { used: true, description: MAX } } });
+  const bible = (description: string) => ({
+    artifacts: [{ id: 'ART005', name: 'purple hooded sweatshirt', label: 'hooded sweatshirt', wornAs: 'Max.outer layer', type: 'outerwear', pages: [4], description }],
+  });
+
+  it('a garment no slot noun names is compared through its link', () => {
+    const f = checkWardrobeAgainstBible(reqs(), bible('purple long-sleeve hooded sweatshirt with a kangaroo pocket at the front and a thick hood'));
+    expect(f).toHaveLength(1);
+    expect(f[0].slot).toBe('outer layer');
+    expect(f[0].wardrobeClause).toBe('and a purple hooded sweatshirt with a kangaroo pocket at the front');
+    expect(f[0].rewording).toBe(true);
+  });
+
+  it('the restated clause keeps its "and a", and a second pass finds nothing', () => {
+    const r: any = reqs();
+    const v = bible('purple long-sleeve hooded sweatshirt with a kangaroo pocket at the front and a thick hood');
+    applyWardrobeBibleCorrections(r, v, { log: { warn: () => {} } });
+    expect(r.Max.standard.description).toContain('white sneakers, and a purple long-sleeve hooded sweatshirt');
+    expect(checkWardrobeAgainstBible(r, v)).toHaveLength(0);
+  });
+
+  it('a replacement bringing its own article does not double it', () => {
+    const r: any = reqs();
+    applyWardrobeBibleCorrections(r, bible('a purple hooded sweatshirt with a zip'), { log: { warn: () => {} } });
+    expect(r.Max.standard.description).toContain('white sneakers, and a purple hooded sweatshirt with a zip.');
+    expect(r.Max.standard.description).not.toMatch(/\ba a\b/);
+  });
+
+  it('a linked garment whose words match no clause still displaces the slot occupant (a visible change)', () => {
+    const v = { artifacts: [{ id: 'ART005', name: 'yellow rain parka', label: 'rain parka', wornAs: 'Max.outer layer', type: 'outerwear', pages: [4], description: 'yellow rain parka' }] };
+    const r = { Max: { standard: { used: true, description: 'A white shirt, blue trousers, and a green jacket.' } } };
+    const f = checkWardrobeAgainstBible(r, v);
+    expect(f).toHaveLength(1);
+    expect(f[0].wardrobeClause).toBe('and a green jacket');
+    expect(f[0].rewording).toBe(false);
+  });
+});

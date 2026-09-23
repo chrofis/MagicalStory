@@ -56429,3 +56429,29 @@ carry, zero, and the p11/p12/p18 prompts say "Max is NOT wearing this … lies o
 `server/lib/testlab.js`, `storyJobPipeline.js` (comment), `tests/unit/worn-garment-review-chain.test.ts`,
 `tests/unit/wardrobe-vs-bible.test.ts`.
 **Status:** ✅ active on staging.
+
+## 2026-09-23 — The wardrobe-vs-bible check reads a garment's declared slot and finds its clause by its own words
+
+**Context.** Dragon run 6 (staging `job_1790100385959_1nitlympp`). `checkWardrobeAgainstBible` decided an
+element's slot from its `type` only when the type was literally a slot name, else from its name through
+the slot-noun list, and located the outfit clause through the same list. ART005 — typed `outerwear`,
+linked `Max.outer layer`, named "purple hooded sweatshirt" — got no slot (neither "outerwear" nor
+"sweatshirt" is in a list), so Max's hoodie was never compared. And a restated clause lost its joiner:
+"…sneakers, and a forest green zip-up fleece jacket" became "…sneakers, forest green long-sleeve … jacket".
+
+**Decision.** The slot comes from declared fields first: the `wornAs` link's slot, then the entry's `type`
+through the one type map (`wornItems.slotFromType`), the name's slot nouns last. A linked element's own
+clause is found by its own declared words (`wornItems.indexOfElementAmong` over name/label/aliases — the
+same identity locator the off-state strip uses; the description is left out because cut words like
+"long-sleeve" recur across garments). Only when those words single out no clause is the clause that
+occupies the slot taken, which is then a different garment (never a rewording). The replacement keeps the
+clause's joiner and article (`spliceClause`), and "already in the same words" compares bodies without
+them, so a second pass finds nothing. Wording ownership (bible vs wardrobe) is untouched — owner's call.
+
+**Replay (rung 1, stored contract + AD bible, no model calls):** Max/outer layer ART005 is now compared
+(reconcile, rewording); the three restated outfits read "…white sneakers, and a purple long-sleeve hooded
+sweatshirt…", "…sneakers, and a forest green long-sleeve zip-up fleece jacket…", "…boots, and a rust-brown
+sleeveless front-zip body warmer…"; a second pass finds 0; no avatar re-render.
+
+**Touched:** `server/lib/clothingCheck.js`, `tests/unit/worn-garment-review-chain.test.ts`.
+**Status:** ✅ active on staging.
