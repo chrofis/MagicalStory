@@ -2181,11 +2181,6 @@ function buildCharacterPromptBlock(char, opts = {}) {
  * @param {Array} characters - Array of character objects with name and height properties
  * @returns {string} Description like "Height order: Emma (shortest) -> Max (taller) -> Dad (slightly taller)"
  */
-// The last age category in which a year of age still reliably means more
-// height (AGE_CATEGORY_ORDER): past it, a tall younger person can stand above
-// an older one, so the centimetres decide.
-const HEIGHT_BY_AGE_MAX_INDEX = AGE_CATEGORY_ORDER.indexOf('young-teen');
-
 function buildRelativeHeightDescription(characters) {
   if (!characters || characters.length < 2) return '';
 
@@ -2209,24 +2204,6 @@ function buildRelativeHeightDescription(characters) {
 
   if (withHeight.length < 2) return '';
 
-  // THE ORDER AGREES WITH THE AGE BLOCK (2026-09-23). The AGE & PROPORTIONS
-  // block draws each child at its age category, and a younger category is
-  // "clearly smaller"; the stored centimetres can say otherwise (staging
-  // job_1790100385959_1nitlympp p12: a toddler at 102 cm listed taller than a
-  // preschooler at 98 cm, while the age block called the toddler clearly
-  // smaller). Among children still growing, the category decides the order and
-  // the centimetres order within one category; everyone else keeps the
-  // centimetre order, and the children keep the slots they held in it.
-  const bandOf = (name) => {
-    const c = characters.find(x => x && x.name === name);
-    const idx = getAgeCategoryIndex(extractCharacterVisualProfile(c || {}).ageCategory);
-    return idx >= 0 && idx <= HEIGHT_BY_AGE_MAX_INDEX ? idx : -1;
-  };
-  for (const c of withHeight) c.band = bandOf(c.name);
-  const slots = withHeight.map((c, i) => (c.band >= 0 ? i : -1)).filter(i => i >= 0);
-  const growing = slots.map(i => withHeight[i]).sort((a, b) => (a.band - b.band) || (a.height - b.height));
-  slots.forEach((slot, k) => { withHeight[slot] = growing[k]; });
-
   // Build relative description
   const descriptions = [];
 
@@ -2242,11 +2219,7 @@ function buildRelativeHeightDescription(characters) {
       const diff = char.height - prev.height;
 
       let descriptor;
-      if (char.band >= 0 && prev.band >= 0 && char.band > prev.band && diff <= 10) {
-        // An older category is never "similar height": the age block says the
-        // younger one is clearly smaller, whatever the centimetres say.
-        descriptor = 'taller';
-      } else if (diff <= 3) {
+      if (diff <= 3) {
         descriptor = 'similar height';
       } else if (diff <= 10) {
         descriptor = 'slightly taller';

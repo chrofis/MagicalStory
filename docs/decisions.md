@@ -57364,7 +57364,7 @@ outlines at all, forms defined by paint edges", a template option) is never flag
 **Touched:** `server/lib/evalPipeline.js`, `tests/unit/style-gate-echo.test.ts`.
 **Status:** ✅ active on staging.
 
-## 2026-09-23 — One page prompt, one height order and no gaze at the page's own place
+## 2026-09-23 — No gaze at the page's own place (the height-order clash is an owner call)
 
 **Context.** Dragon run 6 (staging `job_1790100385959_1nitlympp`) p12, audit 08 S12. The built page prompt
 contradicted itself twice. (1) HEIGHT ORDER, from stored centimetres, read "Max (shortest) → Julian
@@ -57373,10 +57373,11 @@ a preschooler" (his apparentAge; the age-band clamp itself is settled and untouc
 digging in Lindenhof square carried "eyes on Lindenhof square" — `looksAt: LOC002.4`, the page's own
 location, resolved into a gaze target — and the three judges were handed the same line.
 
-**Decision.** (1) `buildRelativeHeightDescription`: among children still growing (age categories up to
-`young-teen`), the age category decides the order and centimetres order within a category; everyone else
-keeps the centimetre order, and the children keep the slots they held in it. A step into an older
-category is at least "taller". (2) `vbIdGuard.gazeTarget`: a `looksAt` naming a LOC the page's `objects[]`
+**Decision.** (1) HEIGHT ORDER is NOT changed: audit 04 A9 already records it as an OWNER CALL with two
+options — drop the comparative clauses from the age-cue markers (HEIGHT ORDER keeps the measured order), or
+order HEIGHT ORDER by age category first (a younger category is shorter, centimetres order within one).
+The second was built and replayed on the run's cast ("Julian (shortest) → Max (taller) → Kiaan (slightly
+taller) → Levin (slightly taller)") and then withdrawn for the owner's pick. (2) `vbIdGuard.gazeTarget`: a `looksAt` naming a LOC the page's `objects[]`
 cites is no gaze target. It is read once, through the reader every consumer already used for the judges
 (`gazeCharacters`), and the page prompt's EXACT POSES / EXPRESSIONS block and the character repair's
 state block read it through the same function.
@@ -57387,9 +57388,8 @@ state block read it through the same function.
 cannot tell which of the AD's two statements is meant; the rule belongs in the AD templates (a row names
 only actors who do that action) and the brief check.
 
-**Replay (rung 1, stored story data):** the run's cast now builds "Julian (shortest) → Max (taller) →
-Kiaan (slightly taller) → Levin (slightly taller)"; the p12 gaze lines for Max, Levin and Kiaan are gone
-from the judge block, Julian keeps "away".
+**Replay (rung 1, stored story data):** the p12 gaze lines for Max, Levin and Kiaan are gone from the judge
+block, Julian keeps "away".
 
 **Touched:** `server/lib/promptBuilders.js`, `server/lib/vbIdGuard.js`, `server/lib/faceRepair.js`,
 `tests/unit/page-prompt-self-consistency.test.ts`.
