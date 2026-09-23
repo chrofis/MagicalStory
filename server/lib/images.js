@@ -807,6 +807,15 @@ function dedupeIdenticalBullets(prompt) {
 // are not droppable at all: the prose IS the page, the colour map is what pairs
 // each baked card with a name, and the rest is what the page was commissioned
 // with.
+//
+// NOR ARE THE PARITY ANCHORS (2026-09-23). NO MARKS and HANDS are one constant
+// each, shared with the judge rule they answer (D-24, D-16b — sibling-registry
+// set `page-image-generator-vs-critics`). They were third and fourth in this
+// list, so an over-cap page was judged for two rules its illustrator never
+// received: staging job_1790100385959_1nitlympp p12 and all three of its covers
+// lost both (docs/audits/prompt-audit-2026-09-23/08-page-images.md S3,
+// 09-covers.md C3). REQUIRED TEXT is protected the same way. None of them is a
+// unit below, and cutBlocks() throws if a unit would ever remove one.
 const { NO_CHARACTER_MARKING_RULE, HANDS_HOLD_ONLY_NAMED_RULE } = require('./promptBuilders');
 
 /**
@@ -832,28 +841,109 @@ function templateParagraph(prefix) {
   return para;
 }
 
+/** A whole template paragraph, removed by its exact text (every occurrence). */
+function paragraphUnit(label, prefix) {
+  const text = templateParagraph(prefix);
+  return {
+    label,
+    apply(s) {
+      const n = s.split(text).length - 1;
+      return { text: n ? s.split(text).join('') : s, entitled: n * text.length };
+    },
+  };
+}
+
+/** A block found by a regex (one match) — the cast-derived page facts. */
+function regexUnit(label, re) {
+  return {
+    label,
+    apply(s) {
+      const m = s.match(re);
+      return m ? { text: s.replace(re, ''), entitled: m[0].length } : { text: s, entitled: 0 };
+    },
+  };
+}
+
 /**
- * The droppable blocks, LEAST LOAD-BEARING FIRST. Built lazily (the templates
+ * ONE BULLET of a bulleted template paragraph. Composition used to go whole —
+ * 1,176 chars on p12 of staging job_1790100385959_1nitlympp, which was ~110
+ * chars over the cap when its turn came — so a page lost its feet-on-the-ground
+ * rule to pay for one sentence. Bullets go one at a time, in rank order; the
+ * header goes with the last one, so no empty heading is ever sent.
+ */
+function bulletUnit(label, paragraphPrefix, bulletPrefix) {
+  const para = templateParagraph(paragraphPrefix);
+  const [header, ...bullets] = para.split('\n');
+  const line = bullets.find(b => b.startsWith(`- ${bulletPrefix}`));
+  if (!line) {
+    throw new Error(`prompt-shrink: the "${paragraphPrefix}" paragraph has no bullet starting "- ${bulletPrefix}" — the drop list is stale`);
+  }
+  const escaped = header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const orphanHeader = new RegExp(`^${escaped}[ \\t]*(?!\\n- )(?=\\n|$)`, 'm');
+  const needle = `\n${line}`;
+  return {
+    label,
+    apply(s) {
+      const n = s.split(needle).length - 1;
+      if (!n) return { text: s, entitled: 0 };
+      let out = s.split(needle).join('');
+      let entitled = n * needle.length;
+      if (orphanHeader.test(out)) {
+        out = out.replace(orphanHeader, '');
+        entitled += header.length;
+      }
+      return { text: out, entitled };
+    },
+  };
+}
+
+/**
+ * The droppable units, LEAST LOAD-BEARING FIRST. Built lazily (the templates
  * are loaded asynchronously at boot) and cached.
+ *
+ * THE RANK (2026-09-23). A unit goes early when something else in the prompt
+ * already carries most of what it says, or when it binds few pages:
+ *   - COUNTS binds only a page that states a number of like things.
+ *   - the Composition SIZE bullet restates what the REQUIRED OBJECTS scale
+ *     riders and DEPTH AND SIZE ("a size stated for an element always wins")
+ *     state per element.
+ *   - the Composition FACING bullet yields to every declared facing, and EXACT
+ *     POSES / EXPRESSIONS AND EYES declare one per figure on a page (a cover
+ *     declares "eyes on the viewer" for everyone).
+ *   - DEPTH AND SIZE defines the brief's foreground/midground/background words.
+ *   - the Composition GROUND bullet is a page's only feet-on-the-ground rule
+ *     (a cover carries a short one of its own).
+ *   - REQUIRED CAST puts in every figure the prose gives no action to.
+ * Then the page facts — height, age, the reference-photo binding, the frame
+ * rule — last to go, as the 2026-09-21 ranking set them.
  */
 let CUT_BLOCKS = null;
 function cutBlocks() {
   if (CUT_BLOCKS) return CUT_BLOCKS;
-  CUT_BLOCKS = [
-    // Generic rules, identical on every page of every book.
-    { label: 'COUNTS', text: templateParagraph('**COUNTS:**') },
-    { label: 'DEPTH AND SIZE', text: templateParagraph('**DEPTH AND SIZE:**') },
-    { label: 'HANDS', text: HANDS_HOLD_ONLY_NAMED_RULE },
-    { label: 'NO MARKS', text: NO_CHARACTER_MARKING_RULE },
-    { label: 'REQUIRED CAST', text: templateParagraph('**REQUIRED CAST:**') },
-    // Page facts. Last to go. NOT "never reached": staging job_1790100385959
-    // p12 and its front cover both lost Composition here (2026-09-23 audit).
-    { label: 'Composition', text: templateParagraph('**Composition:**') },
-    { label: 'HEIGHT ORDER', re: /^\*\*HEIGHT ORDER[^\n]*\n/m },
-    { label: 'AGE & PROPORTIONS', re: /^AGE & PROPORTIONS[\s\S]*?(?=\n\n|$)/m },
-    { label: 'reference-photo rule', text: templateParagraph('When the FIRST reference photo') },
-    { label: 'single-illustration rule', text: templateParagraph('Generate a SINGLE illustration') },
+  const units = [
+    paragraphUnit('COUNTS', '**COUNTS:**'),
+    bulletUnit('Composition: size', '**Composition:**', 'A vessel, building or vehicle'),
+    bulletUnit('Composition: facing', '**Composition:**', 'Each character does a specific action'),
+    paragraphUnit('DEPTH AND SIZE', '**DEPTH AND SIZE:**'),
+    bulletUnit('Composition: ground', '**Composition:**', 'A standing character stands'),
+    paragraphUnit('REQUIRED CAST', '**REQUIRED CAST:**'),
+    // Page facts. Last to go.
+    regexUnit('HEIGHT ORDER', /^\*\*HEIGHT ORDER[^\n]*\n/m),
+    regexUnit('AGE & PROPORTIONS', /^AGE & PROPORTIONS[\s\S]*?(?=\n\n|$)/m),
+    paragraphUnit('reference-photo rule', 'When the FIRST reference photo'),
+    paragraphUnit('single-illustration rule', 'Generate a SINGLE illustration'),
   ];
+  // The anchors are protected by construction; this makes a unit added later
+  // that would reach one fail at the first shrink instead of shipping.
+  const tpl = PROMPT_TEMPLATES.imageGeneration || IMAGE_GENERATION_TEMPLATE_ON_DISK;
+  for (const anchor of [NO_CHARACTER_MARKING_RULE, HANDS_HOLD_ONLY_NAMED_RULE]) {
+    let probe = `${tpl}\n\n${anchor}`;
+    for (const unit of units) probe = unit.apply(probe).text;
+    if (!probe.includes(anchor)) {
+      throw new Error('prompt-shrink: a drop unit removes a generator↔critic parity anchor — anchors are never cut');
+    }
+  }
+  CUT_BLOCKS = units;
   return CUT_BLOCKS;
 }
 
@@ -862,20 +952,6 @@ function cutBlocks() {
  * than the block itself. This is the allowance for that, and nothing else.
  */
 const BLANK_RUN_SLACK = 64;
-
-/**
- * How many characters `block` occupies in `text` — the sum of every occurrence
- * for an exact-text block, the matched length for a regex one (String.replace
- * without /g replaces exactly one). 0 when the block is not present.
- */
-function blockExtent(text, block) {
-  if (block.re) {
-    const m = text.match(block.re);
-    return m ? m[0].length : 0;
-  }
-  const occurrences = text.split(block.text).length - 1;
-  return occurrences * block.text.length;
-}
 
 /**
  * @returns {{ text: string, dropped: string[], proseCut: number }}
@@ -887,11 +963,11 @@ function sectionAwareCut(prompt, maxLen, logLabel) {
     if (out.length <= maxLen) break;
     const before = out.length;
     // What this drop is ENTITLED to remove: its own text, every occurrence of
-    // it, and nothing else. Measured before the removal so the check below has
-    // a number rather than a hope.
-    const entitled = blockExtent(out, block);
-    out = (block.re ? out.replace(block.re, '') : out.split(block.text).join(''))
-      .replace(/\n{3,}/g, '\n\n');
+    // it, and nothing else — reported by the unit that removes it, so the
+    // check below has a number rather than a hope.
+    const applied = block.apply(out);
+    const entitled = applied.entitled;
+    out = applied.text.replace(/\n{3,}/g, '\n\n');
     const removed = before - out.length;
     if (removed > entitled + BLANK_RUN_SLACK) {
       // A DROP THAT REACHES PAST ITS OWN BLOCK IS A DELETED PAGE, NOT A SHRINK.

@@ -16,8 +16,7 @@ const { applyStyledAvatars } = require('./styledAvatars');
 const { coverKeyToType, coverLabel, COVER_PAGE_NUMBERS } = require('./coverKeys');
 const { parseHoldsId } = require('./coverHolds');
 const { normalizeName, isKnownName } = require('./phantomCharacters');
-const { canonicalName, buildCastIndex, sameEntity } = require('./castResolver');
-const { getUsedClothingCategories } = require('./clothingCategories');
+const { canonicalName, buildCastIndex } = require('./castResolver');
 
 // Hard cap on figures a cover may declare (title page is narrowed to mains).
 // ONE constant with the cover JUDGE and with the first-generation path — see
@@ -409,7 +408,14 @@ function applyCoverWornHeldDedupe(photos, coverHint, visualBible) {
       if (!sameName(meta.wornAs.owner, charName)) return 'unrelated';
       return meta.wornAs.slot === segSlot ? 'duplicate' : 'unrelated';
     }
-    if (!meta.slot || !segSlot) return 'duplicate';   // unmappable → the old behaviour
+    // AN ARTIFACT WITH NO WORN SLOT IS NOT A GARMENT (2026-09-23). A bag, an
+    // egg or a lantern can share a colour word with an outfit segment, and the
+    // loose token matcher then pairs them: on staging
+    // job_1790100385959_1nitlympp's title page the held "brown paper bag"
+    // deleted "brown ankle boots" from the holder's outfit line. Nothing that
+    // has no body slot can be the same item as something worn.
+    if (!meta.slot) return 'unrelated';
+    if (!segSlot) return 'duplicate';   // an unmappable outfit segment → the old behaviour
     if (meta.slot !== segSlot) return 'unrelated';
     // Same slot: the slot's own garment nouns decide whether it is one item.
     const nouns = (WORN_SLOT_NOUNS[segSlot] || []);
@@ -585,36 +591,38 @@ function narrowCoverCastToMains(cast, { castFromHint = false, mainIds = null } =
  * `missing_character` for a person who does not exist.
  *
  * Resolution: drop every hint entry that does not resolve against the story's
- * cast, then refill the freed slots from cast members not yet on the cover —
- * mains first, then the remaining characters in their input order. The title
- * page refills from mains only (its rule is mains-only). Name resolution
- * reuses the phantom detector's whole-word matcher, so "Grossvater Felix" in
- * the hint still resolves to cast member "Felix".
+ * cast. Name resolution reuses the phantom detector's whole-word matcher, so
+ * "Grossvater Felix" in the hint still resolves to cast member "Felix".
  *
- * Mutates `coverHints` in place; runs before the clothing reconciliation so a
- * backfilled character's clothing is reconciled like any other.
+ * THE COVER CAST IS THE ART DIRECTOR'S (owner, 2026-09-23). This function used
+ * to REFILL the hint afterwards — mains first, then everyone else, up to
+ * MAX_COVER_CHARACTERS — and it filled even when nothing had been dropped. On
+ * staging job_1790100385959_1nitlympp the AD cast the title page as two
+ * children at a discovery (one centre, one right foreground holding the bag);
+ * the refill added two more with no position, the count flipped the
+ * composition to "a GROUP scene introducing all the story's characters", and
+ * the moment became a four-boy line-up (docs/audits/prompt-audit-2026-09-23/
+ * 09-covers.md C4). The refill is deleted, not narrowed: a dropped phantom
+ * leaves the AD's real cast, and nobody is added that the AD did not place.
+ * A hint that resolves to nobody at all is logged as an ERROR.
+ *
+ * Mutates `coverHints` in place; runs before the clothing reconciliation.
  *
  * @param {Object|null} coverHints - from extractCoverHints()
  * @param {Array} characters - inputData.characters (the real cast)
  * @param {Object} [opts]
- * @param {Array} [opts.mainIds] - inputData.mainCharacters (id array)
- * @param {Object} [opts.clothingRequirements] - to seed a backfilled character's clothing
  * @param {Object} [opts.logger]
- * @returns {{ dropped: Array<{cover, name}>, backfilled: Array<{cover, name}> }}
+ * @returns {{ dropped: Array<{cover, name}> }}
  */
 function validateCoverHintCast(coverHints, characters, opts = {}) {
-  const { mainIds = null, clothingRequirements = null, logger = log } = opts;
-  const result = { dropped: [], backfilled: [] };
+  const { logger = log } = opts;
+  const result = { dropped: [] };
   const cast = (Array.isArray(characters) ? characters : []).filter(c => c && c.name);
   if (!coverHints || cast.length === 0) return result;
 
-  const ids = Array.isArray(mainIds) ? mainIds : [];
-  const isMain = (c) => c.isMainCharacter === true || (ids.length > 0 && ids.includes(c.id));
   const known = new Set(cast.map(c => normalizeName(c.name)));
   // RESOLVE: hint tokens → cast entries, through the one resolver.
   const castIdx = buildCastIndex({ characters: cast }, null);
-  // Refill priority: mains first, then everyone else in cast order.
-  const byPriority = [...cast.filter(isMain), ...cast.filter(c => !isMain(c))];
   const baseOf = (n) => String(n || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
 
   for (const [coverType, hint] of Object.entries(coverHints)) {
@@ -633,63 +641,25 @@ function validateCoverHintCast(coverHints, characters, opts = {}) {
       if (isKnownName(normalizeName(name), known, castIdx)) { kept++; continue; }
       phantoms.add(name);
     }
+    if (phantoms.size === 0) continue;
 
-    if (phantoms.size > 0) {
-      if (Array.isArray(hint.characters)) {
-        hint.characters = hint.characters.filter(n => !phantoms.has(baseOf(n)));
-      }
-      for (const container of [hint.characterDetails, hint.characterClothing, hint.characterPerspectives]) {
-        if (!container || typeof container !== 'object') continue;
-        for (const k of Object.keys(container)) {
-          if (phantoms.has(baseOf(k))) delete container[k];
-        }
-      }
-      for (const name of phantoms) result.dropped.push({ cover: coverType, name });
+    if (Array.isArray(hint.characters)) {
+      hint.characters = hint.characters.filter(n => !phantoms.has(baseOf(n)));
     }
-
-    // Refill the freed slots with real cast members.
-    const mainsOnly = coverType === 'frontCover';
-    const pool = mainsOnly ? byPriority.filter(isMain) : byPriority;
-    const cap = mainsOnly ? pool.length : MAX_COVER_CHARACTERS;
-    const present = (c) => {
-      const norm = normalizeName(c.name);
-      for (const d of declared) {
-        if (phantoms.has(d)) continue;
-        // COMPARE: is this already-declared hint name the same person as `c`?
-        if (normalizeName(d) === norm || sameEntity(d, c.name, castIdx)) return true;
+    for (const container of [hint.characterDetails, hint.characterClothing, hint.characterPerspectives]) {
+      if (!container || typeof container !== 'object') continue;
+      for (const k of Object.keys(container)) {
+        if (phantoms.has(baseOf(k))) delete container[k];
       }
-      return false;
-    };
-    for (const c of pool) {
-      if (kept >= cap) break;
-      if (present(c)) continue;
-      if (!Array.isArray(hint.characters)) hint.characters = [];
-      hint.characters.push(c.name);
-      if (!hint.characterDetails || typeof hint.characterDetails !== 'object') hint.characterDetails = {};
-      hint.characterDetails[c.name] = {
-        name: c.name,
-        position: '',
-        clothing: null,
-        holds: 'nothing',
-        gazesAt: '',
-        priority: 'normal',
-      };
-      const used = clothingRequirements ? getUsedClothingCategories(clothingRequirements, c.name) : [];
-      if (used.length > 0) {
-        if (!hint.characterClothing || typeof hint.characterClothing !== 'object') hint.characterClothing = {};
-        hint.characterClothing[c.name] = used[0];
-        hint.characterDetails[c.name].clothing = used[0];
-      }
-      declared.add(c.name);
-      kept++;
-      result.backfilled.push({ cover: coverType, name: c.name });
+    }
+    for (const name of phantoms) result.dropped.push({ cover: coverType, name });
+    if (kept === 0) {
+      logger?.error?.(`❌ [COVER-CAST] ${coverType}: every character the hint declares is outside the story cast (${[...phantoms].map(n => `"${n}"`).join(', ')}) — the cover hint names nobody real`);
     }
   }
 
-  if (result.dropped.length > 0 || result.backfilled.length > 0) {
-    const dropTxt = result.dropped.map(d => `${d.cover}:"${d.name}"`).join(', ') || 'none';
-    const fillTxt = result.backfilled.map(d => `${d.cover}:${d.name}`).join(', ') || 'none';
-    logger?.warn?.(`⚠️ [COVER-CAST] Hint cast is not the story cast — dropped ${dropTxt}; backfilled ${fillTxt}`);
+  if (result.dropped.length > 0) {
+    logger?.warn?.(`⚠️ [COVER-CAST] Hint cast is not the story cast — dropped ${result.dropped.map(d => `${d.cover}:"${d.name}"`).join(', ')}`);
   }
   return result;
 }

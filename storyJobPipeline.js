@@ -2975,16 +2975,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // A hint may name a figure that is in no cast list at all (the beats bible
     // writer invented one and dropped a real primary to make room —
     // job_1788641639919_mpjwlzkf1). Drop the phantom from every hint container
-    // and refill the freed slot from the real cast BEFORE clothing
-    // reconciliation, so the declared cover cast — which the prompt, the
-    // reference packing and the cover eval all read from here — is real people.
+    // BEFORE clothing reconciliation, so the declared cover cast — which the
+    // prompt, the reference packing and the cover eval all read from here — is
+    // real people. Nobody is added: the cover cast is the Art Director's
+    // (owner, 2026-09-23 — the refill that padded covers to five is deleted).
     {
       const { validateCoverHintCast } = require('./server/lib/coverIterate');
-      validateCoverHintCast(coverHints, inputData.characters, {
-        mainIds: inputData.mainCharacters,
-        clothingRequirements,
-        logger: log,
-      });
+      validateCoverHintCast(coverHints, inputData.characters, { logger: log });
     }
 
     const reconcileResult = reconcileCoverClothingWithRequirements(coverHints, clothingRequirements, log);

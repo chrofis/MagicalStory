@@ -26,6 +26,7 @@ const { castCoverage, castCoverageRule } = require('./castCoverage');
 // requiredText.js requires promptBuilders LAZILY.
 const requiredTextLib = require('./requiredText');
 const { baseVbId } = require('./vbIdGuard');
+const { COVER_PAGE_NUMBERS } = require('./coverKeys');
 const { getPhysical } = require('./characterPhysical');
 const { getTraits } = require('./characterTraits');
 const { frameColorForName } = require('./characterFrames');
@@ -2388,7 +2389,7 @@ function buildReferenceCardColours(chars, referencePhotos) {
     if (col) frameLines.push(`- ${col.label} frame = ${c.name}`);
   }
   if (frameLines.length === 0) return '';
-  return `\nREFERENCE CARD COLOURS (each character's reference card has a coloured frame — match each person to their card):\n${frameLines.join('\n')}\nThe frame colours are identifiers ONLY. Never paint a coloured frame, border, or these colours onto any character, clothing, prop, or surface in the scene.\n`;
+  return `\nREFERENCE CARD COLOURS (each character's reference card has a coloured frame — match each person to their card):\n${frameLines.join('\n')}\nThe frame colours are identifiers ONLY. Never paint a coloured frame or border into the scene, and never recolour a character, garment, prop or surface to match a frame — each keeps the colours described for it.\n`;
 }
 
 function buildCharacterReferenceList(photos, characters = null, { includeClothing = false } = {}) {
@@ -4653,10 +4654,20 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       // job_1789292742265_mgxmrkfpd declared ONE artifact bearing ONE device
       // and a split state, and two pages rendered the device complete on each
       // half. It sits here rather than in the template head so it rides the
-      // protected tail through shrinkPromptForModel, and costs prompt budget
-      // only on pages that actually state an object.
-      requiredObjectsSection += `A state that divides, opens or breaks an object does not multiply its markings: a device, emblem or pattern on the surface is one marking, and the split runs through it — each part shows only its share.
-`;
+      // protected tail through shrinkPromptForModel.
+      //
+      // ONLY WHEN A LISTED ELEMENT HAS STATES (2026-09-23). It was emitted on
+      // every page that listed any object — 202 chars on staging
+      // job_1790100385959_1nitlympp p12 (a dog, a dragon and a gilet, nothing
+      // that divides) while that page's over-cap prompt lost REQUIRED CAST and
+      // Composition to the shrink. An element can only be divided, opened or
+      // broken on a page through a declared bible state, so the element's own
+      // `states` decide — the whole list, not this page's resolved one, because
+      // a state the page's instant contradicts is dropped from the line while
+      // the split it describes is still drawn.
+      if (promptObjects.some(o => o.entry && objectStates(o.entry).length > 0)) {
+        requiredObjectsSection += `${SPLIT_STATE_MARKINGS_RULE}\n`;
+      }
       // A HEADER WITH NOTHING UNDER IT IS NOT A CHECKLIST (2026-09-17). The
       // old test was `promptObjects.length === 0` — "every entry was a
       // location" — and it missed the other way an entry disappears: the
@@ -4723,11 +4734,22 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   // (it writes "Medium shot of …" into the brief). Neither resolving is a real
   // defect — nothing downstream can tell the model what its framing means — so
   // it is logged, not papered over with all eight definitions.
-  const shotBlock = buildShotDefinitions(
-    metadata?.shot || metadata?.fullData?.shot || null,
-    cleanSceneDescription || null
-  );
-  if (!shotBlock.text) {
+  //
+  // A COVER DECLARES NO SHOT (2026-09-23). Its framing is the cover
+  // composition's (whole figures, feet on the ground, the title band), and its
+  // prose opens "A wide group portrait" / "A portrait of …" — which the prose
+  // fallback read as `close-up` ("portrait" is a close-up word), so every cover
+  // of staging job_1790100385959_1nitlympp was told its legs and feet "cannot
+  // appear" beside a composition demanding visible feet, and paid ~220 chars
+  // of an over-cap prompt for the contradiction.
+  const isCoverRender = Object.values(COVER_PAGE_NUMBERS).includes(pageNumber);
+  const shotBlock = isCoverRender
+    ? { text: '', shot: null }
+    : buildShotDefinitions(
+      metadata?.shot || metadata?.fullData?.shot || null,
+      cleanSceneDescription || null
+    );
+  if (!shotBlock.text && !isCoverRender) {
     log.warn(`[IMAGE PROMPT] Page ${pageNumber}: no shot declared and none readable from the scene prose — the illustrator gets no framing rule`);
   }
   const sceneIntentLine = metadata?.sceneIntent
@@ -7989,6 +8011,10 @@ const NO_CHARACTER_MARKING_RULE = "**NO MARKS ON A CHARACTER:** No arrow, symbol
 // the body is not an invitation to the hands.
 const HANDS_HOLD_ONLY_NAMED_RULE = "**HANDS:** A character's hands hold only what the scene names for that character. Never substitute an unnamed prop for a named one, and never fill an empty hand with an invented object — a hand with nothing assigned to it rests or gestures, and never joins a contact the scene gives to another part of that character's body.";
 
+// MARKINGS DO NOT MULTIPLY WITH THE OBJECT — emitted in REQUIRED OBJECTS only
+// when a listed element has declared states (see the emission site).
+const SPLIT_STATE_MARKINGS_RULE = 'A state that divides, opens or breaks an object does not multiply its markings: a device, emblem or pattern on the surface is one marking, and the split runs through it — each part shows only its share.';
+
 /**
  * COUNTING — one string for both Art Director templates (owner, 2026-09-15:
  * "For the count increase limit to three. Judge also just gets more than three
@@ -10904,6 +10930,7 @@ module.exports = {
   TRUE_RELATIVE_SIZE_RULE,
   NO_CHARACTER_MARKING_RULE,
   HANDS_HOLD_ONLY_NAMED_RULE,
+  SPLIT_STATE_MARKINGS_RULE,
   PAGE_OPENING_VARIETY_RULE,
   STYLE_RULEBOOK,
   MOTIVE_AT_THE_ACT_RULE,

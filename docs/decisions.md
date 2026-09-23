@@ -89,6 +89,125 @@ server/lib/beatsPipeline.js, scripts/admin/sibling-registry.json, tests/unit/art
 ## 2026-09-23 — The avatar style anchor keeps its figures
 **Decision:** Owner reason: a figure-free anchor was tested and does not work; the 2026-08-12 decision ("Style-anchor people bleed: swatch wording + de-echoed style eval" — anchors keep their family figures on purpose) stands. Audit 06 S2-2 is closed on that basis. **Status:** ✅ active
 
+---
+
+## 2026-09-23 — The shrink ranks its cuts, never cuts a parity anchor, and a render is not built with rules it cannot use
+
+**Context:** Staging `job_1790100385959_1nitlympp` (audit 08 S3, 09 C3). p12 and all three covers
+were built at 9.8-10.6k characters against the 7,900 Grok cap. `sectionAwareCut` removed COUNTS,
+DEPTH AND SIZE, HANDS, NO MARKS, REQUIRED CAST, and on p12 and the front cover the whole
+1,176-character Composition block, which was only ~110 characters over when its turn came. HANDS and
+NO MARKS are the generator halves of judge rules D-16b and D-24, so those pages were judged for two
+rules the illustrator never received. `generator-critic-rule-reach.test.ts` checked the BUILT prompt,
+which still had them. Text that did not apply survived the cut. On every cover a SHOT block said "A
+close-up ends at the waist: legs, knees and feet … cannot appear", because the prose fallback read
+the cover's "group portrait" as `close-up`. That sat beside a cover composition that demands visible
+feet. Each cover's own composition also repeated the page's ground bullet (484 characters), and a
+split-state markings rule (202 characters) rode every page that listed any object.
+
+**Decision:**
+1. **Parity anchors are never cut.** HANDS and NO MARKS are no longer drop units. REQUIRED TEXT and
+   SHOT never were. `cutBlocks()` throws if a unit would ever remove an anchor.
+2. **Cuts are units in rank order, and Composition goes one bullet at a time.** The order is
+   COUNTS, then the Composition size bullet, the facing bullet, DEPTH AND SIZE, the ground bullet and
+   REQUIRED CAST, then the page facts (HEIGHT ORDER, AGE, the reference-photo rule, the frame rule) as
+   the 2026-09-21 entry ranked them. The rank goes by what else in the prompt already carries the
+   rule: the scale riders on REQUIRED OBJECTS, EXACT POSES / EXPRESSIONS AND EYES, and a cover's
+   "eyes on the viewer". The header goes with the last bullet. Every unit reports the extent it
+   removed, so the confinement guard still has a number to check.
+3. **Inapplicable text is not built at all.**
+   - A cover gets no SHOT block. `buildImagePrompt` recognises a cover by its `COVER_PAGE_NUMBERS`
+     page number.
+   - The markings rule is emitted only when a listed element has bible `states` (the whole list,
+     because a state the page's instant contradicts is dropped from the line while the split is
+     still drawn).
+   - The cover ground bullet is cut to what is cover-specific: one shared ground, feet level, and
+     the water/air case (242 characters).
+4. **Reach is tested on the SENT prompt.** An over-cap page and an over-cap cover are built with the
+   real builders, shrunk to 7,900, and must still contain both anchors
+   (`generator-critic-rule-reach.test.ts`). `prompt-shrink-rank.test.ts` pins the rank, the bullet
+   granularity, the orphan-header rule, the conditional markings rule and the cover's missing SHOT.
+
+**Evidence (rung 1, free):** the pre-shrink prompts were rebuilt from the stored sent prompts plus the
+logged dropped blocks. The rebuilt lengths match the logged `before` exactly (initialPage 9,849,
+backCover 9,819; frontCover 10,614 against a logged 10,615, a one-character title-block heading
+difference). Built as this commit builds them and cut by the new shrinker:
+
+| render | built | sent | kept | cut |
+|---|---|---|---|---|
+| p12 | 9,943 | 7,834 | REQUIRED CAST, NO MARKS, HANDS, SHOT, HEIGHT | COUNTS, DEPTH, all Composition |
+| initialPage | 9,437 | 7,885 | REQUIRED CAST, ground bullet, NO MARKS, HANDS, HEIGHT | COUNTS, DEPTH, facing, size |
+| backCover | 9,407 | 7,855 | REQUIRED CAST, ground bullet, NO MARKS, HANDS, HEIGHT | COUNTS, DEPTH, facing, size |
+| frontCover | 10,202 | 7,569 | NO MARKS, HANDS, HEIGHT | COUNTS, DEPTH, all Composition, REQUIRED CAST |
+
+Before this change all four lost both anchors, REQUIRED CAST, DEPTH and COUNTS.
+
+**Not solved here:** a four-child cover is still ~1.5-2.3k over the cap. The largest remaining block
+on covers is the per-character face description in CHARACTERS IN THIS IMAGE (~150 characters per
+child: jawline, chin, nose, cheekbones, lips), which the reference card already carries. Trimming it
+would change the 2026-08-26 "covers identical to pages" builder, so that is an owner decision.
+
+**Touched:** `server/lib/images.js` (`cutBlocks`, `paragraphUnit` / `regexUnit` / `bulletUnit`,
+`sectionAwareCut`), `server/lib/promptBuilders.js` (`SPLIT_STATE_MARKINGS_RULE`, the cover SHOT skip,
+the reference-card colour line, see the cover entry below), `prompts/cover-composition.txt`,
+`tests/unit/generator-critic-rule-reach.test.ts`, `tests/unit/prompt-shrink-rank.test.ts`,
+`tests/unit/prompt-cut-protects-the-page.test.ts`.
+
+**Status:** ✅ active
+
+---
+
+## 2026-09-23 — Covers follow the Art Director's cast; a slotless prop never dedupes a garment; painted lettering on textless covers is judged; one cause is one scored issue
+
+**Context:** The rest of the covers audit (`docs/audits/prompt-audit-2026-09-23/09-covers.md`) on
+staging `job_1790100385959_1nitlympp`.
+
+**Decision:**
+1. **C4 (owner decision 2026-09-23: "follow the Art Director").** `validateCoverHintCast` drops
+   phantom names and adds nobody. The refill that padded every cover up to `MAX_COVER_CHARACTERS` is
+   deleted, including the mains-only refill of the front cover and the clothing seeding for
+   backfilled characters. A hint that resolves to nobody at all logs an ERROR. On run 6 the AD's
+   two-child discovery on the title page had become a four-boy line-up. This SUPERSEDES "Cover hint
+   casts are validated against the real cast, phantoms dropped and slots refilled" (2026-09-06).
+   Phantom handling is unchanged: every unresolved name still leaves all four hint containers.
+2. **C5.** In `applyCoverWornHeldDedupe`, an artifact with no worn slot is `unrelated` to every
+   outfit segment. The held "brown paper bag" had deleted "brown ankle boots" from the holder's line
+   through the shared colour word. Replayed on the stored bible (`ART001`, type `bag`): the boots stay.
+   The page resolver reads declared `wornItems` rows and has no token matcher, so it has no
+   counterpart of this fault.
+3. **C6.** The app-overlay note (`cover-evaluation-notes.txt` TEXT_NOTE_APP_OVERLAY) now excuses only
+   the app's three strings: title, dedication and "magicalstory.ch". It used to excuse any lettering
+   as "the intended app-composited overlay", but the judge sees the art before the overlay is
+   stamped. Other lettering is judged by the page text rules (D-23). One paid re-judge of the stored
+   initialPage v0 (~$0.003) gave no text finding. That matches D-23 for this image: "TAXI" is
+   correctly spelled signage, and the garbled marks are small incidental signage (MINOR at most). So
+   the rule changed and this page's score did not.
+4. **C9.** `feedback-consolidator.txt` rule 11: a prop missing from the picture and its holder's
+   empty hand are ONE deduped entry at the higher severity. Rule 2a: a non-2/2a drop keeps its issue
+   "as its own entry, or inside the entry that shares its cause". On run 6 the consolidator dropped
+   the bag as "duplicate cause" but kept it in `deduped_issues`, so code scored 60 against its own
+   75. Not replayed: the consolidator model is OpenRouter-only and this machine has no key. The next
+   staging run shows it.
+5. **C12.** The reference-card legend no longer forbids "these colours" on characters or clothing,
+   which read literally banned the contract outfits (red shirt, green fleece and so on under RED and
+   GREEN frames). It now forbids a painted frame or border, and recolouring anything to match a
+   frame: "each keeps the colours described for it".
+
+**Checked and not changed:**
+- **C3's landmark-photo claim.** All three covers carried `landmarkPhotos` (Lindenhof square,
+  Bahnhofstrasse), so the reference-photo rule applied.
+- **C10's "bottom band with no dedication is bloat".** `PUT /api/stories/:id/dedication` can add a
+  dedication after generation and restamp, so the band is kept.
+
+**Touched:** `server/lib/coverIterate.js`, `storyJobPipeline.js`, `prompts/cover-evaluation-notes.txt`,
+`prompts/feedback-consolidator.txt`, `server/lib/promptBuilders.js` (`buildReferenceCardColours`),
+`tests/unit/cover-hint-cast.test.ts`, `tests/unit/cover-worn-held-slot-conflict.test.ts`,
+`tests/unit/cover-eval-notes-extraction.test.ts`.
+
+**Status:** ✅ active
+
+---
+
 ## 2026-09-23 — Absence findings: a duplicate needs the detector's room for it, a CRITICAL/MAJOR "missing" needs a second look, a false-finding drop is never charged
 
 **Context:** Staging `job_1790100385959_1nitlympp` p12 v0. The quality judge listed a figure on empty
@@ -36031,6 +36150,8 @@ members not yet present, mains first then the remaining characters in input orde
 backfilled character's clothing is seeded from the first `used: true` category so the
 later reconciliation and the avatar lookup both hit a pre-generated category. Drops and
 backfills are logged as one `⚠️ [COVER-CAST]` warning.
+> 🗄 **Refill SUPERSEDED 2026-09-23** (owner: covers follow the Art Director): the refill is deleted;
+> phantoms are still dropped. See "2026-09-23 — Covers follow the Art Director's cast…".
 **Rationale:** The prompt rule alone is unverifiable at runtime — the beats pipeline has
 no reviewer that sees cover hints. The mutation happens once, at the single point where
 the hints are parsed and before they are persisted to `stories.data.coverHints`, so every
@@ -36043,7 +36164,7 @@ completeness rather than firing on a name that can never be rendered.
 (`validateCoverHintCast`, module-level `MAX_COVER_CHARACTERS`),
 `server/lib/phantomCharacters.js` (exports `normalizeName` / `isKnownName`),
 `storyJobPipeline.js`, `tests/unit/cover-hint-cast.test.ts`
-**Status:**    ✅ active
+**Status:**    🗄 refill superseded 2026-09-23 (phantom drop still active)
 
 ## A CRITICAL non-clothing finding outranks a MAJOR clothing finding for one repair round (2026-09-06)
 **Context:**   Staging story `job_1788641639919_mpjwlzkf1`, page 5, `sceneImages[4].imageVersions[0]`.
