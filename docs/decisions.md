@@ -21,6 +21,55 @@ superseded and link forward.
 
 ---
 
+## 2026-09-23 — The all-pages Art Director and the scene review see no page text and no art style; the review gets the checks the Art Director was given
+
+**Context:** Prompt audit 04 (`docs/audits/prompt-audit-2026-09-23/04-art-director.md`) over staging
+`job_1790100385959_1nitlympp`. The AD prompt referenced a page text it is never shown (5f, 12j) and an art
+style it is never shown ("must render in the named illustration style"), carried a writer's landmark block
+("woven into the story's action", an example with a `description` key), said both "do not split a vantage
+for time of day" and "the plate's light matches the time", and made `depth` optional in one line and
+required in another. The scene review contradicted the plan line (check 4: "never split across separate
+spots") and the AD (9f: "a page before the first change cites the bare id"), and had no check for four AD
+rules that failed in the run: eyes open (p12 "eyes squeezed shut"), a creature's written face (p9, p11,
+p17), `landmarkView` (0 of 17 landmark pages) and a shot its vantage's plate can hold (p13 close-up on the
+aerial plate; p14/16/17 on the high-angle one; p18 medium on the ultra-wide one).
+
+**Decision:**
+1. **Blind by design (owner, 2026-09-23).** The all-pages AD is not shown the art style (it is added in the
+   image prompt next; no benefit) and neither it nor the scene review is shown page text (written after
+   them; the review's job is drawability). Every rule that referred to either is removed: 5f, 12j and the
+   art-style line from scene-expansion-all.txt, the text-not-a-checklist rule from scene-review.txt. The
+   per-page AD and both iterate templates see the text and keep both rules; the sibling sets
+   `text-not-a-checklist` (now six members) and `art-director-vs-iterate` (`{STAGED_PROP}` no longer an
+   anchor) say so.
+2. **Generator↔critic.** `EYES_OPEN_RULE` and `CREATURE_FACE_RULE` are one constant each, in both AD
+   templates and scene-review check 6. `landmark_view_missing` and `shot_off_plate` are code checks in
+   sceneBriefCheck.js (structured fields only), REVIEWABLE, not run on iterate rewrites (both fields are
+   carried over from the parent in code). The AD's vantage rule is `shotVocabulary.VANTAGE_SHOT_RULE`, built
+   from `PLATE_DERIVED_SHOTS`, the set the check and the plate derive read: an angled vantage holds only
+   pages of its own shot, because nothing derives an eye-level plate from an angled one.
+3. **One plate, one light.** A vantage is split when its pages differ in time of day or weather.
+4. **Check 4** stages a same-goal group where the plan line puts it; **9f** matches the AD (dotted state
+   id on every page).
+5. **The raw AD reply is stored**, one row per attempt, in `sceneExpansionReport.replies[]`. Only parsed
+   parts were stored, and the audit read the post-usage-rebuild bible as the AD's own (A5 — no mutation
+   happened; the checker saw the AD's real table).
+6. **Once, not five times.** The scaleClass spec, `generic` and `label` are stated once; the second
+   creature-tone block and five duplicate lines are gone. The VB "size comparison is fine" clause and the
+   vehicle "dimensions in metres" line are removed — they contradicted scaleClass as the single size source
+   (2026-09-15).
+
+**Rationale:** a rule about an input the call never sees cannot be followed and competes with rules that
+can; a critic without the generator's rule cannot fault its breach. Replay over the stored run (rung 1):
+AD prompt 113,770 → 103,772 chars; the two new checks flag 17/17 landmark pages and the five off-plate pages.
+
+**Not done (owner calls):** the shared-hands rule (A3, decisions 🟡 2026-08-23); HEIGHT ORDER vs photo-read
+age bucket (A9); trimming the landmark list (the AD decides which places are landmarks).
+
+**Touched files:** prompts/scene-expansion-all.txt, prompts/scene-expansion.txt, prompts/scene-review.txt,
+server/lib/promptBuilders.js, server/lib/sceneBriefCheck.js, server/lib/shotVocabulary.js,
+server/lib/beatsPipeline.js, scripts/admin/sibling-registry.json, tests/unit/art-director-audit-2026-09-23.test.ts.
+
 ## 2026-09-23 — Absence findings: a duplicate needs the detector's room for it, a CRITICAL/MAJOR "missing" needs a second look, a false-finding drop is never charged
 
 **Context:** Staging `job_1790100385959_1nitlympp` p12 v0. The quality judge listed a figure on empty
