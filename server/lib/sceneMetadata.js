@@ -1453,6 +1453,72 @@ function findCastMissingFromMetadata(sceneDescription, castNames, sceneMetadata 
 
 
 /**
+ * Roster characters named by a brief's metadata `characters[]` list. STRICT
+ * matching, so "Lukas Zimmer" (a room) never matches the character "Lukas";
+ * an entry that is not a roster name (a creature, a secondary character)
+ * matches nobody.
+ */
+function matchRosterByListedNames(listedNames, characters) {
+  const names = (Array.isArray(listedNames) ? listedNames : [])
+    .map(n => String(typeof n === 'string' ? n : (n && n.name) || '').toLowerCase().trim())
+    .filter(Boolean);
+  return (characters || []).filter(char => {
+    if (!char || !char.name) return false;
+    const nameLower = char.name.toLowerCase().trim();
+    const firstName = nameLower.split(' ')[0];
+
+    return names.some(jsonLower => {
+      const jsonFirstName = jsonLower.split(' ')[0];
+
+      // Exact match on full name or first name
+      if (jsonLower === nameLower || jsonLower === firstName) return true;
+      if (jsonFirstName === nameLower || jsonFirstName === firstName) return true;
+
+      // Only allow partial matches if the character name IS the scene entry
+      // (e.g., character "Lukas" matches scene entry "Lukas", not "Lukas Zimmer")
+      // Avoid matching if scene entry is longer and contains additional words
+      if (jsonLower.includes(nameLower) && jsonLower.split(' ').length === nameLower.split(' ').length) return true;
+      if (nameLower.includes(jsonLower) && nameLower.split(' ').length === jsonLower.split(' ').length) return true;
+
+      return false;
+    });
+  });
+}
+
+/**
+ * The photo-backed cast of a REWRITTEN brief: its metadata `characters[]` list
+ * is authoritative (owner decision 2026-09-23, "Trust the rewrite's list").
+ *
+ * EMPTY IS NOT ABSENT — the same rule as repairPipeline.collectStyleRefSheets.
+ * The list has three states and they mean three different things:
+ *   - an array naming roster people → exactly those people
+ *   - an array of length 0, or one that names only creatures / secondary
+ *     figures → the page has NO photo-backed people: returns [] and NO name
+ *     scan runs. getCharactersInScene read this state as "no list given" and
+ *     fell through to a whole-text name scan, metadata included — staging
+ *     job_1790100385959_1nitlympp p17: a rewrite listing two dragons, whose
+ *     `wornItems[].owner` and `diagnosis` lines named four absent boys, was
+ *     rendered with all four boys' references, a HEIGHT ORDER block for them,
+ *     and scored with a false "Levin absent" CRITICAL.
+ *   - no `characters` array at all, or metadata that did not parse (the
+ *     prose-only recovery's fabricated `[]` included) → returns null: the
+ *     brief did not say, and the caller must not guess.
+ *
+ * @returns {Array|null} roster records in `characters` order, or null when the
+ *   brief declares no characters array
+ */
+function castOfRewrittenBrief(sceneDescription, characters) {
+  if (!sceneDescription || typeof sceneDescription !== 'string') return null;
+  const metadata = extractSceneMetadata(sceneDescription);
+  // The prose-only recovery fabricates `characters: []` for a block that did
+  // not parse — that is "the metadata did not say", not "nobody".
+  if (!metadata || metadata.isRecovered || !metadata.fullData) return null;
+  const listed = metadata.fullData.characters;
+  if (!Array.isArray(listed)) return null;
+  return matchRosterByListedNames(listed, characters);
+}
+
+/**
  * Detect which characters are mentioned in a scene description
  * Priority: 1) JSON metadata block, 2) Markdown parsing, 3) Text search fallback
  * @param {string} sceneDescription - The scene text
@@ -1467,31 +1533,7 @@ function getCharactersInScene(sceneDescription, characters) {
   // Step 0: Try JSON metadata block first (most reliable)
   const metadata = extractSceneMetadata(sceneDescription);
   if (metadata && metadata.characters && metadata.characters.length > 0) {
-    // Match JSON character names to available characters
-    // Use STRICT matching to avoid "Lukas Zimmer" (a room) matching character "Lukas"
-    const matchedCharacters = characters.filter(char => {
-      if (!char.name) return false;
-      const nameLower = char.name.toLowerCase().trim();
-      const firstName = nameLower.split(' ')[0];
-
-      return metadata.characters.some(jsonName => {
-        const jsonLower = jsonName.toLowerCase().trim();
-        const jsonFirstName = jsonLower.split(' ')[0];
-
-        // Exact match on full name or first name
-        if (jsonLower === nameLower || jsonLower === firstName) return true;
-        if (jsonFirstName === nameLower || jsonFirstName === firstName) return true;
-
-        // Only allow partial matches if the character name IS the scene entry
-        // (e.g., character "Lukas" matches scene entry "Lukas", not "Lukas Zimmer")
-        // Avoid matching if scene entry is longer and contains additional words
-        if (jsonLower.includes(nameLower) && jsonLower.split(' ').length === nameLower.split(' ').length) return true;
-        if (nameLower.includes(jsonLower) && nameLower.split(' ').length === jsonLower.split(' ').length) return true;
-
-        return false;
-      });
-    });
-
+    const matchedCharacters = matchRosterByListedNames(metadata.characters, characters);
     if (matchedCharacters.length > 0) {
       return matchedCharacters;
     }
@@ -2481,6 +2523,7 @@ module.exports = {
   findCastMissingFromMetadata,
   isSameFigureName,
   getCharactersInScene,
+  castOfRewrittenBrief,
   unionPageCast,
   parseSceneHintMetadata,
   parseStoryPages,

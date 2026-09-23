@@ -27,7 +27,7 @@ import path from 'path';
 
 const require_ = createRequire(import.meta.url);
 const { carryForwardWornItems, resolveWornItemsForPage } = require_('../../server/lib/wornItems');
-const { checkDeclaredSet, normalizeCitedHandles, restoreParentObjects } = require_('../../server/lib/iterateBeat');
+const { checkDeclaredSet, normalizeCitedHandles, carryParentObjects } = require_('../../server/lib/iterateBeat');
 const { extractSceneMetadata } = require_('../../server/lib/sceneMetadata');
 const { planBookAuditRound } = require_('../../server/lib/repairLogic');
 const { parsePremiseFigures, buildImagePrompt } = require_('../../server/lib/promptBuilders');
@@ -239,20 +239,21 @@ describe('A4 — REQUIRED OBJECTS is never a heading with nothing under it', () 
   });
 
   it("a rewrite that resolves to no listable element takes the parent's list", () => {
-    // p6's shape: the only surviving citation is a location.
-    const out = restoreParentObjects({
-      rewriteObjects: ['LOC001.1'], parentObjects: ['ART001.1', 'LOC001'], visualBible,
+    // p6's shape: the only surviving citation is a location. The 2026-09-23
+    // carry-forward (a superset of the 2026-09-17 restore) still covers it.
+    const out = carryParentObjects({
+      rewriteObjects: ['LOC001.1'], parentObjects: ['ART001.1', 'LOC001'],
     });
-    expect(out.restored).toEqual(['ART001.1']);
+    expect(out.carried).toEqual(['ART001.1']);
     expect(out.objects).toEqual(['LOC001.1', 'ART001.1']);
   });
 
-  it('NEGATIVE CONTROL — a rewrite that still cites one listable element is untouched', () => {
-    const out = restoreParentObjects({
-      rewriteObjects: ['LOC002.1', 'ART004.2'], parentObjects: ['LOC002', 'ART001', 'ART004.2'], visualBible,
+  it('a rewrite that still cites every parent id is untouched, facets included', () => {
+    const out = carryParentObjects({
+      rewriteObjects: ['LOC002.1', 'ART004.2', 'ART001'], parentObjects: ['LOC002', 'ART001', 'ART004.2'],
     });
-    expect(out.restored).toEqual([]);
-    expect(out.objects).toEqual(['LOC002.1', 'ART004.2']);
+    expect(out.carried).toEqual([]);
+    expect(out.objects).toEqual(['LOC002.1', 'ART004.2', 'ART001']);
   });
 
   it('the prompt builder itself can never emit the bare heading', () => {

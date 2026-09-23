@@ -53,7 +53,8 @@ describe('iteratePageCore re-derives and returns the rewritten cast', () => {
   const IMG = fs.readFileSync(path.join(process.cwd(), 'server/lib/images.js'), 'utf8');
 
   it('derives the cast from the REWRITTEN brief, not the original', () => {
-    expect(IMG).toMatch(/getCharactersInScene\(newSceneDescription, characters\)/);
+    // The rewrite's own characters[] list, not a name scan (2026-09-23).
+    expect(IMG).toMatch(/castOfRewrittenBrief\(newSceneDescription, characters\)/);
   });
 
   it('returns it under the contract name the pipeline reads', () => {

@@ -805,36 +805,42 @@ function normalizeCitedHandles({ objects = [], visualBible = null } = {}) {
 }
 
 /**
- * THE PARENT'S OBJECT LIST, WHEN THE REWRITE'S RESOLVES TO NOTHING
- * (2026-09-17, same run, p6 and p16).
+ * THE PARENT'S CITATIONS ARE CARRIED FORWARD (2026-09-23; replaces
+ * `restoreParentObjects`, which restored the parent's list only when the
+ * rewrite's resolved to nothing printable).
  *
- * `buildImagePrompt` lists only NON-location, non-CHR citations, so a rewrite
- * whose surviving citations are all locations produces no REQUIRED OBJECTS
- * lines at all — on p6 the egg the whole page is about, on p16 the egg plus a
- * bundled jacket. The parent brief cited them; a rewrite is allowed to reorder
- * its citations, never to empty them.
+ * A rewrite may reorder its citations, never drop one — the rule
+ * `checkDeclaredSet` states. Stating it was not enough: staging
+ * job_1790100385959_1nitlympp p17's parent brief cited
+ * `["LOC002.5", "ART002.2", "ANI002", "ANI003"]`; the rewrite cited
+ * `["LOC002.1", "ART002.2"]` and moved the two creatures into `characters[]` BY
+ * NAME. The drop check counts a name as a refile, but `buildImagePrompt` takes
+ * only VB-id-shaped entries from `characters[]`, so both creatures left
+ * REQUIRED OBJECTS with their size riders and reference cell, and the hatchling
+ * was drawn as a red copy of the adult. The old restore did not fire because
+ * `ART002.2` was still listable.
  *
- * Purely structural: an id is "listable" when it resolves to a bible entry
- * outside `locations` and `secondaryCharacters` (the two pools the prompt's
- * checklist deliberately skips).
+ * Structured throughout: every parent citation that is a Visual Bible handle
+ * and whose BASE id the rewrite's `objects[]` no longer holds is appended
+ * verbatim. A base id the rewrite still cites keeps the rewrite's facet
+ * (`LOC002.1` stands; the parent's `LOC002.5` is not added beside it). Free-text
+ * citations are never carried — `baseVbId` returns null for them.
  *
- * @returns {{objects: Array, restored: string[]}}
+ * @returns {{objects: Array, carried: string[]}} rewrite order first, carried after
  */
-function restoreParentObjects({ rewriteObjects = [], parentObjects = [], visualBible = null } = {}) {
+function carryParentObjects({ rewriteObjects = [], parentObjects = [] } = {}) {
   const list = Array.isArray(rewriteObjects) ? rewriteObjects : [];
   const parent = Array.isArray(parentObjects) ? parentObjects : [];
-  if (!visualBible || parent.length === 0) return { objects: list, restored: [] };
-  const idx = entryIndex(visualBible);
-  const listable = (o) => {
-    const hit = idx.get(baseId(o));
-    return !!hit && hit.pool !== 'locations' && hit.pool !== 'secondaryCharacters';
-  };
-  if (list.some(listable)) return { objects: list, restored: [] };
-  const parentListable = parent.filter(listable);
-  if (parentListable.length === 0) return { objects: list, restored: [] };
-  const have = new Set(list.map(baseId));
-  const add = parentListable.filter(o => !have.has(baseId(o)));
-  return { objects: [...list, ...add], restored: add.map(o => String(typeof o === 'string' ? o : o.id)) };
+  const handleOf = (o) => String(typeof o === 'string' ? o : (o && o.id) || '').trim();
+  const have = new Set(list.map(o => baseVbId(handleOf(o))).filter(Boolean));
+  const add = [];
+  for (const o of parent) {
+    const id = baseVbId(handleOf(o));
+    if (!id || have.has(id)) continue;
+    have.add(id);
+    add.push(o);
+  }
+  return { objects: [...list, ...add], carried: add.map(handleOf) };
 }
 
 /** One short line per finding, for a log and for the corrective re-ask. */
@@ -861,7 +867,7 @@ module.exports = {
   declaredSetAllowance,
   checkDeclaredSet,
   normalizeCitedHandles,
-  restoreParentObjects,
+  carryParentObjects,
   describeBriefFindings,
   REINSTATE_TYPES,
   INTRODUCED_TYPES,

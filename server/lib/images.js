@@ -170,7 +170,7 @@ const bboxDetectionModule = require('./bboxDetection');
 const { findBadPages, selectCharRepairTasks } = require('./repairLogic');
 // IMAGE_PROMPT for the judges = the string the model actually received.
 // Sibling of resolveEvalSceneHint; see its comment in sceneMetadata.js.
-const { resolveEvalImagePrompt, resolveEvalSceneDescription } = require('./sceneMetadata');
+const { resolveEvalImagePrompt, resolveEvalSceneDescription, castOfRewrittenBrief } = require('./sceneMetadata');
 // storyHelpers functions (lazy-loaded to avoid circular dependencies)
 let storyHelpersModule = null;
 function getStoryHelpers() {
@@ -3683,7 +3683,6 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     getPageText,
     buildSceneDescriptionPrompt,
     buildImagePrompt,
-    getCharactersInScene,
     getCharacterPhotoDetails,
     buildAvailableAvatarsForPrompt,
     extractSceneMetadata,
@@ -3900,7 +3899,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     resolvePlanLine, collectStagedFigures, collectPlanLineCast, renderStagedFiguresBlock,
     checkRewrittenBrief, checkCarriedFields, describeBriefFindings,
     declaredSetAllowance, checkDeclaredSet, partitionAnchoredObjects,
-    normalizeCitedHandles, restoreParentObjects,
+    normalizeCitedHandles, carryParentObjects,
     renderEvaluatorReasoning, renderFixTargetLines, renderParentWornState,
   } = require('./iterateBeat');
   // The corrective loop itself is shared with the authored-brief path — one
@@ -4260,7 +4259,21 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   }
 
   // Step 5: Prepare for image generation
-  const sceneCharacters = getCharactersInScene(newSceneDescription, characters);
+  //
+  // THE REWRITE'S LIST IS THE CAST (owner decision 2026-09-23). A rewrite whose
+  // metadata carries a `characters` array has said who is in the picture —
+  // empty, or creatures only, means no photo-backed people, and no name scan
+  // runs (castOfRewrittenBrief). Staging job_1790100385959_1nitlympp p17: the
+  // name scan found four absent boys in a garment line and a diagnosis line, and
+  // the page was rendered with their references and judged against them.
+  // A rewrite with NO characters array cannot reach this line: every metadata
+  // parser that yields a usable brief requires the key, and the prose-only
+  // recovery carries no sceneIntent, so assessIterateBrief refused it above.
+  // Reaching here without one is a contract break, never a cue to guess.
+  const sceneCharacters = castOfRewrittenBrief(newSceneDescription, characters);
+  if (sceneCharacters === null) {
+    throw new Error(`[ITERATE] Page ${pageNumber}: the rewrite passed the brief guard but declares no characters array — refusing to derive a cast from the brief text`);
+  }
 
   // Extract metadata from the new scene description for per-character clothing
   let newSceneMetadata = extractSceneMetadata(newSceneDescription);
@@ -4283,18 +4296,22 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     }
   }
 
-  // THE CITED HANDLES ARE CHECKED AGAINST THE BIBLE, AND THE LIST CAN NEVER
-  // RESOLVE TO NOTHING (2026-09-17, staging job_1789584708605_rts4wqupm).
+  // THE PARENT'S CITATIONS ARE CARRIED FORWARD, THEN EVERY CITED HANDLE IS
+  // CHECKED AGAINST THE BIBLE.
   //
+  //  - Every Visual Bible id the parent brief cited and the rewrite's
+  //    `objects[]` no longer holds comes back (iterateBeat.carryParentObjects,
+  //    2026-09-23). Staging job_1790100385959_1nitlympp p17: the rewrite moved
+  //    both creatures into `characters[]` by name, which the prompt's REQUIRED
+  //    OBJECTS block does not read, and the hatchling lost its reference cell.
+  //    This supersedes the 2026-09-17 restore, which fired only when the
+  //    rewrite's list resolved to nothing printable (p6 and p16 of staging
+  //    job_1789584708605_rts4wqupm lost the egg their page is about).
   //  - A facet suffix on an entry that has no such facet, or whose facet covers
-  //    no page, is reduced to the bare parent id. Five of six rewrites appended
-  //    one (`LOC001.1`, `LOC002.1`, `LOC003.2` on location entries with an
-  //    EMPTY `vantages[]`, `ART001.2` on a state with an empty `pages[]`), and
-  //    every consumer silently fell back to the parent or to `.1`.
-  //  - A rewrite whose surviving citations are all locations lists NOTHING in
-  //    REQUIRED OBJECTS, because that block skips location entries by design.
-  //    p6 lost the egg the page is about that way, and p16 shipped a header
-  //    with no entries under it. The parent brief's listable ids come back.
+  //    no page, is reduced to the bare parent id (2026-09-17, same run: five of
+  //    six rewrites appended one, e.g. `LOC001.1` on a location with an EMPTY
+  //    `vantages[]`, and every consumer silently fell back to the parent or to
+  //    `.1`). It runs AFTER the carry so a carried handle is checked too.
   //
   // Structured throughout -- ids, pools and facet arrays, never a text match.
   // Both rules rewrite the SAME `objects[]` array in the brief, through the one
@@ -4308,19 +4325,19 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       newSceneMetadata = extractSceneMetadata(newSceneDescription);
       return true;
     };
+    const carry = carryParentObjects({ rewriteObjects: newSceneMetadata?.objects, parentObjects: origObjects });
+    if (carry.carried.length > 0) {
+      if (applyObjects(carry.objects)) {
+        log.warn(`⚠️ [ITERATE] Page ${pageNumber}: the rewrite's objects[] no longer cites ${carry.carried.join(', ')} — carried forward from the parent brief`);
+      } else {
+        log.error(`❌ [ITERATE] Page ${pageNumber}: the rewrite dropped ${carry.carried.join(', ')} and its metadata has no "objects" array to carry them into — the page renders without them`);
+      }
+    }
     const normalized = normalizeCitedHandles({ objects: newSceneMetadata?.objects, visualBible });
     if (normalized.rejected.length > 0) {
       log.warn(`⚠️ [ITERATE] Page ${pageNumber}: rewrite cited facet(s) the Visual Bible does not declare — `
         + `${normalized.rejected.map(r => `${r.handle} (${r.reason})`).join(', ')} — reduced to the bare id`);
       applyObjects(normalized.objects);
-    }
-    const restored = restoreParentObjects({
-      rewriteObjects: newSceneMetadata?.objects, parentObjects: origObjects, visualBible,
-    });
-    if (restored.restored.length > 0) {
-      log.warn(`⚠️ [ITERATE] Page ${pageNumber}: the rewrite's objects[] resolves to no listable element — `
-        + `restoring ${restored.restored.join(', ')} from the parent brief so REQUIRED OBJECTS is not empty`);
-      applyObjects(restored.objects);
     }
   }
 

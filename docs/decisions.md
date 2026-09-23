@@ -56005,3 +56005,68 @@ missing it".
 (`runEntityConsistencyChecks` → `collectEntityAppearances` option `wornItemsVisualBible`; `repairSinglePage`),
 `tests/unit/entity-worn-state-bible-key.test.ts`.
 **Status:** ✅ active on staging.
+
+## 2026-09-23 — The iterate rewrite's `characters[]` is its cast, and the rewrite keeps every parent citation in `objects[]`
+
+**Context.** Staging `job_1790100385959_1nitlympp` (dragon run 6) p17. The v0 brief stages two
+creatures (ANI002 Turi, ANI003 Flämmli) and no people. The iterate repair's rewrite listed only
+those two creatures in `characters[]`, but its `wornItems[].owner` rows named Kiaan, Max and Levin and
+its `diagnosis` line named Julian. `iteratePageCore` built the cast with
+`getCharactersInScene(newSceneDescription, characters)`: the structured step matched no roster name,
+so it fell through to a whole-text name scan (metadata included) and returned all four boys. The v1
+prompt named each boy three times under a HEIGHT ORDER block with four reference cards, and the final
+presence check stored a false CRITICAL "Levin is absent … EXPECTED CAST of 4". The same rewrite
+cited `["LOC002.1", "ART002.2"]` where the parent cited `["LOC002.5", "ART002.2", "ANI002",
+"ANI003"]`: it moved both creatures into `characters[]` by NAME. `checkDeclaredSet` counts a name as
+a refile (2026-09-17, item 2), but `buildImagePrompt`'s union reads only VB-id-shaped entries from
+`characters[]`, so REQUIRED OBJECTS lost both creatures, their size riders and Turi's reference
+cell. The 2026-09-17 `restoreParentObjects` did not fire because `ART002.2` was still listable.
+v1 (45) beat v0 (43) and shipped: the hatchling is a red copy of the adult and the eggshell is gone.
+
+**Decision** (owner, 2026-09-23: "Trust the rewrite's list").
+1. `sceneMetadata.castOfRewrittenBrief` — a rewrite's metadata `characters[]` is authoritative.
+   Roster names in it → exactly those people; empty or creatures-only → NO photo-backed people, and
+   no name scan runs. Same "empty is not absent" rule as `repairPipeline.collectStyleRefSheets`.
+   No array, or metadata that did not parse (the prose-only recovery fabricates `characters: []`,
+   marked `isRecovered`) → `null`, "the brief did not say".
+2. `iteratePageCore` builds its cast from it and THROWS on `null`. That case is unreachable: every
+   parser that yields a usable brief requires the `characters` key, and the prose-only recovery has
+   no `sceneIntent`, so `assessIterateBrief` refuses it and the round fails before step 5. The only
+   stored rewrite without an array (staging `job_1789207854566_l43qgl34w` p7, 2026-09-12) is a cut
+   brief from before that guard (ce9d03add, 2026-09-13). No name-scan fallback is kept.
+3. `iterateBeat.carryParentObjects` replaces `restoreParentObjects`: every parent citation that is
+   a VB handle and whose base id the rewrite's `objects[]` no longer holds is appended verbatim; a
+   base id the rewrite still cites keeps the rewrite's facet. It runs before `normalizeCitedHandles`,
+   so a carried handle is facet-checked too. Superset of the old restore (which covered only the
+   "nothing listable left" case) — replaced, not kept beside it.
+
+**Rationale.** A rewrite's cast is a statement the rewriter made about the picture it commissioned;
+reading names out of garment-ownership and diagnosis lines turns bookkeeping about absent people
+into references, a HEIGHT ORDER block and a presence CRITICAL. Scope is the REWRITE only: on authored
+briefs `unionPageCast` stays (hint ∪ prose) because an authored `characters: []` can omit people the
+prose stages. Measured over the 40 newest staging stories: on 409 authored v0 briefs the list and the
+name scan agree on 407; the one that differs is exactly that shape (l43 p7: list `[]`, prose stages
+four roster pirates). On 110 stored rewrites the two agree on 107; the other three are p17 above,
+`job_1789506283204_3kxqshifx` p10 (a crow-only close-up; the name scan returned Levin from "Levin's
+red wool cap") and the pre-guard cut brief. Carrying ids is structural (ids only, never a name
+match), which is why it replaces the refile allowance's reliance on the prompt's union rather than
+teaching the union to resolve animal names.
+
+**Replay (rung 1, stored v1 of p17, no paid call).** Cast before `[Levin, Julian, Max, Kiaan]` →
+after `[]`; prompt HEIGHT ORDER true → false, boy mentions 3/3/3/3 → 0/0/0/0; `objects[]` →
+`["LOC002.1", "ART002.2", "ANI002", "ANI003"]`, and REQUIRED OBJECTS lists dragon egg, Turi and
+Flämmli again (identical to v0's block).
+
+**Not changed, open.** `getCharactersInScene` on stored briefs in `server/routes/regeneration.js`
+(regenerate-image :557, test-models :1174/:1183/:1390, style-lab :2047/:2055/:2096) and the
+fallback detection in `server/lib/entityConsistency.js:1860` can hit the same name scan on a page
+whose stored brief is an iterate rewrite. Switching them to `castOfRewrittenBrief` would break the
+authored-brief shape above; the stored page cast (`sceneImages[].sceneCharacters`) is the likelier
+source. Owner decision needed.
+
+**Touched.** `server/lib/sceneMetadata.js` (`matchRosterByListedNames`, `castOfRewrittenBrief`;
+`getCharactersInScene` step 0 uses the shared matcher, behaviour unchanged), `server/lib/images.js`
+(`iteratePageCore` cast + objects block), `server/lib/iterateBeat.js` (`carryParentObjects`
+replaces `restoreParentObjects`), `tests/unit/iterate-rewrite-cast-is-the-list.test.ts` (new, 12),
+`tests/unit/iterate-rewrite-keeps-the-brief.test.ts`, `tests/unit/iterate-cast-writeback.test.ts`.
+**Status:** ✅ active on staging.
