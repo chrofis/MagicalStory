@@ -24,7 +24,8 @@
  */
 const CHAR_REPAIR_REQUEST_KEYS = Object.freeze([
   'imageBackend',          // provider for the repaint ('grok' in production)
-  'issueDescription',      // the finding being fixed — drives the repair axes
+  'issueDescription',      // the finding being fixed — drives the repair axes ONLY; never reaches the prompt
+  'defectTypes',           // the finding's structured type(s) — the prompt's fixed defect phrase (faceRepair CHAR_FIX_DEFECT_PHRASES)
   'clothingDescription',   // the outfit contract for this character on this page
   'characterDescription',  // face/hair/build prose for the prompt
   'photoType',             // which avatar variant was handed over

@@ -625,6 +625,49 @@ function buildTextPositionContext(textPosition, sceneDescription) {
   return `\n\nQuiet zone: keep the ${desc} as ${zoneDesc ? `the established ${zoneDesc} — preserve its existing atmospheric character (clouds, gradient, texture)` : 'soft and visually calm'}. Do not place the character's face or any high-contrast detail there, and do not flatten it to a uniform color. It is intentional negative space in the composition.`;
 }
 
+// ---------------------------------------------------------------------------
+// CHAR-FIX DEFECT PHRASES — the ONLY way a finding reaches a character-repair
+// prompt (owner decision "Char-fix: no judge text", 2026-09-23).
+//
+// The prompt used to carry the judge's sentence verbatim as "Issues to fix:".
+// A judge that is wrong about a trait then ORDERS the wrong trait: staging
+// job_1790100385959_1nitlympp p14 — the grid judge wrote that Julian "has blue
+// eyes … compared to the canonical dark-eyed Julian" while his stored eye
+// colour IS blue, and the repaint gave him brown eyes. Identity comes from the
+// reference image and the character's own stored description; the finding only
+// says WHICH KIND of defect, by its structured type, in fixed generic words.
+// A type not listed adds nothing — the reference still carries identity.
+// ---------------------------------------------------------------------------
+const PHRASE_FACE = 'the face does not read as this character — paint the face from the reference image';
+const PHRASE_HAIR = 'the hair differs from the reference — match hair colour and style to the reference image';
+const PHRASE_CLOTHING = 'the clothing is wrong — dress the figure as the reference image and the clothing line show';
+const CHAR_FIX_DEFECT_PHRASES = Object.freeze({
+  face_mismatch: PHRASE_FACE,
+  character_identity: PHRASE_FACE,
+  face_drift: 'the face proportions drift from the reference — match the face shape of the reference image',
+  face_destroyed: 'the face is not properly rendered — paint the facial features from the reference image',
+  age_shift: 'the apparent age differs from the reference — paint the age shown in the reference image',
+  skin_tone: 'the skin tone differs from the reference — match the skin tone of the reference image',
+  facial_hair: 'the facial hair differs from the reference — match the reference image',
+  hair: PHRASE_HAIR,
+  hair_change: PHRASE_HAIR,
+  hair_nuance: PHRASE_HAIR,
+  clothing: PHRASE_CLOTHING,
+  clothing_inconsistent: PHRASE_CLOTHING,
+  garment: PHRASE_CLOTHING,
+  // Code-authored, not a judge finding: the scene composite's placeholder fill.
+  placeholder_figure: 'the marked figure is a flat placeholder silhouette — paint the character there instead',
+});
+
+function charFixDefectContext(defectTypes) {
+  const phrases = [];
+  for (const t of (Array.isArray(defectTypes) ? defectTypes : [])) {
+    const p = CHAR_FIX_DEFECT_PHRASES[String(t || '').toLowerCase().trim()];
+    if (p && !phrases.includes(p)) phrases.push(p);
+  }
+  return phrases.length ? `\nDefect to fix: ${phrases.join('; ')}.` : '';
+}
+
 async function buildPrompt({ treatment, regionSource, faceOnly, charName, opts, sceneBuffer, faceBbox, sceneW, sceneH }) {
   const { PROMPT_TEMPLATES, fillTemplate, repairStyleGuard, isPhotographicArtStyle } = require('../services/prompts');
   // IDENTITY vs REGION. Every "paint <name>" / "match <name>'s clothing" line must
@@ -643,7 +686,9 @@ async function buildPrompt({ treatment, regionSource, faceOnly, charName, opts, 
     ? `\n${richDesc.split(/Wearing:/i)[0].replace(/\s+/g, ' ').trim().slice(0, 380)}`
     : '';
   const clothingContext = opts.clothingDescription ? `\nClothing: ${opts.clothingDescription}` : '';
-  const issueContext = opts.issueContext || (opts.issueDescription ? `\nIssues to fix: ${opts.issueDescription}` : '');
+  // NO JUDGE TEXT (owner, 2026-09-23). The finding's prose never reaches this
+  // prompt — only its structured type, as a fixed phrase. See charFixDefectContext.
+  const issueContext = charFixDefectContext(opts.defectTypes);
   const textPositionContext = opts.textPositionContext || buildTextPositionContext(opts.textPosition, opts.sceneDescription);
   const actionContext = opts.actionContext || buildActionContext(opts.sceneDescription, charName);
 
@@ -1404,4 +1449,7 @@ module.exports = {
   legacyFlagsToAxes,
   applyGeometryGuards,
   buildActionContext,
+  buildPrompt,
+  CHAR_FIX_DEFECT_PHRASES,
+  charFixDefectContext,
 };

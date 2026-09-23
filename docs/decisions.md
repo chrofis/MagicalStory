@@ -21,6 +21,51 @@ superseded and link forward.
 
 ---
 
+## 2026-09-23 — Char-fix: no judge text. A character-repair prompt carries the finding's TYPE as a fixed phrase, never the judge's sentence
+
+**Context:** Staging `job_1790100385959_1nitlympp` (dragon run 6) p14. The entity grid judge wrote a
+CRITICAL `face_mismatch`: Julian "has blue eyes … compared to the canonical dark-eyed Julian". Julian's
+stored `eyeColor` is `blue` — the judge was wrong about the trait. `faceRepair.buildPrompt` copied the
+finding verbatim into the repair prompt as `Issues to fix: …`, so Grok was in effect ordered to give him
+dark eyes; the char-fix came back with brown eyes (pick-best happened to keep the original). The face
+gate checks integrity, not identity, so nothing downstream catches an identity the prompt itself asked
+for. Every char-fix entry point fed judge prose in: the unified pipeline (`decision.issueDescription`),
+the manual repair endpoint (`regeneration.js`, the joined `issue`/`description` strings), the entity
+single-page repair (`entityConsistency.repairSinglePage`, a block built from `canonicalVersion`,
+`fixInstruction` and `details.cellA/cellB`), and the Test Lab `char_repair` stage.
+
+**Decision (owner):** the character-repair prompt no longer carries the judge's free text. Identity
+comes from the reference image (every template's "match IMAGE 1" line) and the character's stored
+description where the template already carries it. A finding reaches the prompt only as its structured
+`type`, mapped through ONE constant, `CHAR_FIX_DEFECT_PHRASES` (`server/lib/faceRepair.js`), to a fixed
+generic phrase — `Defect to fix: the face does not read as this character — paint the face from the
+reference image.` A type the constant does not list adds no line. The request carries the types as
+`defectTypes` (`charRepairRequest.js`); all three sibling entry points and the Lab stage pass them. The
+clothing gate in `decideRepairMethod` now emits `issueTypes: ['clothing']` so a figure redo still names
+its kind. The scene composite's placeholder fill, which passed a code-authored sentence, now passes
+`defectTypes: ['placeholder_figure']`.
+
+**Not changed:** `issueDescription` still travels in the request, because `resolveRepairAxes` reads it
+to choose face vs full figure when no structured type decides it. It no longer reaches any prompt. That
+keyword read is itself a pre-existing text-match of judge prose in code; it is out of scope here and
+left as is. Does not touch the routing verdicts (2026-09-04 critical-only char-fix) or the
+misregistration guards.
+
+**Rationale:** a judge sentence is evidence for WHETHER to repair, not an instruction for WHAT to
+paint. When the judge is wrong about a trait, pasting its sentence makes the repair reproduce the error
+with authority the reference cannot overrule. The type is enough to say which kind of defect it is; the
+reference says what correct looks like.
+
+**Evidence (rung 1, replay):** the p14 prompt rebuilt from the stored finding and stored prompt inputs
+differs from the sent prompt in exactly one line — `Issues to fix: Julian's face in cell E has blue eyes
+… canonical dark-eyed Julian.` → `Defect to fix: the face does not read as this character — paint the
+face from the reference image.`
+
+**Touched:** `server/lib/faceRepair.js`, `server/lib/charRepairRequest.js`, `server/lib/repairLogic.js`,
+`server/lib/repairPipeline.js`, `server/routes/regeneration.js`, `server/lib/entityConsistency.js`,
+`server/lib/testlab.js`, `server/lib/sceneComposite.js`, `tests/unit/char-fix-no-judge-text.test.ts`
+**Status:** ✅ active
+
 ## 2026-09-21 — A teaching guide states no fact that belongs to ONE language
 
 **Context:** Production `job_1789945743706_8ayo2w19e` (Italian, topic `alphabet`) closed on

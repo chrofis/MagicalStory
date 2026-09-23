@@ -3198,7 +3198,7 @@ async function generateSceneComposite(opts) {
           bodyBbox: nb,
           bbox: nb,
           charName: c.name,
-          issueDescription: `The figure is a flat ${c.colorName || 'coloured'} placeholder silhouette. Paint ${c.name} there instead.`,
+          defectTypes: ['placeholder_figure'],
           clothingDescription: c.clothing || null,
           sceneDescription: scene?.description || '',
           artStyle: scene?.artStyle || null,

@@ -1566,6 +1566,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       repairResult = await images().repairCharacterMismatch(currentImageData, avatarPhoto, repairBbox, charName, buildCharRepairRequest({
         imageBackend: 'grok',
         issueDescription: decision.issueDescription,
+        // Structured type only — the prompt never carries the judge's sentence.
+        defectTypes: decision.issueTypes || null,
         clothingDescription: pageClothingDesc,
         characterDescription: charDescForPrompt,
         photoType: avatarPhotoType,

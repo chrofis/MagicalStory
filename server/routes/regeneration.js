@@ -5902,6 +5902,8 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               ...buildCharRepairRequest({
                 imageBackend: 'grok',
                 issueDescription: issueDesc,
+                // Structured type only — the prompt never carries the judge's sentence.
+                defectTypes: charIssues.map(i => i.subType || i.type).filter(Boolean),
                 clothingDescription: clothingDesc,
                 sceneDescription: sceneDesc,
                 faceBbox,

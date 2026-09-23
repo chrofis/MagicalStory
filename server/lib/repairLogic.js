@@ -1008,6 +1008,7 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
         charName,
         severity: String(clothingIssue.severity).toLowerCase(),
         issueDescription,
+        issueTypes: ['clothing'],
         repairParams,
       };
     }

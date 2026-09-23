@@ -3476,6 +3476,8 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
         // Default mode is picked from whiteoutTarget: body → cutout, face → blended
         whiteoutTarget,
         issueDescription: issuesFoundText || '',
+        // Structured type only — the prompt never carries the judge's sentence.
+        defectTypes: (options.issues || []).filter(i => i.pagesToFix?.includes(pageNumber)).map(i => i.subType || i.type).filter(Boolean),
         clothingDescription: clothingDescription || '',
         sceneDescription: sceneDesc,
         faceBbox: targetAppearance.faceBox || null,
