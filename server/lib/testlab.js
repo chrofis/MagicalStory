@@ -5420,7 +5420,11 @@ async function runRepairRoundStage(ctx, { experimentId, params = {} }) {
     latestEval = fresh;
   }
   const entityReport = params.entityReport || storyData.finalChecksReport?.entity || null;
-  const decision = decideRepairMethod(ctx.pageNumber, latestEval, entityReport);
+  // The page's DECLARED cast, as production passes it: a page written for
+  // nobody routes drawn figures to iterate, never to a char-fix.
+  const decision = decideRepairMethod(ctx.pageNumber, latestEval, entityReport, {
+    expectedCast: require('./repairLogic').resolveDeclaredCast(ctx.scene.sceneCharacters),
+  });
 
   const base = { decision: { method: decision.method, reason: decision.reason, charName: decision.charName || null } };
   // decideOnly: report the routing decision + the scores that drove it and

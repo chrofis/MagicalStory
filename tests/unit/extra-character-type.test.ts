@@ -533,7 +533,12 @@ describe('extra_character — prompt vocabulary', () => {
     const t = String(PROMPT_TEMPLATES.imageEvaluation || '');
     const rule = t.split('\n').find(l => l.includes('D-04b `extra_character`')) || '';
     expect(rule).not.toBe('');
-    expect(rule).not.toMatch(/\b(remove|delete|erase|paint out|take out)\b/i);
+    // ONE exception (owner, 2026-09-23): on a roster of "(0): none" there is no
+    // commissioned figure a removal could erase and no cast entry to redraw the
+    // figure AS, so that clause — and only that clause — asks for removal.
+    const [withCast, castZero = ''] = rule.split('On a roster of "(0): none"');
+    expect(withCast).not.toMatch(/\b(remove|delete|erase|paint out|take out)\b/i);
+    expect(castZero).toMatch(/^ the `fix` is: "Remove this figure: the page is written with no one in it\."$/);
   });
 
   it('buildEvaluationPrompt renders the roster into the template', () => {

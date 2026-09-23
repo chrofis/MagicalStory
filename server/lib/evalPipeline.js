@@ -1808,7 +1808,11 @@ function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, de
         description: `${det - ambientDropped}${ambientDropped ? ' cast-scale' : ''} person-figure(s) are in the frame for an EXPECTED CAST of ${castCount} person(s)`
           + ` — ${det - ambientDropped - castCount} more figure(s) than the page was written to hold.`
           + (ambientDropped ? ` (${ambientDropped} distant background figure(s) belong to the setting and were not counted.)` : ''),
-        fix: "Redraw this figure as the EXPECTED CAST entry it should be, matching that entry's reference and CLOTHING CONTRACT.",
+        // A roster of 0 has no entry to redraw the figure AS — the only repair
+        // is taking it out (2026-09-23, job_1790107559778_fcmlfa8kn p7).
+        fix: castCount === 0
+          ? 'Remove this figure: the page is written with no one in it.'
+          : "Redraw this figure as the EXPECTED CAST entry it should be, matching that entry's reference and CLOTHING CONTRACT.",
       }),
     };
   }

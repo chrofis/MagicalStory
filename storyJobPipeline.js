@@ -7280,7 +7280,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // consumers (client, server/routes, and the dev panel never read it), and
     // finalChecksReport.bookAudit / data.bookAuditReport had none either. The
     // MID-LOOP audits (repairPipeline.js, MID-LOOP BOOK AUDIT) are unaffected —
-    // they feed live repair rounds via readerFindingsByPage and stay exactly as
+    // their findings are charged to the version each audit read (repairLogic.js
+    // attributeReaderFindings) and they stay exactly as
     // they were. The capability itself is not gone: run it on demand via the
     // Test Lab "book_audit" stage (server/lib/testlab.js runBookAuditStage) on
     // any completed story. See docs/decisions.md 2026-09-01.

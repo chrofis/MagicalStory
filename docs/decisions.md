@@ -252,6 +252,60 @@ and `shot_off_plate` findings). Lab re-run of the same stage: see the commit / r
 
 ---
 
+## 2026-09-23 — A reader finding is charged to the version the audit read; a page written for nobody routes drawn figures to iterate; a failed char-fix is not repeated on the same version
+
+**Context:** Production `job_1790107559778_fcmlfa8kn`, two repair-loop bugs (owner-approved fixes).
+(1) The book audit reads each page's picked version, but its IMG faults went into a page-keyed map
+(`readerFindingsByPage`) handed to the NEXT round's consolidation of the version that round had
+just painted — a version the audit never saw. p5 v3 was billed a CATASTROPHIC reader line
+("the book is held by Lukas") read off v0's pixels (audit round 2, 23:15:33 CH; v3 scored
+23:19:33 CH): without it v3 scores 68 against v0's 58. p8 v2 was billed "the root is not visible"
+from the audit of v1 although the inpaint had painted the root. The structural effect: reader
+findings penalised every new version and never the one they described. (2) p7's declared cast
+is `[]`; Grok drew two children, the entity check read one as a roster girl with a CRITICAL
+`age_shift`, gate 2 routed char-fix, and char-fix failed ("no usable image") in all three rounds —
+a failed char-fix makes no version, the same version stays best, and nothing flipped the method.
+
+**Decision:**
+- `repairLogic.attributeReaderFindings(imgFaults, auditedVersionByPage)` binds each page-scoped
+  IMG fault to the version OBJECT the audit read (the same map `buildAuditPages` reads from).
+  `runBookAuditRound` re-consolidates THAT version — its own evaluation + entity issues + the reader
+  findings — and re-stamps it with `applyScore`. Its plan is what the next round repairs from.
+  Every other `consolidatePageEval` call (round versions, recolours, rescue) passes no reader
+  findings: a new version is judged on its own evidence. The page-keyed map is deleted. A later
+  audit of the same version replaces its findings; a failed consolidation leaves the version as it
+  was and logs an error. This applies on every audit, the final one included: a version the final
+  reader faulted may lose the pick to another version on the strength of that charge.
+- `decideRepairMethod` takes `options.expectedCast` (the version's declared cast via
+  `resolveDeclaredCast`, an iterate rewrite's own cast first). On `[]`, char-fix is declined for
+  any name (`charFixImpossible`), and gate 1e routes the page to iterate when it carries an
+  `extra_character` CRITICAL/CATASTROPHIC or an entity CRITICAL on this page — the repair is
+  removal, inpaint is closed to `extra_character` (2026-09-13), so the re-render from a brief
+  that holds nobody is the method. Structured data only; no finding text is read.
+- `decideRepairMethod` takes `options.failedMethods`: the round loop records every failed repair
+  on the version it was attempted on (`version.failedRepairs`, via `roundParent`), and a char-fix
+  that already failed on the version being repaired flips to iterate (gates 2 and 2b).
+- The extra_character fix text on a roster of 0 is "Remove this figure: the page is written with
+  no one in it." — in the presence derivation (`evalPipeline.derivePresenceFinding`) and in
+  `image-evaluation.txt` D-04b. This is a narrow exception to the 2026-09-13 "D-04b never instructs
+  a removal": that ruling protects commissioned figures, and a roster of 0 has none; with any cast
+  the fix stays an identity reconciliation. The route is unchanged (still not inpaintable).
+- Test Lab `repair` stage passes `expectedCast` the same way (it still does not pass `characters` —
+  a pre-existing Lab/prod difference, not changed here).
+
+**Rationale:** A score must describe the pixels it is attached to (the same invariant as
+`evalImageFp`). Attributing the finding to the audited version keeps the owner's 2026-08-27
+directive — audit findings feed the next round's repair — because the next round repairs the best
+version from its plan. Replay over the stored rounds: p5 v3 on its own evidence 68 (was 23); p8 v2
+3 (was -14); p7 routes iterate instead of char-fix; a char-fix that failed on the version flips.
+
+**Touched:** `server/lib/repairLogic.js`, `server/lib/repairPipeline.js`, `server/lib/testlab.js`,
+`server/lib/evalPipeline.js`, `prompts/image-evaluation.txt`, `storyJobPipeline.js` (comment),
+`tests/unit/repair-reader-attribution-and-cast0.test.ts`, `tests/unit/extra-character-type.test.ts`,
+`tests/unit/repair-reference-and-finding-ledger.test.ts`.
+
+**Status:** ✅ active
+
 ## 2026-09-23 — The trial front cover is rendered on a people-free plate, never on the raw landmark photo; it shares buildCoverReferences with the full-account cover
 
 **Context:** Owner-reported, prod trial `job_1790169018278_n57xpnufo`. The front cover's packed slot 0

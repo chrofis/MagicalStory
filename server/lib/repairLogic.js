@@ -183,7 +183,7 @@ const AUDIT_ADMIT_MAX = 5;
  * Severity is the ONLY thing code reads here, and it decides ONE thing: whether
  * the page re-enters repair. WHAT to fix on that page stays entirely the
  * consolidator's decision from the prompt (the fault lines are handed to it via
- * `readerFindingsByPage`, unread by code). Never pattern-match the fault text.
+ * attributeReaderFindings, unread by code). Never pattern-match the fault text.
  *
  * @param {Array<{page:number, severity:string}>} imgFaults
  * @returns {number[]} page numbers, first-seen order
@@ -196,6 +196,49 @@ function admitPagesFromAudit(imgFaults) {
     if (!pages.includes(f.page)) pages.push(f.page);
   }
   return pages;
+}
+
+/**
+ * A READER FINDING BELONGS TO THE VERSION THE READER READ (2026-09-23).
+ *
+ * The book audit reads each page's picked version. Its IMG faults used to go
+ * into a page-keyed map that the NEXT round handed to the consolidator of the
+ * version that round had just painted — a version the audit never saw. So a
+ * reader finding charged the new version and never the one it described:
+ * production job_1790107559778_fcmlfa8kn p5 v3 was billed a CATASTROPHIC
+ * "the book is held by Lukas" that described v0's pixels (v3 does not have
+ * him holding it), and p8 v2 was billed "the root is not visible" from the
+ * audit of v1 although the inpaint had painted the root in.
+ *
+ * Now each finding is bound to the version object the audit read on its page,
+ * and only that version is re-scored with it. Every other version is judged on
+ * its own evidence. Severity and line pass through verbatim — code never
+ * reads the fault text.
+ *
+ * @param {Array<{page:number, severity?:string, line?:string}>} imgFaults
+ * @param {Map<number, Object>} auditedVersionByPage  page → the version the audit read
+ * @returns {Map<number, {version:Object, findings:Array<{severity, line, sources}>}>}
+ */
+function attributeReaderFindings(imgFaults, auditedVersionByPage) {
+  const fs_ = require('./findingSources');
+  const out = new Map();
+  for (const f of imgFaults || []) {
+    // Page-scoped only: a fault with no page has no version to belong to.
+    if (!f || f.page == null) continue;
+    const version = auditedVersionByPage?.get(f.page) || null;
+    if (!version) {
+      log.warn(`📖 [BOOK-AUDIT] p${f.page}: reader finding has no audited version to belong to — not charged`);
+      continue;
+    }
+    if (!out.has(f.page)) out.set(f.page, { version, findings: [] });
+    out.get(f.page).findings.push({
+      severity: f.severity || null,
+      line: f.line,
+      // PROVENANCE (2026-09-14): a finding from the READER pass carries it.
+      sources: fs_.mergeSources(fs_.sourcesOf(f), [fs_.FINDING_SOURCES.READER]),
+    });
+  }
+  return out;
 }
 
 /**
@@ -724,7 +767,9 @@ function selectCharRepairTasks(entityReport, options = {}) {
  *
  * Decision order:
  *   1. Catastrophic visual / semantic break    → iterate (regenerate)
- *   2. Major/critical entity (character) issue → char-fix
+ *   1e. Figures on a page whose declared cast is empty → iterate (removal)
+ *   2. Major/critical entity (character) issue → char-fix (iterate when a
+ *      char-fix already failed on this version)
  *   2c. A CRITICAL no method owns (not inpaintable, no roster entry to
  *       char-fix from) and nothing else to execute → iterate
  *   3. Has fixable quality / semantic content   → inpaint
@@ -746,6 +791,13 @@ function selectCharRepairTasks(entityReport, options = {}) {
  * @param {Array} [options.characters] - the uploaded roster. Present, the two char-fix
  *        gates decline a figure with no roster entry (charFixReferenceGap) instead of
  *        routing a repaint that has no reference to paint from. Absent, no opinion.
+ * @param {Array|null} [options.expectedCast] - the DECLARED cast of the version being
+ *        repaired (resolveDeclaredCast). `[]` means the page is written with nobody in
+ *        it: no figure on it is a roster character, so char-fix is declined and drawn
+ *        figures route to iterate (gate 1e). null/absent = not declared, no opinion.
+ * @param {string[]} [options.failedMethods] - bare repair methods that already FAILED
+ *        (produced no image) on the version being repaired. A failed char-fix is not
+ *        repeated on the same pixels: the page flips to iterate.
  * @returns {{method: 'skip'|'inpaint'|'iterate'|'char-fix', reason: string, charName?: string, severity?: string, issueDescription?: string}}
  */
 function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) {
@@ -890,11 +942,58 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   // through to the gates below exactly as it would with no entity finding.
   // `options.characters` absent ⇒ no opinion, every name stays routable (the
   // unit tests and any caller that does not carry the roster).
+  // A PAGE WRITTEN WITH NOBODY ON IT (2026-09-23). Its declared cast is `[]`, so
+  // any figure drawn there is one the book never commissioned — even when the
+  // entity check maps it onto a roster name. Production job_1790107559778_fcmlfa8kn
+  // p7: two invented children, one read as a roster girl with a CRITICAL
+  // age_shift, and all three rounds went to char-fixes that repainted nothing.
+  // Structured data only: the declared cast, never a finding's prose.
+  const castEmpty = Array.isArray(options.expectedCast) && options.expectedCast.length === 0;
   const charFixImpossible = (name) => {
+    if (castEmpty) {
+      return { reason: 'page-cast-empty', message: `the page's expected cast is empty, so ${name || 'the figure'} is not a character this page holds — there is nobody to char-fix` };
+    }
     if (!Array.isArray(options.characters)) return null;
     const { charFixReferenceGap } = require('./charRepairTarget');
     return charFixReferenceGap({ characters: options.characters, characterName: name });
   };
+  // A CHAR-FIX THAT FAILED ON THESE PIXELS IS NOT REPEATED (2026-09-23). A failed
+  // char-fix produces no version, so the same version stays best and the next
+  // round used to pick char-fix on it again: p7 of the job above failed three
+  // times with "char-fix produced no usable image". The character defect still
+  // needs a repair, and iterate is the other method that can redraw a figure.
+  const charFixAlreadyFailed = Array.isArray(options.failedMethods) && options.failedMethods.includes('char-fix');
+  const flippedFromFailedCharFix = (what) => ({
+    method: 'iterate',
+    reason: `${what} — char-fix already failed on this version (no usable image), flipping to iterate`,
+  });
+
+  // 1e. FIGURES ON A PAGE WRITTEN FOR NOBODY → iterate. The repair is REMOVAL,
+  // and inpaint is closed to `extra_character` (NOT_INPAINTABLE_TYPES, owner
+  // 2026-09-13), so the re-render from the brief — which holds no one — is the
+  // method that removes them. The evidence is either an `extra_character`
+  // finding (declared type) or an entity CRITICAL on this page (a figure the
+  // entity check found on it). Like a spec conflict, the salvage floor is not
+  // consulted: no local repair exists.
+  if (pageNumber > 0 && castEmpty) {
+    const surplus = severityIssues.find(i => String(i?.type || '').toLowerCase() === 'extra_character'
+      && /^(critical|catastrophic)$/i.test(String(i?.severity || '')));
+    let entityFigure = null;
+    for (const [charName, charResult] of Object.entries(entityReport?.characters || {})) {
+      for (const issue of (charResult.issues || [])) {
+        if (String(issue.severity || '').toLowerCase() !== 'critical') continue;
+        const pages = issue.pagesToFix || (issue.pageNumber ? [issue.pageNumber] : []);
+        if (pages.includes(pageNumber)) { entityFigure = charName; break; }
+      }
+      if (entityFigure) break;
+    }
+    if (surplus || entityFigure) {
+      return {
+        method: 'iterate',
+        reason: `figures drawn on a page whose expected cast is empty${entityFigure ? ` (one read as ${entityFigure})` : ''} — re-render without them; a char-fix would repaint an uncommissioned figure`,
+      };
+    }
+  }
 
   if (pageNumber > 0 && entityReport?.characters) {
     let worst = null; // {severity, charName, issue}
@@ -919,6 +1018,9 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
     if (entityGap) {
       log.warn(`🚫 [REPAIR-DECIDE] page ${pageNumber}: entity ${worst.severity} on ${worst.charName} cannot take a char fix — ${entityGap.message}`);
       worst = null;
+    }
+    if (worst && charFixAlreadyFailed) {
+      return flippedFromFailedCharFix(`entity ${worst.severity} on ${worst.charName}`);
     }
     if (worst) {
       const issueDescription = worst.issue.description || worst.issue.fixInstruction || '';
@@ -997,6 +1099,9 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
     const clothingGap = clothingIssue && charFixImpossible(String(clothingIssue.character).trim());
     if (clothingGap) {
       log.warn(`🚫 [REPAIR-DECIDE] page ${pageNumber}: clothing ${String(clothingIssue.severity).toLowerCase()} on ${String(clothingIssue.character).trim()} cannot take a figure redo — ${clothingGap.message}`);
+    }
+    if (clothingIssue && !worseNonClothing && !clothingGap && charFixAlreadyFailed) {
+      return flippedFromFailedCharFix(`clothing ${String(clothingIssue.severity).toLowerCase()} on ${String(clothingIssue.character).trim()}`);
     }
     if (clothingIssue && !worseNonClothing && !clothingGap) {
       const charName = String(clothingIssue.character).trim();
@@ -1497,4 +1602,4 @@ function describeFigureForRepair({
 
 module.exports = {
   describeFigureForRepair,
-  repairAttemptFromResult, detectionForRetryEntry, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, CROP_ARTIFACT_TYPES, isCropArtifact, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX };
+  repairAttemptFromResult, detectionForRetryEntry, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, attributeReaderFindings, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, CROP_ARTIFACT_TYPES, isCropArtifact, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX };

@@ -113,7 +113,7 @@ describe('every char-repair entry point reports the same reason', () => {
 
   it('the router is handed the roster', () => {
     expect(read('server/lib/repairPipeline.js'))
-      .toMatch(/decideRepairMethod\(img\.pageNumber, latestEval, currentEntityReport, \{ characters \}\)/);
+      .toMatch(/decideRepairMethod\(img\.pageNumber, latestEval, currentEntityReport, \{\s*characters,/);
   });
 });
 
