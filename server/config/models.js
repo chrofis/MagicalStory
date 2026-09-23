@@ -36,6 +36,16 @@ const TEXT_MODELS = {
     maxOutputTokens: 128000, // true model cap per Anthropic Models API (max_tokens on /v1/models/claude-opus-5)
     description: 'Claude Opus 5 - Strongest reviewer/critic ($5/$25 per 1M). Used for the split outline review (cross-model: Sonnet writes, Opus reviews).'
   },
+  // Claude Opus 5.5 (released 2026-09-22). Lab-only until the owner decides:
+  // no default names this key. Ceiling from GET /v1/models/claude-opus-5-5 ->
+  // max_tokens 128000 (read 2026-09-23). Unlike Opus 5, its DEFAULT effort is
+  // `medium`, not `high` — a call that sends no effort runs one level lower.
+  'claude-opus-5-5': {
+    provider: 'anthropic',
+    modelId: 'claude-opus-5-5',
+    maxOutputTokens: 128000,
+    description: 'Claude Opus 5.5 - ($4/$20 per 1M). Default effort medium. Lab-only, not routed.'
+  },
   'claude-haiku': {
     provider: 'anthropic',
     modelId: 'claude-haiku-4-5-20251001',
@@ -1291,6 +1301,10 @@ const MODEL_PRICING = {
   // `thinking` = `output`: Anthropic bills extended thinking at the output rate.
   'claude-opus-5': { input: 5.00, output: 25.00, thinking: 25.00 },
   'claude-opus': { input: 5.00, output: 25.00, thinking: 25.00 },
+  // Opus 5.5: same page, fetched 2026-09-23 — $4 input / $20 output.
+  // MUST stay an exact key: without it calculateTextCost strips the trailing
+  // "-5" and prices this model as claude-opus-5 ($5/$25).
+  'claude-opus-5-5': { input: 4.00, output: 20.00, thinking: 20.00 },
   'claude-sonnet-4-6': { input: 3.00, output: 15.00, thinking: 15.00 },
   'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00, thinking: 15.00 },
   'claude-sonnet-4-5': { input: 3.00, output: 15.00, thinking: 15.00 },

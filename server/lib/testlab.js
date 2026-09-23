@@ -8172,12 +8172,22 @@ async function runWriterCompareStage(target, { params = {} }) {
  * production does (parseArcCreate), and scores each committed arc with the
  * same judges arc_rounds uses. Cost and quality land side by side.
  *
- * params: { efforts, model, judgeModels }   target: { storyId }
+ * params: { efforts, model, judgeModels, stage, promptFrom }   target: { storyId }
+ *
+ * params.stage      'create' (default) | 'retell'. Retell replays the story's
+ *   STORED round-1 retellPrompt (arcReviewReport.rounds[0].retellPrompt) — the
+ *   exact bytes production sent: that job's committed arc, its panel's
+ *   solutions and its challenge draw. Every arm re-tells the same thing, and
+ *   the re-told FINAL ARC is scored by the same judges as a created arc.
+ * params.promptFrom a Lab experiment id: reuse the create prompt that run
+ *   SENT (its sentPrompts) instead of building a fresh one. A fresh build draws
+ *   the challenge ideas anew, so this is the only way a later model's arms see
+ *   the identical draw — and identical template text — as an earlier sweep.
  */
 async function runArcEffortStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
-  const { buildArcCreatePrompt, parseArcCreate, drawChallengeIdeas } = require('./storyHelpers');
+  const { buildArcCreatePrompt, parseArcCreate, parseArcRetell, drawChallengeIdeas } = require('./storyHelpers');
   const { callTextModelStreaming } = require('./textModels');
   const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
   const sc = require('./storyScorecard');
@@ -8203,16 +8213,42 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
   // (beatsPipeline.js:889/947); omitting it would build a prompt production
   // never sends. Drawn ONCE so every effort arm sees the identical prompt —
   // the arms differ in effort and nothing else.
-  const draw = drawChallengeIdeas(storyData, {});
-  // withTemplates, not `PROMPT_TEMPLATES.x = override` + finally: that global
-  // mutation is what kept the Lab single-flight, because a second experiment's
-  // override is what this builder would read (prompts.js, 2026-08-25).
-  const { withTemplates } = require('../services/prompts');
-  const prompt = withTemplates(
-    { arcCreate: promptOverride },
-    () => buildArcCreatePrompt(storyData, pageCount, { challengeIdeas: draw.section }),
-  );
-  if (!prompt) throw new Error('arc-create prompt could not be built');
+  const stage = params.stage || 'create';
+  if (!['create', 'retell'].includes(stage)) throw new Error(`Unknown stage "${stage}" (create | retell)`);
+  if (stage === 'retell' && (promptOverride || params.promptFrom)) throw new Error('retell replays the stored production prompt verbatim — promptOverride/promptFrom do not apply');
+  let prompt;
+  let promptSource;
+  if (stage === 'retell') {
+    const round1 = (storyData.arcReviewReport?.rounds || [])[0];
+    prompt = String(round1?.retellPrompt || '');
+    if (!prompt) throw new Error('story has no stored arcReviewReport.rounds[0].retellPrompt to replay');
+    promptSource = `stored retellPrompt, round 1 (production model ${round1.retellModel || '?'})`;
+  } else if (params.promptFrom) {
+    const { dbQuery } = require('../services/database');
+    const expId = parseInt(params.promptFrom, 10);
+    const rows = await dbQuery('SELECT stage, targets, results FROM testlab_experiments WHERE id = $1', [expId]);
+    if (!rows.length) throw new Error(`promptFrom ${expId}: not found`);
+    if (rows[0].stage !== 'arc_effort') throw new Error(`promptFrom ${expId}: stage is ${rows[0].stage}, not arc_effort`);
+    const out = (rows[0].results || []).find(r => r.storyId === target.storyId);
+    if (!out) throw new Error(`promptFrom ${expId}: no result for ${target.storyId}`);
+    const sent = (out.sentPrompts || []).filter(sp => sp.label === 'testlab_arc_effort' && !sp.truncated && sp.text);
+    if (!sent.length) throw new Error(`promptFrom ${expId}: no untruncated create prompt stored`);
+    if (new Set(sent.map(sp => sp.text)).size !== 1) throw new Error(`promptFrom ${expId}: its arms sent different prompts`);
+    prompt = sent[0].text;
+    promptSource = `create prompt sent by Lab #${expId}`;
+  } else {
+    const draw = drawChallengeIdeas(storyData, {});
+    // withTemplates, not `PROMPT_TEMPLATES.x = override` + finally: that global
+    // mutation is what kept the Lab single-flight, because a second experiment's
+    // override is what this builder would read (prompts.js, 2026-08-25).
+    const { withTemplates } = require('../services/prompts');
+    prompt = withTemplates(
+      { arcCreate: promptOverride },
+      () => buildArcCreatePrompt(storyData, pageCount, { challengeIdeas: draw.section }),
+    );
+    promptSource = 'built fresh (new challenge draw)';
+  }
+  if (!prompt) throw new Error('arc prompt could not be built');
 
   const judgeTemplate = PROMPT_TEMPLATES.storyArcJudge;
   if (!judgeTemplate) throw new Error('story-arc-judge template unavailable');
@@ -8240,11 +8276,13 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
   for (const effort of efforts) {
     const t = Date.now();
     try {
-      const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_arc_effort', effort });
+      const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: stage === 'retell' ? 'testlab_arc_effort_retell' : 'testlab_arc_effort', effort });
       const visible = String(res.text || '');
       let commit = null, parseError = null;
-      try { commit = parseArcCreate(visible); } catch (e) { parseError = String(e.message || e); }
-      const arcText = commit?.arc || commit?.chosen || visible;
+      // Committed the way production commits each stage: parseArcCreate for a
+      // create, parseArcRetell (its FINAL ARC) for a re-telling.
+      try { commit = stage === 'retell' ? parseArcRetell(visible) : parseArcCreate(visible); } catch (e) { parseError = String(e.message || e); }
+      const arcText = stage === 'retell' ? (commit?.finalArc || visible) : (commit?.arc || commit?.chosen || visible);
       const scored = commit ? await scoreArc(arcText) : { draws: [], mean: null };
       const out = res.usage?.output_tokens || 0;
       // The gap IS the finding: billed output minus what came back as text.
@@ -8269,7 +8307,7 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
 
   const base = arms.find(a => a.effort === 'high' && a.ok);
   return {
-    storyId: target.storyId, model, judges, pageCount, promptChars: prompt.length,
+    storyId: target.storyId, model, stage, promptSource, judges, pageCount, promptChars: prompt.length,
     arms,
     summary: arms.map(a => a.ok
       ? `${a.effort}: $${a.cost.toFixed(4)} | out ${a.outputTokens} tok (${a.invisibleShare != null ? Math.round(a.invisibleShare * 100) : '?'}% not returned) | score ${a.score == null ? 'n/a' : a.score.toFixed(2)}`
