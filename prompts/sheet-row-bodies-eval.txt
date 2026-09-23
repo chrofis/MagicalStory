@@ -12,7 +12,7 @@ TASK 2: FACING ANGLES
 Say what each cell actually shows, then compare it to front, three-quarter, profile, rear turn, left to right. Cell 4 duplicating cell 3's profile, or showing a flat back view with no visible eye or cheek, scores 1-3. Score 1-10.
 
 TASK 3: SAME COSTUME
-Read REQUESTED_OUTFIT below, split it into items, and check every figure wears each item and all 4 cells wear the same outfit. All items present and consistent = 10; one item missing or wrong colour ≤5; outfit varies between cells 1-3. outfitScore 1-10.
+Read REQUESTED_OUTFIT below, split it into items, and check every figure wears each item and all 4 cells wear the same outfit. A collar, placket, hood or trim the outfit does not name — a buttoned polo collar where a plain shirt was asked for — is a wrong item. All items present and consistent = 10; one item missing, wrong colour or with invented trim ≤5; outfit varies between cells 1-3. outfitScore 1-10.
 
 TASK 3b: COSTUME READS
 Only when REQUESTED_COSTUME is given below. Ignoring the item list, judge whether a reader seeing this figure alone would name that costume. Every garment is worn the way that costume wears it. A figure carrying the right items that still reads as everyday clothing scores ≤4. costumeReadsScore 1-10. When no REQUESTED_COSTUME is given, score 10.
@@ -26,7 +26,7 @@ Each cell shows exactly ONE figure: the same single character in every cell. Any
 TASK 6: PLAIN BACKGROUND
 The area behind and around the figures must be plain white and empty (thin cell dividers are fine). Any painted scene, scenery, streets, walls, floor, sky, fog, or coloured/illustrated backdrop behind a figure = backgroundScore ≤ 2. Plain white/empty in every cell = 10. backgroundScore 1-10.
 
-finalScore = lowest of fullBodyScore, anglesScore, outfitScore, costumeReadsScore, proportionsScore, soloScore, backgroundScore. valid = finalScore ≥ 6.
+finalScore = lowest of fullBodyScore, angles.score, outfitScore, costumeReadsScore, proportions.score, soloScore, backgroundScore. valid = finalScore ≥ 6.
 
 {REQUESTED_OUTFIT}
 {REQUESTED_COSTUME}

@@ -28,7 +28,7 @@ const JOB = 'job_1789227389389_z18dmvnt6';
 const DRY = process.argv.includes('--dry');
 
 const sheet = require('../../server/lib/character2x4Sheet.js');
-const { generateCharacter2x4Sheet, declaredAgeBlock, buildPrompt, _internal } = sheet;
+const { generateCharacter2x4Sheet, declaredAgeBlock, _internal } = sheet;
 const { buildBodyRowPrompt, buildHeadRowPrompt } = _internal;
 
 const count = (s, needle) => s.split(needle).length - 1;
@@ -73,14 +73,12 @@ async function loadStory() {
   let bad = 0;
   for (const a of arms) {
     const blk = declaredAgeBlock(a.character);
-    const combined = buildPrompt(artStyle, a.clothing, a.character);
     const live = buildBodyRowPrompt(a.clothing, a.character) + '\n' + buildHeadRowPrompt(a.character, a.clothing);
-    const nCombined = count(combined, 'years old');
     const nLive = count(live, 'years old');
     const want = a.treatment ? 2 : 0;
-    const ok = nCombined === want;
+    const ok = nLive === want;
     if (!ok) bad++;
-    console.log(`${a.label.padEnd(11)} ageBlock=${blk ? 'yes' : 'EMPTY'}  buildPrompt "years old"×${nCombined} (want ${want}) ${ok ? 'OK' : 'MISMATCH'}   LIVE body+head rows "years old"×${nLive}`);
+    console.log(`${a.label.padEnd(11)} ageBlock=${blk ? 'yes' : 'EMPTY'}  body+head rows "years old"×${nLive} (want ${want}) ${ok ? 'OK' : 'MISMATCH'}`);
   }
   if (bad) throw new Error(`${bad} arm(s) failed the prompt assertion — aborting before any paid call`);
   if (DRY) { console.log('\n--dry: stopping before paid calls.'); return; }

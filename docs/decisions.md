@@ -208,6 +208,73 @@ staging `job_1790100385959_1nitlympp`.
 
 ---
 
+## 2026-09-23 — Styled-avatar audit: head-and-shoulders crop, no invented trim, a plain ground on pass 2, every sheet judge's final computed in code, the Lab runs production's judges
+
+**Context:** `docs/audits/prompt-audit-2026-09-23/06-avatars.md`, staging `job_1790100385959_1nitlympp`,
+read on the pixels of all 6 pass-1 and 8 pass-2 sheets. Five generator↔critic gaps and one Lab mis-wiring:
+(S2-3) the head row came back waist/hip/knee-length on 5/6 sheets while the heads judge was told "some
+torso is fine"; (S2-4) a plain "long-sleeve shirt" was drawn as a buttoned polo on both Levin and both
+Kiaan sheets, and the only generator line forbidding it lived in the dead single-call `buildPrompt`;
+(S2-5) pass 2 painted washes and ground shadows behind the figures and removed the dividers on 6/6 sheets
+with no prompt line or judge task covering either; (S3-2) pass-2 hair shift and cheek blotches were judged
+against the PHOTO, not the approved pass-1 sheet; (S3-3) only the bodies judge's final was computed in
+code, the other three shipped the model's own number; (S2-2) the watercolour anchor is pencil-outlined
+while the style line says "no ink or pencil lines"; (S4) the Lab's `avatar_eval` override replaced BOTH
+row-judge templates at once and prefilled `sheet-2x4-evaluation.txt`, a whole-sheet judge production
+never ran; `avatar_style` prefilled `styled-costumed-avatar.txt`, which production never loads.
+
+**Decision:**
+- Head row: framed "like a passport photo", cut off at the upper chest. Heads judge TASK 5 CROP
+  (`cropScore`): a hand, waistband, belt, top hem or legwear in any cell scores 1-3. Bodies judge
+  TASK 3 counts a collar, placket, hood or trim the outfit does not name as a wrong item.
+- `buildUnnamedTrimRule(redress)` in both live rows: no collar, placket, hood or trim the costume does
+  not name (on a redress) / that neither the costume nor the body reference shows (otherwise). The head
+  row also takes its neckline from Image 3, the body row it is drawn to match.
+- `SHEET_GROUND_RULE`, one constant, stated in the pass-2 prompt and filled into the style judge as
+  `{SHEET_GROUND}` (TASK 8, `backgroundScore`; a wash, shape or scenery behind a figure, or dividers gone,
+  3-5). Pass 2 also keeps hair colour and skin tone as Image 1 with no new face patch; the style judge
+  compares hair/skin and colour regions to Image 2 (the pass-1 sheet) — consistency, not photo accuracy
+  (`feedback_eye_colour_consistency_not_accuracy`). A cheek flush clearly stronger than Image 2's is 4-5.
+- Every sheet judge's final is computed in code from its sub-scores: `scoreHeadsReport`,
+  `scoreStyleReport`, `scoreIdentityReport` (lowest cell), beside the existing `applyPoseHeadGate` for
+  bodies. A verdict with no sub-score throws (the callers' existing unjudged path); an axis that fails
+  without a reason gets one so the retry log names it.
+- Anchor vs style text: the anchor line now ends "where Image 2 and the style text above disagree, the
+  style text wins". The anchor asset is unchanged: the owner ruled 2026-09-23 that the anchor keeps its figures
+  (entry above); a pencil-free replacement asset is an owner call.
+- Deleted (no fallbacks): `buildPrompt`, `evaluateSheetWithGemini`, `buildCharacterDescription`,
+  `loadPhantom`, `prompts/sheet-2x4-evaluation.txt`, `scripts/analysis/avatar-grok-vs-gemini.js` (its
+  round 1 was the single-call builder). The whole-sheet cross-row check lived only in that deleted Lab
+  judge; production never ran it.
+- Lab: `avatar_eval` override names ONE judge via `params.evalPrompt` (heads | bodies | identity | style);
+  the prefill is that judge's template; an override for a judge the pass does not run throws. The
+  test-version path goes through `evaluateAvatarSheet` like production, and both Lab avatar stages pass
+  the character's declared age as production does. `avatar_style` prefills the exact
+  `buildStyleTransferPrompt` output for `params.artStyle`.
+- Stored: `passes.pass1.judgePrompts {bodies, heads, identity}` and `passes.pass2.judgePrompt` (text only).
+
+**Downstream check (S2-5):** cell cropping does not need drawn dividers. `cropAvatarCell` splits by the
+analyzer's lowest-variance columns and rejects a split whose columns deviate >25%. Replaying that
+algorithm over the run's shipped styled sheets: 6/6 split cleanly (max column deviation 1.2-9.4%); only the
+two contaminated, unshipped Kiaan attempts fell back to the fixed grid. So the washes are a content
+defect (they ride into each page's reference cell), not a splitter one — which is why the background
+axis fails at 3-5 rather than 1-3.
+
+**Validation:** prompts rebuilt locally (free). Paid: one full pass-1 + pass-2 for Levin (demo-b-hnecf,
+redress, watercolour) through `generateCharacter2x4Sheet`: two runs, 3 Grok + 4 judge calls each (~$0.07 each). Run 1 (first head-row wording, "head drawn large, crop ends at the upper chest"): head row still hip-length and the judge called it "mid-chest", 6 — the wording did not move Grok, and the judge's crop scale named no visible landmark. Run 2 ("framed like a passport photo" + a judge scale keyed to visible hands/waistband/legwear): head row a true head-and-shoulders crop in all four cells, rear turn correct, judged 9. Collars: run 1 plain crew neck; run 2's BODY row drew a buttoned polo again and no judge caught it (the heads row hides it under the jacket; the bodies judge had no trim rule) — so the bodies judge's TASK 3 now counts invented trim as a wrong item (not re-run: the two-attempt cap). Pass 2: both runs kept the dividers and a plain ground with only faint foot shadows (was a painted wash on 6/6). Still passing when it should not: run 2's styled sheet has blotchy red cheeks and hair shifted toward auburn; the judge saw "slightly darker hair, within range" and scored clean 9 — the colour tasks are aimed at the right reference now, but gemini-2.5-flash still reads these as shading. Left OPEN.
+
+**Rationale:** a rule a judge deducts for must be a rule the generator was given, and a rule the
+generator is given should be judged; the final score is arithmetic the prompt already defines, so code
+does it once for all four judges.
+
+**Touched files:** `server/lib/character2x4Sheet.js`, `server/lib/testlab.js`,
+`server/routes/admin/testlab.js`, `server/services/prompts.js`, `prompts/sheet-row-heads-eval.txt`,
+`prompts/sheet-row-bodies-eval.txt`, `prompts/sheet-2x4-style-eval.txt`, deleted
+`prompts/sheet-2x4-evaluation.txt`, `tests/unit/avatar-sheet-audit-2026-09-23.test.ts` + updated sheet tests.
+
+
+---
+
 ## 2026-09-23 — Absence findings: a duplicate needs the detector's room for it, a CRITICAL/MAJOR "missing" needs a second look, a false-finding drop is never charged
 
 **Context:** Staging `job_1790100385959_1nitlympp` p12 v0. The quality judge listed a figure on empty

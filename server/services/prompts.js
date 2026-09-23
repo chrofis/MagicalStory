@@ -260,7 +260,6 @@ async function loadPromptTemplates() {
     ['avatarAcePrompt', 'avatar-ace-prompt.txt'],
     ['avatarRetryPrompt', 'avatar-retry-prompt.txt'],
     ['avatarEvaluation', 'avatar-evaluation.txt'],
-    ['sheet2x4Evaluation', 'sheet-2x4-evaluation.txt'],
     ['sheet2x4StyleEval', 'sheet-2x4-style-eval.txt'],
     ['sheetRowHeadsEval', 'sheet-row-heads-eval.txt'],
     ['sheetRowBodiesEval', 'sheet-row-bodies-eval.txt'],

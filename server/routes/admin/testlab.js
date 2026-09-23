@@ -126,13 +126,6 @@ const STAGE_TEMPLATE_KEYS = {
   // so that is what the override replaces. The old 'frontCover' key here was
   // stale — front-cover.txt retired 2026-08-26, so the prefill loaded null.
   cover: 'imageGeneration',
-  // Avatar sheet eval prefill shows the pass-1 realistic evaluator; pass-2
-  // (styled) uses sheet-2x4-style-eval.txt — paste that manually when A/B-ing
-  // the styled eval prompt.
-  avatar_eval: 'sheet2x4Evaluation',
-  // Pass-2 style transfer. Marked overridable since it shipped but had no
-  // prefill, so "Load current template" silently did nothing for it.
-  avatar_style: 'styledCostumedAvatar',
   // The consolidator writes most of a page's deductions (severity policy,
   // dedupe, MINOR definition), so its rules are the highest-leverage prompt to
   // A/B. Pair the override with params.model to vary the model applying them.
@@ -159,6 +152,35 @@ const STAGE_TEMPLATE_KEYS = {
 // GET /templates resolves every option to its text, and the UI picks the one
 // matching the param the user typed in the params JSON.
 const STAGE_TEMPLATE_VARIANTS = {
+  // The avatar sheet has FOUR judges, each with its own template, and the
+  // override replaces exactly the one params.evalPrompt names (runAvatarEvalStage).
+  // Until 2026-09-23 this prefilled sheet-2x4-evaluation.txt, a whole-sheet judge
+  // production never ran, and one override replaced both row judges at once.
+  avatar_eval: {
+    param: 'evalPrompt',
+    options: {
+      heads: 'sheetRowHeadsEval',
+      bodies: 'sheetRowBodiesEval',
+      identity: 'sheetRowIdentityEval',
+      style: 'sheet2x4StyleEval',
+    },
+  },
+  // avatar_style's prompt is BUILT in JS, not loaded from a template: the
+  // prefill is the exact string production sends for params.artStyle — with the
+  // style anchor attached when that style has one, as on attempt 1 (a Lab
+  // override keeps the anchor). It used to prefill styled-costumed-avatar.txt,
+  // which production never loads.
+  avatar_style: {
+    param: 'artStyle',
+    buildOptions: () => {
+      const { buildStyleTransferPrompt } = require('../../lib/character2x4Sheet');
+      const { loadStyleAnchor } = require('../../lib/styleAnalysis');
+      const { ART_STYLES } = require('../../lib/storyHelpers');
+      return Object.fromEntries(Object.keys(ART_STYLES)
+        .filter(id => id !== 'realistic') // pass 2 never runs on a realistic story
+        .map(id => [id, buildStyleTransferPrompt(id, { hasAnchor: !!loadStyleAnchor(id) })]));
+    },
+  },
   // runAuditReplayStage switches the audit prompt on params.level.
   audit_replay: {
     param: 'level',
@@ -187,10 +209,10 @@ router.get('/templates', async (req, res) => {
       templates[stage] = PROMPT_TEMPLATES[key] || null;
     }
     const variants = {};
-    for (const [stage, { param, options }] of Object.entries(STAGE_TEMPLATE_VARIANTS)) {
+    for (const [stage, { param, options, buildOptions }] of Object.entries(STAGE_TEMPLATE_VARIANTS)) {
       variants[stage] = {
         param,
-        options: Object.fromEntries(
+        options: buildOptions ? buildOptions() : Object.fromEntries(
           Object.entries(options).map(([value, key]) => [value, PROMPT_TEMPLATES[key] || null])
         ),
       };

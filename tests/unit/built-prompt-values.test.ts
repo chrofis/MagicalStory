@@ -350,6 +350,14 @@ describe('every model-facing prompt builder carries its input VALUE', () => {
 // the model call, so the only honest test drives the call with a stubbed
 // `fetch` and reads back the `promptUsed` it reports. No network, no cost.
 // ---------------------------------------------------------------------------
+// Every sheet judge's final is computed in code from its sub-scores
+// (2026-09-23), so the stub carries each judge's axes, not a bare finalScore.
+const STUB_SHEET_VERDICT = JSON.stringify({
+  angles: { score: 9, reason: 'cell1: front' }, cleanRender: { cleanScore: 9, reason: 'none' },
+  coverage: { coverageScore: 9, reason: 'red crew neck' }, solo: { soloScore: 9, reason: 'one per cell' },
+  crop: { cropScore: 9, reason: 'upper chest' }, perCell: { cell1: 9, cell2: 9, cell3: 9, cell4: 9 },
+  identityScore: 9, layoutScore: 9, styleScore: 9, cleanScore: 9, bodyFaceScore: 9, ageScore: 9, soloScore: 9, backgroundScore: 9,
+});
 describe('evaluateSheetRow hands the judge the real outfit, not the token', () => {
   const realFetch = globalThis.fetch;
   afterEach(() => { globalThis.fetch = realFetch; vi.restoreAllMocks(); });
@@ -359,7 +367,7 @@ describe('evaluateSheetRow hands the judge the real outfit, not the token', () =
       ok: true,
       status: 200,
       json: async () => ({
-        candidates: [{ content: { parts: [{ text: '{"finalScore":10}' }] } }],
+        candidates: [{ content: { parts: [{ text: STUB_SHEET_VERDICT }] } }],
         usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 },
       }),
       text: async () => '',

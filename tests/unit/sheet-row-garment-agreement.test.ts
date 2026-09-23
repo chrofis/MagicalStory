@@ -33,10 +33,11 @@ describe('the head row may be clothed, in the SAME garment as the body row', () 
     expect(t).toMatch(/never a collar, placket, hood or trim row 2 does not have/);
   });
 
-  it('the hardcoded identity-sheet prompt binds row 1 the same way', () => {
+  it('the live head-row prompt binds its neckline to the body row it was drawn from', () => {
     const t = read('server/lib/character2x4Sheet.js');
     expect(t).not.toMatch(/head and neck only, no shoulders, no torso, no clothing/);
-    expect(t).toMatch(/it is the same garment cells 5-8 wear/);
+    const { buildHeadRowPrompt } = require('../../server/lib/character2x4Sheet.js');
+    expect(buildHeadRowPrompt({ name: 'A' }, 'a red shirt', true)).toMatch(/Where the neckline shows, it is the one Image 3 wears/);
   });
 
   it('the head-row evaluator checks the garment, not only that something is worn', () => {
@@ -50,16 +51,8 @@ describe('the head row may be clothed, in the SAME garment as the body row', () 
     expect(t).toMatch(/\{REQUESTED_OUTFIT\}/);
   });
 
-  it('the whole-sheet evaluator compares the two rows against each other', () => {
-    const t = read('prompts/sheet-2x4-evaluation.txt');
-    expect(t).toMatch(/Cross-ROW consistency/);
-    expect(t).toMatch(/present in one row and absent from the other scores 1-3/);
-    expect(t).toMatch(/`outfitScore` = LOWEST of item-match, cross-cell consistency and cross-row consistency/);
-    expect(t).toMatch(/"crossRowConsistency"/);
-  });
-
   it('no evaluator still demands a clothing-free top row', () => {
-    for (const f of ['prompts/sheet-2x4-evaluation.txt', 'prompts/styled-costumed-avatar-2x4.txt']) {
+    for (const f of ['prompts/styled-costumed-avatar-2x4.txt']) {
       expect(read(f)).not.toMatch(/no clothing/i);
     }
   });
@@ -142,9 +135,6 @@ describe('a garment named with its parts is one garment, in both rows', () => {
   it('both row evaluators penalise a NAMED part that is missing, not only an invented one', () => {
     const heads = read('prompts/sheet-row-heads-eval.txt');
     expect(heads).toMatch(/A part the outfit DOES name and this row omits scores 1-3/);
-    const whole = read('prompts/sheet-2x4-evaluation.txt');
-    expect(whole).toMatch(/present in one row and absent from the other scores 1-3/);
-    expect(whole).toMatch(/one continuous piece in one row and as separate items in the other/);
   });
 
   it('the garment rule stays generic — no story nouns', () => {

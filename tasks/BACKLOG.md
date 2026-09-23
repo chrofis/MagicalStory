@@ -209,6 +209,10 @@ The first two are corroborated by more than one source, which is why they lead.
       `params.composite` is not exposed → `docs/image-routing.md:160`
 - [ ] Direct-vs-composite thresholds are intuition, never measured → `docs/image-routing.md:161`
 - [ ] Faces-in-style ceiling — experiment TBD → `docs/image-routing.md:162`
+- [ ] Styled-avatar style judge still passes pass-2 cheek blotches and a hair-colour shift
+      (validated 2026-09-23 after re-aiming it at the pass-1 sheet); body row still drew an
+      unnamed polo collar on 1 of 2 runs; the recreation re-render (a/b/c) and a pencil-free
+      watercolour anchor are owner calls → `docs/audits/prompt-audit-2026-09-23/06-avatars.md:3`
 - [ ] Single-portrait avatars (no 2×2 grid) — open lever, not shipped
       → `docs/image-generation-methods.html:533`
 - [ ] 2×4 costumed sheet: Row-1 costume leak; need 5× per character for a real `IMAGE_OTHER`
