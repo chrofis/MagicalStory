@@ -95,10 +95,20 @@ describe('the derived plate is edited from the base, not generated fresh', () =>
 
   it('states what must STAY, positively — a negation renders as nothing', () => {
     const instruction = buildPlateDeriveInstruction('medium', 'high-angle');
-    for (const kept of ['shape', 'position', 'colour', 'palette', 'season', 'light']) {
+    for (const kept of ['shape', 'arrangement', 'colour', 'palette', 'season', 'light']) {
       expect(instruction, kept).toContain(kept);
     }
     expect(instruction).not.toMatch(/\b(?:do not|don't|never|without changing)\b/i);
+  });
+
+  it('never pins an object\'s position: in an edit that pins the camera it asks to move', () => {
+    for (const shot of ['ultra-wide', 'high-angle', 'low-angle', 'aerial']) {
+      expect(buildPlateDeriveInstruction('medium', shot), shot).not.toMatch(/\bposition\b/i);
+    }
+  });
+
+  it('ultra-wide gives the pull-back a size (Lab 1413), not only the definition', () => {
+    expect(buildPlateDeriveInstruction('medium', 'ultra-wide')).toMatch(/middle third/);
   });
 
   it('returns null for a shot it does not know', () => {

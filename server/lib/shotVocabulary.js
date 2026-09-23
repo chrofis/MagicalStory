@@ -525,13 +525,29 @@ function plateClass(shot) {
  *
  * Positive and structural: it names what must stay, never what must not change.
  */
+/**
+ * A camera move the shot's definition alone does not produce in an edit.
+ * ultra-wide: the plain definition pulled back ~15% on dragon run 6 p2
+ * (job_1790100385959_1nitlympp); a pull-back given a SIZE ("the current
+ * picture fills the middle third") halved the buildings in Lab 1413.
+ */
+const DERIVE_CAMERA_MOVE = {
+  'ultra-wide': 'Pull the camera far back to an ultra-wide view. Everything in the current picture shrinks to fill only the middle third of the new frame, and the new frame shows much more around it: more open ground in front, more of the surrounding place on both sides, more sky above.',
+};
+
+/*
+ * What stays is the place's STRUCTURE, never an object's "position": in an
+ * image edit that word means position in the frame, and it pinned the camera
+ * the instruction was asking to move (run 6 p2, 2026-09-23).
+ */
 function buildPlateDeriveInstruction(baseShot, targetShot) {
   const target = SHOTS.find(s => s.id === targetShot);
   if (!target) return null;
   const from = String(baseShot || '').trim();
   const fromPhrase = from ? `painted as a ${from} shot` : 'painted at eye level';
-  return `This backdrop is ${fromPhrase} of a place. Re-paint the same place as a ${target.id} shot. ${target.definition} `
-    + 'Every building, wall, roof, tree, path and surface keeps its own shape, position, material and colour, the palette and the season stay identical, and the light keeps the same direction and time of day. The camera moves; the place stays as it is.';
+  const move = DERIVE_CAMERA_MOVE[target.id] || `Re-paint the same place as a ${target.id} shot. ${target.definition}`;
+  return `This backdrop is ${fromPhrase} of a place. ${move} `
+    + 'The buildings, walls, roofs, trees, paths and surfaces keep their shape, material and colour and their arrangement relative to each other; the palette and the season stay identical, and the light keeps the same direction and time of day. The camera moves; the place stays as it is.';
 }
 
 module.exports = {

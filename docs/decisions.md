@@ -55599,3 +55599,14 @@ Owner, same day: "text on signs I would allow. A taxi with taxi written on it is
 prompts/empty-scene-qc.txt, prompts/scene-expansion.txt, prompts/scene-expansion-all.txt,
 prompts/scene-iteration.txt, prompts/scene-iteration-free.txt, server/lib/letteringCheck.js,
 tests/unit/lettering-check.test.ts, tests/unit/empty-scene-qc-extraction.test.ts.
+
+## 2026-09-23 — The derived ultra-wide plate is given a size; the derive never pins "position"
+
+**Context:** c2d8cd64d derives an ultra-wide plate from the vantage's base plate. On dragon run 6 p2 it pulled back
+only ~15%: the instruction said every building "keeps its own shape, position, …", and in an image edit "position"
+means position in the frame, which pins the camera the instruction asks to move.
+**Decision:** The kept list names structure (shape, material, colour, arrangement relative to each other), never
+position, for every derived shot. Ultra-wide gets a sized pull-back (`DERIVE_CAMERA_MOVE`): the current picture
+shrinks into the middle third of the new frame. Lab 1413 (p18 base plate): buildings about half their size, same
+place. high-angle / low-angle / aerial only lost the word "position"; they were not Lab-tested.
+**Touched:** server/lib/shotVocabulary.js, tests/unit/plate-derive-for-angle.test.ts.
