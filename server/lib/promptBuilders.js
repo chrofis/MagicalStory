@@ -5345,14 +5345,12 @@ function buildOutlineReviewPrompt(inputData, writerOutput, sceneConsistencyIssue
     .map(char => buildCharacterPromptBlock(char, { format: 'bullets', includeClothing: true }))
     .join('\n\n') || '(no character details available)';
 
-  // The canonical DO-NOT-WRITE LIST, from the file both pipelines own. Drop the
-  // writer-only "the analysis pass does NOT need to re-check them" note (that
-  // guidance is for the writer's own self-critique; in split mode the external
-  // reviewer IS the re-check).
-  const doNotWriteList = String(PROMPT_TEMPLATES.doNotWriteList || '')
-    .replace(/^These appear nowhere[^\n]*\n+/m, '')
-    .trim();
-  if (!doNotWriteList) doNotWriteList = '(canonical DO-NOT-WRITE list unavailable — apply the ban categories named in check 25)';
+  // The canonical DO-NOT-WRITE LIST as a checker reads it (doNotWriteListBody).
+  // A missing template is logged as an error there, and this notice says so in
+  // the prompt. (Until 2026-09-23 this assigned to a `const`, so the
+  // missing-template path threw a TypeError instead of reaching the notice.)
+  const doNotWriteList = doNotWriteListBody({ forChecker: true })
+    || '(canonical DO-NOT-WRITE list unavailable — apply the ban categories named in check 25)';
 
   // Aspect scope note (split review) + prior-review context (repeated review).
   const aspectNote = aspect === 'text'
@@ -5462,7 +5460,7 @@ function refineCast(inputData, commissionedDetails = '') {
   };
 }
 
-function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = '') {
+function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = '', { arcHints = '' } = {}) {
   const template = PROMPT_TEMPLATES.textRefine;
   if (!template) {
     log.error('[PROMPT] textRefine template not loaded — text refinement unavailable');
@@ -5537,9 +5535,9 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
   // A brief was computed and passed here until 2026-09-13; the template silently
   // dropped it, and the argument is deleted rather than wired up.
 
-  // Reuse the canonical DO-NOT-WRITE list from the writer template so the ban
-  // categories can never drift between writing and refining.
-  const doNotWriteSection = buildDoNotWriteSection(inputData);
+  // The canonical DO-NOT-WRITE list, so the ban categories can never drift
+  // between writing and refining — as a checker reads it: check 18 IS the re-check.
+  const doNotWriteSection = buildDoNotWriteSection({ forChecker: true });
 
   // The COMPLETE language definition, not the bare name. getLanguageNameEnglish
   // returns "Swiss German" for de-ch, which a model reads as Schwyzerdütsch — it
@@ -5559,6 +5557,8 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     // The whole story — every fact it states belongs on some page. Read-only:
     // never a licence to add events the story does not carry.
     STORY_ARC: String(arc || '').trim() || '(no arc was recorded for this story)',
+    // The hints amend the arc; the writer applied them (buildCriticArcHintsSection).
+    ARC_HINTS: buildCriticArcHintsSection(arcHints),
     // How the story was divided into pictures (beats mode only). Empty on a
     // unified-mode story, which has no page plan.
     PLAN_LINES: planLines || '(no page plan was recorded for this story — judge against the story and scene outlines only)',
@@ -7450,6 +7450,29 @@ function parsePlanCheckPeoplelessPick(raw) {
 // stages, and neither was told which to believe.
 const HINT_VS_ARC_RULE = 'A hint never changes the situation the story settled: where one asks for what the story above rules out — a saved profile\'s friendship where the story stages a first meeting — the story stands and the hint is dropped.';
 
+/**
+ * The arc hints as the two CRITICS of the text read them — the arc-informed
+ * audit and the refine (2026-09-23). The writer is told to apply the hints, so
+ * a critic shown only the unamended arc faults the text for following them: on
+ * job_1790100385959_1nitlympp the audit filed a LOADBEARING fault against a
+ * page that applied a hint, and the refine rebuilt the contradiction the hint
+ * had removed. Both critics get the hints under ONE heading, with the same
+ * HINT_VS_ARC_RULE the writer and the planner carry. The blind audit gets
+ * nothing: it is denied the arc by design, and a hint is an arc amendment.
+ *
+ * @param {string} arcHints
+ * @returns {string} '' when there are no hints
+ */
+function buildCriticArcHintsSection(arcHints = '') {
+  const hints = String(arcHints || '').trim();
+  if (!hints) return '';
+  return `# HINTS — changes made to the story above after it was settled. Read the story with them applied: a page that follows a hint follows the story.
+
+${HINT_VS_ARC_RULE}
+
+${hints}`;
+}
+
 function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', replan = '' } = {}) {
   const template = PROMPT_TEMPLATES.storyBeats;
   if (!template) {
@@ -9193,12 +9216,13 @@ function buildTextAuditBlindPrompt(inputData, pages = []) {
 }
 
 /**
- * ARC-INFORMED audit of the writer's text: the final arc, the page plan, each
- * page's text and its whole picture brief. No back cover, no commission and no
- * arc hints (a stale docblock claiming "back cover + DEPICTS only" sat above the
- * lector builder until 2026-09-23).
+ * ARC-INFORMED audit of the writer's text: the final arc and the arc hints the
+ * writer was told to apply (buildCriticArcHintsSection), the page plan, each
+ * page's text and its whole picture brief. No back cover and no commission (a
+ * stale docblock claiming "back cover + DEPICTS only" sat above the lector
+ * builder until 2026-09-23).
  */
-function buildTextAuditPrompt(inputData, pages = [], arc = '') {
+function buildTextAuditPrompt(inputData, pages = [], arc = '', { arcHints = '' } = {}) {
   const template = PROMPT_TEMPLATES.storyTextAudit;
   if (!template) {
     log.error('[PROMPT] storyTextAudit template not loaded — text audit unavailable');
@@ -9242,6 +9266,7 @@ function buildTextAuditPrompt(inputData, pages = [], arc = '') {
   const simpleBand = SIMPLE_BANDS.has(resolveAgeBand(inputData));
   return fillTemplate(template, {
     STORY_ARC: String(arc || '').trim() || '(no story was recorded — audit the pages alone)',
+    ARC_HINTS: buildCriticArcHintsSection(arcHints),
     PLAN_LINES: planLines || '(no page plan was recorded)',
     PULL_QUESTION: simpleBand
       ? 'skip this question — this book is built from self-contained moments, so a page that leaves nothing open is correct.'
@@ -9630,13 +9655,29 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
  * audit, item M2). The list now lives in a file this pipeline owns, and the
  * unified templates read it through their {DO_NOT_WRITE_LIST} placeholder.
  */
-function buildDoNotWriteSection() {
-  const list = String(PROMPT_TEMPLATES.doNotWriteList || '').trim();
+function buildDoNotWriteSection({ forChecker = false } = {}) {
+  const list = doNotWriteListBody({ forChecker });
+  return list ? `# DO-NOT-WRITE LIST\n\n${list}` : '';
+}
+
+/**
+ * The list's text. The file opens with a line for the WRITER — "the analysis
+ * pass does NOT need to re-check them" — which is false for a stage whose job
+ * includes the re-check: the outline reviewer (check 25) and the text refine
+ * (check 18, "Confirm the pages honour the DO-NOT-WRITE LIST"). A checker gets
+ * the list without that line (2026-09-23: the refine was sent both).
+ *
+ * @param {{forChecker?: boolean}} [opts]
+ * @returns {string} '' when the template is not loaded (logged as an error)
+ */
+function doNotWriteListBody({ forChecker = false } = {}) {
+  let list = String(PROMPT_TEMPLATES.doNotWriteList || '').trim();
   if (!list) {
     log.error('[PROMPT] do-not-write-list template not loaded — narrative prompts will ship without the ban list');
     return '';
   }
-  return `# DO-NOT-WRITE LIST\n\n${list}`;
+  if (forChecker) list = list.replace(/^These appear nowhere[^\n]*\n+/, '').trim();
+  return list;
 }
 
 /**
@@ -9773,7 +9814,7 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     // The writer that produced the candidates also picks the shipped title
     // (2026-08-27) — the reader age is the "can a child say it" yardstick.
     AGE: readerAge(inputData),
-    DO_NOT_WRITE_SECTION: buildDoNotWriteSection(inputData),
+    DO_NOT_WRITE_SECTION: buildDoNotWriteSection(),
     PAGE_OPENING_VARIETY: PAGE_OPENING_VARIETY_RULE,
   });
 }

@@ -13,9 +13,9 @@
  * round."):
  *
  *   1. TWO AUDITS, in parallel, on the writer's text
- *        a. arc-informed  — gemini-3.1-pro, story-text-audit.txt (final arc,
- *           page plan, page text, each page's whole picture brief; no back
- *           cover, no commission, no arc hints — corrected 2026-09-23)
+ *        a. arc-informed  — gemini-3.1-pro, story-text-audit.txt (final arc
+ *           and its hints, page plan, page text, each page's whole picture
+ *           brief; no back cover, no commission — corrected 2026-09-23)
  *        b. blind         — grok-4.6, story-text-audit-blind.txt (page text and
  *           nothing else)
  *   2. MERGE + DEDUPE the two fault lists in code (mergeAuditFindings)
@@ -223,6 +223,12 @@ const FINDING_OUTCOME = {
   NO_PAGE_NAMED: 'no-page-named',
   /** The pass itself failed, so no finding it held was answered. */
   PASS_FAILED: 'pass-failed',
+  /**
+   * The pass rewrote the page, and the diff pass then put the writer's own
+   * sentences back on it. Whether the fix survived is not knowable in code, so
+   * the ledger stops claiming it (settleLedgerAfterDiff).
+   */
+  REWRITE_RESTORED: 'rewrite-restored',
 };
 
 /**
@@ -265,6 +271,64 @@ function resolveFindingOutcomes(findings = [], pages = [], changedPages = [], re
 /** The ledger entries that did NOT reach a rewritten page. */
 function unresolvedFindings(ledger = []) {
   return (ledger || []).filter(f => f.outcome !== FINDING_OUTCOME.PAGE_REWRITTEN);
+}
+
+/**
+ * The sentences of one diff correction that the WRITER's page carried and the
+ * rewrite it corrected did not — i.e. what the correction restored. Provenance
+ * only, by verbatim containment (whitespace-normalised); it says nothing about
+ * whether restoring was right.
+ *
+ * @param {string} correction  the diff pass's replacement text
+ * @param {string} writerText  the page before any whole-page pass (BEFORE)
+ * @param {string} rewritten   the page as the diff pass read it (AFTER)
+ * @returns {string[]}
+ */
+function restoredSentences(correction, writerText, rewritten) {
+  const norm = s => String(s || '').replace(/\s+/g, ' ').trim();
+  const before = norm(writerText);
+  const after = norm(rewritten);
+  const whole = norm(correction);
+  if (!whole) return [];
+  if (before.includes(whole) && !after.includes(whole)) return [whole];
+  return whole
+    .split(/(?<=[.!?…»“”"])\s+/)
+    .map(s => s.trim())
+    .filter(s => s.split(' ').length >= 3 && before.includes(s) && !after.includes(s));
+}
+
+/**
+ * THE LEDGER AFTER THE DIFF PASS (2026-09-23). The ledger is resolved when the
+ * whole-page passes settle, and the diff pass runs after them. On
+ * job_1790100385959_1nitlympp the diff put the writer's sentences back on p11
+ * and p16 — the very text the repair had removed to close three findings — and
+ * the stored ledger still said `page-rewritten` for all of them.
+ *
+ * A finding whose page received a restoring diff correction is re-marked
+ * `rewrite-restored`, with the restored sentences as its reason. That is a
+ * provenance fact, not a verdict: the restoration may be the right call (a fact
+ * the rewrite dropped) or it may undo the fix. The ledger no longer claims
+ * either way, so `unresolvedFindings` counts it.
+ *
+ * @param {Array<Object>} ledger
+ * @param {Array<{pageNumber:number,restored?:string[]}>} diffApplied
+ * @returns {Array<Object>}
+ */
+function settleLedgerAfterDiff(ledger = [], diffApplied = []) {
+  const restoredOn = new Map();
+  for (const a of diffApplied || []) {
+    if (!a.restored?.length) continue;
+    restoredOn.set(a.pageNumber, [...(restoredOn.get(a.pageNumber) || []), ...a.restored]);
+  }
+  return (ledger || []).map((f) => {
+    const restored = f.outcome === FINDING_OUTCOME.PAGE_REWRITTEN ? restoredOn.get(f.pageNumber) : null;
+    if (!restored) return f;
+    return {
+      ...f,
+      outcome: FINDING_OUTCOME.REWRITE_RESTORED,
+      reason: `the diff pass put the writer's words back on page ${f.pageNumber}: ${restored.map(s => `"${s}"`).join('; ')}`,
+    };
+  });
 }
 
 // ──────────── WORD-BUDGET COUNTER: THE DETERMINISTIC THIRD AUDITOR ────────────
@@ -702,7 +766,7 @@ const POST_AUDIT_SCOPE_NOTE = [
  * @param {Array<{pageNumber:number,text:string}>} pages  the FINAL pages (extractRefinablePages)
  * @param {Array<{page:number|null,severity:string|null,line:string}>} textFaults
  *        the audit's TEXT route, verbatim (bookAudit.parseRoutes)
- * @param {Object} [opts] {model, arc, usageLabel}
+ * @param {Object} [opts] {model, arc, arcHints, usageLabel}
  * @returns {Promise<{pages:Array, entry:Object}|null>} null when there is nothing to do
  */
 async function runPostAuditTextRound(storyData, pages, textFaults = [], opts = {}) {
@@ -746,7 +810,7 @@ async function runPostAuditTextRound(storyData, pages, textFaults = [], opts = {
   // pages around it established if it is shown alone. What is scoped is the
   // REWRITE, not the reading.
   const findingsText = `${POST_AUDIT_SCOPE_NOTE}\n\n${lines.join('\n')}`;
-  const prompt = buildTextRefinePrompt(storyData, pages, findingsText, String(opts.arc || '').trim());
+  const prompt = buildTextRefinePrompt(storyData, pages, findingsText, String(opts.arc || '').trim(), { arcHints: opts.arcHints });
   if (!prompt) {
     log.error('❌ [TEXT-POST-AUDIT] text-refine template unavailable — the TEXT route goes unanswered');
     return fail('text-refine template unavailable');
@@ -899,6 +963,9 @@ async function refineStoryText(storyData, pages, opts = {}) {
   // repair judge each page against the arc the beats divided, never against
   // staging alone.
   const arc = String(opts.arc || '').trim();
+  // The arc's hints — amendments the writer applied. The arc-informed audit and
+  // the repair read the story with them applied (buildCriticArcHintsSection).
+  const arcHints = String(opts.arcHints || '').trim();
 
   const original = pages.map(p => ({ ...p }));
   let current = pages.map(p => ({ ...p }));
@@ -910,7 +977,8 @@ async function refineStoryText(storyData, pages, opts = {}) {
   let mergedFindings = [];
   let mergeStats = { bySource: {}, duplicates: 0 };
   // One entry per merged finding, filled the moment the repair pass settles —
-  // see resolveFindingOutcomes. Empty only while that pass has not run.
+  // see resolveFindingOutcomes — and re-settled after the diff pass
+  // (settleLedgerAfterDiff). Empty only while the repair pass has not run.
   let findingLedger = [];
   let proofread = '';
   let lectorFindings = [];
@@ -1076,7 +1144,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     return Promise.race([p, deadline]).finally(() => clearTimeout(timer));
   };
   audits = await Promise.all([
-    withDeadline(runAudit('arc-informed', auditModel, buildTextAuditPrompt(storyData, current, arc), 'text_audit'), 'arc-informed'),
+    withDeadline(runAudit('arc-informed', auditModel, buildTextAuditPrompt(storyData, current, arc, { arcHints }), 'text_audit'), 'arc-informed'),
     withDeadline(runAudit('blind', blindAuditModel, buildTextAuditBlindPrompt(storyData, current), 'text_audit_blind'), 'blind'),
   ]);
   for (const a of audits) {
@@ -1111,7 +1179,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     // is what lets the ledger below name each finding's outcome: a pass handed
     // a blob of text can count its lines and nothing else.
     const findingsText = findings.map(f => f.line).join('\n');
-    let prompt = buildTextRefinePrompt(storyData, base, findingsText, arc);
+    let prompt = buildTextRefinePrompt(storyData, base, findingsText, arc, { arcHints });
     if (!prompt) throw new Error('text-refine template unavailable');
     if (opts.promptOverride) prompt = opts.promptOverride;
     const t0 = Date.now();
@@ -1447,7 +1515,16 @@ async function refineStoryText(storyData, pages, opts = {}) {
         log.warn(`⚠️ [TEXT-DIFF] unreadable finding line — ${u.reason}: ${u.line}`);
       }
       const result = applyLectorFindings(current, diffFindings);
-      diffApplied = result.applied;
+      // What each applied correction put back from the writer's page — the
+      // input settleLedgerAfterDiff needs to keep the ledger true.
+      diffApplied = result.applied.map(a => ({
+        ...a,
+        restored: restoredSentences(
+          a.correction,
+          original.find(o => o.pageNumber === a.pageNumber)?.text,
+          current.find(c => c.pageNumber === a.pageNumber)?.text,
+        ),
+      }));
       diffDropped = result.dropped;
       for (const d of diffDropped) {
         const why = d.reason === 'quote-absent'
@@ -1489,6 +1566,10 @@ async function refineStoryText(storyData, pages, opts = {}) {
         })),
       });
       current = next;
+      findingLedger = settleLedgerAfterDiff(findingLedger, diffApplied);
+      for (const f of findingLedger.filter(x => x.outcome === FINDING_OUTCOME.REWRITE_RESTORED)) {
+        log.warn(`🧾 [TEXT-DIFF] [${f.category}] p${f.pageNumber} is no longer counted as answered — ${f.reason}`);
+      }
       publish();
       log.info(`🔬 [TEXT-DIFF] ${diffModel}: ${pairs.length} rewritten page(s) reviewed, ${diffFindings.length} finding(s), ${diffApplied.length} applied to page(s) ${diffChanged.join(', ') || 'none'}, ${diffDropped.length} dropped${diffUnparsed.length ? `, ${diffUnparsed.length} unreadable` : ''}, in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
     } else if (!pairs.length) {
@@ -1607,6 +1688,22 @@ async function refineStoryText(storyData, pages, opts = {}) {
     // recorded its failure; both do now.
     rounds.push({ round: rounds.length + 1, kind: 'lector', ok: false, modelKey: lectorModel, error: le.message, prompt: lectorPromptSent, rawResponse: proofread });
     publish();   // clears the in-flight flag the join's grace period reads
+  }
+
+  // THE COUNTER, ON THE TEXT THAT SHIPS (2026-09-23). The re-measure above runs
+  // before the diff and the lector, and both edit pages: on
+  // job_1790100385959_1nitlympp the diff put back p4's cut sentences (69 → 92
+  // words) after the last count. Measured only — no further pass; a page out of
+  // budget here ships with a WARN like every other length outcome.
+  if (wordBudget) {
+    const shippedRaw = buildWordBudgetFindings(current, storyData?.languageLevel);
+    wordBudget.shipped = {
+      counts: current.map(p => ({ pageNumber: p.pageNumber, words: countPageWords(p.text) })),
+      remaining: shippedRaw ? shippedRaw.split(/\n/) : [],
+    };
+    for (const line of wordBudget.shipped.remaining) {
+      log.warn(`⚠️ [TEXT-COUNTER] SHIPS OUTSIDE the budget after the diff and the lector: ${line}`);
+    }
   }
 
   const changed = current
@@ -1928,7 +2025,7 @@ function projectTextRefineReport(usable, beforeByPage = new Map()) {
     // rewrite damage was the one pass whose output could not be read back.
     diffReview: usable.diffReview || '',
     diffFindings: (usable.diffFindings || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
-    diffApplied: (usable.diffApplied || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
+    diffApplied: (usable.diffApplied || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction, restored: f.restored || [] })),
     diffDropped: (usable.diffDropped || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction, reason: f.reason })),
     durationMs: usable.rounds.reduce((n, r) => n + (r.elapsedMs || 0), 0),
     model: usable.rounds[0]?.modelId || usable.rounds[0]?.modelKey || null,
@@ -1961,6 +2058,8 @@ module.exports = {
   FINDING_OUTCOME,
   resolveFindingOutcomes,
   unresolvedFindings,
+  restoredSentences,
+  settleLedgerAfterDiff,
   countPageWords,
   buildWordBudgetFindings,
   parseLectorFindings,

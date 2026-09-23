@@ -3641,7 +3641,7 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
     if (!pages.length) throw new Error('story has no page text to audit');
     prompt = blind
       ? H.buildTextAuditBlindPrompt(storyData, pages)
-      : H.buildTextAuditPrompt(storyData, pages, arc);
+      : H.buildTextAuditPrompt(storyData, pages, arc, { arcHints: resolveReplayArcHints(storyData) });
   }
   if (!prompt) throw new Error(`${templateKey} template unavailable`);
 
@@ -4512,6 +4512,7 @@ async function runTextRefineStage(target, { params = {}, promptOverride = null }
 
   const res = await refineStoryText(storyData, pages, {
     arc: storyData.arcReviewReport?.finalArc || storyData.beatsReviewReport?.arc || '',
+    arcHints: resolveReplayArcHints(storyData),
     model: params.model,
     auditModel: params.auditModel,
     blindAuditModel: params.blindAuditModel,
@@ -7897,7 +7898,7 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
     const pages = (basePages.length ? basePages : prior.map(p => ({ pageNumber: p.pageNumber, text: p.text, sceneIntent: '', sceneBrief: '' })))
       .map(p => ({ ...p, text: priorBy.get(p.pageNumber) || p.text }));
     const t = Date.now();
-    const rr = await refineStoryText(storyData, pages, { rounds: 1, model, usageLabel: 'testlab_text_branch', arc: storyData.arcReviewReport?.finalArc || storyData.beatsReviewReport?.arc || '' });
+    const rr = await refineStoryText(storyData, pages, { rounds: 1, model, usageLabel: 'testlab_text_branch', arc: storyData.arcReviewReport?.finalArc || storyData.beatsReviewReport?.arc || '', arcHints: resolveReplayArcHints(storyData) });
     const genMs = Date.now() - t;
     const genCost = (rr.rounds || []).reduce((s, r) => s + (r.cost || 0), 0);
     const storyText = rr.pages.map(p => `--- Page ${p.pageNumber} ---\n${p.text}`).join('\n\n');

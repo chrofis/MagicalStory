@@ -1326,6 +1326,54 @@
       "fixedAt": "2026-09-23",
       "fixedIn": "17bbd887aa824bd32553d62db468f5ca85bbc022",
       "fix": "wornItems.wornItemsBibleOf(storyData) reads either key; runEntityConsistencyChecks passes it to collectEntityAppearances as wornItemsVisualBible. Replay on stored run 6: Kiaan p11/p12 -> standard--off:ART004, Levin p16 -> standard--off:ART006, Max p9 -> standard--off:ART005; worn pages stay in the wearing grid."
+    },
+    {
+      "id": "text-ledger-settled-before-diff",
+      "title": "The text finding ledger and word counter were settled before the diff pass, so findings whose fix the diff reverted were still reported answered",
+      "reportedAt": "2026-09-23",
+      "source": "Reproduced from stored data, dragon run 6 (staging job_1790100385959_1nitlympp), textRefineReport. The diff restored the writer's sentences on p4, p11, p16; findingLedger still says page-rewritten for p4 LENGTH, p11 LOADBEARING, p16 TRANSITION and p16 LOADBEARING.",
+      "rootCause": "server/lib/textRefine.js: findingLedger = entry.findingOutcomes when the repair pass settles, and wordBudget is measured before the diff and the lector; neither is revisited after them.",
+      "impact": "The stored ledger and unresolvedCount claim fixes that do not ship; the counter never measures the shipped text. Staging and production.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "PENDING",
+      "fix": "restoredSentences tags each applied diff correction with the writer sentences it put back; settleLedgerAfterDiff re-marks those pages' page-rewritten findings rewrite-restored; wordBudget.shipped counts the text after the diff and the lector. Replay on stored run 6: exactly the four findings above flip."
+    },
+    {
+      "id": "arc-hints-miss-text-critics",
+      "title": "Arc hints reached the text writer but not the arc-informed audit or the refine, so the audit faulted a hint-applied page and the refine rebuilt the arc contradiction",
+      "reportedAt": "2026-09-23",
+      "source": "Reproduced from stored data, dragon run 6 (staging job_1790100385959_1nitlympp), textRefineReport. Audit FAULT[LOADBEARING] p15 against the writer applying hint 1; the final p15 assigns one place to the other boy and then has the speaker search it.",
+      "rootCause": "buildTextAuditPrompt / buildTextRefinePrompt took the unamended arc only; refineStoryText was never passed arcReviewReport.arcHints. Sibling set arc-hint-handoff listed neither critic.",
+      "impact": "Every beats story with arc hints: the critics judge the text against a story the writer was told to amend.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "PENDING",
+      "fix": "{ARC_HINTS} in story-text-audit.txt and text-refine.txt, filled by buildCriticArcHintsSection (hints + HINT_VS_ARC_RULE); opts.arcHints threaded through refineStoryText, runPostAuditTextRound, the pipeline and three Lab call sites. The blind audit stays blind by design. Both critics added to arc-hint-handoff."
+    },
+    {
+      "id": "outline-review-dnw-const-assign",
+      "title": "buildOutlineReviewPrompt assigns to a const on its missing DO-NOT-WRITE template path (TypeError)",
+      "reportedAt": "2026-09-23",
+      "source": "Code reading confirmed: promptBuilders.js `const doNotWriteList = ...; if (!doNotWriteList) doNotWriteList = ...`.",
+      "rootCause": "const reassignment on the missing-template branch.",
+      "impact": "The outline reviewer throws instead of building its prompt whenever the do-not-write template fails to load.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "PENDING",
+      "fix": "The list comes from doNotWriteListBody({forChecker:true}) with the notice as an expression; pinned by a test that blanks the template."
+    },
+    {
+      "id": "text-refine-scope-self-contradiction",
+      "title": "text-refine.txt contradicts itself on which pages it may rewrite, and tells its own re-check it need not re-check",
+      "reportedAt": "2026-09-23",
+      "source": "Refine prompt stored for dragon run 6 (job_1790100385959_1nitlympp): :58 audited pages plus four cases vs :68/:70/:72 \"Rewrite any page...\" and :88 outline contradiction as a fifth licence; the DO-NOT-WRITE preamble \"the analysis pass does NOT need to re-check them\" beside check 18.",
+      "rootCause": "Rules added at different times without reconciling the scope rule; buildDoNotWriteSection passed the writer-only preamble to the refine (the outline reviewer strips it).",
+      "impact": "Latent: the refine can read a licence to rewrite unaudited pages and to skip check 18.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "PENDING",
+      "fix": "The outline contradiction is the fifth listed case, the three rules say what a rewrite also fixes, Step 2 names rewritable pages; buildDoNotWriteSection({forChecker:true}) drops the writer-only line for the refine and the outline reviewer."
     }
   ]
 }

@@ -83,10 +83,10 @@ describe('Lab audit replay == production', () => {
     expect(resolveTextStagePictureSpec(replayPage)).toBe(resolveTextStagePictureSpec(productionPage));
   });
 
-  it('the replay call site passes the arc and the brief-bearing fields', () => {
+  it('the replay call site passes the arc, its hints and the brief-bearing fields', () => {
     const fs = require('node:fs');
     const src = fs.readFileSync(new URL('../../server/lib/testlab.js', import.meta.url), 'utf8');
-    expect(src).toContain('H.buildTextAuditPrompt(storyData, pages, arc)');
+    expect(src).toContain('H.buildTextAuditPrompt(storyData, pages, arc, { arcHints: resolveReplayArcHints(storyData) })');
     expect(src).toContain('sceneBrief: p.sceneDescription || null');
   });
 });

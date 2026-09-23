@@ -3742,6 +3742,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // The whole story, read-only, for the refiner's judgment (beats mode
           // only — the unified path records no arc).
           arc: beatsResult?.arcReviewReport?.finalArc || beatsResult?.beatsReviewReport?.arc || '',
+          // The hints the writer was told to apply — the critics read the story
+          // with them applied.
+          arcHints: beatsResult?.arcReviewReport?.arcHints || '',
           // No `rounds`: the chain is fixed at two parallel audits → one repair
           // → one lector (owner ruling 2026-09-03). There is no loop to bound.
           usageLabel: 'text_refine',
@@ -6615,6 +6618,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               auditTextFaults,
               {
                 arc: beatsResult?.arcReviewReport?.finalArc || beatsResult?.beatsReviewReport?.arc || '',
+                arcHints: beatsResult?.arcReviewReport?.arcHints || '',
                 usageLabel: 'text_refine_post_audit',
               }
             );

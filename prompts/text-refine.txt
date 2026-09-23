@@ -23,6 +23,8 @@ Characters: {CHARACTER_NAMES}
 
 {STORY_ARC}
 
+{ARC_HINTS}
+
 # THE PAGE PLAN (how the story was divided into pictures)
 
 One line per page: shot — who is in frame — the instant the picture shows — what is true after that page that was not before. A page's text carries the stretch of the story that leads to its instant, and never a stretch a later page carries.
@@ -55,21 +57,21 @@ Nothing in the story or its pictures is dangerous enough that it could lead to d
 
 # YOUR TASK
 
-A page is rewritable when AUDIT FINDINGS names it, and otherwise not. Every other page ships exactly as it stands, however you would have phrased it. Four cases add a page to that set and no others: a MISMATCH move needs its destination page; no early page states plainly what must happen and why, which is fixed on the earliest fitting page; a page carries an abbreviation or acronym, which is named the way a child says it; a page carries a banned dash. Closing a finding on a page the finding does not name is allowed only under these four, and the ledger says which one.
+A page is rewritable when AUDIT FINDINGS names it, and otherwise not. Every other page ships exactly as it stands, however you would have phrased it. Five cases add a page to that set and no others: a MISMATCH move needs its destination page; no early page states plainly what must happen and why, which is fixed on the earliest fitting page; a page's text states the opposite of what its scene outline stages; a page carries an abbreviation or acronym, which is named the way a child says it; a page carries a banned dash. Closing a finding on a page the finding does not name is allowed only under these five, and the ledger says which one.
 
 The checks below are how you READ the pages, not a licence to rewrite them: a check that finds something on a page AUDIT FINDINGS does not name is reported in the analysis and the page is left alone. A clean analysis section is a real answer.
 
 Return only the pages you rewrote. Omit every page you left alone. If no page needs rewriting, return the marker followed by NONE and nothing else.
 
-Do not rewrite a page for small stylistic preference. Rewrite it when it has a real problem from the list below.
+A rewritable page is rewritten for a real problem, never for stylistic preference. On every page you rewrite, also fix what follows.
 
 Never use an em-dash (—) or an en-dash (–), anywhere, for any purpose. Replace every one you find with a comma, a full stop, a colon, or parentheses, and recast the sentence if none of those fit.
 
-Rewrite any page with a sentence broken off for effect, a bare fragment standing as a sentence, or caption-style lines describing the scene like stage directions: recast them as someone telling the story aloud, in complete sentences.
+A sentence broken off for effect, a bare fragment standing as a sentence, or caption-style lines describing the scene like stage directions: recast them as someone telling the story aloud, in complete sentences.
 
-No rhetorical set-pieces: no paired negations, no coined sayings or incantations, no one-sentence paragraphs for drama. Rewrite every occurrence as plain narration.
+No rhetorical set-pieces: no paired negations, no coined sayings or incantations, no one-sentence paragraphs for drama. Recast each as plain narration.
 
-Rewrite any page carrying a sentence longer than the reading level allows, a subordinate clause inside another subordinate clause, or a word a child at that level does not already use.
+A sentence longer than the reading level allows, a subordinate clause inside another subordinate clause, or a word a child at that level does not already use: recast it for that level.
 
 Judge the text as a reader who has only the pages in front of them. They never see the brief, the character details or the scene outlines — those are given to you so you know what the book is FOR, never as evidence that something works. A motivation, trait or fear that exists only in the character details and never reaches the page is a failure to fix, not a justification. Never resolve a weakness by citing the brief.
 
@@ -77,15 +79,13 @@ Work in two steps.
 
 Step 1 — write the analysis. Answer every check below in full, naming pages and quoting lines. This is the work: a page is weak because a check found something specific wrong with it, not because it could be phrased differently.
 
-Step 2 — rewrite the pages your analysis found problems on. A page no check flagged stays exactly as it is. End the analysis with a line per named problem — the problem, then the page(s) the rewrite fixes it on, or the reason it stands. A named problem with neither is a failed review. Every AUDIT FINDING above enters that ledger the same way, and it has three ways to close: fixed on a page, the detail removed, or a stated reason it stands. A fault whose reason exists in the scene outlines is fixed by saying that reason on a page, never by citing the outline. Close a fault about a missing path, arrival or move by showing it happening on one of the pages, or by leaving it to the page turn; never by opening a page with the move already completed. A fault about something the book never established is closed by establishing it on an earlier page or by cutting the claim, never by adding a sentence that asserts both the claim and its opposite. A fault naming an ability or event the pages need but never establish is closed by establishing it earlier, never by describing the moment more vividly.
+Step 2 — rewrite the rewritable pages your analysis found problems on. Every other page stays exactly as it is. End the analysis with a line per named problem — the problem, then the page(s) the rewrite fixes it on, or the reason it stands. A named problem with neither is a failed review. Every AUDIT FINDING above enters that ledger the same way, and it has three ways to close: fixed on a page, the detail removed, or a stated reason it stands. A fault whose reason exists in the scene outlines is fixed by saying that reason on a page, never by citing the outline. Close a fault about a missing path, arrival or move by showing it happening on one of the pages, or by leaving it to the page turn; never by opening a page with the move already completed. A fault about something the book never established is closed by establishing it on an earlier page or by cutting the claim, never by adding a sentence that asserts both the claim and its opposite. A fault naming an ability or event the pages need but never establish is closed by establishing it earlier, never by describing the moment more vividly.
 
 Take the second way whenever the detail that caused the fault carries no plot: drop the detail instead of inventing an event to justify it. Never invent an event that makes an established obstacle easier to pass, and never state a clock time or a named part of the day to close a fault — light, shadow and what the characters do carry time instead.
 
 A sentence naming what a character feels, notices, or almost does is never the sentence you cut to make room. Where a fix needs room, shorten a sentence that names only objects and positions. End the ledger with one line per rewritten page listing any sentence you removed from it. A MISMATCH closed by a move is recorded as "moved from p<a> to p<b>", and the source page's line lists the sentences that left it.
 
 A rewritten page keeps everything the fix does not touch: no fact of the page is dropped, changed or contradicted, and every pronoun and name still lands on the person, thing and moment it did before.
-
-A page that contradicts its scene outline, or that still carries a banned dash, is rewritable on that ground alone.
 
 # THE CHECKS
 

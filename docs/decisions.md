@@ -56123,7 +56123,8 @@ to, and which prompts are not stored, is in `docs/prompt-inventory.md` ("What ea
 3. **"The text chain is TWO PARALLEL AUDITS…" (2026-09-03)** lists the arc-informed audit's inputs as
    "back cover + final arc + page plan + pages + what each picture shows". The template has no back-cover
    placeholder; it gets the arc, the plan lines and each page's WHOLE brief
-   (`resolveTextStagePictureSpec`), and no commission and no arc hints. The same entry names the repair
+   (`resolveTextStagePictureSpec`), and no commission and no arc hints (the hints were added the same
+   day — see "Text chain after dragon run 6" below). The same entry names the repair
    model `deepseek-v4-pro`; "The chain's single repair pass runs on claude-opus" (2026-09-03, later the
    same day) replaced it, and `textRefineModel` is `claude-opus` (models.js:473). The stale "back cover"
    also sat in the `textRefine.js` header and in a misplaced docblock above `buildTextProofreadPrompt`;
@@ -56181,3 +56182,68 @@ stays readable.
 `server/lib/sceneBriefCheck.js`, `server/lib/images.js`, `server/lib/textRefine.js`,
 `server/lib/promptBuilders.js`, `server/lib/evalPipeline.js`, `storyJobPipeline.js`.
 **Status:** ✅ documentation only; no behaviour change.
+
+## 2026-09-23 — Text chain after dragon run 6: the ledger is settled after the diff, the shipped text is counted, the sighted critics read the arc hints, the refine's scope is one rule
+
+**Context.** Staging `job_1790100385959_1nitlympp` (18 pages, de-ch). Builds on the same-day entry
+"The diff pass sees the findings the repair answered" (5a4672c7a), which gave the diff pass the
+findings each rewritten page answered and told it never to write a sentence neither text says. Four
+defects remained:
+1. **The ledger and the counter spoke for text that did not ship.** `findingLedger` was resolved when
+   the whole-page passes settled and the word counter re-measured before the diff; the diff then put
+   the writer's sentences back on p4, p11 and p16. The stored ledger still said `page-rewritten` for
+   the four findings those sentences had been removed to close.
+2. **The arc hints reached the writer only.** The writer applied a hint (p15, who searches where); the
+   arc-informed audit, shown only the unamended arc, filed a LOADBEARING fault against it, and the
+   refine obeyed and rebuilt the arc's contradiction. Set `arc-hint-handoff` listed neither critic.
+3. **`buildOutlineReviewPrompt` assigned to a `const`** on its missing-template path, so that path
+   threw a TypeError instead of reaching its notice.
+4. **`text-refine.txt` contradicted itself on scope.** "Rewritable only when AUDIT FINDINGS names it,
+   plus four cases" against "Rewrite any page with…" (three rules) and "A page that contradicts its
+   scene outline … is rewritable on that ground alone" (a fifth case). And its DO-NOT-WRITE section
+   carried the writer's "the analysis pass does NOT need to re-check them" beside its own check 18,
+   the re-check — the outline reviewer already stripped that line; the refine did not.
+
+**Decision.**
+1. *Ledger after the diff.* Each applied diff correction records `restored`: its sentences that the
+   writer's page carried and the rewrite did not (`restoredSentences`, verbatim containment, provenance
+   only). `settleLedgerAfterDiff` re-marks a `page-rewritten` finding whose page got a restoration as
+   `rewrite-restored`, with the restored sentences as its reason; `unresolvedFindings` counts it and
+   the dev panel shows it with no client change. The ledger no longer claims the fix stands — nor
+   that it fell: a restoration can be the right call (a fact the rewrite dropped). Replayed on the
+   stored run-6 diff: exactly p4 LENGTH, p11 LOADBEARING and both p16 findings flip; p12's
+   «oder widersprach» (new words, no restoration) does not.
+2. *Counter on the shipped text.* `wordBudget.shipped` holds the counts and remaining LENGTH lines
+   after the diff and the lector, with a WARN per line. Measured only: no further pass.
+3. *Hints to the sighted critics.* `story-text-audit.txt` and `text-refine.txt` gain `{ARC_HINTS}`,
+   filled by one builder (`buildCriticArcHintsSection`): the hints as changes to the story, "read the
+   story with them applied", plus the same `HINT_VS_ARC_RULE` the planner and writer carry. Threaded
+   through `refineStoryText`/`runPostAuditTextRound` (`opts.arcHints`, from
+   `arcReviewReport.arcHints`) and the three Lab call sites (`resolveReplayArcHints`). **The blind
+   audit gets nothing**: it is denied the arc by design (2026-09-03 owner ruling), and a hint is an
+   arc amendment. Both critics joined `arc-hint-handoff`.
+4. *Refine scope.* The outline contradiction is the fifth listed case; the three "Rewrite any page…"
+   rules now say what a rewrite of a rewritable page also fixes; Step 2 rewrites "the rewritable pages".
+   `buildDoNotWriteSection({ forChecker: true })` / `doNotWriteListBody` strip the writer-only line for
+   the refine and the outline reviewer; the writer's list is unchanged. The const bug goes with it.
+
+**Still owner calls (not built).** A code guard on invented prose — measured in the 5a4672c7a entry
+as unable to tell a grammar fix from an invented sentence; BACKLOG option (b), a restore-only diff
+pass, stands. `rewrite-restored` is visibility, not a guard: nothing blocks a restoration.
+
+**The "no length guard" ruling (2026-09-06) is touched additively only.** No rule on replacement
+length is added; a verbatim restoration of any length is still applied. What is new is that the
+ledger records it.
+
+**Validation.** Rung 1 (free): the audit, blind audit, refine and diff prompts rebuilt from the stored
+row — hints in the audit and refine, absent from the blind audit; the writer-only DNW line absent from
+the refine. Rung 2 (one paid call, $0.0213): the diff pass (gpt-5.6-luna-pro, temperature 0) re-run on
+the stored BEFORE/AFTER with the findings ledger: 2 corrections instead of 11; p11 and p16 keep the
+refine's fixes (no «Turi blieb auf der Mauer.», nest and fleece stay as rewritten); one p4 restoration
+of a dropped line, correctly re-marked `rewrite-restored`. One run, one story.
+
+**Touched.** `server/lib/textRefine.js`, `server/lib/promptBuilders.js`, `storyJobPipeline.js`,
+`server/lib/testlab.js`, `prompts/story-text-audit.txt`, `prompts/text-refine.txt`,
+`scripts/admin/sibling-registry.json`, `tests/unit/text-chain-hints-and-ledger.test.ts` (new),
+`tests/unit/text-audit-picture-spec.test.ts`, `tasks/bugs.json`.
+**Status:** ✅ active on staging.

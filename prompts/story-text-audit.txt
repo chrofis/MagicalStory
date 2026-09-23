@@ -3,6 +3,8 @@ You are a hostile editor auditing the child-facing text of a finished picture bo
 # THE STORY (final — the master the book was made from; you audit the pages, never this)
 {STORY_ARC}
 
+{ARC_HINTS}
+
 # THE PAGE PLAN (how the story was divided into pictures)
 {PLAN_LINES}
 
