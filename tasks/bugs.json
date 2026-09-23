@@ -1635,6 +1635,54 @@
       "fixedAt": "2026-09-23",
       "fixedIn": "094052d45",
       "fix": "Counters read castCoverage.commissionedCast (the arc stage's COMMISSIONED_CAST_DEF puts saved-detail figures on the Premise figures list, f25a51f3f); UNNAMED_FIGURE_EXEMPT (no name, one page) is one string stated in the arc budget and applied by the counter via isNamedFigure; an unnamed figure across pages still counts."
+    },
+    {
+      "id": "avatar-head-row-not-head-and-shoulders",
+      "title": "The avatar head row came back waist/hip/knee-length and the heads judge was told torso is fine",
+      "reportedAt": "2026-09-23",
+      "source": "Reproduced from stored data and pixels, dragon run 6 (staging job_1790100385959_1nitlympp), docs/audits/prompt-audit-2026-09-23/06-avatars.md S2-3: 5/6 head rows cropped at waist, hip or knee.",
+      "rootCause": "The head-row wording did not move Grok off filling its tall 20:9 cells, and sheet-row-heads-eval.txt waived torso (\"do not penalise it\"), so nothing scored the crop.",
+      "impact": "Every styled sheet: the head cells the pages crop as face references carry half-length figures. Staging and production.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "4d075efdb",
+      "fix": "Head row framed \"like a passport photo\", cut off at the upper chest; heads judge TASK 5 CROP keyed to visible hands/waistband/legwear, folded into the code-computed final. One paid run: true head-and-shoulders row, cropScore 9. Pinned by tests/unit/avatar-sheet-audit-2026-09-23.test.ts."
+    },
+    {
+      "id": "avatar-sheet-invented-collar-no-generator-rule",
+      "title": "The live avatar row generators never got the \"no collar the costume does not name\" rule the heads judge scores",
+      "reportedAt": "2026-09-23",
+      "source": "Reproduced from stored data and pixels, dragon run 6 (staging job_1790100385959_1nitlympp), docs/audits/prompt-audit-2026-09-23/06-avatars.md S2-4: \"a red/blue long-sleeve shirt\" drawn as a buttoned polo on both sheets of two characters; the generator line lived only in the dead buildPrompt.",
+      "rootCause": "The rule was written into the single-call buildPrompt, which production stopped calling on 2026-08-08; buildBodyRowPrompt/buildHeadRowPrompt never carried it, and the bodies judge did not score invented trim.",
+      "impact": "Invented collars and plackets become the character's shirt on every page. Staging and production.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "4d075efdb",
+      "fix": "buildUnnamedTrimRule(redress) in both live rows; the head row takes its neckline from the body row; bodies judge TASK 3 counts invented trim as a wrong item. Validation: 1 of 2 paid runs still drew a polo in the body row (tracked in BACKLOG). Pinned by tests/unit/avatar-sheet-audit-2026-09-23.test.ts."
+    },
+    {
+      "id": "avatar-pass2-backdrop-and-dividers-unjudged",
+      "title": "Pass-2 style transfer painted washes behind the figures and dropped the dividers, and no prompt or judge covered it",
+      "reportedAt": "2026-09-23",
+      "source": "Reproduced from stored data and pixels, dragon run 6 (staging job_1790100385959_1nitlympp), docs/audits/prompt-audit-2026-09-23/06-avatars.md S2-5: 6/6 shipped styled sheets.",
+      "rootCause": "buildStyleTransferPrompt said only \"keep the content\"; the style line carries \"depth from atmospheric haze\"; sheet-2x4-style-eval.txt had no background or divider task.",
+      "impact": "Painted washes ride into every page as part of the character reference cell. Staging and production.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "4d075efdb",
+      "fix": "SHEET_GROUND_RULE stated in the pass-2 prompt and filled into the style judge (TASK 8 backgroundScore). Cell splitting does not depend on drawn dividers (replay: 6/6 shipped sheets split within bounds). Two paid runs: dividers kept, plain ground, faint foot shadows only. Pinned by tests/unit/avatar-sheet-audit-2026-09-23.test.ts."
+    },
+    {
+      "id": "testlab-avatar-eval-override-replaces-two-judges",
+      "title": "The Test Lab avatar_eval override replaced both row-judge templates at once and prefilled a judge production never runs",
+      "reportedAt": "2026-09-23",
+      "source": "Code reading confirmed by grep (audit 06 S4): character2x4Sheet.js passed one promptOverride to both evaluateSheetRow calls; routes/admin/testlab.js prefilled sheet2x4Evaluation (dead) and avatar_style prefilled styledCostumedAvatar (never loaded by production).",
+      "rootCause": "The override plumbing predates the split row judges; nobody re-keyed it per judge.",
+      "impact": "Any Lab A/B of an avatar judge prompt measured something production never runs. Lab only.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "4d075efdb",
+      "fix": "params.evalPrompt names the one judge the override replaces (heads|bodies|identity|style), prefill is that template, a stray override throws; avatar_style prefills the built buildStyleTransferPrompt; the test-version path runs evaluateAvatarSheet. Pinned by tests/unit/avatar-sheet-audit-2026-09-23.test.ts."
     }
   ]
 }
