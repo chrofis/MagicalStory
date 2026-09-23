@@ -568,40 +568,33 @@ async function callModel({ model, prompt, treatedUri, avatarUri, aspect, cropW, 
 // source; the adapter passes context via opts.
 // FAITHFULNESS-CHECK: images.js:11236-11251 (whiteout face-insert prompt).
 // ---------------------------------------------------------------------------
-// Action context (expression / pose / gaze / holding) from scene metadata,
-// falling back to interaction text. FAITHFULNESS-CHECK: images.js:11639-11667.
+// THE CHARACTER'S STATE ON THIS PAGE, from the brief's current schema. Hands
+// and held objects live in `interactions[]` (AD rule 8j), the eyes in
+// `looksAt`, the face in `expression`, the body turn in `perspective`. This
+// read the retired `pose / action / gaze / holding` fields until 2026-09-23, so
+// only `expression` ever arrived and every repaint dropped what the character
+// held and did (job_1790100385959 p14: the chestnut at the mouth was gone).
+// The lines come from the page's own EXACT POSES builder, so the repair carries
+// the pose sentence the page was drawn from.
 function buildActionContext(sceneDescription, charName, visualBible = null) {
-  if (!sceneDescription) return '';
-  try {
-    const { extractSceneMetadata } = require('./storyHelpers');
-    const md = extractSceneMetadata(sceneDescription);
-    // COMPARE: stored scene-metadata name vs the stored target name.
-    const { canonicalName } = require('./castResolver');
-    const charData = md?.fullData?.characters?.find(c => canonicalName(c.name) === canonicalName(charName));
-    if (charData) {
-      const parts = [];
-      if (charData.expression) parts.push(`Expression: ${charData.expression}`);
-      if (charData.pose) parts.push(`Pose: ${charData.pose}`);
-      if (charData.action) parts.push(`Action: ${charData.action}`);
-      if (charData.gaze) parts.push(`Gaze: ${charData.gaze}`);
-      if (charData.holding && typeof charData.holding === 'object') {
-        const holding = [];
-        if (charData.holding.leftHand && charData.holding.leftHand !== 'empty') holding.push(`left hand: ${charData.holding.leftHand}`);
-        if (charData.holding.rightHand && charData.holding.rightHand !== 'empty') holding.push(`right hand: ${charData.holding.rightHand}`);
-        if (holding.length) parts.push(`Holding: ${holding.join(', ')}`);
-      }
-      // `holding.leftHand` / `.rightHand` routinely hold a raw VB id, and this
-      // string is part of a face/character REPAIR prompt for an image model.
-      if (parts.length) {
-        const body = require('./vbIdGuard').scrubVbIds(parts.join(`\n- `), visualBible);
-        return `\n\n${charName}'s state in this scene (MUST be preserved in the redrawn face):\n- ${body}`;
-      }
-    }
-  } catch { /* fall through */ }
-  try {
-    const { buildCharActionContextFromInteractions } = require('./imageCompositing');
-    return buildCharActionContextFromInteractions(sceneDescription, charName, visualBible) || '';
-  } catch { return ''; }
+  if (!sceneDescription || !charName) return '';
+  const { extractSceneMetadata } = require('./storyHelpers');
+  const { buildExactPosesBlock, splitInteractionActors } = require('./promptBuilders');
+  const { canonicalName } = require('./castResolver');
+  const md = extractSceneMetadata(sceneDescription)?.fullData;
+  if (!md) return '';
+  const target = canonicalName(charName);
+  const charData = (Array.isArray(md.characters) ? md.characters : [])
+    .find(c => c && canonicalName(c.name) === target) || null;
+  // A row naming several actors reaches this character as its own line.
+  const rows = (Array.isArray(md.interactions) ? md.interactions : [])
+    .filter(i => i && splitInteractionActors(i.character).some(n => canonicalName(n) === target))
+    .map(i => ({ ...i, character: charName }));
+  const block = buildExactPosesBlock(rows, charData ? [charData] : [], visualBible);
+  const perspective = typeof charData?.perspective === 'string' ? charData.perspective.trim() : '';
+  const parts = [block, perspective ? `VIEW: ${charName} is seen ${perspective}` : ''].filter(Boolean);
+  if (!parts.length) return '';
+  return `\n\n${charName} in this scene — keep this pose, hold, expression and gaze:\n${parts.join('\n')}`;
 }
 
 // Quiet-zone instruction for the text overlay position.

@@ -1468,7 +1468,16 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const { resolveRepairAxes } = require('./faceRepair');
     const repairAxes = resolveRepairAxes(decision.issueDescription, { hasFaceBbox: !!faceBbox, issueTypes: decision.issueTypes || null });
     const useFaceOnly = repairAxes.faceOnly;
-    const repairBbox = useFaceOnly ? faceBbox : (bodyBbox || faceBbox);
+    // THE FIGURE BOX, for a face repair too — the face goes separately as
+    // `faceBbox`, and the face crop is built from that. Passing the face box
+    // here made it the "body" box downstream, so the large-face-box guard
+    // (face area / body area >= 0.6) saw face == body on every face repair and
+    // turned it into a full-figure crosshatch confined to the face box + 10%:
+    // the hatch and the paste ended in straight crop lines through the torso
+    // (job_1790100385959 p14: a hard horizontal seam across the jacket and a
+    // blocky patch at the shoulder). The manual endpoint, the entity repair and
+    // the Lab already pass the body box here.
+    const repairBbox = bodyBbox || faceBbox;
 
     // Pick the sheet CELL matching the figure's declared facing — the same
     // resolveCellPose/cropAvatarCell chain every generation path uses (page,
@@ -1562,7 +1571,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       return txt || (character?.description || '');
     })();
 
-    log.info(`👤 [UNIFIED PIPELINE] Round ${roundNum} char-fix ${charName} on p${pageNumber}: ${useFaceOnly ? 'FACE' : 'BODY'} bbox=[${repairBbox.map(v => Math.round(v * 100) + '%').join(', ')}] (${decision.severity})`);
+    log.info(`👤 [UNIFIED PIPELINE] Round ${roundNum} char-fix ${charName} on p${pageNumber}: ${useFaceOnly ? 'FACE' : 'BODY'} bbox=[${(useFaceOnly ? faceBbox : repairBbox).map(v => Math.round(v * 100) + '%').join(', ')}] (${decision.severity})`);
     require('./runMetrics').forJob(storyData?.id || jobId).count('consistency_regen');
     let repairResult;
     try {
@@ -1691,7 +1700,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // named Emma but the whiteout placed crosshatch on Sarah's bbox. Now
       // visible on the row + bubbled into retryHistory.
       charName,
-      targetBbox: repairBbox,
+      targetBbox: useFaceOnly ? faceBbox : repairBbox,
       targetBboxSource: targetResolved.source,
       whiteoutTarget: useFaceOnly ? 'face' : 'body',
     };

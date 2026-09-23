@@ -57214,4 +57214,34 @@ dropping or capping advisory Q9 lines in the re-plan (W9, 2026-09-09 ruling); ra
 `scripts/admin/sibling-registry.json`, `tests/unit/page-plan-audit-2026-09-23.test.ts`,
 `tests/unit/commissioned-figure-definition.test.ts`, `tests/unit/invented-allowance-counts-the-book.test.ts`,
 `tests/unit/plan-collective-cast.test.ts`.
+## 2026-09-23 — Char-fix reads the brief's current schema, and a face repair keeps its face treatment
+
+**Context.** Dragon run 6 (staging `job_1790100385959_1nitlympp`) p14, audit
+`docs/audits/prompt-audit-2026-09-23/08-page-images.md` S5. The char-fix repaint of Julian lost the
+chestnut he was biting and left a hard horizontal seam across his jacket plus a blocky patch at the
+shoulder. Two separate causes, both confirmed from the stored v1 (`imageVersions[1]`: sent prompt,
+`char-repair-grok-raw`, `inpaint-ref-1`, `char-repair-blend-mask` 439×517).
+1. `faceRepair.buildActionContext` read `characters[].pose / action / gaze / holding`, fields the brief
+   schema no longer has (hands live in `interactions[]` per AD rule 8j, eyes in `looksAt`). Only
+   `Expression` reached the prompt; the interaction-based builder was a fallback that only ran when the
+   character had no `characters[]` row at all, so it never ran on a real page.
+2. `repairPipeline` passed the FACE box as the repair's figure box on a face repair. Downstream it became
+   `bodyBbox`, so the large-face-box guard (face area / body area ≥ 0.6) saw face == body on every
+   pipeline face repair and turned it into a full-figure crosshatch confined to face box + 10%. The hatch
+   and the paste then ended in straight crop lines through the torso: that is the seam. The manual
+   endpoint, the entity repair and the Lab pass the body box there already.
+
+**Decision.** The state block is built from the current schema through the page's own EXACT POSES
+builder (`buildExactPosesBlock`): the character's interactions (including a row naming several actors,
+split by the shared `splitInteractionActors`), `expression` + `looksAt`, and `perspective`. The dead
+`imageCompositing.buildCharActionContextFromInteractions` is deleted (no fallback). `repairPipeline`
+passes the figure box as `bbox` and the face box as `faceBbox`, like its siblings; the telemetry
+`targetBbox` still records the box that was treated.
+
+**Replay (rung 1, stored briefs, no model calls):** p14 Julian now carries "holds one cooled Marroni from
+the paper bag and bites into it" plus expression and gaze; p12 rows naming six actors reach each actor.
+The geometry guard on p14's stored boxes (face .42×.36, body .87×.78, ratio .22) keeps the face blur.
+
+**Touched:** `server/lib/faceRepair.js`, `server/lib/promptBuilders.js`, `server/lib/imageCompositing.js`,
+`server/lib/repairPipeline.js`, `tests/unit/char-fix-page-state.test.ts`.
 **Status:** ✅ active on staging.

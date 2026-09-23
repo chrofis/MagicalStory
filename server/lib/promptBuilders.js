@@ -5171,6 +5171,17 @@ function looksAtPhrase(target, visualBible = null) {
   return `eyes on ${scrubVbIds(t, visualBible)}`;
 }
 
+/**
+ * The actors an interaction row names. `character` may list several
+ * ("Hans + Emma", "A, B and C"); each is one figure.
+ */
+function splitInteractionActors(who) {
+  return String(who || '')
+    .split(/\s*(?:\+|&|\band\b|,)\s*/i)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
 function buildExactPosesBlock(interactions, sceneCharacters = [], visualBible = null, options = {}) {
   const interactionList = Array.isArray(interactions) ? interactions : [];
   const language = options.language || 'en';
@@ -5202,10 +5213,7 @@ function buildExactPosesBlock(interactions, sceneCharacters = [], visualBible = 
     // POSES line as one figure; "Hans + Emma + Noah" gets read as a single
     // weird label, not three figures, so the third figure drifts to "looking
     // at viewer" by default. Allowed input separators: `+`, `&`, `and`, `,`.
-    const splitChars = who
-      .split(/\s*(?:\+|&|\band\b|,)\s*/i)
-      .map(s => s.trim())
-      .filter(Boolean);
+    const splitChars = splitInteractionActors(who);
     const targets = splitChars.length > 1 ? splitChars : [who];
 
     // The schema asks for `where` to be a complete sentence with the object
@@ -11052,6 +11060,7 @@ module.exports = {
   elementLeadLabel,
   vbDeclaredLetteringNames,
   buildExactPosesBlock,
+  splitInteractionActors,
   buildReceiverPlacement,
   sliceAnalysisAspect,
   stripReviewAspectMarkers,
