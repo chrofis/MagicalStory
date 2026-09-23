@@ -55416,3 +55416,30 @@ shots that put the camera low or behind a figure do not. Not addressed here.
 **Touched:** `server/lib/shotVocabulary.js`, `server/lib/promptBuilders.js`,
 tests `shot-distribution-floors`, `plan-counters`, `replan-convergence-class`.
 **Status:** ✅ active
+
+## 2026-09-23 — A thing the story loses must be one it could not simply find again
+
+**Context:** dragon run 6's low point: the egg rolls down a slope into leaves and
+four children, a dog and a dragon cannot find it for a whole page. The owner:
+the premise of losing a football-sized, stone-heavy, visibly steaming egg on the
+small Lindenhof "makes little sense". Traced stage by stage in
+`arcReviewReport`: the ARC CREATOR introduced it (its own self-check counts "the
+snatch, the loss and the search" as an event). Two panelists sensed trouble but
+only about geography — "the egg vanishes into Lindenhof leaves uphill with no
+path or sight line", "falls over the hillside without a stated movement" — and
+the third proposed a fix that KEEPS the loss. The critique approved it and the
+retell kept it. No stage asked whether the thing could stay lost.
+
+**Decision:** not a new generic crisis rule (owner rejected that). The existing
+lens that covers the mirror case is extended on both sides:
+- `prompts/arc-panel.txt` REPLACEABLE already asked, of a thing taken or
+  blocked, "what stops them simply getting another". It now asks the same of a
+  thing that goes MISSING: what stops them simply finding it again, weighed
+  against what the arc already made true — its size, what it gives off, how
+  small and watched the place is, how many search and how soon.
+- `arcCritiqueSpec()` (the creator's and re-teller's shared fault list) gains
+  the matching fault shape beside "a cost the world undoes for free": "a loss
+  the story's own facts undo". One constant, both generators.
+
+**Touched:** `prompts/arc-panel.txt`, `server/lib/promptBuilders.js`.
+**Status:** 🟡 conditional — validate with `arc_panel_replay` on run 6's arc.
