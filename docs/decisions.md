@@ -57464,3 +57464,34 @@ database. `tests/unit/eval-calls-stored.test.ts` pins the columns and the five c
 `server/lib/sceneValidator.js`, `server/lib/images.js`, `storyJobPipeline.js`, `docs/prompt-inventory.md`,
 `tests/unit/eval-calls-stored.test.ts`.
 **Status:** ✅ active on staging.
+
+## 2026-09-23 — Arc: two storylines from age 6; the landmark list stays whole for diversity (owner)
+
+**Context.** Two owner questions from the arc audit (`docs/audits/prompt-audit-2026-09-23/01-arc.md`).
+(1) `buildTellingRulesSection` decided whether the cast must stay on one path from the SHAPE band, which has
+not returned `standard` since the 2026-09-14 band split, so no book of any age could take the "reason to
+separate and a reason to meet again" branch. (2) The 20-entry landmark list reaches arc create and retell
+whole, many entries far from the premise's place.
+
+**Decisions (owner, 2026-09-23).**
+1. **Two storylines: "allow it".** From age 6 (the focus character's age) the cast may split into two threads
+   that meet again, e.g. two children search one place while the others search another. Younger books, and
+   books with no recorded age, stay together on one path. One predicate, `twoThreadsAllowed(inputData)`,
+   drives the telling rules' stay-together line and the 1st-grade read-aloud budget line, which now says "at
+   most two threads" instead of "one thread" where a split is allowed. Siblings checked: the page plan's
+   STORY SHAPE already offers a secondary strand by page count and cast; the Art Director's group rules
+   (scene-expansion-all.txt 4, 6b) and the planner's grouping rules govern who shares ONE frame, not whether
+   the cast is together across the book; plan-check, the plan counters and the text audits carry no
+   whole-cast togetherness rule. The ending rule ("the children safe and together") still closes the book.
+2. **Landmarks: no list trimming.** The owner wants diversity in landmarks, so the 20-entry list stays whole
+   for create and retell (the panel's copy drops only the DESCRIPTION extracts). The audit's relevance-cut
+   proposal is closed.
+
+**Validation.** Rebuilt the arc prompts from the stored row of staging `job_1790100385959_1nitlympp`: the
+real ages (focus 5) keep the one-path line; the same row with every age +3 gets "The group stays together
+unless it has a reason to separate…" and "at most two threads"; no unfilled placeholder. Pinned in
+`tests/unit/arc-prompt-audit-2026-09-23.test.ts`.
+
+**Touched:** `server/lib/promptBuilders.js`, `tests/unit/arc-prompt-audit-2026-09-23.test.ts`,
+`docs/audits/prompt-audit-2026-09-23/01-arc.md`, `tasks/BACKLOG.md`.
+**Status:** ✅ active on staging.
