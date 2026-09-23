@@ -380,6 +380,7 @@
       "parity": {
         "anchors": [
           "{ONE_INSTANT}",
+          "{NO_LENS}",
           "{GAZE_TARGET}",
           "{LOOKS_AT_FIELD}",
           "{EXPRESSION_FIELD}",

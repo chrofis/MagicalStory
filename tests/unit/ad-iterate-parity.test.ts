@@ -101,6 +101,7 @@ const buildIterate = (freeIterate: boolean) => PB.buildSceneDescriptionPrompt(
  */
 const CONSTANT_FOR: Record<string, string> = {
   '{ONE_INSTANT}': 'ONE_INSTANT_RULE',
+  '{NO_LENS}': 'NO_LENS_RULE',
   '{GAZE_TARGET}': 'GAZE_TARGET_RULE',
   '{LOOKS_AT_FIELD}': 'LOOKS_AT_FIELD_RULE',
   '{EXPRESSION_FIELD}': 'EXPRESSION_FIELD_RULE',

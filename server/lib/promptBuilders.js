@@ -2794,6 +2794,7 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // that author a page brief — see ONE_INSTANT_RULE and the block around it.
     // Registered as sibling set art-director-vs-iterate.
     ONE_INSTANT: ONE_INSTANT_RULE,
+    NO_LENS: NO_LENS_RULE,
     GAZE_TARGET: GAZE_TARGET_RULE,
     LOOKS_AT_FIELD: LOOKS_AT_FIELD_RULE,
     EXPRESSION_FIELD: EXPRESSION_FIELD_RULE,
@@ -3106,6 +3107,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // that author a page brief — see ONE_INSTANT_RULE and the block around it.
     // Registered as sibling set art-director-vs-iterate.
     ONE_INSTANT: ONE_INSTANT_RULE,
+    NO_LENS: NO_LENS_RULE,
     GAZE_TARGET: GAZE_TARGET_RULE,
     LOOKS_AT_FIELD: LOOKS_AT_FIELD_RULE,
     EXPRESSION_FIELD: EXPRESSION_FIELD_RULE,
@@ -3559,6 +3561,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     // that author a page brief — see ONE_INSTANT_RULE and the block around it.
     // Registered as sibling set art-director-vs-iterate.
     ONE_INSTANT: ONE_INSTANT_RULE,
+    NO_LENS: NO_LENS_RULE,
     GAZE_TARGET: GAZE_TARGET_RULE,
     LOOKS_AT_FIELD: LOOKS_AT_FIELD_RULE,
     EXPRESSION_FIELD: EXPRESSION_FIELD_RULE,
@@ -8526,6 +8529,12 @@ const DECLARED_TRAIT_VERBATIM_RULE = "A trait CHARACTER DETAILS states — hair 
 const EYES_OPEN_RULE = 'No closed eyes and no eyes shut on any rendered figure — write "eyes narrowed", "a focused gaze", "looking down at the work".';
 const CREATURE_FACE_RULE = 'Every page holding a creature states its brow, eyes and mouth in the prose — including a creature acting hard, diving, chasing, calling or lifting, and at any distance the face can be read at.';
 
+// A brief describes what the frame holds, never how it renders. The medium is
+// the art style's, sent to the illustrator as its own block; an iterate rewrite
+// on staging job_1790100385959_1nitlympp p17 wrote "shallow depth of field"
+// into the prose and the plate prompt, against an ART STYLE that says "depth
+// from atmospheric haze, not optical blur" in the same image prompt.
+const NO_LENS_RULE = "The brief says what the frame holds and where the camera stands, never how it renders: no depth of field, focus, blur, bokeh, lens or film words, in the prose or in `emptyScenePrompt`. The medium comes from the art style, sent separately.";
 const ONE_INSTANT_RULE = "The prose never asks the picture to show how many times something happened, what just finished, or what comes next — no \"again\", \"for the third time\", \"already\", no object both mid-motion and in its ended state. Write the single visible instant.";
 
 const GAZE_TARGET_RULE = "Name at most one gaze target, and compose the frame so that target is the dominant element — large, central, or nearest the camera. Every other figure looks at that same target or at the page's action. Two named characters facing each other are the one exception — a standoff, an exchange, a conversation — and there each looks at the other; that pair is a single relationship, not two targets, and nobody else in the frame looks anywhere but at them or at the action. A gaze aimed at anything smaller or further off than the frame's dominant element lands on the dominant element instead. Never write a gaze to the viewer.";
@@ -11120,6 +11129,7 @@ module.exports = {
   GAP_ACTION_FRAMING_RULE,
   DECLARED_TRAIT_VERBATIM_RULE,
   ONE_INSTANT_RULE,
+  NO_LENS_RULE,
   GAZE_TARGET_RULE,
   LOOKS_AT_FIELD_RULE,
   EXPRESSION_FIELD_RULE,

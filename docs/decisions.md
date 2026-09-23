@@ -57245,3 +57245,26 @@ The geometry guard on p14's stored boxes (face .42×.36, body .87×.78, ratio .2
 **Touched:** `server/lib/faceRepair.js`, `server/lib/promptBuilders.js`, `server/lib/imageCompositing.js`,
 `server/lib/repairPipeline.js`, `tests/unit/char-fix-page-state.test.ts`.
 **Status:** ✅ active on staging.
+
+## 2026-09-23 — A page brief names content, never rendering (all four brief authors)
+
+**Context.** Dragon run 6 (staging `job_1790100385959_1nitlympp`) p17, audit 08 S4. The iterate rewrite
+wrote "shallow depth of field" into the page prose and into its `emptyScenePrompt`; the image prompt then
+carried it next to an ART STYLE block reading "depth from atmospheric haze, not optical blur". None of the
+four brief-authoring templates is given the art style, and none said that rendering is not the brief's
+business. (The same rewrite's cast and dropped creature citations were fixed in 32dce4da9.)
+
+**Decision.** One constant, `NO_LENS_RULE`, filled as `{NO_LENS}` into all four brief authors
+(`scene-expansion.txt`, `scene-expansion-all.txt`, `scene-iteration.txt`, `scene-iteration-free.txt`) and
+anchored in sibling set `art-director-vs-iterate`: the brief says what the frame holds and where the
+camera stands, never depth of field, focus, blur, bokeh, lens or film words, in the prose or in
+`emptyScenePrompt`. The medium stays the art style's. The rewrite's free-text self-report
+(`draftValidation.fixesApplied` "Retained all previously cited object ids …" listing ids the parent never
+cited) is audit-only and read by nothing; left as is.
+
+**Validation.** Rung 1: `tests/unit/ad-iterate-parity.test.ts` pins the constant byte-identical in all four
+BUILT prompts. Not validated against a model: one stochastic rewrite would prove nothing either way.
+
+**Touched:** `server/lib/promptBuilders.js`, the four templates above, `scripts/admin/sibling-registry.json`,
+`tests/unit/ad-iterate-parity.test.ts`.
+**Status:** ✅ active on staging.
