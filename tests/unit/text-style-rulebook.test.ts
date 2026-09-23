@@ -64,6 +64,14 @@ describe('the style rulebook reaches every prose-writing pass', () => {
     }
   });
 
+  it("the writer's analysis step checks each later-revealed motive and each stated size or look", () => {
+    // Lab 1426 (rule alone): no glimpse at the p10 refusal. Lab 1428 (rule + this
+    // analysis step): the writer named the refusal and placed a glimpse at it.
+    const step1 = built.writer.split(/\r?\n/).find(l => l.startsWith('Step 1')) || '';
+    expect(step1).toMatch(/refusal, demand, flight or lie whose reason the story gives only later/);
+    expect(step1).toMatch(/each size or look a page states and what in the plot turns on it/);
+  });
+
   it("the writer's and the repair's specific-form rule excludes sizes and looks", () => {
     for (const pass of ['writer', 'repair']) {
       const sentence = built[pass].split('\n').find(l => l.includes('in its specific form')) || '';

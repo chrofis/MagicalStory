@@ -56893,4 +56893,29 @@ matching generator rule (generator-vs-critic).
 `prompts/story-text-proofread.txt`, `prompts/story-text-audit.txt`, `prompts/story-text-audit-blind.txt`,
 `tests/unit/text-style-rulebook.test.ts`, `tests/unit/text-audit-rules-reach-writer.test.ts`,
 `docs/prompt-inventory.md`.
-**Status:** ✅ active on staging. Validation: see below.
+**Follow-up, same day: the writer's analysis step checks both.** Step 1 of story-text-from-beats.txt now
+also names each refusal, demand, flight or lie whose reason the story gives only later, with the line at
+or before it that lets the reader glimpse the reason, and each size or look a page states with what in
+the plot turns on it (one nothing turns on is cut). The trial writer has no analysis step.
+
+**Validation (rung 2, Test Lab `story_text_replay` on run 6's stored plan, briefs and arc, writer only,
+claude-sonnet-4-6; USD 0.23 of a 0.60 cap).** The `text_refine` chain (~USD 1.29 on this story) was not
+run: over the cap. So the repair, diff and lector halves of the rulebook are unit-pinned but not
+exercised by a model.
+- **Lab 1426** (rulebook + motive rule, USD 0.109): handcart gone; paired negation p12 gone; p14 carries
+  no justification line; p18 ends «"Ja", sagte Kiaan. "Unbedingt."», no summing-up close. Still
+  present: plate (p5), football (p3), cat + orange scales (p17); bare fragments p7 «Wieder nur
+  Rauch.», p15 «Hier. Da. Nichts.»; **p10 refusal still carries no glimpse** of the later reason.
+- **Lab 1428** (+ the analysis step above, via promptOverride, USD 0.117): the analysis cut the
+  handcart and kept football and plate with stated plot uses (lifted by four; the scale lifts the egg on
+  p16); p6/p7/p10 glimpse the mother's call before and at the refusal («Er schaute dabei wieder kurz
+  über die Dächer, dorthin, wo der Ruf hergekommen war, und sein Kiefer war fest zusammengebissen.»);
+  p18 ends «Max strahlte. Kiaan nickte. Und Julian sagte: "Ich auch."». Still present: the cat and
+  orange scales on p17 (the analysis did not list it) and one bare fragment on p3.
+- Size/look sentences: shipped run 6 had 5 (p3, p4, p5, p6, p17); 1426 has 3, 1428 has 3, two of them
+  with a plot use named. Summing-up sentences: shipped p18 1; 1426 0; 1428 0 (p13's «…war selbst der
+  Ängstlichste von allen» is the arc's own turn, told as the boys' realisation).
+
+**Status:** ✅ active on staging. Open: the rulebook reaches a page only where the writer honours it or
+an audit files the page — fragments on an unfiled page (p3, p7, p15 above) reach the repair only if an
+auditor names them, and no audit question asks for style.
