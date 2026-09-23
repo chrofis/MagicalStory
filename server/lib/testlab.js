@@ -7334,7 +7334,7 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
     const meta = stored.sceneMetadata || extractSceneMetadata(x.brief) || {};
     return {
       pageNumber: x.pageNumber,
-      prose: String(x.brief).split('---METADATA---')[0],
+      prose: require('./sceneMetadata').splitBrief(x.brief).prose,
       cast: (stored.sceneCharacters || meta.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
       perCharClothing: stored.perCharClothing
         || (storyData.pageClothing?.pageClothing || {})[String(x.pageNumber)]
@@ -7463,7 +7463,7 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
     const afterPages = checkPages.map(cp => {
       const m = merged.find(x => x.pageNumber === cp.pageNumber);
       const mMeta = extractSceneMetadata(m.brief) || {};
-      return { ...cp, prose: String(m.brief).split('---METADATA---')[0], wornItems: mMeta.wornItems || [] };
+      return { ...cp, prose: require('./sceneMetadata').splitBrief(m.brief).prose, wornItems: mMeta.wornItems || [] };
     });
     const after = checkScenes(afterPages, storyData.clothingRequirements, { artifacts, visualBible: storyData.visualBible });
     const REVIEWABLE = new Set(['outfit_misattributed', 'removal_unstated']);
@@ -7748,7 +7748,7 @@ function resolveStoryBeats(storyData, helpers) {
     const meta = sc.sceneMetadata || extractSceneMetadata(sc.sceneDescription || '') || {};
     return {
       pageNumber: sc.pageNumber,
-      planLine: (meta.sceneIntent || String(sc.sceneDescription || '').split('---METADATA---')[0].slice(0, 300)),
+      planLine: (meta.sceneIntent || require('./sceneMetadata').splitBrief(sc.sceneDescription || '').prose.slice(0, 300)),
     };
   });
   return { beats, source: 'reconstructed-from-prose' };

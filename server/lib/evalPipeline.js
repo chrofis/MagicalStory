@@ -2021,7 +2021,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // "previewMismatches" nor "checks" skipped the strip entirely and shipped
     // the whole JSON — `objects: ["LOC006","ART001",...]` included — into the
     // evaluator prompt.
-    if (originalPrompt && (originalPrompt.includes('---METADATA---')
+    if (originalPrompt && (require('./sceneMetadata').splitBrief(originalPrompt).carrier
         || originalPrompt.includes('"previewMismatches"') || originalPrompt.includes('"checks"'))) {
       const { stripSceneMetadata } = getStoryHelpers();
       const stripped = stripSceneMetadata(originalPrompt);
