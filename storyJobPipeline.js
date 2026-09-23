@@ -4902,10 +4902,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   imageData: derivedForPage ? derivedForPage.imageData : plateImage,
                   prompt: derivedForPage ? derivedForPage.prompt : platePrompt,
                   plateDerivedFor: derivedForPage ? plateClass(shotOfPage(pn)) : null,
-                  // Refs packed into the plate call that produced plateImage
-                  // (the retry's, when the retry won). Same field name every
+                  // Refs packed into the call that produced THIS page's plate.
+                  // The base plate: the refs of its own call (the retry's, when
+                  // the retry won). A derived plate: the base plate itself — the
+                  // one image editImageWithPrompt sends. Same field name every
                   // other image call stores its packed refs under.
-                  grokRefImages: plateRefs,
+                  grokRefImages: derivedForPage ? [plateImage] : plateRefs,
                   textAreaMask: null,
                   emptySceneVbGrid: emptySceneVbGridDataUrl,
                   vantageId,
@@ -5303,7 +5305,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         for (const [pn, bg] of Object.entries(sceneBackgrounds)) {
           const img = bg?.imageData;
           if (!img || typeof img !== 'string') continue;
-          const key = bg.vantageId || `p${pn}`;
+          // A derived plate is a different image from its vantage's base
+          // plate (a wider view can show people the base does not), so it is
+          // read on its own.
+          const key = bg.vantageId ? `${bg.vantageId}${bg.plateDerivedFor ? `:${bg.plateDerivedFor}` : ''}` : `p${pn}`;
           if (!byPlate.has(key)) byPlate.set(key, { imageData: img, pages: [] });
           byPlate.get(key).pages.push(Number(pn));
         }
@@ -5483,6 +5488,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 emptyScenePrompt: sceneBackgrounds[pageData.pageNumber]?.prompt || null,
                 emptySceneGrokRefImages: sceneBackgrounds[pageData.pageNumber]?.grokRefImages || null,
                 vantageId: sceneBackgrounds[pageData.pageNumber]?.vantageId || null,
+                plateDerivedFor: sceneBackgrounds[pageData.pageNumber]?.plateDerivedFor || null,
                 sceneDescription: pageData.scene.sceneDescription,
                 text: pageData.scene.text,
                 sceneCharacters: pageData.sceneCharacters,
@@ -5849,6 +5855,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // plate-group membership is directly auditable instead of being
               // reconstructable only by comparing image hashes across pages.
               vantageId: emptySceneData?.vantageId || null,
+              // Which angled shot this page's plate was DERIVED for (null = the
+              // vantage's base plate). Without it a derived plate cannot be told
+              // from the base one after the run.
+              plateDerivedFor: emptySceneData?.plateDerivedFor || null,
               textAreaMask: emptySceneData?.textAreaMask || null,
               emptySceneVbGrid: emptySceneData?.emptySceneVbGrid || null,
               emptySceneQc: emptySceneData?.v1Issues ? {
@@ -6259,6 +6269,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // offloaded to R2 by extractInlineImagesToR2 (explicit walker).
           emptySceneGrokRefImages: img.emptySceneGrokRefImages || sceneBackgrounds[img.pageNumber]?.grokRefImages || null,
           vantageId: img.vantageId || sceneBackgrounds[img.pageNumber]?.vantageId || null,
+          plateDerivedFor: img.plateDerivedFor || sceneBackgrounds[img.pageNumber]?.plateDerivedFor || null,
           emptySceneQc: img.emptySceneQc || (sceneBackgrounds[img.pageNumber]?.v1Issues ? {
             v1ImageData: sceneBackgrounds[img.pageNumber]?.v1ImageData || null,
             v1Issues: sceneBackgrounds[img.pageNumber]?.v1Issues || null,
@@ -6709,6 +6720,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // offloaded to R2 by extractInlineImagesToR2 (explicit walker).
           emptySceneGrokRefImages: img.emptySceneGrokRefImages || sceneBackgrounds[img.pageNumber]?.grokRefImages || null,
           vantageId: img.vantageId || sceneBackgrounds[img.pageNumber]?.vantageId || null,
+          plateDerivedFor: img.plateDerivedFor || sceneBackgrounds[img.pageNumber]?.plateDerivedFor || null,
           emptySceneQc: img.emptySceneQc || (sceneBackgrounds[img.pageNumber]?.v1Issues ? {
             v1ImageData: sceneBackgrounds[img.pageNumber]?.v1ImageData || null,
             v1Issues: sceneBackgrounds[img.pageNumber]?.v1Issues || null,

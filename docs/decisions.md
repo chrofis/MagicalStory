@@ -55847,3 +55847,15 @@ had "[FINAL] holds the idea text only".
 idea. The two-idea template's FINAL blocks ask for plain sentences only: no numbers, slot labels, check notes or
 headings. No parser-side stripping: the output format is fixed at the source.
 **Touched:** server/lib/ideaContract.js, prompts/generate-story-ideas.txt, tests/unit/idea-contract.test.ts.
+
+## 2026-09-23 — A derived plate is recorded as derived, with its real input
+
+**Context:** Dragon run 6 p2 got a derived ultra-wide plate (c2d8cd64d), but nothing stored said so:
+`plateDerivedFor` was set in memory and dropped by every page whitelist, and the page's `emptySceneGrokRefImages`
+listed the base plate's own generation refs (a landmark photo), not what the derive edit was given. Checking the
+derive meant comparing prompts by hand. The plate-population read grouped plates by `vantageId` alone, so a derived
+plate shared one population reading with its base plate although it is a different, wider image.
+**Decision:** `plateDerivedFor` is persisted at every whitelist (the trial loop, the per-page result and both final
+page builders). A derived plate's `grokRefImages` is `[plateImage]`, the one image `editImageWithPrompt` sends.
+The population read keys by vantage plus derived shot.
+**Touched:** storyJobPipeline.js, tests/unit/plate-derive-for-angle.test.ts.

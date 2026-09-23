@@ -138,4 +138,21 @@ describe('the pipeline honours it', () => {
   it('records which pages got a derived plate', () => {
     expect(src).toContain('plateDerivedFor');
   });
+
+  // Run 6 (job_1790100385959_1nitlympp): p2 got a derived ultra-wide plate, but
+  // the stored page carried no plateDerivedFor and listed the base plate's own
+  // generation refs, so the derive could not be seen after the run.
+  it('persists plateDerivedFor through every page whitelist', () => {
+    expect(src.match(/plateDerivedFor: img\.plateDerivedFor \|\| sceneBackgrounds\[img\.pageNumber\]\?\.plateDerivedFor/g)).toHaveLength(2);
+    expect(src).toContain('plateDerivedFor: emptySceneData?.plateDerivedFor');
+    expect(src).toContain('plateDerivedFor: sceneBackgrounds[pageData.pageNumber]?.plateDerivedFor');
+  });
+
+  it('a derived plate records the base plate as its one reference', () => {
+    expect(src).toContain('grokRefImages: derivedForPage ? [plateImage] : plateRefs');
+  });
+
+  it('reads a derived plate\'s population on its own, not as its base plate', () => {
+    expect(src).toMatch(/bg\.plateDerivedFor \? `:\$\{bg\.plateDerivedFor\}`/);
+  });
 });
