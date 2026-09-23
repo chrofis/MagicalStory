@@ -9141,8 +9141,17 @@ function buildTextProofreadPrompt(inputData, pages = []) {
  * repaired page is rendered as its BEFORE and its AFTER, and only pages the
  * repair pass actually rewrote are passed in.
  *
+ * THE FINDINGS EACH PAGE WAS ANSWERING (owner decision 2026-09-23). The pass
+ * used to see BEFORE and AFTER only, so a deliberate fix read as a dropped
+ * fact and was restored: staging job_1790100385959_1nitlympp p16 got back the
+ * nest location and the missing-fleece contradiction the repair had removed.
+ * Each page now carries the findings the whole-page passes held for it and its
+ * neighbours (a fix lands where it belongs, not where it was filed), each
+ * labelled with the page it names, and the template says a change doing what
+ * one asks is not damage.
+ *
  * @param {Object} inputData story record fields (language)
- * @param {Array<{pageNumber:number,before:string,after:string}>} pairs
+ * @param {Array<{pageNumber:number,before:string,after:string,findings?:Array<{pageNumber:number,category:string,text:string}>}>} pairs
  */
 function buildTextDiffPrompt(inputData, pairs = []) {
   const template = PROMPT_TEMPLATES.storyTextDiff;
@@ -9155,7 +9164,12 @@ function buildTextDiffPrompt(inputData, pairs = []) {
     ? getLanguageNameEnglish(inputData.language)
     : 'the language of the pages';
   const body = pairs
-    .map(p => `--- Page ${p.pageNumber} ---\nBEFORE:\n${String(p.before || '').trim()}\n\nAFTER:\n${String(p.after || '').trim()}`)
+    .map(p => {
+      const answered = (p.findings || [])
+        .map(f => `- p${f.pageNumber} [${f.category || 'UNTAGGED'}] ${String(f.text || '').trim()}`)
+        .join('\n');
+      return `--- Page ${p.pageNumber} ---\nFINDINGS THE REWRITE ANSWERED:\n${answered || '(none)'}\n\nBEFORE:\n${String(p.before || '').trim()}\n\nAFTER:\n${String(p.after || '').trim()}`;
+    })
     .join('\n\n');
   return fillTemplate(template, { LANGUAGE: lang, PAGES: body });
 }

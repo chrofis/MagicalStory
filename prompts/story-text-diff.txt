@@ -1,6 +1,8 @@
-A rewriter has revised pages of a {LANGUAGE} children's book. You see each revised page as BEFORE and AFTER. Judge only the AFTER text, and only against its BEFORE.
+A rewriter has revised pages of a {LANGUAGE} children's book to answer findings. You see each revised page as its BEFORE and its AFTER, with the findings on it and on the pages beside it, each labelled with the page it names: a finding filed on one page may be answered on the next. Judge only the AFTER text, and only against its BEFORE.
 
-The rewrite may change how a page reads. It may not make the page worse or wrong. Report where it did: a meaning changed or lost, a fact dropped or contradicted, a phrase no fluent speaker of {LANGUAGE} would say, a new grammar or word-choice fault. Then read the AFTER on its own, in order, and report anything in it that now lands on the wrong person, thing or moment. Say nothing about style, pacing, or a change that is merely different.
+A change that does what a listed finding asks is the fix, not damage: never report it, and never bring back what it replaced. Beyond that, the rewrite may change how a page reads. It may not make the page worse or wrong. Report where it did: a meaning or fact changed, dropped or contradicted that no listed finding asked to change, a phrase no fluent speaker of {LANGUAGE} would say, a new grammar or word-choice fault. Then read the AFTER on its own, in order, and report anything in it that now lands on the wrong person, thing or moment. Say nothing about style, pacing, or a change that is merely different.
+
+A dropped or contradicted fact comes back in the words BEFORE gave it. A language fault is fixed by changing only the faulty words. Never write a sentence that says what neither BEFORE nor AFTER says.
 
 # PAGES
 

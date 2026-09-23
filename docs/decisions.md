@@ -36899,7 +36899,8 @@ patched, not the primary fix.
 
 **Touched:** none — this entry records a verified non-defect and a guard deliberately NOT
 built.
-**Status:** ✅ active.
+**Status:** 🟡 the length-guard ruling stands; the "never invents prose" finding is refuted by
+`job_1790100385959_1nitlympp` p11 — see 2026-09-23 "The diff pass sees the findings the repair answered".
 
 ## 2026-09-06 — Town-name lookup matches locality, municipality and nearest_city independently; nearest_city widens (rung 1b) but is never "own"
 
@@ -55904,3 +55905,55 @@ plate shared one population reading with its base plate although it is a differe
 page builders). A derived plate's `grokRefImages` is `[plateImage]`, the one image `editImageWithPrompt` sends.
 The population read keys by vantage plus derived shot.
 **Touched:** storyJobPipeline.js, tests/unit/plate-derive-for-angle.test.ts.
+
+## 2026-09-23 — The diff pass sees the findings the repair answered; no code provenance guard (supersedes in part "The diff pass does NOT invent prose", 2026-09-06)
+
+**Context.** Dragon run 6 (staging `job_1790100385959_1nitlympp`, German), `textRefineReport.roundTrace`
+round 1 (`diff`, gpt-5.6-luna-pro). The diff pass saw each rewritten page as BEFORE/AFTER and nothing
+else, so it could not tell a deliberate fix from damage:
+- **p16** — it put back the writer's tree nest and the fleece line. The repair had moved the nest to the
+  wall to answer a **p17** TRANSITION finding (the picture shows the wall), and had written the fleece
+  being taken off to answer a p16 TRANSITION finding.
+- **p11** — it replaced the repair's answer to a LOADBEARING finding ("Turi flinches at the call") with
+  the writer's sentence, and replaced another repair sentence with «Turi blieb auf der Mauer.», which is
+  in neither BEFORE nor AFTER and contradicts the picture. **This refutes the 2026-09-06 correction's
+  finding that the pass never invents prose.** That finding held for the run it was measured on
+  (`job_1788681313413_xqmtk2gcs`); it does not hold as a rule.
+
+**Decision (owner, "Edit-check pass keeps fixes").**
+1. **Ledger.** Each page in the diff prompt carries the findings every whole-page pass (repair,
+   repetition_fix, length_fix) held for that page **and the pages next to it**, each labelled with the
+   page it names. The neighbours are there because of p16/p17: a fix lands where it belongs, not where the
+   auditor filed it. `story-text-diff.txt` says a change that does what a listed finding asks is the fix,
+   not damage, and is never reverted.
+2. **No new prose, prompt side.** A restored fact comes back in the words BEFORE gave it, a language fault
+   is fixed by changing only the faulty words, and the pass never writes a sentence saying what neither
+   BEFORE nor AFTER says.
+3. **No code provenance guard — measured, not assumed.** The owner preferred a mechanical guard if one
+   could be built structurally. Two shapes were replayed over stored data (rung 1, free):
+   - *Exact sentence provenance* (every correction sentence is a sentence of BEFORE or AFTER) holds
+     **5 of run 6's 11** diff corrections: a one-word grammar fix («grössten» → «grossen»), a restoration
+     re-split across a closing guillemet, a restored clause joined to an AFTER sentence, and p11.
+   - *Word provenance* (every word of a correction stands on that page, in BEFORE or AFTER) holds p11
+     («blieb», «auf») and p12 (a restoration joined with a new «oder») on run 6, 2 of 11. But the diff
+     pass is also asked to fix language faults, and those need new words: the same check over the
+     **22 stored lector corrections on staging** (9 stories) holds **16** («geht zuerst» → «geht voraus»,
+     «seule» → «seul», «liegt aus dem Wind» → «liegt im Windschatten»). A grammar fix and an invented
+     sentence both bring in words the page does not have, in similar numbers; nothing structural tells
+     them apart. Telling them apart is classification of meaning, which code does not do here.
+   So a code guard either misfires on the pass's language-fault role or requires withdrawing that role
+   (leaving idiom and grammar to the lector alone). That is a scope change to the diff pass and is left to
+   the owner (BACKLOG). Only run 6 stores diff prompts and findings (projection since ab2f90abb,
+   2026-09-20), so the diff-pass sample is one story.
+
+**The 2026-09-06 length-guard ruling stands.** A verbatim restoration of any length is still correct, and
+no rule on replacement length is added.
+
+**Touched:** `server/lib/textRefine.js` (ledger built from the whole-page rounds' `findingOutcomes`;
+`WHOLE_PAGE_PASS_KINDS` hoisted and shared with `projectTextRefineReport`), `server/lib/promptBuilders.js`
+(`buildTextDiffPrompt` renders `FINDINGS THE REWRITE ANSWERED` per page), `prompts/story-text-diff.txt`,
+`tests/unit/text-diff-ledger.test.ts`. Lector sibling checked: `story-text-proofread.txt` reads the final
+text cold and is told to say nothing about content, so it cannot revert a fix; the shared quote/correction
+output contract is unchanged.
+**Status:** ✅ active on staging. Not re-run with a model: the only Lab stage is `text_refine`, the whole
+chain (~$1.29 on run 6), above the $0.30 cap for this task.

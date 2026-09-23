@@ -575,6 +575,9 @@ function applyLectorFindings(pages = [], findings = []) {
   return { pages: next, applied, dropped };
 }
 
+/** The passes that rewrite whole pages from a finding list (runRepairPass). */
+const WHOLE_PAGE_PASS_KINDS = new Set(['repair', 'repetition_fix', 'length_fix']);
+
 // ─────────────────────── CROSS-PAGE REPETITION (mechanical) ───────────────────
 
 const SHINGLE_WORDS = 5;
@@ -1397,9 +1400,27 @@ async function refineStoryText(storyData, pages, opts = {}) {
     // (nothing changes a page before the repair), AFTER = the text as the
     // corrective pass left it.
     const changedPages = [...new Set([...(repairEntry?.changedPages || []), ...(repetitionEntry?.changedPages || [])])];
+    // THE LEDGER (owner decision 2026-09-23): per page, every finding a
+    // whole-page pass held for it or for a page next to it. Without it a
+    // deliberate fix reads as a dropped fact and the diff pass restores it
+    // (buildTextDiffPrompt). The neighbours are there because a repair answers
+    // a finding where the fix belongs, not where the auditor filed it: on
+    // job_1790100385959_1nitlympp a p17 TRANSITION finding (the picture shows
+    // the wall, the text moved the egg to the tree) was fixed on p16, and the
+    // diff pass reverted it.
+    const answered = rounds
+      .filter(r => r.ok && WHOLE_PAGE_PASS_KINDS.has(r.kind))
+      .flatMap(r => r.findingOutcomes || []);
     const pairs = current
       .filter(p => changedPages.includes(p.pageNumber))
-      .map(p => ({ pageNumber: p.pageNumber, before: original.find(o => o.pageNumber === p.pageNumber)?.text, after: p.text }));
+      .map(p => ({
+        pageNumber: p.pageNumber,
+        before: original.find(o => o.pageNumber === p.pageNumber)?.text,
+        after: p.text,
+        findings: answered
+          .filter(f => f.pageNumber != null && Math.abs(f.pageNumber - p.pageNumber) <= 1)
+          .map(f => ({ pageNumber: f.pageNumber, category: f.category, text: f.text })),
+      }));
     const diffPrompt = pairs.length ? buildTextDiffPrompt(storyData, pairs) : null;
     diffPromptSent = diffPrompt || '';
     if (diffPrompt && TEXT_MODELS[diffModel]) {
@@ -1824,7 +1845,6 @@ function projectTextRefineReport(usable, beforeByPage = new Map()) {
   // a finding list — a few hundred bytes, and the only place the lines the
   // parser rejected can be read back. So: pages for the rewriters, raw for the
   // finding lists, nothing duplicated.
-  const WHOLE_PAGE_KINDS = new Set(['repair', 'repetition_fix', 'length_fix']);
   return {
     rounds: usable.rounds.length,
     roundTrace: usable.rounds.map(r => ({
@@ -1856,7 +1876,7 @@ function projectTextRefineReport(usable, beforeByPage = new Map()) {
       // Only the repair round's prompt was ever stored, so the diff's and the
       // lector's inputs were unreadable after the run.
       prompt: r.prompt || '',
-      rawResponse: WHOLE_PAGE_KINDS.has(r.kind) ? '' : String(r.rawResponse || ''),
+      rawResponse: WHOLE_PAGE_PASS_KINDS.has(r.kind) ? '' : String(r.rawResponse || ''),
       // WHAT THE ROUND RETURNED, per page. `before` is not stored: for round N
       // it is round N-1's `after`, and for round 1 it is `briefsIn` — storing
       // it would double the bytes for no information.
