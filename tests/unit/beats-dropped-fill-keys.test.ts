@@ -125,7 +125,9 @@ describe('BY DESIGN — absent, and must stay absent', () => {
   });
 
   it('the wardrobe contract still learns the era from the commission', () => {
-    expect(built['story-bible-from-beats']).toContain(probe('STORY_BRIEF'));
+    // Its own brief (promptBuilders wardrobeStoryBrief, 2026-09-23): the brief
+    // body without the plot stages' binding paragraph.
     expect(built['story-bible-from-beats']).toContain('moon-landing');
+    expect(built['story-bible-from-beats']).toContain('Neil Armstrong');
   });
 });

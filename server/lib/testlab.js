@@ -7729,7 +7729,7 @@ function resolveStoryBeats(storyData, helpers) {
 async function runStoryBibleReplayStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
-  const { buildStoryBibleFromBeatsPrompt, getPageText, extractSceneMetadata } = require('./storyHelpers');
+  const { buildStoryBibleFromBeatsPrompt, getPageText, extractSceneMetadata, parseBeats } = require('./storyHelpers');
   const { callTextModelStreaming } = require('./textModels');
   const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
   const { UnifiedStoryParser } = require('./outlineParser/unified');
@@ -7743,7 +7743,8 @@ async function runStoryBibleReplayStage(target, { params = {}, promptOverride = 
   if (promptOverride) PROMPT_TEMPLATES.storyBibleFromBeats = promptOverride;
   let prompt;
   try {
-    prompt = buildStoryBibleFromBeatsPrompt(storyData, beats);
+    // Same arc production hands the wardrobe writer (beatsPipeline: approvedArc).
+    prompt = buildStoryBibleFromBeatsPrompt(storyData, beats, { arc: resolveReplayArc(storyData, { parseBeats }) });
   } finally {
     PROMPT_TEMPLATES.storyBibleFromBeats = orig;
   }
@@ -7830,11 +7831,19 @@ async function runClothingReviewStage(target, { params = {}, promptOverride = nu
   }
   if (!prompt) throw new Error('clothing-review template unavailable, or no used outfit in this story');
 
-  const model = params.reviewModel || MODEL_DEFAULTS.outlineReview || MODEL_DEFAULTS.outline;
+  // Production's reviewer (beatsPipeline: MODEL_DEFAULTS.clothingReviewModel),
+  // not the outline reviewer — a replay on a different model measures nothing.
+  const model = params.reviewModel || MODEL_DEFAULTS.clothingReviewModel;
   if (!TEXT_MODELS[model]) throw new Error(`Unknown model "${model}"`);
 
   const t = Date.now();
-  const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_clothing_review' });
+  // `noReasoning`: measures the reviewer with reasoning off (OpenRouter
+  // {enabled:false}) against production's default — the review is the slow
+  // call in front of the avatars (audit 2026-09-23 F2).
+  const res = await callTextModelStreaming(prompt, null, null, model, {
+    usageLabel: 'testlab_clothing_review',
+    ...(params.noReasoning === true || params.noReasoning === 'true' ? { reasoning: { enabled: false } } : {}),
+  });
   if (!String(res.text || '').trim() || res.usage?.output_tokens === 0) {
     throw new Error(`review model ${model} returned an empty response — provider failure, not a result`);
   }
@@ -8102,7 +8111,7 @@ async function runWriterCompareStage(target, { params = {} }) {
           const parsed = SH.parsePlanResponse(r.text, []);
           arm.stages.plan = { ...WC.scorePlan(parsed.pages || [], expectedPages), cost: r.cost, elapsedMs: r.elapsedMs, outTok: r.usage?.output_tokens };
         } else if (stage === 'bible') {
-          const r = await call(SH.buildStoryBibleFromBeatsPrompt(storyData, beats), model, 'bible');
+          const r = await call(SH.buildStoryBibleFromBeatsPrompt(storyData, beats, { arc: textArgs.arc }), model, 'bible');
           const p = new UnifiedStoryParser(r.text);
           arm.stages.bible = { ...WC.scoreBible(p.extractClothingRequirements(), p.extractVisualBible(), expectedChars), cost: r.cost, elapsedMs: r.elapsedMs, outTok: r.usage?.output_tokens };
         } else if (stage === 'scenes') {

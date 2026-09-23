@@ -4122,6 +4122,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const challengeTakenIds = beatsResult?.challengeTakenIds || null;
     const challengeDraw = beatsResult?.challengeDraw || null;
     const clothingReviewReport = beatsResult?.clothingReviewReport || null;
+    // The wardrobe call's prompt + raw reply, and the wardrobe-vs-Visual-Bible
+    // check's findings (adopt / conflict) — diagnostics, stored with the story.
+    const storyBibleReport = beatsResult?.storyBibleReport || null;
+    const wardrobeBibleReport = beatsResult?.wardrobeBibleReport || null;
     const sceneReviewReport = beatsResult?.sceneReviewReport || null;
     // The prompt that WROTE the briefs, next to the one that reviewed them.
     // Beats contributes the timings and which pages fell back to a per-page
@@ -7382,7 +7386,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       challengeTakenIds, // which of them the arc built on, by catalogue id
       challengeDraw, // the random catalogue menu the arc plan was offered (beats mode)
       beatsReviewReport, // per-page before/after from the beats review (beats mode)
+      storyBibleReport, // wardrobe contract call: prompt + raw reply (beats mode)
       clothingReviewReport, // per-outfit before/after from the wardrobe review (beats mode)
+      wardrobeBibleReport, // wardrobe contract vs Visual Bible: adopt / conflict findings (beats mode)
       // The Art Director's own prompt(s), rolled up by distinct prompt with the
       // pages each produced — so "what was this book's brief actually asked for"
       // is a query, not a worktree rebuild at the run's commit.

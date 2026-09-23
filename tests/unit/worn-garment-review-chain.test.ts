@@ -122,41 +122,46 @@ describe('the post-review clothing re-check runs on every reviewed run', () => {
   });
 });
 
-describe('a same-garment rewording is not a wardrobe change', () => {
+describe('the contract owns garment wording: a linked same garment takes the contract words', () => {
   // The run's own words: the wardrobe said the short form, the bible's wornAs
-  // entry restated it longer.
-  const reqs = () => ({
-    Levin: { standard: { used: true, description: 'A red long-sleeve shirt, mid-blue denim jeans with a straight leg, dark grey lace-up sneakers, and a forest green zip-up fleece jacket.' } },
-  });
-  const bible = (description: string, name = 'forest green fleece jacket') => ({
-    artifacts: [{ id: 'ART006', name, label: 'fleece jacket', wornAs: 'Levin.outer layer', type: 'outerwear', pages: [1], description }],
+  // entry restated it longer. Owner, 2026-09-23: the contract wins.
+  const LEVIN = 'A red long-sleeve shirt, mid-blue denim jeans with a straight leg, dark grey lace-up sneakers, and a forest green zip-up fleece jacket.';
+  const reqs = () => ({ Levin: { standard: { used: true, description: LEVIN } } });
+  const bible = (description: string, name = 'forest green fleece jacket', label = 'fleece jacket') => ({
+    artifacts: [{ id: 'ART006', name, label, wornAs: 'Levin.outer layer', type: 'outerwear', pages: [1], description }],
   });
 
-  it('same garment, same colours: restated, flagged as a rewording', () => {
-    const f = checkWardrobeAgainstBible(reqs(), bible('forest green long-sleeve zip-up fleece jacket with a high collar'));
+  it('same garment, other words: the bible entry is rewritten, the contract is not', () => {
+    const vb: any = bible('forest green long-sleeve zip-up fleece jacket with a high collar');
+    const f = checkWardrobeAgainstBible(reqs(), vb);
     expect(f).toHaveLength(1);
-    expect(f[0].kind).toBe('reconcile');
-    expect(f[0].rewording).toBe(true);
+    expect(f[0].kind).toBe('adopt');
     const r: any = reqs();
-    const { applied } = applyWardrobeBibleCorrections(r, bible('forest green long-sleeve zip-up fleece jacket with a high collar'), { log: { warn: () => {} } });
-    expect(applied[0].rewording).toBe(true);
-    expect(r.Levin.standard.description).toContain('high collar');   // the Visual Bible still owns the words
+    applyWardrobeBibleCorrections(r, vb, { log: { warn: () => {} } });
+    expect(r.Levin.standard.description).toBe(LEVIN);
+    expect(vb.artifacts[0].description).toBe('forest green zip-up fleece jacket');
+    expect(checkWardrobeAgainstBible(r, vb)).toHaveLength(0);
   });
 
-  it('a colour change is a visible change', () => {
-    const f = checkWardrobeAgainstBible(reqs(), bible('red zip-up fleece jacket with a high collar', 'red fleece jacket'));
-    expect(f[0].rewording).toBe(false);
+  it('same garment in another colour: the contract colour wins, name included', () => {
+    const vb: any = bible('red zip-up fleece jacket with a high collar', 'red fleece jacket');
+    const r: any = reqs();
+    applyWardrobeBibleCorrections(r, vb, { log: { warn: () => {} } });
+    expect(r.Levin.standard.description).toBe(LEVIN);
+    expect(vb.artifacts[0].description).toBe('forest green zip-up fleece jacket');
+    expect(vb.artifacts[0].name).not.toMatch(/\bred\b/);
+    expect(vb.artifacts[0].label).toBe('fleece jacket');
   });
 
-  it('a different garment in the slot is a visible change', () => {
-    const f = checkWardrobeAgainstBible(reqs(), bible('forest green hooded parka', 'forest green parka'));
-    expect(f[0].rewording).toBe(false);
+  it('a different garment in the slot is a conflict', () => {
+    const f = checkWardrobeAgainstBible(reqs(), bible('forest green hooded parka', 'forest green parka', 'parka'));
+    expect(f[0].kind).toBe('conflict');
   });
 
-  it('only visible changes reach the avatar re-render hook', () => {
+  it('only contract changes reach the avatar re-render hook', () => {
     const src = fs.readFileSync(path.join(process.cwd(), 'server/lib/beatsPipeline.js'), 'utf8');
-    expect(src).toContain('const visibleChanges = applied.filter(f => !f.rewording);');
-    expect(src).toContain('const names = [...new Set(visibleChanges.map(f => f.character).filter(Boolean))];');
+    expect(src).toContain("const contractChanges = applied.filter(f => f.kind === 'conflict');");
+    expect(src).toContain('const names = [...new Set(contractChanges.map(f => f.character).filter(Boolean))];');
   });
 });
 
@@ -175,21 +180,24 @@ describe('the wardrobe-vs-bible check finds a linked garment by its own words, a
     expect(f).toHaveLength(1);
     expect(f[0].slot).toBe('outer layer');
     expect(f[0].wardrobeClause).toBe('and a purple hooded sweatshirt with a kangaroo pocket at the front');
-    expect(f[0].rewording).toBe(true);
+    expect(f[0].kind).toBe('adopt');
+    expect(f[0].contractText).toBe('purple hooded sweatshirt with a kangaroo pocket at the front');
   });
 
-  it('the restated clause keeps its "and a", and a second pass finds nothing', () => {
+  it('the entry takes the clause without its joiner, and a second pass finds nothing', () => {
     const r: any = reqs();
-    const v = bible('purple long-sleeve hooded sweatshirt with a kangaroo pocket at the front and a thick hood');
+    const v: any = bible('purple long-sleeve hooded sweatshirt with a kangaroo pocket at the front and a thick hood');
     applyWardrobeBibleCorrections(r, v, { log: { warn: () => {} } });
-    expect(r.Max.standard.description).toContain('white sneakers, and a purple long-sleeve hooded sweatshirt');
+    expect(r.Max.standard.description).toBe(MAX);
+    expect(v.artifacts[0].description).toBe('purple hooded sweatshirt with a kangaroo pocket at the front');
     expect(checkWardrobeAgainstBible(r, v)).toHaveLength(0);
   });
 
-  it('a replacement bringing its own article does not double it', () => {
-    const r: any = reqs();
-    applyWardrobeBibleCorrections(r, bible('a purple hooded sweatshirt with a zip'), { log: { warn: () => {} } });
-    expect(r.Max.standard.description).toContain('white sneakers, and a purple hooded sweatshirt with a zip.');
+  it('a conflict replacement bringing its own article does not double it', () => {
+    const v = { artifacts: [{ id: 'ART005', name: 'yellow rain parka', label: 'rain parka', wornAs: 'Max.outer layer', type: 'outerwear', pages: [4], description: 'a yellow rain parka' }] };
+    const r: any = { Max: { standard: { used: true, description: 'A white shirt, blue trousers, and a green jacket.' } } };
+    applyWardrobeBibleCorrections(r, v, { log: { warn: () => {} } });
+    expect(r.Max.standard.description).toContain('blue trousers, and a yellow rain parka.');
     expect(r.Max.standard.description).not.toMatch(/\ba a\b/);
   });
 
@@ -199,6 +207,6 @@ describe('the wardrobe-vs-bible check finds a linked garment by its own words, a
     const f = checkWardrobeAgainstBible(r, v);
     expect(f).toHaveLength(1);
     expect(f[0].wardrobeClause).toBe('and a green jacket');
-    expect(f[0].rewording).toBe(false);
+    expect(f[0].kind).toBe('conflict');
   });
 });

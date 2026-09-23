@@ -60,24 +60,28 @@ describe('wardrobe contract vs Visual Bible', () => {
     expect(checkWardrobeAgainstBible(r, bible())).toHaveLength(0);
   });
 
-  it('a declared wornAs item restates the slot in the bible’s words', () => {
-    // Same garment, different wording: the writer said this prop IS her hat, so
-    // the bible's description becomes the contract's text for that slot.
+  it('a declared wornAs item takes the contract’s words; the contract is untouched', () => {
+    // Same garment, different wording: the contract owns garment wording
+    // (owner, 2026-09-23), so the bible entry is rewritten, never the outfit.
     const vb: any = bible();
     vb.artifacts[0].wornAs = 'Emma.headwear';
     const f = checkWardrobeAgainstBible(reqs(), vb).filter((x: any) => x.character === 'Emma');
     expect(f).toHaveLength(1);
-    expect(f[0].kind).toBe('reconcile');
-    expect(f[0].after).toContain('three turned-up brim edges');
+    expect(f[0].kind).toBe('adopt');
+    const r: any = reqs();
+    applyWardrobeBibleCorrections(r, vb, { log: { warn: () => {} } });
+    expect(r.Emma.costumed.description).toBe(EMMA);
+    expect(vb.artifacts[0].description).toBe('black felt tricorn hat with a red cockade');
   });
 
   it('honours an explicit wornAs link over token attribution', () => {
+    // A linked DIFFERENT garment is a conflict, attributed by the link.
     const vb: any = bible();
     vb.artifacts[1].wornAs = 'Emma.headwear';
     const f = checkWardrobeAgainstBible(reqs(), vb);
     expect(f).toHaveLength(1);
     expect(f[0].character).toBe('Emma');
-    expect(f[0].kind).toBe('reconcile');
+    expect(f[0].kind).toBe('conflict');
   });
 
   it('corrects the contract in place and logs loudly', () => {
@@ -149,12 +153,12 @@ describe('a corrected outfit re-renders its avatar', () => {
       .toBeLessThan(beats.indexOf('applyWardrobeBibleCorrections(clothingRequirements, visualBible)'));
   });
 
-  it('the correction fires the re-render hook only for characters VISIBLY corrected', () => {
-    // A same-garment rewording is not a change (2026-09-23) — see
+  it('the correction fires the re-render hook only for characters whose CONTRACT changed', () => {
+    // An `adopt` rewrites the bible entry, not the outfit (2026-09-23) — see
     // tests/unit/worn-garment-review-chain.test.ts.
-    expect(beats).toContain('const visibleChanges = applied.filter(f => !f.rewording);');
-    expect(beats).toContain("if (visibleChanges.length > 0 && typeof onWardrobeCorrected === 'function')");
-    expect(beats).toContain('visibleChanges.map(f => f.character)');
+    expect(beats).toContain("const contractChanges = applied.filter(f => f.kind === 'conflict');");
+    expect(beats).toContain("if (contractChanges.length > 0 && typeof onWardrobeCorrected === 'function')");
+    expect(beats).toContain('contractChanges.map(f => f.character)');
   });
 
   it('the caller wires it, invalidates those avatars and re-renders only them', () => {

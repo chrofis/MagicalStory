@@ -6,9 +6,7 @@ Do not rewrite, extend or comment on the story. Only the one output section belo
 
 # TARGET
 
-Reading level: {READING_LEVEL}
 Pages: {PAGE_COUNT}
-Story language: {LANGUAGE}
 Illustration style: {ART_STYLE}
 Characters: {CHARACTER_NAMES}
 Main characters: {MAIN_CHARACTER_NAMES}
@@ -24,6 +22,10 @@ Primary characters: {PRIMARY_CHARACTER_NAMES}
 
 {CHARACTER_PHYSICAL_BLOCK}
 
+# ARC
+
+{STORY_ARC}
+
 # LOCKED PAGE PLAN
 
 {PLAN_LINES}
@@ -35,9 +37,8 @@ Determine which clothing variants each character needs, based on the page plan.
 - Mark `used: true` only for variants that actually appear.{ERA_CLOTHING_RULE}
 - Set `costumed.used: true` whenever the theme, setting or era implies special clothing, and name it in `costumed.costume` (`medieval`, `wizard`, `pirate`, `firefighter`, `1920s`, …). Leave it false for a present-day story in everyday clothes, and for any character whose own role clothing the story keeps.
 - **A character the story already dresses for their role stays `standard`** — a working captain, a uniformed officer, a baker at their own oven. Their own outfit IS their clothing in this world, and the theme's costume puts a second set of clothes on someone who came dressed. Costume the characters the theme is a costume FOR.
-- **A worn object the story turns on is described IN FULL in the outfit that wears it** — colour, material and what makes this one recognisable — in the slot it occupies. The Visual Bible copies those words for its own entry of the same object, so the two never describe it differently. It stays in the outfit even on pages the character is without it: a page that takes it off says so on that page.
-- If any character is costumed, every cover uses the costumed variant for every cover character.
-- `description` is the FULL final outfit for this story — top, bottom, footwear, accessories — as one self-contained sentence. Start from the character's stored clothing above; keep it, add a story-relevant accessory, or change a garment the story requires. The avatar generator uses it verbatim.
+- **A worn object the story turns on is described IN FULL in the outfit that wears it** — a garment the arc or plan has someone hold, lend, wrap, spread or lose goes in the outfit of the character they give it to, as the garment they name, with colour, material and what makes this one recognisable, in the slot it occupies. The Visual Bible copies those words for its own entry of the same object, so the two never describe it differently. It stays in the outfit even on pages the character is without it: a page that takes it off says so on that page.
+- `description` is the FULL final outfit for this story — top, bottom, footwear, accessories — as one self-contained sentence. The avatar generator uses it verbatim.
 - Costumed descriptions name every slot the character actually wears: headwear, top, bottom, footwear, belt/waist, outer layer. Each slot names colour and material. OMIT a slot they do not wear; never write it out as `none`. Clothing only — no pets, carried objects or bag contents.
 - Name structural garment parts, not just the garment. Dungarees, pinafore, suspenders, kilt, kimono, sari and similar render as plain garments when only named: keep the garment name in front and spell out its parts ("denim dungaree shorts — square bib panel over the chest held by two shoulder straps").
 - No headwear, helmets, crowns or masks that cover the face.
@@ -45,9 +46,9 @@ Determine which clothing variants each character needs, based on the page plan.
 - **Every garment matches the character's sex.** A male character wears garments made for boys or men, a female character garments made for girls or women. When a costume has a male and a female form, each character wears the form matching theirs.
 - **A child's swimwear or costume top is a modest full-coverage garment** (`swim shirt`, `swim top`, a one-piece) — never `bikini`, a bare chest, or a bare midriff.
 - **Characters are told apart by colour.** A different dominant colour per character, on their largest garment.
-  - Plain colour words only: red, blue, green, yellow, orange, purple, brown, black, white, grey.
+  - Every colour is one of these words, alone: red, blue, green, yellow, orange, purple, brown, black, white, grey. No shade name, no modifier (dark, light, pale) and no compound.
   - Never distinguish by a print, badge, pin, brooch, embroidery, trim, buckle, laces, feather, earring, watch or buttons, or anything small.
-- **Outfits differ in garment type and silhouette, not colour alone.** Two characters never wear the same set of garments recoloured. The story world decides the wardrobe; within it one wears a long coat, another a vest, another rolled sleeves and a sash. Vary headwear and footwear the same way.
+- **Outfits differ in garment type and silhouette, not colour alone.** Two characters never wear the same set of garments recoloured — neither the whole outfit nor what is left once a page takes an outer layer off. The story world decides the wardrobe; within it one wears a long coat, another a vest, another rolled sleeves and a sash. Vary headwear and footwear the same way.
 - **One state per garment slot.** Never two that exclude each other. Omit a slot the character does not wear.
 {STYLE_WARDROBE}
 - Never write `none`, `n/a`, `tbd` or `""` as a value. Omit the field instead. `used: false` carries no `description`.

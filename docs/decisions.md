@@ -47554,6 +47554,8 @@ QC retry), `server/lib/evalPipeline.js` (comment), `tests/unit/empty-scene-geome
 
 ## 2026-09-15 — The Visual Bible outranks the wardrobe contract when they dress the same body slot
 
+> → superseded 2026-09-23 (the wardrobe contract owns garment wording; the Art Director selects versions), see "2026-09-23 — The wardrobe contract owns garment wording".
+
 > → corrected 2026-09-23 (its reconcile half runs opposite to the same-day plot-critical-object entry), see "2026-09-23 — Prompt audit of job_1790100385959: corrections to earlier entries", item 7.
 
 **Context:** staging `job_1789420511893_zly5rcdej` drew Captain Sarah in a pirate tricorn on the back
@@ -47600,6 +47602,8 @@ NOT built: that is an eval classification change and the owner's call.
 **Status:** ✅ active — staging only, not on master
 
 ## 2026-09-15 — A plot-critical worn object is described IN FULL in the outfit, not left out of it
+
+> → direction confirmed 2026-09-23 (owner: the wardrobe contract owns garment wording); the `reconcile` mechanism it names is replaced by `adopt`, see "2026-09-23 — The wardrobe contract owns garment wording".
 
 > → corrected 2026-09-23 (the code copies the Visual Bible's words into the outfit, the reverse of "the Visual Bible can then copy that"), see "2026-09-23 — Prompt audit of job_1790100385959: corrections to earlier entries", item 7.
 
@@ -56421,6 +56425,8 @@ of a dropped line, correctly re-marked `rewrite-restored`. One run, one story.
 
 ## 2026-09-23 — A worn garment is not a budget element; a reviewed brief keeps its declared worn rows; a same-garment rewording rebuilds no avatar
 
+> → in part superseded 2026-09-23 (the wardrobe contract owns garment wording; the Art Director selects versions), see "2026-09-23 — The wardrobe contract owns garment wording".
+
 **Context.** Dragon run 6 (staging `job_1790100385959_1nitlympp`), p12 scored 10: Max drawn twice, both in
 the purple sweatshirt the page had taken off him. The chain, from stored data: (1)
 `vbElementBudget.rankPageElements` counted every artifact on the page, including a `wornAs` outer layer
@@ -56479,6 +56485,8 @@ carry, zero, and the p11/p12/p18 prompts say "Max is NOT wearing this … lies o
 **Status:** ✅ active on staging.
 
 ## 2026-09-23 — The wardrobe-vs-bible check reads a garment's declared slot and finds its clause by its own words
+
+> → in part superseded 2026-09-23 (the wardrobe contract owns garment wording; the Art Director selects versions), see "2026-09-23 — The wardrobe contract owns garment wording".
 
 **Context.** Dragon run 6 (staging `job_1790100385959_1nitlympp`). `checkWardrobeAgainstBible` decided an
 element's slot from its `type` only when the type was literally a slot name, else from its name through
@@ -56607,4 +56615,97 @@ SHAPE band, which has not returned `standard` since the 2026-09-14 band split, s
 `tests/unit/arc-prompt-audit-2026-09-23.test.ts`, `tests/unit/arc-critique-spec-and-shape.test.ts`,
 `tests/unit/arc-invented-figures.test.ts`, `docs/prompt-inventory.md`, `docs/audits/prompt-audit-2026-09-23/01-arc.md`,
 `scripts/admin/sibling-registry.json`, `tasks/bugs.json`, `tasks/BACKLOG.md`.
+
+## 2026-09-23 — The wardrobe contract owns garment wording; the Art Director selects versions (supersedes the direction of both 2026-09-15 wardrobe/bible entries)
+
+**Context.** Two 2026-09-15 entries disagreed on direction: "A plot-critical worn object is described IN
+FULL in the outfit" (the wardrobe authors the words, the Visual Bible copies them) and "The Visual Bible
+outranks the wardrobe contract" (the code copied a `wornAs` entry's words into the contract). The prompt
+audit of staging `job_1790100385959_1nitlympp` (`docs/audits/prompt-audit-2026-09-23/03-wardrobe.md` F1;
+corrections entry item 7) found the reviewed contract overwritten after review by the Art Director's
+paraphrase for Levin and Kiaan (ART006 "…with a high collar", ART004 "…with diamond quilting"), both
+avatars re-rendered from photos, and Levin's second sheet re-rolled his face and hair (audit 06). Owner
+ruling, 2026-09-23: **the clothing plan wins.** The wardrobe contract defines the default outfit and any
+version a story needs; each version is its own avatar. The Art Director (and the scene review) only
+SELECTS which version a character wears on a page; it never rewrites garment wording.
+
+**Decision.**
+1. `checkWardrobeAgainstBible`'s `reconcile` kind is deleted (no fallback). A linked (`wornAs`) entry that
+   names the SAME garment as the outfit clause of its slot is an `adopt`: the entry's `description` becomes
+   the contract's clause (joiner and article stripped); a `name`/`label` that states a colour the clause does
+   not takes the clause too. The contract is not touched and no avatar is re-rendered. Same garment = the
+   clause found by the entry's own words (`indexOfElementAmong`) unless the two name different garment nouns
+   of the slot, or a shared slot noun.
+2. The `rewording` flag and `isRewording` (ee8890278) are deleted: they existed only to keep `reconcile`
+   restatements from re-rendering, and nothing restates the contract any more.
+3. The Art Director's `AVAILABLE CLOTHING PER CHARACTER` list now carries each used version's outfit
+   (`buildAvailableAvatarsForPrompt`, all callers: all-pages and per-page AD, iterate, regeneration, Lab), and
+   `scene-expansion-all.txt` says every garment a listed character wears is one those outfits name, its entry
+   repeats the outfit's words, and a page without a garment says so in a `wornItems` row. The "without a
+   garment" version is the existing per-state off-sheet (2026-09-19 "per-state wardrobe variants") — no
+   parallel mechanism.
+4. **Not changed, owner question open:** a `conflict` — a DIFFERENT garment in a slot the outfit already fills,
+   linked or attributed by name — still rewrites the outfit clause to the bible's garment and re-renders
+   that avatar (`onWardrobeCorrected`), and the cover dedupe (`applyCoverWornHeldDedupe`) still drops the
+   contradicting outfit segment. Under the ruling the Art Director cannot add a garment, so this path either
+   goes (the AD's different garment is an error, logged, contract stands), or becomes "a new version": the
+   wardrobe gains a variant with that slot replaced and a redressed sheet, the way off-states work. Who may
+   create a version mid-pipeline is the owner's call. The upstream fix makes the case rarer: the wardrobe
+   writer now sees the arc and the reviewer checks plot garments (next entry).
+
+**Replay (free, stored data).** `applyWardrobeBibleCorrections` over run 6's pre-review contract
+(`clothingReviewReport.outfitsIn`) and its final Visual Bible: 3 findings, all `adopt` (ART004 Kiaan,
+ART005 Max, ART006 Levin), 0 unresolved, contract byte-identical, 0 characters sent to re-render (the run
+itself re-rendered 2).
+
+**Touched:** `server/lib/clothingCheck.js`, `server/lib/beatsPipeline.js`, `server/lib/clothingResolve.js`,
+`prompts/scene-expansion-all.txt`, `tests/unit/wardrobe-vs-bible.test.ts`,
+`tests/unit/worn-garment-review-chain.test.ts`, `tests/unit/wardrobe-prompt-inputs.test.ts`.
+**Status:** ✅ active on staging.
+
+## 2026-09-23 — The wardrobe calls: no saved clothing, the arc for the writer, a trimmed brief, plot-garment and base-layer checks, everything stored
+
+**Context.** Audit `docs/audits/prompt-audit-2026-09-23/03-wardrobe.md` (F2-F9), run 6.
+
+**Decision.**
+1. **The wardrobe writer never gets the character's saved clothing** (owner, 2026-09-23). The template's
+   "Start from the character's stored clothing above" pointed at nothing: `extractCharacterVisualProfile`
+   reads `char.clothing`, and these characters store `structuredClothing` / `avatars.clothing`. The sentence
+   is deleted rather than the field wired: the wardrobe is written per story and the default outfit it
+   writes is what the avatars are drawn from; the saved outfit is not its starting point
+   (memory `feedback_clothing_is_per_story`). The appearance block no longer asks for clothing at all.
+2. **The writer gets the arc** (`{STORY_ARC}`, beatsPipeline `approvedArc`, Lab replay and bench too). Run 6's
+   plan said "his jacket" and "the bundled jacket"; only the arc said "Kiaan's jacket", and Max's outfit had a
+   sweatshirt, Kiaan's a sleeveless gilet (F5). Bible rule: a garment the arc or plan has someone hold, lend,
+   wrap, spread or lose goes in that character's outfit as the garment they name. The reviewer gets the
+   matching check 12 (plot garments) from the plan lines; it is deliberately NOT sent the arc — it is the
+   slow call in front of the avatars and the plan line names the garment.
+3. **Both wardrobe calls get a wardrobe-scoped brief and cast** (`wardrobeStoryBrief`,
+   `wardrobeCharacterDetails`): the brief body and the user-input line without the plot stages' binding
+   paragraph; age, gender and special details without strengths, flaws and challenges. The writer's
+   appearance block drops face geometry and age cues (`buildLabeledPhysicalParts` `includeFace`), and its
+   TARGET drops reading level and story language. Rebuilt on run 6: review prompt 12,708 → 11,627 chars
+   (with check 12 and the colour rule added); bible 15,423 → 16,991 including the 4,445-char arc.
+4. **Check 9 is scoped to the listed characters**: animals, creatures and other plan figures get no
+   wardrobe (run 6 dressed the dragon, the dog and the hatchling; `beats_clothing_review_stray` in 6 of the
+   last 40 staging stories).
+5. **Base-layer variety.** Bible rule and check 11 now cover the garments left once a page takes an outer
+   layer off (run 6: three boys in the same long-sleeve shirt / trousers / shoes, recoloured, from p16).
+6. **Colours**: every colour is one of the ten words, alone — no shade name, modifier (dark, light, pale)
+   or compound — in the bible rule and check 3. Run 6 shipped forest green, navy blue, mid-blue,
+   rust-brown, dark grey, dark brown and the reviewer called them allowed.
+7. Stale text removed: "checks 1-10" (there are 12 now; the format asks for every check by number), and the
+   bible's cover rule (covers are the Art Director's; `scene-expansion-all.txt` carries it).
+8. **Stored with the story:** `storyBibleReport` (model, duration, prompt, raw reply — the transcript's
+   CLOTHING section is rewritten by the review and the bible check, so it is not the reply),
+   `clothingReviewReport.rawResponse` (a stray entry's text was otherwise lost), and `wardrobeBibleReport`
+   (built since 2026-09-15, never returned). The saved-story metadata route strips `rawResponse` from the
+   review report like its prompt.
+9. The Lab wardrobe-review replay now defaults to production's reviewer (`clothingReviewModel`, it used the
+   outline reviewer) and takes `noReasoning` to measure the reviewer with reasoning off.
+
+**Touched:** `prompts/story-bible-from-beats.txt`, `prompts/clothing-review.txt`,
+`server/lib/promptBuilders.js`, `server/lib/beatsPipeline.js`, `storyJobPipeline.js`,
+`server/routes/stories.js`, `server/lib/testlab.js`, `tests/unit/wardrobe-prompt-inputs.test.ts`,
+`tests/unit/beats-dropped-fill-keys.test.ts`.
 **Status:** ✅ active on staging.

@@ -815,7 +815,7 @@ function shippedReplanState(rounds = []) {
  *   text (the kickoff is deliberately early — the Visual Bible does not exist
  *   yet at that point), so the caller re-renders exactly those and nothing else.
  *   Non-blocking, owns its own error handling.
- * @returns {Promise<{title, beats, pages, scenes, rawOutline, meta, beatsReviewReport, clothingReviewReport, sceneReviewReport}>}
+ * @returns {Promise<{title, beats, pages, scenes, rawOutline, meta, beatsReviewReport, storyBibleReport, clothingReviewReport, wardrobeBibleReport, sceneReviewReport}>}
  *   pages[]  mirrors UnifiedStoryParser.extractPages() output consumed by server.js
  *   scenes[] mirrors the resolved value of startSceneExpansion() (expandedScenes)
  *   *ReviewReport  {model, durationMs, changedPages[], analysis, pages:[{pageNumber,before,after}]},
@@ -1921,7 +1921,15 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // the clothing review, the avatar kickoff and expandOnePage all close over it.
   let visualBible = null;
   let clothingRequirements = null;
-  const biblePrompt = buildStoryBibleFromBeatsPrompt(inputData, beats);
+  // What the wardrobe call was sent and what it answered, verbatim — the
+  // transcript's CLOTHING section is rewritten by the review and by the
+  // wardrobe-vs-bible check, so it is not a copy of the reply.
+  let storyBibleReport = null;
+  // The wardrobe-vs-Visual-Bible check, filled once the Art Director has run.
+  let wardrobeBibleReport = null;
+  // The arc names whose garment the plot uses ("lift the egg in X's jacket");
+  // the plan line often says only "his jacket".
+  const biblePrompt = buildStoryBibleFromBeatsPrompt(inputData, beats, { arc: approvedArc });
   if (!biblePrompt) {
     log.warn('⚠️ [BEATS] story-bible-from-beats template unavailable — no clothing requirements');
     gl.warn('beats_story_bible_failed', 'Wardrobe template unavailable — story ships with no clothing contract');
@@ -1932,6 +1940,12 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       const bibleRes = await textModels.callTextModelStreaming(biblePrompt, null, onChunk, bibleModel, { usageLabel: 'beats_story_bible' });
       const sections = extractBibleSections(bibleRes.text || '', CLOTHING_MARKERS);
       meta.timings.storyBibleMs = Date.now() - t;
+      storyBibleReport = {
+        model: bibleRes.modelId || bibleModel,
+        durationMs: meta.timings.storyBibleMs,
+        prompt: biblePrompt,
+        rawResponse: bibleRes.text || '',
+      };
       if (!sections) {
         log.warn(`🚨 [BEATS] Wardrobe call returned no parseable section marker (${(bibleRes.text || '').length} chars)`);
         gl.warn('beats_story_bible_failed', `${bibleRes.modelId || bibleModel} emitted no ---CLOTHING REQUIREMENTS--- marker — story ships with no clothing contract`);
@@ -2016,6 +2030,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
           durationMs: meta.timings.clothingReviewMs,
           analysis: parsed.analysis || '',
           changed: rewrites,
+          // The whole reply: a stray entry (a creature the reviewer dressed)
+          // is dropped from `changed`, so this is the only copy of its text.
+          rawResponse: cRes.text || '',
           // Same dev-mode inspection as the other two reviews: the exact prompt
           // and every outfit as sent, not only the ones that moved.
           prompt: clothingPrompt,
@@ -2373,11 +2390,12 @@ ${bibleBody}` : bibleBody;
   // The two describe the same body and nothing compared them: a costume line
   // could put a hat on a character the bible already dresses with a different
   // one, on every page she appears (staging job_1789420511893_zly5rcdej,
-  // ART002). The bible wins — it has a rendered reference cell — so the outfit
-  // clause is rewritten here, the first moment both exist, and every swap is
-  // logged. Contained like every other check: a throw ships the contradiction
-  // rather than killing the run, but never silently.
-  let wardrobeBibleReport = null;
+  // ART002). The contract owns garment wording (owner, 2026-09-23): a linked
+  // entry naming the SAME garment takes the contract's words (`adopt`), the
+  // contract is untouched. Only a DIFFERENT garment in an occupied slot
+  // (`conflict`) rewrites the outfit clause. Contained like every other check:
+  // a throw ships the contradiction rather than killing the run, but never
+  // silently.
   if (visualBible && clothingRequirements && Object.keys(clothingRequirements).length > 0) {
     try {
       const { applyWardrobeBibleCorrections } = require('./clothingCheck');
@@ -2386,33 +2404,33 @@ ${bibleBody}` : bibleBody;
       // after every rewrite), so identity comparison against `findings` was
       // always false and every successful correction logged as uncorrected.
       // Compare on what identifies a finding instead.
-      const correctionKey = (f) => `${f.character} ${f.category} ${f.slot} ${f.elementId || ''}`;
+      const correctionKey = (f) => `${f.character} ${f.category} ${f.slot} ${f.elementId || ''}`;
       const appliedKeys = new Set(applied.map(correctionKey));
+      const contractChanges = applied.filter(f => f.kind === 'conflict');
       if (findings.length > 0) {
         wardrobeBibleReport = {
           conflicts: findings.map(f => ({
-            character: f.character, category: f.category, slot: f.slot,
-            elementId: f.elementId, elementLabel: f.elementLabel,
+            kind: f.kind, character: f.character, category: f.category, slot: f.slot,
+            elementId: f.elementId, elementLabel: f.elementLabel, elementText: f.elementText,
             wardrobeClause: f.wardrobeClause, corrected: appliedKeys.has(correctionKey(f)),
-            rewording: !!f.rewording,
           })),
         };
-        gl.warn('beats_wardrobe_bible_conflict', `${findings.length} wardrobe/bible wardrobe conflict(s): ${findings.map(f => `${f.character}/${f.slot} "${f.wardrobeClause}" vs ${f.elementId || '?'} "${f.elementLabel}"`).join('; ')}`, null, {
+        gl.warn('beats_wardrobe_bible_conflict', `${findings.length} wardrobe/bible disagreement(s): ${findings.map(f => `${f.kind} ${f.character}/${f.slot} "${f.wardrobeClause}" vs ${f.elementId || '?'} "${f.elementLabel}"`).join('; ')}`, null, {
           conflicts: wardrobeBibleReport.conflicts,
         });
         // The transcript is what every later consumer re-parses the contract
         // out of; correcting only the object leaves them on the old outfit.
-        if (applied.length > 0 && bibleSections) {
+        if (contractChanges.length > 0 && bibleSections) {
           const rewritten = replaceClothingSection(bibleSections, clothingRequirements);
           if (rewritten === bibleSections) {
-            gl.warn('beats_wardrobe_bible_unmerged', `${applied.length} outfit(s) corrected against the Visual Bible but the transcript has no CLOTHING REQUIREMENTS section to update`);
+            gl.warn('beats_wardrobe_bible_unmerged', `${contractChanges.length} outfit(s) corrected against the Visual Bible but the transcript has no CLOTHING REQUIREMENTS section to update`);
           } else {
             bibleSections = rewritten;
           }
         }
         if (unresolved.length > 0) {
           wardrobeBibleReport.unresolved = unresolved.map(f => ({
-            character: f.character, category: f.category, slot: f.slot,
+            kind: f.kind, character: f.character, category: f.category, slot: f.slot,
             elementId: f.elementId, elementLabel: f.elementLabel, wardrobeClause: f.wardrobeClause,
           }));
         }
@@ -2420,21 +2438,11 @@ ${bibleBody}` : bibleBody;
       // THE AVATAR WAS RENDERED FROM THE PRE-CORRECTION TEXT. The styled-avatar
       // kickoff fires at the story-bible stage, long before the Visual Bible
       // this check needs exists — deliberately, because avatars are the long
-      // pole in front of every image. So page prompts would carry the corrected
-      // garment while the avatar reference cell still wore the old one: the
-      // words-vs-picture split, one layer upstream. The affected characters —
-      // and only those — are re-rendered by the caller.
-      //
-      // A REWORDING IS NOT A CHANGE (2026-09-23). A `reconcile` finding whose
-      // bible entry names the same garment in the same colours only restates
-      // the clause in the bible's words — the avatar already wears that
-      // garment, so nothing visible moved and nothing is re-rendered. On
-      // staging job_1790100385959_1nitlympp two such restatements ("fleece
-      // jacket" → "forest green … fleece jacket with a high collar") rebuilt
-      // two sheets from photos and re-rolled Levin's face and hair.
-      const visibleChanges = applied.filter(f => !f.rewording);
-      if (visibleChanges.length > 0 && typeof onWardrobeCorrected === 'function') {
-        const names = [...new Set(visibleChanges.map(f => f.character).filter(Boolean))];
+      // pole in front of every image. Only a `conflict` changes the contract,
+      // so only its characters are re-rendered; an `adopt` changes the bible
+      // entry and leaves the avatar's outfit exactly as drawn.
+      if (contractChanges.length > 0 && typeof onWardrobeCorrected === 'function') {
+        const names = [...new Set(contractChanges.map(f => f.character).filter(Boolean))];
         try {
           onWardrobeCorrected(names, clothingRequirements);
         } catch (err) {
@@ -3495,7 +3503,7 @@ ${bibleBody}` : bibleBody;
   // trimmed, age-clamped, landmark-linked. The caller prefers it over a
   // re-parse of rawOutline so the two can never diverge (the transcript is
   // kept in step by syncVisualBibleSection; the re-parse is the fallback).
-  return { title, titleJudge, beats, pages, scenes, rawOutline, visualBible, meta, challengeDrawIds, challengeTakenIds, challengeDraw, arcReviewReport, beatsReviewReport, clothingReviewReport, sceneExpansionReport, sceneReviewReport };
+  return { title, titleJudge, beats, pages, scenes, rawOutline, visualBible, meta, challengeDrawIds, challengeTakenIds, challengeDraw, arcReviewReport, beatsReviewReport, storyBibleReport, clothingReviewReport, wardrobeBibleReport, sceneExpansionReport, sceneReviewReport };
 }
 
 module.exports = { generateStoryViaBeats, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };

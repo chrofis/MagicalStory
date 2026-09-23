@@ -545,10 +545,16 @@ function missingGarments(clothingDescription, prose, requiredSlots = ['top', 'bo
  * checks garments WITHIN one outfit), and the covers hid it entirely because
  * the cover dedupe suppressed the artifact as a duplicate of the coat.
  *
- * The bible WINS. It has a rendered reference cell the page grid carries and it
- * is what the prose cites; the wardrobe line is text nobody drew. So the
- * conflicting outfit clause is rewritten to the bible entry and the swap is
- * logged loudly, naming character, slot and both items.
+ * THE CONTRACT OWNS GARMENT WORDING (owner, 2026-09-23). A garment the bible
+ * links to a character's slot (`wornAs`) and the outfit already names is the
+ * SAME garment: the bible entry takes the contract's words (`adopt`), the
+ * contract is never touched and no avatar is re-rendered. The Art Director
+ * selects outfits and worn states; it does not reword them.
+ *
+ * A DIFFERENT garment in an occupied slot (`conflict`) still rewrites the
+ * outfit clause to the bible entry and re-renders the avatar — who may add a
+ * garment version mid-pipeline is an open owner question (docs/decisions.md
+ * 2026-09-23 "The wardrobe contract owns garment wording").
  *
  * Deterministic, no API call. Scope is deliberately narrow:
  *   - only headwear / footwear / outer layer — the slots whose items are named
@@ -627,27 +633,6 @@ function colourSet(text) {
   return out;
 }
 
-/**
- * Does restating `clause` as `replacement` change what is DRAWN? (2026-09-23)
- *
- * A rewording keeps the garment — the clause IS the element (found by its own
- * declared words, or sharing its slot noun), and the replacement names no slot
- * noun the clause does not — and keeps
- * its colours (the same plain colour words on both sides). Anything else — a
- * different garment, a colour added, dropped or changed — is a visible change.
- * Structured comparison over the contract's closed vocabularies (SLOT_NOUNS,
- * COLOUR_WORDS), the ones this module already reads; unsure answers count as
- * visible.
- */
-function isRewording(sameGarment, slot, clause, replacement) {
-  if (!sameGarment) return false;
-  const clauseNouns = slotNounsIn(slot, clause);
-  if (slotNounsIn(slot, replacement).some(n => !clauseNouns.includes(n))) return false;
-  const a = colourSet(clause);
-  const b = colourSet(replacement);
-  return a.size === b.size && [...a].every(c => b.has(c));
-}
-
 /** Every wearable bible entry, across the pools that can hold one. */
 function wearableBibleEntries(visualBible) {
   const out = [];
@@ -707,31 +692,36 @@ function checkWardrobeAgainstBible(clothingRequirements, visualBible) {
         if (!clause) continue;                                        // wardrobe silent — the bible just adds it
         const elNouns = slotNounsIn(slot, elText);
         const clauseNouns = slotNounsIn(slot, clause);
-        const sameGarment = own >= 0 || elNouns.some(n => clauseNouns.includes(n));
-        const replacement = String(el.description || elName).trim().replace(/\.\s*$/, '');
-        // A DECLARED item (`wornAs`) owns its slot outright: the writer said
-        // this prop IS that character's garment there, so the bible's words
-        // become the contract's words even when both name the same garment —
-        // "the same item in the same words" is the rule the Art Director works
-        // to. Without a link, only a different garment is a fault.
-        const kind = link ? 'reconcile' : 'conflict';
+        // Found by its own words is the same garment unless the two name
+        // different garment nouns of the slot ("parka" vs "jacket" found by a
+        // shared colour) — then it is a different garment.
+        const nounsDisagree = elNouns.length > 0 && clauseNouns.length > 0 && !elNouns.some(n => clauseNouns.includes(n));
+        const sameGarment = (own >= 0 && !nounsDisagree) || elNouns.some(n => clauseNouns.includes(n));
+        const bibleText = String(el.description || elName).trim().replace(/\.\s*$/, '');
         if (sameGarment && !link) continue;                           // the same garment, twice
-        if (link && clauseBody(clause) === clauseBody(replacement)) continue;   // already in the same words
+        if (sameGarment) {
+          // `adopt`: the linked entry IS this outfit's garment, so it carries
+          // the outfit's words. Already identical → nothing to do.
+          const contractText = clause.replace(CLAUSE_LEAD_RE, '').trim();
+          if (clauseBody(clause) === clauseBody(bibleText)) continue;
+          findings.push({
+            kind: 'adopt', character, category, slot,
+            elementId: el.id || null, elementLabel: elName, elementText: bibleText,
+            wardrobeClause: clause, contractText, element: el,
+          });
+          continue;
+        }
         findings.push({
-          kind,
-          // Same garment, same colours, other words: the contract text is
-          // restated but nothing an avatar shows has changed, so no caller may
-          // treat it as a wardrobe change (beatsPipeline onWardrobeCorrected).
-          rewording: !!link && isRewording(sameGarment, slot, clause, replacement),
+          kind: 'conflict',
           character,
           category,
           slot,
           elementId: el.id || null,
           elementLabel: elName,
-          elementText: replacement,
+          elementText: bibleText,
           wardrobeClause: clause,
           before: description,
-          after: spliceClause(description, clause, replacement),
+          after: spliceClause(description, clause, bibleText),
         });
       }
     }
@@ -740,30 +730,47 @@ function checkWardrobeAgainstBible(clothingRequirements, visualBible) {
 }
 
 /**
- * Run the check and CORRECT the wardrobe toward the bible, in place.
- * Loud by construction: every swap logs character, slot and both items.
+ * Run the check and apply it, in place: an `adopt` rewrites the bible entry to
+ * the contract's words, a `conflict` rewrites the outfit clause to the bible's
+ * garment. Loud by construction: every change logs character, slot and both
+ * texts.
  *
- * @returns {{findings: Array, applied: Array}}
+ * @returns {{findings: Array, applied: Array, unresolved: Array}}
  */
 function applyWardrobeBibleCorrections(clothingRequirements, visualBible, opts = {}) {
   const logger = opts.log || log;
   const findings = checkWardrobeAgainstBible(clothingRequirements, visualBible);
   const applied = [];
-  // One correction at a time, re-deriving after each: two entries can point at
-  // the same outfit, and the second's `before` is the first's `after`.
+  // An entry adopts once: a character dressed in two categories that word the
+  // same garment differently would otherwise flip it back and forth.
+  const adopted = new Set();
+  const open = () => checkWardrobeAgainstBible(clothingRequirements, visualBible)
+    .filter(f => !(f.kind === 'adopt' && adopted.has(f.element)));
+  // One change at a time, re-deriving after each: two entries can point at the
+  // same outfit, and the second's `before` is the first's `after`.
   for (let pass = 0; pass < findings.length + 1; pass++) {
-    const pending = checkWardrobeAgainstBible(clothingRequirements, visualBible);
+    const pending = open();
     if (pending.length === 0) break;
     const f = pending[0];
+    if (f.kind === 'adopt') {
+      const el = f.element;
+      adopted.add(el);
+      el.description = f.contractText;
+      // A short name that states a colour the contract does not is the same
+      // disagreement in fewer words; it takes the contract's words too.
+      const contractColours = colourSet(f.contractText);
+      for (const key of ['name', 'label']) {
+        if (el[key] && [...colourSet(el[key])].some(c => !contractColours.has(c))) el[key] = f.contractText;
+      }
+      applied.push(f);
+      logger.warn(`🧥 [WARDROBE-BIBLE] ${f.character}/${f.slot}: ${f.elementId || 'the bible'} "${f.elementLabel}" is declared worn in this slot — its description now carries the contract's words "${f.contractText}" (was "${f.elementText}")`);
+      continue;
+    }
     const entry = clothingRequirements?.[f.character]?.[f.category];
     if (!entry || entry.description !== f.before) break;   // nothing safe to do
     entry.description = f.after;
     applied.push(f);
-    if (f.kind === 'reconcile') {
-      logger.warn(`🧥 [WARDROBE-BIBLE] ${f.character}/${f.slot}: ${f.elementId || 'the bible'} "${f.elementLabel}" is declared worn in this slot — the outfit clause "${f.wardrobeClause}" is restated in the bible's words${f.rewording ? ' (same garment, same colours: a rewording, not a wardrobe change)' : ''}`);
-    } else {
-      logger.warn(`🧥 [WARDROBE-BIBLE] ${f.character}/${f.slot}: the wardrobe said "${f.wardrobeClause}" while ${f.elementId || 'the bible'} says "${f.elementLabel}" on the same body — the Visual Bible wins, outfit clause rewritten`);
-    }
+    logger.warn(`🧥 [WARDROBE-BIBLE] ${f.character}/${f.slot}: the wardrobe said "${f.wardrobeClause}" while ${f.elementId || 'the bible'} says "${f.elementLabel}" on the same body — a different garment; outfit clause rewritten to the bible's`);
   }
   const unresolved = checkWardrobeAgainstBible(clothingRequirements, visualBible);
   for (const f of unresolved) {
@@ -775,4 +782,4 @@ function applyWardrobeBibleCorrections(clothingRequirements, visualBible, opts =
 // slotStated + missingGarments are exported so the image-prompt clothing check
 // (storyHelpers buildImagePrompt) uses THIS definition of "is this garment in
 // the prose" rather than growing a second one.
-module.exports = { checkPage, checkWardrobeAgainstBible, applyWardrobeBibleCorrections, isRewording, outfitClauses, checkScenes, renderFindingsBlock, splitSlots, slotStated, missingGarments, characterProse, characterWindow, tokens, contractPairs, colourBefore };
+module.exports = { checkPage, checkWardrobeAgainstBible, applyWardrobeBibleCorrections, outfitClauses, checkScenes, renderFindingsBlock, splitSlots, slotStated, missingGarments, characterProse, characterWindow, tokens, contractPairs, colourBefore };
