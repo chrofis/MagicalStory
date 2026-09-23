@@ -13,6 +13,7 @@ const { MODEL_DEFAULTS } = require('./textModels');
 const { getPhysical } = require('./characterPhysical');
 const { stripDataUriPrefix } = require('./r2');
 const { baseVbId, vbIdFacet } = require('./vbIdGuard');
+const { COVER_PAGE_NUMBERS } = require('./coverKeys');
 const vbLabel = require('./vbLabel');
 
 /**
@@ -121,6 +122,25 @@ function objectStateForPage(entry, pageNumber) {
  */
 function defaultObjectState(entry) {
   return objectStates(entry)[0] || null;
+}
+
+/**
+ * The FINAL state of an object: the LAST row of `states[]` — the look the
+ * story leaves it in. Same construction as `defaultObjectState`: the authoring
+ * templates list the states in the order the story reaches them, so the last
+ * row IS the resolved look.
+ *
+ * @returns {Object|null} the last state, or null for a state-less entry
+ */
+function finalObjectState(entry) {
+  const states = objectStates(entry);
+  return states[states.length - 1] || null;
+}
+
+/** True for the negative page numbers the three covers carry (coverKeys.COVER_PAGE_NUMBERS). */
+function isCoverPageNumber(pageNumber) {
+  const n = Number(pageNumber);
+  return Object.values(COVER_PAGE_NUMBERS).includes(n);
 }
 
 const hasRefImage = (o) => !!(o?.referenceImageData || o?.referenceImageUrl);
@@ -551,6 +571,8 @@ function appearanceContradiction(entry, state, sceneMetadata, visualBible) {
  * flag disagrees with the brief's `interactions[]` is wrong for this page.
  *
  * Rules, in order:
+ *   0. A COVER (negative page number) → the cited state, else the FINAL (last)
+ *      state: a cover shows the object as the story leaves it.
  *   1. Cited and declared agree, or only one exists → that state.
  *   2. They disagree → the one whose `held` matches the page's contact; on no
  *      verdict, the bible's table (the brief has already been shown to cite a
@@ -576,7 +598,16 @@ function resolveObjectState(entry, handle = null, pageNumber = null, sceneMetada
   const held = pageHoldsObject(entry, sceneMetadata, visualBible);
   const agrees = (st) => typeof held === 'boolean' && typeof st?.held === 'boolean' && st.held === held;
   let state;
-  if (cited && declared && cited !== declared) {
+  if (isCoverPageNumber(pageNumber)) {
+    // COVERS SHOW THE RESOLVED LOOK (2026-09-23, supersedes "covers pin to the
+    // base state" of 2026-09-06). No state's pages[] covers a cover, so a bare
+    // citation used to fall to the default — the FIRST row, which for a thing
+    // the story makes is its raw materials: prod trial
+    // job_1790169018278_n57xpnufo painted a pile of loose leaves on the ground
+    // for a front cover whose own prose held the finished crown. A dotted
+    // handle the cover hint cites is the author's explicit choice and wins.
+    state = cited || finalObjectState(entry);
+  } else if (cited && declared && cited !== declared) {
     let why;
     if (agrees(cited) && !agrees(declared)) { state = cited; why = "the brief's interactions match the cited state"; }
     else if (agrees(declared) && !agrees(cited)) { state = declared; why = "the brief's interactions match the bible's state"; }
@@ -3691,9 +3722,12 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
  * Fallback for when appearsInPages doesn't match actual scene content.
  * @param {Object} visualBible
  * @param {string[]} elementIds - IDs like ["CHR001", "ART002"]
+ * @param {number} pageNumber - the page (or negative cover number) being
+ *   rendered, so a stated object hands over the state resolveObjectState picks
+ *   for it — a cover's is the final state, never the default one.
  * @returns {Array} elements with referenceImageData
  */
-function getElementReferenceImagesByIds(visualBible, elementIds) {
+function getElementReferenceImagesByIds(visualBible, elementIds, pageNumber) {
   if (!visualBible || !elementIds || elementIds.length === 0) return [];
 
   const hasRef = hasElementReference;
@@ -3713,8 +3747,9 @@ function getElementReferenceImagesByIds(visualBible, elementIds) {
     for (const entry of entries || []) {
       if (!hasRef(entry)) continue;
       if (!entry.id || !idSet.has(entry.id.toUpperCase())) continue;
-      // A stated object's render lives on its default state's cell.
-      const { cell } = elementRefCell(entry);
+      // A stated object's render lives on a state row: the one this page
+      // resolves to (same resolver as the REQUIRED OBJECTS clause).
+      const { cell } = elementRefCell(entry, null, pageNumber);
       results.push({
         id: entry.id,
         name: entry.name,
@@ -3938,6 +3973,8 @@ module.exports = {
   objectStateFor,
   objectStateForPage,
   defaultObjectState,
+  finalObjectState,
+  isCoverPageNumber,
   pageHoldsObject,
   entryNamedByRow,
   citedEntries,

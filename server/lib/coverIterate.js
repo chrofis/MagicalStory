@@ -70,17 +70,22 @@ function enrichCoverHintWithArtifacts(coverHint, visualBible, opts = {}) {
       }
     }
   }
+  const coverPageNumber = COVER_PAGE_NUMBERS[opts.coverKey];
+  if (coverPageNumber === undefined) {
+    throw new Error(`enrichCoverHintWithArtifacts: unknown coverKey "${opts.coverKey}" — the prop's state cannot be resolved`);
+  }
   for (const raw of (coverHint?.objects || [])) {
-    // Base state: a cover never shows the object mid-transformation, and the
-    // id is a lookup key - a dotted state handle matched no artifact at all.
+    // The id is a lookup key - a dotted state handle matched no artifact at
+    // all, so it is normalised to its parent here and passed whole below.
     const id = baseVbId(raw);
     if (!id || !/^ART\d+$/.test(id)) continue;
     const art = (visualBible?.artifacts || []).find(a => baseVbId(a?.id) === id);
     if (!art) continue;
     // A stated object has no base render — its cells live on its state rows —
-    // so the cover prop image must be resolved through elementRefCell (the
-    // default state), never read off the entry.
-    const { cell } = require('./visualBible').elementRefCell(art);
+    // so the cover prop image is resolved through elementRefCell: the state
+    // the hint cites, else the object's FINAL state (a cover shows the object
+    // as the story leaves it — visualBible.resolveObjectState rule 0).
+    const { cell } = elementRefCell(art, String(raw), coverPageNumber);
     const src = cell.referenceImageUrl || cell.referenceImageData;
     if (src) enriched._artifactImages[id] = src;
   }
@@ -90,7 +95,7 @@ function enrichCoverHintWithArtifacts(coverHint, visualBible, opts = {}) {
 // englishEntityRef / englishLocationRef / significantEntityTokens moved to
 // visualBible.js (canonical implementations, shared with the page-prompt
 // builders in storyHelpers.js). Re-exported below for existing consumers.
-const { englishEntityRef, englishLocationRef, significantEntityTokens, hasElementReference } = require('./visualBible');
+const { englishEntityRef, englishLocationRef, significantEntityTokens, hasElementReference, elementRefCell } = require('./visualBible');
 
 /**
  * VB ids the cover hint actually asks for: `Objects:` list ∪ every character's
@@ -1289,7 +1294,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
     // Pull artifact prop bytes + a full-VB id→name map so the composite layer
     // has everything ready (shared producer helper — same enrichment the
     // regeneration test-models path uses).
-    const enrichedHint = enrichCoverHintWithArtifacts(coverHint, visualBible, { language: storyData.language });
+    const enrichedHint = enrichCoverHintWithArtifacts(coverHint, visualBible, { language: storyData.language, coverKey });
     const landmarkBuf = options.landmarkBufOverride
       || (coverLandmarkPhotos?.[0] ? await loadLandmarkBytes(coverLandmarkPhotos[0]) : null);
     compositeInputs = {
@@ -1963,7 +1968,7 @@ async function buildCoverReferences({
       }
     }
     if (sceneIds.length > 0) {
-      const idBasedRefs = getElementReferenceImagesByIds(visualBible, sceneIds);
+      const idBasedRefs = getElementReferenceImagesByIds(visualBible, sceneIds, coverPageNumber);
       const existingIds = new Set(elementRefs.map(r => r.id));
       const newRefs = idBasedRefs.filter(r => !existingIds.has(r.id));
       if (newRefs.length > 0) {
@@ -1981,12 +1986,17 @@ async function buildCoverReferences({
     {
       const nameMatched = matchVbEntitiesInText(sceneDescription, visualBible)
         .filter(e => e.hasReference)
-        .map(e => ({
-          id: e.id, name: e.name, type: e.type, description: e.description,
-          referenceImageData: e.referenceImageData,
-          referenceImageUrl: e.referenceImageUrl,
-          priority: e.priority,
-        }));
+        .map(e => {
+          // A stated object has no base render — its cells are its states —
+          // so the cell comes from the one resolver (a cover's final state).
+          const { cell } = elementRefCell(e.entry, null, coverPageNumber);
+          return {
+            id: e.id, name: e.name, type: e.type, description: e.description,
+            referenceImageData: cell.referenceImageData,
+            referenceImageUrl: cell.referenceImageUrl,
+            priority: e.priority,
+          };
+        });
       const have = new Set(elementRefs.map(r => String(r.id || r.name).toUpperCase()));
       const addable = nameMatched.filter(r => !have.has(String(r.id || r.name).toUpperCase()));
       if (addable.length > 0) {

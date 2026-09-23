@@ -1314,7 +1314,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               if (id && !id.startsWith('LOC')) sceneIds.push(id);
             }
             if (sceneIds.length > 0) {
-              const idBasedRefs = getElementReferenceImagesByIds(streamingVisualBible, sceneIds);
+              const idBasedRefs = getElementReferenceImagesByIds(streamingVisualBible, sceneIds, page.pageNumber);
               const existingIds = new Set(elementRefs.map(r => r.id));
               const newRefs = idBasedRefs.filter(r => !existingIds.has(r.id));
               if (newRefs.length > 0) elementRefs = [...elementRefs, ...newRefs].slice(0, 6);
@@ -4441,7 +4441,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             if (id && !id.startsWith('LOC')) sceneIds.push(id);
           }
           if (sceneIds.length > 0) {
-            const idBasedRefs = getElementReferenceImagesByIds(visualBible, sceneIds);
+            const idBasedRefs = getElementReferenceImagesByIds(visualBible, sceneIds, pageNum);
             const existingIds = new Set(elementReferences.map(r => r.id));
             const newRefs = idBasedRefs.filter(r => !existingIds.has(r.id));
             if (newRefs.length > 0) {

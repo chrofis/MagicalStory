@@ -1503,7 +1503,7 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
           // Pull artifact prop bytes + full-VB id→name map so the cast's prop
           // references resolve (shared producer helper — same enrichment the
           // coverIterate composite path uses).
-          const enrichedHint = enrichCoverHintWithArtifacts(coverHint, visualBible, { language: storyData.language });
+          const enrichedHint = enrichCoverHintWithArtifacts(coverHint, visualBible, { language: storyData.language, coverKey: coverType });
           // Back-cover main-only narrowing — FALLBACK only. When the hint
           // lists characters, the cast builder below intersects with the
           // hint's characterDetails, and every hint-listed character must

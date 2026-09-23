@@ -37109,7 +37109,7 @@ normalised by `vbElementBudget.baseId()`. States are the artifact-side twin of i
    stated object — which now has no base render of its own — from being dropped as reference-less,
    and `updateElementReferenceImage` marks the parent entry generated when a state cell lands.
 
-6. **Covers pin to the base state.** A cover shows the book's canonical object, never one
+6. **Covers pin to the base state.** (SUPERSEDED 2026-09-23 — covers take the FINAL state; see that entry.) A cover shows the book's canonical object, never one
    mid-transformation, so `coverComposite` and `coverIterate` normalise a dotted handle to its
    parent before using it as a lookup key.
 
@@ -57527,4 +57527,55 @@ unless it has a reason to separate…" and "at most two threads"; no unfilled pl
 
 **Touched:** `server/lib/promptBuilders.js`, `tests/unit/arc-prompt-audit-2026-09-23.test.ts`,
 `docs/audits/prompt-audit-2026-09-23/01-arc.md`, `tasks/BACKLOG.md`.
+**Status:** ✅ active on staging.
+
+## 2026-09-23 — Covers show a stated object in its FINAL state
+
+**Context.** Prod trial `job_1790169018278_n57xpnufo` ("La Couronne de William et l'Écureuil du Parvis",
+fr-ch). The laurel crown ART001 has two states: ART001.1 "feuilles libres" (pages 1-3, "tas de feuilles de
+laurier détachées, non liées, posées à plat") and ART001.2 "couronne finie" (pages 4-6). The front cover's
+own prose held "la couronne de laurier finie", yet its REQUIRED OBJECTS line carried the ART001.1 delta and
+a pile of loose leaves was painted on the ground. Cause: `resolveObjectState` finds no state whose `pages[]`
+covers a negative (cover) page number, so a bare `ART001` fell to the DEFAULT state (first row) — by
+construction the unaltered look, which for a thing the story MAKES is its raw materials. The same resolver
+picks the reference cell, and `enrichCoverHintWithArtifacts` / `getElementReferenceImagesByIds` called
+`elementRefCell(entry)` with no page at all, so the cover prop image was the first state everywhere.
+Separately, the trial cover's reference grid parsed `coverScene.objects` with `typeof obj === 'string'`
+only, while the trial cover JSON writes objects as `{id, name, position}` — so NO trial cover ever received
+a VB element reference cell (this one got the landmark photo and William's sheet, nothing else).
+
+**Decision.**
+1. `visualBible.resolveObjectState` rule 0: on a cover page number (`isCoverPageNumber`, the three
+   `COVER_PAGE_NUMBERS`) the state is the one the cover cites by dotted handle, else `finalObjectState` —
+   the LAST row of `states[]`, the look the story leaves the object in (the templates order states as the
+   story reaches them, so the last row is the resolved look, exactly as the first is the default). All three
+   covers take the same rule. Story pages are unchanged.
+2. Every cover cell site passes the cover page number through the one resolver:
+   `getElementReferenceImagesByIds(vb, ids, pageNumber)` (new third argument, passed at all four call sites —
+   the two page sites pass their page, so a page by-id ref also takes its declared state),
+   `enrichCoverHintWithArtifacts` (now requires `opts.coverKey` and throws without it; callers in
+   coverIterate and regeneration pass it), and the cover VB-NAME-MATCH union in `buildCoverReferences`,
+   which read `entry.referenceImageData` directly — null for a stated object, which has no base render.
+3. The trial cover's string-only id parse was replaced the same day by a parallel commit (8c1a6b4b3) that
+   routes the trial cover through `buildCoverReferences` like every full-account cover, so the trial cover
+   inherits point 2 with no trial-specific code.
+
+**Supersedes** point 6 of the 2026-09-06 object-states entry ("Covers pin to the base state"). That point
+was a lookup-key fix (normalise a dotted handle) whose stated premise — the base state is the book's
+canonical object — does not hold for a made or transformed object. The key normalisation stays; only the
+chosen state changes. Known trade-off: an object whose last state is a spent look (an emptied shell, a
+lamp gone dark) now shows that look on the cover; a cover hint can pin any other state by citing its dotted
+handle.
+
+**Not changed (owner decision pending).** The title's squirrel ANI001 was named only in the cover's
+`imageSummary`; neither the trial template (`story-trial.txt` COVER SCENE: "ONLY the main character") nor
+the Art Director's cover hints (`scene-expansion-all.txt`: "Objects: LOC### plus 1-2 ART###") has a slot
+for an animal, so this is a writer-prompt question and was not built.
+
+**Validation.** Rung 1: replayed the real `buildCoverPrompt` over the stored cover description and bible —
+REQUIRED OBJECTS now reads "feuilles nouées en anneau fermé par le fil rouge, forme ronde et tenue" (stored
+prod: "tas de feuilles ... posées à plat").
+
+**Touched:** `server/lib/visualBible.js`, `server/lib/coverIterate.js`, `server/routes/regeneration.js`,
+`storyJobPipeline.js` (page by-id refs pass their page), `tests/unit/cover-object-final-state.test.ts`.
 **Status:** ✅ active on staging.
