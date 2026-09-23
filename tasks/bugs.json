@@ -1791,6 +1791,18 @@
       "fixedAt": "2026-09-23",
       "fixedIn": "63aecbdf8",
       "fix": "styleGateEchoedFields flags a four-word span of the art style that is not a template option; such a gate is stored as echoed with matches_style null. Replay: 6/6 flagged. Pinned by tests/unit/style-gate-echo.test.ts."
+    },
+    {
+      "id": "cover-stated-object-default-state",
+      "title": "A cover drew a stated object in its FIRST state (raw materials) instead of its finished state",
+      "reportedAt": "2026-09-23",
+      "source": "Production trial job_1790169018278_n57xpnufo (\"La Couronne de William et l'Écureuil du Parvis\", fr-ch, 2026-09-23), read from stories.data. coverImages.frontCover.prompt REQUIRED OBJECTS: \"laurel leaf crown (object) - tas de feuilles de laurier détachées, non liées, posées à plat\" = visualBible.artifacts ART001.states[0] (pages 1-3); the cover description held \"la couronne de laurier finie\" (ART001.2, pages 4-6).",
+      "rootCause": "resolveObjectState finds no state whose pages[] covers a negative cover page number, so a bare citation fell to defaultObjectState (first row); cover cell sites called elementRefCell with no page at all.",
+      "impact": "Every cover showing an object the story makes or transforms rendered its starting look - here a pile of leaves on the ground.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "684f51d93",
+      "fix": "resolveObjectState rule 0: covers take the cited dotted state, else finalObjectState; getElementReferenceImagesByIds / enrichCoverHintWithArtifacts / cover VB-NAME-MATCH resolve through it with the cover page number. Pinned by tests/unit/cover-object-final-state.test.ts."
     }
   ]
 }
