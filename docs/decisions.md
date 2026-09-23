@@ -57834,3 +57834,46 @@ spoken line. The arc-informed audit with the HINT question on the stored writer 
 `text-chain-hints-and-ledger`, `beats-replay-inputs`, `lector-span-parity`; `writer-brief-wardrobe-dedupe`
 deleted with the helpers it pinned).
 **Status:** ✅ active on staging.
+
+## 2026-09-24 — Every servable landmark photo is judged, worldwide; unjudged photos are not a serving tier
+
+**Context.** Prod story `job_1790169018278_n57xpnufo` set every page at the Parvis Notre-Dame (landmark
+6383) and drew its backdrop from photo variant 2: a close-up of a man having his silhouette cut, the
+cathedral not in the frame at all. Variant 3 was a bride with a crowd, facing away from the cathedral.
+The judge rules already give such a picture `photo` 0 ("a portrait of people … or a picture of somewhere
+else", `docs/landmark-judging-instructions.md`), and judged rows show them applied (5683_3 = 0, 7024_1 =
+0, 10763_2 = 5). The hole was that 6383 had never been judged: `prep-landmark-judging.js` only ever
+queued Swiss rows, and `servedLandmark` hands an unjudged landmark EVERY described slot as a variant, so
+the writer picked the one daytime description ("street-level view … portrait artists"). Measured on prod:
+939 servable landmarks (story_score NULL or ≥ 40, no score rows at all) held 2,512 unvetted photos,
+mostly Germany, France, the US, Italy, Austria. The description agents had also passed both Paris photos
+(`subjectMatch` is not stored, so it is no serving signal).
+
+**Decision.** Owner's call (2026-09-23): judge them, with the existing $0 agent workflow and the existing
+instructions — no serving-code change, no stopgap, no paid vision API. `prep-landmark-judging.js` gained
+`--country=<name>|all` (default stays Switzerland), `--ids=` / `--ids-file=` and downloads the R2 copy
+when one is stored (the picture production serves; Commons throttles). The target set was FROZEN up
+front as an id list: merging a landmark's slot 1 rewrites its story_score, so a live `story_score >= 40`
+filter would drop its remaining slots the moment the lead photo judged low.
+
+**Run (prod, 2026-09-23/24).** Pilot: 6383 + one batch of 25 (Frankfurt), merged, then replayed through
+`resolveAvailableLandmarks({city:'Paris'})`: 6383 serves slot 1 only (72, medium); slots 2 and 3 scored
+0 and 20 and are no longer offered. Then five agents, one per country slice, each image viewed, merged
+after every batch. Total **2,567 photos across 957 landmarks**, none left unjudged (one Commons download
+failed in prep and was judged by hand). 305 photos scored `photo` < 40 (69 at 0). **270 landmarks** are
+now below the 40 cutoff and no longer offered: 48 because none of their photos shows them usably, 222
+because the place itself was judged not drawable (hospitals, offices, stations, event articles, a
+brothel). Paris went from 11 served landmarks to 9. Recurring finds besides people-as-subject: one Sanaa
+photo filed under 8 different places, the same tram photo under 4 The Hague stations, paintings,
+renders, scale models, book pages and plaques standing in for the place. Spot check: 52 verdicts (2%)
+re-viewed against the pixels; 49 agree, 3 are lenient `photo` scores on a plaque, a station sign and a
+museum statuette — all three carry draw ≤ 25, so the landmark verdict is unchanged.
+
+**Rationale.** The judge already encodes "people are the subject → reject"; what was missing was the
+judging, not a signal. A code rule keyed on unjudged rows (slot 1 only, or hide unjudged landmarks) was
+offered and declined: it trades variety or coverage for a problem the existing lever solves once.
+
+**Touched:** `scripts/admin/prep-landmark-judging.js`, `docs/landmark-database.md`. Data:
+`landmark_photo_scores` + `landmark_index.story_score*` on prod via `merge-landmark-judgments.js` only.
+Staging receives it through `sync-landmark-index-to-staging.js` (not run — owner's call).
+**Status:** ✅ done.

@@ -20,6 +20,15 @@
  * and an index-named file would be scored as somewhere else entirely.
  *
  *   node scripts/admin/prep-landmark-judging.js [--limit=N] [--out=DIR] [--gaps] [--town=Baden]
+ *        [--country=France|all] [--ids=6383,12 | --ids-file=ids.json]
+ *
+ * --country defaults to Switzerland (the original scope); `all` drops the
+ * filter. --ids / --ids-file (a JSON array) pin the run to a fixed landmark set.
+ * Freeze the set BEFORE judging when selecting on story_score: merging slot 1
+ * rewrites story_score, so a live filter would drop a landmark's remaining
+ * slots mid-run the moment its lead photo judged low. The download uses our R2
+ * copy (photo_r2_url[_N]) when one is stored — it is the picture production
+ * serves, and it is not throttled like Commons.
  */
 'use strict';
 
@@ -61,6 +70,18 @@ const MIN_USABLE_PHOTO = 40;
 // while they still have nothing of their own to show. --gaps should keep
 // pushing until the village itself has a picture.
 const TOWN = `coalesce(locality, municipality, nearest_city)`;
+
+const countryArg = args.find(a => a.startsWith('--country='));
+const COUNTRY = countryArg ? countryArg.split('=').slice(1).join('=') : 'switzerland';
+const COUNTRY_SQL = COUNTRY.toLowerCase() === 'all' ? 'TRUE'
+  : `country ILIKE '%${COUNTRY.replace(/'/g, "''")}%'`;
+const idsArg = args.find(a => a.startsWith('--ids='));
+const idsFileArg = args.find(a => a.startsWith('--ids-file='));
+const IDS = idsArg ? idsArg.split('=')[1].split(',').map(Number).filter(Number.isFinite)
+  : idsFileArg ? JSON.parse(fs.readFileSync(idsFileArg.split('=').slice(1).join('='), 'utf8')).map(Number).filter(Number.isFinite)
+  : null;
+const IDS_SQL = IDS && IDS.length ? `AND id IN (${IDS.join(',')})` : '';
+
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -116,13 +137,14 @@ function thumbUrl(url, width = 900) {
   const rows = (await pool.query(`
     WITH imgs AS (
       SELECT id, name, type, ${TOWN} town, wikipedia_extract,
-             s.slot, s.url
+             s.slot, s.url, s.r2
         FROM landmark_index
         CROSS JOIN LATERAL unnest(
           ARRAY[1,2,3,4,5,6],
-          ARRAY[photo_url, photo_url_2, photo_url_3, photo_url_4, photo_url_5, photo_url_6]
-        ) AS s(slot, url)
-       WHERE country ILIKE '%switzerland%' AND ${NEV} AND s.url IS NOT NULL ${townFilter} ${gapFilter})
+          ARRAY[photo_url, photo_url_2, photo_url_3, photo_url_4, photo_url_5, photo_url_6],
+          ARRAY[photo_r2_url, photo_r2_url_2, photo_r2_url_3, photo_r2_url_4, photo_r2_url_5, photo_r2_url_6]
+        ) AS s(slot, url, r2)
+       WHERE ${COUNTRY_SQL} AND ${NEV} AND s.url IS NOT NULL ${townFilter} ${gapFilter} ${IDS_SQL})
     SELECT i.* FROM imgs i
       LEFT JOIN landmark_photo_scores ps ON ps.landmark_id = i.id AND ps.slot = i.slot
      WHERE ps.landmark_id IS NULL
@@ -148,7 +170,7 @@ function thumbUrl(url, width = 900) {
       continue;
     }
     try {
-      const r = await fetch(thumbUrl(l.url), {
+      const r = await fetch(l.r2 || thumbUrl(l.url), {
         headers: { 'User-Agent': 'MagicalStory/1.0 (https://magicalstory.ch) landmark-QA' },
         signal: AbortSignal.timeout(25000),
       });
@@ -166,7 +188,7 @@ function thumbUrl(url, width = 900) {
     // never lands and no agent can start on what already downloaded.
     if (manifest.length && manifest.length % BATCH === 0) writeManifest();
     if ((i + 1) % 100 === 0) console.log(`  ${ok}/${i + 1} downloaded`);
-    await sleep(DELAY);
+    if (!l.r2) await sleep(DELAY);
   }
 
   writeManifest();

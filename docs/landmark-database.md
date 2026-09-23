@@ -361,6 +361,15 @@ never overwritten. `server/lib/landmarkPhotoStore.js`:
 `prep-landmark-judging.js` → agents → `merge-landmark-judgments.js` ·
 `score-landmarks-for-stories.js` · `landmark-rankings.js`
 
+Prep queues Swiss rows by default; `--country=<name>|all` widens it and
+`--ids=` / `--ids-file=` pins a fixed set. It downloads the R2 copy when one is
+stored. **Freeze the id set before a run that selects on `story_score`:** merging
+slot 1 rewrites the landmark's story_score, so a live filter drops its remaining
+slots mid-run. The merge writes prod (`--staging` for staging ids, which differ).
+An unjudged landmark offers EVERY described slot as a variant, unvetted — the
+2026-09-24 run judged all 2,567 such photos worldwide after a close-up of a
+silhouette artist was served as the Parvis Notre-Dame (decisions.md, 2026-09-24).
+
 **Data repair** (all free — Wikidata/Nominatim)
 `backfill-landmark-municipality.js` (P131) · `backfill-landmark-fame.js` ·
 `backfill-landmark-types.js` · `fix-landmark-country.js` (P17) ·
@@ -430,3 +439,4 @@ search for `landmark`. The load-bearing ones:
 - 2026-08-28 — a landmark answers to BOTH its village and its municipality
 - 2026-08-29 — a failed photo analysis is not a verdict about the place
 - 2026-09-03 — landmark photos are stored on R2; Commons URL kept as provenance
+- 2026-09-24 — every servable photo judged worldwide; unjudged is not a serving tier
