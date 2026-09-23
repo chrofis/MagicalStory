@@ -11,7 +11,6 @@
  * allowance, and no code re-counted anything.
  */
 import { describe, it, expect } from 'vitest';
-import fs from 'fs';
 
 // @ts-ignore — CommonJS lib
 import pb from '../../server/lib/promptBuilders.js';
@@ -146,7 +145,9 @@ describe('the list must not inflate critiqueMaxSeverity', () => {
     // rather than written into arc-create.txt, so reading the file tested where
     // the words live instead of whether the model is told.
     const { arcCritiqueSpec } = require('../../server/lib/promptBuilders');
-    for (const spec of [arcCritiqueSpec(), fs.readFileSync('prompts/arc-retell.txt', 'utf8')]) {
+    // The re-tell template fills the same INVENTED_FIGURES_SPEC string
+    // (2026-09-23), so the constant is what the re-tell is told.
+    for (const spec of [arcCritiqueSpec(), (pb as any).INVENTED_FIGURES_SPEC]) {
       expect(spec).toMatch(/Invented figures:/);
       expect(spec).toMatch(/"- <name> — <what it is in the story, three words>"/);
     }
@@ -160,7 +161,10 @@ describe('the source-based definition', () => {
     expect(txt).toMatch(/the story gives it a name and the commission did not/);
     expect(txt).toMatch(/parent, grandparent, teacher, shopkeeper or neighbour/);
     expect(txt).toMatch(/never speaks/);
-    expect(txt).toMatch(/including any animal or companion it supplied/);
+    // Commissioned = character list + premise figures + figures a character's
+    // saved details name (2026-09-23, one definition for every arc stage).
+    expect(txt).toContain((pb as any).COMMISSIONED_CAST_DEF);
+    expect(txt).toMatch(/saved details name/);
     expect(txt).toMatch(/places, buildings, landmarks, rivers, mountains, vehicles and objects/);
     expect(txt).toMatch(/taking its name away is not a way off it/);
   });

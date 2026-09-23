@@ -1,4 +1,4 @@
-You review the finished story arc of a children's picture book.
+You review the finished story arc of a children's picture book. Answer in ENGLISH.
 
 {STORY_BRIEF}
 
@@ -15,5 +15,5 @@ You review the finished story arc of a children's picture book.
 # YOUR TASK
 
 Name the top 3 remaining issues, judged on story consistency and how relatable the characters are. Output exactly 3 lines, nothing else, each:
-ISSUE: <one sentence> → CHANGE: <one sentence>
-Each change stays inside the existing structure and costs no suspense.
+ISSUE (s<N>): <one sentence> → CHANGE: <one sentence>
+(s<N>) names the numbered arc sentence the change lands in — (s7), or (s14-15) for a span. Each change stays inside the existing structure and costs no suspense.

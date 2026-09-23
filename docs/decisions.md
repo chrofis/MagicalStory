@@ -56535,3 +56535,76 @@ Supersedes the fixed two-page floor of R20 (2026-09 "coverage floor, alongside t
 (`buildBeatsPrompt`), `prompts/story-beats.txt`, `server/lib/beatsPipeline.js`, `server/lib/testlab.js`
 (beats_replan replay), `tests/unit/cast-coverage.test.ts`, `tests/unit/plan-counters.test.ts`.
 **Status:** ✅ active on staging.
+
+## 2026-09-23 — Arc prompts after the prompt audit: one commissioned-cast definition, every child acts, the panel's rules are the creator's rules, hints carry sentence anchors
+
+**Context.** Audit `docs/audits/prompt-audit-2026-09-23/01-arc.md` of staging `job_1790100385959_1nitlympp`
+(dragon run 6), plus two owner decisions the same evening. Every item below was checked against the stored
+prompts and replies of that run and rebuilt from its stored story row with the new builders (no paid call).
+
+**Decisions.**
+1. **Who is commissioned — one definition** (`COMMISSIONED_CAST_DEF`, promptBuilders.js): the character list
+   plus any named figure the premise supplies *or a character's saved details name*. It fills the budgets'
+   "Not counted" line, the "Premise figures:" list spec (`PREMISE_FIGURES_SPEC`, now one string for arc-create's
+   critique and arc-retell's output, which carried a hand copy) and the panel's CAST lens. The plan counters
+   already count the character list plus the arc's "Premise figures:" names (`commissionedCast()`,
+   castCoverage.js, same definition in its doc), so a pet named only in saved details is now listed by the arc
+   and never charged as invented. Evidence: the run's dog, named only in one boy's saved details, drew
+   `ARC_INVENTED_UNDECLARED` and `ARC_INVENTED_OVER_ALLOWANCE` on both plan rounds. The owner's "prompt route,
+   not a code harvest of the saved details" follows the ban on reading meaning out of prose in code.
+2. **Every child acts** (owner, 2026-09-23: "Every child gets a moment"; clarified: the ARC rule is an action,
+   the PAGE PLAN rule is coverage). `EVERY_CHILD_ACTS_RULE`: every child on the character list does at least one
+   thing of their own that matters to the plot; only where the book is too short for its cast do several share
+   one action, and no child is left with nothing. It replaces STORY SHAPE's "Everyone else — … — is simply there
+   alongside the main character. No moment of their own, no arc." (arc variant and the three simple bands) and
+   the clause "at most two carry a book". Generator: STORY SHAPE. Critics: a sixth Check line ("Each child's
+   action", naming each child's sentence number — an enumeration, not a self-certified total) and a panel
+   ACTION lens. The arc does not use `castCoverageRule(…, { unit: 'story' })`: the picture count is the plan's
+   rule, not the arc's. Evidence: the run's critique called a moment-less boy removable and the counters
+   flagged the other two as having no focal page.
+3. **The panel's rules are the creator's rules.** ENTRANCE, ASSUMED and SENSE lenses now read one string each
+   (`ARC_ENTRANCE_RULE`, `ARC_GIVEN_RULE`, `ARC_SENSE_RULE`), and the same strings are telling rules for the
+   creator and the re-teller. Strangers learn each other's names before they act together; a possession
+   carries how they came by it; every turn holds against sizes, emissions, distances and witnesses. Evidence:
+   all three panelists caught unnamed strangers, an unexplained possession and an uncaused arrival the creator
+   was never told to avoid.
+4. **Central figure defined** (`CENTRAL_FIGURE_DEF`): the creature, title figure or object the story idea is
+   about, never the main character; one that cannot act yet acts through what it does to the others. The
+   Check names it or writes "none". Both critiques of the run answered it about the main character.
+5. **Critique persona is the book's reader**: "answered as <reader age> reader" from `readerAgeLabel`, the same
+   resolver as the budgets' read-aloud line. Replaces the fixed "eight-year-old listener" (2026-08-30, before
+   the age mode existed).
+6. **Language line** on arc-panel.txt and arc-hints.txt ("Answer in ENGLISH."). A panelist answered in German
+   and the reply went verbatim into the re-tell.
+7. **A view the commission describes stands** over the photo-vantage rule, in `buildAvailableLandmarksSection`
+   (every consumer) and the panel's LANDMARK lens; the landmark in it is drawn from what its photos show.
+   The run dropped the view the family's own idea named because no photo showed it.
+8. **Topic guide is material, never wording** (`GUIDE_USE_RULE` under the TOPIC GUIDE header): a turn it names
+   is acted out, never stated, and a world the commission names stands over the guide's settings. The guide's
+   `COSTUME:` field (an avatar-pipeline field) no longer reaches the story prompts. The run's book stated a
+   guide "What turns" line as a realisation.
+9. **Hints carry sentence anchors**: `ISSUE (s14-15): … → CHANGE: …`, parsed and kept by `parseArcHints`;
+   `HINT_ANCHOR_RULE` beside `HINT_VS_ARC_RULE` in all three hint headings (planner, writer, critics). A hint
+   was planned onto a page before the scene it changes existed.
+10. **Bloat**: the panel reads the landmark list without DESCRIPTION extracts (`descriptions: false`), and a
+    book gets one stay-together line instead of two that disagreed. Replayed on the run: panel 23.2k → 21.9k
+    chars despite the new lenses; create 32.7k → 35.1k (new rules), retell 53.1k → 55.5k.
+11. **Storage**: each round stores the re-telling's raw reply (`rounds[].retellRaw`); the report stores the
+    hint pass's `hintsModel`, `hintsPrompt` and `hintsRaw`, kept even when the pass fails to parse.
+
+**Reaffirmed, unchanged.** The owner reaffirmed the 2026-09-06 panel restraint ("change as little as
+possible"; audit #12). No change to the size-of-change rule.
+
+**Not changed, for the owner.** The 20-entry landmark list (owner, 2026-09-19) still reaches create and
+retell whole; a relevance cut is a landmark-pipeline decision. Rules stated in both the age-band file and
+TELLING_RULES (no adult rescue, low point, visible change) are left: the band files are shared with the
+idea and trial prompts and the 6+ books have no band file. `buildTellingRulesSection` keys `noSplit` on the
+SHAPE band, which has not returned `standard` since the 2026-09-14 band split, so no book can take the
+"reason to separate" branch any more (tasks/BACKLOG.md).
+
+**Touched:** `server/lib/promptBuilders.js`, `server/lib/beatsPipeline.js`, `prompts/arc-panel.txt`,
+`prompts/arc-retell.txt`, `prompts/arc-hints.txt`, `client/src/types/story.ts`,
+`tests/unit/arc-prompt-audit-2026-09-23.test.ts`, `tests/unit/arc-critique-spec-and-shape.test.ts`,
+`tests/unit/arc-invented-figures.test.ts`, `docs/prompt-inventory.md`, `docs/audits/prompt-audit-2026-09-23/01-arc.md`,
+`scripts/admin/sibling-registry.json`, `tasks/bugs.json`, `tasks/BACKLOG.md`.
+**Status:** ✅ active on staging.

@@ -1128,6 +1128,11 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         // already give their prompts (outlinePrompt, storyTextPrompts).
         panelPrompt,
         retellPrompt,
+        // The re-telling's raw reply (2026-09-23). The parsed fields below drop
+        // its "Premise figures:" / "Invented figures:" / "Challenges taken:"
+        // head and strip the [C###] tags, so without the raw nothing they were
+        // parsed from could be audited.
+        retellRaw: retellRes.text,
         retellModel: retellRes.modelId || arcCreatorModel,
         finalArc: retold.finalArc,
         used: retold.used,
@@ -1168,13 +1173,19 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // GROK HINT PASS (owner verdict 2026-09-01, lean flow): one outside look
     // at the final arc — the top remaining issues travel forward as hints,
     // never as another re-telling round. Advisory: failure skips, never blocks.
+    // Prompt and raw reply are kept whether or not the pass parses (2026-09-23):
+    // the prompt was built and sent but never stored, so a hint could not be
+    // traced to what the pass was shown.
+    let hintsPrompt = null;
+    let hintsRaw = null;
+    const hintsModel = MODEL_DEFAULTS.arcHintsModel || 'grok-4.6';
     try {
-      const hintsModel = MODEL_DEFAULTS.arcHintsModel || 'grok-4.6';
-      const hintsPrompt = buildArcHintsPrompt(inputData, approvedArc);
+      hintsPrompt = buildArcHintsPrompt(inputData, approvedArc);
       if (!hintsPrompt) throw new Error('arc-hints template unavailable');
       // null maxTokens = the model's own maximum; temp 0 on the non-Anthropic paths.
       const hintsRes = await textModels.callTextModelStreaming(hintsPrompt, null, onChunk, hintsModel, { usageLabel: 'arc_hints', ...tempFor(hintsModel, 0) });
-      arcHints = parseArcHints(hintsRes?.text || '');
+      hintsRaw = hintsRes?.text || '';
+      arcHints = parseArcHints(hintsRaw);
       if (!arcHints) throw new Error('no ISSUE → CHANGE lines parsed');
       gl.info('arc_hints', `Hint pass (${hintsRes.modelId || hintsModel}): ${arcHints.split('\n').length} hint(s) on the final arc`, null, {
         model: hintsRes.modelId || hintsModel, hints: arcHints.split('\n'),
@@ -1207,6 +1218,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       maxSeverity: roundReports.length ? roundReports[roundReports.length - 1].maxSeverity : null,
       critique: roundReports.length ? roundReports[roundReports.length - 1].critique : arcWeakPoints,
       arcHints,
+      hintsModel,
+      hintsPrompt,
+      hintsRaw,
     };
     gl.info('beats_arc', `Arc machine done: ${roundReports.length}/${arcRounds} round(s), final arc by ${arcCreatorModel} (${(meta.timings.arcMs / 1000).toFixed(1)}s)`, null, {
       rounds: roundReports.length, creatorModel: arcCreatorModel,

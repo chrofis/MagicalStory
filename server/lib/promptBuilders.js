@@ -6229,7 +6229,7 @@ function buildStoryShapeSection(inputData, pageCount, { arc = false } = {}) {
   const othersNames = others.map(c => c.name).join(', ');
   const shapeHeader = '# STORY SHAPE (fixed by the age of the main character — not yours to change)';
   const alongside = othersNames
-    ? `Everyone else — ${othersNames} — is simply there alongside the main character. No moment of their own, no arc.`
+    ? `Everyone else — ${othersNames} — carries no arc of their own. ${EVERY_CHILD_ACTS_RULE}`
     : '';
 
   // The three simple bands carry no budgeted challenge, so the arithmetic below
@@ -6337,7 +6337,7 @@ function buildStoryShapeSection(inputData, pageCount, { arc = false } = {}) {
   const level = String(inputData.languageLevel || 'standard').toLowerCase();
   const simplest = level.includes('1st') || level.includes('early') || pages <= 10;
   const mainLine = mains.length >= 2
-    ? `Main characters: ${mains.map(c => `${c.name}${c.age ? ` (${c.age})` : ''}`).join(' and ')} — at most two carry a book. They share the challenges, the ending belongs to them, and ONE of them carries the visible change.`
+    ? `Main characters: ${mains.map(c => `${c.name}${c.age ? ` (${c.age})` : ''}`).join(' and ')}. They share the challenges, the ending belongs to them, and ONE of them carries the visible change.`
     : `Main character: ${mainName} — carries the challenges and the one visible change; the ending belongs to them.`;
   const levelDifficulty = simplest
     // NO PERIL CLAUSE HERE. This line said "Nothing frightening beyond a moment"
@@ -6612,6 +6612,9 @@ function characterSourceRule({ master = 'premise' } = {}) {
   ].join('\n');
 }
 
+// How the TOPIC GUIDE is read — one line under its header (2026-09-23).
+const GUIDE_USE_RULE = 'Its lines are material for you, never sentences for the story: a turn it names is acted out, never stated. Where the commission names the world, that world stands over the guide\'s settings.';
+
 function buildStoryContextFields(inputData) {
   const language = inputData.language || 'en';
   const brief = buildStoryBriefBody(inputData);
@@ -6660,7 +6663,14 @@ function buildStoryContextFields(inputData) {
     // Swiss guide mid-sentence — and a fact mandate ("every fact, date, name
     // and sequence comes from this guide") over a guide that stops mid-sentence
     // is the one shape that cannot be obeyed.
-    if (guide) guideSection = `# TOPIC GUIDE (facts and context for ${guideKey})${factMandate}\n\n${String(guide)}`;
+    // The guide is material for the author, never wording (2026-09-23): a
+    // "What turns" line went verbatim into an arc and on into the book as a
+    // stated realisation (job_1790100385959_1nitlympp). Its settings give way
+    // to a world the commission names ("mountain eyries" in a city story). The
+    // COSTUME line is an avatar-pipeline field, not story material — costumes
+    // reach the story through the wardrobe stages, never through this block.
+    const guideBody = String(guide || '').split('\n').filter(l => !/^COSTUME:/.test(l)).join('\n').trim();
+    if (guideBody) guideSection = `# TOPIC GUIDE (facts and context for ${guideKey})${factMandate}\n${GUIDE_USE_RULE}\n\n${guideBody}`;
   } catch (err) {
     log.warn(`[PROMPT] topic guide unavailable for ${inputData.storyCategory}/${guideKey}: ${err.message}`);
   }
@@ -7454,6 +7464,13 @@ function parsePlanCheckPeoplelessPick(raw) {
 // stages, and neither was told which to believe.
 const HINT_VS_ARC_RULE = 'A hint never changes the situation the story settled: where one asks for what the story above rules out — a saved profile\'s friendship where the story stages a first meeting — the story stands and the hint is dropped.';
 
+// WHERE A HINT LANDS (2026-09-23). The hint pass now names the arc sentence each
+// change lands in — "ISSUE (s14-15): …" — so every reader of the hints places
+// it there and not on an earlier page (job_1790100385959_1nitlympp: a hint about
+// a huddle was planned onto a page before the huddle existed). One constant,
+// beside HINT_VS_ARC_RULE in all three headings.
+const HINT_ANCHOR_RULE = 'A hint opens with the story sentence it changes, as (s7) or (s14-15): it applies where that sentence is told, never earlier, and what it changes there replaces what the sentence says.';
+
 /**
  * The arc hints as the two CRITICS of the text read them — the arc-informed
  * audit and the refine (2026-09-23). The writer is told to apply the hints, so
@@ -7473,6 +7490,7 @@ function buildCriticArcHintsSection(arcHints = '') {
   return `# HINTS — changes made to the story above after it was settled. Read the story with them applied: a page that follows a hint follows the story.
 
 ${HINT_VS_ARC_RULE}
+${HINT_ANCHOR_RULE}
 
 ${hints}`;
 }
@@ -7572,6 +7590,7 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
         '',
         'Each is a change to the STORY. Apply it in the pages where a picture can hold it. Where it cannot — a figure kept in frame past the cast limit, two actions at one instant — leave it to the text, which is told to apply what the division has not. Never break a rule below to honour a hint.',
         HINT_VS_ARC_RULE,
+        HINT_ANCHOR_RULE,
         '',
         String(arcHints).trim(),
       ].join('\n')
@@ -7837,7 +7856,7 @@ function buildArcBudgetSection(inputData, pageCount) {
     ...(lvl === '1st-grade' ? [`- This book is read aloud to ${readerAgeLabel(inputData, band)} and must be simple to follow: one question open at a time, one thread, and every turn traceable to something already shown on the page.`] : []),
     `- Invented named figures: this book has room for ${allowance} beyond the commissioned cast; each one past that carries one line of justification on its own line before the numbered arc, never inside a numbered sentence.`,
     '- A figure counts when the story gives it a name and the commission did not: persons, animals and creatures alike, including one who appears on a single page, one who never speaks, and any adult who frames a scene — a parent, grandparent, teacher, shopkeeper or neighbour who sets a rule, waits, permits or welcomes. Standing in the background does not take a figure off the list.',
-    '- Not counted: anyone the commission named, including any animal or companion it supplied; places, buildings, landmarks, rivers, mountains, vehicles and objects, however named; a group named collectively; a figure given no name and referred to only by what it is.',
+    `- Not counted: the commissioned cast, which is ${COMMISSIONED_CAST_DEF}; places, buildings, landmarks, rivers, mountains, vehicles and objects, however named; a group named collectively; a figure given no name and referred to only by what it is.`,
     '- A figure the story needs and cannot drop stays on the list; taking its name away is not a way off it.',
   ].join('\n');
 }
@@ -8460,6 +8479,67 @@ const AD_COMPOSITION_RULE = [
 ].join('\n');
 
 /**
+ * WHO IS COMMISSIONED — one definition for every arc stage (2026-09-23).
+ *
+ * The arc budgets ("Not counted: anyone the commission named"), the critique's
+ * "Premise figures:" list and the panel's CAST lens each said it their own way,
+ * and none covered a figure named only in a character's saved details. On
+ * staging job_1790100385959_1nitlympp a dog named in one boy's saved details
+ * fitted neither figure list; the creator explained it in prose the parser
+ * cannot read, and the plan counters (which count the character list plus the
+ * arc's "Premise figures:" names) charged the dog as invented and over the
+ * allowance on both plan rounds. The counters need no change: they read the
+ * list this definition fills.
+ */
+const COMMISSIONED_CAST_DEF = "the character list plus any named figure the premise supplies or a character's saved details name — a sibling, a friend, a pet, a companion";
+
+/**
+ * The two figure lists the arc emits ahead of its critique. A PARSER CONTRACT
+ * (parseFigureList / INVENTED_BLOCK_STOP): the headings and the dash-line shape
+ * keep their wording. ONE string each, filled into the create critique spec and
+ * the re-tell template — the re-tell carried its own hand-kept copy until
+ * 2026-09-23.
+ */
+const PREMISE_FIGURES_SPEC = `"Premise figures:" then one dash line per commissioned figure outside the character list (the commissioned cast is ${COMMISSIONED_CAST_DEF}), "- <name> — <what it is in the story, three words>". These are commissioned, never invented: they belong on this list and never on the next one. Never numbered. Write the heading even when no figure is on the list; an empty list is the heading alone, with no dash line.`;
+const INVENTED_FIGURES_SPEC = '"Invented figures:" then one dash line per named figure outside the commissioned cast, counted by the rule in the budgets, "- <name> — <what it is in the story, three words>", then one line "Allowed: <N>. Written: <M>." Never numbered. Write the heading and the two counts even when no figure is on the list; an empty list has no dash line.';
+
+/**
+ * Generator-side twins of three arc-panel lenses (ENTRANCE, ASSUMED, SENSE).
+ * The panel deducted for them while the creator was never given them, so the
+ * arc was corrected after the fact instead of written right (audit 01 #6: the
+ * committed arc of job_1790100385959_1nitlympp let strangers act together
+ * unnamed, gave a possession no origin and a figure no cause to arrive, and
+ * all three panelists caught it). ONE string each, filled into {TELLING_RULES}
+ * and into the panel lens that reads for it.
+ */
+const ARC_ENTRANCE_RULE = 'Every figure is where a stated cause put them — never simply already there, never arriving exactly where they are needed. Figures who do not know each other meet on the page and learn each other\'s names before they act together.';
+const ARC_GIVEN_RULE = 'Nothing is used that the arc has not given: a name is exchanged before it is used, a place shown before it is relied on, an ability or a possession established — with how they came by it — before it does work, and knowledge is held only by someone who could hold it.';
+const ARC_SENSE_RULE = 'Every turn holds against what the story has already made true — how big things are, what they give off (sound, light, warmth, smell), how far apart places are, who is watching, what anyone present would plainly do. No turn leaves a reader asking "but why don\'t they just …?" or saying "that could not happen".';
+
+/**
+ * EVERY CHILD ACTS (owner, 2026-09-23): every commissioned child does something
+ * of their own that matters to the plot. It replaced "Everyone else — … — is
+ * simply there alongside the main character. No moment of their own, no arc."
+ * in STORY SHAPE, which the critique, the telling rules and the plan counters
+ * then faulted: on job_1790100385959_1nitlympp two of four commissioned boys
+ * were kept moment-less by that line and the final critique called one of them
+ * removable. The arc half only — how many PICTURES each child is in is the
+ * page plan's coverage target, a separate rule. ONE string: STORY SHAPE (the
+ * generator), the critique's check and the panel's ACTION lens (the critics).
+ */
+const EVERY_CHILD_ACTS_RULE = 'Every child on the character list does at least one thing of their own that matters to the plot — never only present. Only where the book is too short for its cast do several children share one action, and no child is left with nothing.';
+
+/**
+ * The commission's CENTRAL FIGURE (born 2026-08-31, decisions.md "the title
+ * dragon acted twice after hatching (cargo)"). The rule never said who it is,
+ * and both critiques of job_1790100385959_1nitlympp answered it about the main
+ * character — duplicating the hero-competence rule and never testing the
+ * creature it was built for. An egg cannot "choose, move, speak" until it
+ * hatches, so the rule also says how a figure that cannot act yet acts.
+ */
+const CENTRAL_FIGURE_DEF = 'the creature, title figure or object the story idea is about, never the main character';
+
+/**
  * # RULES OF THE TELLING for the arc prompts ({TELLING_RULES} in arc-create and
  * arc-retell). Interpolated rather than baked into the templates because four
  * of its lines demanded exactly what the simple bands forbid: escalation, a
@@ -8522,14 +8602,22 @@ function buildTellingRulesSection(inputData = {}) {
     '- The story ends with the children safe and together, one of them feeling something a child can name. A container or reveal the story promises opens before the end, and a story that enters through a doorway, portal or frame returns through it.',
     '- The ending is the page the child remembers: one emotion or one image that stays — never bookkeeping, never a stated moral. Settle debts and props before the final page; the last page belongs to the feeling.',
     '- Close every thread: a question raised is answered, and anything that resolves the conflict has an origin — an earlier setup, an in-world rule, a legend. A character singled out — the only one who can help, waited for, chosen — has a stated reason.',
-    '- Use the fewest characters the story needs: invent no figure an existing character could be, and merge two roles into one where the plot allows. The group stays together unless it has a reason to separate and a reason to meet again.',
-    ...(noSplit ? ['- The cast stays together on one path — never two groups going separate ways; where the commission itself splits them, keep them together and justify it in one line.'] : []),
+    '- Use the fewest characters the story needs: invent no figure an existing character could be, and merge two roles into one where the plot allows.',
+    // ONE stay-together line per book (2026-09-23): the general "unless it has
+    // a reason to separate" sat beside the noSplit "never two groups", and a
+    // noSplit book was told both.
+    noSplit
+      ? '- The cast stays together on one path — never two groups going separate ways; where the commission itself splits them, keep them together and justify it in one line.'
+      : '- The group stays together unless it has a reason to separate and a reason to meet again.',
     '- Characters enter in ones or twos — never more than three at once — and each gets one line of their own on first appearance, doing or saying something only they would.',
+    `- ${ARC_ENTRANCE_RULE}`,
+    `- ${ARC_GIVEN_RULE}`,
+    `- ${ARC_SENSE_RULE}`,
     '- Each named character speaks with a distinctive voice — word choice and rhythm a child could tell apart with eyes closed.',
     '- An animal or creature that travels with the children is named by them where they decide to help it, and goes by that name after.',
     '- Names the commission gives stand as written; every other vessel, vehicle or place name is invented fresh and distinctive — never a variant of a given name, and two vessels never share a word.',
     '- When the deadline is a time of day, the story starts at an hour the book\'s length can cross to reach it.',
-    '- The commission\'s central figure acts in every third of the story — chooses, moves, speaks, changes something; never reduced to cargo another figure carries.',
+    `- The commission's central figure — ${CENTRAL_FIGURE_DEF} — acts in every third of the story: chooses, moves, speaks, changes something; never cargo another figure carries. One that cannot act yet acts through what it does to the others — it stirs, warms, calls, gives a sign.`,
   ].join('\n');
 }
 
@@ -8565,28 +8653,34 @@ function buildTellingRulesSection(inputData = {}) {
  *   retell  the arc-retell variant — the same spec against a final arc, whose
  *           faults are the ones that REMAIN after the re-telling.
  */
-function arcCritiqueSpec({ retell = false } = {}) {
+function arcCritiqueSpec({ retell = false, inputData = {} } = {}) {
   const remain = retell ? ' that remain' : '';
+  // The judge persona is the book's own reader (2026-09-23). It was a fixed
+  // "eight-year-old listener" from 2026-08-30, before the age-mode section
+  // existed, and sat in the same prompt as "The child this book is for is
+  // five" (audit 01 #11). Same resolver as the budgets' read-aloud line.
+  const reader = readerAgeLabel(inputData, resolvePacingBand(inputData));
   // The re-tell template declares "Premise figures:" and "Invented figures:" as
   // its OWN top-level output bullets, ahead of "Fixing:" — so the spec must not
   // ask for them a second time inside the critique.
   const figureLists = retell ? [] : [
     'The critique opens with these two lists, ahead of everything else and never numbered:',
-    `"Premise figures:" then one dash line per named figure the commission's own premise supplies that its character list does not — a sibling, a friend, a pet, a companion — "- <name> — <what it is in the story, three words>". These are commissioned, never invented: they belong on this list and never on the next one. Write the heading even when no figure is on the list; an empty list is the heading alone, with no dash line.`,
+    PREMISE_FIGURES_SPEC,
     '',
-    '"Invented figures:" then one dash line per figure, "- <name> — <what it is in the story, three words>", then one line "Allowed: <N>. Written: <M>." Write the heading and the two counts even when no figure is on the list; an empty list has no dash line.',
+    INVENTED_FIGURES_SPEC,
     '',
   ];
   return [
     ...figureLists,
-    '"Checks:" and these five lines, each ending in OK or a tag. They are counts and allowances, not story faults, and they never take a place in the numbered list below:',
+    '"Checks:" and these six lines, each ending in OK or a tag. They are counts and allowances, not story faults, and they never take a place in the numbered list below:',
     '- Events: <N> against the stated budget. An event is a happening a child would retell on its own. More events than the budget is MAJOR: cut whole events, never compress them.',
     '- Surplus facts: name any event in which one figure tells more than one thing the reader did not already know.',
     '- Invented figures: <M> written against <N> allowed, by the counting rule in the budgets. A figure written past the allowance without its one-line cannot-work-without justification outside the numbered arc, or with that justification written inside a numbered sentence, is MAJOR.',
-    `- Central figure: does the commission's central figure act in each third of the story? A stretch where they are only carried, held or talked about is MAJOR.`,
+    `- Central figure: name it — ${CENTRAL_FIGURE_DEF} — or write "none" where the idea is about the main character. Does it act in each third of the story? A stretch where it is only carried, held or talked about and does nothing to the others is MAJOR.`,
+    `- Each child's action: ${EVERY_CHILD_ACTS_RULE} Name each child on the character list with the number of the sentence where they do it. A child with none is MAJOR.`,
     '- Commission honored: are the central quest and the named elements delivered as commissioned? A goal inverted, a trigger dropped, a destination replaced is named here, and the next telling fixes it or justifies it in one line.',
     '',
-    '"Questions:" and these six, numbered 1 to 6, answered as an eight-year-old listener:',
+    `"Questions:" and these six, numbered 1 to 6, answered as ${reader} reader:`,
     '1. Where does the story lose them — confusion, boredom, disbelief?',
     '2. Does each thing follow from what came before?',
     '3. Is there a question they need answered, with the outcome in doubt to the end?',
@@ -8614,7 +8708,7 @@ function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null } = 
     ARC_BUDGETS: buildArcBudgetSection(inputData, pageCount),
     TELLING_RULES: buildTellingRulesSection(inputData),
     CHALLENGE_IDEAS: challengeIdeas ?? buildChallengeIdeasSection(inputData),
-    ARC_CRITIQUE_SPEC: arcCritiqueSpec(),
+    ARC_CRITIQUE_SPEC: arcCritiqueSpec({ inputData }),
     ARC_LENGTH: arcLengthRange(pageCount),
   });
 }
@@ -8635,12 +8729,20 @@ function buildArcPanelPrompt(inputData, committedBlock) {
     // was never told the allowance, so nobody but the author (grading itself in
     // the same call) could audit the invented cast.
     INVENTED_ALLOWANCE: arcInventedAllowance(inputData),
+    // The same definition the creator's budgets and figure lists carry.
+    COMMISSIONED_CAST_DEF,
+    // The lenses a creator rule mirrors read that rule's own string.
+    ARC_ENTRANCE_RULE,
+    ARC_GIVEN_RULE,
+    ARC_SENSE_RULE,
+    EVERY_CHILD_ACTS_RULE,
     // A14: the REAL LANDMARKS block is one constant with three consumers
     // (create, panel, retell). The panel is the only independent reader of the
     // arc; without the list it cannot see a real place the arc invented, and
     // the retell was told to keep landmarks "inside the commission's world"
-    // while never being shown which ones those are.
-    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote),
+    // while never being shown which ones those are. Without the DESCRIPTION
+    // lines: the panel checks names and vantages, never what a place is.
+    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote, { descriptions: false }),
   });
 }
 
@@ -8664,7 +8766,9 @@ function buildArcRetellPrompt(inputData, pageCount, committedBlock, panelSolutio
     TELLING_RULES: buildTellingRulesSection(inputData),
     COMMITTED_ARC: String(committedBlock || '').trim(),
     PANEL_SOLUTIONS: String(panelSolutions || '').trim(),
-    ARC_CRITIQUE_SPEC: arcCritiqueSpec({ retell: true }),
+    ARC_CRITIQUE_SPEC: arcCritiqueSpec({ retell: true, inputData }),
+    PREMISE_FIGURES_SPEC,
+    INVENTED_FIGURES_SPEC,
     ARC_LENGTH: arcLengthRange(pageCount),
     // A14: same block the creator got (see buildArcPanelPrompt).
     AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote),
@@ -8723,12 +8827,18 @@ function buildArcAmendPrompt(inputData, finalArc) {
  * lines that don't match are skipped; no matches return '' (the caller skips
  * the hand-off, never blocks).
  */
+// A hint's sentence ANCHOR (2026-09-23): "ISSUE (s14-15): …" names the arc
+// sentence the change lands in. Without it the planner put a hint about a
+// huddle on a page before the huddle existed (job_1790100385959_1nitlympp p14).
+// Kept as the model wrote it, normalised to "(s14)" / "(s14-15)"; a hint with
+// no anchor still parses.
 function parseArcHints(raw) {
   const lines = [];
-  const re = /ISSUE\s*:\s*(.+?)\s*(?:→|->|=>)\s*(?:\*\*)?CHANGE\s*:\s*(.+?)\s*$/gim;
+  const re = /ISSUE\s*(?:\(\s*(s?\s*\d+(?:\s*[-–—]\s*s?\s*\d+)?)\s*\))?\s*:\s*(.+?)\s*(?:→|->|=>)\s*(?:\*\*)?CHANGE\s*:\s*(.+?)\s*$/gim;
   let m;
   while (lines.length < 3 && (m = re.exec(String(raw || ''))) !== null) {
-    lines.push(`ISSUE: ${m[1].replace(/\*\*/g, '').trim()} → CHANGE: ${m[2].replace(/\*\*/g, '').trim()}`);
+    const anchor = m[1] ? ` (s${m[1].replace(/[s\s]/gi, '').replace(/[–—]/g, '-')})` : '';
+    lines.push(`ISSUE${anchor}: ${m[2].replace(/\*\*/g, '').trim()} → CHANGE: ${m[3].replace(/\*\*/g, '').trim()}`);
   }
   return lines.join('\n');
 }
@@ -9809,7 +9919,7 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
   return fillTemplate(template, {
     STORY_ARC: String(arc || '').trim() || '(no arc was recorded for this story)',
     ARC_HINTS: String(arcHints || '').trim()
-      ? `# HINTS — apply these in the text where the beats have not\n\n${HINT_VS_ARC_RULE}\n\n${String(arcHints).trim()}`
+      ? `# HINTS — apply these in the text where the beats have not\n\n${HINT_VS_ARC_RULE}\n${HINT_ANCHOR_RULE}\n\n${String(arcHints).trim()}`
       : '',
     // NO COMMISSION HERE. The template carries no {STORY_BRIEF}: by this stage
     // the arc IS the story, and it has already ruled on the idea's mechanics —
@@ -10190,8 +10300,12 @@ function shortLandmarkDescription(extract) {
  *               schema for a format it must never produce — including a worked
  *               example object with a "description" key, in a prompt that ends
  *               "Last line, exactly: Stronger: Arc <N>".
+ *   descriptions  false drops each DESCRIPTION line and its two use-rules. The
+ *               arc PANEL asks only whether a named place is on the list and
+ *               seen from a vantage a photo shows; the extracts were ~3k of its
+ *               prompt it never used (audit 01 C, 2026-09-23).
  */
-function buildAvailableLandmarksSection(landmarks, retryNote = '', { jsonFields = false } = {}) {
+function buildAvailableLandmarksSection(landmarks, retryNote = '', { jsonFields = false, descriptions = true } = {}) {
   if (!landmarks || landmarks.length === 0) {
     return '';
   }
@@ -10220,14 +10334,14 @@ function buildAvailableLandmarksSection(landmarks, retryNote = '', { jsonFields 
     .map(l => {
       let entry = `- ${l.name}`;
       if (l.type) entry += ` [${l.type}]`;
-      const description = shortLandmarkDescription(l.wikipediaExtract || l.wikipedia_extract);
+      const description = descriptions ? shortLandmarkDescription(l.wikipediaExtract || l.wikipedia_extract) : '';
       if (description) entry += `\n  DESCRIPTION: ${description}`;
       entry += photoLine(l);
       return entry;
     })
     .join('\n');
 
-  const hasDescriptions = landmarks.some(l => l.wikipediaExtract || l.wikipedia_extract);
+  const hasDescriptions = descriptions && landmarks.some(l => l.wikipediaExtract || l.wikipedia_extract);
   const hasPhotos = landmarks.some(l => Array.isArray(l.photoVariants) && l.photoVariants.length > 0);
 
   // THE ONE STATEMENT OF THE LANDMARK RULE (owner, 2026-09-19). The telling
@@ -10243,7 +10357,7 @@ ${jsonFields ? `- Set "isRealLandmark": true
 - Set "landmarkQuery": copy-paste the EXACT name from the list above (WITHOUT the [type])
 ` : ''}${hasDescriptions ? `- Use the DESCRIPTION above to understand what the landmark is and incorporate it authentically into your story
 - The DESCRIPTION is reference for you, not wording for the page. Never carry an abbreviation, acronym or technical term from it into the story — name the thing the way a child would say it` : ''}
-${hasPhotos ? `- A landmark is drawn from one of its PHOTOS. Name a location or a vantage of it only from a viewpoint one of its photos shows — an exterior is seen from the street or the square, an interior from inside, a distant or view-from photo from afar. If no photo shows the view a page needs (a skyline from a hilltop, a bird's-eye, the far side), that landmark is not available for that page: use one whose photos fit, or none` : ''}
+${hasPhotos ? `- A landmark is drawn from one of its PHOTOS. Name a location or a vantage of it only from a viewpoint one of its photos shows — an exterior is seen from the street or the square, an interior from inside, a distant or view-from photo from afar. If no photo shows the view a page needs (a skyline from a hilltop, a bird's-eye, the far side), that landmark is not available for that page: use one whose photos fit, or none. A view the commission's own words describe is the exception: it stands, and the landmark in it is drawn from what its photos show` : ''}
 
 ${jsonFields ? `
 EXAMPLE - Using "Ruine Stein [Ruins]" as "The Enchanted Castle" in your story:
@@ -10589,6 +10703,15 @@ module.exports = {
   buildTellingRulesSection,
   characterSourceRule,
   arcCritiqueSpec,
+  COMMISSIONED_CAST_DEF,
+  PREMISE_FIGURES_SPEC,
+  INVENTED_FIGURES_SPEC,
+  ARC_ENTRANCE_RULE,
+  ARC_GIVEN_RULE,
+  ARC_SENSE_RULE,
+  CENTRAL_FIGURE_DEF,
+  EVERY_CHILD_ACTS_RULE,
+  GUIDE_USE_RULE,
   RISK_FRAMING_RULE,
   ANIMAL_FATE_RULE,
   COUNTING_RULE,
@@ -10601,6 +10724,7 @@ module.exports = {
   DEED_AND_EFFECT_DEF,
   TWO_HEIGHTS_DEF,
   HINT_VS_ARC_RULE,
+  HINT_ANCHOR_RULE,
   NAMING_DEF,
   ENDING_EVENT_DEF,
   WANTED_PICTURE_DEF,
