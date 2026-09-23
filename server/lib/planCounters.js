@@ -474,6 +474,22 @@ function resolveCast(pages, commissionedNames = [], placeNames = [], roster = nu
   return { commissioned, invented, places: excludedPlaces, all, aliases: firstTokenAliases(all, pool) };
 }
 
+/** Determiners that make a roster entry a description ("their mother"), never a name. */
+const DESCRIPTION_LEADS = new Set(['the', 'a', 'an', 'his', 'her', 'their', 'its', 'our', 'my', 'your', 'one', 'some', 'another', 'other']);
+
+/**
+ * Is a roster PERSON a named figure, or a figure referred to only by what it is?
+ * The plan is written in English by contract, so a name starts with a capital
+ * and carries no determiner; "their mother" or "a guard" does not.
+ */
+function isNamedFigure(entry) {
+  const t = String(entry || '').trim();
+  if (!t) return false;
+  const first = t.split(/\s+/)[0].toLowerCase();
+  if (DESCRIPTION_LEADS.has(first)) return false;
+  return /^\p{Lu}/u.test(t);
+}
+
 /**
  * Names from `cast` present in a piece of text (possessives count as present).
  * `aliases` (name → other spellings, from `resolveCast().aliases`) lets a bare
@@ -830,7 +846,23 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
     // No thing-guard needed here any more: `cast.invented` holds only names the
     // plan check's roster reported as PEOPLE, so a ship or a town never reaches
     // this list (2026-09-11, replacing the article/preposition marking).
-    const undeclared = cast.invented.filter(n => !lower.has(String(n).toLowerCase()));
+    // THE ARC'S COUNTING RULE, NOT A LOOSER ONE (2026-09-23). The arc budget
+    // says "Not counted: … a figure given no name and referred to only by what
+    // it is", and the arc applied it — then this counter charged "their mother"
+    // (the roster's word for an unnamed figure) as an undeclared invented
+    // figure on staging job_1790100385959_1nitlympp, and the re-plan cut her
+    // from page 1 citing the false over-allowance. The exemption is the arc's
+    // own, stated once (promptBuilders.UNNAMED_FIGURE_EXEMPT): a figure with no
+    // name, on a single page. An unnamed figure the story keeps on several
+    // pages still counts — "taking its name away is not a way off it" (the
+    // 2026-09-19 raven that held three pages' obstacles). A roster entry is a
+    // NAME when it reads as one in the English the plan is written in: a
+    // capital first letter and no determiner in front. Figures the commission
+    // supplied outside its character list are already out of `cast.invented`
+    // (commissionedCast → commissionedNames).
+    const pagesOf = n => rows.filter(r => r.present.includes(n)).length;
+    const exempt = n => !isNamedFigure(n) && pagesOf(n) <= 1;
+    const undeclared = cast.invented.filter(n => !exempt(n) && !lower.has(String(n).toLowerCase()));
     if (undeclared.length) {
       add('ARC_INVENTED_UNDECLARED', [],
         `the plan names invented ${undeclared.length === 1 ? 'figure' : 'figures'} ${undeclared.join(', ')} that the arc's own invented list does not carry (arc declared: ${declared.length ? declared.join(', ') : 'none'})`);
@@ -858,6 +890,41 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
       add('ARC_INVENTED_OVER_ALLOWANCE', [],
         `the book carries ${effective.length} invented figures (${effective.join(', ')}) against an allowance of ${inventedAllowance}${shortfall}`);
     }
+  }
+
+  // 6c. THE WHO COLUMN IS THE COMPLETE CAST (2026-09-23). The planner is told
+  //     every person the instant stages belongs in the who column or is not
+  //     written into the instant (PLAN_LINE_FIELD_CONTRACT), and the roster
+  //     reads the who column alone by design — so a figure named only in the
+  //     instant was invisible to every check. The check's roster now reports
+  //     them under `unlisted` (language, the model's answer); this counts them.
+  //     Measured on staging job_1790100385959_1nitlympp: a shipped hatching
+  //     page's instant sends a spark "toward <character>'s sleeve" with that
+  //     character absent from its who column, and a page staged "against
+  //     <creature>'s warm side while the others wait" with neither listed.
+  //
+  //     THE LIST IS RE-COUNTED, NEVER TRUSTED (the `covers` rule below): a
+  //     claimed name counts only when that name is in the page's instant. The
+  //     validation call of 2026-09-23 listed characters the story has present at
+  //     that moment but the instant never names (a people-free egg page came
+  //     back "unlisted = <two boys>"), which as a must-fix would have pushed
+  //     cast onto the book's people-free page.
+  const unlistedPages = [];
+  const unlistedDetail = [];
+  for (const r of rows) {
+    const row = roster.get(Number(r.pageNumber));
+    const lowerPresent = new Set(r.present.map(n => n.toLowerCase()));
+    const instant = planSegments(r.planLine)[2] || '';
+    const claimed = (row?.unlisted || []).map(n => String(n || '').trim()).filter(Boolean);
+    const names = namesIn(instant, claimed).filter(n => !lowerPresent.has(String(n).toLowerCase()));
+    if (names.length) {
+      unlistedPages.push(r.pageNumber);
+      unlistedDetail.push(`page ${r.pageNumber}: ${names.join(', ')}`);
+    }
+  }
+  if (unlistedPages.length) {
+    add('CAST_NOT_IN_WHO_COLUMN', unlistedPages,
+      `the instant names a character the who column does not carry (${unlistedDetail.join('; ')}) — write them into the who column, or take them out of the instant`);
   }
 
   // PEOPLED pages only, by design: a page with nobody in frame is a legitimate
@@ -1155,6 +1222,17 @@ function replanChangeDirection(tag) {
  *             fewer. Under the ceiling there is room to add, so a removal is
  *             not what that finding asked for; at or over it, taking a name
  *             out to make room is exactly right and is allowed.
+ *   focal     a `cast out` that takes a commissioned character's LAST focal
+ *             page (2026-09-23). On job_1790100385959_1nitlympp a NO_FOCAL_PAGE
+ *             for one boy was answered by casting another out of his only
+ *             focal page, and the recheck raised NO_FOCAL_PAGE for him instead.
+ *   action    a `cast out` of a character from the page the check's ACTION line
+ *             names as staging that character's own action (plan-check Q12).
+ *   protected any change on a page the re-plan was told stays — the last page,
+ *             a WANTED picture, an ACTION page — that answers a NOTED finding or
+ *             none. On the same job a noted two-heights line deleted the
+ *             ending's own event from the last page; a noted finding never
+ *             licenses removing a picture the book must keep.
  *   balance   a page that takes another page's material where the freed page
  *             declares no `material to page <N>` saying what it stages
  *             instead, or the reverse. The book keeps its page count, so a
@@ -1171,10 +1249,15 @@ function replanChangeDirection(tag) {
  * @param {number} [args.maxCast]   the image model's cast ceiling
  * @param {Map<number,string[]>} [args.obstacles] page → obstacle-holders, from the
  *   plan check that produced these findings
+ * @param {string[]} [args.focalNames] the characters that owe a focal page (the
+ *   commission's character list, when castCoverage says each gets one)
+ * @param {Map<number,string>} [args.protectedPages] page → why it stays
+ * @param {Array<{key:string,page:number|null}>} [args.actions] the check's ACTION lines
+ * @param {function(Object):string} [args.rankOf] a finding tag → 'must' | 'also'
  * @returns {{refusals: Array<{pageNumber:number, rule:string, detail:string, line:string}>,
  *            declaredOut: Map<number,string[]>, notes: string[]}}
  */
-function reviewPlanChanges({ changes = [], standing = [], returned = [], castNames = [], aliases = {}, maxCast = 3, obstacles = null } = {}) {
+function reviewPlanChanges({ changes = [], standing = [], returned = [], castNames = [], aliases = {}, maxCast = 3, obstacles = null, focalNames = [], protectedPages = null, actions = [], rankOf = null } = {}) {
   const names = (Array.isArray(castNames) ? castNames : []).map(n => String(n || '').trim()).filter(Boolean);
   const refusals = [];
   const notes = [];
@@ -1196,6 +1279,22 @@ function reviewPlanChanges({ changes = [], standing = [], returned = [], castNam
   };
   const beforeSpan = spanIn(beforeWho);
   const afterSpan = spanIn(afterWho);
+  // A focal page, read the way the NO_FOCAL_PAGE counter reads it: at most two
+  // in frame, or first named in a close-up.
+  const focalPagesIn = (pages, who, name) => (pages || []).filter((p) => {
+    const w = who.get(Number(p.pageNumber)) || [];
+    if (!w.includes(name)) return false;
+    const shot = classifyShot(planSegments(p.planLine)[0] || '');
+    return w.length <= 2 || (shot === 'close-up' && w[0] === name);
+  }).map(p => Number(p.pageNumber));
+  const focalSet = new Set((Array.isArray(focalNames) ? focalNames : []).flatMap(n => namesIn(String(n || ''), names, aliases)));
+  const actionPageOf = new Map();
+  for (const a of (Array.isArray(actions) ? actions : [])) {
+    if (!a || a.page == null || !(Number(a.page) > 0)) continue;
+    for (const n of namesIn(String(a.key || ''), names, aliases)) actionPageOf.set(n, Number(a.page));
+  }
+  const isProtected = page => protectedPages instanceof Map && protectedPages.has(Number(page));
+  const isMust = tag => !!(tag && typeof rankOf === 'function' && rankOf(tag) === 'must');
   const refuse = (pageNumber, rule, detail, line) => {
     if (!Number.isFinite(pageNumber)) return;
     refusals.push({ pageNumber: Number(pageNumber), rule, detail, line: String(line || '') });
@@ -1210,6 +1309,12 @@ function reviewPlanChanges({ changes = [], standing = [], returned = [], castNam
     const dir = replanChangeDirection(c.answers);
     if (!c.answers) notes.push(`p${page}: "${String(c.line || '').slice(0, 120)}" names no finding tag`);
 
+    // A page the re-plan was told stays changes only for a must-fix finding.
+    if (isProtected(page) && !isMust(c.answers)) {
+      refuse(page, 'protected', `${protectedPages.get(page)} stays, and ${c.answersText || 'an untagged change'} is a noted finding, not a must-fix one`, c.line);
+      continue;
+    }
+
     if (c.kind === 'cast_out') {
       const hit = resolve(c.subject);
       if (!hit.length) {
@@ -1222,6 +1327,17 @@ function reviewPlanChanges({ changes = [], standing = [], returned = [], castNam
       const onObstacle = hit.filter(n => heldNames.includes(n));
       if (onObstacle.length) {
         refuse(page, 'obstacle', `${onObstacle.join(', ')} holds this page's obstacle (the check's own OBSTACLES line)`, c.line);
+        continue;
+      }
+      const onAction = hit.filter(n => actionPageOf.get(n) === page);
+      if (onAction.length) {
+        refuse(page, 'action', `${onAction.join(', ')}: this page stages their own action (the check's ACTION line)`, c.line);
+        continue;
+      }
+      const lastFocal = hit.filter(n => focalSet.has(n)
+        && focalPagesIn(standing, beforeWho, n).includes(page) && focalPagesIn(returned, afterWho, n).length === 0);
+      if (lastFocal.length) {
+        refuse(page, 'focal', `${lastFocal.join(', ')} would be left with no focal page`, c.line);
         continue;
       }
       const stranded = hit.filter(n => (beforeSpan.get(n) || 0) >= 2 && (afterSpan.get(n) || 0) < 2);
@@ -1289,5 +1405,6 @@ module.exports = {
   castLostByReplan,
   reviewPlanChanges,
   replanChangeDirection,
+  isNamedFigure,
   REPLAN_FINDING_DIRECTION,
 };

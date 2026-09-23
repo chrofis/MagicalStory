@@ -26,9 +26,20 @@ const lineFor = (res: any, code: string) =>
  * two exactly this way; job_1789759147125_p08djwhbl declared NONE while its
  * story turns on an invented raven — the antagonist — plus a baker.
  */
+describe("the arc exemption for an unnamed figure is the arc's own: no name, one page", () => {
+  it('an unnamed figure on one page is not counted; kept on two pages it is', () => {
+    const one = plan([[1, 'Levin'], [2, 'Levin, their mother']]);
+    const oneR = roster([[1, ['Levin']], [2, ['Levin', 'their mother']]]);
+    expect(codes(run(one, oneR, [], 0))).not.toContain('ARC_INVENTED_UNDECLARED');
+    const two = plan([[1, 'Levin, raven'], [2, 'Levin, raven']]);
+    const twoR = roster([[1, ['Levin', 'raven']], [2, ['Levin', 'raven']]]);
+    expect(codes(run(two, twoR, [], 0))).toContain('ARC_INVENTED_OVER_ALLOWANCE');
+  });
+});
+
 describe('the invented allowance is checked against what the book has', () => {
-  const pages = plan([[1, 'Levin'], [2, 'raven'], [3, 'baker'], [4, 'tinker']]);
-  const r = roster([[1, ['Levin']], [2, ['raven']], [3, ['baker']], [4, ['tinker']]]);
+  const pages = plan([[1, 'Levin'], [2, 'Raven'], [3, 'Baker'], [4, 'Tinker']]);
+  const r = roster([[1, ['Levin']], [2, ['Raven']], [3, ['Baker']], [4, ['Tinker']]]);
 
   it('an arc that declares NONE while the plan names three is over an allowance of two', () => {
     const res = run(pages, r, [], 2);
@@ -40,23 +51,23 @@ describe('the invented allowance is checked against what the book has', () => {
   });
 
   it('honest declaration over the allowance still reports, as it always did', () => {
-    const res = run(pages, r, ['raven', 'baker', 'tinker'], 2);
+    const res = run(pages, r, ['Raven', 'Baker', 'Tinker'], 2);
     expect(codes(res)).toContain('ARC_INVENTED_OVER_ALLOWANCE');
     expect(codes(res)).not.toContain('ARC_INVENTED_UNDECLARED');
   });
 
   it('under-declared but WITHIN the allowance is undeclared only, never over', () => {
-    const two = plan([[1, 'Levin'], [2, 'raven'], [3, 'baker']]);
-    const tr = roster([[1, ['Levin']], [2, ['raven']], [3, ['baker']]]);
+    const two = plan([[1, 'Levin'], [2, 'Raven'], [3, 'Baker']]);
+    const tr = roster([[1, ['Levin']], [2, ['Raven']], [3, ['Baker']]]);
     const res = run(two, tr, [], 2);
     expect(codes(res)).toContain('ARC_INVENTED_UNDECLARED');
     expect(codes(res)).not.toContain('ARC_INVENTED_OVER_ALLOWANCE');
   });
 
   it('an honest arc inside its allowance reports neither', () => {
-    const two = plan([[1, 'Levin'], [2, 'raven']]);
-    const tr = roster([[1, ['Levin']], [2, ['raven']]]);
-    const res = run(two, tr, ['raven'], 2);
+    const two = plan([[1, 'Levin'], [2, 'Raven']]);
+    const tr = roster([[1, ['Levin']], [2, ['Raven']]]);
+    const res = run(two, tr, ['Raven'], 2);
     expect(codes(res)).not.toContain('ARC_INVENTED_UNDECLARED');
     expect(codes(res)).not.toContain('ARC_INVENTED_OVER_ALLOWANCE');
   });

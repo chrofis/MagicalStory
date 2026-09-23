@@ -9575,8 +9575,9 @@ function rawObstacleLines(text) {
 function analyzeReplanCompliance({
   replanText = '', checkText = '', standing = [], findings = [],
   castNames = [], aliases = {}, maxCast = 3,
+  focalNames = [], keep = [],
 } = {}) {
-  const { parsePlanResponse, parsePlanChanges, parsePlanCheckObstacles, findingPages } = require('./promptBuilders');
+  const { parsePlanResponse, parsePlanChanges, parsePlanCheckObstacles, parsePlanCheckActions, findingPages, replanRank } = require('./promptBuilders');
   const { reviewPlanChanges, castLostByReplan } = require('./planCounters');
 
   const standingBy = new Map(standing.map(b => [Number(b.pageNumber), b]));
@@ -9613,8 +9614,15 @@ function analyzeReplanCompliance({
       ? standingBy.get(Number(pg.pageNumber))
       : pg));
   };
+  // Production's review arguments (beatsPipeline): the pages the round was
+  // told to keep, the ACTION lines of the check that raised the findings, the
+  // characters that owe a focal page, and the must-fix ranking.
   const review = reviewPlanChanges({
     changes: declared.changes, standing, returned: merged, castNames, aliases, maxCast, obstacles,
+    focalNames,
+    protectedPages: new Map((keep || []).map(k => [Number(k.page), k.why])),
+    actions: parsePlanCheckActions(String(checkText || '')),
+    rankOf: replanRank,
   });
   restore(review.refusals.map(r => r.pageNumber));
   const lost = castLostByReplan(standing, merged, castNames, aliases, review.declaredOut);
@@ -9745,6 +9753,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
   const {
     buildBeatsPrompt, buildPlanCheckPrompt, parsePlanCheck, parsePlanCheckRoster,
     parsePlanCheckObstacles, buildReplanSection, getHistoricalLocations, getHistoricalObjects,
+    parsePlanCheckWanted, parsePlanCheckActions, replanKeepPages,
   } = require('./promptBuilders');
   const { parseBeats } = require('./storyHelpers');
   const { runPlanCounters, collectPlaceNames } = require('./planCounters');
@@ -9793,7 +9802,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
   const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
 
   // ── the plan check ────────────────────────────────────────────────────────
-  const checkPrompt = buildPlanCheckPrompt(storyData, standing, approvedArc, pagePlan);
+  const checkPrompt = buildPlanCheckPrompt(storyData, standing, approvedArc, pagePlan, { arcHints });
   if (!checkPrompt) throw new Error('plan-check template unavailable');
   let t = Date.now();
   const checkRes = await callTextModelStreaming(checkPrompt, null, null, checkModel, {
@@ -9817,7 +9826,14 @@ async function runBeatsReplanStage(target, { params = {} }) {
   }
 
   // ── the re-plan ───────────────────────────────────────────────────────────
-  const replanSection = buildReplanSection(pagePlan, findings, { pageCount });
+  const keep = replanKeepPages({
+    pageCount,
+    wanted: parsePlanCheckWanted(checkRes.text || ''),
+    actions: parsePlanCheckActions(checkRes.text || ''),
+    focalPages: (counters.stats && counters.stats.focalPages) || {},
+  });
+  const coverageRule = require('./castCoverage').castCoverage({ pageCount, castCount: commission.listed.length });
+  const replanSection = buildReplanSection(pagePlan, findings, { pageCount, keep });
   const replanPrompt = buildBeatsPrompt(storyData, pageCount, { finalArc: approvedArc, arcHints, replan: replanSection });
   if (!replanPrompt) throw new Error('story-beats template unavailable');
   t = Date.now();
@@ -9833,6 +9849,8 @@ async function runBeatsReplanStage(target, { params = {} }) {
     castNames: (counters.cast && counters.cast.all) || commissionedNames,
     aliases: (counters.cast && counters.cast.aliases) || {},
     maxCast,
+    focalNames: coverageRule && coverageRule.focalEach ? commission.listed : [],
+    keep,
   });
 
   const { appliedPlan, ...reportFields } = verdict;

@@ -1,10 +1,12 @@
-Check how a finished story was divided into {PAGE_COUNT} pages. The story itself is settled — never judge, repair or rewrite it. Only the division is in question, and only on the eleven points below.
+Check how a finished story was divided into {PAGE_COUNT} pages. The story itself is settled — never judge, repair or rewrite it. Only the division is in question, and only on the thirteen points below.
 
 Commissioned characters: {CHARACTER_NAMES}
 
 # THE STORY
 
 {FINAL_ARC}
+
+{ARC_HINTS}
 
 # THE PAGE PLAN
 
@@ -20,30 +22,36 @@ Report every name the who column carries, on every page, under one of the two he
 
 A who column also reaches characters without naming them — a count of them ("the three of them"), a word for the group ("the whole family"), a description standing in for one. Under COVERS write out the names that reference stands for, one by one. Read the WHO COLUMN ALONE: a figure named only in the instant or in what is true after is not in frame, and nothing outside the who column is ever expanded. Expand every reference the who column does carry whenever this story's own cast can put names to it, however the words are shaped — the test is whether you can name them, never how group-like the phrase sounds. A reference you cannot put names to — strangers, a crowd, onlookers, guards — covers nobody, and a column that names everyone it holds covers nobody.
 
+Under UNLISTED, and only there, read the instant as well: write every character whose name the instant contains — alone or on their hand, face or clothing — that the who column does not carry. A character the instant does not name is never unlisted. They are not in frame; the line reports them.
+
 # YOUR TASK
 
-Answer only these eleven:
+Answer only these thirteen:
 
 1. Emotional highlights. Name every page the plan stages as one character showing a strong feeling, and say whether that page is truly one person's felt moment. A page holding a second actor, an event, or a feeling nobody shows is a finding.
 2. Entrances. Name the page each character first appears on. That page stages an {NAMING_DEF} A character already in frame before anyone says who they are is a finding.
 3. Cast of three or more. For each page with three or more named characters in frame — counting the names that page's ROSTER line expands under `covers`, never the who column alone — say whether its plan line justifies the third. A justification that repeats the action, names the place, or asserts the characters are needed does not hold.
-4. The most wanted pictures. {WANTED_PICTURE_DEF} Name both. A picture that falls between two pages, or that only a page's change reports as already done, is a finding.
+4. The most wanted pictures. {WANTED_PICTURE_DEF} {ACT_SPANS} Take each act's picture from that act's own sentences and give it a WANTED line. A picture that falls between two pages, or that only a page's change reports as already done, is a finding.
 5. The instant. Name every page whose plan line's instant only states presence or position — stands, together, visible, gathered, waits — instead of an action being performed, and every page whose instant is the state after an action rather than the action itself.
 6. Peopleless pages. Name every page with no people in frame and say whether its subject is something the story has been driving toward — a discovery, an arrival, a payoff. A peopleless page whose subject carries no story weight is a finding. When no page is people-free, nominate the one page best suited to give up its cast and give it a PEOPLELESS line: a page whose subject is already a thing or a place seen alone — a vessel, an object, the weather, a place — never a moment between people, and never one of the most wanted pictures question 4 names. A book with no people-free page and no nomination is a finding. A page that is BOTH the people-free page and the ultra-wide page is not a finding for that reason alone — one page is allowed to answer both, and a landscape with nobody in it is the natural page to do it; judge it on its story weight like any other.
 7. Plants and payoffs. Pair each object or flaw a page plants with the later page that pays it off. Work the pairs out silently and report only what is left unpaired: a plant no later page pays off, and a payoff no earlier page planted. A plant that has its payoff is not a finding and gets no line.
 8. The last page. {ENDING_EVENT_DEF} Say whether it does. A last page staging a different moment while the ending's event happened earlier, off the page, or not at all is a finding.
 
-9. Deed and effect. Name every page whose instant shows an action and the result of that action together. {DEED_AND_EFFECT_DEF} The instant shows one, and what follows it belongs in what is true after. {PAGE_CHANGE} Name every page whose what-is-true-after states no change its instant does not already show.
+9. Deed and effect. Name every page whose instant shows an action and the result of that action together. {DEED_AND_EFFECT_DEF} The instant shows one, and what follows it belongs in what is true after. {PAGE_CHANGE} Name every page whose what-is-true-after states no change its instant does not already show. Name a page once here, under the half that fits it.
 
-10. Two heights. Name every page whose instant puts {TWO_HEIGHTS_DEF} Such a page is staged from one level with the other character out of frame, or split into a page per level.
+10. Two heights. Name every page whose instant puts {TWO_HEIGHTS_DEF} Such a page is staged from the level its event happens on, with the other character out of frame, or split into a page per level.
 
 11. Obstacles. Name every page whose instant works against what a character is doing — a way blocked, a place kept, a thing taken or withheld, a refusal. For each, give that page an OBSTACLES line naming that character, and say whether the page's plan line names them. A page whose obstacle is held by a character the plan line does not name is a finding.
+
+12. Each character's own action. {CAST_ACTION} For each commissioned character, give an ACTION line: the sentence where the story gives them an action of their own, and the page whose instant stages it. A character whose action no page stages as its instant is a finding.
+
+13. Order. Name every page whose instant stages a moment the story reaches only in a later sentence, or that needs something a later page first brings about. A change listed under HINTS belongs where its own words place it in the story.
 
 # OUTPUT FORMAT
 
 The roster first, one line per page, every page present and in order:
 
-ROSTER <page>: people = <names, comma separated, or none>; things = <names, comma separated, or none>; covers = <names, comma separated, or none>
+ROSTER <page>: people = <names, comma separated, or none>; things = <names, comma separated, or none>; covers = <names, comma separated, or none>; unlisted = <names, comma separated, or none>
 
 Then one line for each page whose instant works against what a character is doing, and no line for the other pages:
 
@@ -53,6 +61,14 @@ Then, only when no page is people-free, one line naming the page best suited to 
 
 PEOPLELESS <page>: <the thing or the place that page's picture is already of>
 
+Then one line per act, in story order:
+
+WANTED <setup, middle or ending>: sentence <number> — page <number, or none>
+
+Then one line per commissioned character:
+
+ACTION <name>: sentence <number> — page <number, or none>
+
 Then the findings: numbered, one line each, nothing before or after. Each line begins with the number of the check it answers, then names the page and what is wrong; several findings may carry the same number. Never propose a rewrite, never write a plan line. When a check finds nothing, write no line for it — a line saying a check found nothing, or naming something the check confirms is right, is itself wrong.
 
-When the roster is complete and nothing is wrong anywhere, write the roster, the obstacle lines, the peopleless line if one is owed, and then exactly: NONE
+When the roster is complete and nothing is wrong anywhere, write the roster, the obstacle lines, the peopleless line if one is owed, the WANTED and ACTION lines, and then exactly: NONE

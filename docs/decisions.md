@@ -56704,7 +56704,7 @@ sleeveless front-zip body warmer…"; a second pass finds 0; no avatar re-render
 **Touched:** `server/lib/clothingCheck.js`, `tests/unit/worn-garment-review-chain.test.ts`.
 **Status:** ✅ active on staging.
 
-## 2026-09-23 — Every commissioned child gets a moment: one castCoverage() for the arc, the planner and the counters
+## 2026-09-23 — Every commissioned child gets a moment: one castCoverage() for the planner, the plan check and the counters
 
 **Context.** Owner decision on the main-cast conflict, verbatim: "Every child gets a moment. And ideally
 we have them in multiple images. Depends on the story length and amount of characters, ideally each one is
@@ -56722,14 +56722,20 @@ gives the numbers from the page count and the size of the commission's character
   shared; the counter floor is 3 when the target reaches 4, else the target itself.
 Measured on the three owner cases: 4 children / 18 pages → focal each, 3-4 pages; 7 / 10 → focal each,
 at least 2 pages; 2 / 24 → focal each, 3-4 pages; 12 / 10 → group moments, at least 1.
-`castCoverageRule(cov)` states it to the planner (`{CAST_COVERAGE}` in story-beats.txt, page form) and to
-the arc (story form, wired by the arc stage in place of "at most two carry a book"). The plan counters call
-the same function on the plan (`NO_FOCAL_PAGE` only when focal-each holds, `UNDER_COVERED_CHARACTER` at the
-`min` floor), so generator and critic hold one number. The duties apply to the commission's character list
+The owner then split the decision in two (same evening): the ARC rule is narrative — every child does an
+action of their own in the story (`EVERY_CHILD_ACTS_RULE`, the arc stage's entry below) and carries no image
+count; the PAGE PLAN rule is this one, plus the link between them: each child's focal page stages that
+action. `castActionRule(cov)` is the action half, one sentence told to the planner and asked by plan-check
+question 12 (must-fix; the check emits one `ACTION <name>: sentence N — page M` line per child).
+`castCoverageRule(cov)` adds the appearance floor for the planner only (`{CAST_COVERAGE}` in
+story-beats.txt), stated as "at least N pages": shown "in frame on 3 to 4 pages", the checker read the range
+as a cap and filed four must-fix findings against children on more pages (validation call below). The plan
+counters call the same `castCoverage()` on the plan (`NO_FOCAL_PAGE` only when focal-each holds,
+`UNDER_COVERED_CHARACTER` at the `min` floor), so planner and counters hold one number. The duties apply to the commission's character list
 (`commissionedCast().listed`); a figure the commission supplies elsewhere (premise, saved details) is
 commissioned, never invented, and owes no page — before this a premise pet drew `NO_FOCAL_PAGE`.
-Supersedes the fixed two-page floor of R20 (2026-09 "coverage floor, alongside the focal page") and the
-"at most two carry a book" line. plan-check.txt asks no coverage question; the counters own it.
+Supersedes the fixed two-page floor of R20 (2026-09 "coverage floor, alongside the focal page"). The
+appearance count is the counters' alone; plan-check.txt asks only about the action.
 
 **Touched:** `server/lib/castCoverage.js` (new), `server/lib/planCounters.js`, `server/lib/promptBuilders.js`
 (`buildBeatsPrompt`), `prompts/story-beats.txt`, `server/lib/beatsPipeline.js`, `server/lib/testlab.js`
@@ -57034,3 +57040,79 @@ matching generator rule (generator-vs-critic).
 `tests/unit/text-style-rulebook.test.ts`, `tests/unit/text-audit-rules-reach-writer.test.ts`,
 `docs/prompt-inventory.md`.
 **Status:** ✅ active on staging. Validation: see below.
+
+
+## 2026-09-23 — Page plan after prompt audit 02: the check reads the hints, the acts are sentence thirds, a noted finding cannot take a kept picture, the who column is checked, the divider gets its landmarks only
+
+**Context.** Prompt audit of staging `job_1790100385959_1nitlympp` (`docs/audits/prompt-audit-2026-09-23/02-page-plan.md`).
+The shipped round-1 re-plan was worse than the first division: it answered a NOTED two-heights line by
+deleting the ending's own event from the last page (W3), answered one boy's missing focal page by casting
+another out of his only focal page and answered an unstable Q4 answer by overwriting the page of the hero's
+turning idea (W5, W8), and the code's refusals of its own changes went back to nobody. A hint anchored after
+an event was planned before it, unseen by the checker, which never gets the hints (W2). Figures named only
+in the instant were invisible to every check (W6). The counters charged a pet from a character's saved
+details and an unnamed one-page mother against the invented allowance, against the arc's own rule (W7).
+
+**Decision.**
+- **Plan check (plan-check.txt, 11 → 13 questions).** Reads the hints under the critics' heading
+  (`buildCriticArcHintsSection`, with the arc stage's sentence anchors). Q13 (order, noted): a page staging
+  a moment the story reaches only in a later sentence, and a hint placed away from where its words put it.
+  Q12 (each child's own action, MUST-FIX) with ACTION lines — see the castCoverage entry above. Q4 answers
+  each act from its own sentences: the acts are the arc's numbered sentences in thirds, computed in code
+  (`arcActSpans`) and stated identically to the planner's question 6; the check emits `WANTED <act>:
+  sentence N — page M`. Q9 names a page once, and `DEED_AND_EFFECT_DEF` (shared) says an effect that is the
+  deed itself made visible at the same instant is part of the deed. Q10 and the planner's one-level rule
+  keep "the level the page's event happens on" — which level to keep, not an exemption, so the 2026-09-10 Q10
+  ruling stands (the flight exemption, W3 b, remains an owner call).
+- **Roster `unlisted` field → `CAST_NOT_IN_WHO_COLUMN`.** The roster still reads the who column alone
+  (2026-09-20); a fourth field reports characters the instant names that the who column does not carry,
+  and the counter turns it into a finding. Must-fix but convergence-exempt: cleared by one name in one
+  column, like a shot relabel, so it may not buy a lost picture.
+- **What a re-plan may not take.** `replanKeepPages` (data only: the last page, the check's WANTED and
+  ACTION pages, a character's only focal page) is named in RE-DIVIDE ("change only for a must-fix finding
+  that names them") and enforced by `reviewPlanChanges`: `protected` refuses any change on a kept page that
+  answers a noted or untagged finding; `focal` refuses a cast-out that takes a listed character's last focal
+  page; `action` refuses casting a character out of their ACTION page. RE-DIVIDE also says a noted finding
+  is answered only where the answer removes nothing the story's sentences stage, and the next round gets
+  `## UNDONE LAST ROUND` — the previous round's refused changes with the rule that refused them.
+- **Counting who is invented (W7).** The counters read the arc's list through
+  `castCoverage.commissionedCast` (the arc stage's `COMMISSIONED_CAST_DEF` puts saved-detail pets on that
+  list), and the arc budget's unnamed-figure exemption is one string, `UNNAMED_FIGURE_EXEMPT` — "a figure
+  given no name, referred to only by what it is, on a single page" — applied by the counter (`isNamedFigure`
+  + one page). An unnamed figure kept across pages still counts: the 2026-09-19 raven that held three pages'
+  obstacles was unnamed, and "taking its name away is not a way off it".
+- **Divider landmarks (bloat).** `buildBeatsPrompt` gets `buildDividerLandmarksSection`: only the landmarks
+  the settled arc names (matched by the list's own names), their PHOTOS lines and the vantage rule — no
+  descriptions, no "build at least two in". Without an arc the planner is the author and keeps the full block.
+- **Storage.** `plannerReply`, `replanReplies[]` (and `replanReply` on discarded rounds), the recheck's own
+  `prompt`, and the check's `wanted` / `actions`.
+- Registry: plan-check.txt joined `arc-hint-handoff`; new set `commissioned-cast-arc-vs-plan-counters`.
+
+**Validation.** Rung 1 (free): rebuilt the planner and check prompts from the stored `input_data` and the
+stored arc/hints/landmarks — planner 31.0k → 24.9k (landmark block 8.3k → 1.1k, 2 of 20 landmarks), check
+15.4k → 18.2k, no unfilled placeholder. Counters over the stored roster: "their mother" and (with the arc
+listing it) Nia no longer charged; the "(none" lines gone. Review over the stored round-1 declared changes:
+the p5 cast-out (Max's only focal page) refused `focal`, both p18 changes (ending) refused `protected`.
+Rung 2 (one direct call, gpt-5.6-luna-pro, $0.03): the rebuilt check on the stored first division returned
+WANTED setup s4/p6, middle s12/p12, ending s18/p18 (no Q4 finding against the hatching), ACTION lines for all
+four boys (Levin s16 → p17, the nest page), `unlisted = Nia` on p5 → `CAST_NOT_IN_WHO_COLUMN`; with those
+lines the review also refuses the stored p17 overwrite (`action`) and the p6 two-heights edit (`protected`).
+It missed the hint placement on p14 (those hints carried no sentence anchor; the arc stage adds them) and
+read "in frame on 3 to 4 pages" as a cap — fixed by moving the count out of the checker (entry above).
+A second call ($0.03, count removed) raised no count finding under Q12, and `unlisted` caught p14's
+creature and p18's hatchling (both W6 cases) — but also listed characters a people-free page and a
+nameless instant never name. The counter now re-counts the claim: a name counts only when it is in the
+page's instant (`namesIn`), the `covers` rule. Still unstable between the two calls: Levin's ACTION page
+(p17 then p15), the ending's WANTED sentence (s18 then s17, "page none"), and one stray Q8 line. Stopped at
+two paid calls.
+
+**Not done (owner calls).** W4 round 1 exempt from the discard test; W3 (b) a flight exemption from Q10;
+dropping or capping advisory Q9 lines in the re-plan (W9, 2026-09-09 ruling); ranking Q13 must-fix.
+
+**Touched:** `prompts/plan-check.txt`, `prompts/story-beats.txt`, `server/lib/promptBuilders.js`,
+`server/lib/planCounters.js`, `server/lib/castCoverage.js`, `server/lib/beatsPipeline.js`,
+`server/lib/testlab.js` (beats_replan replay: hints, keep list, review arguments),
+`scripts/admin/sibling-registry.json`, `tests/unit/page-plan-audit-2026-09-23.test.ts`,
+`tests/unit/commissioned-figure-definition.test.ts`, `tests/unit/invented-allowance-counts-the-book.test.ts`,
+`tests/unit/plan-collective-cast.test.ts`.
+**Status:** ✅ active on staging.
