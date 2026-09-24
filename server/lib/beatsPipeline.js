@@ -148,6 +148,23 @@ function keepDeclaredWornRows(pageNumber, rewritten, previous, pass, gl) {
   if (gl) gl.warn('beats_worn_rows_carried', msg, null, { pageNumber, carried: carry.carried, pass });
   return carry.brief;
 }
+
+/**
+ * A reviewed brief keeps the declared light (`timeOfDay` / `weather`) of the
+ * brief it replaces when it states none (2026-09-24). A rewrite that states a
+ * value wins — the review's check 3a may correct it. Without this a rewritten
+ * page loses its light, its plate falls back into the vantage's base light, and
+ * its page prompt carries no LIGHT line. Loud: the omission is logged.
+ */
+function keepDeclaredLight(pageNumber, rewritten, previous, pass, gl) {
+  const { carryForwardLightInBrief } = require('./sceneLight');
+  const carry = carryForwardLightInBrief(rewritten, previous);
+  if (!carry) return rewritten;
+  const msg = `Page ${pageNumber}: the ${pass} dropped ${carry.carried.join(' and ')} — carried forward as declared`;
+  log.warn(`🌗 [BEATS] ${msg}`);
+  if (gl) gl.warn('beats_light_carried', msg, null, { pageNumber, carried: carry.carried, pass });
+  return carry.brief;
+}
 // The corrective loop's shared halves — the payload contract and the
 // introduced-vs-survived verdict. The rewrite path (images.js iteratePageCore)
 // reaches the same two through briefCorrection.correctFindings.
@@ -2771,7 +2788,9 @@ ${bibleBody}` : bibleBody;
       for (const x of expansions) {
         const reviewed = byPage.get(x.pageNumber);
         if (reviewed && reviewed.trim()) {
-          const fixed = keepDeclaredWornRows(x.pageNumber, reviewed, x.brief, 'scene review', gl);
+          const fixed = keepDeclaredLight(x.pageNumber,
+            keepDeclaredWornRows(x.pageNumber, reviewed, x.brief, 'scene review', gl),
+            x.brief, 'scene review', gl);
           if (fixed !== x.brief) sceneDiffs.push({ pageNumber: x.pageNumber, before: x.brief, after: fixed });
           x.brief = fixed;
           x.reviewRewrote = true;
@@ -3020,7 +3039,9 @@ ${bibleBody}` : bibleBody;
                 const wrByPage = new Map(wrParsed.pages.map(pg => [pg.pageNumber, pg.text]));
                 for (const x of subset) {
                   const reworn = wrByPage.get(x.pageNumber);
-                  const fixed = reworn && reworn.trim() ? keepDeclaredWornRows(x.pageNumber, reworn, x.brief, 'worn-state round', gl) : reworn;
+                  const fixed = reworn && reworn.trim()
+                    ? keepDeclaredLight(x.pageNumber, keepDeclaredWornRows(x.pageNumber, reworn, x.brief, 'worn-state round', gl), x.brief, 'worn-state round', gl)
+                    : reworn;
                   if (fixed && fixed.trim() && fixed !== x.brief) {
                     sceneDiffs.push({ pageNumber: x.pageNumber, before: x.brief, after: fixed, round: 'worn' });
                     x.brief = fixed;

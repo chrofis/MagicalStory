@@ -112,6 +112,18 @@ const METADATA_TAIL_RE = /---\s*METADATA\s*---[\s\S]*$/i;
 const VB_ID_RE = /\[[A-Z]{2,4}\d{1,4}(?:\.\d+)?\]/g;
 const MACHINE_FIELD_RE = /\b(sceneIntent|Preview:|Intent:|emptyScenePrompt|textPosition)\b/i;
 
+// Longer than this and a sentence is never forwarded whole: only its
+// people-free geometry clauses are (sanitizeGeometrySentence).
+const MAX_WHOLE_SENTENCE = 240;
+
+// A cut clause that OPENS on a verb, an adverb or a body part lost its subject
+// to the cut — and in a scene brief that subject is a figure: "stands seen from
+// behind on the steep slope", "leaning slightly forward", "head tilted toward
+// the egg". Measured 2026-09-24 over 54 stored staging pages: once long
+// sentences were salvaged, 12 of the 17 pages whose facts changed gained a
+// figure-action fragment of this shape. A place clause opens on its own noun or a preposition.
+const ELIDED_SUBJECT_RE = /^(?!(?:morning|evening|ceiling|building|lightning|spring|opening|clearing|railing|landing|swing|ring|string|wing|thing|nothing|something|everything|early|only)\b)(?:[a-z]+ing|[a-z]+ly|stands?|sits?|kneels?|crouch(?:es)?|looks?|leans?|steps?|walks?|runs?|climbs?|lands?|holds?|reaches?|pulls?|pushes?|turns?|waits?|watches?|stares?|bends?|bent|tilted|seen|lies|lay|smiles?|carries|grips?|presses?|hurries|rides?|stumbles?|jumps?|faces?|head|arms?|legs?|feet|body|white|red|blue|green|yellow|brown|black|grey|gray|orange|pink|purple)\b/i;
+
 function namesIn(castNames) {
   return (castNames || [])
     .map(c => (typeof c === 'string' ? c : c?.name))
@@ -135,12 +147,17 @@ function sanitizeGeometrySentence(sentence, names) {
   const s = String(sentence || '').replace(VB_ID_RE, '').replace(/\s+/g, ' ').trim();
   if (!s || MACHINE_FIELD_RE.test(s)) return null;
   if (!GEOMETRY_RE.test(s)) return null;
-  if (isClean(s, names)) return s;
+  // A paragraph-long sentence carries more than geometry, so it is never kept
+  // whole — but its geometry clauses are salvaged like any mixed sentence's.
+  // It used to be skipped outright: a 247-char sentence carrying "at night"
+  // was lost from a plate (prod job_1790107559778_fcmlfa8kn p10).
+  if (s.length <= MAX_WHOLE_SENTENCE && isClean(s, names)) return s;
 
   const kept = s
     .split(CLAUSE_SPLIT_RE)
     .map(c => c.trim().replace(/[.!?,;:"']+$/, '').trim())
-    .filter(c => c.length > 3 && GEOMETRY_RE.test(c) && (DIRECTION_RE.test(c) || LIGHT_RE.test(c)) && isClean(c, names));
+    .filter(c => c.length > 3 && GEOMETRY_RE.test(c) && (DIRECTION_RE.test(c) || LIGHT_RE.test(c)) && isClean(c, names)
+      && !ELIDED_SUBJECT_RE.test(c));
   if (kept.length === 0) return null;
 
   const joined = `${kept.join(', ')}.`;
@@ -170,7 +187,6 @@ function selectGeometryFacts(opts = {}) {
       .map(s => s.trim())
       .filter(Boolean);
     for (const s of sentences) {
-      if (s.length > 240) continue;            // a paragraph-long sentence carries more than geometry
       const text = sanitizeGeometrySentence(s, names);
       if (!text) continue;
       const dims = GEOMETRY_DIMENSIONS.filter(d => d.match.test(text)).map(d => d.key);

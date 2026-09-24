@@ -618,14 +618,20 @@ const DERIVE_CAMERA_MOVE = {
  * image edit that word means position in the frame, and it pinned the camera
  * the instruction was asking to move (run 6 p2, 2026-09-23).
  */
-function buildPlateDeriveInstruction(baseShot, targetShot) {
+function buildPlateDeriveInstruction(baseShot, targetShot, { relight = '' } = {}) {
   const target = SHOTS.find(s => s.id === targetShot);
   if (!target) return null;
   const from = String(baseShot || '').trim();
   const fromPhrase = from ? `painted as a ${from} shot` : 'painted at eye level';
   const move = DERIVE_CAMERA_MOVE[target.id] || `Re-paint the same place as a ${target.id} shot. ${target.definition}`;
+  // `relight`: sceneLight.relightClause — the page this plate serves declares
+  // a different time of day or weather than the base plate was painted in, so
+  // the one edit moves the camera AND re-lights (2026-09-24).
+  const light = relight
+    ? `the palette and the season stay identical. ${relight}`
+    : 'the palette and the season stay identical, and the light keeps the same direction and time of day.';
   return `This backdrop is ${fromPhrase} of a place. ${move} `
-    + 'The buildings, walls, roofs, trees, paths and surfaces keep their shape, material and colour and their arrangement relative to each other; the palette and the season stay identical, and the light keeps the same direction and time of day. The camera moves; the place stays as it is, and no one is added to it.';
+    + `The buildings, walls, roofs, trees, paths and surfaces keep their shape, material and colour and their arrangement relative to each other; ${light} The camera moves; the place stays as it is, and no one is added to it.`;
 }
 
 module.exports = {

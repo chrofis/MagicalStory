@@ -773,7 +773,7 @@ async function validateAndRepairScene(sceneJson, options = {}) {
  * @param {object} parts - the per-page inputs, already resolved by the caller
  * @param {'light'|'full'} level - Gemini-safety sanitisation level
  */
-function buildSemanticPrompt(template, { storyText, sceneHint, imagePrompt, interactionsBlock, elementsBlock, evalContext = {} } = {}, level = 'light') {
+function buildSemanticPrompt(template, { storyText, sceneHint, imagePrompt, interactionsBlock, elementsBlock, declaredLight = '', evalContext = {} } = {}, level = 'light') {
   const { sanitizeForGemini } = require('./images');
   const clean = (text) => text ? sanitizeForGemini(stripEntityIds(text), level) : null;
   return fillTemplate(template, {
@@ -800,6 +800,11 @@ function buildSemanticPrompt(template, { storyText, sceneHint, imagePrompt, inte
     // from the one builder (requiredText.js). '' when the page declares no
     // readable lettering.
     TEXT_RULES: evalContext.textRules || '',
+    // The page's `timeOfDay` / `weather` (sceneLight.js) — the same two fields
+    // the page prompt's LIGHT line is built from, so the light is judged
+    // against what the illustrator was told and never read out of prose.
+    // '' when the brief declares none: the check is then skipped.
+    DECLARED_LIGHT: declaredLight || '',
     // ONE rule for every template that authors or judges a page against its
     // text (promptBuilders.TEXT_NOT_A_CHECKLIST_RULE, 2026-09-18). The
     // CHARACTER AUTHORITY paragraph in image-semantic.txt used to state the
@@ -850,6 +855,7 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
   // judge copies the id back as `element` on every finding about that thing —
   // which is how the repair is later handed the element's picture by id.
   let elementsBlock = '(none)';
+  let declaredLightLine = '';
   try {
     const { extractSceneMetadata: getSceneMetadata } = require('./storyHelpers');
     const sceneMeta = getSceneMetadata(imagePrompt || sceneHint || '');
@@ -860,6 +866,12 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
     const objects = sceneMeta?.objects
       || (Array.isArray(sceneMeta?.fullData?.objects) ? sceneMeta.fullData.objects : null);
     elementsBlock = guard.formatElementsBlock(objects, evalContext.visualBible || null);
+    // The brief carries the fields; the built image prompt does not. Read the
+    // hint first for that reason, the prompt when the hint has no metadata.
+    const light = require('./sceneLight');
+    const fromHint = light.declaredLight(sceneHint ? getSceneMetadata(sceneHint) : null);
+    const lit = (fromHint.timeOfDay || fromHint.weather) ? fromHint : light.declaredLight(sceneMeta);
+    declaredLightLine = light.describeLight(lit);
   } catch { /* silent fallback */ }
 
   // Convert image to base64 if needed
@@ -870,7 +882,7 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
 
   // Build prompt at a given sanitization level
   const buildPrompt = (level) => buildSemanticPrompt(template, {
-    storyText, sceneHint, imagePrompt, interactionsBlock, elementsBlock, evalContext,
+    storyText, sceneHint, imagePrompt, interactionsBlock, elementsBlock, declaredLight: declaredLightLine, evalContext,
   }, level);
 
   // Parse the Gemini/Grok response text into a result object

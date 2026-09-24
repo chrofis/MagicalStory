@@ -280,6 +280,21 @@
       "severity": "block"
     },
     {
+      "id": "scene-light-generator-vs-critic",
+      "axis": "generator-vs-critic",
+      "reason": "A page's time of day and weather are its brief's `timeOfDay` / `weather` fields (server/lib/sceneLight.js, owner 2026-09-24). image-generation.txt carries them as the page's LIGHT line and empty-scene.txt as the plate's; image-semantic.txt (DECLARED LIGHT), empty-scene-qc.txt (LIGHT_CHECK) and the visual-flow judge in styleConsistency.js judge the render against the same two fields. A light rule a judge applies that the illustrator was never given — or a judge that goes back to reading the hour out of prose — is the blind grade this pair exists to prevent. The shared half is one module: every line on both sides is built from sceneLight.js.",
+      "generators": [
+        "prompts/image-generation.txt",
+        "prompts/empty-scene.txt"
+      ],
+      "critics": [
+        "prompts/image-semantic.txt",
+        "prompts/empty-scene-qc.txt",
+        "server/lib/styleConsistency.js"
+      ],
+      "severity": "block"
+    },
+    {
       "id": "cover-generator-vs-critic",
       "axis": "generator-vs-critic",
       "reason": "cover-evaluation-notes.txt is the cover-only preamble the evaluator is given (viewer gaze, flat title, and the text regime), and cover-composition.txt plus the cover hint assembly in coverIterate.js is what the cover was painted from; a text or gaze rule tightened on one side and not the other scores a cover for a brief it never had. Extracted from evalPipeline.js string literals on 2026-09-15 so this pair can name a path instead of a 5,000-line module. Widened 2026-09-23: a cover is also judged by the semantic judge (image-semantic.txt, via evalPipeline.js's cover branch), consolidated by feedback-consolidator.txt (repairPipeline.js), and its structured {TEXT_RULES} comes from requiredText.js. None of the three carried the baked title, so on staging job_1790100385959_1nitlympp the semantic judge filed the correctly painted title as CRITICAL, the consolidator ordered it removed and the front cover shipped without one (docs/audits/prompt-audit-2026-09-23/09-covers.md C1). The title generator itself is buildCoverPrompt/bakedTitleLine in promptBuilders.js, not listed here because every commit touches that module. Since 2026-09-23 the title is a required-text item (requiredText.coverRequiredTexts) in every judge's {TEXT_RULES}, the consolidator input and the inpaint clause, and the generator's title block is headed REQUIRED TEXT — change the title contract there, on both sides at once.",
@@ -389,6 +404,7 @@
           "{WORN_ON_OTHER}",
           "{NEVER_NAME_ABSENT}",
           "{SCENE_INTENT_FIELD}",
+          "{SCENE_LIGHT_FIELD}",
           "{CONCEALED_OBJECT}",
           "{CONTACT_VERB}",
           "{EYES_OPEN}",

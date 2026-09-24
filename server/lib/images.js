@@ -995,6 +995,7 @@ const PROMPT_NEVER_CUT = [
   { label: 'REQUIRED OBJECTS', why: 'the commissioned elements of the page', marker: '**REQUIRED OBJECTS' },
   { label: 'KEY STORY ELEMENTS', why: 'a cover\'s Visual Bible elements (owner, 2026-09-23: must-keep on every cover path)', marker: '**KEY STORY ELEMENTS:**' },
   { label: 'SEASON', why: 'the book-wide season, even against a reference photo from another season', marker: '**SEASON:**' },
+  { label: 'LIGHT', why: "the page's declared time of day and weather, which wins over the plate's light (sceneLight.js)", marker: '**LIGHT:**' },
   { label: 'COMPOSITION GUIDELINES', why: 'a cover\'s own composition: title-safe top third, group, bottom margin', marker: '**COMPOSITION GUIDELINES:**' },
   { label: 'ART STYLE', why: 'the style the book is commissioned in', marker: '**ART STYLE' },
   { label: 'SHOT', why: 'the page\'s declared framing (a cover carries none)' },
@@ -3872,6 +3873,8 @@ async function renderStoryPagePlate({
           // AD objects[] gates which vehicles enter the plate prompt + grid
           // (AD is the authority on vehicle presence; VB pages is only the menu).
           sceneObjects: sceneMetadata?.objects || null,
+          // The page's declared time of day and weather (sceneLight.js).
+          light: require('./sceneLight').declaredLight(sceneMetadata),
         });
         const isCoverPage = pageNumber < 0;
         const emptyResult = await generateImageOnly(emptyPrompt, [], {
@@ -4739,6 +4742,21 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       log.warn(`⚠️ [ITERATE] Page ${pageNumber}: rewrite cited facet(s) the Visual Bible does not declare — `
         + `${normalized.rejected.map(r => `${r.handle} (${r.reason})`).join(', ')} — reduced to the bare id`);
       applyObjects(normalized.objects);
+    }
+  }
+
+  // THE DECLARED LIGHT IS CARRIED FORWARD (2026-09-24, sceneLight.js). A
+  // rewrite that states no `timeOfDay` / `weather` keeps the parent brief's, in
+  // the brief text itself, so the page prompt's LIGHT line, the stored brief
+  // the judges read and the next rewrite all see it. A rewrite that states a
+  // value wins. Loud: the omission is logged.
+  {
+    const { carryForwardLightInBrief } = require('./sceneLight');
+    const lightCarry = carryForwardLightInBrief(newSceneDescription, parentSceneMetadata);
+    if (lightCarry) {
+      log.warn(`🌗 [ITERATE] Page ${pageNumber}: the rewrite dropped ${lightCarry.carried.join(' and ')} — carried forward from the parent brief`);
+      newSceneDescription = lightCarry.brief;
+      newSceneMetadata = extractSceneMetadata(newSceneDescription);
     }
   }
 

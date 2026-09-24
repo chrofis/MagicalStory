@@ -4697,11 +4697,31 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const { plateClass, PLATE_BASE_CLASS, buildPlateDeriveInstruction } = require('./server/lib/shotVocabulary');
             const shotOfPage = (pn) => (pageDataArray.find(pd => pd.pageNumber === pn)
               ?.sceneMetadata?.fullData?.shot || '').trim();
-            // Pull a representative page so we can inherit aspect / model / landmark refs.
-            const repPageNum = group.pageNumbers.find(pn => plateClass(shotOfPage(pn)) === PLATE_BASE_CLASS)
+            // ONE PLATE, ONE LIGHT (owner, 2026-09-24). A page's time of day and
+            // weather are its brief's `timeOfDay` / `weather` (sceneLight.js),
+            // never the plate's. The base plate is painted in the light most of
+            // the vantage's pages declare, and a page declaring another light
+            // gets a plate RE-LIT from the base below — same place, same camera.
+            // Before this every page inherited the representative's light:
+            // prod job_1790107559778_fcmlfa8kn p2/p4/p5/p6 all got p2's rain.
+            const { declaredLight, lightKey, describeLight, relightClause, buildPlateRelightInstruction } = require('./server/lib/sceneLight');
+            const lightOfPage = (pn) => declaredLight(pageDataArray.find(pd => pd.pageNumber === pn)?.sceneMetadata);
+            const lightVotes = new Map();
+            for (const pn of group.pageNumbers) {
+              const k = lightKey(lightOfPage(pn));
+              if (k) lightVotes.set(k, (lightVotes.get(k) || 0) + 1);
+            }
+            const commonLightKey = [...lightVotes.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+            // Pull a representative page so we can inherit aspect / model / landmark refs:
+            // a plate-sharing page, in the common light when one is declared.
+            const basePages = group.pageNumbers.filter(pn => plateClass(shotOfPage(pn)) === PLATE_BASE_CLASS);
+            const repPageNum = basePages.find(pn => lightKey(lightOfPage(pn)) === commonLightKey)
+              ?? basePages[0]
               ?? group.pageNumbers[0];
             const repPageData = pageDataArray.find(pd => pd.pageNumber === repPageNum);
             if (!repPageData) return;
+            const baseLight = lightOfPage(repPageNum);
+            const baseLightKey = lightKey(baseLight);
             const artStyleDesc = resolveArtStyle(inputData.artStyle || 'pixar', repPageData.pageImageBackend) || '';
             const layoutAspect = inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect;
             // Vantage canvas is GENERIC — no character-space hints (the canvas
@@ -4804,6 +4824,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 // against, reduced to the geometry facts (no cast, no action).
                 mainScenePrompt: repPageData.scene?.sceneDescription || null,
                 castNames: (repPageData.sceneMetadata?.fullData?.characters || []).map(c => c?.name).filter(Boolean),
+                light: baseLight,
               });
               const result = await generateImageOnly(emptyPrompt, [], {
                 aspectRatio: layoutAspect,
@@ -4843,7 +4864,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // ONE set of QC options for the plate, its retry and every plate
               // derived from it — the retry was judged on pixels only and the
               // derived plates not at all (2026-09-23, dragon run 6).
-              let plateQcOpts = { artStyle: artStyleDesc, shot: plateClass(vantageShot), pageNumber: repPageNum, landmarkPhoto: landmarkPhotos[0] || null };
+              let plateQcOpts = { artStyle: artStyleDesc, shot: plateClass(vantageShot), pageNumber: repPageNum, landmarkPhoto: landmarkPhotos[0] || null, light: baseLight };
               const { validateEmptyScene } = require('./server/lib/images');
               try {
                 const seenPlacement = new Set();
@@ -4894,6 +4915,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     sceneObjects: repSceneObjects,
                     mainScenePrompt: repPageData.scene?.sceneDescription || null,
                     castNames: (repPageData.sceneMetadata?.fullData?.characters || []).map(c => c?.name).filter(Boolean),
+                    light: baseLight,
                   });
                   const retryResult = await generateImageOnly(retryPrompt, [], {
                     aspectRatio: layoutAspect,
@@ -4946,13 +4968,31 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // one location, which is what a shared plate exists to prevent.
               // On failure the page keeps the base plate (owner's call): the
               // wrong camera on the right place beats no plate at all.
+              //
+              // A PAGE IN ANOTHER LIGHT TAKES A PLATE RE-LIT FROM THIS ONE
+              // (owner, 2026-09-24), by the same edit + QC + one fed-back retry:
+              // a relit derive keeps the place's buildings, trees and palette,
+              // which a fresh generation would not. An angled page in another
+              // light takes ONE edit that moves the camera and re-lights. A page
+              // that declares no light (a brief written before the fields) keeps
+              // the base plate's light.
               const derivedPlates = new Map();
               const baseShotForDerive = plateClass(vantageShot) === PLATE_BASE_CLASS ? vantageShot : '';
-              for (const pn of group.pageNumbers) {
+              const plateKeyOf = (pn) => {
                 const cls = plateClass(shotOfPage(pn));
-                if (cls === PLATE_BASE_CLASS || derivedPlates.has(cls)) continue;
-                const deriveInstruction = buildPlateDeriveInstruction(baseShotForDerive, cls);
+                const light = lightOfPage(pn);
+                const k = lightKey(light);
+                const relit = !!k && k !== baseLightKey;
+                return { cls, light, relit, key: `${cls}|${relit ? k : ''}` };
+              };
+              for (const pn of group.pageNumbers) {
+                const { cls, light: pageLight, relit, key } = plateKeyOf(pn);
+                if ((cls === PLATE_BASE_CLASS && !relit) || derivedPlates.has(key)) continue;
+                const deriveInstruction = cls === PLATE_BASE_CLASS
+                  ? buildPlateRelightInstruction(pageLight)
+                  : buildPlateDeriveInstruction(baseShotForDerive, cls, { relight: relit ? relightClause(pageLight) : '' });
                 if (!deriveInstruction) continue;
+                const deriveLabel = `${cls}${relit ? ` (${describeLight(pageLight)})` : ''}`;
                 try {
                   const { editImageWithPrompt } = require('./server/lib/images');
                   // The book's art style goes to the edit (it went as null, and
@@ -4973,7 +5013,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     storyEra: plateQcOpts.storyEra || null,
                     artStyle: artStyleDesc,
                     shot: cls,
-                    pageNumber: group.pageNumbers.find(pn => plateClass(shotOfPage(pn)) === cls) ?? repPageNum,
+                    // Judged on the light the derive was told to paint.
+                    light: relit ? pageLight : baseLight,
+                    pageNumber: pn,
                     // The derive keeps the base plate's landmark, which was
                     // painted from this photo — judged against it, not the words.
                     landmarkPhoto: plateQcOpts.landmarkPhoto || null,
@@ -4984,7 +5026,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   if (derivedImage) {
                     const dqc = await validateEmptyScene(derivedImage, null, `vantage-${vantageId}-${cls}`, derivedQcOpts);
                     if (!dqc.pass) {
-                      genLog.warn('vantage_plate_qc_failed', `Derived ${cls} plate for ${vantageId} failed QC: ${dqc.issues.join(', ')} — re-deriving with feedback`);
+                      genLog.warn('vantage_plate_qc_failed', `Derived ${deriveLabel} plate for ${vantageId} failed QC: ${dqc.issues.join(', ')} — re-deriving with feedback`);
                       const retryInstruction = dqc.visionFeedback
                         ? `${deriveInstruction} The previous attempt had this problem: ${dqc.visionFeedback}. Fix this in the new version.`
                         : deriveInstruction;
@@ -4996,20 +5038,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                       if (rqc && (rqc.pass || rqc.issues.length < dqc.issues.length)) {
                         derivedImage = retryImage;
                         derivedPrompt = retryInstruction;
-                        genLog.info('vantage_plate_qc_retry', `Derived ${cls} plate for ${vantageId}: re-derive ${rqc.pass ? 'passed QC' : `has ${rqc.issues.length} issue(s), fewer than ${dqc.issues.length} — kept`}`);
+                        genLog.info('vantage_plate_qc_retry', `Derived ${deriveLabel} plate for ${vantageId}: re-derive ${rqc.pass ? 'passed QC' : `has ${rqc.issues.length} issue(s), fewer than ${dqc.issues.length} — kept`}`);
                       } else {
-                        genLog.warn('vantage_plate_qc_retry', `Derived ${cls} plate for ${vantageId}: re-derive did not improve${rqc ? ` (${rqc.issues.join(', ')})` : ' (no image)'} — keeping the first derive`);
+                        genLog.warn('vantage_plate_qc_retry', `Derived ${deriveLabel} plate for ${vantageId}: re-derive did not improve${rqc ? ` (${rqc.issues.join(', ')})` : ' (no image)'} — keeping the first derive`);
                       }
                     }
                   }
                   if (derivedImage) {
-                    derivedPlates.set(cls, { imageData: derivedImage, prompt: derivedPrompt, qcRecord: derivedQcRecord });
-                    log.info(`🏛️ [VANTAGE] ${vantageId}: derived a ${cls} plate from the ${baseShotForDerive || 'base'} one`);
+                    derivedPlates.set(key, { imageData: derivedImage, prompt: derivedPrompt, qcRecord: derivedQcRecord, label: deriveLabel, light: relit ? pageLight : baseLight });
+                    log.info(`🏛️ [VANTAGE] ${vantageId}: derived a ${deriveLabel} plate from the ${baseShotForDerive || 'base'}${baseLightKey ? ` ${describeLight(baseLight)}` : ''} one`);
                   } else {
-                    log.error(`❌ [VANTAGE] ${vantageId}: ${cls} plate derive returned no image — those pages keep the base plate, drawn for a camera that cannot hold them`);
+                    log.error(`❌ [VANTAGE] ${vantageId}: ${deriveLabel} plate derive returned no image — those pages keep the base plate, drawn for a camera or a light that is not theirs`);
                   }
                 } catch (deriveErr) {
-                  log.error(`❌ [VANTAGE] ${vantageId}: ${cls} plate derive failed (${deriveErr.message}) — those pages keep the base plate`);
+                  log.error(`❌ [VANTAGE] ${vantageId}: ${deriveLabel} plate derive failed (${deriveErr.message}) — those pages keep the base plate`);
                 }
                 imageGenHeartbeat();
               }
@@ -5018,11 +5060,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // or the derived one where the page's own camera earned it.
               for (const pn of group.pageNumbers) {
                 if (sceneBackgrounds[pn]) continue; // pre-populated (e.g. trial mode)
-                const derivedForPage = derivedPlates.get(plateClass(shotOfPage(pn))) || null;
+                const derivedForPage = derivedPlates.get(plateKeyOf(pn).key) || null;
                 sceneBackgrounds[pn] = {
                   imageData: derivedForPage ? derivedForPage.imageData : plateImage,
                   prompt: derivedForPage ? derivedForPage.prompt : platePrompt,
-                  plateDerivedFor: derivedForPage ? plateClass(shotOfPage(pn)) : null,
+                  // The derive's identity — its camera class, plus the light
+                  // when it was re-lit ("eye-level (night, rain)"). Also the
+                  // plate-population key, so each distinct image is read once.
+                  plateDerivedFor: derivedForPage ? derivedForPage.label : null,
+                  // The time of day and weather this plate was painted in.
+                  plateLight: describeLight(derivedForPage ? derivedForPage.light : baseLight) || null,
                   // Refs packed into the call that produced THIS page's plate.
                   // The base plate: the refs of its own call (the retry's, when
                   // the retry won). A derived plate: the base plate itself — the
@@ -5039,7 +5086,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   ...((derivedForPage ? derivedForPage.qcRecord : plateQcRecord) || {}),
                 };
               }
-              log.info(`🏛️ [VANTAGE] ${vantageId} ${v.locationName} – ${v.name}: 1 canvas → pages [${group.pageNumbers.join(',')}]`);
+              log.info(`🏛️ [VANTAGE] ${vantageId} ${v.locationName} – ${v.name}: 1 canvas${derivedPlates.size ? ` + ${derivedPlates.size} derived` : ''} → pages [${group.pageNumbers.join(',')}]`);
             } catch (err) {
               log.warn(`⚠️ [VANTAGE] ${vantageId} failed: ${err.message}`);
             }
@@ -5076,7 +5123,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const artStyleDesc = resolveArtStyle(inputData.artStyle || 'pixar', pageData.pageImageBackend) || '';
             const camera = sceneMetadata?.setting?.camera || 'wide shot';
             const lighting = sceneMetadata?.setting?.lighting || '';
-            const weather = sceneMetadata?.setting?.weather || '';
+            // The page's declared time of day and weather (sceneLight.js) — the
+            // plate's LIGHT line. Replaces the `setting.weather` prose field.
+            const pageLight = require('./server/lib/sceneLight').declaredLight(sceneMetadata);
 
             // Use rich emptyScenePrompt from scene expansion if available, fallback to metadata fields.
             // Prepend a **SHOT:** line — the template ends with "Use the exact camera angle and
@@ -5086,7 +5135,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const shotForCamera = (sceneMetadata?.fullData?.shot || camera || '').trim();
             const shotPrefix = shotForCamera ? `**SHOT:** ${shotForCamera}\n\n` : '';
             const emptySceneDesc = shotPrefix + (expandedEmptyPrompt
-              || `**SETTING:** ${settingDesc}\n**CAMERA:** ${camera}${lighting ? `\n**LIGHTING:** ${lighting}` : ''}${weather ? `\n**WEATHER:** ${weather}` : ''}`);
+              || `**SETTING:** ${settingDesc}\n**CAMERA:** ${camera}${lighting ? `\n**LIGHTING:** ${lighting}` : ''}`);
 
             // Classify each character by depth AND lateral side so the empty scene leaves
             // room in the right band. "Leave space for 2 figures in the far background" is
@@ -5224,6 +5273,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // against, reduced to the geometry facts (no cast, no action).
               mainScenePrompt: pageData.scene?.sceneDescription || null,
               castNames: (sceneMetadata?.fullData?.characters || []).map(c => c?.name).filter(Boolean),
+              light: pageLight,
             });
 
             try {
@@ -5283,6 +5333,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   shot: shotForCamera || null,
                   pageNumber: pageData.pageNumber,
                   landmarkPhoto: pageData.landmarkPhotos?.[0] || null,
+                  light: pageLight,
                 };
                 const qc = await validateEmptyScene(result.imageData, textPos, `P${pageData.pageNumber}`, pageQcOpts);
                 if (!qc.pass) {
@@ -5313,6 +5364,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     sceneObjects: pageSceneObjects,
                     mainScenePrompt: pageData.scene?.sceneDescription || null,
                     castNames: (sceneMetadata?.fullData?.characters || []).map(c => c?.name).filter(Boolean),
+                    light: pageLight,
                   });
                   const retryResult = await generateImageOnly(retryPrompt, [], {
                     aspectRatio: layoutAspect,

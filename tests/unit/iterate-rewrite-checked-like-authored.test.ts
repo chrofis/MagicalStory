@@ -130,6 +130,10 @@ describe('which sceneBriefCheck types reach a rewrite', () => {
       // The same holds for the `shot` a plate must hold (2026-09-23): it is
       // carried over from the parent in code, so a rewrite cannot answer it.
       'shot_off_plate',
+      // Same for the declared light (2026-09-24): a rewrite that states no
+      // `timeOfDay` / `weather` gets the parent's put back in code
+      // (sceneLight.carryForwardLightInBrief, images.js), so it cannot miss them.
+      'light_undeclared',
       'textzone_character_collision', 'textzone_fullwidth_floor', 'textzone_top_floor',
       'textzone_bottom_floor', 'textzone_half_streak'];
     for (const t of SBC.REVIEWABLE) {

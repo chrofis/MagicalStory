@@ -57,11 +57,12 @@ It must be detailed enough to illustrate without additional context.
       "location": "[Location Name [LOC001]]" or "none",
       "indoorOutdoor": "[indoor/outdoor]",
       "description": "[visual setting details: colors, textures, atmosphere]",
-      "lighting": "[time of day + light quality]",
-      "weather": "[sunny/cloudy/rainy/snowy/n/a]",
+      "lighting": "[light quality and the direction it comes from]",
       "camera": "[close-up|medium|wide|ultra-wide]",
       "depthLayers": "[describe what's in foreground, midground, background]"
     },
+    "timeOfDay": "[{TIME_OF_DAY_ENUM}]",
+    "weather": "[{WEATHER_ENUM}]",
     "landmarkView": "[exterior|distant|close|interior|view-from|none — OMIT unless setting.location is a real landmark]",
     "characters": [
       {
@@ -98,7 +99,7 @@ It must be detailed enough to illustrate without additional context.
 - `objects`: include visual bible items visible in the scene with their IDs. `size` restates the object's scale for this page's shot, in the same shape the visual bible uses; it overrides the bible entry where they differ.
 - `background`: describes crowd/environment density. Tells image generator if scene feels isolated or populated.
 - `interactions`: 1-4 visible character-to-object or character-to-character contacts, one row per foreground/midground character. `priority: "essential"` for the page's central action, `"low"` for incidental gaze or pose. When several characters use ONE object together, join their names with ` + ` in one row — separate rows with the same object render as duplicate objects. Omit pure ground/floor contact, leaning on walls and sitting on generic chairs. Every row also appears in the story text as the same physical contact.
-- Use `"n/a"` for weather in indoor scenes.
+- `timeOfDay` and `weather` (required on every scene): {SCENE_LIGHT_FIELD}
 
 **Composition — every scene hint obeys these:**
 {AD_COMPOSITION}
@@ -192,11 +193,12 @@ Front cover scene hint. The main character ({MAIN_CHARACTER_NAME}) is the only p
       "location": "[Location Name [LOC001]]",
       "indoorOutdoor": "[indoor/outdoor]",
       "description": "[visual setting details]",
-      "lighting": "[time of day + light quality]",
-      "weather": "[weather]",
+      "lighting": "[light quality and the direction it comes from]",
       "camera": "wide",
       "depthLayers": "[foreground, midground, background description]"
     },
+    "timeOfDay": "[{TIME_OF_DAY_ENUM}]",
+    "weather": "[{WEATHER_ENUM}]",
     "characters": [
       {
         "id": null,
@@ -223,7 +225,7 @@ TEXT:
 
 SCENE HINT:
 ```json
-{"scene":{"imageSummary":"...","setting":{"location":"...","indoorOutdoor":"...","description":"...","lighting":"...","weather":"...","camera":"medium","depthLayers":"..."},"characters":[{"id":"CHR001","name":"...","position":"...","action":"...","expression":"...","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[]}}
+{"scene":{"imageSummary":"...","setting":{"location":"...","indoorOutdoor":"...","description":"...","lighting":"...","camera":"medium","depthLayers":"..."},"timeOfDay":"...","weather":"...","characters":[{"id":"CHR001","name":"...","position":"...","action":"...","expression":"...","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[]}}
 ```
 
 --- Page 2 ---
@@ -232,7 +234,7 @@ TEXT:
 
 SCENE HINT:
 ```json
-{"scene":{"imageSummary":"...","setting":{"location":"...","indoorOutdoor":"...","description":"...","lighting":"...","weather":"...","camera":"medium","depthLayers":"..."},"characters":[{"id":"CHR001","name":"...","position":"...","action":"...","expression":"...","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[]}}
+{"scene":{"imageSummary":"...","setting":{"location":"...","indoorOutdoor":"...","description":"...","lighting":"...","camera":"medium","depthLayers":"..."},"timeOfDay":"...","weather":"...","characters":[{"id":"CHR001","name":"...","position":"...","action":"...","expression":"...","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[]}}
 ```
 
 ... continue for ALL {PAGES} pages ...

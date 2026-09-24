@@ -43,67 +43,43 @@ const COLS = 3;                // grid columns
 const CONFIRMATION_FLAG_RATIO = 0.2;
 
 // ─────────────────────────────────────────────────────────────────────
-// VISUAL FLOW — time-of-day and facing, measured on the same grid pass.
+// VISUAL FLOW — time of day, weather and facing, measured on the same grid pass.
 //
 // A book may span days. "Page 3 is morning and page 13 is evening" is not a
-// defect, it is a story, so a rendered time can only ever be wrong against the
-// time the page's own brief DECLARED. Everything below therefore compares
-// rendered-vs-declared and nothing else; a page whose brief declares no time
+// defect, it is a story, so a rendered light can only ever be wrong against the
+// light the page's own brief DECLARED. Everything below therefore compares
+// rendered-vs-declared and nothing else; a page whose brief declares no light
 // can never produce a mismatch.
 //
-// The extraction is deliberately dumb and readable: a keyword hit in the brief
-// picks a bucket, and the sentence carrying it is handed to the judge verbatim
-// as the declaration. Nothing infers a time from the plot, from neighbouring
-// pages, or from an assumed single day.
+// The declaration is the brief's `timeOfDay` / `weather` fields (sceneLight.js,
+// owner 2026-09-24) — the same two fields the page prompt's LIGHT line and the
+// plate are built from. The keyword scan of the prose that stood here
+// (`extractDeclaredLight`) is deleted: it guessed the hour from words, and the
+// fields state it. The judge answers from the same closed vocabularies and is
+// not shown the declaration.
 //
 // WARN-ONLY, measure-first. Nothing here triggers a repair, changes a score, or
 // gates anything — the point of this pass is to find out how often the renders
 // contradict their briefs before anyone decides what to do about it.
 // ─────────────────────────────────────────────────────────────────────
 
-const TIME_BUCKETS = 'morning|midday|afternoon|evening|night|indoor-unclear';
-
-// Keywords are SPECIFIC on purpose. Bare "light" and bare "dark" are banned:
-// every brief opens with hair and clothing descriptions ("light blonde",
-// "dark red"), and keying on them classifies a character's hair as the hour.
-const TIME_KEYWORDS = [
-  ['morning', /\b(morning|early morning|sunrise|dawn|daybreak|morgens?|frühmorgens|morgendlich|sonnenaufgang)\b/i],
-  ['midday', /\b(midday|noon|middaylight|high sun|overhead sun|mittag(s|szeit)?)\b/i],
-  ['afternoon', /\b(afternoon|nachmittags?)\b/i],
-  ['evening', /\b(evening|dusk|sunset|twilight|golden hour|golden light|late day|shadows lengthen|lengthening shadows|long shadows|abends?|abendlich|dämmerung|sonnenuntergang|lange schatten)\b/i],
-  ['night', /\b(night|nighttime|midnight|moonlight|moonlit|starlight|starlit|dark sky|nachts?|mitternacht|mondlicht|sternenlicht)\b/i],
-];
+const { TIMES_OF_DAY, WEATHERS, declaredLight, timeContradicts } = require('./sceneLight');
+// The judge's vocabularies: the declared enums, plus the answer for a cell
+// whose light cannot be read. `none` (an interior) is the declared value; the
+// judge names what it sees, `indoor`.
+const TIME_BUCKETS = [...TIMES_OF_DAY, 'unclear'].join('|');
+const WEATHER_BUCKETS = [...WEATHERS.filter(w => w !== 'none'), 'indoor', 'unclear'].join('|');
 
 /**
- * The time-of-day a page's brief DECLARED, plus the sentence that declared it.
- * Returns { token: null, text: <first 200 chars> } when no keyword hits — the
- * judge still sees the opening of the brief, but code can never call it a
- * mismatch.
+ * The light a page's brief DECLARED, from its metadata fields. Nothing is
+ * read out of the prose; a brief without the fields declares nothing.
+ * @returns {{timeOfDay: string|null, weather: string|null}}
  */
-function extractDeclaredLight(sceneDescription) {
-  const brief = String(sceneDescription || '').split(/---\s*METADATA/i)[0].trim();
-  if (!brief) return { token: null, text: '' };
-
-  // EARLIEST hit wins, so a brief that sets its hour in the first lighting
-  // sentence is not overruled by a stray word further down.
-  let best = null;
-  for (const [token, re] of TIME_KEYWORDS) {
-    const m = brief.match(re);
-    if (m && (best === null || m.index < best.index)) best = { token, index: m.index };
-  }
-  if (!best) return { token: null, text: brief.slice(0, 200) };
-
-  // The sentence carrying the keyword, verbatim — that is the declaration the
-  // judge is asked to check the pixels against.
-  const sentences = brief.split(/(?<=[.!?])\s+/);
-  let cursor = 0;
-  let sentence = '';
-  for (const s of sentences) {
-    const end = cursor + s.length;
-    if (best.index >= cursor && best.index <= end) { sentence = s; break; }
-    cursor = end + 1;
-  }
-  return { token: best.token, text: (sentence || brief).trim().slice(0, 200) };
+function declaredLightOfBrief(brief) {
+  const text = String(brief || '');
+  if (!text.trim()) return { timeOfDay: null, weather: null };
+  const { extractSceneMetadata } = require('./sceneMetadata');
+  return declaredLight(extractSceneMetadata(text));
 }
 
 // ───────────────────────────────────────────────────
@@ -550,8 +526,8 @@ async function checkStoryStyleConsistency(storyData, opts = {}) {
       imageData: s.imageData,
       page: s.pageNumber,
       // Covers declare nothing (they have no brief), so they stay undefined and
-      // can never contribute a time mismatch.
-      declared: extractDeclaredLight(brief),
+      // can never contribute a mismatch.
+      declared: declaredLightOfBrief(brief),
       // Season is a BOOK-level declaration, so every page cell carries the same
       // one; the LOC ids are per page and are what the place-vs-place check
       // groups on.
@@ -600,13 +576,10 @@ async function checkStoryStyleConsistency(storyData, opts = {}) {
   // its per-cell answers instead of from its own aggregation.
   const buildPrompt = (batch) => {
     const codes = batch.map(c => c.page);
-    // Declarations are handed over verbatim, per cell. The judge is never told
-    // what the book's "overall" time is, and never asked to compare cells to
-    // each other — a story may legitimately span several days.
-    const declaredBlock = batch
-      .filter(c => c.declared?.text)
-      .map(c => `${c.page}: ${c.declared.text}`)
-      .join('\n');
+    // The judge is never shown a declaration, never told what the book's
+    // "overall" time is, and never asked to compare cells to each other — a
+    // story may legitimately span several days. It reports what it sees; code
+    // compares that to the brief's fields.
     return `You are a visual-style auditor for a children's storybook.
 
 The image is a grid of pages from one storybook. Each cell has a small RED code in its top-left corner identifying it: -1 = front cover, -2 = initial page, -3 = back cover, and the page number (1, 2, 3, …) for every other page. Return these exact code numbers.
@@ -630,16 +603,11 @@ For each flagged page, name 2-4 SPECIFIC differences. Severity:
 - "moderate" — the commissioned medium, but a defining property named in the style is clearly absent
 - "minor"    — subtle inconsistency (slight colour cast, small edge-style variation)
 
-Separately, report three OBSERVATIONS per cell. These are descriptions, not judgments — never let them change a style verdict.
-- "renderedTime": the time of day the cell's own light shows, one of: ${TIME_BUCKETS}. Use "indoor-unclear" when the light gives no time.
+Separately, report four OBSERVATIONS per cell. These are descriptions, not judgments — never let them change a style verdict.
+- "renderedTime": the time of day the cell's own light shows, one of: ${TIME_BUCKETS}. Use "unclear" when the light gives no time.
+- "renderedWeather": the weather the cell's own sky and surfaces show, one of: ${WEATHER_BUCKETS}. Use "indoor" for an interior, "unclear" when nothing shows it.
 - "renderedSeason": the season this cell's own foliage, ground cover and daylight colour show, one of: ${SEASON_BUCKETS}. Judge the cell alone; never carry a season from another cell. Use "indeterminate" for an interior, a night frame, or any cell showing no foliage, ground or sky.
 - "facing": which way the dominant figure faces — "frame-left", "frame-right", or "camera". Use "none" when no figure dominates.
-${declaredBlock ? `
-Each line below is the sentence a page's own brief used to set its light. Report only what the pixels show; do not let the sentence decide your answer, and do not assume the pages share one day.
-"""
-${declaredBlock}
-"""
-` : ''}
 ${requestedStyle ? `Separately from the per-cell verdicts, classify this grid's RENDERING MEDIUM against the commissioned art style above. Base it on the cells you judged as departing: only call it wrong for the whole grid when MOST cells departed.
 - "matches" — the same medium as commissioned. Use this even when the execution is imperfect: weaker brushwork, smoother shading, less texture, a missing named-artist mannerism, or any other fidelity shortfall is still "matches".
 - "drifted" — recognisably the commissioned medium, but a defining property named in the style is largely absent.
@@ -649,7 +617,7 @@ Judge only how it is DRAWN, never whether a scene suits its subject. A majority 
 ` : ''}Return ONLY this JSON, no prose. \`cells\` carries ONE entry per code listed above, in that order — never fewer, never merged, never a shared verdict:
 {
   "cells": [
-    { "page": <code>, "matchesStyle": true|false, "severity": "major"|"moderate"|"minor", "differences": ["<2-4 specifics; omit when matchesStyle is true>"], "renderedTime": "${TIME_BUCKETS}", "renderedSeason": "${SEASON_BUCKETS}", "facing": "frame-left"|"frame-right"|"camera"|"none" }
+    { "page": <code>, "matchesStyle": true|false, "severity": "major"|"moderate"|"minor", "differences": ["<2-4 specifics; omit when matchesStyle is true>"], "renderedTime": "${TIME_BUCKETS}", "renderedWeather": "${WEATHER_BUCKETS}", "renderedSeason": "${SEASON_BUCKETS}", "facing": "frame-left"|"frame-right"|"camera"|"none" }
   ],${requestedStyle ? `
   "dominantStyleVerdict": "matches" | "drifted" | "wrong_medium",
   "requestedStyleDifferences": ["<how the departing cells depart; empty when they match>"],` : ''}
@@ -703,6 +671,7 @@ Use the red corner code as the "page" value: -1 front cover, -2 initial page, -3
     const outliers = [];
     const observations = [];
     const TIME_SET = new Set(TIME_BUCKETS.split('|'));
+    const WEATHER_SET = new Set(WEATHER_BUCKETS.split('|'));
     const SEASON_SET = new Set(SEASON_BUCKETS.split('|'));
     const FACING_SET = new Set(['frame-left', 'frame-right', 'camera', 'none']);
     const declaredByPage = new Map(batch.map(c => [c.page, c.declared || null]));
@@ -713,7 +682,8 @@ Use the red corner code as the "page" value: -1 front cover, -2 initial page, -3
       // Observations, not judgments — recorded for every cell, outlier or not.
       // An unrecognised value is dropped rather than coerced: a made-up bucket
       // must not become a mismatch against a real declaration.
-      const rendered = TIME_SET.has(c.renderedTime) ? c.renderedTime : null;
+      const rendered = TIME_SET.has(c.renderedTime) && c.renderedTime !== 'unclear' ? c.renderedTime : null;
+      const renderedWeather = WEATHER_SET.has(c.renderedWeather) && c.renderedWeather !== 'unclear' ? c.renderedWeather : null;
       const declared = declaredByPage.get(c.page) || null;
       const cell = byPage.get(c.page) || {};
       // An unrecognised season word is dropped rather than coerced, for the
@@ -721,13 +691,18 @@ Use the red corner code as the "page" value: -1 front cover, -2 initial page, -3
       const renderedSeason = SEASON_SET.has(c.renderedSeason) ? c.renderedSeason : null;
       observations.push({
         page: c.page,
-        declared: declared?.token || null,
-        declaredText: declared?.text || '',
+        declared: declared?.timeOfDay || null,
         rendered,
-        // A mismatch needs BOTH a declaration and a readable rendered hour.
-        // "indoor-unclear" is not a contradiction of anything — an interior can
-        // legitimately look like any hour.
-        mismatch: !!(declared?.token && rendered && rendered !== 'indoor-unclear' && rendered !== declared.token),
+        // A mismatch needs BOTH a declaration and a readable rendered hour, and
+        // neighbours on the clock (dawn/morning, evening/dusk, dusk/night) are
+        // not one — see sceneLight.timeContradicts.
+        mismatch: !!(declared?.timeOfDay && rendered && timeContradicts(declared.timeOfDay, rendered)),
+        declaredWeather: declared?.weather || null,
+        renderedWeather,
+        // Weather is compared outdoors only: a declared interior (`none`) and a
+        // cell the judge reads as indoor contradict no sky.
+        weatherMismatch: !!(declared?.weather && declared.weather !== 'none' && renderedWeather
+          && renderedWeather !== 'indoor' && renderedWeather !== declared.weather),
         facing: FACING_SET.has(c.facing) ? c.facing : null,
         // Season rides on the same row. `declaredSeason` is undefined on cover
         // cells (they carry no brief and no location), so they can neither
@@ -938,10 +913,14 @@ Use the red corner code as the "page" value: -1 front cover, -2 initial page, -3
   // enter the outlier list, does not touch a score, and does not trigger a
   // repair — the pass exists to find out how often briefs and renders disagree.
   const timeMismatches = timeFlow.filter(t => t.mismatch);
+  const weatherMismatches = timeFlow.filter(t => t.weatherMismatch);
   const declaredCount = timeFlow.filter(t => t.declared).length;
-  log.info(`🕑 [VISUAL-FLOW] ${declaredCount}/${timeFlow.length} cell(s) declared a time; ${timeMismatches.length} rendered against it`);
+  log.info(`🕑 [VISUAL-FLOW] ${declaredCount}/${timeFlow.length} cell(s) declared a time; ${timeMismatches.length} rendered against it; ${weatherMismatches.length} weather mismatch(es)`);
   for (const t of timeMismatches) {
     log.warn(`🕑 [VISUAL-FLOW] time-of-day mismatch on p${t.page}: declared ${t.declared}, rendered ${t.rendered}`);
+  }
+  for (const t of weatherMismatches) {
+    log.warn(`🕑 [VISUAL-FLOW] weather mismatch on p${t.page}: declared ${t.declaredWeather}, rendered ${t.renderedWeather}`);
   }
 
   const seasonRead = seasonFlow.filter(r => r.renderedSeason && r.renderedSeason !== 'indeterminate').length;
@@ -958,7 +937,7 @@ module.exports = {
   buildStyleAuditInput,
   pageBriefMap,
   buildStyleGrid,
-  extractDeclaredLight,
+  declaredLightOfBrief,
   extractSceneLocationIds,
   compareSeasons,
   batchCells,

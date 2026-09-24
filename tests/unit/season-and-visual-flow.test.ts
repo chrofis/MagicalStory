@@ -17,7 +17,7 @@ import { describe, it, expect } from 'vitest';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { resolveSeason, normalizeSeason, seasonForDate, seasonLabel, buildSeasonNote } = require('../../server/lib/season.js');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { extractDeclaredLight, buildStyleAuditInput, pageBriefMap } = require('../../server/lib/styleConsistency.js');
+const { declaredLightOfBrief, buildStyleAuditInput, pageBriefMap } = require('../../server/lib/styleConsistency.js');
 
 describe('season resolver', () => {
   it('honours an explicit season', () => {
@@ -61,35 +61,31 @@ describe('season resolver', () => {
   });
 });
 
-describe('extractDeclaredLight — the vocabulary the briefs actually use', () => {
-  // Verbatim sentences from job_1788614817116_vxnu60yjg.
-  const cases: Array<[number, string, string | null]> = [
-    [6, 'Warm golden morning light filters through the beech and oak canopy onto the grey-brown compacted earth path.', 'morning'],
-    [10, 'The sun sits noticeably low and orange directly above the dark green forest treeline in a pale warm sky, casting long late-afternoon shadows across the clearing.', 'afternoon'],
-    [13, 'In the deep background, the sun sits directly on the jagged dark blue-grey Alpine ridge, casting long amber evening shadows across the platform boards.', 'evening'],
-    [16, 'Below the platform, the unseen valley falls away into complete darkness under the deep blue-black night sky.', 'night'],
-    // p5 states no hour — null is the correct answer, not a miss.
-    [5, 'A preschooler of average build with short tousled wavy light blonde hair and green eyes, wearing a red short-sleeved cotton T-shirt.', null],
-  ];
+// The keyword scan of the prose (extractDeclaredLight) is DELETED (owner,
+// 2026-09-24): the declaration is the brief's `timeOfDay` / `weather` fields
+// (server/lib/sceneLight.js), never a word found in the prose.
+describe("declaredLightOfBrief — the brief's fields, never its prose", () => {
+  const brief = (prose: string, meta: Record<string, unknown>) =>
+    `${prose}\n---METADATA---\n${JSON.stringify({ characters: [], objects: [], ...meta })}`;
 
-  for (const [page, brief, token] of cases) {
-    it(`p${page} → ${token ?? 'null'}`, () => {
-      expect(extractDeclaredLight(brief).token).toBe(token);
-    });
-  }
-
-  it('an absent brief is what made the whole pass inert — it must stay null, never throw', () => {
-    expect(extractDeclaredLight(undefined).token).toBeNull();
-    expect(extractDeclaredLight(undefined).text).toBe('');
+  it('reads timeOfDay and weather from the metadata', () => {
+    expect(declaredLightOfBrief(brief('A boy stands on the path.', { timeOfDay: 'night', weather: 'rain' })))
+      .toEqual({ timeOfDay: 'night', weather: 'rain' });
   });
 
-  it('does not key on "light blonde" / "dark red" hair and clothing', () => {
-    expect(extractDeclaredLight('A boy with light blonde hair in a dark red jacket.').token).toBeNull();
+  it('never reads the hour out of the prose — a brief without the fields declares nothing', () => {
+    // Verbatim sentence from job_1788614817116_vxnu60yjg p16: the old scan said "night".
+    const prose = 'Below the platform, the unseen valley falls away into complete darkness under the deep blue-black night sky.';
+    expect(declaredLightOfBrief(brief(prose, {}))).toEqual({ timeOfDay: null, weather: null });
   });
 
-  it('reads the brief only, never the METADATA block', () => {
-    const brief = 'A boy stands on the path.\n---METADATA---\n{"sceneIntent":"night sky over the valley"}';
-    expect(extractDeclaredLight(brief).token).toBeNull();
+  it('an unknown word is not a declaration', () => {
+    expect(declaredLightOfBrief(brief('A path.', { timeOfDay: 'golden hour', weather: 'sunny' })))
+      .toEqual({ timeOfDay: null, weather: null });
+  });
+
+  it('an absent brief declares nothing and never throws', () => {
+    expect(declaredLightOfBrief(undefined)).toEqual({ timeOfDay: null, weather: null });
   });
 });
 
@@ -108,8 +104,10 @@ describe('extractDeclaredLight — the vocabulary the briefs actually use', () =
  */
 describe("buildStyleAuditInput — the repair pipeline's style-audit projection", () => {
   // Verbatim from job_1788641639919_mpjwlzkf1.
-  const P7 = 'Soft orange and pale grey dusk light fills the evening sky above the heavy tree canopies.';
-  const P13 = 'The dense horse chestnut tree canopy above blocks out the night sky, casting deep shadows over the cobbles.';
+  const withLight = (prose: string, timeOfDay: string) =>
+    `${prose}\n---METADATA---\n${JSON.stringify({ characters: [], objects: [], timeOfDay, weather: 'clear' })}`;
+  const P7 = withLight('Soft orange and pale grey dusk light fills the evening sky above the heavy tree canopies.', 'dusk');
+  const P13 = withLight('The dense horse chestnut tree canopy above blocks out the night sky, casting deep shadows over the cobbles.', 'night');
   const P1 = 'Margaret — an elderly woman of average build, wearing a soft purple long-line wool cardigan.';
 
   // Exactly what storyJobPipeline hands the repair pipeline: page rows keyed
@@ -140,12 +138,11 @@ describe("buildStyleAuditInput — the repair pipeline's style-audit projection"
     const input = buildStyleAuditInput(pipelineStoryData, bestByPage);
     expect(input.sceneImages.map((s: any) => s.pageNumber)).toEqual([1, 7, 13]);
     expect(input.sceneImages.every((s: any) => !!s.sceneDescription)).toBe(true);
-    // The bug in one assertion: dusk must be declared, not null.
+    // The bug in one assertion: the brief reaches the audit, fields and all.
     const p7 = input.sceneImages.find((s: any) => s.pageNumber === 7);
-    expect(extractDeclaredLight(p7.sceneDescription).token).toBe('evening');
-    expect(extractDeclaredLight(p7.sceneDescription).text).toContain('dusk');
+    expect(declaredLightOfBrief(p7.sceneDescription)).toEqual({ timeOfDay: 'dusk', weather: 'clear' });
     const p13 = input.sceneImages.find((s: any) => s.pageNumber === 13);
-    expect(extractDeclaredLight(p13.sceneDescription).token).toBe('night');
+    expect(declaredLightOfBrief(p13.sceneDescription)).toEqual({ timeOfDay: 'night', weather: 'clear' });
   });
 
   it('carries the picked-best pixels, never the input page rows', () => {

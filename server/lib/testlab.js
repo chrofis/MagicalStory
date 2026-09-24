@@ -813,6 +813,9 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
     // AD objects[] gates which vehicles enter the plate prompt + grid — same
     // gate production runs (AD is the authority on vehicle presence).
     sceneObjects: meta.objects || null,
+    // The page's declared time of day and weather — the plate's LIGHT line, as
+    // at every production plate call site (sceneLight.js).
+    light: require('./sceneLight').declaredLight(meta),
     // The geometry facts the plate is GRADED on (validateEmptyScene reads the
     // same scene prose). Production passes these at every page/vantage plate
     // call site; without them the Lab renders a plate blind to the geometry and
@@ -851,6 +854,7 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
       artStyle: plateStyle,
       shot: (meta.fullData?.shot || meta.shot || '').trim() || null,
       landmarkPhoto: ctx.landmarkPhotos?.[0] || null,
+      light: require('./sceneLight').declaredLight(meta),
     });
     qc = { pass: qcRes.pass, issues: qcRes.issues || [], visionFeedback: qcRes.visionFeedback || null };
   } catch (err) {

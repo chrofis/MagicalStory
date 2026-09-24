@@ -36,6 +36,7 @@ const { getSwissStoryResearch, getSwissCityById } = require('./swissStories');
 const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata, resolveTextStagePictureSpec, buildTextStagePictureSpecs, SHARED_GRIP_RULE } = require('./sceneMetadata');
 const { resolveClothingForPage, buildUsedClothingText, buildAvailableAvatarsForPrompt } = require('./clothingResolve');
 const { seasonLabel, buildSeasonNote, buildSeasonInstruction } = require('./season');
+const { SCENE_LIGHT_FIELD_RULE, buildLightLine, declaredLight, TIME_OF_DAY_ENUM, WEATHER_ENUM } = require('./sceneLight');
 const { isNotSetRelationship, isStrangersRelationship } = require('./relationships');
 const { VB_ELEMENT_BUDGET } = require('./vbElementBudget');
 
@@ -2907,6 +2908,9 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     WORN_ON_OTHER: WORN_ON_OTHER_RULE,
     NEVER_NAME_ABSENT: ABSENT_THING_RULE,
     SCENE_INTENT_FIELD: SCENE_INTENT_FIELD_RULE,
+    // The page's declared light (sceneLight.js) — one rule for every brief author
+    // and the scene review's check (sibling set scene-light-generator-vs-critic).
+    SCENE_LIGHT_FIELD: SCENE_LIGHT_FIELD_RULE,
     // No TEXT_NOT_A_CHECKLIST: the page text is written AFTER these briefs, so
     // this call never sees it and a rule about it cannot apply (owner,
     // 2026-09-23). The per-page Art Director and both iterate templates see
@@ -3230,6 +3234,9 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     WORN_ON_OTHER: WORN_ON_OTHER_RULE,
     NEVER_NAME_ABSENT: ABSENT_THING_RULE,
     SCENE_INTENT_FIELD: SCENE_INTENT_FIELD_RULE,
+    // The page's declared light (sceneLight.js) — one rule for every brief author
+    // and the scene review's check (sibling set scene-light-generator-vs-critic).
+    SCENE_LIGHT_FIELD: SCENE_LIGHT_FIELD_RULE,
     // ONE rule for every template that authors or judges a page against its
     // text — see TEXT_NOT_A_CHECKLIST_RULE. The brief author's half is the
     // PERMISSION: the page text may name more than the frame stages.
@@ -3689,6 +3696,9 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     WORN_ON_OTHER: WORN_ON_OTHER_RULE,
     NEVER_NAME_ABSENT: ABSENT_THING_RULE,
     SCENE_INTENT_FIELD: SCENE_INTENT_FIELD_RULE,
+    // The page's declared light (sceneLight.js) — one rule for every brief author
+    // and the scene review's check (sibling set scene-light-generator-vs-critic).
+    SCENE_LIGHT_FIELD: SCENE_LIGHT_FIELD_RULE,
     // ONE rule for every template that authors or judges a page against its
     // text — see TEXT_NOT_A_CHECKLIST_RULE. An iterate rewrites the WHOLE
     // brief, so the permission to stage one moment has to travel with it.
@@ -4927,6 +4937,12 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       // renderer must honour even when an attached landmark reference photo
       // was shot in a different season (decisions.md 2026-08-16).
       SEASON_NOTE: buildSeasonNote(inputData || {}),
+      // The page's declared time of day and weather (sceneLight.js), a fixed
+      // line from the brief's two fields. In the protected tail
+      // (images.js PROMPT_NEVER_CUT marker **LIGHT:**) and it wins over the
+      // plate's light — a shared or re-lit plate never decides the hour.
+      // '' when the brief declares no light (written before the fields).
+      LIGHT_NOTE: buildLightLine(declaredLight(metadata)),
       // See the declarations: one constant per rule, mirrored by the judge rule
       // it answers (D-24, D-16b). The template places both at the very end, in
       // the protected tail.
@@ -10411,6 +10427,8 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
     // 7b / 10: the plan's close-up wins — the constant the Art Director gets
     // as 11c and `shot_widened` states (shotVocabulary.CLOSEUP_KEPT_RULE).
     CLOSEUP_KEPT: CLOSEUP_KEPT_RULE,
+    // Check 3a, from the one rule every brief author is given (sceneLight.js).
+    SCENE_LIGHT_FIELD: SCENE_LIGHT_FIELD_RULE,
   });
 }
 
@@ -10789,6 +10807,11 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       // Same cap as the full path's Title Page Objects (visualBible.js).
       COVER_ELEMENT_CAP: String(COVER_KEY_ELEMENT_CAP),
       LANDMARKS: landmarksInstruction,
+      // The declared light of every trial scene (sceneLight.js): the same two
+      // enums and the same rule the Art Director and the iterate rewrite get.
+      TIME_OF_DAY_ENUM: TIME_OF_DAY_ENUM.replace(/ \| /g, '|'),
+      WEATHER_ENUM: WEATHER_ENUM.replace(/ \| /g, '|'),
+      SCENE_LIGHT_FIELD: SCENE_LIGHT_FIELD_RULE,
       // Same resolver the trial's images use, so prose and pictures agree.
       SEASON: buildSeasonInstruction(inputData),
       MAIN_CHARACTER_NAME: mainChar?.name || 'the main character',
@@ -11384,6 +11407,9 @@ module.exports = {
   WORN_ON_OTHER_RULE,
   ABSENT_THING_RULE,
   SCENE_INTENT_FIELD_RULE,
+  // Re-exported from sceneLight.js: the parity tests read every brief-authoring
+  // rule off this module.
+  SCENE_LIGHT_FIELD_RULE,
   // ONE rule for the nine templates that author or judge a page against its
   // text — see TEXT_NOT_A_CHECKLIST_RULE. Exported so the four fill sites that
   // live outside this file (prompts.js, evalPipeline.js, sceneValidator.js,

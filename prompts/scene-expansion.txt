@@ -148,6 +148,8 @@ Then a single-line JSON object:
   "aboard": "VEH001",
   "landmarkView": "exterior",
   "era": "present day",
+  "timeOfDay": "midday",
+  "weather": "none",
   "objects": ["LOC001", "ART002"],
 <!-- TEXT_OVERLAY_BEGIN -->
   "textPosition": "top-left|top-right|bottom-left|bottom-right|top-full|bottom-full",
@@ -168,6 +170,8 @@ Then a single-line JSON object:
 ### Field rules
 
 **`sceneIntent`** (required): {SCENE_INTENT_FIELD}
+
+**`timeOfDay` / `weather`** (required): {SCENE_LIGHT_FIELD}
 
 **`characters[]`**
 - One entry per main or primary character in the scene. Secondary characters never appear here — they have no avatar, so no clothing category can apply to them.

@@ -170,14 +170,14 @@ Only a place listed in the REAL LANDMARKS section above gets `isRealLandmark: tr
 
 {PLACE_SEPARATE} {PLACE_INSIDE_OUTSIDE}
 
-A location shown from one viewpoint needs no `vantages[]`. Give it `vantages[]` and split it when the same place appears from a fundamentally different camera position — exterior/interior, on a structure/beside it, wide vista/close on one element, approach/arrival. Split it too when its pages differ in time of day or weather: the plate carries the light. Never split for a different cast. An object with `states[]` is cited by a page as `ART###.N`, the state whose `pages` include that page; otherwise the bare `ART###`. Vantage ids are `LOC###.N` from 1; each carries `name` (3-8 words), `shot` (one of {SHOT_ENUM}; {VANTAGE_SHOT}), a 2-3 sentence background-only `description` of what the place looks like from here, an `emptyScenePrompt` (the plate, rules below), and `pages`. Every page in the location's `pages` appears in exactly one vantage.
+A location shown from one viewpoint needs no `vantages[]`. Give it `vantages[]` and split it when the same place appears from a fundamentally different camera position — exterior/interior, on a structure/beside it, wide vista/close on one element, approach/arrival. Never split for a different cast, time of day or weather: each page declares its light in `timeOfDay` and `weather`, and the plate is painted, or re-lit, in that page's light. An object with `states[]` is cited by a page as `ART###.N`, the state whose `pages` include that page; otherwise the bare `ART###`. Vantage ids are `LOC###.N` from 1; each carries `name` (3-8 words), `shot` (one of {SHOT_ENUM}; {VANTAGE_SHOT}), a 2-3 sentence background-only `description` of what the place looks like from here, an `emptyScenePrompt` (the plate, rules below), and `pages`. Every page in the location's `pages` appears in exactly one vantage.
 
 One backdrop plate is painted per vantage, and every page of that vantage is drawn on it. A location with no `vantages[]` carries its single plate in its own `emptyScenePrompt`. A page whose backdrop the shared plate cannot hold — a different camera position, a different part of the place, a framing the plate has no room for — takes a vantage of its own, with its own plate. Decide that split here, from the plan lines: a plate is written once for the pages that share it, never once per page.
 
 **`emptyScenePrompt`** — one plate per vantage
 - 2-3 sentences describing only the background. Every page of the vantage is drawn on this one plate; you write it once, here, and never again on a page.
 - The framing the vantage's `shot` names: a close vantage gets a close stage (the wall, the doorway, the table corner), a wide vantage the wide setting. Never an establishing wide shot for a close vantage.
-- The plate carries this vantage's geometry: the same direction and the same gradient for any path, river, road, corridor, shoreline or horizon — a route the pages climb rises away from the camera, one they descend falls away; the vanishing point or opening named as a frame position (upper-right, lower-centre); the dominant diagonals; a lighting direction that matches the story's time and weather at this place. When the camera is aboard a vessel or inside a structure (rule 11d), it is that view's geometry — the rail's line, the deck's recession, the direction the light enters.
+- The plate carries this vantage's geometry: the same direction and the same gradient for any path, river, road, corridor, shoreline or horizon — a route the pages climb rises away from the camera, one they descend falls away; the vanishing point or opening named as a frame position (upper-right, lower-centre); the dominant diagonals; the direction the light comes from. The plate names no time of day and no weather — the pages declare those. When the camera is aboard a vessel or inside a structure (rule 11d), it is that view's geometry — the rail's line, the deck's recession, the direction the light enters.
 - The plate describes only what the camera sees from this vantage — never the exterior of the vehicle or structure the camera stands on.
 - Foreground, midground and background bands show the place's own ground, floor, deck or water continuing unbroken — figures are composited into them on every page that uses this plate, so those bands are written as the scene's own surface and never as a reference to the figures themselves. Everywhere else the room or landscape keeps its furnishing; never clear the whole frame.
 - The geography gives a standing character footing at every depth the pages on this vantage place one — a bank, path, floor, deck or walkway, never open water or air under a standing figure. A plan line that puts a figure where nothing standable exists moves the figure or takes another vantage. A character inside a shaft, pit or hollow stands on its floor: that floor is the standable surface, shown from within (rule 11e).
@@ -384,6 +384,8 @@ Then a single-line JSON object:
   "aboard": "VEH001",
   "landmarkView": "exterior",
   "era": "present day",
+  "timeOfDay": "midday",
+  "weather": "none",
   "objects": ["LOC001", "ART002"],
 <!-- TEXT_OVERLAY_BEGIN -->
   "textPosition": "top-left|top-right|bottom-left|bottom-right|top-full|bottom-full",
@@ -404,6 +406,8 @@ Then a single-line JSON object:
 ### Field rules
 
 **`sceneIntent`** (required): {SCENE_INTENT_FIELD}
+
+**`timeOfDay` / `weather`** (required): {SCENE_LIGHT_FIELD}
 
 **`characters[]`**
 - One entry per main or primary character in the scene. Secondary characters never appear here.

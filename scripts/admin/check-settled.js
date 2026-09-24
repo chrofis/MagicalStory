@@ -49,6 +49,14 @@ const CHECKS = [
     verdict: "A VB cell's drawn AREA is not the size lever - measured and killed 2026-09-19 (docs/SETTLED.md)",
   },
   {
+    // The page render used to be told to copy the plate's light, so every page on a
+    // shared plate took the representative page's weather (decisions.md 2026-09-24).
+    name: "A page's light is its declared timeOfDay / weather, never the plate's",
+    dirs: ['prompts'], ext: ['.txt'],
+    pattern: /geography and light direction|split it too when its pages differ in time of day/i,
+    verdict: "A page's time of day and weather are its brief's fields; a plate in another light is re-lit, never inherited (docs/SETTLED.md)",
+  },
+  {
     name: 'Swiss orthography: ss, never eszett',
     dirs: ['prompts', path.join('client', 'src')], ext: ['.txt', '.ts', '.tsx', '.js', '.jsx', '.json'],
     pattern: /ß/,

@@ -6,6 +6,8 @@ Generate a SINGLE illustration of the background environment. Paint only what th
 
 {EMPTY_SCENE_DESCRIPTION}
 
+{LIGHT_NOTE}
+
 {SCENE_GEOMETRY}
 
 {CHARACTER_SPACE}

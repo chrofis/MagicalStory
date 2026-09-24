@@ -650,6 +650,9 @@ function guardPromptString(prompt, context = 'unknown') {
  *   pages array, decides what is in frame. Pass the SAME list to
  *   buildEmptySceneVbGrid so prompt and reference grid agree.
  * @param {number} [opts.pageNumber]       - Page number, for sanitizer logging
+ * @param {{timeOfDay: string|null, weather: string|null}} [opts.light] - The
+ *   declared light of the page(s) this plate serves (sceneLight.declaredLight).
+ *   Becomes the plate's LIGHT line; omit when no page declares one.
  * @param {'landmark'|'element'} [opts.referenceKind] - Which single reference family
  *   is attached to this plate call (landmark photo XOR Visual Bible vehicle/structure
  *   render — never an invented location, which is built from its text).
@@ -772,6 +775,9 @@ function buildEmptyScenePrompt(opts = {}) {
     // the same three facts it is judged on and none of the cast.
     SCENE_GEOMETRY: geometryBlock,
     LANDMARK_FIDELITY: opts.landmarkFidelity || '',
+    // The time of day and weather this plate is painted in — the declared
+    // light of the page(s) it serves (sceneLight.js). '' when undeclared.
+    LIGHT_NOTE: opts.light ? require('../lib/sceneLight').buildLightLine(opts.light, { plate: true }) : '',
   });
 
   // Resolve VB ids to their English refs before the model sees them. The
