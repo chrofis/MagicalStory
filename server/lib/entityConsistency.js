@@ -1916,7 +1916,10 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
             const vbSecondary = vb.secondaryCharacters?.find(c => c.name === name || c.id === name);
             const vbEntry = vbAnimal || vbSecondary;
             if (vbEntry) {
-              const desc = vbEntry.extractedDescription || vbEntry.description || name;
+              // A creature's description states no size (cells get no size,
+              // 2026-09-23) — the scale it used to carry is added back here.
+              const baseDesc = vbEntry.extractedDescription || vbEntry.description || name;
+              const desc = vbAnimal ? require('./visualBible').withScaleNote(baseDesc, vbEntry) : baseDesc;
               return { name, description: sanitizeForGemini(desc, 'full'), position: '' };
             }
           }

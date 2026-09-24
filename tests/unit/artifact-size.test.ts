@@ -49,25 +49,26 @@ const ARTIFACT_AUTHORING_TEMPLATES = [
 ];
 
 describe('artifact size — builder contract', () => {
-  it('folds the authored band into the description, the way animals do', () => {
+  // 2026-09-24 (owner, 2026-09-23: "Cells get no size"): the description is
+  // what the reference cell paints, so it carries NO scale. The band reaches
+  // the page through elementScaleNote on the page-side readers instead.
+  it('keeps the authored band OUT of the description', () => {
     const desc = buildArtifactDescription({
       description: 'a squat pail with two iron bands',
       type: 'hand tool',
       scaleClass: 'knee'
     });
-    expect(desc).toContain('a squat pail with two iron bands');
-    expect(desc).toContain('stands knee-high to an adult');
-    // the phrase, never the token
-    expect(desc).not.toMatch(/Size: knee$/);
+    expect(desc).toBe('a squat pail with two iron bands');
+    expect(desc).not.toContain('knee-high');
   });
 
-  it('falls back to a stored free-text size when the bible predates the enum', () => {
+  it('keeps a pre-enum stored free-text size out of the description too', () => {
     const desc = buildArtifactDescription({
       description: 'a squat pail with two iron bands',
       type: 'hand tool',
       size: 'reaches the knee of a child standing beside it'
     });
-    expect(desc).toContain('reaches the knee of a child standing beside it');
+    expect(desc).toBe('a squat pail with two iron bands');
   });
 
   it('omits the size clause entirely when neither a band nor a size is set', () => {
@@ -117,8 +118,10 @@ describe('artifact size — builder contract', () => {
       }]
     }) + '\n```';
     const vb = parseVisualBible(outline);
+    // The stored size stays on the entry (elementScaleNote's fallback) and
+    // never in the description the cell paints.
     expect(vb.artifacts[0].size).toBe('spans a child forearm');
-    expect(vb.artifacts[0].description).toContain('spans a child forearm');
+    expect(vb.artifacts[0].description).not.toContain('spans a child forearm');
   });
 });
 

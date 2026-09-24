@@ -442,11 +442,16 @@ describe('scaleClass — the parser the pipeline actually runs', () => {
     expect(vb.artifacts[0].scaleClass).toBeNull();
   });
 
-  it('folds an animal\'s band into the description it computes, and a stored size when there is no band', () => {
-    const classed = parse({ animals: [{ id: 'ANI001', name: 'Fauchi', pages: [1], species: 'dragon', scaleClass: 'house' }] });
-    expect(classed.animals[0].description).toContain('several adults high, the size of a house');
+  // 2026-09-24 (owner, 2026-09-23: "Cells get no size"): the computed
+  // description is what the reference cell paints, so it states no scale; the
+  // band and a pre-enum stored size stay on the entry for the page readers.
+  it('computes an animal description with NO scale, and keeps the scale on the entry', () => {
+    const classed = parse({ animals: [{ id: 'ANI001', name: 'Fauchi', pages: [1], species: 'dragon', coloring: 'green', scaleClass: 'house' }] });
+    expect(classed.animals[0].description).toBe('dragon. green');
+    expect(elementScaleNote(classed.animals[0])).toBe('several adults high, the size of a house');
     const stored = parse({ animals: [{ id: 'ANI001', name: 'Fauchi', pages: [1], species: 'dragon', size: 'as long as a city bus' }] });
-    expect(stored.animals[0].description).toContain('as long as a city bus');
+    expect(stored.animals[0].description).toBe('dragon');
+    expect(elementScaleNote(stored.animals[0])).toBe('as long as a city bus');
   });
 });
 

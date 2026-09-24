@@ -17,7 +17,7 @@ const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = requi
 // this module was the prose worn-vs-held matcher deleted 2026-09-18. It stays
 // exported from visualBible.js for coverIterate.js, which still uses it.
 const { REQUIRED_TEXT_AUTHORING_RULE, declaredText } = require('./requiredText');
-const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote } = require('./visualBible');
+const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote, withScaleNote } = require('./visualBible');
 const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { castCoverage, castCoverageRule, castActionRule } = require('./castCoverage');
@@ -506,7 +506,11 @@ function buildSecondaryCharacterDescriptions(visualBible, sceneNames, knownNames
     if (e.face) parts.push(`Face: ${e.face}`);
     if (e.signatureLook) parts.push(`Distinctive: ${e.signatureLook}`);
     if (e.clothing) parts.push(`Wearing: ${e.clothing}`);
-    const baseDesc = e.description || parts.join('. ');
+    // An animal's description states no size (cells get no size, 2026-09-23),
+    // so the scale the parts list carries is added back to it here.
+    const baseDesc = e.description
+      ? (matched.kind === 'animal' ? withScaleNote(e.description, e) : e.description)
+      : parts.join('. ');
     const label = e.name || name;
     const rich = baseDesc ? `${label} (${matched.kind}). ${baseDesc}` : `${label} (${matched.kind})`;
     // Key by the metadata name (may be a VB id placeholder like "CHR001")
@@ -2605,7 +2609,9 @@ function buildRecurringElementsText(visualBible, filterIds = new Set()) {
     if (visualBible.animals && visualBible.animals.length > 0) {
       for (const animal of visualBible.animals) {
         if (!isRelevant(animal)) continue;
-        const description = animal.extractedDescription || animal.description;
+        // The Art Director sizes each thing; a creature's scale is on its line
+        // because its description states none (cells get no size, 2026-09-23).
+        const description = withScaleNote(animal.extractedDescription || animal.description, animal);
         recurringElements += `* **${animal.name}** [${animal.id}] (animal): ${description}\n`;
         // STATES, listed the way an object's are below: the Art Director needs
         // the dotted handle to cite the look this page shows.
@@ -3249,7 +3255,9 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     // Add ALL animals
     if (visualBible.animals && visualBible.animals.length > 0) {
       for (const animal of visualBible.animals) {
-        const description = animal.extractedDescription || animal.description;
+        // The Art Director sizes each thing; a creature's scale is on its line
+        // because its description states none (cells get no size, 2026-09-23).
+        const description = withScaleNote(animal.extractedDescription || animal.description, animal);
         recurringElements += `* **${animal.name}** [${animal.id}] (animal): ${description}\n`;
         // STATES, listed the way an object's are below: the Art Director needs
         // the dotted handle to cite the look this page shows.

@@ -21,6 +21,67 @@ superseded and link forward.
 
 ---
 
+## 2026-09-24 — Cells get no size: a Visual Bible description states no scale; page-side readers add it via `withScaleNote`
+
+**Context:** Owner, 2026-09-23: *"Cells get no size."* A reference cell paints one element alone, so it
+has one size, its own; a phrase that measures it against an adult names a figure the cell must not draw
+(standing rule: no scale referent inside a VB cell, 2026-09-14). But the animal description builder baked
+the `scaleClass` phrase into `description`, and `description` is exactly the cell's prose
+(`referenceSheets.elementCellText`). Staging `job_1790100385959_1nitlympp`: ANI001 "terrier-mix dog.
+stands knee-high to an adult. …", ANI002 "young dragon. stands hip-high to an adult. …", ANI003 "baby
+dragon. about as long as an adult's forearm. …" — all three reached their cell prompts. The live parser
+(`outlineParser/unified.js`) baked it for animals only; artifacts were taken verbatim there, and
+`buildArtifactDescription`'s `Size:` suffix lived only in `visualBible.parseVisualBible` /
+`parseNewVisualBibleEntries`, which have no production callers.
+
+**Decision:**
+1. `buildAnimalDescription` and `buildArtifactDescription` state no size. The live parser's hand-kept copy of
+   the animal builder is deleted; it calls `buildAnimalDescription` (one builder, both parse paths).
+2. The scale lives only in `scaleClass` (or a pre-enum stored `size`, now also kept on animal entries by both
+   `visualBible.js` parsers so `elementScaleNote`'s fallback can reach it; the live parser already kept it).
+3. Every PAGE-side reader that took a creature's scale from its description now adds it itself through
+   `withScaleNote(description, entry)` (visualBible.js — `elementScaleNote` phrase appended as `Size: …`):
+   the page fallback VISUAL REFERENCE ELEMENTS block (`buildVisualBiblePrompt`), the cover KEY STORY ELEMENTS
+   (`buildFullVisualBiblePrompt`), the plate creature block (`resolveSceneCreatures` →
+   `sceneComposite.buildPlateCreatureBlock`), both Art Director recurring-elements blocks
+   (`buildRecurringElementsText` and the per-page scene-description prompt), the brief rewriter's staged
+   figures (`iterateBeat.figurePool`), and the two detector/eval rosters (`buildSecondaryCharacterDescriptions`,
+   the entity-consistency expected-character list in `entityConsistency.js`). Animals only: those are the
+   entries whose description carried it.
+   Deliberately NOT given the scale: the GroundingDINO object-grounding hint (`buildObjectGroundingHints`) — a
+   phrase naming "an adult" in a grounding query points the detector at the adult — and the token/keyword
+   matchers (`iterateBeat.partitionAnchoredObjects`, entity keyword index), where "adult"/"stands" were spurious
+   anchors. Both simply lose the phrase with the description.
+   REQUIRED OBJECTS and the pose-line rider already stated the scale separately and are unchanged.
+4. The cell prompt and the element-cell gate read the plain description and so state no size. The gate never
+   asked a size question (its checks are kind, material/colour/parts, style); nothing changed there.
+
+**Constraint — stored bibles (old data shape):** a bible stored before this entry keeps the phrase inside its
+animal descriptions, and it is NOT stripped: stripping stored prose is text-pattern surgery on descriptions,
+which the codebase forbids. Consequences, accepted: (a) re-rendering a stored bible's animal cell still
+carries the phrase — the cell the book's pages were drawn against was rendered with it anyway; (b) on
+page-side readers the phrase appears twice for a stored animal (once in the stored prose, once from
+`withScaleNote`). Both copies come from the same `elementScaleNote` lookup, so they cannot disagree.
+Rebuilding the cell prose from the structured `species`/`coloring`/`features` fields that live-parsed stored
+animals still carry was considered and not done: it is a second derivation path for one field, and it would
+silently replace any animal `description` an author wrote directly. `elementScaleNote`'s stored-`size`
+fallback stays PERMANENT for page prompts (2026-09-15 entry, point 4).
+
+**Rationale:** the scale is load-bearing on pages (the 2026-09-11 dragon: knee-high on two pages,
+house-sized on a fourth) and meaningless-to-harmful in a cell. One field (`scaleClass`), one lookup
+(`elementScaleNote`), stated only where there is something to measure against.
+
+**Validation (rung 1, free):** replayed run 6's stored bible and stored p12 brief through old (HEAD) and new
+code. Cell prompts for ANI001/ANI002 re-described by the new builder: no scale phrase (was one each). Page 12
+image prompt: byte-identical scale lines (REQUIRED OBJECTS carried them before and after). Cover KEY STORY
+ELEMENTS and plate creature lines: still carry the phrase.
+
+**Touched:** `server/lib/visualBible.js`, `server/lib/outlineParser/unified.js`, `server/lib/promptBuilders.js`,
+`server/lib/iterateBeat.js`, `server/lib/entityConsistency.js`,
+`tests/unit/vb-cell-no-size.test.ts` (new), `tests/unit/artifact-size.test.ts`, `tests/unit/vb-scale-class.test.ts`.
+
+**Status:** ✅ active
+
 ## 2026-09-23 — The trial front cover is rendered on a people-free plate, never on the raw landmark photo; it shares buildCoverReferences with the full-account cover
 
 **Context:** Owner-reported, prod trial `job_1790169018278_n57xpnufo`. The front cover's packed slot 0

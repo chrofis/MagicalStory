@@ -936,6 +936,30 @@ function elementScaleNote(entry) {
   return size || null;
 }
 
+/**
+ * An element's appearance prose WITH its scale sentence, for PAGE-side readers
+ * only (page prompt, plate, cover, Art Director, detector). Never for a
+ * reference cell: a cell shows one element alone and states no size (owner,
+ * 2026-09-23 — `buildAnimalDescription` / `buildArtifactDescription` bake none).
+ *
+ * A bible stored before 2026-09-24 already carries the phrase inside its animal
+ * descriptions; for those the sentence appears twice. That is the accepted
+ * cost of never editing stored prose (decisions.md 2026-09-24) — the phrase is
+ * identical, so the two copies cannot disagree.
+ *
+ * @param {string} description - the appearance prose the caller already chose
+ * @param {Object} entry - the Visual Bible entry (scaleClass / stored size)
+ * @returns {string}
+ */
+function withScaleNote(description, entry) {
+  const desc = String(description || '').trim();
+  const scale = elementScaleNote(entry);
+  if (!scale) return desc;
+  const phrase = scale.replace(/\.\s*$/, '');
+  if (!desc) return `Size: ${phrase}`;
+  return `${desc.replace(/\.\s*$/, '')}. Size: ${phrase}`;
+}
+
 function normaliseScaleClass(raw, id) {
   const who = id ? String(id) : 'entry';
   if (raw === undefined || raw === null || (typeof raw === 'string' && !raw.trim())) {
@@ -1080,6 +1104,9 @@ function tryParseVisualBibleJSON(outline) {
         name: animal.name,
         appearsInPages: animal.pages || [],
         scaleClass: normaliseScaleClass(animal.scaleClass, animal.id),
+        // A pre-enum bible's free-text size. The description no longer carries
+        // it, so it must stay on the entry for elementScaleNote's fallback.
+        size: animal.size || null,
         description: buildAnimalDescription(animal),
         extractedDescription: null,
         firstAppearanceAnalyzed: false,
@@ -1265,11 +1292,13 @@ function buildAnimalDescription(animal) {
   const parts = [];
   if (animal.species) parts.push(animal.species);
   if (animal.coloring) parts.push(animal.coloring);
-  // The scale note is the enum phrase when a class is authored and the stored
-  // free-text `size` otherwise. A creature is the element whose scale drifts
-  // most and the one nothing else anchors (decisions.md 2026-09-11).
-  const animalScale = elementScaleNote(animal);
-  if (animalScale) parts.push(animalScale);
+  // NO SIZE (owner, 2026-09-23: "Cells get no size"). `description` is what a
+  // Visual Bible reference cell paints, and a cell shows one element alone —
+  // a phrase measuring it against an adult names a figure the cell must not
+  // draw. The scale lives only in `scaleClass` (or a pre-enum stored `size`)
+  // and every PAGE-side reader states it through `elementScaleNote` /
+  // `withScaleNote`. Stored bibles keep the phrase they were built with
+  // (decisions.md 2026-09-24).
   if (animal.features) parts.push(animal.features);
   return parts.join('. ');
 }
@@ -1277,23 +1306,16 @@ function buildAnimalDescription(animal) {
 /**
  * Build description string from artifact JSON
  *
- * The artifact twin of buildAnimalDescription. Artifacts used to take their
- * `description` verbatim, so `size` reached only the REQUIRED OBJECTS rider
- * (promptBuilders: `sizeNote`) and never the blocks built from the description
- * — the full Visual Bible block and the cover's KEY STORY ELEMENTS. A held
- * prop therefore had no scale anchor on the cover at all.
- *
- * The size sentence is appended, not merged: `description` is authored as
- * appearance prose and a state delta is layered onto it downstream.
+ * The artifact twin of buildAnimalDescription: the authored appearance prose,
+ * or the bare type when none was written. NO SIZE (owner, 2026-09-23) — the
+ * description is what the reference cell paints, and a cell has one size, its
+ * own. The scale lives in `scaleClass` and reaches every page-side reader
+ * through `elementScaleNote` / `withScaleNote`.
  */
 function buildArtifactDescription(artifact) {
-  const parts = [];
   const desc = typeof artifact.description === 'string' ? artifact.description.trim() : '';
-  if (desc) parts.push(desc.replace(/\.\s*$/, ''));
-  else if (artifact.type) parts.push(String(artifact.type).trim());
-  const size = elementScaleNote(artifact);
-  if (size) parts.push(`Size: ${size.replace(/\.\s*$/, '')}`);
-  return parts.filter(Boolean).join('. ');
+  if (desc) return desc.replace(/\.\s*$/, '');
+  return artifact.type ? String(artifact.type).trim() : '';
 }
 
 /**
@@ -1843,7 +1865,9 @@ function resolveSceneCreatures(visualBible, objectIds = [], pageNumber = null) {
       && Array.isArray(entry.appearsInPages)
       && entry.appearsInPages.includes(pageNumber);
     if (!byId && !byName && !byPage) continue;
-    const description = String(entry.extractedDescription || entry.description || '').trim();
+    // The plate paints the creature from this line alone, so it carries the
+    // scale: the description states none (cells get no size, 2026-09-23).
+    const description = withScaleNote(entry.extractedDescription || entry.description, entry);
     out.push({ id: entry.id || null, name: entry.name || 'creature', description });
   }
   return out;
@@ -1903,7 +1927,11 @@ These elements are NOT required - only include them if they naturally fit the im
   // landmarks keep their real-world names.
   const GENERIC_NOUN_BY_TYPE = { artifact: 'object', vehicle: 'vehicle', clothing: 'outfit' };
   for (const entry of allEntries) {
-    const description = entry.extractedDescription || entry.description;
+    // A creature's scale rides its line: the description states none (cells
+    // get no size, 2026-09-23), and this block is the page's only VB text when
+    // the brief cited no REQUIRED OBJECTS.
+    const baseDescription = entry.extractedDescription || entry.description;
+    const description = entry.type === 'animal' ? withScaleNote(baseDescription, entry) : baseDescription;
     let lead;
     if (entry.type === 'character' || entry.type === 'animal') {
       lead = `**${entry.name}**`;
@@ -2022,7 +2050,10 @@ function buildFullVisualBiblePrompt(visualBible, options = {}) {
   if (keyElements.length > 0) {
     prompt += '\n**KEY STORY ELEMENTS:**\n';
     for (const entry of keyElements) {
-      const description = entry.extractedDescription || entry.description;
+      // A creature's scale rides its line (cells get no size, 2026-09-23 — the
+      // description states none).
+      const baseDescription = entry.extractedDescription || entry.description;
+      const description = entry.type === 'animal' ? withScaleNote(baseDescription, entry) : baseDescription;
       // Image-facing text is English-only. A VB entity NAME follows the story
       // language (a German artifact name would leak into the English prompt
       // and can even get painted as lettering), so artifacts/vehicles lead
@@ -2333,6 +2364,7 @@ function tryParseNewEntriesJSON(section) {
         label: typeof animal.label === 'string' && animal.label.trim() ? animal.label.trim() : null,
         name: animal.name,
         description: buildAnimalDescription(animal),
+        size: animal.size || null,
         scaleClass: normaliseScaleClass(animal.scaleClass, animal.id),
         pages: animal.pages || [],
         source: 'story_text'
@@ -3879,6 +3911,7 @@ module.exports = {
   resolveScaleClass,
   scalePhrase,
   elementScaleNote,
+  withScaleNote,
   normaliseScaleClass,
   isGenericEntry,
   LARGE_SCALE_CLASSES,
@@ -3935,6 +3968,7 @@ module.exports = {
   updateElementReferenceImage,
   buildCharacterDescription,
   buildArtifactDescription,
+  buildAnimalDescription,
   getElementReferenceImagesForPage,
   MAX_OBJECT_STATES,
   normaliseObjectStates,

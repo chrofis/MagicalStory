@@ -111,7 +111,11 @@ function figurePool(visualBible) {
         id: String(e.id).trim().toUpperCase().split('.')[0],
         name: String(e.name).trim(),
         kind,
-        description: String(e.extractedDescription || e.description || '').trim(),
+        // A creature's description states no size (cells get no size,
+        // 2026-09-23); the rewriter sizes it from the scale added here.
+        description: kind === 'animal'
+          ? require('./visualBible').withScaleNote(e.extractedDescription || e.description, e)
+          : String(e.extractedDescription || e.description || '').trim(),
         entry: e,
       });
     }
