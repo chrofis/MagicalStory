@@ -1971,6 +1971,18 @@
       "fixedAt": "2026-09-24",
       "fixedIn": "f636291c5",
       "fix": "Owner-approved severity rule (code, structural): runEntityConsistencyChecks stamps each character's declaredOffByPage (from the same per-appearance offIds that key the grids, i.e. the page's wornItems rows); scoring.offByDesignFinding voids a finding on a page when it bills as clothing (evalBuckets), the page declares >=1 of the character's garments off, and the finding's clothingCategory is not that exact off-state grid (or is unknown). entityIssuesForPage returns it under excused (0 points), never in issues, so it never reaches the consolidator, the panel list or char-fix; entityConsistency logs each one. Stamps now carry clothingCategory and Step 4b dedupes per grid. No prompt change: the judge already gets the page state through the --off: grid (17bbd887a). Replay: p11 v0 70->85, p12 v1 -15->0, p16 v0 13->28; p9 (Max ART005 off) unchanged 75."
+    },
+    {
+      "id": "generation-tracking-dropped-after-60-min",
+      "title": "The global generation tracker silently dropped any job still processing after 60 minutes, while production stories run 52-83 minutes",
+      "reportedAt": "2026-09-24",
+      "source": "Coordinator-confirmed 2026-09-24 from code plus measured production durations (52, 54, 57, 58, 83 min). client/src/context/GenerationContext.tsx cleared the active job when Date.now()-startedAt > 60 min while the server still reported processing.",
+      "rootCause": "A client-side ORPHANED_JOB_THRESHOLD_MS (60 min) age cutoff, set when stories took minutes, second-guessed the server; the server status route already marks a stalled job failed (10-minute heartbeat watchdog, 180-minute backstop).",
+      "impact": "Readers who left the wizard (as the wait screen now tells them to) lost the nav %, the My Stories generating card and the auto-open on completion after minute 60 of every long story; only the email remained.",
+      "status": "fixed",
+      "fixedAt": "2026-09-24",
+      "fixedIn": "(this commit; hash recorded in the follow-up)",
+      "fix": "Removed the 60-minute orphan cutoff and the 24h restore cap. The tracker ends only on a terminal server status via jobStatusOutcome (client/src/context/jobStatusOutcome.ts): completed, failed/cancelled (silent for stalls, abandonment and user cancels), or the row gone (404). Pinned in tests/unit/generation-tracking-no-age-cutoff.test.ts."
     }
   ]
 }
