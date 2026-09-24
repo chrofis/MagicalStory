@@ -21,6 +21,25 @@ superseded and link forward.
 
 ---
 
+## 2026-09-24 — A page holds at most 5 paragraphs (was 4)
+
+**Context:** The 2026-09-23 text-stage round made the paragraph shape one constant
+(`PAGE_PARAGRAPHS`) filled into the writer and the refine as `{PARAGRAPH_SHAPE}` and read by the
+counter (`buildWordBudgetFindings`), with a maximum of 4. Owner, 2026-09-24: "Raise the per-page
+paragraph limit from 4 to 5."
+**Decision:** `PAGE_PARAGRAPHS.maxPerPage` 4 → 5. The writer, the refine and the counter all read the
+one constant, so all three move together. The paragraph maximum stays exact; the +50% OVER tolerance
+stays on the sentence and word counts only. The shape still fits every level's sentence band:
+5 × 4 = 20 reaches advanced's ceiling (4 × 4 = 16 did not), and 5 × 2 = 10 stays under 1st-grade's
+tolerated 13.5, so a lean five-paragraph page never trips a sentence fault on its own.
+**Rationale:** Owner call. The band check is pinned by a test so a later change to a level's
+sentence band or to the shape cannot make the two contradict each other.
+**Touched:** `server/lib/promptBuilders.js` (`PAGE_PARAGRAPHS`),
+`tests/unit/text-stage-counter-and-specs.test.ts`.
+**Status:** ✅ active
+
+---
+
 ## 2026-09-24 — One place is one place: the arc keeps inside and outside apart, and the Art Director never folds two named places or an indoor page into one outdoor location
 
 **Context:** Prod `job_1790107559778_fcmlfa8kn`. The committed arc (sentence 4) had a child "carry the
@@ -59349,3 +59368,30 @@ server/lib/testlab.js, server/routes/regeneration.js, prompts/scene-expansion-al
 prompts/cover-composition.txt, scripts/admin/sibling-registry.json, scripts/admin/verify-checks.js, tasks/verify.json,
 docs/SETTLED.md, tests/unit/covers-as-pages.test.ts and the updated cover tests.
 **Status:** ✅ active on staging — verify entry `covers-are-pages` (needs a full-story run).
+
+## 2026-09-24 — The repair panel lists a page's entity findings through the reader the score bills from
+
+**Context:** Staging `job_1790100385959_1nitlympp` back cover. The entity report there is assembled from the
+shipped picks: Julian's crop-artefact finding sits in the root `issues` only, `byClothing.standard` has 0 issues.
+The canonical score (scoring.js `entityIssuesForPage`, root issues) counts it at 0 points; the panel list did not
+show it, because `images.js collectAllIssuesForPage` and the client's Collect Feedback both read byClothing first
+and the root only when byClothing was empty.
+
+**Decision:** `scoring.entityFindingsForPage(pageNumber, report)` is the one page reader of an entity report —
+root `issues` of characters and objects, filtered by `pages` / `pagesToFix` / `pageNumber`.
+`entityIssuesForPage` bills exactly that list; `collectAllIssuesForPage` lists it; the evaluation-data route
+returns each page's `entityIssuesForPage(...).issues`, and `useRepairWorkflow` shows those instead of reading the
+report itself. byClothing issues are never read for a page list: they are the evaluator's raw copies of the
+root findings (entityConsistency.js pushes each one to the root with page attribution), so the root alone has
+every finding once.
+
+**Rationale:** the panel cannot list a finding the score did not count, or miss one it did. A second reader
+drifted once already.
+
+**Replay (rung 1, no paid call):** stored back cover — the list now holds Julian's MAJOR cutout_artifact, the
+entity bill is identical to the old reader's (penalty 0), and the replayed canonical score stays 85.
+
+**Touched:** server/lib/scoring.js, server/lib/images.js, server/routes/stories.js,
+client/src/hooks/useRepairWorkflow.ts, client/src/services/storyService.ts,
+tests/unit/entity-findings-one-reader.test.ts, tasks/bugs.json.
+**Status:** ✅ active

@@ -1911,6 +1911,18 @@
       "fixedAt": "2026-09-24",
       "fixedIn": "0765b1305",
       "fix": "scoring.entityIssuesForPage is the one entity reader (pipeline + route); the route stamps the evaluator result unmodified and returns finalScore/evalScore/entityPenalty/entity deductions from the stamped version; client reads the stored finalScore. Pinned by tests/unit/reevaluate-canonical-score.test.ts."
+    },
+    {
+      "id": "repair-panel-list-hides-root-entity-findings",
+      "title": "The repair panel's issue list omitted entity findings that live only in the entity report's root issues whenever a byClothing entry existed",
+      "reportedAt": "2026-09-24",
+      "source": "Owner-approved bug report 2026-09-24. Staging job_1790100385959_1nitlympp back cover (page -3): finalChecksReport.entity is assembled from the shipped picks; Julian carries 4 root findings (one a MAJOR cutout_artifact on page -3) while byClothing.standard has 0 issues. The canonical score counts the crop finding (at 0 points); the panel listed nothing for it.",
+      "rootCause": "Two list readers read byClothing FIRST and the root issues only when byClothing was empty: images.js collectAllIssuesForPage (re-evaluate route's fixableIssues and bbox enrichment input) and useRepairWorkflow.ts collectEntityIssues (Collect Feedback). The score reads the root through scoring.entityIssuesForPage. entityConsistency.js pushes every finding to the root with page attribution; byClothing holds the raw evaluator copies, and an assembled report carries findings at the root only.",
+      "impact": "Entity findings the score counted were missing from the panel list and from the re-evaluate route's issue list, so the admin could not see or repair them.",
+      "status": "fixed",
+      "fixedAt": "2026-09-24",
+      "fixedIn": "c64661d60",
+      "fix": "scoring.entityFindingsForPage is the one page reader of an entity report (root issues, characters + objects); entityIssuesForPage bills it, collectAllIssuesForPage lists it, and the evaluation-data route returns each page's entityIssuesForPage list, which the client shows instead of reading the report itself. Pinned by tests/unit/entity-findings-one-reader.test.ts; replayed over the stored back cover (list now has Julian's crop artefact, canonical score 85 unchanged)."
     }
   ]
 }

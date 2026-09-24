@@ -5963,61 +5963,21 @@ function collectAllIssuesForPage(scene, storyData, pageNumber) {
     issues.push(...latestRetry.preRepairEval.fixableIssues.map(i => ({ ...i, source: 'pre-repair eval' })));
   }
 
-  // Source 3: Entity consistency issues (characters)
-  const entity = storyData.finalChecksReport?.entity;
-  if (entity?.characters) {
-    for (const [charName, charResult] of Object.entries(entity.characters)) {
-      const charIssues = [];
-      if (charResult.byClothing && Object.keys(charResult.byClothing).length > 0) {
-        for (const cr of Object.values(charResult.byClothing)) {
-          if (cr.issues) charIssues.push(...cr.issues);
-        }
-      } else if (charResult.issues) {
-        charIssues.push(...charResult.issues);
-      }
-      for (const issue of charIssues) {
-        if (issue.pagesToFix?.includes(pageNumber) || issue.pageNumber === pageNumber) {
-          issues.push({
-            description: issue.fixInstruction || issue.description,
-            severity: issue.severity,
-            // Real entity class first (face_drift, hair_nuance, ...) — the
-            // report keeps it in subType with type flattened to 'consistency'.
-            type: issue.subType || issue.type || 'consistency',
-            fix: issue.canonicalVersion || issue.fixInstruction || '',
-            character: charName,
-            source: 'entity check',
-          });
-        }
-      }
-    }
-  }
-
-  // Source 4: Entity consistency issues (objects)
-  if (entity?.objects) {
-    for (const [objName, objResult] of Object.entries(entity.objects)) {
-      const objIssues = [];
-      if (objResult.byClothing && Object.keys(objResult.byClothing).length > 0) {
-        for (const cr of Object.values(objResult.byClothing)) {
-          if (cr.issues) objIssues.push(...cr.issues);
-        }
-      } else if (objResult.issues) {
-        objIssues.push(...objResult.issues);
-      }
-      for (const issue of objIssues) {
-        if (issue.pagesToFix?.includes(pageNumber) || issue.pageNumber === pageNumber) {
-          issues.push({
-            description: issue.fixInstruction || issue.description,
-            severity: issue.severity,
-            // Real entity class first (face_drift, hair_nuance, ...) — the
-            // report keeps it in subType with type flattened to 'consistency'.
-            type: issue.subType || issue.type || 'consistency',
-            fix: issue.canonicalVersion || issue.fixInstruction || '',
-            character: objName,
-            source: 'entity check',
-          });
-        }
-      }
-    }
+  // Sources 3+4: Entity consistency issues (characters + objects), read by
+  // scoring.entityFindingsForPage — the same reader the score bills from, so
+  // this list holds exactly the entity findings the page's score counted.
+  const { entityFindingsForPage } = require('./scoring');
+  for (const { name, issue } of entityFindingsForPage(pageNumber, storyData.finalChecksReport?.entity)) {
+    issues.push({
+      description: issue.fixInstruction || issue.description,
+      severity: issue.severity,
+      // Real entity class first (face_drift, hair_nuance, ...) — the
+      // report keeps it in subType with type flattened to 'consistency'.
+      type: issue.subType || issue.type || 'consistency',
+      fix: issue.canonicalVersion || issue.fixInstruction || '',
+      character: name,
+      source: 'entity check',
+    });
   }
 
   // Source 5: Image checks (cross-page consistency)

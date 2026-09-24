@@ -3639,6 +3639,8 @@ async function runBookAuditStage(target, { params = {}, promptOverride = null })
  *                 along with the rest of the beats-review/audit machinery —
  *                 the production beats layer no longer runs a reviewer or
  *                 auditor (see planCheck in promptBuilders.js).
+ * params.fromWriterText : text levels — audit data.writerText (the draft the
+ *                 production audits read) instead of the shipped text
  * params.models : comma list of TEXT_MODELS keys (default: the production
  *                 auditor for that level)
  */
@@ -3702,6 +3704,20 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
       if (!textOf.size) throw new Error(`fromExperiment: result #${idx} of #${expId} stored no page text`);
       const missing = pages.filter(p => !textOf.has(p.pageNumber)).map(p => p.pageNumber);
       if (missing.length) throw new Error(`fromExperiment: #${expId} has no text for page(s) ${missing.join(', ')}`);
+      for (const p of pages) p.text = textOf.get(p.pageNumber);
+    }
+    // params.fromWriterText (2026-09-24): audit the writer's draft
+    // (data.writerText, frozen since 2026-08-25) — the text the production
+    // audits actually read, before the refine, diff and lector changed it.
+    // The shipped text is post-refine, so replaying an audit on it measures
+    // recall on faults the chain has already removed.
+    if (params.fromWriterText === true || params.fromWriterText === 'true') {
+      if (params.fromExperiment) throw new Error('fromWriterText and fromExperiment are exclusive — pick one text source');
+      const draft = H.parseStoryPages(String(storyData.writerText || ''));
+      if (!draft.length) throw new Error(`story ${target.storyId} has no stored writerText`);
+      const textOf = new Map(draft.map(d => [d.pageNumber, d.content]));
+      const missing = pages.filter(p => !textOf.has(p.pageNumber)).map(p => p.pageNumber);
+      if (missing.length) throw new Error(`fromWriterText: writerText has no page(s) ${missing.join(', ')}`);
       for (const p of pages) p.text = textOf.get(p.pageNumber);
     }
     prompt = blind
