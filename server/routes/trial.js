@@ -415,7 +415,19 @@ const TRIAL_FUNNEL_STEPS = [
   // the truth was 50%.
   'account_created',
 ];
-const TRIAL_FUNNEL_STEP_SET = new Set(TRIAL_FUNNEL_STEPS);
+
+// Site-visit events for AD-TAGGED arrivals (client: startSiteVisitTracking in
+// client/src/utils/trialFunnel.ts). Stored in trial_events so they join to the
+// same visit_id, user and order as the funnel — but deliberately NOT funnel steps:
+// buildTrialFunnelRows() and the admin card read only TRIAL_FUNNEL_STEPS, whose
+// baseline is `landing` (/try opened). Added 2026-09-24: 3 paid clicks reached no
+// /try and left no row at all, so a page that never loaded, a 2-second bounce and
+// a minute of reading were indistinguishable.
+const SITE_VISIT_STEPS = [
+  'site_arrival',  // a page opened with campaign tags or a gclid (meta.bootMs)
+  'site_exit',     // first hide/leave of that visit (meta.seconds, meta.pages)
+];
+const ACCEPTED_EVENT_STEPS = new Set([...TRIAL_FUNNEL_STEPS, ...SITE_VISIT_STEPS]);
 
 // Steps only SOME visitors legitimately pass through. They're reported like any
 // other, but they can't be the baseline for the step after them — the
@@ -458,6 +470,19 @@ const TRIAL_META_SCHEMA = {
   preselected: 'bool',
   deepLink: 'bool',
   age: 'age',              // the child's declared age — decides which tiles were shown
+  // site_arrival / site_exit (ad-tagged visits)
+  bootMs: 'ms',            // ms from navigation start until the app ran — a slow mobile load shows here
+  seconds: 'seconds',      // time on site until the visit first hid or left the page
+  pages: 'count',          // distinct page paths viewed in that time
+};
+
+// Integer kinds and their inclusive bounds. Out of range or non-integer is dropped, like any other
+// mis-shaped value.
+const TRIAL_META_INT_BOUNDS = {
+  age: [0, 18],
+  ms: [0, 600000],
+  seconds: [0, 86400],
+  count: [1, 1000],
 };
 
 const TRIAL_META_SLUG_RE = /^[a-z0-9][a-z0-9-]{0,39}$/;
@@ -480,8 +505,9 @@ function sanitizeTrialEventMeta(meta) {
       if (typeof value === 'boolean') clean[key] = value;
     } else if (kind === 'slug') {
       if (typeof value === 'string' && TRIAL_META_SLUG_RE.test(value)) clean[key] = value;
-    } else if (kind === 'age') {
-      if (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 18) clean[key] = value;
+    } else if (TRIAL_META_INT_BOUNDS[kind]) {
+      const [min, max] = TRIAL_META_INT_BOUNDS[kind];
+      if (typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max) clean[key] = value;
     }
   }
   return Object.keys(clean).length ? clean : null;
@@ -552,7 +578,7 @@ router.post('/event', trialEventLimiter, async (req, res) => {
 
   try {
     const { visitId, step } = req.body || {};
-    if (!UUID_RE.test(String(visitId || '')) || !TRIAL_FUNNEL_STEP_SET.has(step)) return;
+    if (!UUID_RE.test(String(visitId || '')) || !ACCEPTED_EVENT_STEPS.has(step)) return;
 
     const ua = String(req.headers['user-agent'] || '');
     if (BOT_UA_RE.test(ua)) return;
@@ -3246,6 +3272,8 @@ module.exports.getTrialStatsHistory = getTrialStatsHistory;
 module.exports.getTrialFunnel = getTrialFunnel;
 module.exports.getTrialStepFunnel = getTrialStepFunnel;
 module.exports.TRIAL_FUNNEL_STEPS = TRIAL_FUNNEL_STEPS;
+module.exports.SITE_VISIT_STEPS = SITE_VISIT_STEPS;
+module.exports.ACCEPTED_EVENT_STEPS = ACCEPTED_EVENT_STEPS;
 module.exports.OPTIONAL_TRIAL_STEPS = OPTIONAL_TRIAL_STEPS;
 module.exports.sanitizeTrialEventMeta = sanitizeTrialEventMeta;
 module.exports.buildTrialFunnelRows = buildTrialFunnelRows;

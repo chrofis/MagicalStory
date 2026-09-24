@@ -63,6 +63,22 @@ const money = (micros) => `CHF ${(micros / 1e6).toFixed(2)}`;
 // and zero of that outcome. Never CHF 0.00 per trial: that would read as free paid trials.
 const per = (micros, n) => (!micros ? '-' : n ? money(micros / n) : 'no ');
 
+// Site-visit events (site_arrival / site_exit, since 2026-09-24): did the ad click load the page, how long
+// did the visitor stay, did they look beyond the landing page. One visit = one row per step, so MAX() reads
+// the single value. Dwell is readable after a dozen clicks where trial counts need hundreds.
+const VISIT_SITE_COLUMNS = `BOOL_OR(step = 'site_arrival') AS arrived,
+             MAX((meta->>'seconds')::int) FILTER (WHERE step = 'site_exit') AS seconds,
+             MAX((meta->>'pages')::int)   FILTER (WHERE step = 'site_exit') AS pages`;
+const SITE_AGGREGATES = `COUNT(*) FILTER (WHERE v.arrived) AS arrived,
+           PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY v.seconds) FILTER (WHERE v.arrived) AS median_seconds,
+           COUNT(*) FILTER (WHERE v.arrived AND v.pages > 1) AS multi_page`;
+/** "arrived  med s  >1pg" cells; '-' where no ad-tagged arrival was recorded. */
+const siteCells = (r) => {
+  const a = Number(r.arrived || 0);
+  const med = r.median_seconds == null ? '-' : `${Math.round(Number(r.median_seconds))}s`;
+  return `${String(a).padStart(7)}  ${(a ? med : '-').padStart(5)}  ${(a ? String(r.multi_page) : '-').padStart(4)}`;
+};
+
 async function main() {
   if (!CONN) {
     console.error(`Missing ${STAGING ? 'STAGING_DATABASE_URL' : 'DATABASE_URL'} in .env`);
@@ -101,7 +117,8 @@ async function main() {
              MAX(utm_campaign) AS utm_campaign,
              MAX(gclid)        AS gclid,
              MAX(user_id)      AS user_id,
-             BOOL_OR(step = $1) AS completed_trial
+             BOOL_OR(step = $1) AS completed_trial,
+             ${VISIT_SITE_COLUMNS}
         FROM trial_events
        WHERE created_at >= ${SINCE}
        GROUP BY visit_id
@@ -110,6 +127,7 @@ async function main() {
                                          WHEN v.utm_source IS NOT NULL THEN v.utm_source
                                          ELSE '(organic / direct)' END) AS campaign,
            COUNT(*)                                              AS visits,
+           ${SITE_AGGREGATES},
            COUNT(*) FILTER (WHERE v.completed_trial)              AS trials,
            COUNT(DISTINCT v.user_id)                              AS accounts,
            COUNT(DISTINCT o.user_id)                              AS buyers,
@@ -125,7 +143,7 @@ async function main() {
   const camp = new Map(rows.map((r) => [r.campaign, { ...r, impressions: 0, clicks: 0, costMicros: 0, adsNames: '' }]));
   if (spend) {
     for (const [utm, s] of spend.byUtmCampaign) {
-      const e = camp.get(utm) || { campaign: utm, visits: 0, trials: 0, accounts: 0, buyers: 0, revenue_cents: 0 };
+      const e = camp.get(utm) || { campaign: utm, visits: 0, arrived: 0, median_seconds: null, multi_page: 0, trials: 0, accounts: 0, buyers: 0, revenue_cents: 0 };
       Object.assign(e, { impressions: s.impressions, clicks: s.clicks, costMicros: s.costMicros, adsNames: [...s.campaigns].join(', ') });
       camp.set(utm, e);
     }
@@ -135,7 +153,7 @@ async function main() {
   if (!campRows.length) {
     console.log('\n  No trial_events rows and no ad spend in this window.');
   } else {
-    console.log('\n  ' + (spend ? '  impr  clicks        spend ' : '') + ' visits  trials  accts  buyers     revenue' +
+    console.log('\n  ' + (spend ? '  impr  clicks        spend ' : '') + 'arrived  med s  >1pg  visits  trials  accts  buyers     revenue' +
       (spend ? '   CHF/trial   CHF/buyer' : '') + '  campaign');
     for (const r of campRows) {
       const rev = (Number(r.revenue_cents) / 100).toFixed(2);
@@ -146,7 +164,7 @@ async function main() {
         ? `  ${per(r.costMicros || 0, Number(r.trials)).padStart(10)}  ${per(r.costMicros || 0, Number(r.buyers)).padStart(10)}`
         : '';
       console.log(
-        `  ${s}${String(r.visits).padStart(6)}  ${String(r.trials).padStart(6)}  ` +
+        `  ${s}${siteCells(r)}  ${String(r.visits).padStart(6)}  ${String(r.trials).padStart(6)}  ` +
         `${String(r.accounts).padStart(5)}  ${String(r.buyers).padStart(6)}  CHF ${rev.padStart(7)}${c}  ` +
         `${r.campaign}${r.adsNames && r.adsNames !== r.campaign ? `  [${r.adsNames}]` : ''}`
       );
@@ -160,7 +178,9 @@ async function main() {
       const paid = campRows.filter((r) => r.costMicros);
       const pt = paid.reduce((a, r) => ({ t: a.t + Number(r.trials), b: a.b + Number(r.buyers) }), { t: 0, b: 0 });
       console.log(`  PAID  ${t.k} clicks, ${money(t.c)} -> ${pt.t} trials (${per(t.c, pt.t).trim()}/trial) -> ${pt.b} buyers (${per(t.c, pt.b).trim()}/buyer)`);
-      console.log('  ("no " = money spent and none of that outcome; clicks vs visits: a click that never loaded the app is not a visit)');
+      console.log('  ("no " = money spent and none of that outcome. clicks vs arrived: a paid click whose page never ran our code');
+      console.log('   is not an arrival. med s = median seconds on site until the visitor first left; >1pg = viewed more');
+      console.log('   than the landing page. Arrivals are recorded from 2026-09-24 on.)');
     }
   }
 
@@ -168,10 +188,12 @@ async function main() {
   const kw = await pool.query(`
     WITH visit AS (
       SELECT visit_id, MAX(utm_campaign) AS utm_campaign, LOWER(MAX(utm_term)) AS utm_term, MAX(user_id) AS user_id,
-             BOOL_OR(step = $1) AS completed_trial
+             BOOL_OR(step = $1) AS completed_trial,
+             ${VISIT_SITE_COLUMNS}
         FROM trial_events WHERE created_at >= ${SINCE} GROUP BY visit_id
     )
-    SELECT v.utm_campaign, v.utm_term, COUNT(*) visits, COUNT(*) FILTER (WHERE v.completed_trial) trials,
+    SELECT v.utm_campaign, v.utm_term, COUNT(*) visits, ${SITE_AGGREGATES},
+           COUNT(*) FILTER (WHERE v.completed_trial) trials,
            COUNT(DISTINCT o.user_id) buyers
       FROM visit v
       LEFT JOIN orders o ON o.user_id = v.user_id
@@ -183,7 +205,7 @@ async function main() {
   if (spend) {
     for (const [key, s] of spend.byKeyword) {
       const [utm] = key.split('|');
-      const e = kwMap.get(key) || { utm_campaign: utm, utm_term: s.keyword, visits: 0, trials: 0, buyers: 0 };
+      const e = kwMap.get(key) || { utm_campaign: utm, utm_term: s.keyword, visits: 0, arrived: 0, median_seconds: null, multi_page: 0, trials: 0, buyers: 0 };
       Object.assign(e, { clicks: s.clicks, costMicros: s.costMicros, adGroup: s.adGroup });
       kwMap.set(key, e);
     }
@@ -194,11 +216,11 @@ async function main() {
   if (!kwRows.length) {
     console.log('  No keyword has a click or a tagged visit in this window yet.');
   } else {
-    console.log('  ' + (spend ? 'clicks        spend  ' : '') + 'visits  trials  buyers' + (spend ? '   CHF/trial' : '') + '  campaign / keyword');
+    console.log('  ' + (spend ? 'clicks        spend  ' : '') + 'arrived  med s  >1pg  visits  trials  buyers' + (spend ? '   CHF/trial' : '') + '  campaign / keyword');
     for (const r of kwRows) {
       const s = spend ? `${String(r.clicks || 0).padStart(6)}  ${money(r.costMicros || 0).padStart(11)}  ` : '';
       const c = spend ? `  ${per(r.costMicros || 0, Number(r.trials)).padStart(10)}` : '';
-      console.log(`  ${s}${String(r.visits).padStart(6)}  ${String(r.trials).padStart(6)}  ${String(r.buyers).padStart(6)}${c}  ${r.utm_campaign} / ${r.utm_term}`);
+      console.log(`  ${s}${siteCells(r)}  ${String(r.visits).padStart(6)}  ${String(r.trials).padStart(6)}  ${String(r.buyers).padStart(6)}${c}  ${r.utm_campaign} / ${r.utm_term}`);
     }
     console.log('  Keyword counts stay 0-1 for a long time at Swiss volume - read verdicts at campaign / ad-group level.');
   }

@@ -30,6 +30,20 @@ function clientSteps(): string[] {
   return [...block[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
 }
 
+function serverSiteSteps(): string[] {
+  const src = fs.readFileSync(SERVER_FILE, 'utf8');
+  const block = src.match(/const SITE_VISIT_STEPS = \[([\s\S]*?)\];/);
+  if (!block) throw new Error('SITE_VISIT_STEPS not found in server/routes/trial.js');
+  return [...block[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+}
+
+function clientSiteSteps(): string[] {
+  const src = fs.readFileSync(CLIENT_UTIL, 'utf8');
+  const block = src.match(/export type SiteVisitStep =([\s\S]*?);/);
+  if (!block) throw new Error('SiteVisitStep union not found in client/src/utils/trialFunnel.ts');
+  return [...block[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+}
+
 /** Every step name passed to trackTrialStep() anywhere in the client. */
 function calledSteps(): string[] {
   const found = new Set<string>();
@@ -50,6 +64,13 @@ function calledSteps(): string[] {
 describe('trial funnel step names', () => {
   it('server whitelist and client union are identical, in the same order', () => {
     expect(clientSteps()).toEqual(serverSteps());
+  });
+
+  it('site-visit steps: server list and client union are identical, and outside the funnel', () => {
+    // Same silent-drift risk as the funnel steps: the endpoint answers 204 to an unknown step.
+    expect(clientSiteSteps()).toEqual(serverSiteSteps());
+    const funnel = new Set(serverSteps());
+    expect(serverSiteSteps().filter((s) => funnel.has(s))).toEqual([]);
   });
 
   it('every trackTrialStep() call site uses a whitelisted step', () => {

@@ -6,7 +6,7 @@ import { ScrollToTop } from './components/common/ScrollToTop';
 import { RouteTracker } from './components/common/RouteTracker';
 import { GenerationProvider } from './context/GenerationContext';
 import { useAuth } from './context/AuthContext';
-import { captureAttribution } from './utils/trialFunnel';
+import { startSiteVisitTracking } from './utils/trialFunnel';
 
 // Route guard for admin-only pages. Without this wrapper, the AdminDashboard
 // component briefly mounts and renders before its own role check fires —
@@ -77,7 +77,9 @@ function App() {
   // was gone and every trial_events row landed with a null campaign (0 of 40
   // in production, checked 2026-08-26). This call is idempotent and writes to
   // localStorage, so /try later reads back whatever the landing page saw.
-  useEffect(() => { captureAttribution(); }, []);
+  // It also records an ad-tagged arrival and its exit (site_arrival / site_exit) —
+  // see startSiteVisitTracking in utils/trialFunnel.ts.
+  useEffect(() => { startSiteVisitTracking(); }, []);
 
   return (
     <GenerationProvider>
