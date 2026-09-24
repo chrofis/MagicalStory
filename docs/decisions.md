@@ -59709,3 +59709,11 @@ p9 v0 unchanged. Pages 14 and −3 (Julian, non-wardrobe findings) unchanged.
 server/lib/repairLogic.js, server/lib/feedbackConsolidator.js, server/lib/images.js, server/routes/regeneration.js,
 tests/unit/entity-multipage-off-by-design.test.ts, tasks/bugs.json.
 **Status:** ✅ active on staging.
+
+**Addendum (same day, after outfit versions 984c71192):** a page that WEARS an outfit version carries the
+version id in its `--off:` grid key (`offIdsForCharacter`) without taking anything off. `declaredOffByPage` is
+therefore `{ [page]: { offIds, stateIds } }`: `offIds` = the garments truly removed
+(`wardrobeVariants.removedIdsForCharacter`, version rows excluded), `stateIds` = the page's full grid key. A
+version-wearing page with nothing removed gets no entry, so its clothing findings are charged as before; a page
+that both wears a version and removes a garment counts a wardrobe finding only when it was judged in that full
+key. Pinned in `tests/unit/entity-multipage-off-by-design.test.ts` (outfit-version setup). Replay numbers unchanged.
