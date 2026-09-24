@@ -7930,12 +7930,11 @@ async function runClothingReviewStage(target, { params = {}, promptOverride = nu
   if (!TEXT_MODELS[model]) throw new Error(`Unknown model "${model}"`);
 
   const t = Date.now();
-  // `noReasoning`: measures the reviewer with reasoning off (OpenRouter
-  // {enabled:false}) against production's default — the review is the slow
-  // call in front of the avatars (audit 2026-09-23 F2).
+  // Production's reasoning setting too (MODEL_DEFAULTS.clothingReviewReasoning,
+  // off since 2026-09-24, Lab 1425/1427) — one value, both call sites.
   const res = await callTextModelStreaming(prompt, null, null, model, {
     usageLabel: 'testlab_clothing_review',
-    ...(params.noReasoning === true || params.noReasoning === 'true' ? { reasoning: { enabled: false } } : {}),
+    reasoning: MODEL_DEFAULTS.clothingReviewReasoning,
   });
   if (!String(res.text || '').trim() || res.usage?.output_tokens === 0) {
     throw new Error(`review model ${model} returned an empty response — provider failure, not a result`);
@@ -7963,6 +7962,7 @@ async function runClothingReviewStage(target, { params = {}, promptOverride = nu
   return {
     storyId: target.storyId,
     model, modelId: res.modelId,
+    reasoning: MODEL_DEFAULTS.clothingReviewReasoning,
     elapsedMs: Date.now() - t,
     cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
     usage: res.usage,

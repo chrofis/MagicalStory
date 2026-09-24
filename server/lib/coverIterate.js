@@ -518,13 +518,15 @@ function applyCoverWornHeldDedupe(photos, coverHint, visualBible) {
           if (verdict === 'unrelated') {
             // A token near-miss across two different slots. Neither side moves.
           } else if (verdict === 'conflict') {
-            // NOT a duplicate — a different item in the same body slot. The
-            // contract and the bible disagree, and the tie was being resolved
-            // silently toward the wardrobe text. The VB wins: it has a rendered
-            // reference cell, so the artifact stays in REQUIRED OBJECTS and
-            // the contradicting outfit segment goes.
-            drop = true;
-            log.warn(`⚠️ [COVER-CLOTHING] ${photo.name}: outfit segment "${segment}" and ${meta.id} "${meta.name}" are DIFFERENT items in the same slot — not a duplicate; the Visual Bible wins and the segment is dropped`);
+            // A different item in the same body slot, not a duplicate. The
+            // outfit segment is NOT dropped (owner, 2026-09-24): a garment the
+            // Visual Bible puts in place of a contract garment is an OUTFIT
+            // VERSION, marked on the entry and linked to its wearer before any
+            // cover runs, and a cover that cites it has already had its outfit
+            // text switched to the version (wornItems.
+            // applyCoverOutfitVersions). What reaches here was never
+            // attributed to this character, so neither side moves.
+            log.info(`🧥 [COVER-CLOTHING] ${photo.name}: outfit segment "${segment}" and ${meta.id} "${meta.name}" are different items in the same slot and no outfit version links them — both kept`);
           } else {
             // Worn (overlaps an outfit) and held by nobody → clothing keeps it,
             // REQUIRED OBJECTS must not list it again.
@@ -1078,10 +1080,15 @@ async function iterateCover(coverKey, storyData, options = {}) {
   {
     const sav = require('./storyAvatars');
     const fakeMeta = (coverCharacterPhotos || []).map(p => ({ name: p.name, pose: 'front', flip: false }));
-    // No `wornResolved`: covers always take the worn (base) sheet — the same
-    // ruling compositeCastBuilder states (2026-09-19). A cover has no page whose
-    // declared wornItems could pick a wardrobe-state variant.
-    await sav.applyStoryCellRefs(coverCharacterPhotos, storyData.characterAvatars || null, fakeMeta);
+    // A cover takes no off-state (it has no wornItems), but an OUTFIT VERSION
+    // follows the page rule (owner, 2026-09-24): a character whose version
+    // garment the hint cites wears the version — its outfit text and its sheet.
+    // Same helpers as the first-generation cover path.
+    const { coverVersionRows } = require('./wardrobeVariants');
+    const { applyCoverOutfitVersions } = require('./wornItems');
+    const versionRows = coverVersionRows(visualBible, (coverCharacterPhotos || []).map(p => p.name), collectCoverHintElementIds(coverHint));
+    applyCoverOutfitVersions(coverCharacterPhotos, versionRows);
+    await sav.applyStoryCellRefs(coverCharacterPhotos, storyData.characterAvatars || null, fakeMeta, { wornResolved: versionRows });
   }
 
   log.debug(`🔄 [COVER-ITERATE] ${coverKey}: ${coverCharacterPhotos.length} characters, clothing: ${coverClothing}`);

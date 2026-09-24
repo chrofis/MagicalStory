@@ -157,6 +157,91 @@ keep-list closes it (BACKLOG).
 
 ---
 
+## 2026-09-24 — The wardrobe review runs with reasoning OFF, in production and in the Lab
+
+**Context:** the wardrobe review (`beats_clothing_review`, `clothingReviewModel` deepseek-v4-pro) is the
+slow call in front of the styled-avatar kickoff. Test Lab on run 6's stored contract
+(`job_1790100385959_1nitlympp`): exp **1425** reasoning on — 232 s, 21,538 reasoning tokens, $0.071;
+exp **1427** reasoning off — 8 s, 0 reasoning tokens, $0.007. Off names the same colour and plot-garment
+faults in its analysis but rewrites fewer outfits (only Max; colour faults left unrewritten). The
+2026-09-23 entry "The wardrobe calls…" left the trade to the owner.
+
+**Decision:** owner, 2026-09-24: *"runs with reasoning/thinking OFF in production … The owner chose
+speed."* `MODEL_DEFAULTS.clothingReviewReasoning = { enabled: false }` sits next to the model in
+`server/config/models.js` (behaviour is code, not env). Production (`beatsPipeline`) and the Lab replay
+(`testlab.runClothingReviewStage`) both pass that one constant as the OpenRouter `reasoning` field; the
+Lab's `noReasoning` parameter is deleted — a replay measures what production runs. Both reports record
+the setting (`clothingReviewReport.reasoning`, Lab result `reasoning`).
+
+**Rationale:** ~3.5 minutes off the path in front of the avatars for a measured loss in rewrite coverage
+the owner accepted. One constant for both sites so the Lab can never silently measure a different
+reviewer from production (the 2026-09-23 fix to the Lab's model choice, applied to reasoning).
+
+**Touched:** `server/config/models.js`, `server/lib/beatsPipeline.js`, `server/lib/testlab.js`,
+`tests/unit/outfit-version.test.ts`, `docs/prompt-inventory.md`.
+**Status:** ✅ active — staging only
+
+---
+
+## 2026-09-24 — A garment the Art Director adds in a filled slot is a new OUTFIT VERSION with its own sheet; the default outfit is never rewritten (answers 2026-09-23 item 4; supersedes the `conflict` half of 2026-09-15 "The Visual Bible outranks the wardrobe contract")
+
+**Context:** the 2026-09-23 entry "The wardrobe contract owns garment wording" left one path open: a
+`conflict` — a Visual Bible garment that is a DIFFERENT garment in a slot the wardrobe contract already
+fills — still rewrote the outfit clause to the bible's garment, re-rendered that character's avatar from
+photos (`onWardrobeCorrected`), and the cover dedupe dropped the contradicting outfit segment. So one
+page's garment became the character's outfit on every page, and the re-render re-rolled the face.
+
+**Decision:** owner, 2026-09-24: *"this becomes a NEW OUTFIT VERSION with its own avatar sheet. The
+default outfit stays untouched."* Built on the existing wardrobe-state variant mechanism (2026-09-19
+"A garment coming off gets an avatar SHEET"), no parallel one:
+1. `applyWardrobeBibleCorrections` marks the entry `outfitVersion = {character, category, slot, replaces,
+   garment, outfit}` (`replaces` = the contract clause, `garment` = the bible's words, `outfit` = the
+   default with that one clause spliced). An entry attributed by name alone is linked `wornAs:
+   "<character>.<slot>"` so the per-page worn machinery sees it. The contract is byte-identical; nothing
+   is re-rendered. A marked entry is settled — the check skips it on a re-run.
+2. **The page that needs the garment selects the version**: a `wornItems` row declaring it, or `objects[]`
+   citing it (`wornItems.resolveWornItemsForPage`). Any other page gets no row for it at all — the default
+   outfit, no text swap, no variant sheet. A version garment declared `off` is the default outfit: nothing
+   is stripped and no off-sheet is keyed.
+3. On a version page the outfit text is the exact splice (`applyWornItemsToOutfit`, never the slot-noun
+   guess), and the state set that keys the sheet (`offIdsForCharacter`) holds the version id —
+   `styled-<category>--off:<ARTid>`, one key algebra with the off-states, so every crop, entity-grid and
+   repair site picks it up unchanged. The suffix keeps its historical name.
+4. **One new sheet per version, never the default re-rendered**: `deriveWardrobeVariantRequirements` asks
+   for the approved default sheet of the version's plain category, redressed by `redressSheetVariant`
+   with an instruction that QUOTES the version's two recorded texts (`versionRedressNote`) — nothing is
+   derived from English. A costumed-category version, or a page that wears a version AND takes a garment
+   off, gets no sheet (logged ERROR; the crop site falls back loudly to the default sheet).
+5. **Covers follow the same rule**: a cover whose hint (objects ∪ holds) cites the version garment wears
+   it — outfit text via `applyCoverOutfitVersions`, sheet via `wornResolved` — at both cover sites
+   (first generation and iterate); the streaming cover waits on `wardrobeVersionsReady` for its sheet.
+   This amends 2026-09-19 item 7 ("covers always take the worn sheet") for versions only; covers still
+   take no off-state.
+6. **Deleted (no fallback):** the contract rewrite, the transcript re-merge for a conflict, the
+   `onWardrobeCorrected` hook and its re-render in `storyJobPipeline`, and the cover dedupe's
+   "drop the contradicting segment" branch (a same-slot item nothing links now leaves both sides).
+
+**Validated (free replay, stored staging `job_1790100385959_1nitlympp`, contract + Visual Bible):**
+stored contract → 1 `adopt`, 0 versions, contract byte-identical, 0 version sheets (the 3 off-state
+variants unchanged); pre-review contract → 3 `adopt` (as in 8dbe8d28b), 0 versions. Synthetic conflict
+on the same story (a yellow raincoat linked to Levin's outer layer, cited on p1 only): 1 `conflict` → 1
+version, Levin's default outfit unchanged, one sheet requested (`standard--off:ART099`, page 1), p1
+wears the raincoat and all 10 other Levin pages keep the default fleece.
+
+**Known limits:** a version mark lives on the in-memory/stored Visual Bible, not in the transcript
+(`syncVisualBibleSection` does not copy it — same as `adopt`), so a resume that re-parses the outline
+loses it. A linked version garment on its own owner drops its element plate like any worn garment
+(`referenceCarriesItem`); if its sheet failed, the page has the default sheet plus the text.
+
+**Touched:** `server/lib/clothingCheck.js`, `server/lib/wornItems.js`, `server/lib/wardrobeVariants.js`,
+`server/lib/beatsPipeline.js`, `storyJobPipeline.js`, `server/lib/coverIterate.js`,
+`tests/unit/outfit-version.test.ts`, `tests/unit/wardrobe-vs-bible.test.ts`,
+`tests/unit/worn-garment-review-chain.test.ts`, `tests/unit/cover-worn-held-slot-conflict.test.ts`,
+`docs/prompt-inventory.md`.
+**Status:** ✅ active — staging only
+
+---
+
 ## 2026-09-24 — One place is one place: the arc keeps inside and outside apart, and the Art Director never folds two named places or an indoor page into one outdoor location
 
 **Context:** Prod `job_1790107559778_fcmlfa8kn`. The committed arc (sentence 4) had a child "carry the
@@ -48968,6 +49053,8 @@ QC retry), `server/lib/evalPipeline.js` (comment), `tests/unit/empty-scene-geome
 
 ## 2026-09-15 — The Visual Bible outranks the wardrobe contract when they dress the same body slot
 
+> → `conflict` half superseded 2026-09-24: a different garment in a filled slot is a new outfit version, the contract is never rewritten and no avatar re-renders, see "2026-09-24 — A garment the Art Director adds in a filled slot is a new OUTFIT VERSION".
+
 > → superseded 2026-09-23 (the wardrobe contract owns garment wording; the Art Director selects versions), see "2026-09-23 — The wardrobe contract owns garment wording".
 
 > → corrected 2026-09-23 (its reconcile half runs opposite to the same-day plot-critical-object entry), see "2026-09-23 — Prompt audit of job_1790100385959: corrections to earlier entries", item 7.
@@ -50309,6 +50396,8 @@ string), `client/src/types/story.ts` (`ImageVersion.prompt: string | null`),
 ---
 
 ## 2026-09-19 — A garment coming off gets an avatar SHEET, not just a sentence: per-state wardrobe variants
+
+> → item 7 amended 2026-09-24 for outfit VERSIONS only: a cover that cites a version garment wears the version sheet, see "2026-09-24 — A garment the Art Director adds in a filled slot is a new OUTFIT VERSION".
 
 **Context.** Staging `job_1789759147125_p08djwhbl` (18 pages) flips three garments: Levin's green fleece
 (off on 9 pages), his red cap (off on 2), Julian's rust scarf (off on 1). `data.characterAvatars` held
@@ -58043,6 +58132,8 @@ SHAPE band, which has not returned `standard` since the 2026-09-14 band split, s
 `scripts/admin/sibling-registry.json`, `tasks/bugs.json`, `tasks/BACKLOG.md`.
 
 ## 2026-09-23 — The wardrobe contract owns garment wording; the Art Director selects versions (supersedes the direction of both 2026-09-15 wardrobe/bible entries)
+
+> → item 4 answered 2026-09-24 (owner): a `conflict` is a new outfit version with its own sheet, see "2026-09-24 — A garment the Art Director adds in a filled slot is a new OUTFIT VERSION".
 
 **Context.** Two 2026-09-15 entries disagreed on direction: "A plot-critical worn object is described IN
 FULL in the outfit" (the wardrobe authors the words, the Visual Bible copies them) and "The Visual Bible
