@@ -1847,8 +1847,10 @@
       "source": "Found in the Lab 1433/1435 fix work (staging job_1790100385959_1nitlympp, Lindenhof, 18 pages). Read back from stories.data.sceneImages[].landmarkPhotos: p3-5 cite LOC002.2 and were served slot 2 (an aerial rooftop panorama), p6-11 cite LOC002.3 and were served slot 3 (a riverside promenade that is not the Lindenhof at all); p12-16 cite .4/.5, slots that do not exist, and the loader substituted slot 1. Only p17 carried a landmarkView.",
       "rootCause": "getLandmarkPhotosForScene / sceneMetadata parsed every `LOC###.N` into landmarkVariants and passed it as explicitVariant, which decideLandmarkPhotoSource took BEFORE pickVariantForView(landmarkView). The `.N`-is-a-photo convention predates vantages; once the Visual Bible gave locations vantages[] (`LOC###.N` = camera position) the two meanings shared one namespace. loadLandmarkPhotoVariant then hid the collision by serving another slot for a number that had none.",
       "impact": "Every story whose Art Director cites a real landmark by a vantage id: the page is anchored to an arbitrary photo of the landmark, or to a photo of a different place.",
-      "status": "open",
-      "fix": ""
+      "status": "fixed",
+      "fixedAt": "2026-09-24",
+      "fixedIn": "cb6413614",
+      "fix": "pickVariantForView is the only selector: landmarkView picks the kind, the judged photoScore ranks within it (below MIN_USABLE_PHOTO is no candidate). landmarkVariants / explicitVariant / `.0` and the loader's cross-slot substitution deleted. Trial writer emits landmarkView instead of [LOC###.N]; iterate templates cite real landmarks bare. Replay: p3-p11 slot 2/3 -> slot 1. Pinned by tests/unit/landmark-vantage-id-not-photo.test.ts. docs/decisions.md 2026-09-24."
     }
   ]
 }
