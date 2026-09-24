@@ -57933,6 +57933,8 @@ Staging receives it through `sync-landmark-index-to-staging.js` (not run — own
 
 ## 2026-09-23 — A creature or character the title names goes on the front cover: a writer rule, and a code check that only warns
 
+**SUPERSEDED the same day** by "Any Visual Bible animal, artifact or vehicle may ride on any cover" below (owner widened the scope); the warn-only check stays.
+
 **Context.** Same prod trial as the entry above (`job_1790169018278_n57xpnufo`). The title names the
 squirrel ANI001; the writer put it in the cover's `imageSummary` only, never in `objects`, so the cover got
 no Visual Bible definition and no reference cell for it. Neither writer template allowed it: the trial COVER
@@ -57975,4 +57977,74 @@ No baseline arm was run, so whether the old template also put companions on the 
 
 **Touched:** `prompts/story-trial.txt`, `prompts/scene-expansion-all.txt`, `server/lib/coverIterate.js`,
 `storyJobPipeline.js`, `tests/unit/cover-title-named-cast-warning.test.ts`.
+**Status:** ✅ active on staging.
+
+## 2026-09-23 — Any Visual Bible animal, artifact or vehicle may ride on any cover
+
+**Context.** Owner, widening the title-creature rule of the entry above: the Art Director and the trial writer
+may put ANY Visual Bible animal, artifact or vehicle on ANY cover. The templates allowed less —
+`scene-expansion-all.txt` gave all three covers "Objects: [LOC### plus 1-2 ART###]" and admitted an ANI only
+on the Title Page when the story centred on it; `story-trial.txt` allowed only the main character.
+
+**Decision.**
+1. **Full Art Director** (`scene-expansion-all.txt`): after the LOC, a cover's `Objects:` list any `ART###`,
+   `ANI###` or `VEH###` the cover calls for, at most `{COVER_ELEMENT_CAP}`, on all three covers; each one listed
+   appears in that cover's scene. The title-creature rule stays for the Title Page. Unchanged: props belong in
+   the backdrop, `holds` is one ART from Objects, secondary characters follow the cover cast lists.
+2. **Trial writer** (`story-trial.txt`): the main character stays the only PERSON; after the LOC `objects` may
+   list up to `{COVER_ELEMENT_CAP}` Visual Bible animals or artifacts (the trial bible has no vehicles), each with
+   its id and named in `imageSummary`; a title-named animal is always one of them. The JSON example gains an
+   optional element row.
+3. **One number for the cap.** `{COVER_ELEMENT_CAP}` is filled in both builders from
+   `visualBible.COVER_KEY_ELEMENT_CAP` (3) — the same constant that sizes the cover's KEY STORY ELEMENTS block, so
+   a writer can never list more elements than the prompt defines.
+4. **The listed elements are in the cover SCENE.** `buildCoverSceneFromHint` now ends with one sentence naming
+   every unheld ART/ANI/VEH the hint lists ("Also in the scene with them: …" — animals by name, things by their
+   English descriptor). Before, an unheld element reached the full-path render only as a definition and a
+   reference cell, and this prose is ALSO the brief the cover judges score against (`outlineExtract` → the
+   semantic judge's fidelity reference, which is told to catch "extra objects") — so the generator/critic pair
+   now reads the element from the same sentence. `buildPlateDescription` drops that sentence (it keys on the
+   exact lead the builder emits), so an animal is never painted into the people-free plate. The one-/two-person
+   starters now say "no other people" instead of "no other figures", which forbade the listed animal.
+5. **Vehicles get a description.** The live parse (`outlineParser/unified.js`) kept the authored shape
+   (`colorAndDetails` + `signatureElement`) with no `description`, so staging covers shipped
+   "**Vehicle**: undefined" (`job_1789343124794_z2c779f7i` initial page; 4 of 51 staging vehicles and 1 of 3
+   prod vehicles in the last 30 days). One helper, `visualBible.vehicleDescription`, now derives it in both parse
+   paths; an authored `description` stands.
+6. **Warn-only check** (`warnTitleNamedEntitiesMissingFromCover`) now scans animals, secondary characters,
+   artifacts and vehicles; front cover only; adds nothing.
+7. **Sibling registry:** new set `cover-element-carriers` (storyJobPipeline.js trial + streaming covers,
+   coverIterate.js iterate, regeneration.js) with a parity anchor on `buildCoverReferences(`.
+
+**Downstream audit (what carries an ANI/VEH, per builder).** Reference cells: every builder goes through
+`buildCoverReferences` → `getElementReferenceImagesByIds`, which already searched animals and vehicles.
+KEY STORY ELEMENTS: `collectCoverHintElementIds` already admitted ANI/VEH. REQUIRED OBJECTS: only the trial
+cover has one (its JSON carries a metadata `objects[]`, and the REQUIRED OBJECTS loop handles animals and
+vehicles). **Full-path covers carry NO REQUIRED OBJECTS block for any element type, ART included** — the
+scene is code-built prose with no metadata block, by the earlier design noted at `buildCoverPrompt`. So ANI/VEH
+now have parity with ART on every path; adding REQUIRED OBJECTS to full-path covers is a separate decision
+(BACKLOG).
+
+**Constraints recorded, not fixed.** (a) The five stored stories whose vehicles lack `description` keep
+"undefined" in KEY STORY ELEMENTS on an iterate or regeneration — the fix is at parse time. (b) On an over-cap
+full-path cover the shrink's last resort trims the head from its END, and with no REQUIRED OBJECTS block the
+KEY STORY ELEMENTS, SEASON and COMPOSITION sections sit at the end of the head: staging
+`job_1789853503332_riqncqg1i` back cover shipped with all three gone (its animal survived only as "holds the
+Zippi"). (c) The composite cover path (over five figures) pastes only the first ART as a prop cutout; an ANI/VEH
+reaches it through the VB grid only. (d) The Art Director never sees the title (step 4 vs step 6), so the
+title half of the creature rule is only enforceable by the warning.
+
+**Validation.** Rung 1: the real builders replayed over three stored staging covers whose hints list ANI/VEH —
+the tram (VEH001) and the dog (ANI001) are now named in the cover scene, both get their reference cell, the
+plate drops the sentence; `vehicleDescription` rebuilds the stored tram's missing description. Rung 2: Test Lab
+**1438** (`trial_challenge_draw`, one claude-sonnet-4-6 call, $0.115, new template as override, staging story
+`job_1789296188291_thezv15y1`): cover objects = LOC001, ANI001 (hedgehog), ART001 (chestnut), each with id; the
+hedgehog named in `imageSummary`. Caveat: staging's deployed builder did not yet fill `{COVER_ELEMENT_CAP}`, so the
+sent rule read "up to  Visual Bible animals" — the number itself was not exercised. Earlier Lab **1437** ($0.105)
+ran the superseded title-only wording.
+
+**Touched:** `prompts/scene-expansion-all.txt`, `prompts/story-trial.txt`, `server/lib/promptBuilders.js`,
+`server/lib/visualBible.js`, `server/lib/outlineParser/unified.js`, `server/lib/coverIterate.js`,
+`scripts/admin/sibling-registry.json`, `tests/unit/cover-objects-any-element.test.ts`,
+`tests/unit/cover-title-named-cast-warning.test.ts`.
 **Status:** ✅ active on staging.

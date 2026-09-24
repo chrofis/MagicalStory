@@ -215,10 +215,10 @@ const foldForTitleMatch = (s) => String(s || '')
   .toLowerCase();
 
 /**
- * WARN-ONLY (owner, 2026-09-23): a creature or character the TITLE names that
- * has its own Visual Bible entry belongs in the front cover's objects — the
- * writer templates say so (story-trial.txt COVER SCENE, scene-expansion-all.txt
- * cover rules). When the writer left it out, this logs it and changes NOTHING:
+ * WARN-ONLY (owner, 2026-09-23): a Visual Bible entity the TITLE names belongs
+ * in the front cover's objects — the writer templates expect a title-named
+ * creature there (story-trial.txt COVER SCENE, scene-expansion-all.txt cover
+ * rules). When the writer left it out, this logs it and changes NOTHING:
  * the name match decides whether to warn, never what the cover shows.
  *
  * @param {Object} args
@@ -235,7 +235,7 @@ function warnTitleNamedEntitiesMissingFromCover({ title, objects, visualBible, l
     .map(o => baseVbId(typeof o === 'string' ? o : o?.id))
     .filter(Boolean));
   const missing = [];
-  for (const pool of ['animals', 'secondaryCharacters']) {
+  for (const pool of ['animals', 'secondaryCharacters', 'artifacts', 'vehicles']) {
     for (const entry of (Array.isArray(visualBible[pool]) ? visualBible[pool] : [])) {
       const id = baseVbId(entry?.id);
       if (!id || listed.has(id)) continue;
@@ -720,6 +720,9 @@ function validateCoverHintCast(coverHints, characters, opts = {}) {
  * final render then keeps those placeholders alongside the real cast —
  * phantom duplicate figures.
  */
+/** Lead of the one sentence buildCoverSceneFromHint emits for the hint's unheld elements. */
+const COVER_ALSO_IN_SCENE_LEAD = 'Also in the scene with them:';
+
 function stripCharacterSentences(description, characterNames = []) {
   if (!description) return description;
   const names = (characterNames || [])
@@ -748,6 +751,12 @@ function stripCharacterSentences(description, characterNames = []) {
 function buildPlateDescription(emptyDescRaw, characterNames, visualBible, pageNumber) {
   const { sanitizeVbIdsInPrompt } = getStoryHelpers();
   const stripped = stripCharacterSentences(emptyDescRaw, characterNames)
+    // The hint's own elements go in with the cast, never onto the empty plate
+    // (an animal painted into the plate is a duplicate once the render adds it).
+    // The sentence is emitted by buildCoverSceneFromHint with this exact lead.
+    .split(/(?<=[.!?])\s+/)
+    .filter(s => !s.startsWith(COVER_ALSO_IN_SCENE_LEAD))
+    .join(' ')
     .replace(/\ba wide group portrait set before\b/gi, 'A wide view of')
     .replace(/\ba portrait of (?:two characters|a single character) set before\b/gi, 'A wide view of')
     .replace(/\bOnly (?:these two people|this one person) appears?[^.]*\.\s*/gi, '')
@@ -2198,12 +2207,38 @@ function buildCoverSceneFromHint(hint, visualBible, characters, opts = {}) {
   // out the "group" — so only say "group" for 3+; otherwise state the exact
   // count and forbid extra figures.
   const nChars = sortedDetails.length;
+  // "no other PEOPLE", not "no other figures": an animal the hint lists is a
+  // figure too, and the old wording forbade it in the same breath the objects
+  // sentence below asks for it.
   const sceneStarter = nChars >= 3
     ? `A wide group portrait set before ${landmarkName}.`
     : nChars === 2
-      ? `A portrait of two characters set before ${landmarkName}. Only these two people appear; no other figures, no crowd.`
-      : `A portrait of a single character set before ${landmarkName}. Only this one person appears; no other figures, no crowd.`;
-  const lines = [moodPhrase, sceneStarter, ...charSentences].filter(Boolean);
+      ? `A portrait of two characters set before ${landmarkName}. Only these two people appear; no other people, no crowd.`
+      : `A portrait of a single character set before ${landmarkName}. Only this one person appears; no other people, no crowd.`;
+  // THE HINT'S OWN ELEMENTS, IN THE PROSE (2026-09-23). A listed ART/ANI/VEH
+  // that nobody holds reached the image model only as a KEY STORY ELEMENTS
+  // definition and a reference cell — the scene never said it was THERE, and
+  // this prose is also the brief the cover judges score against, so a judge
+  // told to catch "extra objects" had no line placing it. Held ids are already
+  // named in their holder's sentence.
+  const heldIds = new Set(sortedDetails.map(d => parseHoldsId(String(d.holds || ''))).filter(Boolean).map(id => baseVbId(id)));
+  const shownRefs = [];
+  for (const raw of objects) {
+    const id = baseVbId(raw);
+    if (!id || !/^(ART|ANI|VEH)\d+$/.test(id) || heldIds.has(id)) continue;
+    const ref = resolveHoldable(id);
+    if (!ref) {
+      log.warn(`⚠️ [COVER-SCENE] cover hint lists ${id}, which is in no Visual Bible pool — not named in the cover scene`);
+      continue;
+    }
+    // An animal keeps its name (as in KEY STORY ELEMENTS); a thing takes "the".
+    const phrase = id.startsWith('ANI') ? ref : `the ${ref}`;
+    if (!shownRefs.includes(phrase)) shownRefs.push(phrase);
+  }
+  const alsoLine = shownRefs.length > 0
+    ? `${COVER_ALSO_IN_SCENE_LEAD} ${shownRefs.join(', ')}.`
+    : '';
+  const lines = [moodPhrase, sceneStarter, ...charSentences, alsoLine].filter(Boolean);
   return lines.join(' ');
 }
 

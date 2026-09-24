@@ -40,11 +40,11 @@ describe('warnTitleNamedEntitiesMissingFromCover', () => {
     }
   });
 
-  it('matches a proper name and a secondary character; ignores artifacts and partial words', () => {
+  it('matches a proper name, a secondary character and an artifact; never a partial word', () => {
     const ids = warnTitleNamedEntitiesMissingFromCover({
       title: 'Nox, the Baker and the lantern', objects: [], visualBible: bible(),
     }).map((m: any) => m.id);
-    expect(ids.sort()).toEqual(['ANI002', 'CHR002']);
+    expect(ids.sort()).toEqual(['ANI002', 'ART001', 'CHR002']);
     expect(warnTitleNamedEntitiesMissingFromCover({ title: 'Noxious fumes', objects: [], visualBible: bible() })).toEqual([]);
   });
 

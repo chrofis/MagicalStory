@@ -17,7 +17,7 @@ const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = requi
 // this module was the prose worn-vs-held matcher deleted 2026-09-18. It stays
 // exported from visualBible.js for coverIterate.js, which still uses it.
 const { REQUIRED_TEXT_AUTHORING_RULE, declaredText } = require('./requiredText');
-const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote } = require('./visualBible');
+const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote, COVER_KEY_ELEMENT_CAP } = require('./visualBible');
 const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { castCoverage, castCoverageRule, castActionRule } = require('./castCoverage');
@@ -2806,6 +2806,9 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // inputs the bible rules need travel here instead of to the bible stage.
     CHARACTER_NAMES: characters.map(c => c.name).filter(Boolean).join(', ') || 'None',
     COVER_CAST: buildCoverCastLines(inputData),
+    // How many elements a cover's Objects may list after its LOC â€” the number
+    // KEY STORY ELEMENTS defines on the cover prompt (visualBible.js).
+    COVER_ELEMENT_CAP: String(COVER_KEY_ELEMENT_CAP),
     // Each landmark's PHOTOS line: the bible may only name a viewpoint one of
     // them shows, and the per-page `landmarkView` is picked from the same list.
     // The Art Director variant: it marks which of the plan's places are listed
@@ -10674,6 +10677,8 @@ The story takes place in ${inputData.userLocation.city}. Use real place names â€
       CLOTHING_RULE: clothingRule,
       COVER_CLOTHING_NOTE: coverClothingNote,
       COVER_CLOTHING: coverClothing,
+      // Same cap as the full path's Title Page Objects (visualBible.js).
+      COVER_ELEMENT_CAP: String(COVER_KEY_ELEMENT_CAP),
       LANDMARKS: landmarksInstruction,
       // Same resolver the trial's images use, so prose and pictures agree.
       SEASON: buildSeasonInstruction(inputData),

@@ -137,6 +137,31 @@ function finalObjectState(entry) {
   return states[states.length - 1] || null;
 }
 
+/**
+ * A vehicle's one-line description. The Art Director and the writers author a
+ * vehicle as `colorAndDetails` + `signatureElement` with no `description`
+ * field, and every consumer (KEY STORY ELEMENTS, REQUIRED OBJECTS, the
+ * reference sheet) reads `description` — so both parse paths derive it here.
+ * An authored `description` stands. Without this the live parse left it
+ * undefined and staging covers shipped "**Vehicle**: undefined"
+ * (job_1789343124794_z2c779f7i initial page).
+ */
+function vehicleDescription(veh) {
+  const authored = typeof veh?.description === 'string' ? veh.description.trim() : '';
+  if (authored) return authored;
+  const details = typeof veh?.colorAndDetails === 'string' ? veh.colorAndDetails.trim() : '';
+  const signature = typeof veh?.signatureElement === 'string' ? veh.signatureElement.trim() : '';
+  if (!details && !signature) return null;
+  return [details, signature ? `Signature: ${signature}` : ''].filter(Boolean).join('. ');
+}
+
+/**
+ * How many Visual Bible elements a cover's KEY STORY ELEMENTS block defines,
+ * and so how many elements after the LOC a cover's objects may list: the
+ * writer templates are filled from this same number ({COVER_ELEMENT_CAP}).
+ */
+const COVER_KEY_ELEMENT_CAP = 3;
+
 /** True for the negative page numbers the three covers carry (coverKeys.COVER_PAGE_NUMBERS). */
 function isCoverPageNumber(pageNumber) {
   const n = Number(pageNumber);
@@ -1200,14 +1225,14 @@ function tryParseVisualBibleJSON(outline) {
     // Vehicles
     if (jsonData.vehicles && Array.isArray(jsonData.vehicles)) {
       const vehiclesKept = splitGenericEntries(jsonData.vehicles, 'vehicles',
-        veh => `${veh.colorAndDetails}. Signature: ${veh.signatureElement}`, visualBible.genericObjects);
+        vehicleDescription, visualBible.genericObjects);
       visualBible.vehicles = vehiclesKept.map(veh => ({
         id: veh.id || generateId('VEH', visualBible.vehicles.length),
         label: typeof veh.label === 'string' && veh.label.trim() ? veh.label.trim() : null,
         name: veh.name,
         appearsInPages: veh.pages || [],
         scaleClass: normaliseScaleClass(veh.scaleClass, veh.id),
-        description: `${veh.colorAndDetails}. Signature: ${veh.signatureElement}`,
+        description: vehicleDescription(veh),
         signatureElement: veh.signatureElement,
         extractedDescription: null,
         firstAppearanceAnalyzed: false,
@@ -2033,7 +2058,7 @@ function buildFullVisualBiblePrompt(visualBible, options = {}) {
   // position said "on <name>'s back", but this block only read animals and
   // artifacts, so the name reached the model with no species and the four
   // riders were painted on the dog — the only creature defined.
-  const KEY_ELEMENT_CAP = 3;
+  const KEY_ELEMENT_CAP = COVER_KEY_ELEMENT_CAP;
   const keyElements = [];
   const pools = [
     ['secondaryCharacters', 'character', !!allowedIds],
@@ -2403,7 +2428,7 @@ function tryParseNewEntriesJSON(section) {
         id: veh.id || generateId('VEH', idCounter.VEH++),
         label: typeof veh.label === 'string' && veh.label.trim() ? veh.label.trim() : null,
         name: veh.name,
-        description: `${veh.colorAndDetails}. Signature: ${veh.signatureElement}`,
+        description: vehicleDescription(veh),
         signatureElement: veh.signatureElement,
         scaleClass: normaliseScaleClass(veh.scaleClass, veh.id),
         pages: veh.pages || [],
@@ -3979,6 +4004,8 @@ module.exports = {
   defaultObjectState,
   finalObjectState,
   isCoverPageNumber,
+  vehicleDescription,
+  COVER_KEY_ELEMENT_CAP,
   pageHoldsObject,
   entryNamedByRow,
   citedEntries,

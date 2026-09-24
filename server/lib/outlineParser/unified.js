@@ -210,7 +210,7 @@ class UnifiedStoryParser {
         // reason — this path JSON.parses the authored object raw, so an
         // unknown `scaleClass` token would otherwise sail through unchecked and
         // a `generic: true` entry would keep its id and its cell.
-        const { normaliseObjectStates, normaliseScaleClass, splitGenericEntries } = require('../visualBible');
+        const { normaliseObjectStates, normaliseScaleClass, splitGenericEntries, vehicleDescription } = require('../visualBible');
         const normalizeVisualBibleEntries = (entries) => {
           if (!entries || !Array.isArray(entries)) return entries;
           return entries.map(entry => {
@@ -253,7 +253,10 @@ class UnifiedStoryParser {
           this._cache.visualBible.animals = normalizeVisualBibleEntries(this._cache.visualBible.animals);
         }
         if (this._cache.visualBible.vehicles) {
-          this._cache.visualBible.vehicles = normalizeVisualBibleEntries(this._cache.visualBible.vehicles);
+          // A vehicle is authored as colorAndDetails + signatureElement; every
+          // consumer reads `description` (same derivation as parseVisualBible).
+          this._cache.visualBible.vehicles = normalizeVisualBibleEntries(this._cache.visualBible.vehicles)
+            .map(v => ({ ...v, description: vehicleDescription(v) }));
         }
         if (this._cache.visualBible.locations) {
           this._cache.visualBible.locations = normalizeVisualBibleEntries(this._cache.visualBible.locations);
