@@ -59,6 +59,8 @@ Nothing in the story or its pictures is dangerous enough that it could lead to d
 
 {AUDIT_FINDINGS}
 
+A finding is a claim from a reader who saw less than you: one read the pages cold, the other without the pictures. Weigh each against the story, the plan and the scene outlines before acting on it. A finding that is wrong for this book, such as a detail the story turns on, or the ending's own act or spoken line, is left as it stands, and your analysis names it as declined with one line why. A declined finding does not make its page rewritable.
+
 # YOUR TASK
 
 A page is rewritable when AUDIT FINDINGS names it, and otherwise not. Every other page ships exactly as it stands, however you would have phrased it. Five cases add a page to that set and no others: a MISMATCH move needs its destination page; no early page states plainly what must happen and why, which is fixed on the earliest fitting page; a page's text states the opposite of what its scene outline stages; a page carries an abbreviation or acronym, which is named the way a child says it; a page carries a banned dash. Closing a finding on a page the finding does not name is allowed only under these five, and the ledger says which one.
@@ -75,7 +77,7 @@ Every page you rewrite keeps the style rules below:
 
 {STYLE_RULEBOOK}
 
-A STYLE finding quotes one sentence that breaks one of these rules. It is closed by recasting that sentence alone, or by joining it into the sentence beside it, and it never licenses a change anywhere else on its page. A page named only by STYLE findings is not analysed under the checks below.
+A STYLE finding quotes one sentence that breaks one of these rules. One you accept is closed by recasting that sentence alone, or by joining it into the sentence beside it, and it never licenses a change anywhere else on its page. A page named only by STYLE findings is not analysed under the checks below.
 
 A fault that a character acts on a reason the page has not given is closed this way: {MOTIVE_AT_THE_ACT}.
 

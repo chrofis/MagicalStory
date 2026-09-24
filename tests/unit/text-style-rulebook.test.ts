@@ -107,3 +107,18 @@ describe('the arc-informed audit carries the ending check and the widened INFERR
     expect(question('LOADBEARING')).toMatch(/a size, a colour, a look\W+is never load-bearing, and a page that leaves it out drops nothing/);
   });
 });
+
+// Owner, 2026-09-24: "We review all the text and send all findings to redo. And the
+// redo has the story and should be able to decide such things." The audit readers
+// see less than the repair (cold, or without pictures); a wrong finding must not
+// force a rewrite (Lab 1434 filed the book's own closing line as a summary).
+describe('the repair weighs findings instead of obeying them', () => {
+  beforeAll(async () => { await require('../../server/services/prompts').loadPromptTemplates(); });
+
+  it('may decline a finding that is wrong for the book, and says why', () => {
+    const repair = B.buildTextRefinePrompt(inputData, PAGES, 'FAULT[STYLE]: p1 — «Mara zog am Seil.» summary', 'An arc.');
+    expect(repair).toMatch(/Weigh each against the story/);
+    expect(repair).toMatch(/names it as declined with one line why/);
+    expect(repair).toMatch(/A declined finding does not make its page rewritable/);
+  });
+});

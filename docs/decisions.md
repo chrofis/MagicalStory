@@ -58434,3 +58434,19 @@ The selection is a pure function, `scoreRowsToDelete`, pinned by
 **Touched:** `scripts/admin/sync-landmark-index-to-staging.js`,
 `tests/unit/landmark-sync-mirror-scores.test.ts`, `docs/landmark-database.md`.
 **Status:** ✅ active.
+
+## 2026-09-24 — The text repair weighs audit findings; it may decline a wrong one
+
+**Context:** The blind audit's new STYLE question (668ab8809) filed 17 sentences on a writer rerun of dragon run 6
+(Lab 1434); about 5 were wrong, among them the book's own closing line «Ich heisse Levin» filed as a summary, a
+temperature ("warm wie eine Ofenkachel") filed as a look, and a plain setup fact filed as narrator explanation.
+The repair prompt treated every finding as an order ("is closed by recasting that sentence"), so each wrong
+finding forced a rewrite. Owner: no clarifications to the audit rules ("the clarifications will lead to more and
+more clarifications"); "the redo has the story and should be able to decide such things".
+**Decision:** `text-refine.txt` tells the repair that a finding is a claim from a reader who saw less (cold, or
+without pictures). It weighs each against the story, plan and scene outlines; a finding wrong for this book is
+left as it stands, named as declined in the analysis with one line why, and a declined finding does not make its
+page rewritable. Applies to every finding category, not only STYLE. No audit-side rule was added.
+**Rationale:** The judgement belongs to the stage that holds the full context; audit precision stops being a
+rewrite risk.
+**Touched:** prompts/text-refine.txt, tests/unit/text-style-rulebook.test.ts.
