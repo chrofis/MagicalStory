@@ -57690,10 +57690,7 @@ chosen state changes. Known trade-off: an object whose last state is a spent loo
 lamp gone dark) now shows that look on the cover; a cover hint can pin any other state by citing its dotted
 handle.
 
-**Not changed (owner decision pending).** The title's squirrel ANI001 was named only in the cover's
-`imageSummary`; neither the trial template (`story-trial.txt` COVER SCENE: "ONLY the main character") nor
-the Art Director's cover hints (`scene-expansion-all.txt`: "Objects: LOC### plus 1-2 ART###") has a slot
-for an animal, so this is a writer-prompt question and was not built.
+**The title-named squirrel** (defect B) was decided separately, same day — see the next entry.
 
 **Validation.** Rung 1: replayed the real `buildCoverPrompt` over the stored cover description and bible —
 REQUIRED OBJECTS now reads "feuilles nouées en anneau fermé par le fil rouge, forme ronde et tenue" (stored
@@ -57933,3 +57930,43 @@ offered and declined: it trades variety or coverage for a problem the existing l
 `landmark_photo_scores` + `landmark_index.story_score*` on prod via `merge-landmark-judgments.js` only.
 Staging receives it through `sync-landmark-index-to-staging.js` (not run — owner's call).
 **Status:** ✅ done.
+
+## 2026-09-23 — A creature or character the title names goes on the front cover: a writer rule, and a code check that only warns
+
+**Context.** Same prod trial as the entry above (`job_1790169018278_n57xpnufo`). The title names the
+squirrel ANI001; the writer put it in the cover's `imageSummary` only, never in `objects`, so the cover got
+no Visual Bible definition and no reference cell for it. Neither writer template allowed it: the trial COVER
+SCENE said "ONLY the main character, no secondary characters", and the Art Director's Title Page format line
+read "Objects: [LOC### plus 1-2 ART###]" — contradicting its own rule 210 two paragraphs earlier ("When the
+story centres on a creature or animal — the title names it, or the plot turns on it — the Title Page lists
+that `ANI###` in `Objects:`").
+
+**Decision (owner, option 3 of three: prompt rule + warn-only check).**
+1. `story-trial.txt` COVER SCENE: the "ONLY the main character" rule gains ONE exception — a creature or
+   character the TITLE names that has its own Visual Bible entry appears beside the main character, is named
+   in `imageSummary`, and is listed in `objects` with its id. The trial writer writes the title in the same
+   call, so it can apply the rule.
+2. `scene-expansion-all.txt` Title Page format line: `Objects:` now offers "the ANI### of the creature rule
+   above when it applies", so the format no longer contradicts rule 210. The parser already accepted ANI ids.
+3. `coverIterate.warnTitleNamedEntitiesMissingFromCover` runs on the trial front cover and the full-path front
+   cover (storyJobPipeline): an `animals[]` or `secondaryCharacters[]` entry whose `name` or `properName`
+   appears in the title (whole word, case- and accent-insensitive) but whose id is not in the cover's objects
+   is logged `[COVER-TITLE-CAST]`. **Nothing is added** — the name match decides only whether to warn. This
+   follows the owner's 2026-09-23 "covers follow the Art Director, add nobody" ruling (769c655ff).
+
+**Constraint (not fixed, recorded).** On the full (beats) path the Art Director runs at step 4 and the title
+is picked from the finished page text at step 6, so the AD never sees the title: rule 210's "the title names
+it" clause cannot be applied there, only "the plot turns on it". The warn-only check is the one place that
+knows both the title and the Title Page objects, which is why it exists on that path.
+
+**Judges.** No cover judge carries a "main character only" rule; a listed ANI reaches the judges the same
+way a listed ART does (KEY STORY ELEMENTS, reference cell, and on the trial path the REQUIRED OBJECTS line of
+the sent prompt), so there is no critic-side rule to move.
+
+**Validation.** Rung 1: the real `buildTrialStoryPrompt` over the stored `input_data` carries the exception,
+no unfilled placeholders; the real `buildSceneExpansionAllPrompt` renders the new Title Page line; the check
+over the stored cover JSON and the stored `coverHints.frontCover` both flag `l'Écureuil (ANI001)`.
+
+**Touched:** `prompts/story-trial.txt`, `prompts/scene-expansion-all.txt`, `server/lib/coverIterate.js`,
+`storyJobPipeline.js`, `tests/unit/cover-title-named-cast-warning.test.ts`.
+**Status:** ✅ active on staging.

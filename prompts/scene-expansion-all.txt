@@ -317,7 +317,7 @@ Then, exactly:
 ---COVER SCENE HINTS---
 **Title Page**
 Mood: [one phrase]
-Objects: [LOC### plus 1-2 ART###]
+Objects: [LOC### plus 1-2 ART###, plus the ANI### of the creature rule above when it applies]
 Characters:
 - [Name] ([position]): [clothing], holds: [ART### or nothing], priority: [essential|normal|low]
 

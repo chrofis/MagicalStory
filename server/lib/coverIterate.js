@@ -207,6 +207,49 @@ function matchVbEntitiesInText(text, visualBible) {
   return matched.sort((a, b) => a.priority - b.priority);
 }
 
+// Case- and accent-insensitive form of a name or title, for the warning below
+// only: "l'Écureuil" and "L’ecureuil" compare equal.
+const foldForTitleMatch = (s) => String(s || '')
+  .normalize('NFD').replace(/\p{M}/gu, '')
+  .replace(/[‘’ʼ]/g, "'")
+  .toLowerCase();
+
+/**
+ * WARN-ONLY (owner, 2026-09-23): a creature or character the TITLE names that
+ * has its own Visual Bible entry belongs in the front cover's objects — the
+ * writer templates say so (story-trial.txt COVER SCENE, scene-expansion-all.txt
+ * cover rules). When the writer left it out, this logs it and changes NOTHING:
+ * the name match decides whether to warn, never what the cover shows.
+ *
+ * @param {Object} args
+ * @param {string} args.title - the story title
+ * @param {Array<string|Object>} args.objects - the cover's objects (ids or {id})
+ * @param {Object} args.visualBible
+ * @param {string} [args.label]
+ * @returns {Array<{id: string, name: string}>} the title-named entries missing from objects
+ */
+function warnTitleNamedEntitiesMissingFromCover({ title, objects, visualBible, label = 'FRONT COVER' } = {}) {
+  const folded = foldForTitleMatch(title);
+  if (!folded.trim() || !visualBible) return [];
+  const listed = new Set((Array.isArray(objects) ? objects : [])
+    .map(o => baseVbId(typeof o === 'string' ? o : o?.id))
+    .filter(Boolean));
+  const missing = [];
+  for (const pool of ['animals', 'secondaryCharacters']) {
+    for (const entry of (Array.isArray(visualBible[pool]) ? visualBible[pool] : [])) {
+      const id = baseVbId(entry?.id);
+      if (!id || listed.has(id)) continue;
+      const names = [entry.name, entry.properName].map(n => String(n || '').trim()).filter(Boolean);
+      if (!names.some(n => entityNameRegex(foldForTitleMatch(n)).test(folded))) continue;
+      missing.push({ id, name: names[0] });
+    }
+  }
+  if (missing.length > 0) {
+    log.warn(`⚠️ [COVER-TITLE-CAST] ${label}: the title "${title}" names ${missing.map(m => `${m.name} (${m.id})`).join(', ')}, which the cover's objects do not list — the cover gets no definition or reference for it. Not added (warn only).`);
+  }
+  return missing;
+}
+
 /**
  * Remove one entity NAME from a cover scene description, preferring to drop
  * the whole clause that mentions it so the prose stays grammatical.
@@ -2184,6 +2227,7 @@ module.exports = {
   matchVbEntitiesInText,
   stripEntityNameFromDescription,
   reconcileCoverSceneEntities,
+  warnTitleNamedEntitiesMissingFromCover,
   COVER_ELEMENT_REF_CAP,
   applyCoverWornHeldDedupe,
   buildInitialPageComposition,

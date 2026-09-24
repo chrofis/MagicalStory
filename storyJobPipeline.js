@@ -1880,6 +1880,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           ? modelOverrides.singlePassScene
           : MODEL_DEFAULTS.singlePassScene === true)
           || modelOverrides.generateEmptyScenes === false;
+        if (coverKeyForRefs === 'frontCover') {
+          // Title-named creature/character missing from the Title Page objects: WARN ONLY.
+          require('./server/lib/coverIterate').warnTitleNamedEntitiesMissingFromCover({
+            title: streamingTitle || title || inputData.title || inputData.storyTitle || '',
+            objects: hint?.objects, visualBible: streamingVisualBible, label: coverLabel,
+          });
+        }
         const coverRefs = await buildCoverReferences({
           coverKey: coverKeyForRefs,
           visualBible: streamingVisualBible,
@@ -2416,6 +2423,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               stripMode: 'token', // the trial cover description is a JSON blob
             });
             sceneDescription = trialNameFix.sceneDescription;
+            // Title-named creature/character missing from objects: WARN ONLY.
+            require('./server/lib/coverIterate').warnTitleNamedEntitiesMissingFromCover({
+              title: coverTitle, objects: coverScene.objects, visualBible: streamingVisualBible, label: 'TRIAL FRONT COVER',
+            });
             const visualBibleText = buildFullVisualBiblePrompt(streamingVisualBible, {
               skipMainCharacters: true,
               allowedElementIds: trialNameFix.elementIds,
