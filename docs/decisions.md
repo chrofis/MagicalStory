@@ -21,6 +21,76 @@ superseded and link forward.
 
 ---
 
+## 2026-09-24 — Image prompts say each thing once; the shrinker's cut order is one named list the docs render
+
+**Context.** Staging `job_1790100385959_1nitlympp`: every four-character image prompt (pages and
+covers) sat at or over ~10,010 characters, the line above which the shrinker (Grok cap 7,900) spends
+REQUIRED CAST; the front cover crossed it (10,129 built, REQUIRED CAST cut). Most of the overshoot was
+the same thing said twice. The ranked cut of 769c655ff existed only as a builder function with a
+docblock, and prompt-inventory.md kept a hand-written copy of the rank. Owner, 2026-09-24:
+"remove the pure repetition" (seven listed items) and "make clear what gets removed in which order" —
+one explicit ordered list in code, code and docs reading the same list, the log naming each cut block.
+
+**Decision — repetition (shared builders, so pages and covers stay identical per 2026-08-26).**
+1. ONE ground/feet rule: the cover-composition.txt ground bullet (all three covers) is deleted; the
+   shared Composition ground bullet (`COMPOSITION_GROUND_BULLET`) gains the one clause a page also
+   needs, "then no ground is invented under" a figure that swims, floats or flies. "Feet level with
+   each other" is not carried over: it contradicts a cover figure placed in the background.
+2. No `**CHARACTER REFERENCE PHOTOS:** [Name], …` line (`buildCharacterReferenceList`); REQUIRED CAST
+   reads "Every named character" instead of "named in the reference list" (pages never had the list).
+3. `buildCharacterPhysicalDescription` states the age once (no "(Looks: X)"), no height in cm
+   (HEIGHT ORDER carries relative size; nothing compares cm), and drops the midpoint build "average"
+   (same logic as the midpoint faces); slim / athletic / stocky stay. This line also feeds the entity
+   judge, consolidator and detector rich line, so generator and critic move together.
+4. `buildCoverSceneFromHint` no longer restates the age per figure and states the gaze once
+   ("Each of them looks at the viewer." / "<Name> looks at the viewer."); the empty-plate strip drops
+   the group sentence. Gaze stays code-owned at the viewer (SETTLED).
+5. The cover "Each character has 2 hands / at most 2 items" bullet is deleted (HANDS anchor carries it).
+6. The front "ALL MAIN CHARACTERS are prominently featured…" bullet is shortened to "The characters
+   form one balanced, uncluttered group, each clearly recognizable." (REQUIRED CAST carries the cast).
+7. Covers do not build the Composition facing bullet or COUNTS: both are now code constants
+   (`buildCompositionBlock({cover})`, `COUNTS_RULE`, placeholders `{COMPOSITION}` / `{COUNTS}` in
+   image-generation.txt). Same "inapplicable text is not built" precedent as the 2026-09-23 cover SHOT.
+Untouched: face text (d5dd79baf), the baked title block (SETTLED), the NO MARKS / HANDS anchors.
+
+**Decision — cut order.** `PROMPT_CUT_ORDER` (server/lib/images.js) is the one ordered list: each step
+has label, what, why and approximate size, and builds the exact-text remover the shrinker runs.
+`PROMPT_NEVER_CUT` lists what no step may remove (NO MARKS, HANDS, REQUIRED TEXT — checked by
+construction — plus SHOT, EXACT POSES and the `marker` entries REQUIRED OBJECTS, KEY STORY ELEMENTS, SEASON, COMPOSITION GUIDELINES, ART STYLE, which open the protected tail: b794b9731's MUST_KEEP_MARKERS is now derived from this list, not a second copy). The rank
+itself is unchanged from 769c655ff. The docs' section is generated from these constants by
+`scripts/admin/sync-prompt-cut-order-docs.js`; `tests/unit/prompt-cut-order-docs.test.ts` fails when
+a doc is stale, and the hand-written copy in prompt-inventory.md is replaced by a pointer. The log line
+and the generation-log event now read `cut in order: #1 COUNTS (-233) > #2 Composition: size (-305) …`
+(`droppedSteps` carries step, label, chars).
+
+**Evidence (rung 1, free).** The stored story rebuilt through the real builders (covers as
+storyJobPipeline builds them; pages 12 and 1 via `buildImagePrompt` from the stored brief, cast and
+reference photos) and the real shrinker at 7,900:
+
+| prompt | built before → after | sent before → after | cut after |
+|---|---|---|---|
+| front cover | 10,129 → 8,641 | 7,494 → 7,688 | size, DEPTH AND SIZE (REQUIRED CAST and ground now kept) |
+| initial page | 9,329 → 7,975 | 7,777 → 7,671 | size (DEPTH AND SIZE now kept) |
+| back cover | 9,280 → 7,907 | 7,728 → 7,603 | size (DEPTH AND SIZE now kept) |
+| page 12 (4 children) | 10,022 → 10,043 | 7,567 → 7,545 | COUNTS … ground (unchanged; REQUIRED CAST kept) |
+| page 1 (2 children) | 8,944 → 8,965 | 7,391 → 7,412 | unchanged |
+
+Every judge-checked rule (REQUIRED CAST, NO MARKS, HANDS, DEPTH AND SIZE, size, COUNTS, ground, HEIGHT
+ORDER, title, top third, viewer gaze) was grepped in each sent prompt: none went from sent to cut; on
+pages the only text change is the ground clause and the REQUIRED CAST wording. Page prompts carry no
+character lines or name list, so Task A saves nothing on pages; a four-child page still loses
+DEPTH AND SIZE and Composition to the cap.
+
+**Touched:** `prompts/image-generation.txt`, `prompts/cover-composition.txt`,
+`server/lib/promptBuilders.js`, `server/lib/coverIterate.js`, `server/lib/images.js`,
+`scripts/admin/sync-prompt-cut-order-docs.js`, `docs/image-generation-methods.html`,
+`docs/prompt-inventory.md`, `tests/unit/prompt-says-each-thing-once.test.ts`,
+`tests/unit/prompt-cut-order-docs.test.ts` (+ three tests moved to the constants).
+
+**Status:** ✅ active
+
+---
+
 ## 2026-09-24 — Cells get no size: a Visual Bible description states no scale; page-side readers add it via `withScaleNote`
 
 **Context:** Owner, 2026-09-23: *"Cells get no size."* A reference cell paints one element alone, so it
@@ -58561,3 +58631,78 @@ page rewritable. Applies to every finding category, not only STYLE. No audit-sid
 **Rationale:** The judgement belongs to the stage that holds the full context; audit precision stops being a
 rewrite risk.
 **Touched:** prompts/text-refine.txt, tests/unit/text-style-rulebook.test.ts.
+
+## 2026-09-23 — KEY STORY ELEMENTS, SEASON and COMPOSITION GUIDELINES are must-keep in the prompt shrink
+
+**Context.** The shrink (`images.shrinkPromptForModel` → `sectionAwareCut`) protects a TAIL verbatim and
+pays for an over-cap prompt out of the head: first by the ranked, exact-text drop units (2026-09-21 /
+769c655ff), then — last resort — by trimming the head's END at a sentence boundary. The tail began at
+`**REQUIRED OBJECTS`, or at `**ART STYLE` when a prompt has none. Full-path covers have no REQUIRED OBJECTS
+block, and `image-generation.txt` places `{VISUAL_BIBLE}` (KEY STORY ELEMENTS), `{SEASON_NOTE}` and
+`{COVER_COMPOSITION}` directly before ART STYLE — i.e. at the very end of the trimmable head, the first text
+the last-resort trim removes. Staging `job_1789853503332_riqncqg1i`'s back cover shipped with all three gone
+(stored sent prompt 7,880 chars; its animal survived only as "holds the Zippi"). The comment above the drop
+list already said the season was "not droppable at all"; the trim did not honour it.
+
+**Decision (owner-approved).**
+1. `MUST_KEEP_MARKERS` = REQUIRED OBJECTS, KEY STORY ELEMENTS, SEASON, COMPOSITION GUIDELINES, ART STYLE; the
+   protected tail starts at the EARLIEST one present (`protectedTailStart`), on every prompt. Pages with a
+   REQUIRED OBJECTS block are byte-identical (it already came first); the change reaches full-path covers
+   (streaming, iterate, regeneration) and pages without REQUIRED OBJECTS, whose season is now protected.
+2. Lower-value text still goes first and in the same order — the ranked drop units, then the sentence-boundary
+   trim of the scene prose — and never reaches into the tail, by construction.
+3. **Fail loudly.** When the must-keep tail alone leaves under 500 chars for the scene, the shrink THROWS
+   instead of the old blunt `truncatePromptForModel` slice (which cut from the end — ART STYLE first). The
+   render fails; nothing ships with its must-keep sections cut. Non-image prompts with no section marker (Grok
+   edit body, composite blend) keep the plain truncation.
+4. `sceneHeadOf` (the `compressedScene` the batch eval judges against) uses the same boundary, so it is the
+   scene block alone, never the must-keep sections.
+5. The "a drop removes its own block" guard is untouched: the drop units still remove only their exact text,
+   and none of them contains a must-keep marker.
+
+**Validation.** Rung 1: the back cover of staging `job_1789853503332_riqncqg1i` rebuilt with the real builders
+(9,326 chars against grok-imagine-image-2.0's 7,900 cap) → 7,774 chars, drops only (COUNTS, two Composition
+bullets, DEPTH AND SIZE), KEY STORY ELEMENTS / SEASON / COMPOSITION GUIDELINES / ART STYLE / the cast / the
+animal all present. Prod trial `job_1790169018278_n57xpnufo` front cover rebuilt (9,149) → 7,595 at the cap and
+5,499 at a forced 6,000 cap, all must-keep sections present. Unit: `tests/unit/cover-shrink-must-keep.test.ts`
+(prose trimmed, must-keep whole; tail too large → throws; REQUIRED OBJECTS prompts unchanged).
+
+**Touched:** `server/lib/images.js`, `tests/unit/cover-shrink-must-keep.test.ts`.
+**Status:** ✅ active on staging.
+
+## 2026-09-24 — The admin re-evaluate route scores through the pipeline's scorer; it keeps no sum of its own
+
+**Context.** `POST /:id/repair-workflow/re-evaluate` (server/routes/regeneration.js) summed
+`SEVERITY_POINTS` over every 'entity check' / 'image checks' issue and wrote `evaluation.score − that`
+into the version's `qualityScore`, into the stamp's input, into the scene fallback and into the
+response the repair panel shows. The sum ignored the per-type rules (`ZERO_POINT_TYPES`,
+`MAX_SEVERITY_TYPES`, `ENTITY_ONLY_ZERO_POINT_TYPES`): a crop artefact that costs 0 was charged 15. It also
+passed `collectAllIssuesForPage`'s list (retry-history issues from earlier images, and the entity
+findings a second time) to the stamp as if the evaluator had reported them, and its response carried no
+`finalScore`, so `findBadPages` (`computeFinalScore` → `score − entityPenalty`) subtracted the
+entity charge twice. The repair panel's collect-feedback step did the same on the client
+(`qualityScore − Σ`, entity issues stripped of their type, image checks priced though the scorer never
+charges them) and priced each listed issue on a 30/20/10 table nothing else uses.
+
+**Decision (owner-approved bug fix, 2026-09-24).** One scorer, one entity reader:
+- `scoring.js entityIssuesForPage(pageNumber, entityReport)` — moved verbatim from a repairPipeline
+  closure — is the only reader of an entity report for scoring. The pipeline and the route both call it.
+- The route stamps the active version with the evaluator's result unmodified plus that entity bucket
+  (the same inputs as repairPipeline's `stampAtCreation`), and everything it writes or returns —
+  `finalScore`, `evalScore`, `entityPenalty`, the entity deductions, `scoreBreakdown` — is read back
+  from the stamped version. `version.qualityScore` / `scene.qualityScore` mirror `evalScore`.
+- No fallback: a page with no active version to stamp returns an error for that page; nothing is
+  written on the evaluator's scale.
+- The client shows the stored `finalScore` (evaluation-data now returns it) and decides redo on it;
+  entity findings keep type/subType so their displayed price follows the per-type rules; image-check
+  findings are listed, not priced.
+
+**Evidence.** Replay over staging job_1790100385959_1nitlympp's stored back cover (v0 stamped 70 with a
+MAJOR entity-only `figure_completeness` crop finding): the new route path stamps 85, entity −0, equal to
+the canonical scorer. Pinned by `tests/unit/reevaluate-canonical-score.test.ts`.
+
+**Touched:** `server/routes/regeneration.js`, `server/lib/scoring.js`, `server/lib/repairPipeline.js`,
+`server/routes/stories.js`, `client/src/hooks/useRepairWorkflow.ts`,
+`client/src/components/generation/RepairWorkflowPanel.tsx`, `client/src/types/story.ts`,
+`client/src/services/storyService.ts`, `tests/unit/reevaluate-canonical-score.test.ts`.
+**Status:** ✅ active.

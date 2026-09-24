@@ -6,7 +6,6 @@ import type {
   SceneImage,
   CoverImages,
   EntityConsistencyReport,
-  EvaluationData,
   FinalChecksImageCheck,
 } from '../types/story';
 import type { Character } from '../types/character';
@@ -209,11 +208,7 @@ export interface UseRepairWorkflowReturn {
 
   // Step 4: Re-evaluate
   reEvaluatePages: (pageNumbers?: number[]) => Promise<{
-    evalPages: Record<number, {
-      score?: number;
-      qualityScore: number;
-      fixableIssues?: unknown[];
-    }>;
+    evalPages: Record<number, RepairWorkflowState['reEvaluationResults']['pages'][number]>;
     badPages: number[];
   } | undefined>;
 
@@ -377,6 +372,76 @@ export function useRepairWorkflow({
       const pages: Record<number, PageFeedback> = {};
       let totalIssues = 0;
 
+      // Entity-report findings (characters + objects) for one page — shared by
+      // scenes and covers. type/subType are carried so entityIssuePoints can
+      // apply the per-type rules (a crop artefact costs 0).
+      const collectEntityIssues = (pageNumber: number, feedback: PageFeedback) => {
+        // Get entity issues from finalChecksReport - CHARACTERS
+        if (fcReport?.entity) {
+          for (const [charName, charResult] of Object.entries((fcReport.entity as any).characters || {})) {
+            const cr = charResult as any;
+            // Mutually exclusive: prefer byClothing (detailed), fall back to root issues (legacy flattening)
+            const allIssues: any[] = [];
+            if (cr.byClothing && Object.keys(cr.byClothing).length > 0) {
+              for (const clothingResult of Object.values(cr.byClothing) as any[]) {
+                if (clothingResult.issues) {
+                  allIssues.push(...clothingResult.issues);
+                }
+              }
+            } else if (cr.issues) {
+              allIssues.push(...cr.issues);
+            }
+
+            // Filter to issues affecting this page
+            const charIssues = allIssues.filter((i: any) =>
+              i.pagesToFix?.includes(pageNumber) || i.pageNumber === pageNumber
+            );
+
+            for (const issue of charIssues) {
+              feedback.entityIssues.push({
+                character: charName,
+                issue: issue.description,
+                severity: issue.severity,
+                type: issue.type,
+                subType: issue.subType,
+                source: 'entity check',
+              });
+            }
+          }
+
+          // Get entity issues from finalChecksReport - OBJECTS
+          for (const [objectName, objectResult] of Object.entries((fcReport.entity as any).objects || {})) {
+            const or = objectResult as any;
+            const allIssues: any[] = [];
+            if (or.byClothing && Object.keys(or.byClothing).length > 0) {
+              for (const clothingResult of Object.values(or.byClothing) as any[]) {
+                if (clothingResult.issues) {
+                  allIssues.push(...clothingResult.issues);
+                }
+              }
+            } else if (or.issues) {
+              allIssues.push(...or.issues);
+            }
+
+            // Filter to issues affecting this page
+            const objectIssues = allIssues.filter((i: any) =>
+              i.pagesToFix?.includes(pageNumber) || i.pageNumber === pageNumber
+            );
+
+            for (const issue of objectIssues) {
+              feedback.objectIssues.push({
+                object: objectName,
+                issue: issue.description,
+                severity: issue.severity,
+                type: issue.type,
+                subType: issue.subType,
+                source: 'entity check',
+              });
+            }
+          }
+        }
+      };
+
       // Process each scene image, enriching with server-side evaluation data
       console.log(`[collectFeedback] Processing ${sceneImages.length} scene images, ${evalByPage.size} eval entries from server`);
       for (const scene of sceneImages) {
@@ -448,66 +513,7 @@ export function useRepairWorkflow({
           }
         }
 
-        // Get entity issues from finalChecksReport - CHARACTERS
-        if (fcReport?.entity) {
-          for (const [charName, charResult] of Object.entries((fcReport.entity as any).characters || {})) {
-            const cr = charResult as any;
-            // Mutually exclusive: prefer byClothing (detailed), fall back to root issues (legacy flattening)
-            const allIssues: any[] = [];
-            if (cr.byClothing && Object.keys(cr.byClothing).length > 0) {
-              for (const clothingResult of Object.values(cr.byClothing) as any[]) {
-                if (clothingResult.issues) {
-                  allIssues.push(...clothingResult.issues);
-                }
-              }
-            } else if (cr.issues) {
-              allIssues.push(...cr.issues);
-            }
-
-            // Filter to issues affecting this page
-            const charIssues = allIssues.filter((i: any) =>
-              i.pagesToFix?.includes(scene.pageNumber) || i.pageNumber === scene.pageNumber
-            );
-
-            for (const issue of charIssues) {
-              feedback.entityIssues.push({
-                character: charName,
-                issue: issue.description,
-                severity: issue.severity,
-                source: 'entity check',
-              });
-            }
-          }
-
-          // Get entity issues from finalChecksReport - OBJECTS
-          for (const [objectName, objectResult] of Object.entries((fcReport.entity as any).objects || {})) {
-            const or = objectResult as any;
-            const allIssues: any[] = [];
-            if (or.byClothing && Object.keys(or.byClothing).length > 0) {
-              for (const clothingResult of Object.values(or.byClothing) as any[]) {
-                if (clothingResult.issues) {
-                  allIssues.push(...clothingResult.issues);
-                }
-              }
-            } else if (or.issues) {
-              allIssues.push(...or.issues);
-            }
-
-            // Filter to issues affecting this page
-            const objectIssues = allIssues.filter((i: any) =>
-              i.pagesToFix?.includes(scene.pageNumber) || i.pageNumber === scene.pageNumber
-            );
-
-            for (const issue of objectIssues) {
-              feedback.objectIssues.push({
-                object: objectName,
-                issue: issue.description,
-                severity: issue.severity,
-                source: 'entity check',
-              });
-            }
-          }
-        }
+        collectEntityIssues(scene.pageNumber, feedback);
 
         // Get semantic/legacy image check issues from finalChecksReport.imageChecks
         if (fcReport?.imageChecks) {
@@ -530,7 +536,12 @@ export function useRepairWorkflow({
           }
         }
 
-        // Compute entity penalty (same model as backend re-evaluate)
+        // Entity penalty for display: the entity report's findings priced per
+        // type (entityIssuePoints mirrors scoring.js deductionPoints — the
+        // type/subType carried above is what lets a crop artefact cost 0).
+        // Image-check findings are listed but not priced: the server's score
+        // never charges them (scoring.js entityIssuesForPage reads the entity
+        // report only).
         let entityPenalty = 0;
         for (const ei of feedback.entityIssues) {
           entityPenalty += entityIssuePoints(ei);
@@ -538,14 +549,10 @@ export function useRepairWorkflow({
         for (const oi of feedback.objectIssues) {
           entityPenalty += entityIssuePoints(oi);
         }
-        for (const si of feedback.semanticIssues) {
-          entityPenalty += entityIssuePoints(si, false);
-        }
         feedback.entityPenalty = capEntityPenalty(entityPenalty);
-        // Score convention: qualityScore = raw visual (Gemini), score = final after penalties.
-        // Use qualityScore as base, subtract entity penalties to get final score.
-        const baseScore = feedback.qualityScore ?? 100;
-        feedback.score = Math.max(0, baseScore - feedback.entityPenalty);
+        // The score is the STORED canonical one (applyScore's stamp, mirrored
+        // on the scene) — never re-derived here.
+        feedback.score = evalPage?.finalScore ?? scene.finalScore ?? undefined;
 
         totalIssues += feedback.fixableIssues.length + feedback.entityIssues.length +
                        feedback.objectIssues.length + feedback.semanticIssues.length;
@@ -609,14 +616,19 @@ export function useRepairWorkflow({
             }
           }
 
-          // Compute entity penalty (covers typically have no entity issues, but handle uniformly)
+          // Covers carry entity findings too (the entity check grids cover
+          // cells); read and price them exactly as for scenes.
+          collectEntityIssues(pageNum, feedback);
           let entityPenalty = 0;
           for (const ei of feedback.entityIssues) {
             entityPenalty += entityIssuePoints(ei);
           }
+          for (const oi of feedback.objectIssues) {
+            entityPenalty += entityIssuePoints(oi);
+          }
           feedback.entityPenalty = capEntityPenalty(entityPenalty);
-          const baseScore = feedback.qualityScore ?? 100;
-          feedback.score = Math.max(0, baseScore - feedback.entityPenalty);
+          // The STORED canonical score, never re-derived here.
+          feedback.score = evalPage?.finalScore ?? cover.finalScore ?? undefined;
 
           totalIssues += feedback.fixableIssues.length + feedback.entityIssues.length +
                          feedback.objectIssues.length + feedback.semanticIssues.length;
@@ -684,13 +696,15 @@ export function useRepairWorkflow({
 
       // Prefer re-evaluation scores when available (more current than collectedFeedback)
       const reEval = workflowState.reEvaluationResults.pages?.[page];
-      const score = reEval?.score ?? reEval?.qualityScore ?? feedback.qualityScore ?? 100;
+      // The stored canonical score (same number server findBadPages reads).
+      // An unscored page skips the score test, as it does there.
+      const score = (reEval ? reEval.finalScore : feedback.score) ?? null;
       const issueCount = reEval
         ? (reEval.fixableIssues?.length ?? 0)
         : fallbackIssueCount;
 
       // Mark for redo if score is low or too many issues
-      if (score < scoreThreshold) {
+      if (score != null && score < scoreThreshold) {
         pagesToRedo.push(page);
         reasons[page] = `Low quality score: ${score}`;
       } else if (issueCount >= issueThreshold) {
@@ -829,17 +843,9 @@ export function useRepairWorkflow({
   }, [storyId, workflowState.redoPages.pageNumbers, workflowState.reEvaluationResults.pages, workflowState.collectedFeedback.pages, imageModel, sceneImages, onImageUpdate, startStep, failStep, redoCoverOrPage]);
 
   // Step 4: Re-evaluate pages
-  type EvalPageResult = {
-    score?: number;
-    qualityScore: number;
-    semanticScore?: number | null;
-    entityPenalty?: number;
-    verdict?: string;
-    issuesSummary?: string;
-    reasoning?: string;
-    fixableIssues: EvaluationData['fixableIssues'];
-    fixTargets?: Array<{ boundingBox: number[]; issue: string; fixPrompt: string }>;
-  };
+  // Every score field is read back from the server's stamped version
+  // (applyScore) — the panel shows the stored number, never a re-derived one.
+  type EvalPageResult = RepairWorkflowState['reEvaluationResults']['pages'][number];
 
   const reEvaluatePages = useCallback(async (pageNumbers?: number[], scoreThresholdOverride?: number): Promise<{ evalPages: Record<number, EvalPageResult>; badPages: number[] } | undefined> => {
     if (!storyId) return undefined;
@@ -863,9 +869,13 @@ export function useRepairWorkflow({
         const pr = pageResult as EvalPageResult;
         evalResults[parseInt(pageNum)] = {
           score: pr.score,
+          finalScore: pr.finalScore,
+          evalScore: pr.evalScore,
           qualityScore: pr.qualityScore,
           semanticScore: pr.semanticScore,
           entityPenalty: pr.entityPenalty,
+          entityIssues: pr.entityIssues,
+          scoreBreakdown: pr.scoreBreakdown,
           verdict: pr.verdict,
           issuesSummary: pr.issuesSummary,
           reasoning: pr.reasoning,

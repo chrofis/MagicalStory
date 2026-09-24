@@ -156,6 +156,8 @@ function stripAgeWords(text) {
  * Age words are stripped first, as before.
  */
 const FACE_MIDPOINT_RE = /^(?:neutral|medium)\b/i;
+// character-analysis.txt's build scale is slim / average / athletic / stocky.
+const BUILD_MIDPOINT_RE = /^average\b/i;
 function buildFaceDescription(face) {
   if (isNone(face)) return '';
   return String(stripAgeWords(String(face)))
@@ -2069,7 +2071,7 @@ function buildLabeledPhysicalParts(profile, options = {}) {
 /**
  * Build a prose physical description of a character (used for simple
  * validation / feedback text, NOT for image prompts).
- * Format: "Name is a {age}-year-old {noun}, {height}cm tall, {build} build. Hair: ... ."
+ * Format: "Name is a {age category} {noun}[, {non-midpoint build} build]. Hair: ... ."
  *
  * @param {Object} char - Character object
  * @returns {string} Prose description
@@ -2087,11 +2089,15 @@ function buildCharacterPhysicalDescription(char, clothingOverride = null) {
     || (p.gender === 'male' ? 'boy' : p.gender === 'female' ? 'girl' : 'child');
   const age = p.numericAge ?? 10;
 
+  // The age is stated ONCE (owner, 2026-09-24: no repetition). Height in cm is
+  // not stated: HEIGHT ORDER carries the relative size every judge compares,
+  // and no reader compares centimetres. The midpoint build ("average") is
+  // dropped like the midpoint face descriptors (buildFaceDescription); any
+  // other build stays.
   let s = ageLabel
-    ? `${p.name} is a ${ageLabel} ${genderLabel} (Looks: ${ageLabel})`
+    ? `${p.name} is a ${ageLabel} ${genderLabel}`
     : `${p.name} is a ${age}-year-old ${genderLabel}`;
-  if (p.height) s += `, ${p.height} cm tall`;
-  if (p.build) s += `, ${p.build} build`;
+  if (p.build && !BUILD_MIDPOINT_RE.test(String(p.build).trim())) s += `, ${p.build} build`;
   if (p.hair) s += `. Hair: ${p.hair}`;
   if (p.gender === 'male' && !isNone(p.facialHair)) {
     s += p.facialHair.toLowerCase() === 'clean-shaven'
@@ -2491,12 +2497,13 @@ function buildCharacterReferenceList(photos, characters = null, { includeClothin
   // character's physical description on first mention"), and each
   // attached image carries a `[Name]:` label in the parts array. Repeating
   // the description here was triple-binding the same info — drop it.
-  // Just list the names so the model knows which images to expect.
   // Exception: covers set includeClothing — their scene prose carries no
   // clothing, so without a text anchor the outfit rides on the reference
   // pixels alone and repairs can drift it.
-  const names = photos.map(p => `[${p.name}]`).join(', ');
-  let result = `\n**CHARACTER REFERENCE PHOTOS (one per character, labeled images attached below):** ${names}\n`;
+  // No bare `[Name], [Name]` line (owner, 2026-09-24): every name is already
+  // in the character lines below and in the reference-card legend, and a page
+  // prompt never carried one.
+  let result = '';
 
   if (includeClothing) {
     // BIND THE GARMENT TO THE PERSON, exactly as a page does (owner,
@@ -4919,6 +4926,10 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       // the protected tail.
       NO_CHARACTER_MARKING: NO_CHARACTER_MARKING_RULE,
       HANDS_HOLD_ONLY_NAMED: HANDS_HOLD_ONLY_NAMED_RULE,
+      // A cover gets neither the facing bullet (its gaze is code-owned at the
+      // viewer) nor COUNTS (its prose states no number) — see the constants.
+      COMPOSITION: buildCompositionBlock({ cover: isCoverRender }),
+      COUNTS: isCoverRender ? '' : COUNTS_RULE,
       // REQUIRED TEXT. In the protected tail, beside the other two rule
       // constants: shrinkPromptForModel drops head blocks first, and a page
       // over the Grok cap losing the only statement of what its signpost has
@@ -8254,6 +8265,33 @@ const NO_CHARACTER_MARKING_RULE = "**NO MARKS ON A CHARACTER:** No arrow, symbol
 // the body is not an invitation to the hands.
 const HANDS_HOLD_ONLY_NAMED_RULE = "**HANDS:** A character's hands hold only what the scene names for that character. Never substitute an unnamed prop for a named one, and never fill an empty hand with an invented object — a hand with nothing assigned to it rests or gestures, and never joins a contact the scene gives to another part of that character's body.";
 
+// THE COMPOSITION BULLETS AND THE COUNTING RULE (code-built since 2026-09-24).
+// They were literal paragraphs of image-generation.txt, so every render carried
+// them — including the three covers, where the FACING bullet ("faces that
+// target — not the camera") contradicts the code-owned viewer gaze and COUNTS
+// has no number to bind (cover prose is built from the hint and never states
+// one). Inapplicable text is not built (the 2026-09-23 cover-SHOT precedent);
+// the shrinker's cut list (images.js PROMPT_CUT_ORDER) removes these same
+// strings, so there is one copy of each.
+//
+// The GROUND bullet is the ONE feet-on-the-ground rule for pages and covers
+// alike (owner, 2026-09-24: merge the cover guideline into it). What the cover
+// copy added that a page also needs — nothing invented under a figure that
+// swims, floats or flies — is folded in here.
+const COMPOSITION_HEADER = '**Composition:**';
+const COMPOSITION_FACING_BULLET = '- Each character does a specific action (reaches, holds, walks toward, gazes at) and faces that target — not the camera — unless the scene declares a facing for them, which always wins. When the target is in the background and no facing is declared, the character faces away, back or side visible. Companions sharing a movement or destination all face the same way.';
+const COMPOSITION_GROUND_BULLET = '- A standing character stands on visible standable ground — never on or over water, and never in the air — unless the scene description has them swim, float, or fly, and then no ground is invented under them. Outside a close-up and the near figure of an over-the-shoulder shot, each standing figure is drawn complete down to both feet, placed on the surface the scene names for that figure — where several surfaces are named, a ledge above and a floor below, each figure stands on its own. A lower body may be hidden by an object in front of the figure, never by the figure ending.';
+const COMPOSITION_SIZE_BULLET = "- A vessel, building or vehicle keeps its true size against the figures near it: a person reaches about to a boat's rail, a doorway lintel or a wheel hub — never eye-level with a masthead, a rooftop or a chimney. A held or carried object keeps the size stated for it against the hand or body holding it.";
+const COUNTS_RULE = '**COUNTS:** An exact number the scene states for a group of like things is three or fewer, and exactly that many are drawn. A group given as more than three, a cluster, a row, a few or several is drawn with no countable exact number.';
+
+/** The Composition block of an image prompt. A cover omits the facing bullet. */
+function buildCompositionBlock({ cover = false } = {}) {
+  const bullets = cover
+    ? [COMPOSITION_GROUND_BULLET, COMPOSITION_SIZE_BULLET]
+    : [COMPOSITION_FACING_BULLET, COMPOSITION_GROUND_BULLET, COMPOSITION_SIZE_BULLET];
+  return [COMPOSITION_HEADER, ...bullets].join('\n');
+}
+
 // MARKINGS DO NOT MULTIPLY WITH THE OBJECT — emitted in REQUIRED OBJECTS only
 // when a listed element has declared states (see the emission site).
 const SPLIT_STATE_MARKINGS_RULE = 'A state that divides, opens or breaks an object does not multiply its markings: a device, emblem or pattern on the surface is one marking, and the split runs through it — each part shows only its share.';
@@ -11316,6 +11354,12 @@ module.exports = {
   TRUE_RELATIVE_SIZE_RULE,
   NO_CHARACTER_MARKING_RULE,
   HANDS_HOLD_ONLY_NAMED_RULE,
+  COMPOSITION_HEADER,
+  COMPOSITION_FACING_BULLET,
+  COMPOSITION_GROUND_BULLET,
+  COMPOSITION_SIZE_BULLET,
+  COUNTS_RULE,
+  buildCompositionBlock,
   SPLIT_STATE_MARKINGS_RULE,
   PAGE_OPENING_VARIETY_RULE,
   STYLE_RULEBOOK,

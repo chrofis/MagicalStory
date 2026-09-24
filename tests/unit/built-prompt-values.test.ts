@@ -710,11 +710,13 @@ describe('object counts are exact up to three and non-numeric above', () => {
   it('the illustrator is told the same limit, in the protected tail', () => {
     const tpl = fs.readFileSync(path.join(PROMPTS, 'image-generation.txt'), 'utf8');
     const idx = tpl.indexOf('**REQUIRED OBJECTS');
-    const counts = tpl.indexOf('**COUNTS:**');
+    // Code-built since 2026-09-24 (PB.COUNTS_RULE, not built on a cover).
+    const counts = tpl.indexOf('{COUNTS}');
     expect(counts, 'the illustrator carries no counting rule').toBeGreaterThan(-1);
-    expect(counts, 'the counting rule sits ahead of the protected tail').toBeGreaterThan(idx);
-    expect(tpl.slice(counts, counts + 400)).toMatch(/three or fewer/i);
-    expect(tpl.slice(counts, counts + 400)).toMatch(/more than three/i);
+    expect(counts, 'the counting rule sits ahead of the protected tail').toBeGreaterThan(tpl.indexOf('{REQUIRED_OBJECTS}'));
+    expect(idx, 'REQUIRED OBJECTS is a placeholder, never literal template text').toBe(-1);
+    expect(PB.COUNTS_RULE).toMatch(/three or fewer/i);
+    expect(PB.COUNTS_RULE).toMatch(/more than three/i);
   });
 
   it('the judge checks no exact number above three', () => {
