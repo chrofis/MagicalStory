@@ -176,7 +176,7 @@ const TAG = args.tag || 'run';
     CHAR,
     {
       imageBackend: 'grok',
-      issueDescription: 'clothing color mismatch',
+      defectTypes: ['clothing_inconsistent'],
       clothingDescription: char.avatars?.clothing?.[clothingCategory] || '',
       photoType,
       sceneDescription: scene.sceneDescription || scene.text || '',

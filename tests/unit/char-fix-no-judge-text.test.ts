@@ -43,7 +43,7 @@ describe('char-fix prompt carries no judge text', () => {
 
   for (const axes of AXES) {
     it(`${axes.treatment}/${axes.regionSource}/${axes.faceOnly ? 'face' : 'body'}: the finding's wrong trait never reaches the prompt`, async () => {
-      const prompt = await build(axes, { issueDescription: JUDGE_TEXT, defectTypes: ['face_mismatch'] });
+      const prompt = await build(axes, { defectTypes: ['face_mismatch'] });
       expect(prompt).not.toMatch(/dark-eyed/);
       expect(prompt).not.toMatch(/cell E/);
       expect(prompt).not.toMatch(/Issues to fix/);
@@ -58,23 +58,27 @@ describe('char-fix prompt carries no judge text', () => {
   }
 
   it('every template keeps its match-IMAGE-1 identity line', async () => {
-    const cut = await build(AXES[0], { issueDescription: JUDGE_TEXT, defectTypes: ['face_mismatch'] });
+    const cut = await build(AXES[0], { defectTypes: ['face_mismatch'] });
     expect(cut).toContain('Face, hair, skin tone and build: from IMAGE 1.');
-    const box = await build(AXES[1], { issueDescription: JUDGE_TEXT, defectTypes: ['face_mismatch'] });
+    const box = await build(AXES[1], { defectTypes: ['face_mismatch'] });
     expect(box).toContain('Face: match IMAGE 1');
-    const face = await build(AXES[2], { issueDescription: JUDGE_TEXT, defectTypes: ['face_mismatch'] });
+    const face = await build(AXES[2], { defectTypes: ['face_mismatch'] });
     expect(face).toContain('to look like Julian from IMAGE 1');
-    const body = await build(AXES[3], { issueDescription: JUDGE_TEXT, defectTypes: ['face_mismatch'] });
+    const body = await build(AXES[3], { defectTypes: ['face_mismatch'] });
     expect(body).toContain('to match IMAGE 1');
   });
 
   it('an unknown or missing type adds no defect line — the reference still carries identity', async () => {
     for (const defectTypes of [null, [], ['cutout_artifact'], ['no-such-type']]) {
-      const prompt = await build(AXES[0], { issueDescription: JUDGE_TEXT, defectTypes });
+      const prompt = await build(AXES[0], { defectTypes });
       expect(prompt).not.toMatch(/Defect to fix/);
       expect(prompt).not.toMatch(/dark-eyed/);
       expect(prompt).toContain('IMAGE 1');
     }
+  });
+
+  it('the repair request cannot carry the judge sentence — the field is gone from the contract', () => {
+    expect(() => buildCharRepairRequest({ imageBackend: 'grok', issueDescription: JUDGE_TEXT })).toThrow(/unknown field/);
   });
 
   it('several types dedupe to one phrase each', () => {
@@ -94,7 +98,9 @@ describe('char-fix prompt carries no judge text', () => {
     });
     expect(decision.method).toBe('char-fix');
     expect(decision.issueTypes).toEqual(['face_mismatch']);
-    const prompt = await build(AXES[2], { issueDescription: decision.issueDescription, defectTypes: decision.issueTypes });
+    // The decision carries no judge sentence at all — only the type.
+    expect(decision).not.toHaveProperty('issueDescription');
+    const prompt = await build(AXES[2], { defectTypes: decision.issueTypes });
     expect(prompt).not.toMatch(/dark-eyed/);
     expect(prompt).toContain(faceRepair.CHAR_FIX_DEFECT_PHRASES.face_mismatch);
   });

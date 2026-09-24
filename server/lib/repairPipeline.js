@@ -1458,7 +1458,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const { resolveRepairAxes } = require('./faceRepair');
     // A figure repainted INTO another character is a whole-figure redraw, never
     // a face patch.
-    const repairAxes = resolveRepairAxes(decision.issueDescription, { hasFaceBbox: !!faceBbox, issueTypes: decision.issueTypes || null, ...(byFigure ? { forceTarget: 'body' } : {}) });
+    const repairAxes = resolveRepairAxes({ hasFaceBbox: !!faceBbox, issueTypes: decision.issueTypes || null, ...(byFigure ? { forceTarget: 'body' } : {}) });
     const useFaceOnly = repairAxes.faceOnly;
     // THE FIGURE BOX, for a face repair too — the face goes separately as
     // `faceBbox`, and the face crop is built from that. Passing the face box
@@ -1573,7 +1573,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const { buildCharRepairRequest } = require('./charRepairRequest');
       repairResult = await images().repairCharacterMismatch(currentImageData, avatarPhoto, repairBbox, charName, buildCharRepairRequest({
         imageBackend: 'grok',
-        issueDescription: decision.issueDescription,
         // Structured type only — the prompt never carries the judge's sentence.
         defectTypes: decision.issueTypes || null,
         clothingDescription: pageClothingDesc,

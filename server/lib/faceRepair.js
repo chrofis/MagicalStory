@@ -1368,10 +1368,7 @@ function applyGeometryGuards(axes, { faceBbox, bodyBbox } = {}) {
 
 // ---------------------------------------------------------------------------
 // resolveRepairAxes — THE single place the "which axes for this issue" decision
-// lives. Replaces the scattered `useFaceOnly` derivations (images.js:8174 +
-// regeneration.js:5444). Face issue → whiteout + cutout + face; body issue →
-// crosshatch + body. Keyword lists match the legacy derivations verbatim.
-// FAITHFULNESS-CHECK: images.js:8174-8177 / regeneration.js:5443-5450.
+// lives. Face issue → blur + cutout + face; body issue → crosshatch + box.
 // ---------------------------------------------------------------------------
 // DEFECT-TYPE → REPAIR-MODE mapping (owner ruling, 2026-09-01): "The char is
 // needed if figure is distorted or limbs missing or position wrong. But age
@@ -1379,31 +1376,52 @@ function applyGeometryGuards(axes, { faceBbox, bodyBbox } = {}) {
 // patch that works even on busy multi-figure pages where every full-figure
 // draw is gate-refused (p16, 12/12). FULL-FIGURE repair is for STRUCTURAL /
 // POSITIONAL defects and clothing (garment = body scale).
-const FACE_DEFECT_TYPES = new Set(['age_shift', 'face_drift', 'face_mismatch', 'facial_hair', 'skin_tone',
-  // face_destroyed (2026-09-12): a featureless or smeared face in the page. A
-  // face-only patch is exactly the repair — the head size and tilt survive, so
-  // the features come back from the reference avatar without a full redraw.
-  'face_destroyed']);
-const BODY_DEFECT_TYPES = new Set(['clothing_inconsistent', 'color_change', 'shape_change', 'missing', 'unexpected', 'garment']);
+//
+// STRUCTURED DATA ONLY (2026-09-24). The finding's `type`, read through the
+// evaluator vocabulary (evalBuckets.bucketForType): a type in the
+// `character_identity` bucket (face, age, hair, skin, facial hair, a destroyed
+// face) is an identity cue → FACE; a type in any other known bucket (clothing,
+// anatomy, figure completeness, pose, objects…) → FULL FIGURE. The judge's
+// sentence is never read — it used to be keyword-sniffed for 'eye' / 'hair' /
+// 'cloth' when no type decided, which is judge prose interpreted in code.
+// A type the vocabulary does not know decides nothing; with no deciding type
+// and no explicit forceTarget there is NO answer, and resolveRepairAxes throws
+// rather than guess (callers decline the repair loudly).
+// Repair-only types that are not evaluator findings, so have no bucket:
+const BODY_ONLY_REPAIR_TYPES = new Set([
+  'placeholder_figure', // scene composite: paint the character into a flat placeholder
+]);
 
-function resolveRepairAxes(issueDescription, { hasFaceBbox = false, model = 'grok', forceTarget = null, issueTypes = null } = {}) {
-  const issueText = (issueDescription || '').toLowerCase();
-  const hasFaceIssue = issueText.includes('face') || issueText.includes('hair') || issueText.includes('skin') || issueText.includes('eye') || issueText.includes('age');
-  const hasClothingIssue = issueText.includes('cloth') || issueText.includes('outfit') || issueText.includes('dress') || issueText.includes('shirt') || issueText.includes('jacket') || issueText.includes('color');
-  // Structured finding types beat keyword sniffing: "appears older" contains
-  // no keyword and routed a pure age cue to a full-figure repaint (the G7
-  // failure mode). Types come from the entity findings' subType field.
+/**
+ * 'face' | 'body' | null — the repair target the finding TYPES decide.
+ * Mixed face + body types → 'body' (garment and build own the body scale).
+ * Unknown types are ignored; null when no type decides.
+ */
+function repairTargetForTypes(issueTypes) {
+  const { bucketForType } = require('./evalBuckets');
   const types = (Array.isArray(issueTypes) ? issueTypes : [])
     .map(t => String(t || '').toLowerCase().trim()).filter(Boolean);
-  const typeFace = types.some(t => FACE_DEFECT_TYPES.has(t));
-  const typeBody = types.some(t => BODY_DEFECT_TYPES.has(t));
-  // forceTarget: explicit 'face' | 'body' override (user/dev toggle) beats the
-  // keyword heuristic, mirroring regeneration.js's whiteoutTarget override.
-  let faceOnly;
-  if (forceTarget === 'face') faceOnly = hasFaceBbox;
-  else if (forceTarget === 'body') faceOnly = false;
-  else if (typeFace || typeBody) faceOnly = typeFace && !typeBody && hasFaceBbox;
-  else faceOnly = hasFaceIssue && !hasClothingIssue && hasFaceBbox;
+  let face = false;
+  let body = false;
+  for (const t of types) {
+    if (BODY_ONLY_REPAIR_TYPES.has(t)) { body = true; continue; }
+    const bucket = bucketForType(t);
+    if (bucket === 'character_identity') face = true;
+    else if (bucket !== 'other') body = true;
+  }
+  if (body) return 'body';
+  if (face) return 'face';
+  return null;
+}
+
+function resolveRepairAxes({ hasFaceBbox = false, model = 'grok', forceTarget = null, issueTypes = null } = {}) {
+  // forceTarget: explicit 'face' | 'body' (user/dev toggle, or a caller whose
+  // route is by definition a whole-figure redraw) beats the type mapping.
+  const target = (forceTarget === 'face' || forceTarget === 'body') ? forceTarget : repairTargetForTypes(issueTypes);
+  if (!target) {
+    throw new Error(`resolveRepairAxes: no finding type decides face vs full figure (types: ${JSON.stringify(issueTypes || [])}) and no forceTarget — refusing to guess`);
+  }
+  const faceOnly = target === 'face' && hasFaceBbox;
   // FACE = BLUR (owner, 2026-08-26). A blur destroys the features while keeping
   // head size and tilt, so the pose survives and identity has to come from the
   // reference avatar; a whiteout hands the model an empty region and loses that
@@ -1451,6 +1469,7 @@ module.exports = {
   repairDescriptor,
   legacyMethodAlias,
   resolveRepairAxes,
+  repairTargetForTypes,
   legacyFlagsToAxes,
   applyGeometryGuards,
   buildActionContext,

@@ -2065,7 +2065,6 @@ async function runCharRepairStage(ctx, opts) {
   const { buildCharRepairRequest } = require('./charRepairRequest');
   const sharedRequest = buildCharRepairRequest({
     imageBackend: backend,
-    issueDescription: params.issueDescription || null,
     defectTypes: Array.isArray(params.issueTypes) ? params.issueTypes : null,
     clothingDescription,
     // Face/hair/build text for the prompt. Follows refName so an identity swap

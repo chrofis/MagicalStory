@@ -5374,9 +5374,11 @@ async function repairCharacterMismatch(imageData, characterPhoto, bbox, charName
   // treatment + samUnionBlend + gate battery (style-match / IoU / white-card /
   // coverage / sharpness) as grok and qwen. Axes come from the ONE central rule.
   const { repairCharacterFace, resolveRepairAxes } = require('./faceRepair');
-  const geminiAxes = resolveRepairAxes(options.issueDescription, {
+  const geminiAxes = resolveRepairAxes({
     hasFaceBbox: Array.isArray(options.faceBbox) && options.faceBbox.length === 4,
     forceTarget: (options.whiteoutTarget === 'face' || options.whiteoutTarget === 'body') ? options.whiteoutTarget : null,
+    // The finding's structured type(s) decide face vs full figure — never its prose.
+    issueTypes: options.defectTypes || null,
     model: 'gemini',
   });
   return repairCharacterFace(imageData, characterPhoto, {
@@ -5529,7 +5531,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
   if (options.faceOnly !== undefined && options.faceOnly !== null) explicitAxes.faceOnly = !!options.faceOnly;
 
   return repairCharacterFace(imageData, characterPhoto, {
-    ...options,      // issueDescription, clothingDescription, sceneDescription,
+    ...options,      // defectTypes, clothingDescription, sceneDescription,
                      // photoType, protectedFaces/Bodies, textPosition, artStyle,
                      // includeDebug, characterDescription/richDescription, etc.
     ...axes,         // regionSource / treatment / model / faceOnly (override any

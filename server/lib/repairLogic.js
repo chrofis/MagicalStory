@@ -787,7 +787,7 @@ function selectCharRepairTasks(entityReport, options = {}) {
  * @param {string[]} [options.failedMethods] - bare repair methods that already FAILED
  *        (produced no image) on the version being repaired. A failed char-fix is not
  *        repeated on the same pixels: the page flips to iterate.
- * @returns {{method: 'skip'|'inpaint'|'iterate'|'char-fix', reason: string, charName?: string, severity?: string, issueDescription?: string}}
+ * @returns {{method: 'skip'|'inpaint'|'iterate'|'char-fix', reason: string, charName?: string, severity?: string, issueTypes?: string[]}}
  */
 function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) {
   const evaluator = evaluation || {};
@@ -973,6 +973,15 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
       if (source !== 'character' || offByDesign) continue;
       const sev = String(issue.severity || '').toLowerCase();
       if (sev !== 'critical' || isCropArtifact(issue, { entity: true })) continue;
+      // The finding's TYPE decides face vs full figure (resolveRepairAxes). A
+      // type the evaluator vocabulary does not know decides nothing, and the
+      // judge's sentence is never read in its place — that finding cannot be
+      // routed, so it is declined here, loudly, and the next one is tried.
+      const { repairTargetForTypes } = require('./faceRepair');
+      if (!repairTargetForTypes([issue.subType || issue.type])) {
+        log.error(`🚫 [REPAIR-DECIDE] page ${pageNumber}: entity ${sev} on ${charName} has type "${issue.subType || issue.type || ''}", which decides neither a face nor a full-figure repair — no char-fix for it`);
+        continue;
+      }
       if (!worst) worst = { severity: sev, charName, issue };
     }
     const entityGap = worst && charFixImpossible(worst.charName);
@@ -984,9 +993,8 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
       return flippedFromFailedCharFix(`entity ${worst.severity} on ${worst.charName}`);
     }
     if (worst) {
-      const issueDescription = worst.issue.description || worst.issue.fixInstruction || '';
       // repairParams: the 3-axis repair plan for this char-fix, resolved from the
-      // issue text by the ONE central rule (resolveRepairAxes). Emitted here so the
+      // finding's TYPE by the ONE central rule (resolveRepairAxes). Emitted here so the
       // decision — not a scattered per-caller `useFaceOnly` derivation — owns which
       // axes a char-fix uses. faceOnly here is the INTENT (assumes a face box is
       // available); executeCharFixAction finalises it against the actual bbox.
@@ -994,13 +1002,12 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
       // The finding's TYPE decides face vs full-figure (owner, 2026-09-01):
       // an age_shift is a face patch, never a full-figure repaint.
       const issueTypes = [worst.issue.subType || worst.issue.type].filter(Boolean);
-      const repairParams = resolveRepairAxes(issueDescription, { hasFaceBbox: true, issueTypes });
+      const repairParams = resolveRepairAxes({ hasFaceBbox: true, issueTypes });
       return {
         method: 'char-fix',
         reason: `entity ${worst.severity} on ${worst.charName}`,
         charName: worst.charName,
         severity: worst.severity,
-        issueDescription,
         issueTypes,
         repairParams,
       };
@@ -1023,7 +1030,6 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
     if (identity) {
       const charName = String(identity.character).trim();
       if (charFixAlreadyFailed) return flippedFromFailedCharFix(`figure ${identity.figure} is ${charName} drawn wrong`);
-      const issueDescription = require('./scoring').findingText(identity);
       const { resolveRepairAxes } = require('./faceRepair');
       return {
         method: 'char-fix',
@@ -1033,9 +1039,8 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
         // on any figure, so the name-based bbox ladder cannot locate it.
         targetFigure: Number(identity.figure),
         severity: String(identity.severity).toLowerCase(),
-        issueDescription,
         issueTypes: ['character_identity'],
-        repairParams: resolveRepairAxes(issueDescription, { hasFaceBbox: true, forceTarget: 'body' }),
+        repairParams: resolveRepairAxes({ hasFaceBbox: true, forceTarget: 'body' }),
       };
     }
   }
@@ -1099,17 +1104,15 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
     }
     if (clothingIssue && !worseNonClothing && !clothingGap) {
       const charName = String(clothingIssue.character).trim();
-      const issueDescription = require('./scoring').findingText(clothingIssue);
       const { resolveRepairAxes } = require('./faceRepair');
       // forceTarget 'body' so this never degrades into a face-only cutout:
       // the whole figure is redrawn, which is the point of the route.
-      const repairParams = resolveRepairAxes(issueDescription, { hasFaceBbox: true, forceTarget: 'body' });
+      const repairParams = resolveRepairAxes({ hasFaceBbox: true, forceTarget: 'body' });
       return {
         method: 'char-fix',
         reason: `clothing ${String(clothingIssue.severity).toLowerCase()} on ${charName} — figure redo`,
         charName,
         severity: String(clothingIssue.severity).toLowerCase(),
-        issueDescription,
         issueTypes: ['clothing'],
         repairParams,
       };

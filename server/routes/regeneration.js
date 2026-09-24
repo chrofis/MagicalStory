@@ -5798,22 +5798,31 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             return { task, error: true, failReason: `No avatar for ${characterName}` };
           }
 
-          // Determine repair region based on issue types
-          // face issues → use faceBox, clothing issues → use bodyBox, both → bodyBox
-          const issueDesc = charIssues.length > 0
-            ? charIssues.map(i => i.issue || i.description || '').filter(Boolean).join('; ')
-            : '';
-          // Pick the right box via the ONE central rule (resolveRepairAxes).
-          // The manual route lets the user force the target (whiteoutTarget
-          // face|body) — passed as forceTarget, which beats the keyword
-          // heuristic; anything else falls back to the issue-text derivation.
-          const { resolveRepairAxes } = require('../lib/faceRepair');
-          const manualAxes = resolveRepairAxes(issueDesc, {
+          // Pick the right box via the ONE central rule (resolveRepairAxes):
+          // face issues → faceBox, body issues → bodyBox, both → bodyBox. The
+          // user's target (whiteoutTarget face|body) wins; on "Auto (by issue
+          // type)" the entity findings' TYPES decide (owner, 2026-09-01) — the
+          // judge's sentence is never read (2026-09-24). A page with no finding
+          // whose type decides has nothing for Auto to go by: refuse and ask
+          // for an explicit target instead of guessing.
+          const { resolveRepairAxes, repairTargetForTypes } = require('../lib/faceRepair');
+          const forceTarget = (whiteoutTarget === 'face' || whiteoutTarget === 'body') ? whiteoutTarget : null;
+          // A crop artefact is a defect of the entity grid's cutout, never of the
+          // page, so it decides nothing here (same predicate as the automatic gate).
+          const { isCropArtifact } = require('../lib/repairLogic');
+          const charIssueTypes = charIssues.filter(i => !isCropArtifact(i, { entity: true })).map(i => i.subType || i.type).filter(Boolean);
+          if (!forceTarget && !repairTargetForTypes(charIssueTypes)) {
+            log.error(`🚫 [CHAR REPAIR] ${characterName} p${pageNumber}: Auto target but no finding type decides face vs full figure (types: ${JSON.stringify(charIssueTypes)}) — refusing`);
+            return {
+              task, error: true,
+              failReason: `${characterName} on page ${pageNumber} has no consistency finding whose type says face or full figure${charIssueTypes.length ? ` (types: ${charIssueTypes.join(', ')})` : ''} - choose "Face only" or "Full body" as the target.`,
+              rejectedReason: 'no_repair_target',
+            };
+          }
+          const manualAxes = resolveRepairAxes({
             hasFaceBbox: !!storedAppearance.faceBox,
-            forceTarget: (whiteoutTarget === 'face' || whiteoutTarget === 'body') ? whiteoutTarget : null,
-            // Finding TYPES decide face vs full-figure (owner, 2026-09-01) —
-            // "appears older" has no routing keyword but its subType is age_shift.
-            issueTypes: charIssues.map(i => i.subType || i.type).filter(Boolean),
+            forceTarget,
+            issueTypes: charIssueTypes,
           });
           const useFaceOnly = manualAxes.faceOnly;
           const repairBox = useFaceOnly ? storedAppearance.faceBox : (storedAppearance.bodyBox || storedAppearance.faceBox);
@@ -5921,9 +5930,8 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               // field can no longer be dropped by forgetting to type it.
               ...buildCharRepairRequest({
                 imageBackend: 'grok',
-                issueDescription: issueDesc,
                 // Structured type only — the prompt never carries the judge's sentence.
-                defectTypes: charIssues.map(i => i.subType || i.type).filter(Boolean),
+                defectTypes: charIssueTypes,
                 clothingDescription: clothingDesc,
                 sceneDescription: sceneDesc,
                 faceBbox,

@@ -119,16 +119,12 @@ async function main() {
 
   // Call char-fix with includeDebug so we capture the masked input + Grok raw output
   console.log(`Running char-fix...`);
-  const issueDescription = (v0.fixableIssues || [])
-    .filter(it => (it.character || '').toLowerCase() === TARGET_CHARACTER.toLowerCase())
-    .map(it => it.description || it.issue)
-    .join(' | ') || 'clothing should match the costumed reference';
   const result = await repairCharacterMismatch(v0DataUri, avatarPhoto, bbox, TARGET_CHARACTER, {
     faceBbox,
     photoType,
     useFullScene: true,
     includeDebug: true,
-    issueDescription,
+    whiteoutTarget: 'body',
     sceneDescription: page.description || page.sceneDescription || '',
     artStyle: story.artStyle || 'watercolor',
     textPosition: page.textPosition || null,

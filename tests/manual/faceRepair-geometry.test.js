@@ -202,33 +202,33 @@ ok('grok_blackout (deprecated): no flags, body default → gated box+crosshatch+
 // ===========================================================================
 console.log('\nissue → axes (resolveRepairAxes central rule)');
 // ===========================================================================
-ok('face issue + faceBbox → whiteout+cutout+face', () => {
+ok('face type + faceBbox → blur+cutout+face', () => {
   assert.deepStrictEqual(
-    resolveRepairAxes('the face and hair look wrong', { hasFaceBbox: true }),
-    { regionSource: 'cutout', treatment: 'whiteout', model: 'grok', faceOnly: true });
+    resolveRepairAxes({ hasFaceBbox: true, issueTypes: ['face_mismatch'] }),
+    { regionSource: 'cutout', treatment: 'blur', model: 'grok', faceOnly: true });
 });
-ok('face issue but NO faceBbox → body path (crosshatch)', () => {
+ok('face type but NO faceBbox → body path (crosshatch)', () => {
   assert.deepStrictEqual(
-    resolveRepairAxes('the face looks wrong', { hasFaceBbox: false }),
+    resolveRepairAxes({ hasFaceBbox: false, issueTypes: ['face_mismatch'] }),
     { regionSource: 'box', treatment: 'crosshatch', model: 'grok', faceOnly: false });
 });
-ok('face + clothing issue → body path (clothing pulls it to body)', () => {
+ok('face + clothing types → body path (clothing pulls it to body)', () => {
   assert.deepStrictEqual(
-    resolveRepairAxes('wrong face and wrong jacket color', { hasFaceBbox: true }),
+    resolveRepairAxes({ hasFaceBbox: true, issueTypes: ['face_mismatch', 'clothing_inconsistent'] }),
     { regionSource: 'box', treatment: 'crosshatch', model: 'grok', faceOnly: false });
 });
-ok('pure clothing issue → body path', () => {
+ok('pure clothing type → body path', () => {
   assert.deepStrictEqual(
-    resolveRepairAxes('the dress is the wrong color', { hasFaceBbox: true }),
+    resolveRepairAxes({ hasFaceBbox: true, issueTypes: ['clothing_inconsistent'] }),
     { regionSource: 'box', treatment: 'crosshatch', model: 'grok', faceOnly: false });
 });
-ok('forceTarget body overrides a face issue', () => {
+ok('forceTarget body overrides a face type', () => {
   assert.deepStrictEqual(
-    resolveRepairAxes('face wrong', { hasFaceBbox: true, forceTarget: 'body' }),
+    resolveRepairAxes({ hasFaceBbox: true, issueTypes: ['face_mismatch'], forceTarget: 'body' }),
     { regionSource: 'box', treatment: 'crosshatch', model: 'grok', faceOnly: false });
 });
 ok('model axis threads through (qwen)', () => {
-  assert.strictEqual(resolveRepairAxes('face wrong', { hasFaceBbox: true, model: 'qwen' }).model, 'qwen');
+  assert.strictEqual(resolveRepairAxes({ hasFaceBbox: true, issueTypes: ['face_mismatch'], model: 'qwen' }).model, 'qwen');
 });
 
 // ===========================================================================

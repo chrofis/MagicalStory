@@ -72,7 +72,7 @@ describe('the repair router declines a char fix it cannot execute', () => {
   const roster = [{ name: 'Mila' }];
   const evaluation = { scoreBreakdown: { visual: { score: 60 }, semantic: { score: 60 } }, qualityScore: 60 };
   const entityReport = (name: string) => ({
-    characters: { [name]: { issues: [{ id: 'i1', severity: 'CRITICAL', description: 'face drift', pagesToFix: [11] }] } },
+    characters: { [name]: { issues: [{ id: 'i1', type: 'face_drift', severity: 'CRITICAL', description: 'face drift', pagesToFix: [11] }] } },
   });
 
   it('routes char-fix for a CRITICAL on a roster character', () => {

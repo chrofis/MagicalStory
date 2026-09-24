@@ -21,6 +21,59 @@ superseded and link forward.
 
 ---
 
+## 2026-09-24 — Char-fix face vs full figure is decided by the finding's TYPE only; the judge's sentence is no longer read
+
+**Context:** `resolveRepairAxes` (`server/lib/faceRepair.js`) picked a face patch or a whole-figure
+redraw. A structured type beat it since 2026-09-02, but when no listed type decided, it keyword-sniffed
+the judge's sentence ('face' / 'hair' / 'skin' / 'eye' / 'age' against 'cloth' / 'outfit' / 'dress' /
+'shirt' / 'jacket' / 'color'). That is judge prose interpreted in code, which the eval rule bans; the
+2026-09-23 "char-fix: no judge text" entry left it in place and carried `issueDescription` through the
+repair request only for it. The keyword read also disagreed with itself: a `hair_change` finding went
+face or full figure depending on whether the judge happened to write "color" (British "colour" does not
+match).
+
+**Decision (owner, 2026-09-24 "Fix them"):** the choice comes from structured data only.
+- `repairTargetForTypes(types)`: a type whose evaluator bucket (`evalBuckets.bucketForType`) is
+  `character_identity` — age, face, hair, skin, facial hair, a destroyed face — is an identity cue →
+  FACE; a type in any other known bucket (clothing, anatomy, figure completeness, pose, objects …) →
+  FULL FIGURE; mixed → full figure; `placeholder_figure` (scene composite, not an eval type) → full
+  figure. A type the vocabulary does not know decides nothing.
+- `resolveRepairAxes({ hasFaceBbox, model, forceTarget, issueTypes })` — the text argument is gone.
+  `forceTarget` still wins. With no deciding type and no `forceTarget` it THROWS; it never guesses.
+- Callers: `decideRepairMethod` gate 2 declines a CRITICAL entity finding whose type decides nothing
+  (`log.error`, next CRITICAL tried) instead of routing it by its prose; the manual
+  `/repair-workflow/character-repair` route on "Auto (by issue type)" refuses a (character, page) with
+  no deciding type and asks for "Face only" / "Full body" (crop artefacts excluded, same
+  `isCropArtifact` predicate as the automatic gate); the Gemini branch of `repairCharacterMismatch`
+  reads `defectTypes`. `issueDescription` is deleted from the char-repair request contract
+  (`charRepairRequest.js`) and from the `decideRepairMethod` char-fix decisions — its only reader was
+  the keyword sniff.
+
+**Evidence (rung 1, replay):** old vs new over every stored entity report of the last 40 days
+(57 staging + 17 production stories). Dragon run 6 (`job_1790100385959_1nitlympp`): the one char-fix
+it ran (p14 Julian, CRITICAL `face_mismatch`) is FACE before and after — no repair changes axis.
+Across all stories, gate 2 (the automatic router) changes on 16 pages: 14 carry TYPE-LESS findings
+written before 2026-08-27 (when the entity parse started storing the real type — no type-less finding
+since), 2 carry off-vocabulary types from the model (`cross_character_leakage`, `character_mismatch`).
+All 16 would now take no automatic char-fix. The manual "Auto" route changes on 232/600 staging and
+95/146 production (character, page) pairs: almost all old type-less rows or crop-artefact-only pages
+(now refused with "choose Face only or Full body"), plus `hair_change` / `hair_nuance` now always FACE
+(was body whenever the sentence said "color").
+
+**Open (owner):** the entity model sometimes emits a type outside its own list (`facial_features`,
+`body_build`, `eye_colour`, `character_mismatch`, …). Such a finding now routes nowhere. Fixing it at
+the source is a prompt/vocabulary choice — a closed "type is exactly one of" line in
+`prompts/entity-consistency-check.txt`, or alias entries in `evalBuckets.TYPE_TO_BUCKET` (which also
+moves their scoring bucket) — not decided here.
+
+**Touched:** `server/lib/faceRepair.js`, `server/lib/repairLogic.js`, `server/lib/repairPipeline.js`,
+`server/routes/regeneration.js`, `server/lib/images.js`, `server/lib/charRepairRequest.js`,
+`server/lib/entityConsistency.js`, `server/lib/testlab.js`, `tests/unit/repair-axes-types.test.ts`,
+`tests/unit/char-fix-no-judge-text.test.ts`, `tests/unit/repair-reference-and-finding-ledger.test.ts`,
+`tests/manual/faceRepair-geometry.test.js`, `scripts/test-char-repair-overlap.js`,
+`scripts/analysis/rerun-charfix-p2.js`
+**Status:** ✅ active
+
 ## 2026-09-24 — Blind text audit recall measured: 🟡 keep — it adds real faults on one story in four, and recall is unstable
 
 **Context:** Prompt audit 05 left an owner call: is the blind text audit (`text_audit_blind`, grok-4.6,
