@@ -5,7 +5,11 @@
  * stays different is only what a cover genuinely is:
  *   - its aspect (`MODEL_DEFAULTS.coverAspect`, on every book layout);
  *   - its copy space is always in the image — a cover carries its title,
- *     dedication or back-cover line whatever the page layout does with text;
+ *     dedication or back-cover line whatever the page layout does with text —
+ *     at the beat's `textPosition` (COVER_TEXT_POSITION). The render takes it
+ *     from here, like the iterate's locked position: on a story whose text-zone
+ *     rules are off the Art Director's metadata carries no `textPosition` at
+ *     all (Lab 1458), and its prose already stages the band;
  *   - the front cover's baked title (runtime `coverTitleMode`): the typography-
  *     aware model, and the REQUIRED TEXT block at the prompt tail;
  *   - its text contract for the judges (`resolveCoverTextContract`);
@@ -15,6 +19,7 @@
 
 const { MODEL_DEFAULTS } = require('../config/models');
 const { coverKeyOfPage } = require('./coverBeats');
+const { COVER_TEXT_POSITION } = require('./coverKeys');
 
 /**
  * @param {number} pageNumber
@@ -22,7 +27,7 @@ const { coverKeyOfPage } = require('./coverBeats');
  * @param {string} [ctx.title] - the story title (baked onto the front cover)
  * @param {string} [ctx.dedication]
  * @param {string} [ctx.coverTitleMode] - a run override of runtime.coverTitleMode
- * @returns {null|{coverKey, aspectRatio, textInImage, bakeTitle, titleBaked, imageModel, textMode, expectedText, usageLabel, captureLabel}}
+ * @returns {null|{coverKey, aspectRatio, textInImage, textPosition, bakeTitle, titleBaked, imageModel, textMode, expectedText, usageLabel, captureLabel}}
  */
 function coverRenderOptions(pageNumber, { title = '', dedication = null, coverTitleMode = null } = {}) {
   const coverKey = coverKeyOfPage(pageNumber);
@@ -37,6 +42,7 @@ function coverRenderOptions(pageNumber, { title = '', dedication = null, coverTi
     coverKey,
     aspectRatio: MODEL_DEFAULTS.coverAspect,
     textInImage: true,
+    textPosition: COVER_TEXT_POSITION[coverKey],
     bakeTitle: titleMode.bakeTitle || '',
     titleBaked,
     imageModel: titleMode.bakedModel || null,

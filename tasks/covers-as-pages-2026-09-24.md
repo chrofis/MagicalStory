@@ -329,7 +329,19 @@ Commits `6fbd2b599` + `5906363cb` (the cover gaze exception reaches every brief 
 - [x] Tests (`covers-as-pages.test.ts` + updated cover tests), sibling registry (3 new sets, 2 updated), verify entry
       `covers-are-pages` (supersedes `cover-briefed-like-a-page`), SETTLED gaze line, prompt inventory.
 - [x] Rung 1 — free replay of the real cover-beat + AD builders over 4 stored staging stories.
-- [ ] Rung 2 — Lab `beats_scenes` with cover beats + render of the three returned briefs (see below).
+- [x] Rung 2a/2b — Lab **1458** (`beats_scenes`, `plainStoredBeats`, staging `job_1788555701112_99txp8evx`, 4 pages +
+      3 covers, scene review on; ≈ $0.40): the Art Director returned full briefs for −1/−2/−3 that parse as pages; cast
+      exactly the beat's (front: the main character; opening and back: all five); every figure `looksAt: "viewer"`; the
+      copy space staged in the prose ("the top third … open blue sky … for the book title", "the bottom fifth … calm,
+      empty autumn ground", "the bottom tenth … calm, open grass"); the scene review rewrote the back cover along with
+      the pages. Found: the metadata carried NO `textPosition` on any cover (this story's text-zone rules are off, so
+      the template's field is gated out) → the render now takes the beat's position (`coverRenderOptions.textPosition`,
+      as the iterate already did) and `cover_text_zone_mismatch` fires only on a CONTRADICTING declared zone.
+      The first all-pages attempt was refused by the provider (`content_filter`, 0 tokens); the retry succeeded — one
+      sample, cause unknown.
+- [ ] Rung 2c — render of the three returned briefs: NOT run. No Lab stage renders a given brief through the cover
+      options (the `image` stage renders a stored page's context at the page aspect; the `cover` stage needs a stored
+      briefed cover, and none exists before rung 3). Options: a `params.brief` on the Lab `cover` stage, or rung 3.
 - [ ] Rung 3 — needs owner approval (smoke story / trial).
 
 Deviations from the plan, and why:

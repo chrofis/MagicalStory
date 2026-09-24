@@ -260,7 +260,7 @@ checks.coversArePages = (ctx) => {
     const off = figs.filter(f => !/^(viewer|the viewer|camera)$/i.test(String(f?.looksAt || '').trim())).map(f => f?.name);
     if (!figs.length) faults.push('brief declares no cast');
     if (off.length) faults.push(`gaze not at the viewer: ${off.join(', ')}`);
-    if (String(meta.textPosition || '') !== COVER_TEXT_POSITION[k]) faults.push(`textPosition "${meta.textPosition || ''}" (beat: ${COVER_TEXT_POSITION[k]})`);
+    if (meta.textPosition && String(meta.textPosition) !== COVER_TEXT_POSITION[k]) faults.push(`textPosition "${meta.textPosition}" (beat: ${COVER_TEXT_POSITION[k]})`);
     const prompt = String(c.prompt || '');
     if (prompt.includes('KEY STORY ELEMENTS')) faults.push('KEY STORY ELEMENTS present');
     if (prompt.includes('---METADATA---')) faults.push('METADATA block leaked');
