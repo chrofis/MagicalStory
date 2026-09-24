@@ -57966,6 +57966,12 @@ the sent prompt), so there is no critic-side rule to move.
 **Validation.** Rung 1: the real `buildTrialStoryPrompt` over the stored `input_data` carries the exception,
 no unfilled placeholders; the real `buildSceneExpansionAllPrompt` renders the new Title Page line; the check
 over the stored cover JSON and the stored `coverHints.frontCover` both flag `l'Écureuil (ANI001)`.
+Rung 2: Test Lab experiment **1437** (`trial_challenge_draw`, one claude-sonnet-4-6 writer call, $0.105, new
+template as override, staging story `job_1789296188291_thezv15y1`). The writer listed its cat `ANI001` in the
+cover `objects` with id and named it in `imageSummary` — the format is followed — but the title it chose
+("Omar und der festsitzende Ball") does NOT name the cat, so the exception was applied beyond its scope.
+No baseline arm was run, so whether the old template also put companions on the cover is unmeasured.
+🟡 open: the scope wording may need tightening (BACKLOG).
 
 **Touched:** `prompts/story-trial.txt`, `prompts/scene-expansion-all.txt`, `server/lib/coverIterate.js`,
 `storyJobPipeline.js`, `tests/unit/cover-title-named-cast-warning.test.ts`.
