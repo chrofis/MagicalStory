@@ -140,6 +140,32 @@ function stripAgeWords(text) {
 }
 
 /**
+ * A character's face as every prompt carries it — ONE builder for the page
+ * path (Art Director input), the cover path (CHARACTERS IN THIS IMAGE), the
+ * detector identity line and the single-page repair prompt (owner,
+ * 2026-09-24: "Shorten each child's face everywhere. Same logic.").
+ *
+ * The stored face is a comma list from character-analysis.txt's fixed scale:
+ * jawline, chin, nose, cheekbones, lips. Descriptors at their scale's MIDPOINT
+ * — `neutral` chin, `medium` cheekbones, `medium` lips — say "nothing unusual
+ * here" and separate nobody: over 149 staging faces, 147 carry "neutral chin"
+ * and "medium cheekbones" and 140 "medium lips". They are dropped; a
+ * non-midpoint value (full lips, high cheekbones, a dimpled chin) stays. The
+ * reference card carries the face itself. Mean face text 91 → 46 characters,
+ * which matters on a four-child cover over the image model's prompt cap.
+ * Age words are stripped first, as before.
+ */
+const FACE_MIDPOINT_RE = /^(?:neutral|medium)\b/i;
+function buildFaceDescription(face) {
+  if (isNone(face)) return '';
+  return String(stripAgeWords(String(face)))
+    .split(',')
+    .map(s => s.trim())
+    .filter(s => s && !FACE_MIDPOINT_RE.test(s))
+    .join(', ');
+}
+
+/**
  * Build physical age-marker cues from an apparentAge category.
  *
  * The analyzer emits apparentAge as a single category ("teenager", "school-age"),
@@ -655,7 +681,8 @@ function buildCastIdentityDescription(char, clothingText = '') {
   const hair = buildHairDescription(phys, char.physicalTraitsSource);
   if (hair) parts.push(`hair: ${hair}`);
   if (phys.build) parts.push(`build: ${phys.build}`);
-  if (phys.face) parts.push(phys.face);
+  const face = buildFaceDescription(phys.face);
+  if (face) parts.push(face);
   if (Array.isArray(char.traits) && char.traits.length) parts.push(char.traits.filter(t => typeof t === 'string').join(', '));
   const base = parts.filter(Boolean).join(', ');
   if (!base) return '';
@@ -2024,7 +2051,8 @@ function buildLabeledPhysicalParts(profile, options = {}) {
       : `Facial hair: ${profile.facialHair}`);
   }
 
-  if (includeFace && !isNone(profile.face)) parts.push(`Face: ${stripAgeWords(profile.face)}`);
+  const face = includeFace ? buildFaceDescription(profile.face) : '';
+  if (face) parts.push(`Face: ${face}`);
   if (!isNone(profile.glasses)) parts.push(`Glasses: ${profile.glasses}`);
   if (!isNone(profile.other)) parts.push(`Distinctive marks: ${stripAgeWords(profile.other)}`);
 
@@ -2066,7 +2094,8 @@ function buildCharacterPhysicalDescription(char, clothingOverride = null) {
       ? '. Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face'
       : `. Facial hair: ${p.facialHair}`;
   }
-  if (!isNone(p.face)) s += `, ${stripAgeWords(p.face)}`;
+  const face = buildFaceDescription(p.face);
+  if (face) s += `, ${face}`;
   if (!isNone(p.glasses)) s += `. Glasses: ${p.glasses}`;
   if (!isNone(p.other)) s += `, ${stripAgeWords(p.other)}`;
   if (p.clothing) s += `. Wearing: ${p.clothing}`;
@@ -11164,6 +11193,7 @@ module.exports = {
   extractCharacterVisualProfile,
   buildLabeledPhysicalParts,
   buildCharacterPhysicalDescription,
+  buildFaceDescription,
   buildGroundingPrompt,
   estimateHeightFromAgeGender,
   buildCharacterDescriptionForExpansion,

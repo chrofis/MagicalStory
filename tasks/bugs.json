@@ -1851,6 +1851,15 @@
       "fixedAt": "2026-09-24",
       "fixedIn": "cb6413614",
       "fix": "pickVariantForView is the only selector: landmarkView picks the kind, the judged photoScore ranks within it (below MIN_USABLE_PHOTO is no candidate). landmarkVariants / explicitVariant / `.0` and the loader's cross-slot substitution deleted. Trial writer emits landmarkView instead of [LOC###.N]; iterate templates cite real landmarks bare. Replay: p3-p11 slot 2/3 -> slot 1. Pinned by tests/unit/landmark-vantage-id-not-photo.test.ts. docs/decisions.md 2026-09-24."
+    },
+    {
+      "id": "entity-crop-figure-completeness-charged",
+      "title": "A crop artefact only the entity check saw was charged −15 as figure_completeness and got an inpaint fix",
+      "reportedAt": "2026-09-24",
+      "source": "Reproduced from stored data, staging job_1790100385959_1nitlympp: backCover v0 entity issue cutout_artifact MAJOR ('jagged white edges ... cropping artifact'), consolidated as figure_completeness MAJOR sources ['entity'] → deductions.entity −15, finalScore 70, per_character_fixes 'Fill Julian's left arm and jacket to remove white cropping artifacts'. Same on p16 v1 (−15). Audit 09-covers.md C7.",
+      "rootCause": "The consolidator relabels the entity check's cutout_artifact as figure_completeness; that type had no source-scoped cost or route rule, so a defect of our grid crop was billed and repaired as a defect of the page.",
+      "impact": "Covers and pages lose 15 points and get paid inpaint fixes for gaps the image does not have. Staging and production.",
+      "status": "open"
     }
   ]
 }

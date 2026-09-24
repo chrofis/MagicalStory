@@ -11,7 +11,7 @@
  */
 
 const { REPAIR_DEFAULTS } = require('../config/models');
-const { computeFinalScore, SCORE_THRESHOLDS, findingText } = require('./scoring');
+const { computeFinalScore, SCORE_THRESHOLDS, findingText, ENTITY_ONLY_ZERO_POINT_TYPES, isEntitySourced } = require('./scoring');
 const { log } = require('../utils/logger');
 
 /**
@@ -611,6 +611,9 @@ function collectCriticalFindings(result) {
     if (!Array.isArray(list)) continue;
     for (const i of list) {
       if (!/^(critical|catastrophic)$/i.test(String(i?.severity || ''))) continue;
+      // A crop artefact is not a defect of the page: it never makes the page
+      // critical (it costs 0 and takes no repair route, see isCropArtifact).
+      if (isCropArtifact(i)) continue;
       out.push({
         type: i.type || i.category || null,
         severity: String(i.severity),
@@ -669,7 +672,7 @@ function selectCharRepairTasks(entityReport, options = {}) {
       // major/critical compare never matched the evaluator's UPPERCASE
       // severities, so this selector was dead code too.
       const sev = String(issue.severity || '').toLowerCase();
-      if (sev !== 'critical' || isCropArtifact(issue)) continue;
+      if (sev !== 'critical' || isCropArtifact(issue, { entity: true })) continue;
 
       const pagesToFix = issue.pagesToFix || (issue.pageNumber ? [issue.pageNumber] : []);
       for (const pageNum of pagesToFix) {
@@ -906,7 +909,7 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
       }
       for (const issue of allIssues) {
         const sev = String(issue.severity || '').toLowerCase();
-        if (sev !== 'critical' || isCropArtifact(issue)) continue;
+        if (sev !== 'critical' || isCropArtifact(issue, { entity: true })) continue;
         const pages = issue.pagesToFix || (issue.pageNumber ? [issue.pageNumber] : []);
         if (!pages.includes(pageNumber)) continue;
         if (!worst) worst = { severity: sev, charName, issue };
@@ -1278,8 +1281,18 @@ const NOT_INPAINTABLE_TYPES = new Set([
  * a white block that existed only in the grid crop. Keyed on the declared type.
  */
 const CROP_ARTIFACT_TYPES = new Set(['cutout_artifact']);
-function isCropArtifact(issue) {
-  return [issue?.type, issue?.subType].some(t => CROP_ARTIFACT_TYPES.has(String(t || '').toLowerCase()));
+// Also a crop artefact: a type in scoring.js ENTITY_ONLY_ZERO_POINT_TYPES
+// (`figure_completeness`) that ONLY the entity check reported (owner,
+// 2026-09-24: "log only"). The entity judge sees the crop, never the page. On
+// job_1790100385959_1nitlympp's back cover the consolidator relabelled a
+// `cutout_artifact` as `figure_completeness` and planned "Fill the arm and
+// jacket to remove white cropping artifacts". Source-scoped, never by wording:
+// the same type from the quality judge keeps every route. `entity: true` is for
+// callers reading the entity report itself, whose issues carry no `sources`.
+function isCropArtifact(issue, { entity = false } = {}) {
+  const types = [issue?.type, issue?.subType].map(t => String(t || '').toLowerCase());
+  if (types.some(t => CROP_ARTIFACT_TYPES.has(t))) return true;
+  return types.some(t => ENTITY_ONLY_ZERO_POINT_TYPES.has(t)) && (entity || isEntitySourced(issue));
 }
 
 /**

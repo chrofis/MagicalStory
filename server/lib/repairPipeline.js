@@ -748,7 +748,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           // does the entity billing. Measured cost on one production book:
           // 75 points across four pages and a cover for hair differing by a
           // shade, which the owner reads as a nuance.
-          out.penalty += deductionPoints(issue);
+          // { entity: true }: this IS the entity report, so its source-scoped
+          // zero (scoring.js ENTITY_ONLY_ZERO_POINT_TYPES) applies.
+          out.penalty += deductionPoints(issue, { entity: true });
           out.issues.push({
             name: charName,
             // Carried so the ceiling is reproducible downstream and the dev
@@ -767,7 +769,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const objIssues = objData.issues || [];
       for (const issue of objIssues) {
         if (issue.pages?.includes(pageNumber) || issue.pagesToFix?.includes(pageNumber) || issue.pageNumber === pageNumber) {
-          out.penalty += deductionPoints(issue);
+          out.penalty += deductionPoints(issue, { entity: true });
           out.issues.push({
             name: objName,
             type: issue.type || null,

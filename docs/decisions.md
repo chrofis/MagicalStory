@@ -108,6 +108,94 @@ Supersedes the 2026-08-11 "variant 0" convention. **Status:** ✅ active.
 
 ---
 
+## 2026-09-24 — One shorter face, everywhere: pages and covers still describe a character identically, now shorter
+
+**Context.** Four-child covers of staging `job_1790100385959_1nitlympp` are still 1.3-2.3k characters
+over Grok's 7,900 cap after 769c655ff, and the front cover loses REQUIRED CAST to the shrinker (entry
+below, "Not solved here"). The per-child face text in CHARACTERS IN THIS IMAGE was named as the
+largest remaining block. Owner, 2026-09-24: "Shorten each child's face everywhere. Same logic. If a
+normal page is too long it is same logic."
+
+**Measured.** Over 149 stored staging faces (character-analysis.txt's fixed scale): 147 carry
+"neutral chin", 147 "medium cheekbones", 140 "medium lips", 141 "straight nose with rounded tip";
+the jawline is "soft" or "rounded" on 141. Mean face text 91 characters. The midpoint descriptors
+separate nobody — the reference card carries the face itself.
+
+**Decision.** ONE builder, `buildFaceDescription` (promptBuilders.js), drops the descriptors at their
+scale's midpoint (`neutral …`, `medium …`) after the usual age-word strip; any non-midpoint value
+(full lips, high cheekbones, a dimpled chin) stays. Every face path goes through it: the cover's
+CHARACTERS IN THIS IMAGE line and the entity judge / consolidator / detector rich line
+(`buildCharacterPhysicalDescription`), the Art Director's cast input for pages
+(`buildLabeledPhysicalParts`), the detector identity line (`buildCastIdentityDescription`, which also
+gains the age-word strip it lacked) and the single-page repair prompt
+(`entityConsistency.buildPhysicalTraitsDescription`, which had its own copy). The 2026-08-26 rule is
+NOT reversed: covers and pages describe a character identically — now shorter — and the critic reads
+the same face the generator got. Mean 91 → 46 characters. The avatar-sheet override line
+(`avatarOverrides.js`, a user-declared "Face shape") is not a page or cover prompt and is unchanged.
+
+**Over-cap logic is one path.** Pages and covers are both shrunk by `shrinkPromptForModel`
+(images.js, the image-gen entry both call), with 769c655ff's ranked cut and parity anchors.
+
+**Evidence (rung 1, free).** 769c655ff's replay (stored sent prompts + the logged dropped blocks,
+current templates), face text swapped for the new builder's, run through the real shrinker:
+
+| render | built before → after | sent before → after | still cut |
+|---|---|---|---|
+| p12 | 9,943 → 9,943 | 7,834 → 7,834 | COUNTS, DEPTH, all Composition |
+| initialPage | 9,437 → 9,253 | 7,885 → 7,701 | COUNTS, DEPTH, facing, size |
+| backCover | 9,407 → 9,223 | 7,855 → 7,671 | COUNTS, DEPTH, facing, size |
+| frontCover | 10,202 → 10,018 | 7,569 → 7,385 | COUNTS, DEPTH, all Composition, REQUIRED CAST |
+
+Page prompts carry no face geometry at all (the Art Director weaves wardrobe, not jawlines — 0 of 18
+stored briefs contain one), so p12 is unchanged; the page effect is on the Art Director's input. The
+covers gain 184 characters each and no block survives that did not before. Dropping the face text
+entirely was also replayed: the front cover then keeps REQUIRED CAST (9,830 → 7,721). That is a
+different decision (remove, not shorten) and is left to the owner.
+
+**Touched:** `server/lib/promptBuilders.js`, `server/lib/entityConsistency.js`,
+`tests/unit/face-description-shared.test.ts`.
+
+**Status:** ✅ active
+
+---
+
+## 2026-09-24 — A `figure_completeness` only the entity check reported is logged, costs 0 and is never repaired
+
+**Context.** Staging `job_1790100385959_1nitlympp` back cover: the entity check filed jagged white
+edges on one child's arm as `cutout_artifact` (correct — it exists only in the grid crop). The
+consolidator relabelled it `figure_completeness` MAJOR with `sources: ['entity']`; the cover lost 15
+points (85 → 70) and its plan carried "Fill the arm and jacket to remove white cropping artifacts".
+Same on p16 v1 ("Large white cutout artifact obscuring lower body", entity-only, −15). Owner:
+"log only".
+
+**Decision** (owner-approved shape: a severity rule in code, keyed on type and source, no text):
+- `scoring.js` `ENTITY_ONLY_ZERO_POINT_TYPES = {figure_completeness}` + `isEntitySourced`:
+  `deductionPoints` charges 0 when the finding came from the entity check alone (`source: 'entity'`,
+  `sources` all `entity`, or `{ entity: true }` from a caller reading the entity report —
+  `repairPipeline.getEntityPenaltyAndIssues`). The same type from quality, or merged with any other
+  source, keeps its full cost (image-evaluation D-11 sees the page).
+- `repairLogic.isCropArtifact` covers it too, so neither char-fix gate routes it and
+  `collectCriticalFindings` never counts it (nor a `cutout_artifact`) as making a page critical.
+- `feedbackConsolidator.dropCropArtifactFixes`: a per-character fix whose declared types are all crop
+  artefacts moves to `dropped_issues` before the 3-fix cap; the finding stays in `deduped_issues`.
+- Client mirror `useRepairWorkflow.entityIssuePoints` prices it 0 for entity issues.
+
+**Evidence (rung 1, free).** All 32 stored versions of the story rescored from their stored
+deductions: 3 change — backCover v0 70 → 85 and its fix dropped; p16 v1 20 → 35 and its fix dropped;
+p14 v0 score unchanged (its `cutout_artifact` already cost 0), its already-uninpaintable fix now
+dropped at the plan. No other score moves.
+
+**Not changed:** the consolidator still relabels `cutout_artifact` despite its type-list note that the type is kept (a prompt
+matter); the finding is logged and free either way.
+
+**Touched:** `server/lib/scoring.js`, `server/lib/repairLogic.js`, `server/lib/repairPipeline.js`,
+`server/lib/feedbackConsolidator.js`, `client/src/hooks/useRepairWorkflow.ts`,
+`tests/unit/entity-crop-figure-completeness.test.ts`.
+
+**Status:** ✅ active
+
+---
+
 ## 2026-09-24 — `landmark_view_missing` is deleted; the plan's shot wins over the review and over `shot_off_plate`
 
 **Context.** Test Lab experiment **1433** (`scene_review_replay` on staging
@@ -406,6 +494,9 @@ Before this change all four lost both anchors, REQUIRED CAST, DEPTH and COUNTS.
 on covers is the per-character face description in CHARACTERS IN THIS IMAGE (~150 characters per
 child: jawline, chin, nose, cheekbones, lips), which the reference card already carries. Trimming it
 would change the 2026-08-26 "covers identical to pages" builder, so that is an owner decision.
+→ Owner decided 2026-09-24: shorten it in the ONE shared builder, pages and covers alike (entry
+"One shorter face, everywhere", above). It saves 184 characters per four-child cover; the front
+cover still loses REQUIRED CAST.
 
 **Touched:** `server/lib/images.js` (`cutBlocks`, `paragraphUnit` / `regexUnit` / `bulletUnit`,
 `sectionAwareCut`), `server/lib/promptBuilders.js` (`SPLIT_STATE_MARKINGS_RULE`, the cover SHOT skip,
@@ -22804,6 +22895,10 @@ Covers get one more pass for text, that is it. Otherwise they are identical"):
   no longer emits a detached wardrobe list. It emits one line per character
   through the SAME builder pages use (`buildCharacterPromptBlock` in `prose`
   form), so the garment sits inside its wearer's own description.
+
+**2026-09-24 note (not a reversal):** still identical — the face inside each character's line is
+now the shorter `buildFaceDescription` text on pages and covers alike (entry "One shorter face,
+everywhere").
 
 **Scope check.** `includeClothing` is set at exactly three call sites, all
 covers, so no page prompt changes shape.

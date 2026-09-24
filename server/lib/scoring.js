@@ -117,6 +117,29 @@ const { log } = require('../utils/logger');
 // (same contract as garment_colour: reported in full, costs nothing).
 const ZERO_POINT_TYPES = new Set(['garment_colour', 'garment_color', 'cutout_artifact']);
 
+// Types that cost nothing when ONLY the entity check reported them (owner,
+// 2026-09-24: "log only"). The entity judge sees our grid CROP, never the page,
+// so an incomplete figure that only it reports is a defect of the crop. Measured
+// on staging job_1790100385959_1nitlympp's back cover: the entity check filed
+// jagged white edges on one child's arm as `cutout_artifact`, the consolidator
+// relabelled it `figure_completeness` MAJOR with `sources: ['entity']`, and the
+// cover lost 15 points and got an inpaint plan for a gap the page did not have.
+// Scoped by SOURCE, never by wording: the same type from the quality judge,
+// which sees the page (image-evaluation D-11), keeps its full cost. The finding
+// stays in the report; repairLogic.isCropArtifact closes its repair routes.
+const ENTITY_ONLY_ZERO_POINT_TYPES = new Set(['figure_completeness']);
+
+/**
+ * Did only the entity check report this finding? A consolidated issue says so in
+ * `sources`; a normalised deduction in `source`. Raw entity-report issues carry
+ * neither in that shape (their `source` is 'character' / 'object'), so their
+ * callers state it: deductionPoints(issue, { entity: true }).
+ */
+function isEntitySourced(d) {
+  if (d?.source === 'entity') return true;
+  return Array.isArray(d?.sources) && d.sources.length > 0 && d.sources.every(s => s === 'entity');
+}
+
 // Types with a hard severity CEILING, applied to the SCORE regardless of what
 // the evaluator claimed. Same shape as ZERO_POINT_TYPES: the finding is still
 // reported in full, only its cost is bounded.
@@ -414,7 +437,7 @@ function composeDeductions({ evalResult = null, entityResult = null, consolidate
  * Sum severity points across every category (entity capped). This is the
  * total deduction; `100 − total` is the raw (un-clamped) score.
  */
-function deductionPoints(d) {
+function deductionPoints(d, { entity = false } = {}) {
   // subType FIRST. Entity findings are normalised to a flat `type:
   // 'consistency'` with the real classification moved to `subType`
   // (entityConsistency.js), so reading `type` alone made EVERY ceiling and
@@ -425,6 +448,7 @@ function deductionPoints(d) {
   // their classification in `type` and are unaffected.
   const type = String(d?.subType || d?.type || '').toLowerCase();
   if (ZERO_POINT_TYPES.has(type)) return 0;
+  if (ENTITY_ONLY_ZERO_POINT_TYPES.has(type) && (entity || isEntitySourced(d))) return 0;
   const raw = SEVERITY_POINTS[String(d?.severity || '').toLowerCase()] || 0;
   // Ceiling by type — charge the lower of what was claimed and what the type
   // is allowed to cost.
@@ -1132,6 +1156,8 @@ module.exports = {
   sameConcept,
   sumDeductionPoints,
   deductionPoints,
+  ENTITY_ONLY_ZERO_POINT_TYPES,
+  isEntitySourced,
   deductionClassKey,
   PAGE_SCOPED_BUCKETS,
   BUCKET_BILLING_CATEGORY,
