@@ -16,8 +16,27 @@
         "kind": "auto",
         "fn": "aerialNotOwed"
       },
-      "status": "pending",
-      "evidence": []
+      "status": "confirmed",
+      "evidence": [
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:35:25 CH",
+          "result": "CONFIRMED",
+          "note": "planner prompt names no aerial floor, no SHOT_AERIAL_COUNT finding; aerial pages in the book: none"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:40:40 CH",
+          "result": "CONFIRMED",
+          "note": "planner prompt names no aerial floor, no SHOT_AERIAL_COUNT finding; aerial pages in the book: none"
+        }
+      ]
     },
     {
       "id": "lettering-check-findings",
@@ -36,8 +55,27 @@
         "kind": "auto",
         "fn": "letteringFindings"
       },
-      "status": "pending",
-      "evidence": []
+      "status": "confirmed",
+      "evidence": [
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:35:25 CH",
+          "result": "CONFIRMED",
+          "note": "25 version(s) recorded the lettering check (3 inventory item(s)); 2 finding(s) stored as the claim requires: p7 v0 \"Mama\" CRITICAL; p10 v0 \"THE MIST TRAIL\" CRITICAL"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:40:40 CH",
+          "result": "CONFIRMED",
+          "note": "25 version(s) recorded the lettering check (3 inventory item(s)); 2 finding(s) stored as the claim requires: p7 v0 \"Mama\" CRITICAL; p10 v0 \"THE MIST TRAIL\" CRITICAL"
+        }
+      ]
     },
     {
       "id": "sceneintent-no-mood-tag",
@@ -55,8 +93,27 @@
         "kind": "auto",
         "fn": "sceneIntentMoodTag"
       },
-      "status": "pending",
-      "evidence": []
+      "status": "confirmed",
+      "evidence": [
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:35:25 CH",
+          "result": "CONFIRMED",
+          "note": "0/18 briefs (0%) end sceneIntent on a mood sentence (baseline 20%; pass = none)"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:40:40 CH",
+          "result": "CONFIRMED",
+          "note": "0/18 briefs (0%) end sceneIntent on a mood sentence (baseline 20%; pass = none)"
+        }
+      ]
     },
     {
       "id": "emotion-enum",
@@ -73,8 +130,27 @@
         "kind": "auto",
         "fn": "emotionEnum"
       },
-      "status": "pending",
-      "evidence": []
+      "status": "confirmed",
+      "evidence": [
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:35:25 CH",
+          "result": "CONFIRMED",
+          "note": "29/30 brief character rows carry an enum emotion; 2 emotion-check finding(s), 0 CRITICAL"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:40:40 CH",
+          "result": "CONFIRMED",
+          "note": "29/30 brief character rows carry an enum emotion; 2 emotion-check finding(s), 0 CRITICAL"
+        }
+      ]
     },
     {
       "id": "arc-sense-lens",
@@ -93,7 +169,26 @@
         "fn": "arcSenseLens"
       },
       "status": "pending",
-      "evidence": []
+      "evidence": [
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:35:25 CH",
+          "result": "HUMAN",
+          "note": "SENSE lens in 1/1 panel prompt(s) | LOOK: read the panel faults for \"a reader would stop here\" turns (arcReviewReport.rounds[].panel): A: The ball is used in the leaf game though the arc never gave anyone a ball or said how it arrived. Julian trips over an egg that is then too deep in a root-gap … | B: Missed issues not in the critique: - M1 (Turn 2, ASSUMED): The ball in beats 2–3 has no established owner or source, so the egg discovery relies on an unplante… | C: - **M1 — Entrance:** Max and Kiaan are said to “come” to the Lindenhof without a stated reason or showing how their meeting with Levin and Julian begins. - **M…"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:40:40 CH",
+          "result": "HUMAN",
+          "note": "SENSE lens in 1/1 panel prompt(s) | LOOK: read the panel faults for \"a reader would stop here\" turns (arcReviewReport.rounds[].panel): A: The ball is used in the leaf game though the arc never gave anyone a ball or said how it arrived. Julian trips over an egg that is then too deep in a root-gap … | B: Missed issues not in the critique: - M1 (Turn 2, ASSUMED): The ball in beats 2–3 has no established owner or source, so the egg discovery relies on an unplante… | C: - **M1 — Entrance:** Max and Kiaan are said to “come” to the Lindenhof without a stated reason or showing how their meeting with Levin and Julian begins. - **M…"
+        }
+      ]
     },
     {
       "id": "size-look-rule",
@@ -110,8 +205,27 @@
         "kind": "auto",
         "fn": "sizeComparisons"
       },
-      "status": "pending",
-      "evidence": []
+      "status": "confirmed",
+      "evidence": [
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:35:25 CH",
+          "result": "FAILED",
+          "note": "size comparisons — arc 1 (\"as big as a football and as warm as an\"); plan 0 (none); text 0 (none)"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:40:40 CH",
+          "result": "CONFIRMED",
+          "note": "size comparisons — commission 1 (\"so gross wie ein Fussball und warm wie ein\"); arc 1 (\"as big as a football and as warm as an\"); plan 0 (none); text 0 (none)"
+        }
+      ]
     },
     {
       "id": "vb-cell-no-scale",
@@ -129,8 +243,27 @@
         "kind": "auto",
         "fn": "vbCellNoScale"
       },
-      "status": "pending",
-      "evidence": []
+      "status": "confirmed",
+      "evidence": [
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:35:25 CH",
+          "result": "CONFIRMED",
+          "note": "3 animal description(s), none states a scale"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:40:40 CH",
+          "result": "CONFIRMED",
+          "note": "3 animal description(s), none states a scale"
+        }
+      ]
     },
     {
       "id": "ultra-wide-derived-plate",
@@ -171,7 +304,26 @@
         "fn": "otsCropAndNoContact"
       },
       "status": "pending",
-      "evidence": [],
+      "evidence": [
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:35:25 CH",
+          "result": "FAILED",
+          "note": "p12: near figure Kiaan touches (presses his ear to the egg)"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:40:40 CH",
+          "result": "FAILED",
+          "note": "p12: near figure Kiaan touches (presses his ear to the egg)"
+        }
+      ],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — over-the-shoulder / ultra-wide line (OTS accepted as is by the owner 2026-09-23; subject-size idea untried)"
     },
     {
@@ -243,8 +395,27 @@
         "kind": "auto",
         "fn": "wornOffGrid"
       },
-      "status": "pending",
-      "evidence": []
+      "status": "confirmed",
+      "evidence": [
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:35:25 CH",
+          "result": "FAILED",
+          "note": "off pages: 0 in an off grid; 10 in a wearing grid (Levin p7 under standard--identity/standard--off:CLO001, Levin p8 under standard--identity/standard--off:CLO001, Levin p9 under standard--identity/standard--off:CLO001, Levin p10 under standard--identity/standard--off:CLO001, Levin p11 under standard--identity/standard--off:CLO001, Levin p13 under standard--identity/standard--off:CLO001, Levin p14 under standard--identity/standard--off:CLO001, Julian p14 under standard--identity/standard--off:CLO002, Max p14 under standard--identity/standard--off:CLO003, Kiaan p14 under standard--identity/standard--off:CLO004); 0 not in any grid"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:40:40 CH",
+          "result": "CONFIRMED",
+          "note": "off pages: 10 in an off grid (Levin p7, Levin p8, Levin p9, Levin p10, Levin p11, Levin p13, Levin p14, Julian p14, Max p14, Kiaan p14); 0 in a wearing grid; 0 not in any grid"
+        }
+      ]
     },
     {
       "id": "diff-pass-ledger",
@@ -262,7 +433,26 @@
         "fn": "diffPassLedger"
       },
       "status": "pending",
-      "evidence": []
+      "evidence": [
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:35:25 CH",
+          "result": "HUMAN",
+          "note": "diff prompt carries the findings; 3 diff correction(s), 0 introduce a sentence neither text had | LOOK: no invented sentence found by the word-overlap measure; spot-read textRefineReport.diffApplied"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:40:40 CH",
+          "result": "HUMAN",
+          "note": "diff prompt carries the findings; 3 diff correction(s), 0 introduce a sentence neither text had | LOOK: no invented sentence found by the word-overlap measure; spot-read textRefineReport.diffApplied"
+        }
+      ]
     },
     {
       "id": "text-style-rulebook",
@@ -283,7 +473,26 @@
         "fn": "styleAuditAndDecline"
       },
       "status": "pending",
-      "evidence": []
+      "evidence": [
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:35:25 CH",
+          "result": "HUMAN",
+          "note": "4 FAULT[STYLE] line(s) from the audits; 2 decline line(s) in the repair analysis; narration fragments <=3 words: 4; paired negations: 1 | LOOK: read for style: fragments p1 \", rief Julian.\", p7 \"Max seufzte.\", p12 \", fragte Kiaan leise.\", p14 \"Julian weinte leise.\"; negations p4 \"Dort lag kein Stein und kein Ast, sondern ein Ei, grau und …\"; ending \"Levin und Julian standen unter den Laternen und schauten ihnen nach. Julian hob die Hand und winkte, bis die beiden Drachen zwischen den Stämmen verschwunden w…\"; declines: - CONTRADICTION p14 (jackets on the heap vs. worn) — declined: the page plan and the scene's WHAT H… | - ENDING p18 (closing line sums up) — declined: that spoken line is the ending the story itself end…"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:40:40 CH",
+          "result": "HUMAN",
+          "note": "4 FAULT[STYLE] line(s) from the audits; 2 decline line(s) in the repair analysis; narration fragments <=3 words: 4; paired negations: 1 | LOOK: read for style: fragments p1 \", rief Julian.\", p7 \"Max seufzte.\", p12 \", fragte Kiaan leise.\", p14 \"Julian weinte leise.\"; negations p4 \"Dort lag kein Stein und kein Ast, sondern ein Ei, grau und …\"; ending \"Levin und Julian standen unter den Laternen und schauten ihnen nach. Julian hob die Hand und winkte, bis die beiden Drachen zwischen den Stämmen verschwunden w…\"; declines: - CONTRADICTION p14 (jackets on the heap vs. worn) — declined: the page plan and the scene's WHAT H… | - ENDING p18 (closing line sums up) — declined: that spoken line is the ending the story itself end…"
+        }
+      ]
     },
     {
       "id": "repair-descriptor-no-names",
@@ -310,6 +519,15 @@
           "checkedAt": "2026-09-24 14:52:54 CH",
           "result": "CONFIRMED",
           "note": "7 inpaint instruction(s), no cast name, no fallback descriptor; outside this entry, a creature NAME reached Grok: p13 v1 Turi"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:40:40 CH",
+          "result": "FAILED",
+          "note": "p2 v1 names Julian; p13 v1 names Levin; outside this entry, a creature NAME reached Grok: p2 v1 Nebla"
         }
       ]
     },
@@ -330,7 +548,26 @@
         "fn": "repairDescriptorNoVbFigureNames"
       },
       "status": "pending",
-      "evidence": []
+      "evidence": [
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:35:25 CH",
+          "result": "FAILED",
+          "note": "p2 v1 inpaint names Nebla (inpaint 7, char-fix 0, manual repair 0; 3 bible figure name(s))"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:40:40 CH",
+          "result": "FAILED",
+          "note": "p2 v1 inpaint names Nebla (inpaint 7, char-fix 0, manual repair 0; 3 bible figure name(s))"
+        }
+      ]
     },
     {
       "id": "grouped-face-fix-clothing",
@@ -376,7 +613,26 @@
         "fn": "arcEffortCost"
       },
       "status": "pending",
-      "evidence": [],
+      "evidence": [
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:35:25 CH",
+          "result": "HUMAN",
+          "note": "arc_create $1.52, 854s, 58446 out; arc_retell $0.30, 95s, 8074 out | LOOK: read arcReviewReport.create / .critique / .finalArc against the high/high arcs before any master push; is the re-tell needed when the first arc is good?"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:40:40 CH",
+          "result": "HUMAN",
+          "note": "arc_create $1.52, 854s, 58446 out; arc_retell $0.30, 95s, 8074 out | LOOK: read arcReviewReport.create / .critique / .finalArc against the high/high arcs before any master push; is the re-tell needed when the first arc is good?"
+        }
+      ],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — Arc create max / re-tell medium"
     },
     {
@@ -404,6 +660,24 @@
           "checkedAt": "2026-09-24 14:52:54 CH",
           "result": "HUMAN",
           "note": "4/18 pages over the VB element budget after the scene review (p9: 5, p11: 5, p12: 5, p16: 5) | LOOK: owner decision: count one side, or make the AD cite from the trimmed claims (docs/decisions.md 2026-09-08 \"Art Director second pass\")"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:35:25 CH",
+          "result": "HUMAN",
+          "note": "0/18 pages over the VB element budget after the scene review (none) | LOOK: owner decision: count one side, or make the AD cite from the trimmed claims (docs/decisions.md 2026-09-08 \"Art Director second pass\")"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:40:40 CH",
+          "result": "HUMAN",
+          "note": "0/18 pages over the VB element budget after the scene review (none) | LOOK: owner decision: count one side, or make the AD cite from the trimmed claims (docs/decisions.md 2026-09-08 \"Art Director second pass\")"
         }
       ],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — vb_element_overflow at birth"
@@ -431,6 +705,24 @@
           "build": "b03c64b03abbfc5eaa6c2747267026eeeedbd8d3",
           "runDate": "2026-09-22 20:06:26 CH",
           "checkedAt": "2026-09-24 14:52:54 CH",
+          "result": "HUMAN",
+          "note": "human check | LOOK: sceneReviewReport.analysis [facing_not_per_character] lines and briefUnfixed; then read sceneDescription of each 3+-figure page for a per-figure facing clause"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:35:25 CH",
+          "result": "HUMAN",
+          "note": "human check | LOOK: sceneReviewReport.analysis [facing_not_per_character] lines and briefUnfixed; then read sceneDescription of each 3+-figure page for a per-figure facing clause"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:40:40 CH",
           "result": "HUMAN",
           "note": "human check | LOOK: sceneReviewReport.analysis [facing_not_per_character] lines and briefUnfixed; then read sceneDescription of each 3+-figure page for a per-figure facing clause"
         }
@@ -536,6 +828,24 @@
           "build": "b03c64b03abbfc5eaa6c2747267026eeeedbd8d3",
           "runDate": "2026-09-22 20:06:26 CH",
           "checkedAt": "2026-09-24 14:52:54 CH",
+          "result": "HUMAN",
+          "note": "human check | LOOK: open each styledAvatarGeneration[] output of this run and check the feet on every full-body cell"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:35:25 CH",
+          "result": "HUMAN",
+          "note": "human check | LOOK: open each styledAvatarGeneration[] output of this run and check the feet on every full-body cell"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:40:40 CH",
           "result": "HUMAN",
           "note": "human check | LOOK: open each styledAvatarGeneration[] output of this run and check the feet on every full-body cell"
         }
@@ -703,6 +1013,15 @@
           "checkedAt": "2026-09-24 14:52:54 CH",
           "result": "CONFIRMED",
           "note": "last styled avatar 605s before the page-image stage started (6 styled)"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:40:40 CH",
+          "result": "CONFIRMED",
+          "note": "last styled avatar 795s before the page-image stage started (4 styled)"
         }
       ],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — T5"
@@ -730,6 +1049,24 @@
           "build": "b03c64b03abbfc5eaa6c2747267026eeeedbd8d3",
           "runDate": "2026-09-22 20:06:26 CH",
           "checkedAt": "2026-09-24 14:52:54 CH",
+          "result": "HUMAN",
+          "note": "human check | LOOK: compare each styledAvatarGeneration[] output with clothingRequirements / pageClothing for that character"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:35:25 CH",
+          "result": "HUMAN",
+          "note": "human check | LOOK: compare each styledAvatarGeneration[] output with clothingRequirements / pageClothing for that character"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:40:40 CH",
           "result": "HUMAN",
           "note": "human check | LOOK: compare each styledAvatarGeneration[] output with clothingRequirements / pageClothing for that character"
         }
@@ -786,6 +1123,24 @@
           "checkedAt": "2026-09-24 14:52:54 CH",
           "result": "HUMAN",
           "note": "redo_trigger 11, consistency_regen 1, char_repair_run 1 over 18 pages | LOOK: compare with the pre-fix baseline in tasks/redo-clothing-analysis-2026-07-20.md"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:35:25 CH",
+          "result": "HUMAN",
+          "note": "redo_trigger 9, consistency_regen 0, char_repair_run 0 over 18 pages | LOOK: compare with the pre-fix baseline in tasks/redo-clothing-analysis-2026-07-20.md"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:40:40 CH",
+          "result": "HUMAN",
+          "note": "redo_trigger 9, consistency_regen 0, char_repair_run 0 over 18 pages | LOOK: compare with the pre-fix baseline in tasks/redo-clothing-analysis-2026-07-20.md"
         }
       ],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — One full showcase re-run to confirm redo counts drop"
@@ -862,7 +1217,26 @@
         "fn": "coversArePages"
       },
       "status": "pending",
-      "evidence": []
+      "evidence": [
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:35:25 CH",
+          "result": "HUMAN",
+          "note": "backCover: ok (4 figure(s)) | LOOK: look at each cover: the title / dedication band clear, the cast whole and facing the viewer — backCover https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/backCover/cover/v0-rmufzq3mr.jpg"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:40:40 CH",
+          "result": "HUMAN",
+          "note": "backCover: ok (4 figure(s)) | LOOK: look at each cover: the title / dedication band clear, the cast whole and facing the viewer — backCover https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/backCover/cover/v0-rmufzq3mr.jpg"
+        }
+      ]
     },
     {
       "id": "replan-round-never-regresses",
@@ -879,8 +1253,27 @@
         "kind": "auto",
         "fn": "replanRoundNeverRegresses"
       },
-      "status": "pending",
-      "evidence": [],
+      "status": "confirmed",
+      "evidence": [
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:35:25 CH",
+          "result": "CONFIRMED",
+          "note": "the guard discarded round(s) 1: raised the cast/focal must-fix count (cast/focal must-fix 3 → 4, 1 checker verdict(s) on untouched pages set aside (6 m…"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:40:40 CH",
+          "result": "CONFIRMED",
+          "note": "the guard discarded round(s) 1: raised the cast/focal must-fix count (cast/focal must-fix 3 → 4, 1 checker verdict(s) on untouched pages set aside (6 m…"
+        }
+      ],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — Re-plan regression guard"
     },
     {
@@ -917,7 +1310,26 @@
         "what": "Start a story on staging as a NON-dev account (or dev mode off): first ~7 s a large panel says the story takes about an hour and an email follows; then it shrinks to a small line under the spinner and tips/avatars rotate. The modal must not close when the first image exists; after completion the reader lands on the finished story. Nav % and My Stories card show only a percentage and never go backwards near the end."
       },
       "status": "pending",
-      "evidence": []
+      "evidence": [
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:35:25 CH",
+          "result": "HUMAN",
+          "note": "human check | LOOK: Start a story on staging as a NON-dev account (or dev mode off): first ~7 s a large panel says the story takes about an hour and an email follows; then it shrinks to a small line under the spinner and tips/avatars rotate. The modal must not close when the first image exists; after completion the reader lands on the finished story. Nav % and My Stories card show only a percentage and never go backwards near the end."
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:40:40 CH",
+          "result": "HUMAN",
+          "note": "human check | LOOK: Start a story on staging as a NON-dev account (or dev mode off): first ~7 s a large panel says the story takes about an hour and an email follows; then it shrinks to a small line under the spinner and tips/avatars rotate. The modal must not close when the first image exists; after completion the reader lands on the finished story. Nav % and My Stories card show only a percentage and never go backwards near the end."
+        }
+      ]
     },
     {
       "id": "idea-cards-final-only",
@@ -953,7 +1365,26 @@
         "what": "Start a story on staging, click Continue in Background, browse elsewhere; return after 60+ minutes: the nav % button and the My Stories generating card are still there and advancing; on completion the Ready badge appears and opens the finished story."
       },
       "status": "pending",
-      "evidence": []
+      "evidence": [
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:35:25 CH",
+          "result": "HUMAN",
+          "note": "human check | LOOK: Start a story on staging, click Continue in Background, browse elsewhere; return after 60+ minutes: the nav % button and the My Stories generating card are still there and advancing; on completion the Ready badge appears and opens the finished story."
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:40:40 CH",
+          "result": "HUMAN",
+          "note": "human check | LOOK: Start a story on staging, click Continue in Background, browse elsewhere; return after 60+ minutes: the nav % button and the My Stories generating card are still there and advancing; on completion the Ready badge appears and opens the finished story."
+        }
+      ]
     },
     {
       "id": "entity-closed-type-list",
@@ -970,8 +1401,27 @@
         "kind": "auto",
         "fn": "entityClosedTypes"
       },
-      "status": "pending",
-      "evidence": []
+      "status": "confirmed",
+      "evidence": [
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:35:25 CH",
+          "result": "CONFIRMED",
+          "note": "all 7 entity finding(s) carry a listed type"
+        },
+        {
+          "storyId": "job_1790277448294_5herh01j7",
+          "env": "staging",
+          "build": "30e5d33cceef00c1938536a2fcb8f25a99064159",
+          "runDate": "2026-09-24 21:17:28 CH",
+          "checkedAt": "2026-09-24 22:40:40 CH",
+          "result": "CONFIRMED",
+          "note": "all 7 entity finding(s) carry a listed type"
+        }
+      ]
     }
   ]
 }

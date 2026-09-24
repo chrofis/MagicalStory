@@ -407,10 +407,13 @@ checks.sizeComparisons = (ctx) => {
   if (!arc && !plan) return notCovered('no arc or page plan stored');
   const text = pages(ctx).map(p => p.text || '').join('\n');
   const a = sizeHits(arc); const pl = sizeHits(plan); const t = sizeHits(text);
+  // Owner, 2026-09-24: a size the customer wrote into the commission stays in the
+  // arc once. The arc may carry as many as the commission does, the plan none.
+  const c = sizeHits(ctx.data?.storyDetails);
   const fmt = (xs) => xs.length ? xs.slice(0, 6).map(x => `"${x}"`).join(', ') : 'none';
   return {
-    covered: true, pass: a.length + pl.length + t.length === 0,
-    detail: `size comparisons — arc ${a.length} (${fmt(a)}); plan ${pl.length} (${fmt(pl)}); text ${t.length} (${fmt(t)})`,
+    covered: true, pass: a.length <= c.length && pl.length + t.length === 0,
+    detail: `size comparisons — commission ${c.length} (${fmt(c)}); arc ${a.length} (${fmt(a)}); plan ${pl.length} (${fmt(pl)}); text ${t.length} (${fmt(t)})`,
   };
 };
 
@@ -538,6 +541,9 @@ checks.wornOffGrid = (ctx) => {
       const byC = r.characters?.[o.owner]?.byClothing || {};
       for (const [k, g] of Object.entries(byC)) if ((g?.appearances || []).some(a => Number(a?.pageNumber) === o.pn)) keys.add(k);
     }
+    // The `--identity` grid is the face-only corpus over every page of the base
+    // category (entityConsistency.js), not a wearing grid — it never judges clothing.
+    for (const k of [...keys]) if (k.endsWith('--identity')) keys.delete(k);
     if (!keys.size) absent.push(`${o.owner} p${o.pn}`);
     else if ([...keys].every(k => k.includes('--off:'))) good.push(`${o.owner} p${o.pn}`);
     else bad.push(`${o.owner} p${o.pn} under ${[...keys].join('/')}`);
