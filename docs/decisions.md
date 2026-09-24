@@ -74,6 +74,34 @@ moves their scoring bucket) — not decided here.
 `scripts/analysis/rerun-charfix-p2.js`
 **Status:** ✅ active
 
+## 2026-09-24 — The lettering check's input is stored per version (`letteringInventory`), so "ran and saw nothing" is told apart from "never ran"
+
+**Context:** The undeclared-lettering check (`server/lib/letteringCheck.js`, 2026-09-23) compares the
+blind inventory's `lettering[]` against the page's declared strings and emits `rendered_text` findings.
+The list itself was never stored, so a run with zero lettering-check findings could not be told from
+a run where the check never ran, and verify entry `lettering-check-findings` fell back to a human look.
+
+**Decision:** the evaluator returns `letteringInventory = { items: [{text, surface, position,
+placement, spelling}], declared: [strings] }` — exactly what the check compared — on scene evals that
+reached the inventory; `null` when the check did not run. It rides `carryEvalEvidence` (images.js, all
+eval assembly branches) and is whitelisted into every stored page version by `buildVersionEntry`
+(repairPipeline.js). Small text only (each string capped at 200 chars); no images. Verify check
+`letteringFindings` now decides automatically: covered once a version holds the record; pass when
+every undeclared overlay / misspelled / misplaced-legible item has a CRITICAL lettering-check finding
+quoting it, every misplaced scribble a MINOR one, and no stored lettering-check finding is left
+unaccounted for (a charged fits+correct sign fails).
+
+**Evidence:** local live eval of dragon run 6 p6 v0 (the "TENSE BUT QUIET STANDOFF" caption page):
+`letteringInventory` = 1 item (overlay / correct, declared []), 1 CRITICAL lettering-check finding,
+carried through `carryEvalEvidence`, verify check → covered pass. The `buildVersionEntry` hop is proven
+on the next staging run (`node scripts/admin/verify-run.js <storyId> --write`).
+
+**Touched:** `server/lib/letteringCheck.js` (`letteringRecord`), `server/lib/evalPipeline.js`,
+`server/lib/images.js`, `server/lib/repairPipeline.js`, `scripts/admin/verify-checks.js`,
+`tasks/verify.json`, `tests/unit/lettering-check.test.ts`, `tests/unit/eval-evidence-whitelist.test.ts`,
+`tests/unit/verify-lettering-check.test.ts`
+**Status:** ✅ active
+
 ## 2026-09-24 — Blind text audit recall measured: 🟡 keep — it adds real faults on one story in four, and recall is unstable
 
 **Context:** Prompt audit 05 left an owner call: is the blind text audit (`text_audit_blind`, grok-4.6,

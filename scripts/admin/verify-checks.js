@@ -195,21 +195,77 @@ checks.replanRoundNeverRegresses = (ctx) => {
   return notCovered(`${kept.length} kept round(s), ${discarded.length} discarded for other reasons — nothing the guard judged`);
 };
 
-/** 1d4f1bcf1 + 67c617743 — unrequested lettering becomes a lettering-check finding. */
+/**
+ * 1d4f1bcf1 + 67c617743 — unrequested lettering becomes a lettering-check finding.
+ *
+ * Reads what the check compared, stored per version as `letteringInventory`
+ * ({items, declared}; null = the check did not run on that version). For every
+ * inventory item the page did not declare, the claim fixes what must be stored
+ * on THAT version:
+ *   overlay, misspelled, or misplaced + legible -> a CRITICAL lettering-check
+ *     finding quoting the text;
+ *   misplaced + scribble                        -> a MINOR lettering-check finding;
+ *   fits + correct                              -> no finding.
+ * A stored lettering-check finding no item accounts for fails the check too.
+ * Covered once one version stored the record — a run whose inventory saw no
+ * writing is a covered pass, told apart from one where the check never ran.
+ */
 checks.letteringFindings = (ctx) => {
   const ps = pages(ctx);
   if (!ps.length) return notCovered('no scene pages');
+  const { isDeclared, squash: squashText } = require(path.join(LIB, 'letteringCheck.js'));
+  let recorded = 0;
+  let unrecorded = 0;
+  let itemsSeen = 0;
+  const problems = [];
   const hits = [];
-  for (const p of ps) for (const f of pageFindings(p)) if (f.source === 'lettering-check') hits.push({ pn: p.pageNumber, f });
-  if (hits.length) {
-    const list = hits.slice(0, 8).map(h => `p${h.pn}[${h.f.severity}] ${trunc(h.f.description, 70)}`).join('; ');
-    return { covered: true, pass: true, detail: `${hits.length} lettering-check finding(s): ${list}` };
+  for (const p of ps) {
+    versions(p).forEach((v, vi) => {
+      const rec = v?.letteringInventory;
+      if (!rec || !Array.isArray(rec.items)) { unrecorded++; return; }
+      recorded++;
+      itemsSeen += rec.items.length;
+      const declared = (Array.isArray(rec.declared) ? rec.declared : []).map(squashText).filter(Boolean);
+      const stored = (Array.isArray(v.fixableIssues) ? v.fixableIssues : []).filter(f => f && f.source === 'lettering-check');
+      const used = new Set();
+      const take = (pred) => {
+        const i = stored.findIndex((f, k) => !used.has(k) && pred(f));
+        if (i >= 0) used.add(i);
+        return i >= 0;
+      };
+      const where = `p${p.pageNumber} v${vi}`;
+      for (const it of rec.items) {
+        const text = String(it?.text || '').trim();
+        if (!text || isDeclared(text, declared)) continue;
+        const pl = it?.placement;
+        const sp = it?.spelling;
+        if (pl === 'overlay' || sp === 'misspelled' || (pl === 'misplaced' && sp === 'correct')) {
+          if (take(f => String(f.severity).toUpperCase() === 'CRITICAL' && String(f.description || '').includes(`"${text}`))) hits.push(`${where} "${trunc(text, 30)}" CRITICAL`);
+          else problems.push(`${where}: "${trunc(text, 40)}" (${pl}/${sp}) has no CRITICAL lettering-check finding`);
+        } else if (pl === 'misplaced' && sp === 'scribble') {
+          if (take(f => String(f.severity).toUpperCase() === 'MINOR')) hits.push(`${where} scribble MINOR`);
+          else problems.push(`${where}: scribble on ${trunc(it?.surface || 'a surface', 30)} (misplaced) has no MINOR lettering-check finding`);
+        }
+      }
+      // fits + correct must stay silent: anything stored that no item above
+      // accounted for is a finding the claim does not allow.
+      stored.forEach((f, k) => {
+        if (used.has(k)) return;
+        const fitsCorrect = rec.items.some(it => it?.placement === 'fits' && it?.spelling === 'correct' && String(f.description || '').includes(`"${String(it?.text || '').trim()}"`));
+        const fitsScribble = String(f.severity).toUpperCase() === 'MINOR' && rec.items.some(it => it?.placement === 'fits' && it?.spelling === 'scribble');
+        if (fitsScribble) { hits.push(`${where} scribble MINOR`); return; }
+        problems.push(`${where}: stored ${f.severity} lettering-check finding ${fitsCorrect ? 'on a fits+correct item' : 'that no inventory item accounts for'}: ${trunc(f.description, 70)}`);
+      });
+    });
   }
-  return {
-    covered: true, pass: null,
-    detail: 'no lettering-check finding stored (the inventory lettering itself is not persisted, so "ran and found nothing" cannot be told from "did not run")',
-    human: `look for unrequested writing on the active images: ${ps.map(p => `p${p.pageNumber} ${activeImageUrl(ctx, p.pageNumber) || '(no url)'}`).slice(0, 18).join(' | ')}`,
-  };
+  if (!recorded) {
+    return notCovered(`no version stored letteringInventory (${unrecorded} version(s) without it) — the lettering check did not run, or the run predates the record`);
+  }
+  const base = `${recorded} version(s) recorded the lettering check (${itemsSeen} inventory item(s))${unrecorded ? `, ${unrecorded} without the record` : ''}`;
+  if (problems.length) {
+    return { covered: true, pass: false, detail: `${base}; ${problems.length} mismatch(es): ${problems.slice(0, 6).join('; ')}` };
+  }
+  return { covered: true, pass: true, detail: `${base}; ${hits.length} finding(s) stored as the claim requires${hits.length ? `: ${hits.slice(0, 8).join('; ')}` : ' (no undeclared overlay/misspelled/misplaced writing seen)'}` };
 };
 
 /** 8dfdb2b0d — a cover is briefed the way a page is: Scene prose + REQUIRED OBJECTS, no KEY STORY ELEMENTS. */

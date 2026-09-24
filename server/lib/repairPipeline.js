@@ -3876,6 +3876,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // answer "was clothing actually checked on this version".
       // null = the evaluator never ran; [] = it ran and judged everything.
       notEvaluated: v.evaluation?.notEvaluated ?? null,
+      // What the undeclared-lettering check compared on THESE bytes: the blind
+      // inventory's lettering list and the page's declared strings (small
+      // text). Without it a version with no lettering-check finding cannot be
+      // told apart from one the check never ran on.
+      // null = the check did not run; {items: []} = it ran and saw no writing.
+      letteringInventory: v.evaluation?.letteringInventory ?? null,
       // The style repaint's own record — which anchor it aimed at, and the
       // comparative verdict the gate decided on. Same whitelist lesson as
       // rawOutput and styleGate above: without this line the field exists only

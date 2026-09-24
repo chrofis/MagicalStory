@@ -98,4 +98,22 @@ function checkUndeclaredLettering({ lettering, declared } = {}) {
   return findings;
 }
 
-module.exports = { checkUndeclaredLettering, isDeclared, squash };
+/**
+ * The record stored on a page version: exactly what the check compared. Each
+ * inventory item keeps only the five fields the check reads, each string
+ * capped at 200 characters so a runaway model answer cannot bloat the row.
+ * @returns {{items: Array<{text, surface, position, placement, spelling}>, declared: string[]}}
+ */
+function letteringRecord({ lettering, declared } = {}) {
+  const str = (v) => (v == null ? null : String(v).slice(0, 200));
+  const items = (Array.isArray(lettering) ? lettering : []).map(l => ({
+    text: str(l?.text),
+    surface: str(l?.surface),
+    position: str(l?.position),
+    placement: str(l?.placement),
+    spelling: str(l?.spelling),
+  }));
+  return { items, declared: (Array.isArray(declared) ? declared : []).map(str).filter(Boolean) };
+}
+
+module.exports = { checkUndeclaredLettering, letteringRecord, isDeclared, squash };

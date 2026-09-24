@@ -18,11 +18,14 @@ describe('carryEvalEvidence', () => {
     const ne = [{ dimension: 'held_objects', reason: 'no_required_objects' }];
     const ts = { stage2: { issues: [] } };
     const rt = [{ id: null, label: 'cover', text: 'A Title' }];
-    expect(carryEvalEvidence({ notEvaluated: ne, threeStageResult: ts, requiredTexts: rt }))
-      .toEqual({ notEvaluated: ne, threeStageResult: ts, requiredTexts: rt });
+    const li = { items: [{ text: 'TAXI', surface: 'a car roof', position: 'left', placement: 'fits', spelling: 'correct' }], declared: [] };
+    expect(carryEvalEvidence({ notEvaluated: ne, threeStageResult: ts, requiredTexts: rt, letteringInventory: li }))
+      .toEqual({ notEvaluated: ne, threeStageResult: ts, requiredTexts: rt, letteringInventory: li });
+    // Ran-and-saw-no-writing ({items: []}) must NOT collapse to null.
+    expect(carryEvalEvidence({ letteringInventory: { items: [], declared: [] } }).letteringInventory).toEqual({ items: [], declared: [] });
     // Evaluated-and-nothing-skipped ([]) must NOT collapse to null.
     expect(carryEvalEvidence({ notEvaluated: [] }).notEvaluated).toEqual([]);
-    expect(carryEvalEvidence(null)).toEqual({ notEvaluated: null, threeStageResult: null, requiredTexts: null });
+    expect(carryEvalEvidence(null)).toEqual({ notEvaluated: null, threeStageResult: null, requiredTexts: null, letteringInventory: null });
   });
 
   it('every runEval assembly branch in images.js spreads it', () => {

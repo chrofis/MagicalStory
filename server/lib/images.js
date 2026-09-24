@@ -55,6 +55,10 @@ function carryEvalEvidence(qualityResult) {
     // The required lettering every judge was told about (VB strings + a painted
     // cover title). The consolidator reads it so no repair plan removes it.
     requiredTexts: qualityResult?.requiredTexts ?? null,
+    // The blind inventory's lettering list + the declared strings the
+    // undeclared-lettering check compared it against. null = the check did
+    // not run on this image; {items: []} = it ran and saw no writing.
+    letteringInventory: qualityResult?.letteringInventory ?? null,
   };
 }
 // Eval cluster now lives in evalPipeline.js (verbatim move; see its header).

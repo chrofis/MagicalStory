@@ -3276,6 +3276,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
 
       // Merge P1 figure data if available (better age detection — P1 doesn't see the prompt)
       let p1Usage = null;
+      // What the undeclared-lettering check compared (2026-09-24): the blind
+      // inventory's lettering list and the page's declared strings, stored on
+      // the version so "the check ran and saw no writing" can be told from
+      // "the check never ran". null = it did not run on this image.
+      let letteringInventory = null;
       if (p1Promise) {
         try {
           const p1Result = await p1Promise;
@@ -3367,6 +3372,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             // in appOverlay mode, and a painted cover title is a REQUIRED TEXT
             // item (declaredTexts) the judges check through D-33.
             try {
+              if (evaluationType === 'scene') {
+                letteringInventory = require('./letteringCheck').letteringRecord({
+                  lettering: p1Result.lettering, declared: declaredTexts,
+                });
+              }
               const lettering = evaluationType !== 'scene' ? [] : require('./letteringCheck').checkUndeclaredLettering({
                 lettering: p1Result.lettering, declared: declaredTexts,
               });
@@ -3603,6 +3613,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         semanticResult,                   // Full semantic evaluation result (if available)
         threeStageResult,                 // Full three-stage evaluation result (if available)
         secondLook,                       // absence second look {checked, capped, confirmed, error} (null = not run)
+        letteringInventory,               // {items, declared} the lettering check compared (null = not run)
         usage: totalUsage,
         modelId: modelId
       };

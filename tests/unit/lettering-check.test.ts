@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 // @ts-ignore — CommonJS module
-import { checkUndeclaredLettering } from '../../server/lib/letteringCheck.js';
+import { checkUndeclaredLettering, letteringRecord } from '../../server/lib/letteringCheck.js';
 
 const item = (text: string, placement: string, spelling: string, surface = 'a sign') =>
   ({ text, surface, position: 'left-midground', placement, spelling });
@@ -63,5 +63,29 @@ describe('an unclassified item raises nothing', () => {
   it('nothing at all without lettering', () => {
     expect(checkUndeclaredLettering({ lettering: [], declared: ['ABC'] })).toEqual([]);
     expect(checkUndeclaredLettering({})).toEqual([]);
+  });
+});
+
+describe('letteringRecord — what the check compared, stored on the version', () => {
+  it('keeps the five fields of every item and the declared strings', () => {
+    const rec = letteringRecord({
+      lettering: [{ text: 'TAXI', surface: 'a car roof', position: 'left', placement: 'fits', spelling: 'correct', readable: true, extra: 'x' }],
+      declared: ['ABC', ''],
+    });
+    expect(rec).toEqual({
+      items: [{ text: 'TAXI', surface: 'a car roof', position: 'left', placement: 'fits', spelling: 'correct' }],
+      declared: ['ABC'],
+    });
+  });
+
+  it('no writing seen is an empty list, not null — the check ran', () => {
+    expect(letteringRecord({ lettering: [], declared: [] })).toEqual({ items: [], declared: [] });
+    expect(letteringRecord({})).toEqual({ items: [], declared: [] });
+  });
+
+  it('caps each string so a runaway answer cannot bloat the row', () => {
+    const rec = letteringRecord({ lettering: [{ text: 'A'.repeat(1000), placement: 'overlay', spelling: 'correct' }] });
+    expect(rec.items[0].text.length).toBe(200);
+    expect(rec.items[0].surface).toBe(null);
   });
 });
