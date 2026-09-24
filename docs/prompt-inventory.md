@@ -122,13 +122,12 @@ Grok image cap: **7,900 characters** (`server/config/models.js` `maxPromptLength
 9. **reference-photo rule** (~512 chars) — which attached photo is a place and which is a person. *Why here:* a page fact: the plate-vs-identity binding of the attached images.
 10. **single-illustration rule** (~503 chars) — one full-bleed picture, no lettering, ids are not painted. *Why here:* the frame rule; the very last block the cut may spend.
 
-**Never cut. Once every step has run, only the text before the protected tail (from the first of REQUIRED OBJECTS / KEY STORY ELEMENTS / SEASON / LIGHT / COMPOSITION GUIDELINES / ART STYLE) is trimmed, at a sentence boundary; if the tail alone leaves no room, the render fails loudly.**
+**Never cut. Once every step has run, only the text before the protected tail (from the first of REQUIRED OBJECTS / SEASON / LIGHT / COMPOSITION GUIDELINES / ART STYLE) is trimmed, at a sentence boundary; if the tail alone leaves no room, the render fails loudly.**
 
 - **NO MARKS** — generator half of D-24 (sibling-registry page-image-generator-vs-critics parity anchor)
 - **HANDS** — generator half of D-16b (same parity anchor set)
 - **REQUIRED TEXT** — the baked cover title and any lettering a Visual Bible element must carry (SETTLED: baked title)
 - **REQUIRED OBJECTS** — the commissioned elements of the page
-- **KEY STORY ELEMENTS** — a cover's Visual Bible elements (owner, 2026-09-23: must-keep on every cover path)
 - **SEASON** — the book-wide season, even against a reference photo from another season
 - **LIGHT** — the page's declared time of day and weather, which wins over the plate's light (sceneLight.js)
 - **COMPOSITION GUIDELINES** — a cover's own composition: title-safe top third, group, bottom margin

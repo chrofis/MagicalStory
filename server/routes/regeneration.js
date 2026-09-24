@@ -155,7 +155,6 @@ const { callClaudeAPI } = require('../lib/textModels');
 const {
   getVisualBibleEntriesForPage,
   getElementReferenceImagesForPage,
-  buildFullVisualBiblePrompt
 } = require('../lib/visualBible');
 const { applyStyledAvatars } = require('../lib/styledAvatars');
 const { runEntityConsistencyChecks, repairSinglePage, getStyledAvatarForClothing, collectEntityAppearances, buildClothingDescription } = require('../lib/entityConsistency');

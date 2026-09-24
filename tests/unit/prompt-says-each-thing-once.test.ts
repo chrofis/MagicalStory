@@ -47,7 +47,6 @@ const coverPrompt = (key: 'front' | 'initialPage' | 'back') => String(PB.buildCo
   inputData, characters: chars, visualBible: bible, referencePhotos: photos,
   options: {
     characterReferenceListOverride: PB.buildCharacterReferenceList(photos, chars, { includeClothing: true }),
-    visualBibleOverride: '',
     bakeTitle: key === 'front' ? inputData.title : '',
   },
 }));

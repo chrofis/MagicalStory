@@ -993,7 +993,6 @@ const PROMPT_NEVER_CUT = [
   { label: 'HANDS', why: 'generator half of D-16b (same parity anchor set)', text: () => HANDS_HOLD_ONLY_NAMED_RULE },
   { label: 'REQUIRED TEXT', why: 'the baked cover title and any lettering a Visual Bible element must carry (SETTLED: baked title)', text: () => '**REQUIRED TEXT:**' },
   { label: 'REQUIRED OBJECTS', why: 'the commissioned elements of the page', marker: '**REQUIRED OBJECTS' },
-  { label: 'KEY STORY ELEMENTS', why: 'a cover\'s Visual Bible elements (owner, 2026-09-23: must-keep on every cover path)', marker: '**KEY STORY ELEMENTS:**' },
   { label: 'SEASON', why: 'the book-wide season, even against a reference photo from another season', marker: '**SEASON:**' },
   { label: 'LIGHT', why: "the page's declared time of day and weather, which wins over the plate's light (sceneLight.js)", marker: '**LIGHT:**' },
   { label: 'COMPOSITION GUIDELINES', why: 'a cover\'s own composition: title-safe top third, group, bottom margin', marker: '**COMPOSITION GUIDELINES:**' },
@@ -1115,10 +1114,12 @@ function describeCutSteps(steps) {
  * loudly rather than cut it (sectionAwareCut). REQUIRED OBJECTS and ART STYLE
  * were the only two markers until 2026-09-23, so a prompt with no REQUIRED
  * OBJECTS block — every full-path cover — had its tail start at ART STYLE, and
- * the last-resort prose trim ate KEY STORY ELEMENTS, SEASON and COMPOSITION
- * GUIDELINES first, because the template places them just before ART STYLE:
- * staging job_1789853503332_riqncqg1i's back cover shipped with all three gone
- * (owner, 2026-09-23: those three are must-keep on every cover path).
+ * the last-resort prose trim ate the cover's Visual Bible block, SEASON and
+ * COMPOSITION GUIDELINES first, because the template places them just before
+ * ART STYLE: staging job_1789853503332_riqncqg1i's back cover shipped with all
+ * three gone (owner, 2026-09-23: must-keep on every cover path). Every cover now
+ * carries REQUIRED OBJECTS like a page, and the separate cover block (KEY STORY
+ * ELEMENTS) is deleted.
  */
 const MUST_KEEP_MARKERS = PROMPT_NEVER_CUT.filter(k => k.marker).map(k => k.marker);
 

@@ -159,7 +159,6 @@ const {
   addVisualBibleChangeLog,
   getVisualBibleEntriesForPage,
   buildVisualBiblePrompt,
-  buildFullVisualBiblePrompt,
   analyzeVisualBibleElements,
   updateVisualBibleWithExtracted,
   getElementsNeedingAnalysis,

@@ -210,6 +210,7 @@ Each cover is a structured spec, not prose. The fields are the spec.
 - `priority` is `essential | normal | low`.
 - `Mood` is one phrase of 2-5 words.
 - After the LOC, a cover's `Objects:` list any `ART###`, `ANI###` or `VEH###` from the Visual Bible that the cover calls for — at most {COVER_ELEMENT_CAP}, on any of the three covers. Each one listed appears in that cover's scene.
+- `Scene` is the cover's prose, in English, one to three sentences written like a page brief: name each entry `Objects:` lists after the LOC and interleave its identifying detail (rule 10). It does not place, pose or dress the characters of the Characters lines and says nothing about gaze — those lines and the code own them. With no element after the LOC, `Scene` describes the backdrop in one sentence.
 - When the story centres on a creature or animal — the title names it, or the plot turns on it — the Title Page lists that `ANI###` in `Objects:` right after the LOC.
 - No perspective or depth on covers — every figure faces the viewer and is fully visible. If the cast does not fit, drop the least essential character instead of hiding them.
 
@@ -321,18 +322,21 @@ Then, exactly:
 **Title Page**
 Mood: [one phrase]
 Objects: [LOC###, then the ART### / ANI### / VEH### this cover shows]
+Scene: [English prose naming each element above with its identifying detail]
 Characters:
 - [Name] ([position]): [clothing], holds: [ART### or nothing], priority: [essential|normal|low]
 
 **Initial Page**
 Mood: [one phrase]
 Objects: [LOC###, then the ART### / ANI### / VEH### this cover shows]
+Scene: [English prose naming each element above with its identifying detail]
 Characters:
 - [Name] ([position]): [clothing], holds: [ART### or nothing], priority: [essential|normal|low]
 
 **Back Cover**
 Mood: [one phrase]
 Objects: [LOC###, then the ART### / ANI### / VEH### this cover shows]
+Scene: [English prose naming each element above with its identifying detail]
 Characters:
 - [Name] ([position]): [clothing], holds: [ART### or nothing], priority: [essential|normal|low]
 

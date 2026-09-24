@@ -2,13 +2,15 @@ import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 
-// KEY STORY ELEMENTS, SEASON and COMPOSITION GUIDELINES ARE MUST-KEEP (owner,
-// 2026-09-23). A full-path cover has no REQUIRED OBJECTS block, so its protected
-// tail used to start at ART STYLE — and the template places those three sections
-// right before it, at the very end of the trimmable head. The last-resort prose
-// trim therefore ate them first: staging job_1789853503332_riqncqg1i's back cover
-// shipped with all three gone. They are now in the protected tail on every
-// prompt; if the tail alone cannot fit, the shrink throws instead of cutting it.
+// REQUIRED OBJECTS, SEASON and COMPOSITION GUIDELINES ARE MUST-KEEP (owner,
+// 2026-09-23). A cover with no REQUIRED OBJECTS block had its protected tail
+// start at ART STYLE — and the template places the cover's element block, SEASON
+// and COMPOSITION right before it, at the very end of the trimmable head. The
+// last-resort prose trim ate them first: staging job_1789853503332_riqncqg1i's
+// back cover shipped with all three gone. They are now in the protected tail on
+// every prompt; if the tail alone cannot fit, the shrink throws instead.
+// (Every cover now carries REQUIRED OBJECTS like a page; the cover's separate
+// KEY STORY ELEMENTS block was deleted the same day.)
 
 // @ts-expect-error - JS module without types
 import { shrinkPromptForModel } from '../../server/lib/images.js';
@@ -22,7 +24,7 @@ const para = (prefix: string) => {
   return p;
 };
 
-// A full-path cover's shape: cast + prose in the head, NO REQUIRED OBJECTS.
+// A cover's shape: cast + prose in the head, then the must-keep tail.
 const coverPrompt = (proseRepeat: number, styleRepeat = 20) => [
   para('Generate a SINGLE illustration'),
   '',
@@ -34,8 +36,8 @@ const coverPrompt = (proseRepeat: number, styleRepeat = 20) => [
   '',
   buildCompositionBlock(),
   '',
-  '**KEY STORY ELEMENTS:**',
-  '**Pip** (animal): SENTINEL_ELEMENT_DEFINITION a small grey harbour seal',
+  '**REQUIRED OBJECTS IN THIS SCENE (each appears exactly as the scene description places it):**',
+  '* **SENTINEL_ELEMENT_LINE** (animal) — about knee-high',
   '',
   '**SEASON:** Autumn. SENTINEL_SEASON foliage and daylight are autumn\'s throughout the book.',
   '',
@@ -51,7 +53,7 @@ const coverPrompt = (proseRepeat: number, styleRepeat = 20) => [
   COUNTS_RULE,
 ].join('\n');
 
-const MUST_KEEP = ['SENTINEL_ELEMENT_DEFINITION', 'SENTINEL_SEASON', 'SENTINEL_COMPOSITION', '**ART STYLE:**'];
+const MUST_KEEP = ['SENTINEL_ELEMENT_LINE', 'SENTINEL_SEASON', 'SENTINEL_COMPOSITION', '**ART STYLE:**'];
 
 describe('cover shrink — the must-keep sections survive', () => {
   it('when the drops are not enough, the prose is trimmed and the three must-keep sections stay whole', async () => {
@@ -70,11 +72,10 @@ describe('cover shrink — the must-keep sections survive', () => {
     await expect(shrinkPromptForModel(prompt, 7000, 'TEST cover', null)).rejects.toThrow(/must-keep/);
   });
 
-  it('a page prompt with REQUIRED OBJECTS keeps its existing tail (unchanged behaviour)', async () => {
-    const prompt = coverPrompt(60).replace('**KEY STORY ELEMENTS:**',
-      '**REQUIRED OBJECTS IN THIS SCENE (each appears exactly as the scene description places it):**\n* **rope** (object)\n\n**KEY STORY ELEMENTS:**');
-    const out: string = await shrinkPromptForModel(prompt, 7000, 'TEST page', null);
-    expect(out).toContain('**REQUIRED OBJECTS');
-    for (const m of MUST_KEEP) expect(out).toContain(m);
+  it('with no REQUIRED OBJECTS block, SEASON still opens the protected tail', async () => {
+    const prompt = coverPrompt(100).replace(/\*\*REQUIRED OBJECTS[^\n]*\n\* \*\*SENTINEL_ELEMENT_LINE[^\n]*\n/, '');
+    expect(prompt).not.toContain('REQUIRED OBJECTS');
+    const out: string = await shrinkPromptForModel(prompt, 7000, 'TEST no objects', null);
+    for (const m of ['SENTINEL_SEASON', 'SENTINEL_COMPOSITION', '**ART STYLE:**']) expect(out).toContain(m);
   });
 });

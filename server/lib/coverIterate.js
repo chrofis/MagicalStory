@@ -10,7 +10,7 @@ const { log } = require('../utils/logger');
 const { baseVbId } = require('./vbIdGuard');
 const { MODEL_DEFAULTS, IMAGE_MODELS, emptyScenePlateRouting } = require('../config/models');
 const { resolveArtStyle, resolveArtStyleForEmptyScene } = require('./storyHelpers');
-const { resolveEvalImagePrompt } = require('./sceneMetadata');
+const { resolveEvalImagePrompt, splitBrief, METADATA_DELIMITER } = require('./sceneMetadata');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { applyStyledAvatars } = require('./styledAvatars');
 const { coverKeyToType, coverLabel, COVER_PAGE_NUMBERS } = require('./coverKeys');
@@ -101,7 +101,7 @@ const { englishEntityRef, englishLocationRef, significantEntityTokens, hasElemen
  * VB ids the cover hint actually asks for: `Objects:` list ∪ every character's
  * `holds:` id (holds ⊄ objects — the outline sometimes holds an id it forgot
  * to list). Returns null when the hint declares no objects and no holds, so
- * callers keep the legacy unfiltered KEY STORY ELEMENTS for hint-less stories.
+ * a hint-less cover lists no elements in its REQUIRED OBJECTS.
  */
 function collectCoverHintElementIds(coverHint) {
   const ids = [];
@@ -165,7 +165,7 @@ function entityNameRegex(name, flags = 'i') {
  * scene description name?".
  *
  * Used by BOTH sides of the cover invariant:
- *   (a) the KEY STORY ELEMENTS gate (allowedElementIds), and
+ *   (a) the cover's REQUIRED OBJECTS list (the brief's METADATA objects), and
  *   (b) the VB reference grid in buildCoverReferences.
  *
  * Why it exists: buildCoverSceneFromHint pastes the outline's per-character
@@ -301,11 +301,11 @@ function stripEntityNameFromDescription(description, name, opts = {}) {
  * THE COVER NAME INVARIANT.
  *
  * "A Visual Bible entity whose name appears in the assembled cover scene
- * description is either FULLY SENT — its definition in KEY STORY ELEMENTS and
- * its reference image in the VB grid — or its name does not appear."
+ * description is either FULLY SENT — its REQUIRED OBJECTS line and its
+ * reference image in the VB grid — or its name does not appear."
  *
  * Named entities that can be fully sent are unioned into the element-id list
- * (which gates KEY STORY ELEMENTS and is re-derived identically by
+ * (the cover brief's METADATA objects, re-derived identically by
  * buildCoverReferences for the grid). Entities that cannot — no reference
  * image, or the cover reference budget is already full — have their name
  * stripped from the description, loudly.
@@ -380,7 +380,7 @@ const significantTokens = significantEntityTokens;
  *     "worn tied at the neck" AND "held in the hand" about the same item.
  *   - WORN wins: when an artifact overlaps a cover character's clothing line
  *     but nobody holds it, it is part of the worn outfit — its id goes to
- *     `excludeElementIds` so KEY STORY ELEMENTS doesn't emit it a second time.
+ *     `excludeElementIds` so REQUIRED OBJECTS doesn't list it a second time.
  *
  * Overlap rule (deterministic): an artifact matches a comma/semicolon segment
  * of a clothing description when they share ≥2 significant tokens, or ≥1
@@ -434,7 +434,7 @@ function applyCoverWornHeldDedupe(photos, coverHint, visualBible) {
    * What an artifact IS to the outfit segment it token-overlaps:
    *
    *   'duplicate'  the same garment, described twice → the artifact is the one
-   *                that goes (KEY STORY ELEMENTS must not emit it again).
+   *                that goes (REQUIRED OBJECTS must not list it again).
    *   'conflict'   a DIFFERENT garment in the SAME body slot → not a duplicate
    *                at all. The contract and the bible disagree.
    *   'unrelated'  different slots, or someone else's declared item → leave
@@ -521,13 +521,13 @@ function applyCoverWornHeldDedupe(photos, coverHint, visualBible) {
             // NOT a duplicate — a different item in the same body slot. The
             // contract and the bible disagree, and the tie was being resolved
             // silently toward the wardrobe text. The VB wins: it has a rendered
-            // reference cell, so the artifact stays in KEY STORY ELEMENTS and
+            // reference cell, so the artifact stays in REQUIRED OBJECTS and
             // the contradicting outfit segment goes.
             drop = true;
             log.warn(`⚠️ [COVER-CLOTHING] ${photo.name}: outfit segment "${segment}" and ${meta.id} "${meta.name}" are DIFFERENT items in the same slot — not a duplicate; the Visual Bible wins and the segment is dropped`);
           } else {
             // Worn (overlaps an outfit) and held by nobody → clothing keeps it,
-            // KEY STORY ELEMENTS must not emit it again.
+            // REQUIRED OBJECTS must not list it again.
             excludeElementIds.add(meta.id);
           }
         }
@@ -720,8 +720,6 @@ function validateCoverHintCast(coverHints, characters, opts = {}) {
  * final render then keeps those placeholders alongside the real cast —
  * phantom duplicate figures.
  */
-/** Lead of the one sentence buildCoverSceneFromHint emits for the hint's unheld elements. */
-const COVER_ALSO_IN_SCENE_LEAD = 'Also in the scene with them:';
 /**
  * The cover's gaze, stated ONCE for a group (owner, 2026-09-24): it was
  * ", eyes on the viewer" at the end of every figure's sentence. Gaze is
@@ -757,14 +755,20 @@ function stripCharacterSentences(description, characterNames = []) {
  * setting-only view, and resolves/drops VB ids so no raw ART###/CHR###
  * token reaches the image model as paintable text.
  */
-function buildPlateDescription(emptyDescRaw, characterNames, visualBible, pageNumber) {
+function buildPlateDescription(emptyDescRaw, characterNames, visualBible, pageNumber, { excludeText = [] } = {}) {
   const { sanitizeVbIdsInPrompt } = getStoryHelpers();
-  const stripped = stripCharacterSentences(emptyDescRaw, characterNames)
-    // The hint's own elements go in with the cast, never onto the empty plate
-    // (an animal painted into the plate is a duplicate once the render adds it).
-    // The sentence is emitted by buildCoverSceneFromHint with this exact lead.
+  // The cover's own elements (the Art Director's `Scene` prose names them with
+  // their looks) go in with the cast, never onto the empty plate: an animal
+  // painted into the plate is a duplicate once the render adds it. Removed by
+  // its exact text, the way the shrink removes a block.
+  let raw = String(emptyDescRaw || '');
+  for (const t of excludeText) {
+    const text = String(t || '').trim();
+    if (text) raw = raw.split(text).join('');
+  }
+  const stripped = stripCharacterSentences(raw, characterNames)
     .split(/(?<=[.!?])\s+/)
-    .filter(s => !s.startsWith(COVER_ALSO_IN_SCENE_LEAD) && s !== COVER_GROUP_GAZE_SENTENCE)
+    .filter(s => s !== COVER_GROUP_GAZE_SENTENCE)
     .join(' ')
     .replace(/\ba wide group portrait set before\b/gi, 'A wide view of')
     .replace(/\ba portrait of (?:two characters|a single character) set before\b/gi, 'A wide view of')
@@ -860,7 +864,6 @@ async function iterateCover(coverKey, storyData, options = {}) {
   } = require('./images');
   const { blackoutIssueRegions } = require('./imageInpainting');
 
-  const { buildFullVisualBiblePrompt } = require('./visualBible');
 
   // Get existing cover data. After the R2 migration `imageData` is stripped
   // from the JSON blob on save (bytes live in story_images + R2 URLs), so
@@ -1084,31 +1087,37 @@ async function iterateCover(coverKey, storyData, options = {}) {
   log.debug(`🔄 [COVER-ITERATE] ${coverKey}: ${coverCharacterPhotos.length} characters, clothing: ${coverClothing}`);
 
   // --- Build cover prompt ---
-  // KEY STORY ELEMENTS filtered to what the cover hint actually asks for
+  // REQUIRED OBJECTS lists what the cover hint actually asks for
   // (objects ∪ holds); worn-vs-held dedupe resolves the "same item as both
   // clothing and artifact" contradiction before any text block is built.
   const hintElementIds = collectCoverHintElementIds(coverHint);
+  // THE STORED BRIEF'S SHAPE decides where the cover's objects come from. A
+  // trial cover stores the writer's fenced JSON, which carries its own
+  // `objects` (the trial hint holds only the LOC) and is sent as-is, like a
+  // trial page. A full-path cover stores prose — with a `---METADATA---` block
+  // since 2026-09-23, without one before — and is re-briefed from the hint.
+  const isTrialJsonBrief = /^\s*```json/i.test(sceneDescription);
+  const storedSplit = splitBrief(sceneDescription);
+  const coverProse = isTrialJsonBrief
+    ? sceneDescription
+    : (storedSplit.carrier === 'delimiter' ? storedSplit.prose : sceneDescription);
   // COVER NAME INVARIANT — an entity NAMED in the description is either fully
-  // sent (definition + reference image) or its name is stripped. Same helper
-  // the first-generation and trial cover paths use; buildCoverReferences
+  // sent (checklist line + reference image) or its name is stripped. Same
+  // helper the first-generation and trial cover paths use; buildCoverReferences
   // re-derives the same matches for the reference grid.
   const coverNameFix = reconcileCoverSceneEntities({
-    sceneDescription,
+    sceneDescription: coverProse,
     visualBible,
     elementIds: hintElementIds,
     label: `${coverKey} ITERATE`,
+    ...(isTrialJsonBrief ? { stripMode: 'token' } : {}),
   });
-  sceneDescription = coverNameFix.sceneDescription;
   const coverElementIds = coverNameFix.elementIds;
   const { photos: clothingDedupedPhotos, excludeElementIds } =
     applyCoverWornHeldDedupe(coverCharacterPhotos, coverHint, visualBible);
-  const visualBiblePrompt = visualBible
-    ? buildFullVisualBiblePrompt(visualBible, {
-        skipMainCharacters: true,
-        allowedElementIds: coverElementIds,
-        excludeElementIds,
-      })
-    : '';
+  sceneDescription = isTrialJsonBrief
+    ? withTrialCoverObjects(coverNameFix.sceneDescription, (coverNameFix.injected || []).map(h => h.id))
+    : coverBriefWithObjects(coverNameFix.sceneDescription, coverElementIds || hintElementIds || [], excludeElementIds);
   // Identical to the page path (owner, 2026-08-26): the per-character block
   // binds each garment to its wearer, and the colour legend says which framed
   // reference card is whom. grok.js frames cover cards exactly as it frames page
@@ -1157,7 +1166,6 @@ async function iterateCover(coverKey, storyData, options = {}) {
       // Empty unless baked mode is on; buildCoverPrompt appends the TITLE block.
       bakeTitle,
       characterReferenceListOverride: characterRefList,
-      visualBibleOverride: visualBiblePrompt,
       promptTemplateOverride,
     },
   });
@@ -1964,8 +1972,10 @@ async function buildCoverReferences({
       const artStyleDesc = resolveArtStyleForEmptyScene(artStyle || 'pixar')
         || resolveArtStyle(artStyle || 'pixar')
         || '';
+      // The brief's PROSE only: a full-path cover brief ends in a
+      // `---METADATA---` block (coverBriefWithObjects) the plate must not see.
       const emptyDescRaw = emptyScenePromptOverride
-        || `**SETTING:** ${sceneDescription}\n**CAMERA:** wide shot`;
+        || `**SETTING:** ${splitBrief(sceneDescription).prose || sceneDescription}\n**CAMERA:** wide shot`;
       // The plate must be PEOPLE-FREE. Covers fall back to the full
       // group-portrait prose, so drop every sentence that names a character
       // (those sentences also carry the held VB props) — a placeholder
@@ -1977,7 +1987,8 @@ async function buildCoverReferences({
         ...((visualBible?.mainCharacters || []).map(c => c?.name)),
         ...((visualBible?.secondaryCharacters || []).map(c => c?.name)),
       ];
-      const emptyDesc = buildPlateDescription(emptyDescRaw, coverCastNames, visualBible, coverPageNumber);
+      const emptyDesc = buildPlateDescription(emptyDescRaw, coverCastNames, visualBible, coverPageNumber,
+        { excludeText: [coverHint?.scene] });
       const { buildEmptyScenePrompt } = require('../services/prompts');
       // Built BEFORE the prompt: which reference family is attached decides
       // the REFERENCE line (referenceKind below), exactly as at the production
@@ -2066,7 +2077,7 @@ async function buildCoverReferences({
     // entity named in the prose (job_1788903616404_iqvhj4l8m: the dog "Nia",
     // pasted verbatim out of the outline's `position` free text) shipped with
     // no definition and no reference — the model painted a phantom child.
-    // Same matcher the KEY STORY ELEMENTS gate uses (one source of truth).
+    // Same matcher the cover NAME invariant uses (one source of truth).
     {
       const nameMatched = matchVbEntitiesInText(sceneDescription, visualBible)
         .filter(e => e.hasReference)
@@ -2107,6 +2118,57 @@ async function buildCoverReferences({
   }
 
   return { landmarkPhotos, visualBibleGrid, sceneBackground, sceneMetadata, coverPageNumber };
+}
+
+/**
+ * A full-path cover's BRIEF, in the page brief's shape: its prose, then a
+ * `---METADATA---` block whose `objects` are the cover's elements. The page
+ * builder reads that block exactly as it reads a page's, so a cover gets the
+ * same REQUIRED OBJECTS checklist (name, scale, state, reference pointer), and
+ * the bbox labels and the D-16b held-object judge read it from the sent prompt
+ * like a page's. `characters` is empty on purpose: a cover's cast, positions
+ * and gaze are code-owned in the prose and the reference list, and a metadata
+ * cast would make the page builder emit per-figure pose and gaze defaults.
+ *
+ * @param {string} prose - the cover's scene prose (no metadata block)
+ * @param {Array<string>} objectIds - the cover's Visual Bible ids (LOC included)
+ * @param {Array<string>} [excludeIds] - worn-wins ids (applyCoverWornHeldDedupe):
+ *   an item worn in the cast's outfit is not listed as a loose object
+ */
+function coverBriefWithObjects(prose, objectIds, excludeIds = []) {
+  const exclude = new Set((excludeIds || []).map(id => String(id).toUpperCase()));
+  const ids = [];
+  for (const raw of (objectIds || [])) {
+    const id = String(raw || '').trim().toUpperCase();
+    if (!id || exclude.has(id) || ids.includes(id)) continue;
+    ids.push(id);
+  }
+  return `${String(prose || '').trim()}\n\n${METADATA_DELIMITER}\n${JSON.stringify({ characters: [], objects: ids })}`;
+}
+
+/**
+ * A TRIAL cover's brief is the writer's fenced JSON, the same shape as a trial
+ * page's; its `objects[]` is the metadata the page builder reads. Add ids that
+ * are not there yet (the cover NAME invariant's injected entities) so they get
+ * a REQUIRED OBJECTS line like every declared one. A description that is not
+ * a fenced JSON object is returned unchanged, and so is one with nothing to add.
+ */
+function withTrialCoverObjects(description, addIds = []) {
+  const text = String(description || '');
+  const wanted = (addIds || []).map(id => String(id || '').trim().toUpperCase()).filter(Boolean);
+  if (wanted.length === 0) return text;
+  const m = text.match(/^\s*```json\s*([\s\S]*?)\s*```\s*$/i);
+  if (!m) return text;
+  let json;
+  try { json = JSON.parse(m[1]); } catch (err) {
+    log.error(`❌ [TRIAL-COVER] brief JSON does not parse (${err.message}) — ${wanted.join(', ')} not added to REQUIRED OBJECTS`);
+    return text;
+  }
+  const scene = (json && typeof json.scene === 'object' && json.scene) ? json.scene : json;
+  const objects = Array.isArray(scene.objects) ? scene.objects : (scene.objects = []);
+  const have = new Set(objects.map(o => String(typeof o === 'string' ? o : o?.id || '').toUpperCase()));
+  for (const id of wanted) if (!have.has(id)) objects.push({ id });
+  return '```json\n' + JSON.stringify(json, null, 2) + '\n```';
 }
 
 /**
@@ -2228,37 +2290,22 @@ function buildCoverSceneFromHint(hint, visualBible, characters, opts = {}) {
   // count and forbid extra figures.
   const nChars = sortedDetails.length;
   // "no other PEOPLE", not "no other figures": an animal the hint lists is a
-  // figure too, and the old wording forbade it in the same breath the objects
-  // sentence below asks for it.
+  // figure too, and the old wording forbade it in the same breath REQUIRED
+  // OBJECTS asks for it.
   const sceneStarter = nChars >= 3
     ? `A wide group portrait set before ${landmarkName}.`
     : nChars === 2
       ? `A portrait of two characters set before ${landmarkName}. Only these two people appear; no other people, no crowd.`
       : `A portrait of a single character set before ${landmarkName}. Only this one person appears; no other people, no crowd.`;
-  // THE HINT'S OWN ELEMENTS, IN THE PROSE (2026-09-23). A listed ART/ANI/VEH
-  // that nobody holds reached the image model only as a KEY STORY ELEMENTS
-  // definition and a reference cell — the scene never said it was THERE, and
-  // this prose is also the brief the cover judges score against, so a judge
-  // told to catch "extra objects" had no line placing it. Held ids are already
-  // named in their holder's sentence.
-  const heldIds = new Set(sortedDetails.map(d => parseHoldsId(String(d.holds || ''))).filter(Boolean).map(id => baseVbId(id)));
-  const shownRefs = [];
-  for (const raw of objects) {
-    const id = baseVbId(raw);
-    if (!id || !/^(ART|ANI|VEH)\d+$/.test(id) || heldIds.has(id)) continue;
-    const ref = resolveHoldable(id);
-    if (!ref) {
-      log.warn(`⚠️ [COVER-SCENE] cover hint lists ${id}, which is in no Visual Bible pool — not named in the cover scene`);
-      continue;
-    }
-    // An animal keeps its name (as in KEY STORY ELEMENTS); a thing takes "the".
-    const phrase = id.startsWith('ANI') ? ref : `the ${ref}`;
-    if (!shownRefs.includes(phrase)) shownRefs.push(phrase);
-  }
-  const alsoLine = shownRefs.length > 0
-    ? `${COVER_ALSO_IN_SCENE_LEAD} ${shownRefs.join(', ')}.`
-    : '';
-  const lines = [moodPhrase, sceneStarter, ...charSentences, gazeSentence, alsoLine].filter(Boolean);
+  // THE ART DIRECTOR'S COVER PROSE (2026-09-23). A page gets each element's
+  // look from the Art Director's prose (scene-expansion-all.txt rule 10); a
+  // cover now gets it the same way, from the hint's `Scene` field, and the
+  // element's presence from REQUIRED OBJECTS (coverBriefWithObjects). A hint
+  // written before the field carries none, and nothing stands in for it: the
+  // element keeps its reference cell and its checklist line (decisions.md
+  // 2026-09-23).
+  const adScene = typeof hint.scene === 'string' ? hint.scene.trim() : '';
+  const lines = [moodPhrase, sceneStarter, adScene, ...charSentences, gazeSentence].filter(Boolean);
   return lines.join(' ');
 }
 
@@ -2268,6 +2315,8 @@ module.exports = {
   trialCoverLocationId,
   trialCoverPlateDescription,
   buildCoverSceneFromHint,
+  coverBriefWithObjects,
+  withTrialCoverObjects,
   stripCharacterSentences,
   buildPlateDescription,
   enrichCoverHintWithArtifacts,
@@ -2277,7 +2326,7 @@ module.exports = {
   MAX_COVER_CHARACTERS,
   // Cover-prompt hygiene helpers (shared with the streaming initial-gen path)
   collectCoverHintElementIds,
-  // Cover NAME invariant — one matcher, used by the KEY STORY ELEMENTS gate
+  // Cover NAME invariant — one matcher, used for the REQUIRED OBJECTS list
   // and by the reference grid (see reconcileCoverSceneEntities).
   matchVbEntitiesInText,
   stripEntityNameFromDescription,

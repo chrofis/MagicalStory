@@ -52,7 +52,6 @@ const {
 const {
   filterMainCharactersFromVisualBible,
   initializeVisualBibleMainCharacters,
-  buildFullVisualBiblePrompt,
   linkPreDiscoveredLandmarks,
   injectHistoricalLocations,
   getElementReferenceImagesForPage,
@@ -1737,16 +1736,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }
 
         // Cover prompt setup — routed model/backend determined after scene expansion.
-        // KEY STORY ELEMENTS filtered to the hint's objects ∪ holds, and the
+        // REQUIRED OBJECTS lists the hint's objects ∪ holds, and the
         // worn-vs-held contradiction resolved before the CLOTHING block is
         // built (same helpers the iterate path uses — single source of truth).
         const { collectCoverHintElementIds, applyCoverWornHeldDedupe } = require('./server/lib/coverIterate');
         const hintElementIds = collectCoverHintElementIds(hint);
         const { photos: clothingDedupedPhotos, excludeElementIds } =
           applyCoverWornHeldDedupe(coverPhotos, hint, streamingVisualBible);
-        // visualBibleText is built AFTER the scene description below — the
-        // KEY STORY ELEMENTS gate has to see which entities the assembled
-        // description actually names (cover NAME invariant).
+        // The brief's objects are fixed AFTER the scene description below —
+        // REQUIRED OBJECTS has to list every entity the assembled description
+        // actually names (cover NAME invariant).
         // Same block as every other cover path and as pages: garment bound to
         // its wearer, plus the legend saying which framed card is whom.
         let characterRefList = buildCharacterReferenceList(clothingDedupedPhotos, inputData.characters, { includeClothing: true })
@@ -1778,7 +1777,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // COVER NAME INVARIANT — buildCoverSceneFromHint pastes the outline's
         // per-character `position` free text verbatim, so any entity NAME the
         // writer put there arrives here. Either it is fully sent (definition
-        // in KEY STORY ELEMENTS + reference image in the VB grid, which
+        // in REQUIRED OBJECTS + reference image in the VB grid, which
         // buildCoverReferences re-derives with the same matcher) or its name
         // is stripped. job_1788903616404_iqvhj4l8m front cover: the dog "Nia"
         // reached the model undefined and was painted as a phantom child.
@@ -1788,15 +1787,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           elementIds: hintElementIds,
           label: `${coverType} FIRST-GEN`,
         });
-        sceneDescription = coverNameFix.sceneDescription;
-        const visualBibleText = streamingVisualBible
-          ? buildFullVisualBiblePrompt(streamingVisualBible, {
-              skipMainCharacters: true,
-              allowedElementIds: coverNameFix.elementIds,
-              excludeElementIds,
-            })
-          : '';
-        const coverExpandedMetadata = null; // No metadata block — structured hint IS the metadata.
+        // The page brief's shape: prose + a METADATA block whose objects are
+        // the cover's elements, so the page builder emits REQUIRED OBJECTS for
+        // the cover exactly as for a page (coverBriefWithObjects).
+        const { coverBriefWithObjects } = require('./server/lib/coverIterate');
+        sceneDescription = coverBriefWithObjects(coverNameFix.sceneDescription,
+          coverNameFix.elementIds || hintElementIds || [], excludeElementIds);
+        const coverExpandedMetadata = null; // The hint IS the metadata; the brief carries its objects.
 
         const coverLabel = coverType === 'frontCover' ? 'FRONT COVER' : coverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
 
@@ -1875,7 +1872,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             options: {
               customStyleDescription: styleDescription,
               characterReferenceListOverride: characterRefList,
-              visualBibleOverride: visualBibleText,
               // Empty unless baked mode is on; buildCoverPrompt appends the TITLE block.
               bakeTitle: coverTitleModeInfo.bakeTitle,
             },
@@ -2425,9 +2421,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   (inputData.characters || []).filter(c => coverPhotos.some(ph => ph.name === c.name)),
                   coverPhotos
                 );
-            // KEY STORY ELEMENTS filtered to the cover hint's declared ids
-            // (same fix as the full-account cover paths — without it every VB
-            // artifact got dumped into the prompt and strays got painted).
+            // The cover's declared element ids (its JSON objects[]), the input
+            // to the cover NAME invariant below.
             const trialCoverIds = (coverScene.objects || [])
               .map(obj => typeof obj === 'string' ? obj.match(/((?:ART|ANI|VEH|CHR|LOC)\d+)/i)?.[1]?.toUpperCase() : (obj?.id ? String(obj.id).toUpperCase() : null))
               .filter(Boolean);
@@ -2442,14 +2437,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               label: 'TRIAL FRONT COVER',
               stripMode: 'token', // the trial cover description is a JSON blob
             });
-            sceneDescription = trialNameFix.sceneDescription;
+            // An entity the invariant injected (named in the prose, fully
+            // sendable) joins the JSON objects[], so REQUIRED OBJECTS lists it
+            // exactly as a trial page's brief would.
+            sceneDescription = require('./server/lib/coverIterate').withTrialCoverObjects(
+              trialNameFix.sceneDescription, (trialNameFix.injected || []).map(h => h.id));
             // Title-named creature/character missing from objects: WARN ONLY.
             require('./server/lib/coverIterate').warnTitleNamedEntitiesMissingFromCover({
               title: coverTitle, objects: coverScene.objects, visualBible: streamingVisualBible, label: 'TRIAL FRONT COVER',
-            });
-            const visualBibleText = buildFullVisualBiblePrompt(streamingVisualBible, {
-              skipMainCharacters: true,
-              allowedElementIds: trialNameFix.elementIds,
             });
 
             // Textless when covers are typeset app-side — same rule the
@@ -2478,7 +2473,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               options: {
                 customStyleDescription: styleDescription,
                 characterReferenceListOverride: characterRefList,
-                visualBibleOverride: visualBibleText,
                 // Empty unless baked mode is on; buildCoverPrompt appends the TITLE block.
                 bakeTitle: trialCoverTitleMode.bakeTitle,
               },

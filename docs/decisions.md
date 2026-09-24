@@ -59039,3 +59039,66 @@ from leaving a gap; not added — a schema change for the owner to decide.
 `scripts/admin/compact-landmark-slots.js`, `tests/unit/landmark-photo-slots-contiguous.test.ts`,
 `docs/landmark-database.md`.
 **Status:** ✅ active.
+
+## 2026-09-23 — A cover is briefed the way a page is: Art Director prose for the look, REQUIRED OBJECTS for presence; KEY STORY ELEMENTS deleted
+
+**Context.** Covers and pages carried a Visual Bible element two different ways. A page: the Art Director's
+prose writes each element's look (`scene-expansion-all.txt` rule 10), the REQUIRED OBJECTS checklist says it is
+there (name, scale, state, reference pointer — name-only by the 2026-09-02 ruling), the reference cell shows it.
+A full-path cover: the scene text was code-built from a structured hint with NO look anywhere, so a separate
+cover-only block — KEY STORY ELEMENTS, `visualBible.buildFullVisualBiblePrompt`, passed in through
+`visualBibleOverride` — pasted up to three full Visual Bible descriptions into `{VISUAL_BIBLE}`; full-path covers
+had no REQUIRED OBJECTS at all, so the bbox labels, the entity keys and the D-16b held-object judge had nothing
+to read (`notEvaluated: no_required_objects`). The trial cover had both blocks. Owner (2026-09-23): covers and
+pages work the SAME way, one block; the look comes the page way (Option 1: the Art Director writes cover prose).
+
+**Decision.**
+1. **Art Director cover prose.** Each cover in `---COVER SCENE HINTS---` gains a `Scene:` line — English, one to
+   three sentences written like a page brief: it names each entry `Objects:` lists after the LOC and interleaves
+   its identifying detail (rule 10). Positions, gaze, cast and clothing stay code-owned and structured (the
+   Characters lines; gaze SETTLED). Parsed by `outlineParser/unified.js` into `hint.scene`;
+   `buildCoverSceneFromHint` places it right after the scene starter. This SUPERSEDES the structured-only cover
+   hint design of 2026-05-10 for the element look only.
+2. **REQUIRED OBJECTS on every cover, from the page builder.** A full-path cover brief is now the page brief's
+   shape — prose + `---METADATA---` — via `coverIterate.coverBriefWithObjects(prose, ids, excludeIds)`: `objects`
+   = the hint ids ∪ the cover NAME invariant's injected ids, minus the worn-wins ids of
+   `applyCoverWornHeldDedupe`; `characters: []` on purpose (a metadata cast would make the page builder emit
+   per-figure pose/gaze defaults, and a cover's cast and gaze are code-owned). Streaming covers build it at
+   generation; `iterateCover` (repair, dev iterate and every user regenerate route) re-briefs a stored prose
+   description from the hint the same way. A trial cover's brief stays the writer's fenced JSON — the same shape
+   a trial page uses — and `withTrialCoverObjects` adds the invariant's injected ids to its `objects[]`.
+3. **KEY STORY ELEMENTS deleted:** `buildFullVisualBiblePrompt`, the `visualBibleOverride` option and its three
+   call sites, `COVER_KEY_ELEMENT_CAP`, the shrink's must-keep entry (the must-keep list is now REQUIRED OBJECTS,
+   SEASON, COMPOSITION GUIDELINES, ART STYLE), the manual harness `tests/manual/test-cover-prompt-builder.js`, the
+   tests that pinned it, and the generated doc lines. The "Also in the scene" sentence of the earlier entry is
+   deleted with it — presence is REQUIRED OBJECTS' job.
+4. **The cover element cap is the page element budget.** `{COVER_ELEMENT_CAP}` (both writers) is filled from
+   `VB_ELEMENT_BUDGET` (4, SETTLED "four Visual Bible elements per page") — a cover is drawn the way a page is.
+5. **The plate** is built from the brief's prose only (`splitBrief`), with the `Scene` prose removed by its exact
+   text: the cover's elements come in with the cast, never onto the empty plate.
+6. **Judges / downstream.** Nothing new is wired and nothing needed to be: D-16b (`buildEvalRequiredObjects`) and
+   the bbox labels (`parseVisualBibleObjects`) read REQUIRED OBJECTS from the SENT prompt, exactly as for a page,
+   so they now run on full-path covers. The semantic judge's cover brief (`outlineExtract` = the stored
+   description) carries the Art Director's `Scene` prose, i.e. the same look text the generator got. The
+   regeneration header search (`regeneration.js`, test-models page composite) already matches
+   `**REQUIRED OBJECTS`. No judge prompt carries a KEY STORY ELEMENTS rule.
+
+**Accepted constraint (owner).** A story written before the `Scene` field has none: on iterate or regeneration
+its cover elements get their REQUIRED OBJECTS line and their reference cell, and NO look text — nothing
+substitutes a look from the Visual Bible.
+
+**Validation.** Rung 1 (free): the real builders over three stored staging full covers (back cover with ANI001,
+initial page with VEH001, front cover with ANI001 + ART001) on the streaming sequence, the real `iterateCover`
+(image call intercepted) on the new brief AND on the stored old description, and the prod trial front cover
+(`job_1790169018278_n57xpnufo`) on the trial sequence and the real `iterateCover` over its JSON brief: every
+built prompt has REQUIRED OBJECTS (e.g. "**Zippi** (animal) — about as long as an adult's forearm", "**tram**
+(vehicle)", the crown with its final-state delta), no KEY STORY ELEMENTS, no leaked METADATA block, and the D-16b
+checklist and the bbox labels are non-empty (source: prompt). Rung 2: see the Lab entry appended below.
+
+**Touched:** `prompts/scene-expansion-all.txt`, `server/lib/outlineParser/unified.js`, `server/lib/coverIterate.js`,
+`server/lib/promptBuilders.js`, `server/lib/visualBible.js`, `server/lib/images.js`, `storyJobPipeline.js`,
+`server.js`, `server/routes/regeneration.js`, `docs/prompt-inventory.md`, `docs/image-generation-methods.html`,
+`tests/unit/cover-objects-any-element.test.ts`, `tests/unit/cover-shrink-must-keep.test.ts`,
+`tests/unit/cover-key-elements-secondary.test.ts`, `tests/unit/vb-cell-no-size.test.ts`,
+`tests/unit/prompt-says-each-thing-once.test.ts`, `tests/manual/test-cover-prompt-builder.js` (deleted).
+**Status:** ✅ active on staging.

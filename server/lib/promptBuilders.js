@@ -17,7 +17,7 @@ const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = requi
 // this module was the prose worn-vs-held matcher deleted 2026-09-18. It stays
 // exported from visualBible.js for coverIterate.js, which still uses it.
 const { REQUIRED_TEXT_AUTHORING_RULE, declaredText } = require('./requiredText');
-const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote, withScaleNote, COVER_KEY_ELEMENT_CAP } = require('./visualBible');
+const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote, withScaleNote } = require('./visualBible');
 const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { castCoverage, castCoverageRule, castActionRule } = require('./castCoverage');
@@ -2849,9 +2849,9 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // inputs the bible rules need travel here instead of to the bible stage.
     CHARACTER_NAMES: characters.map(c => c.name).filter(Boolean).join(', ') || 'None',
     COVER_CAST: buildCoverCastLines(inputData),
-    // How many elements a cover's Objects may list after its LOC — the number
-    // KEY STORY ELEMENTS defines on the cover prompt (visualBible.js).
-    COVER_ELEMENT_CAP: String(COVER_KEY_ELEMENT_CAP),
+    // How many elements a cover's Objects may list after its LOC: the page
+    // budget (VB_ELEMENT_BUDGET) — a cover is drawn the way a page is.
+    COVER_ELEMENT_CAP: String(VB_ELEMENT_BUDGET),
     // Each landmark's PHOTOS line: the bible may only name a viewpoint one of
     // them shows, and the per-page `landmarkView` is picked from the same list.
     // The Art Director variant: it marks which of the plan's places are listed
@@ -4840,13 +4840,15 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     log.debug(`[IMAGE PROMPT] Skipping Visual Bible text for page ${pageNumber} (visual reference sent as image)`);
   }
 
-  // COVER OVERRIDES. A cover pre-computes these two blocks because its cast and
-  // its Visual Bible are filtered by the cover hint (worn-vs-held dedupe,
-  // allowedElementIds) before the prompt is built. Everything else — the
-  // per-character wardrobe binding, the card-colour legend, heights, age
-  // proportions, the VB-id sanitiser — is the page code, unchanged.
+  // COVER OVERRIDE. A cover pre-computes its character reference list because
+  // its cast is filtered by the cover hint (worn-vs-held dedupe) before the
+  // prompt is built. Everything else — REQUIRED OBJECTS (from the brief's
+  // METADATA block, coverIterate.coverBriefWithObjects), the per-character
+  // wardrobe binding, the card-colour legend, heights, age proportions, the
+  // VB-id sanitiser — is the page code, unchanged. A cover's Visual Bible
+  // elements are no longer a separate block: the KEY STORY ELEMENTS override
+  // was deleted 2026-09-23 (decisions.md).
   if (options.characterReferenceListOverride) characterReferenceList = options.characterReferenceListOverride;
-  if (options.visualBibleOverride !== undefined) visualBibleSection = options.visualBibleOverride;
 
   const template = options.promptTemplateOverride || PROMPT_TEMPLATES.imageGeneration || null;
 
@@ -10804,8 +10806,8 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       CLOTHING_RULE: clothingRule,
       COVER_CLOTHING_NOTE: coverClothingNote,
       COVER_CLOTHING: coverClothing,
-      // Same cap as the full path's Title Page Objects (visualBible.js).
-      COVER_ELEMENT_CAP: String(COVER_KEY_ELEMENT_CAP),
+      // Same cap as the full path's cover Objects: the page element budget.
+      COVER_ELEMENT_CAP: String(VB_ELEMENT_BUDGET),
       LANDMARKS: landmarksInstruction,
       // The declared light of every trial scene (sceneLight.js): the same two
       // enums and the same rule the Art Director and the iterate rewrite get.
