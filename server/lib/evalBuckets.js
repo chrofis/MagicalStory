@@ -400,7 +400,28 @@ function bucketsToIssues(merged = {}) {
   });
 }
 
+/**
+ * THE CLOSED FINDING-TYPE LIST — the `type` values a consolidated finding may
+ * carry (prompts/feedback-consolidator.txt rule 9). Injected into every judge
+ * whose findings reach the consolidator without a type of their own — the book
+ * audit's reader lines (bookAudit.js, {FINDING_TYPES}) — so the reader names
+ * its finding from the same list the consolidator carries over instead of the
+ * consolidator inventing one. tests/unit/finding-types-closed-list.test.ts
+ * pins the consolidator template's hand-written list to this constant.
+ */
+const CONSOLIDATED_TYPES = Object.freeze([
+  'image_coherence', 'character_identity', 'duplicate_character', 'duplicate_identity',
+  'missing_character', 'extra_character', 'clothing', 'clothing_detail', 'clothing_sex',
+  'accessory', 'accessory_missing', 'hair', 'hair_nuance', 'face_drift', 'face_destroyed',
+  'cutout_artifact', 'nudity', 'anatomy', 'figure_completeness', 'action_interaction',
+  'object_presence', 'missing_element', 'object_count', 'duplicate_object', 'scale',
+  'structure_scale', 'setting', 'style_consistency', 'rendered_text', 'required_text',
+  'character_marking', 'anachronism', 'garment_colour', 'naturalness', 'emotion',
+  'viewer_address', 'physics', 'unverified_absence', 'composite_seam',
+]);
+
 module.exports = {
+  CONSOLIDATED_TYPES,
   BUCKETS, TYPE_TO_BUCKET, SEVERITY_RANK, RANK_TO_SEVERITY,
   sevRank, bucketForType, normalizeType, mapIssuesToBuckets, mergeJudges, bucketsToIssues, medianRank,
 };

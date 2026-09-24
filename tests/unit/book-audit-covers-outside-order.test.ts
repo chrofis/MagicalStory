@@ -77,7 +77,7 @@ describe('question 6 does not bind a cover', () => {
 
   it('keeps the p<N> fault format the parser keys on', () => {
     // The heading gains a name; the fault line must still carry the number.
-    expect(read()).toContain('FAULT[IMG][<WEIGHT>]: p<N>');
+    expect(read()).toContain('FAULT[IMG][<WEIGHT>][<TYPE>]: p<N>');
     expect(read()).toContain('FAULT[TEXT][<WEIGHT>]: p<N>');
   });
 });

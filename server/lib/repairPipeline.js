@@ -2076,8 +2076,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           // carry a declared size. Passing only the projection starved it: zero
           // candidates, zero skips, no notEvaluated row, total silence in the
           // live path. bookAudit now log.errors on a starved call.
+          // `characters` too (2026-09-24): the reader's per-page cast is
+          // resolved through the evaluator's roster, which indexes them.
           ? await auditStoryBook(
-              { id: consolidatorStoryId, visualBible: storyData?.visualBible || visualBible || null, sceneImages: auditPages },
+              { id: consolidatorStoryId, visualBible: storyData?.visualBible || visualBible || null, characters: storyData?.characters || [], sceneImages: auditPages },
               { usageTracker })
           : null;
         if (audit) {

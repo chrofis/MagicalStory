@@ -77,8 +77,10 @@ function SCALE_COLLECTIONS_PRESENT(vb) {
 // purpose: the judge sometimes nests a fault under the page it was reasoning
 // about, and an anchored `^FAULT` silently dropped exactly those — the audit
 // reported 3 faults on a replay that had found 5.
-// Severity bracket is optional so pre-severity stored reports still parse.
-const ROUTED_FAULT_RE = /^[ \t>*-]*FAULT\[(IMG|TEXT)\](?:\[(MINOR|MAJOR|CRITICAL|CATASTROPHIC)\])?:\s*(?:p(-?\d+))?\s*(.*)$/gim;
+// Severity bracket is optional so pre-severity stored reports still parse; the
+// TYPE bracket (IMG lines, from the closed list — 2026-09-24) is optional so
+// pre-type reports still parse.
+const ROUTED_FAULT_RE = /^[ \t>*-]*FAULT\[(IMG|TEXT)\](?:\[(MINOR|MAJOR|CRITICAL|CATASTROPHIC)\])?(?:\[([a-z_]+)\])?:\s*(?:p(-?\d+))?\s*(.*)$/gim;
 
 /**
  * Position of the SHIPPED image inside a scene's imageVersions[].
@@ -181,9 +183,64 @@ function buildAuditPages(images, pickVersion) {
       text: img.text || '',
       imageData,
       citedIds: [...citedIds(img)],
+      // The brief the picture was drawn from rides along (auditPageBrief).
+      sceneCharacters: Array.isArray(img.sceneCharacters) ? img.sceneCharacters : null,
+      sceneMetadata: img.sceneMetadata || null,
+      outlineCharacters: Array.isArray(img.outlineCharacters) ? img.outlineCharacters : [],
     });
   }
   return out;
+}
+
+/**
+ * THE BRIEF THE PICTURE WAS DRAWN FROM (2026-09-24).
+ *
+ * The reader used to get only the page text and the picture, so it read a
+ * character the words name as a character the picture should show. The Art
+ * Director stages one moment and trims the cast by design; the per-page judges
+ * are told that and the reader was not. Prod job_1790107559778_fcmlfa8kn: p7
+ * (brief cast: nobody — a landmark at dusk) was charged "Manuel absent", p9
+ * (cast: Lukas) "Sophie and Manuel not visible"; over 17 stories 40 IMG faults
+ * named a character outside that page's cast.
+ *
+ * The cast is the ONE ROSTER the per-page evaluator judged the same image
+ * against (evalPipeline.resolveExpectedCastNames, called with the arguments
+ * images.js passes); the moment is the brief's `sceneIntent`. `cast` is null
+ * when the page records no cast at all (a cover) — never an empty roster by
+ * accident.
+ *
+ * @returns {{cast: string[]|null, sceneIntent: string}}
+ */
+function auditPageBrief(scene, storyData = null) {
+  const meta = scene?.sceneMetadata || null;
+  const sceneIntent = String(meta?.sceneIntent || meta?.fullData?.sceneIntent || '').trim();
+  if (!Array.isArray(scene?.sceneCharacters)) return { cast: null, sceneIntent };
+  try {
+    const { resolveExpectedCastNames } = require('./evalPipeline');
+    const roster = resolveExpectedCastNames({
+      sceneCharacters: scene.sceneCharacters,
+      visualBible: storyData?.visualBible || null,
+      evaluationType: 'scene',
+      pageLabel: `PAGE ${scene.pageNumber} `,
+      sceneMetadata: meta,
+      pageNumber: scene.pageNumber,
+      extraNames: scene.outlineCharacters || [],
+      storyData,
+    });
+    return { cast: roster.names, sceneIntent };
+  } catch (err) {
+    log.error(`❌ [BOOK-AUDIT] p${scene.pageNumber}: cast roster failed (${err.message}) — the reader gets no cast for this page`);
+    return { cast: null, sceneIntent };
+  }
+}
+
+/** The BRIEF line the reader gets between a page's text and its picture. */
+function briefLine(heading, brief) {
+  if (!brief || (brief.cast === null && !brief.sceneIntent)) return null;
+  const parts = [];
+  if (brief.sceneIntent) parts.push(`the moment drawn: ${brief.sceneIntent.replace(/[.\s]+$/, '')}`);
+  if (brief.cast !== null) parts.push(`drawn with: ${brief.cast.length ? brief.cast.join(', ') : 'nobody — no character is in this picture by design'}`);
+  return `${heading} BRIEF — ${parts.join('. ')}`;
 }
 
 /** Split a data URI (or bare base64) into the shape a Gemini inline_data part wants. */
@@ -286,6 +343,9 @@ async function judgeChunk(template, chunk, modelId, thinkingLevel = null) {
     // is the one that can commit the fault outright — and, reading the whole
     // book in order, the one place the rule's second half can actually fire.
     TEXT_NOT_A_CHECKLIST: require('./promptBuilders').TEXT_NOT_A_CHECKLIST_RULE,
+    // The consolidator's closed type list — the reader names its IMG finding
+    // from it, so the consolidator carries the type over (evalBuckets).
+    FINDING_TYPES: require('./evalBuckets').CONSOLIDATED_TYPES.map(t => `\`${t}\``).join(' · '),
   });
 
   // Instructions FIRST, then the book. The judge must know what it is looking
@@ -294,6 +354,8 @@ async function judgeChunk(template, chunk, modelId, thinkingLevel = null) {
   const parts = [{ text: instructions }];
   for (const p of chunk) {
     parts.push({ text: `${pageHeading(p.pageNumber)} TEXT: ${p.text || '(no text on this page)'}` });
+    const brief = briefLine(pageHeading(p.pageNumber), p.brief);
+    if (brief) parts.push({ text: brief });
     parts.push(p.part);
   }
 
@@ -463,15 +525,19 @@ function parseRoutes(raw) {
   for (const m of String(raw || '').matchAll(ROUTED_FAULT_RE)) {
     const route = m[1].toUpperCase();
     const severity = m[2] ? m[2].toUpperCase() : null;
-    const page = m[3] != null ? parseInt(m[3], 10) : null;
+    // The reader's own type, carried verbatim; the consolidator discards an
+    // unlisted value as it does for every evaluator.
+    const type = m[3] ? m[3].toLowerCase() : null;
+    const page = m[4] != null ? parseInt(m[4], 10) : null;
     byRoute[route].push({
       page,
       severity,
+      type,
       // The whole line, verbatim — the corrective text round is fed FAULT lines
       // in the same shape the text audit produces, so the refine template reads
       // them without a second format to learn.
       line: m[0].trim(),
-      detail: (m[4] || '').replace(/^[—–-]\s*/, '').trim(),
+      detail: (m[5] || '').replace(/^[—–-]\s*/, '').trim(),
     });
   }
   return byRoute;
@@ -533,7 +599,7 @@ async function auditStoryBook(storyData, opts = {}) {
         log.warn(`⚠️ [BOOK-AUDIT] p${scene.pageNumber} image load failed (${err.message})`);
       }
       if (!part) { missing.push(scene.pageNumber); return; }
-      prepared.push({ pageNumber: scene.pageNumber, text: String(scene.text || '').trim(), part });
+      prepared.push({ pageNumber: scene.pageNumber, text: String(scene.text || '').trim(), part, brief: auditPageBrief(scene, storyData) });
     }));
     prepared.sort((a, b) => a.pageNumber - b.pageNumber);
     if (prepared.length === 0) throw new Error('no page images could be resolved');
@@ -674,6 +740,8 @@ async function auditStoryBook(storyData, opts = {}) {
 module.exports = {
   auditStoryBook,
   buildAuditPages,
+  auditPageBrief,
+  briefLine,
   shippedVersionIndex,
   parseRoutes,
   collectObjectScale,
