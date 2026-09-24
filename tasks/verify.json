@@ -313,12 +313,13 @@
     },
     {
       "id": "repair-descriptor-vb-figures",
-      "title": "A creature or secondary character is named by sight in a repair instruction, never by its bible name",
+      "title": "No image-model repair text names a figure the model has no reference for: inpaint, char-fix pose lines, manual repair route",
       "commits": [
-        "cd9958ae2"
+        "cd9958ae2",
+        "411b65324"
       ],
       "addedAt": "2026-09-24",
-      "claim": "No inpaint instruction names a Visual Bible animal or secondary character (name or properName); such a figure is identified by kind, colouring/garment and position.",
+      "claim": "No inpaint instruction names a Visual Bible animal or secondary character; no char-fix prompt names a bible figure (nor, where the record names the target, another cast member); no manual-repair payload names a cast member or bible figure. Such figures are identified by kind, colouring/garment and position.",
       "runShape": [
         "needs-inpaint"
       ],

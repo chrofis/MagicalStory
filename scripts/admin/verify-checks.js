@@ -487,25 +487,54 @@ checks.repairDescriptorNoNames = (ctx) => {
   return { covered: true, pass: bad.length === 0, detail: (bad.length ? bad.join('; ') : `${n} inpaint instruction(s), no cast name, no fallback descriptor`) + extra };
 };
 
-/** 2026-09-24 — a creature or secondary character is identified in an inpaint instruction by its description, never its bible name. */
+/**
+ * 2026-09-24 — no image-model repair text names a figure the model has no reference for:
+ * inpaint instructions (no bible creature / secondary character), char-fix prompts (no
+ * figure but the target), manual-repair payloads (no cast or bible name).
+ */
 checks.repairDescriptorNoVbFigureNames = (ctx) => {
   const vb = ctx.data?.visualBible || {};
   const figs = ['animals', 'secondaryCharacters']
     .flatMap(pool => (vb[pool] || []).flatMap(e => [e?.name, e?.properName]))
     .filter(nm => typeof nm === 'string' && nm.trim())
     .map(nm => nm.trim());
-  if (!figs.length) return notCovered('no named creature or secondary character in the bible');
+  const cast = castNames(ctx);
+  if (!figs.length && cast.length < 2) return notCovered('no bible figure and no second cast member to leak');
   const esc = (v) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const bad = []; let n = 0;
-  for (const p of pages(ctx)) versions(p).forEach((v, i) => {
-    if (!v.inpaintInstruction || /^char-fix/.test(v.source || '')) return;
-    n += 1;
-    const s = String(v.inpaintInstruction);
-    const hit = figs.filter(nm => new RegExp(`(?<![\\p{L}\\p{N}])${esc(nm)}(?![\\p{L}\\p{N}])`, 'u').test(s));
-    if (hit.length) bad.push(`p${p.pageNumber} v${i} names ${hit.join(', ')}`);
-  });
-  if (!n) return notCovered('no inpaint instruction');
-  return { covered: true, pass: bad.length === 0, detail: bad.length ? bad.join('; ') : `${n} inpaint instruction(s), no creature or secondary-character name (${figs.length} in the bible)` };
+  const named = (s, list) => list.filter(nm => new RegExp(`(?<![\\p{L}\\p{N}])${esc(nm)}(?![\\p{L}\\p{N}])`, 'u').test(s));
+  const bad = []; const seen = { inpaint: 0, charFix: 0, manual: 0 };
+  for (const p of pages(ctx)) {
+    versions(p).forEach((v, i) => {
+      if (!v.inpaintInstruction) return;
+      const s = String(v.inpaintInstruction);
+      if (/^char-fix/.test(v.source || '')) {
+        // Char-fix targets a cast member (it needs an avatar), so a bible figure is never
+        // the target. Other cast names are judged only when the stored record says who
+        // the target was — the prompt is never read to find out.
+        const target = (p.retryHistory || []).find(r => r?.versionIndex === i && r?.charName)?.charName || null;
+        seen.charFix += 1;
+        const hit = named(s, [...figs, ...(target ? cast.filter(c => c !== target) : [])]);
+        if (hit.length) bad.push(`p${p.pageNumber} v${i} char-fix${target ? ` ${target}` : ''} names ${hit.join(', ')}`);
+        return;
+      }
+      seen.inpaint += 1;
+      const hit = named(s, figs);
+      if (hit.length) bad.push(`p${p.pageNumber} v${i} inpaint names ${hit.join(', ')}`);
+    });
+    (p.retryHistory || []).forEach((r, k) => {
+      if (!r?.editInstruction) return;
+      seen.manual += 1;
+      const hit = named(String(r.editInstruction), [...figs, ...cast]);
+      if (hit.length) bad.push(`p${p.pageNumber} manual repair #${k} names ${hit.join(', ')}`);
+    });
+  }
+  const n = seen.inpaint + seen.charFix + seen.manual;
+  if (!n) return notCovered('no inpaint, char-fix or manual-repair text stored');
+  return {
+    covered: true, pass: bad.length === 0,
+    detail: (bad.length ? bad.join('; ') : 'no figure named that the model has no reference for')
+      + ` (inpaint ${seen.inpaint}, char-fix ${seen.charFix}, manual repair ${seen.manual}; ${figs.length} bible figure name(s))`,
+  };
 };
 
 /** d49cbf0e0 — a grouped face fix names each child by clothing and states remove AND show. */
