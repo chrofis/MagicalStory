@@ -271,8 +271,13 @@ function resolvePageClothingCategory(storyData, pageNumber, charName) {
   if (Number(pageNumber) < 0) {
     const { COVER_PAGE_NUMBERS } = require('./coverKeys');
     const coverKey = Object.keys(COVER_PAGE_NUMBERS).find(k => COVER_PAGE_NUMBERS[k] === Number(pageNumber));
-    const hint = coverKey ? storyData?.coverHints?.[coverKey] : null;
-    const byChar = hint?.characterClothing;
+    // A cover briefed as a page (2026-09-24) carries its own per-character
+    // clothing, like a page; a trial or pre-change cover was made from the
+    // outline's cover hint and its clothing lives there.
+    const rec = coverKey ? storyData?.coverImages?.[coverKey] : null;
+    const byChar = rec?.briefedAsPage === true
+      ? rec.perCharClothing
+      : (coverKey ? storyData?.coverHints?.[coverKey] : null)?.characterClothing;
     if (byChar && typeof byChar === 'object') {
       const hit = lookupByName(byChar, charName, castIdx);   // RESOLVE
       if (hit && hit.value) return normalizeClothingCategory(hit.value);

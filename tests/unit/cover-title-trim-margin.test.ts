@@ -71,8 +71,8 @@ describe('baked cover title: trim-safe margin', () => {
     }
   });
 
-  it('adds no title block — and no margin clause — to back or initial covers', () => {
-    for (const key of ['back', 'initialPage']) {
+  it('adds no title block — and no margin clause — to the back cover (the trial builder renders front and back only)', () => {
+    for (const key of ['back']) {
       const p = buildCoverPrompt(key, {
         sceneDescription: 'A quiet meadow at dusk.',
         inputData: { artStyle: 'watercolor', language: 'de' },

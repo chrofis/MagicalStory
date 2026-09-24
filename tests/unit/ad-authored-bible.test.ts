@@ -1,8 +1,9 @@
 /**
  * The ART DIRECTOR authors the Visual Bible (owner, 2026-09-11).
  *
- * The all-pages scene-expansion call now emits `---VISUAL BIBLE---` and
- * `---COVER SCENE HINTS---` BEFORE page 1's heading, then the page briefs, so a
+ * The all-pages scene-expansion call now emits `---VISUAL BIBLE---` BEFORE
+ * page 1's heading, then the page briefs — the covers' among them, as pages
+ * -1/-2/-3 since 2026-09-24 (coverBeats.js) — so a
  * page's `objects[]` can only cite an id the same response already declared.
  * Before this the bible was written one stage earlier and had to guess page
  * assignment from plan-line prose: on job_1789147573901_m3uam0nxi that guess
@@ -41,13 +42,6 @@ const bibleBlock = (vb: unknown) => [
   JSON.stringify(vb, null, 2),
   '```',
   '',
-  '---COVER SCENE HINTS---',
-  '**Title Page**',
-  'Mood: quiet and curious',
-  'Objects: LOC001, ART001',
-  'Characters:',
-  '- Mia (centre): standard, holds: ART001, priority: essential',
-  '',
 ].join('\n');
 
 const pageBlock = (n: number, objects: string[]) => [
@@ -59,32 +53,30 @@ const pageBlock = (n: number, objects: string[]) => [
   '',
 ].join('\n');
 
-const fullResponse = bibleBlock(VB) + [1, 2, 3].map(n => pageBlock(n, n === 3 ? ['LOC001', 'ART001'] : ['LOC001'])).join('\n');
+const fullResponse = bibleBlock(VB) + [1, 2, 3, -1].map(n => pageBlock(n, n === 3 ? ['LOC001', 'ART001'] : ['LOC001'])).join('\n');
 
 describe('an AD response carrying a bible plus pages parses both halves', () => {
-  it('takes the two leading sections and stops at page 1s heading', () => {
+  it('takes the leading bible section and stops at page 1s heading', () => {
     const sections = extractBibleSections(fullResponse, AD_BIBLE_MARKERS);
     expect(sections).toBeTruthy();
-    expect(sections.found).toEqual(['---VISUAL BIBLE---', '---COVER SCENE HINTS---']);
-    // The page briefs must NOT bleed into the cover-hints section — the
-    // cover-hints regex is terminated by the next ---SECTION---, and a page
-    // heading is not one, so an uncut body would swallow the whole story.
+    expect(sections.found).toEqual(['---VISUAL BIBLE---']);
+    // The page briefs must NOT bleed into the bible section — a page heading
+    // is not a ---SECTION---, so an uncut body would swallow the whole story.
     expect(sections.body).not.toContain('## Page 1');
     expect(sections.body).not.toContain('cobbled square in flat morning light');
   });
 
-  it('parses the Visual Bible and the cover hints out of that body', () => {
+  it('parses the Visual Bible out of that body', () => {
     const body = extractBibleSections(fullResponse, AD_BIBLE_MARKERS).body;
     const parser = new UnifiedStoryParser(body);
     const vb = parser.extractVisualBible();
     expect(vb.artifacts[0].id).toBe('ART001');
     expect(vb.artifacts[0].appearsInPages).toEqual([3]);
-    expect(parser.extractCoverHints()).toBeTruthy();
   });
 
-  it('parses every page brief out of the same response', () => {
-    const parsed = parseRefinedText(fullResponse, [1, 2, 3], 'SCENES');
-    expect(parsed.pages.map((p: any) => p.pageNumber)).toEqual([1, 2, 3]);
+  it('parses every page brief — a cover page (-1) included — out of the same response', () => {
+    const parsed = parseRefinedText(fullResponse, [1, 2, 3, -1], 'SCENES');
+    expect(parsed.pages.map((p: any) => p.pageNumber)).toEqual([1, 2, 3, -1]);
     expect(parsed.missing).toEqual([]);
     // The bible must not have been swept into page 1's prose.
     expect(parsed.pages[0].text).not.toContain('secondaryCharacters');
@@ -166,6 +158,7 @@ describe('the wardrobe half is extracted with its own marker set', () => {
     const parser = new UnifiedStoryParser(transcript);
     expect(parser.extractClothingRequirements().Mia.standard.description).toBe('a red coat');
     expect(parser.extractVisualBible().artifacts[0].id).toBe('ART001');
-    expect(parser.extractCoverHints()).toBeTruthy();
+    // No cover section in the transcript (covers are pages since 2026-09-24): no hints.
+    expect(parser.extractCoverHints()).toBeNull();
   });
 });

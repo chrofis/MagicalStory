@@ -224,7 +224,8 @@ describe('wiring — production still passes what the resolver mirrors', () => {
   });
 
   it('production hands the all-pages Art Director the approved arc', () => {
-    const call = (beatsSrc.match(/buildSceneExpansionAllPrompt\(inputData, beats, \{[\s\S]*?\n  \}\);/) || [])[0] || '';
+    // `briefBeats`: the story beats plus the cover pages' beats (coverBeats.js, 2026-09-24).
+    const call = (beatsSrc.match(/buildSceneExpansionAllPrompt\(inputData, briefBeats, \{[\s\S]*?\n  \}\);/) || [])[0] || '';
     expect(call).toContain('finalArc: approvedArc');
     expect(call).toContain('clothingRequirements');
     expect(call).toContain('availableAvatars');

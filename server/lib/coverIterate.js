@@ -545,38 +545,6 @@ function applyCoverWornHeldDedupe(photos, coverHint, visualBible) {
 }
 
 /**
- * COMPOSITION lines for the initial-page templates ({GROUP_COMPOSITION}).
- * The "GROUP scene / MAIN CHARACTER in the CENTER / others arranged AROUND"
- * boilerplate only makes sense for 3+ characters — with 1-2 it contradicts
- * the hint's explicit per-character positions and makes the model invent
- * extra figures to fill out the "group".
- */
-function buildInitialPageComposition(characterCount) {
-  const n = Number(characterCount) || 0;
-  if (n === 1) {
-    return [
-      '- Draw EXACTLY the single character described in the SCENE — no more, no fewer. Do not invent extra figures.',
-      '- Place the character at the position given in the SCENE',
-      '- The character should be clearly visible and recognizable',
-    ].join('\n');
-  }
-  if (n === 2) {
-    return [
-      '- Draw EXACTLY the two characters described in the SCENE — no more, no fewer. Do not invent extra figures.',
-      '- Place each character at the position given in the SCENE',
-      '- Both characters should be clearly visible and recognizable',
-    ].join('\n');
-  }
-  // 3+ (and unknown/0 → legacy group behaviour)
-  return [
-    "- This is a GROUP scene introducing all the story's characters",
-    '- The MAIN CHARACTER should be positioned in the CENTER',
-    '- Other characters should be arranged AROUND the main character',
-    '- Everyone should be clearly visible and recognizable',
-  ].join('\n');
-}
-
-/**
  * Back cover is a main-characters-only group portrait — drop supporting
  * characters that slipped in via the hint or scene description. Single source
  * of truth for the filter used by both the iterate path and the regeneration
@@ -757,17 +725,9 @@ function stripCharacterSentences(description, characterNames = []) {
  * setting-only view, and resolves/drops VB ids so no raw ART###/CHR###
  * token reaches the image model as paintable text.
  */
-function buildPlateDescription(emptyDescRaw, characterNames, visualBible, pageNumber, { excludeText = [] } = {}) {
+function buildPlateDescription(emptyDescRaw, characterNames, visualBible, pageNumber) {
   const { sanitizeVbIdsInPrompt } = getStoryHelpers();
-  // The cover's own elements (the Art Director's `Scene` prose names them with
-  // their looks) go in with the cast, never onto the empty plate: an animal
-  // painted into the plate is a duplicate once the render adds it. Removed by
-  // its exact text, the way the shrink removes a block.
-  let raw = String(emptyDescRaw || '');
-  for (const t of excludeText) {
-    const text = String(t || '').trim();
-    if (text) raw = raw.split(text).join('');
-  }
+  const raw = String(emptyDescRaw || '');
   const stripped = stripCharacterSentences(raw, characterNames)
     .split(/(?<=[.!?])\s+/)
     .filter(s => s !== COVER_GROUP_GAZE_SENTENCE)
@@ -844,6 +804,15 @@ async function iterateCover(coverKey, storyData, options = {}) {
     // keep the scored contract: eval + detection run here.
     skipEval = false,
   } = options;
+
+  // TRIAL-ONLY (owner, 2026-09-24 — plan covers-as-pages Q7 (a)). A full-story
+  // cover is a page: it iterates through the page path
+  // (coverRender.iterateFullStoryCover → iteratePageCore). This function
+  // renders a TRIAL cover from its hint, next to the trial-only cover builder,
+  // and refuses anything else; coverIteratePath throws for a pre-change cover.
+  if (require('./coverBeats').coverIteratePath(storyData, coverKey) !== 'trial') {
+    throw new Error(`[COVER-ITERATE] ${coverKey}: a full-story cover is a page — it iterates through the page path (iterateFullStoryCover), never iterateCover`);
+  }
 
   const {
     getCharacterPhotoDetails,
@@ -1142,9 +1111,6 @@ async function iterateCover(coverKey, storyData, options = {}) {
   // a third in the trial cover — three parallel paths that never received what
   // pages got. Cover art is generated TEXTLESS and the title is composited by
   // the typography pass afterwards, so no template needs a TITLE block.
-  const groupComposition = normalizedCoverType === 'initialPage'
-    ? buildInitialPageComposition(coverCharacterPhotos.length)
-    : '';
   // `let`, not `const`: the character restriction, the evaluation feedback and
   // the VB-id sanitizer below all REASSIGN this. Same regression as the
   // streaming cover path (c0d594a75) — as a const, every cover regeneration
@@ -1167,7 +1133,6 @@ async function iterateCover(coverKey, storyData, options = {}) {
     characters: (storyData.characters || []).filter(c => clothingDedupedPhotos.some(p => p.name === c.name)),
     visualBible,
     referencePhotos: clothingDedupedPhotos,
-    groupComposition,
     options: {
       customStyleDescription: styleDescription,
       // Empty unless baked mode is on; buildCoverPrompt appends the TITLE block.
@@ -1680,54 +1645,11 @@ async function iterateCover(coverKey, storyData, options = {}) {
   // textless and bakeCoverTypographyPostPersist stamps it later; restamping here
   // would double-bake. Post-generation repaints (regenerate/edit/repair) run
   // after the bake, so ${key}Art exists and they DO need the restamp.
-  let servedImageData = imageResult.imageData;
-  let artImageData = null;
-  let typographySpec = null;
-  // Cover art is ALWAYS generated textless now (2026-08-26) — the title,
-  // dedication and branding are composited by the typography pass, which is the
-  // one extra pass a cover gets over a page. There is no longer a text-baking
-  // template to gate this on.
-  {
-    let bakeAlreadyRan = false;
-    try {
-      const { dbQuery } = require('../services/database');
-      const rows = await dbQuery("SELECT 1 FROM story_images WHERE story_id=$1 AND image_type=$2 LIMIT 1", [storyData.id, `${coverKey}Art`]);
-      bakeAlreadyRan = rows.length > 0;
-    } catch (e) { /* check failed → skip restamp (safe: textless served, initial bake handles it) */ }
-    if (skipTypography || bakeTitle) {
-      log.info(`🅰️ [COVER-ITERATE] ${coverKey}: typography composite SKIPPED (Lab: baked-title test) — served bytes are the raw render`);
-    } else if (bakeAlreadyRan || forceRestampWhenUnbaked) {
-      try {
-        const { restampCover } = require('./coverTypography');
-        // Typography must dodge the figures on the bytes it is stamping. This
-        // read existingCover.bboxDetection — boxes measured on the PREVIOUS
-        // render's pixels — so when the repaint changed the composition, the
-        // title could land straight across a face that moved. The fresh
-        // detection of THIS render already exists (coverBboxDetection above,
-        // carried as imageResult.bboxDetection); use it. On the skipEval path
-        // no detection ran: pass NO figures and let composeCover use its
-        // figure-less placement, loudly — stale boxes are worse than none.
-        // (Owner intends to retire restampCover eventually; correct until then.)
-        const figures = imageResult.bboxDetection?.figures || [];
-        if (!imageResult.bboxDetection) {
-          log.warn(`⚠️ [COVER-ITERATE] ${coverKey}: no fresh detection for this render (skipEval path) — restamping WITHOUT figure avoidance`);
-        }
-        const stamped = await restampCover(storyData, coverKey, imageResult.imageData, { seed: storyData.title, figures });
-        servedImageData = stamped.titledData;
-        artImageData = stamped.textlessData;
-        typographySpec = stamped.spec;
-        // The detection ran on the textless render; the served bytes are the
-        // stamped ones. Re-point the fp (the ONLY sanctioned fp restamp — see
-        // restampDetectionForCoverText) so the stored boxes stay pairable.
-        if (imageResult.bboxDetection) {
-          require('./images').restampDetectionForCoverText(imageResult.bboxDetection, servedImageData);
-        }
-        log.info(`🅰️ [COVER-ITERATE] ${coverKey}: re-composited text (${typographySpec?.fontId || '?'}/${typographySpec?.layout || '?'})`);
-      } catch (e) {
-        log.warn(`⚠️ [COVER-ITERATE] ${coverKey}: restamp failed (${e.message}) — serving textless render`);
-      }
-    }
-  }
+  // Cover art is ALWAYS generated textless (2026-08-26) — the title,
+  // dedication and branding are composited by the typography pass. One
+  // implementation with the full-story cover page path (coverTypography).
+  const { servedImageData, artImageData, typographySpec } = await require('./coverTypography')
+    .stampRepaintedCover(storyData, coverKey, imageResult, { force: forceRestampWhenUnbaked, skip: skipTypography || !!bakeTitle });
 
   return {
     imageData: servedImageData,
@@ -1994,8 +1916,7 @@ async function buildCoverReferences({
         ...((visualBible?.mainCharacters || []).map(c => c?.name)),
         ...((visualBible?.secondaryCharacters || []).map(c => c?.name)),
       ];
-      const emptyDesc = buildPlateDescription(emptyDescRaw, coverCastNames, visualBible, coverPageNumber,
-        { excludeText: [coverHint?.scene] });
+      const emptyDesc = buildPlateDescription(emptyDescRaw, coverCastNames, visualBible, coverPageNumber);
       const { buildEmptyScenePrompt } = require('../services/prompts');
       // Built BEFORE the prompt: which reference family is attached decides
       // the REFERENCE line (referenceKind below), exactly as at the production
@@ -2179,6 +2100,56 @@ function withTrialCoverObjects(description, addIds = []) {
 }
 
 /**
+ * THE TRIAL'S DEFAULT COVER HINTS (bug trial-back-cover-empty-hint, 2026-09-24).
+ *
+ * The trial writer emits one `---COVER SCENE---` JSON (the front cover, which
+ * onCoverScene renders) and no cover-hints section, so the back cover — and the
+ * front, when that JSON is missing — has no parsed hint. These are its hints,
+ * in the STRUCTURED shape every cover consumer reads (mood, objects, characters,
+ * characterDetails, characterClothing): `buildCoverSceneFromHint` builds the
+ * scene from them, the backdrop check gives them the story's location, and the
+ * clothing reconciliation and the stored `coverHints` treat them like any hint.
+ *
+ * They replace the two inline default hints the trial start block used to build.
+ * Those were written as a bare `hint:` prose line that `buildCoverSceneFromHint`
+ * does not read, and they never ran at all: the parser returned a truthy EMPTY
+ * hint for every cover, so every trial back cover rendered from nothing
+ * ("A portrait of a single character set before <place>").
+ *
+ * Cast = the main characters (else the first three), as the old prose named;
+ * a costume trial dresses the whole cast in its costume, as before.
+ *
+ * @param {'frontCover'|'backCover'} coverKey
+ * @param {Object} inputData - the trial job's inputData
+ */
+function trialDefaultCoverHint(coverKey, inputData = {}) {
+  const all = (Array.isArray(inputData.characters) ? inputData.characters : []).filter(c => c && c.name);
+  const mains = all.filter(c => c.isMainCharacter);
+  const cast = (mains.length > 0 ? mains : all.slice(0, 3)).map(c => c.name);
+  const names = cast.join(', ') || 'the main character';
+  const theme = inputData.storyTopic || inputData.storyTheme || 'adventure';
+  const byKey = {
+    frontCover: {
+      mood: 'magical and eye-catching, the characters excited and ready for adventure',
+      hint: `A magical, eye-catching front cover scene featuring ${names} in a ${theme}-themed setting. The main characters are prominently displayed, looking excited and ready for adventure. The composition leaves space at the top for the title.`,
+    },
+    backCover: {
+      mood: 'calm, warm end-of-day light, the characters content and relaxed after the adventure',
+      hint: `A calm closing back-cover scene featuring ${names} at the story's main location, warm end-of-day light, content and relaxed after the adventure. Simple composition with open space, no text.`,
+    },
+  };
+  const t = byKey[coverKey];
+  if (!t) throw new Error(`trialDefaultCoverHint: the trial renders a front and a back cover, not ${coverKey}`);
+  const characterClothing = {};
+  if (inputData._trialCostumeType) {
+    for (const c of all) characterClothing[c.name] = 'costumed';
+  }
+  const characterDetails = {};
+  for (const n of cast) characterDetails[n] = { name: n, position: '', clothing: characterClothing[n] || null, holds: 'nothing', gazesAt: '', priority: 'essential' };
+  return { hint: t.hint, mood: t.mood, objects: [], characters: [...cast], characterClothing, characterDetails };
+}
+
+/**
  * Build a deterministic SCENE prose string from a structured coverHint.
  *
  * This REPLACES the previous Haiku scene-expansion call for covers. The
@@ -2304,15 +2275,7 @@ function buildCoverSceneFromHint(hint, visualBible, characters, opts = {}) {
     : nChars === 2
       ? `A portrait of two characters set before ${landmarkName}. Only these two people appear; no other people, no crowd.`
       : `A portrait of a single character set before ${landmarkName}. Only this one person appears; no other people, no crowd.`;
-  // THE ART DIRECTOR'S COVER PROSE (2026-09-23). A page gets each element's
-  // look from the Art Director's prose (scene-expansion-all.txt rule 10); a
-  // cover now gets it the same way, from the hint's `Scene` field, and the
-  // element's presence from REQUIRED OBJECTS (coverBriefWithObjects). A hint
-  // written before the field carries none, and nothing stands in for it: the
-  // element keeps its reference cell and its checklist line (decisions.md
-  // 2026-09-23).
-  const adScene = typeof hint.scene === 'string' ? hint.scene.trim() : '';
-  const lines = [moodPhrase, sceneStarter, adScene, ...charSentences, gazeSentence].filter(Boolean);
+  const lines = [moodPhrase, sceneStarter, ...charSentences, gazeSentence].filter(Boolean);
   return lines.join(' ');
 }
 
@@ -2322,6 +2285,7 @@ module.exports = {
   trialCoverLocationId,
   trialCoverPlateDescription,
   buildCoverSceneFromHint,
+  trialDefaultCoverHint,
   coverBriefWithObjects,
   withTrialCoverObjects,
   stripCharacterSentences,
@@ -2341,6 +2305,5 @@ module.exports = {
   warnTitleNamedEntitiesMissingFromCover,
   COVER_ELEMENT_REF_CAP,
   applyCoverWornHeldDedupe,
-  buildInitialPageComposition,
   englishEntityRef,
 };

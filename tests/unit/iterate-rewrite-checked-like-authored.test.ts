@@ -134,6 +134,9 @@ describe('which sceneBriefCheck types reach a rewrite', () => {
       // `timeOfDay` / `weather` gets the parent's put back in code
       // (sceneLight.carryForwardLightInBrief, images.js), so it cannot miss them.
       'light_undeclared',
+      // A cover's copy space is locked to its beat's zone on iterate (images.js
+      // lockedTextPosition = COVER_TEXT_POSITION), like the text-zone family.
+      'cover_text_zone_mismatch',
       'textzone_character_collision', 'textzone_fullwidth_floor', 'textzone_top_floor',
       'textzone_bottom_floor', 'textzone_half_streak'];
     for (const t of SBC.REVIEWABLE) {

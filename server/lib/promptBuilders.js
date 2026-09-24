@@ -2392,8 +2392,11 @@ function buildCharacterRestriction(selectedNames, excludedNames) {
  * typography pass that composites the title. The art itself is generated
  * textless, so no template needs a TITLE or DEDICATION block at all.
  *
- * @param {'front'|'initialPage'|'back'} coverType
- * @param {Object} args - everything buildImagePrompt needs, plus groupComposition
+ * TRIAL ONLY since 2026-09-24: a full-story cover is a page (coverBeats.js)
+ * whose layout lives in its beat. The trial renders a front and a back cover.
+ *
+ * @param {'front'|'back'} coverType
+ * @param {Object} args - everything buildImagePrompt needs
  */
 function buildCoverPrompt(coverType, {
   sceneDescription,
@@ -2401,10 +2404,12 @@ function buildCoverPrompt(coverType, {
   characters = null,
   visualBible = null,
   referencePhotos = null,
-  groupComposition = '',
   options = {},
 } = {}) {
-  const key = coverType === 'front' ? 'front' : coverType === 'back' ? 'back' : 'initialPage';
+  if (coverType !== 'front' && coverType !== 'back') {
+    throw new Error(`[COVER PROMPT] ${coverType}: the trial cover builder renders a front or a back cover — a full-story cover is a page`);
+  }
+  const key = coverType;
   const raw = PROMPT_TEMPLATES.coverComposition || '';
   // Sections are delimited by '### <key>' lines in cover-composition.txt.
   const section = (() => {
@@ -2416,7 +2421,7 @@ function buildCoverPrompt(coverType, {
     return m.slice(m.indexOf('\n') + 1).trim();
   })();
   let composition = section
-    ? `**COMPOSITION GUIDELINES:**\n${section.replace('{GROUP_COMPOSITION}', groupComposition || '').trim()}`
+    ? `**COMPOSITION GUIDELINES:**\n${section.trim()}`
     : '';
 
   // BAKED TITLE (runtime `coverTitleMode`). The front cover is rendered WITH its
@@ -2435,12 +2440,20 @@ function buildCoverPrompt(coverType, {
     inputData,
     characters,
     visualBible,
-    require('./coverKeys').COVER_PAGE_NUMBERS[
-      coverType === 'front' ? 'frontCover' : coverType === 'back' ? 'backCover' : 'initialPage'
-    ] ?? null,
+    require('./coverKeys').COVER_PAGE_NUMBERS[coverType === 'front' ? 'frontCover' : 'backCover'],
     referencePhotos,
     { ...options, coverComposition: composition }
   );
+  return withBakedTitle(prompt, bakedTitle);
+}
+
+/**
+ * The baked-title tail of a front cover: the REQUIRED TEXT block, appended at
+ * the ABSOLUTE END of the image prompt. ONE implementation for the trial cover
+ * (buildCoverPrompt) and the full-story cover page (storyJobPipeline, through
+ * the page path). An empty title returns the prompt unchanged.
+ */
+function withBakedTitle(prompt, bakedTitle) {
   if (!bakedTitle) return prompt;
 
   // The TITLE block goes at the ABSOLUTE END of the prompt — after **ART
@@ -2621,27 +2634,6 @@ function namedByMain(inputData = {}, main = true) {
 }
 
 /**
- * The two cover cast lines of the Art Director's cover hints. Built here, not
- * templated, because the template spliced namedByMain's 'None' into a list:
- * "up to 5 characters from Levin, Julian, Max, Kiaan and None" (staging
- * job_1790100385959_1nitlympp — a cast with no primary characters).
- */
-function buildCoverCastLines(inputData = {}) {
-  const names = (main) => (inputData.characters || [])
-    .filter(c => ((inputData.mainCharacters || []).includes(c.id) ? main : !main))
-    .map(c => c.name)
-    .filter(Boolean);
-  const main = names(true);
-  const primary = names(false);
-  const title = main.length ? `Title Page: only ${main.join(', ')}.` : 'Title Page: the characters of the Initial Page.';
-  const pool = [...main, ...primary];
-  const rest = pool.length <= 5
-    ? `Initial Page and Back Cover: ${pool.join(', ')}.`
-    : `Initial Page and Back Cover: up to 5 characters from ${pool.join(', ')}${main.length ? `, always including ${main.join(', ')}` : ''}. Over 5, drop the least important characters entirely.`;
-  return `${title}\n${rest}`;
-}
-
-/**
  * ONE state line for a recurring-elements dump, WITH the state's page range
  * (2026-09-17). The bible declares each state's `pages` and a page cites the
  * state whose range covers it; the brief REWRITER was shown the states' names
@@ -2761,14 +2753,16 @@ function buildRecurringElementsText(visualBible, filterIds = new Set()) {
  * one call. Repetition and visual arc were already reviewed set-wide; now they
  * are authored set-wide too.
  *
- * It also AUTHORS the Visual Bible and the cover scene hints (2026-09-11),
- * emitted BEFORE page 1 so every page's `objects[]` can only cite an id the
- * response already declared. One author owns both what is in each picture and
- * what each thing looks like, so the two cannot contradict each other.
+ * It also AUTHORS the Visual Bible (2026-09-11), emitted BEFORE page 1 so
+ * every page's `objects[]` can only cite an id the response already declared.
+ * One author owns both what is in each picture and what each thing looks like,
+ * so the two cannot contradict each other. The book's covers are pages too
+ * (2026-09-24): their beats (coverBeats.js, page numbers -1/-2/-3) ride after
+ * the story beats and get briefs of the same shape.
  *
- * Output shape is `---VISUAL BIBLE---` + `---COVER SCENE HINTS---`, then
- * `## Page N` + prose + METADATA per page. beatsPipeline's
- * extractBibleSections(raw, AD_BIBLE_MARKERS) takes the two leading sections and
+ * Output shape is `---VISUAL BIBLE---`, then `## Page N` + prose + METADATA per
+ * page. beatsPipeline's extractBibleSections(raw, AD_BIBLE_MARKERS) takes the
+ * leading section and
  * parseRefinedText(raw, expected, 'SCENES') reads the pages with no new parser.
  *
  * @param {Object} inputData
@@ -2853,10 +2847,6 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // The Art Director AUTHORS the Visual Bible now (2026-09-11), so the three
     // inputs the bible rules need travel here instead of to the bible stage.
     CHARACTER_NAMES: characters.map(c => c.name).filter(Boolean).join(', ') || 'None',
-    COVER_CAST: buildCoverCastLines(inputData),
-    // How many elements a cover's Objects may list after its LOC: the page
-    // budget (VB_ELEMENT_BUDGET) — a cover is drawn the way a page is.
-    COVER_ELEMENT_CAP: String(VB_ELEMENT_BUDGET),
     // Each landmark's PHOTOS line: the bible may only name a viewpoint one of
     // them shows, and the per-page `landmarkView` is picked from the same list.
     // The Art Director variant: it marks which of the plan's places are listed
@@ -4104,7 +4094,10 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   // (advanced reading level / square layout). The image has no text overlay,
   // so we MUST NOT inject COPY SPACE — let the model fill the whole frame.
   // Defaults to true for legacy callers that don't pass inputData.layout.
-  const textInImage = inputData?.layout?.textInImage !== false;
+  // A COVER always carries its text in the image (its title, dedication or
+  // back-cover line), whatever the layout does with page text — its copy space
+  // is staged by its brief's textPosition like a page's (2026-09-24).
+  const textInImage = (Number.isFinite(Number(pageNumber)) && Number(pageNumber) < 0) || inputData?.layout?.textInImage !== false;
   // Text area instruction: tell the model to keep an area calm for text overlay.
   // Critical: do NOT say "white", "blank", "empty", or "negative space" — the model
   // will paint a literal white box. Instead say "continue the scene but keep it simple".
@@ -5447,6 +5440,10 @@ function buildExactPosesBlock(interactions, sceneCharacters = [], visualBible = 
     if (coveredNames.has(name.toLowerCase())) continue;
     const depth = String(c.depth || '').toLowerCase();
     if (depth === 'background') continue;
+    // A figure the brief sends to the viewer (a cover portrait, 2026-09-24)
+    // keeps that gaze: its EYES line below says so, and a fill line saying
+    // "not at the viewer" would contradict it.
+    if (looksAtPhrase(c.looksAt, visualBible) === 'eyes on the viewer') continue;
     lines.push(`- ${name}: looking off into the scene, not at the viewer`);
   }
 
@@ -5946,8 +5943,9 @@ function parseRefinedText(raw, expectedPages = [], markerName = 'STORY TEXT', tr
     : '';
 
   const pages = [];
-  // "## Page N" headings, tolerating bold/extra markup around the number.
-  const re = /^\s*#{1,4}\s*\**\s*(?:Page|Seite|Pagina)\s*\**\s*(\d+)\s*\**\s*:?\s*\**\s*$/gim;
+  // "## Page N" headings, tolerating bold/extra markup around the number. A
+  // cover page's number is negative (coverKeys.COVER_PAGE_NUMBERS).
+  const re = /^\s*#{1,4}\s*\**\s*(?:Page|Seite|Pagina)\s*\**\s*(-?\d+)\s*\**\s*:?\s*\**\s*$/gim;
   const marks = [];
   let m;
   // headStart = where the "## Page N" line BEGINS, bodyStart = just after it.
@@ -8805,7 +8803,16 @@ const ONE_INSTANT_RULE = "The prose never asks the picture to show how many time
 
 const GAZE_TARGET_RULE = "Name at most one gaze target, and compose the frame so that target is the dominant element — large, central, or nearest the camera. Every other figure looks at that same target or at the page's action. Two named characters facing each other are the one exception — a standoff, an exchange, a conversation — and there each looks at the other; that pair is a single relationship, not two targets, and nobody else in the frame looks anywhere but at them or at the action. A gaze aimed at anything smaller or further off than the frame's dominant element lands on the dominant element instead. Never write a gaze to the viewer.";
 
-const LOOKS_AT_FIELD_RULE = "Every foreground or midground character carries `looksAt`: another character's name, a Visual Bible id, or `away`. There is no value for the viewer: a figure never meets the reader's eye. It is the eyes only; hands live in `interactions[]`, and a character holding a thing does not look at it unless the plan line says so. When the plan line stages two named characters facing each other, in a standoff, an exchange or a conversation, each one's `looksAt` is the other — unless the plan line gives one of them a different gaze (\"looks up at it\", \"stares at the chest\"), in which case that one looks where the plan says and the other looks at them. On different levels the lower one looks up, the upper one looks down. The prose clause says the same thing the field says. A secondary character (a CHR id in `objects[]`) has no `characters[]` row: its gaze is a `watching` interaction whose `object` is what it looks at, and its prose clause says the same.";
+/**
+ * THE COVER GAZE EXCEPTION (covers-as-pages, 2026-09-24; SETTLED "cover gaze is
+ * code-owned: always at the viewer"). A full-story cover is a page whose beat
+ * sends every figure to the viewer; every brief author (via LOOKS_AT_FIELD_RULE)
+ * and the scene review's gaze check read this ONE sentence, so neither the
+ * author nor the critic "fixes" a cover portrait back into a page gaze.
+ */
+const COVER_GAZE_EXCEPTION = "A book cover page (page -1, -2 or -3) is the one exception: its plan line poses the cast for the reader, every figure's `looksAt` is `viewer`, and that plan line overrides every rule against facing or looking at the viewer.";
+
+const LOOKS_AT_FIELD_RULE = "Every foreground or midground character carries `looksAt`: another character's name, a Visual Bible id, or `away`. There is no value for the viewer: a figure never meets the reader's eye. " + COVER_GAZE_EXCEPTION + " It is the eyes only; hands live in `interactions[]`, and a character holding a thing does not look at it unless the plan line says so. When the plan line stages two named characters facing each other, in a standoff, an exchange or a conversation, each one's `looksAt` is the other — unless the plan line gives one of them a different gaze (\"looks up at it\", \"stares at the chest\"), in which case that one looks where the plan says and the other looks at them. On different levels the lower one looks up, the upper one looks down. The prose clause says the same thing the field says. A secondary character (a CHR id in `objects[]`) has no `characters[]` row: its gaze is a `watching` interaction whose `object` is what it looks at, and its prose clause says the same.";
 
 /**
  * ONE contract for the `expression` field, at every site that writes a brief.
@@ -10492,6 +10499,7 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
     // 7b / 10: the plan's close-up wins — the constant the Art Director gets
     // as 11c and `shot_widened` states (shotVocabulary.CLOSEUP_KEPT_RULE).
     CLOSEUP_KEPT: CLOSEUP_KEPT_RULE,
+    COVER_GAZE_EXCEPTION,
     // Check 3a, from the one rule every brief author is given (sceneLight.js).
     SCENE_LIGHT_FIELD: SCENE_LIGHT_FIELD_RULE,
   });
@@ -11380,6 +11388,7 @@ module.exports = {
   buildCharacterReferenceList,
   buildReferenceCardColours,
   buildCoverPrompt,
+  withBakedTitle,
   buildBasePrompt,
   buildRecurringElementsText,
   buildSceneExpansionAllPrompt,
@@ -11457,7 +11466,6 @@ module.exports = {
   STAGED_PROP_RULE,
   EYES_OPEN_RULE,
   CREATURE_FACE_RULE,
-  buildCoverCastLines,
   CONTACT_VERB_RULE,
   REACHABLE_CONTACT_RULE,
   GAP_ACTION_FRAMING_RULE,
@@ -11466,6 +11474,7 @@ module.exports = {
   NO_LENS_RULE,
   GAZE_TARGET_RULE,
   LOOKS_AT_FIELD_RULE,
+  COVER_GAZE_EXCEPTION,
   EXPRESSION_FIELD_RULE,
   GARMENT_REMOVED_RULE,
   WORN_ITEMS_ROW_RULE,

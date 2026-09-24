@@ -2390,8 +2390,18 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         return res.status(400).json({ error: `No cover image found for ${coverKey}` });
       }
 
-      const sceneDescription = existingCover.description || 'A beautiful illustrated cover page.';
       const normalizedCoverType = coverKeyToType(coverKey);
+
+      // WHICH PATH (owner, 2026-09-24 — plan covers-as-pages Q1/Q7): a trial
+      // cover iterates through iterateCover; a full-story cover is a page and
+      // iterates through the page path; a full-story cover made before covers
+      // became pages has no brief and is refused.
+      let coverPath;
+      try {
+        coverPath = require('../lib/coverBeats').coverIteratePath(storyData, coverKey);
+      } catch (pathErr) {
+        return res.status(409).json({ error: pathErr.message });
+      }
 
       // Merge avatars: story avatars first, then fresh from characters table as fallback
       const freshCharResult = await getDbPool().query(
@@ -2401,18 +2411,38 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       const freshCharData = freshCharResult.rows[0]?.data || {};
       const freshCharacters = freshCharData.characters || [];
 
-      // Use shared cover iterate function
-      const { iterateCover } = require('../lib/coverIterate');
-      const imageResult = await iterateCover(coverKey, storyData, {
-        imageModel: imageModel || null,
-        evaluationFeedback,
-        useOriginalAsReference: !!useOriginalAsReference,
-        blackoutIssues: !!blackoutIssues,
-        freshCharacters,
-        // User-triggered (post-generation): stamp the title even when the
-        // story predates app-side typography — also upgrades it (art row).
-        forceRestampWhenUnbaked: true,
-      });
+      let imageResult;
+      if (coverPath === 'page') {
+        // Same avatar re-hydration the page branch does below.
+        const { mergeFreshAvatars } = require('../lib/characterPhotos');
+        storyData.characters = mergeFreshAvatars(storyData.characters || [], freshCharacters, storyData.artStyle || 'pixar');
+        imageResult = await require('../lib/coverRender').iterateFullStoryCover(coverKey, storyData, {
+          modelOverrides: imageModel ? { imageModel } : {},
+          evaluationFeedback,
+          useOriginalAsReference: !!useOriginalAsReference,
+          blackoutIssues: !!blackoutIssues,
+          freeIterate: !!freeIterate,
+          referenceMode: referenceMode || null,
+          singlePassScene: typeof singlePassScene === 'boolean' ? singlePassScene : null,
+        });
+      } else {
+        const { iterateCover } = require('../lib/coverIterate');
+        imageResult = await iterateCover(coverKey, storyData, {
+          imageModel: imageModel || null,
+          evaluationFeedback,
+          useOriginalAsReference: !!useOriginalAsReference,
+          blackoutIssues: !!blackoutIssues,
+          freshCharacters,
+          // User-triggered (post-generation): stamp the title even when the
+          // story predates app-side typography — also upgrades it (art row).
+          forceRestampWhenUnbaked: true,
+        });
+      }
+      // A page-path iterate REWRITES the cover's brief: the new version and the
+      // cover record carry the rewrite, exactly as a page's do.
+      const sceneDescription = coverPath === 'page'
+        ? imageResult.newScene
+        : (existingCover.description || 'A beautiful illustrated cover page.');
 
       const previousImageData = imageResult.previousImage;
       const previousScore = imageResult.previousScore;
@@ -2548,7 +2578,13 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         referencePhotos: coverCharacterPhotos,
         iteratedAt: timestamp,
         iterationCount: (existingCover.iterationCount || 0) + 1,
-        imageVersions: existingCover.imageVersions
+        imageVersions: existingCover.imageVersions,
+        ...(coverPath === 'page' ? {
+          sceneDescription,
+          sceneMetadata: imageResult.newSceneMetadata || null,
+          sceneCharacters: imageResult.newSceneCharacters || existingCover.sceneCharacters || null,
+          compressedScene: imageResult.compressedScene || null,
+        } : {}),
       };
       storyData.coverImages[coverKey] = coverData;
 
@@ -3093,17 +3129,28 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
 
     const coverKey = coverTypeToKey(normalizedCoverType);
 
-    // Apply user edits to storyData BEFORE calling iterateCover. The
-    // iterateCover function reads from storyData (title / dedication /
-    // coverImages[*].description) so mutating these fields makes the user's
-    // edits flow through the standard render pipeline. No duplicate prompt-
-    // building logic in this endpoint — iterateCover is the only place that
-    // builds cover prompts.
+    // WHICH PATH (owner, 2026-09-24 — plan covers-as-pages Q1/Q7): a trial
+    // cover renders through iterateCover; a full-story cover is a page and
+    // regenerates through the page path; a full-story cover made before covers
+    // became pages has no brief and is refused.
+    let coverPath;
+    try {
+      coverPath = require('../lib/coverBeats').coverIteratePath(storyData, coverKey);
+    } catch (pathErr) {
+      return res.status(409).json({ error: pathErr.message });
+    }
+
+    // Apply user edits to storyData BEFORE the render. Both paths read from
+    // storyData (title / dedication / the cover's scene), so mutating these
+    // fields makes the user's edits flow through the standard render path.
+    // A trial cover's scene is its `description`; a full-story cover's is its
+    // Art Director brief (`sceneDescription`), which the page-path rewrite
+    // starts from.
     if (editedScene && editedScene.trim()) {
       storyData.coverImages = storyData.coverImages || {};
       storyData.coverImages[coverKey] = storyData.coverImages[coverKey] || {};
-      storyData.coverImages[coverKey].description = editedScene.trim();
-      log.debug(`📕 [COVER REGEN] Applied editedScene to ${coverKey}.description (${editedScene.trim().length} chars)`);
+      storyData.coverImages[coverKey][coverPath === 'page' ? 'sceneDescription' : 'description'] = editedScene.trim();
+      log.debug(`📕 [COVER REGEN] Applied editedScene to ${coverKey} (${editedScene.trim().length} chars, ${coverPath} path)`);
     }
     if (editedTitle !== undefined) {
       storyData.title = editedTitle;
@@ -3184,21 +3231,41 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
     // selects characters, builds prompt, calls the image model, and returns
     // a uniform result. Same function the unified-pipeline auto-repair and
     // the dev-mode iterate endpoint use.
-    const { iterateCover } = require('../lib/coverIterate');
     const coverLabelStr = coverLabel(normalizedCoverType);
     const coverImageModelId = MODEL_DEFAULTS.coverImage;
-    const iterResult = await iterateCover(coverKey, storyData, {
-      imageModel: coverImageModelId,
-      freshCharacters,
-      selectedCharacterIds: Array.isArray(characterIds) && characterIds.length > 0 ? characterIds : null,
-      // Überarbeiten = regenerate from scratch with the user's edited scene.
-      // Always a normal single-pass render — never the composite method
-      // (composite stays for iterate + the auto pipeline).
-      compositeCovers: false,
-      // User-triggered (post-generation): stamp the title even when the
-      // story predates app-side typography — also upgrades it (art row).
-      forceRestampWhenUnbaked: true,
-    });
+    let iterResult;
+    if (coverPath === 'page') {
+      // The page path: the cover's brief (the user's edit, when given) is
+      // rewritten and rendered exactly like a page iterate. A cast the user
+      // picked is the rewrite's cast: the whole roster is offered (free
+      // iterate) and the rule names exactly who is in the picture.
+      const { mergeFreshAvatars } = require('../lib/characterPhotos');
+      storyData.characters = mergeFreshAvatars(storyData.characters || [], freshCharacters, storyData.artStyle || 'pixar');
+      const picked = Array.isArray(characterIds) && characterIds.length > 0
+        ? (storyData.characters || []).filter(c => characterIds.includes(c.id)).map(c => c.name)
+        : null;
+      if (picked && picked.length === 0) {
+        return res.status(400).json({ error: 'None of the selected characters belong to this story' });
+      }
+      iterResult = await require('../lib/coverRender').iterateFullStoryCover(coverKey, storyData, {
+        freeIterate: !!picked,
+        sceneExtraRule: picked ? `The picture shows exactly these characters, and no other story character: ${picked.join(', ')}.` : null,
+      });
+    } else {
+      const { iterateCover } = require('../lib/coverIterate');
+      iterResult = await iterateCover(coverKey, storyData, {
+        imageModel: coverImageModelId,
+        freshCharacters,
+        selectedCharacterIds: Array.isArray(characterIds) && characterIds.length > 0 ? characterIds : null,
+        // Überarbeiten = regenerate from scratch with the user's edited scene.
+        // Always a normal single-pass render — never the composite method
+        // (composite stays for iterate + the auto pipeline).
+        compositeCovers: false,
+        // User-triggered (post-generation): stamp the title even when the
+        // story predates app-side typography — also upgrades it (art row).
+        forceRestampWhenUnbaked: true,
+      });
+    }
 
     // Result mapping: keep the variable names the downstream save / response
     // code expects so we don't have to rewrite that section too.
@@ -3214,7 +3281,9 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
       bboxOverlayImage: iterResult.bboxOverlayImage || null,
       compositeDebug: iterResult.compositeDebug || null,
     };
-    const sceneDescription = storyData.coverImages?.[coverKey]?.description || '';
+    const sceneDescription = coverPath === 'page'
+      ? (iterResult.newScene || '')
+      : (storyData.coverImages?.[coverKey]?.description || '');
     const coverPrompt = iterResult.prompt;
     const coverCharacterPhotos = iterResult.referencePhotos || [];
 
@@ -3290,7 +3359,22 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
       regenerationCount: (previousCover?.regenerationCount || 0) + 1,
       bboxOverlayImage: coverResult.bboxOverlayImage || null,
       // NEW: imageVersions array for unified versioning
-      imageVersions: updatedVersions
+      imageVersions: updatedVersions,
+      // A full-story cover stays a page: its brief record (the rewrite this
+      // render was painted from, its plan line, clothing and plate) survives
+      // the regenerate, so the next iterate / repair reads it.
+      ...(coverPath === 'page' ? {
+        briefedAsPage: true,
+        sceneDescription,
+        sceneMetadata: iterResult.newSceneMetadata || null,
+        sceneCharacters: iterResult.newSceneCharacters || existingCover.sceneCharacters || null,
+        compressedScene: iterResult.compressedScene || null,
+        outlineExtract: existingCover.outlineExtract || null,
+        perCharClothing: existingCover.perCharClothing || null,
+        titleBaked: existingCover.titleBaked === true,
+        emptySceneImage: existingCover.emptySceneImage || null,
+        emptyScenePrompt: existingCover.emptyScenePrompt || null,
+      } : {}),
     };
 
     log.debug(`📸 [COVER REGEN] New ${normalizedCoverType} cover generated - score: ${coverResult.score}, attempts: ${coverResult.totalAttempts}, model: ${coverResult.modelId}, version: ${newVersionIndex}`);
@@ -5459,6 +5543,17 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
       const entityReport = storyData.finalChecksReport?.entity;
       const { entityFindingsForPage } = require('../lib/scoring');
       for (const pageNumber of pages) {
+        // A full-story cover made before covers became pages has no brief to
+        // repair against (owner, 2026-09-24 — plan covers-as-pages Q1): refused
+        // loudly, like its iterate and regenerate.
+        if (pageNumber < 0) {
+          try {
+            require('../lib/coverBeats').coverIteratePath(storyData, getCoverType(pageNumber));
+          } catch (pathErr) {
+            results.push({ character: characterName, pagesRepaired: [], error: pathErr.message });
+            continue;
+          }
+        }
         const pageCharIssues = entityFindingsForPage(pageNumber, entityReport)
           .filter(f => f.source === 'character' && f.name === characterName && !f.offByDesign)
           .map(f => f.issue);

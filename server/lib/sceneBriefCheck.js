@@ -145,6 +145,49 @@ function checkTextZoneCollision(page, metadata) {
 }
 
 /**
+ * A COVER PAGE'S TWO BEAT FACTS (owner, 2026-09-24). A cover is a page the Art
+ * Director briefs from its beat (coverBeats.js); two facts of that beat are
+ * mechanical, so they are checked here and handed to the scene review like any
+ * brief fault:
+ *   - every figure looks at the viewer (`looksAt: "viewer"`) — the cover gaze
+ *     rule (docs/SETTLED.md: covers are head-on portraits);
+ *   - the text goes where the book's text goes (`coverBeats.COVER_TEXT_POSITION`).
+ * Story pages return nothing.
+ */
+function checkCoverBrief(page, metadata) {
+  const { isCoverPage, coverKeyOfPage, COVER_TEXT_POSITION } = require('./coverBeats');
+  if (!page || !isCoverPage(page.pageNumber)) return [];
+  const out = [];
+  const raw = (metadata && Array.isArray(metadata.fullData && metadata.fullData.characters))
+    ? metadata.fullData.characters
+    : (metadata && Array.isArray(metadata.characters) ? metadata.characters : []);
+  const off = raw
+    .filter(c => c && typeof c === 'object' && c.name)
+    .filter(c => !/^(viewer|the viewer|camera)$/i.test(String(c.looksAt || '').trim()))
+    .map(c => `${c.name} (${c.looksAt ? `looksAt "${c.looksAt}"` : 'no looksAt'})`);
+  if (off.length > 0) {
+    out.push({
+      pageNumber: page.pageNumber,
+      type: 'cover_gaze_not_viewer',
+      detail: `This is a book cover: every figure looks at the viewer. ${off.join(', ')} — set \`looksAt: "viewer"\` and turn the figure toward the viewer in the prose.`,
+    });
+  }
+  // A brief with no `textPosition` (a story whose text-zone rules are off
+  // carries none) is not a fault: the render takes the beat's position. Only a
+  // brief that DECLARES another zone contradicts its beat.
+  const want = COVER_TEXT_POSITION[coverKeyOfPage(page.pageNumber)];
+  const got = String((metadata && metadata.textPosition) || '').trim();
+  if (want && got && got !== want) {
+    out.push({
+      pageNumber: page.pageNumber,
+      type: 'cover_text_zone_mismatch',
+      detail: `This cover's text needs \`textPosition: "${want}"\` (its beat's copy space); the brief has ${got ? `"${got}"` : 'none'}. Keep that band clear of every figure and prop.`,
+    });
+  }
+  return out;
+}
+
+/**
  * R1 — the distribution floors, tallied across the finished book. Verbatim from
  * the old unified chain (the since-deleted story-unified.txt "Distribution
  * requirements across the full story" + outline-analysis check 20; the live
@@ -159,6 +202,9 @@ function checkTextZoneCollision(page, metadata) {
 function checkTextZoneDistribution(pages = []) {
   const rows = [];
   for (const page of pages || []) {
+    // The book-wide floors are over the STORY pages; a cover's copy space is
+    // its beat's (checkCoverBrief), never a vote in the distribution.
+    if (!(Number(page && page.pageNumber) > 0)) continue;
     const metadata = (page && page.metadata) || extractSceneMetadata(String((page && page.brief) || ''));
     const pos = parseTextPosition(metadata && metadata.textPosition);
     if (pos) rows.push({ pageNumber: page.pageNumber, ...pos });
@@ -433,7 +479,10 @@ function checkObjectStateBase(pages = [], visualBible = null) {
   const earliest = new Map();
   for (const page of (pages || [])) {
     const n = Number(page && page.pageNumber);
-    if (!Number.isFinite(n)) continue;
+    // A cover (negative page number) is not a step in the story: it takes the
+    // object's FINAL state by rule (visualBible.resolveObjectState rule 0),
+    // so it never decides which state opens the book.
+    if (!Number.isFinite(n) || n <= 0) continue;
     const metadata = (page && page.metadata) || extractSceneMetadata(String((page && page.brief) || ''));
     for (const { base } of objectHandles(metadata)) {
       if (!stated.has(base)) continue;
@@ -636,6 +685,7 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
   const brief = String((page && page.brief) || '');
   if (!brief.trim()) return findings;
   const metadata = (page && page.metadata) || extractSceneMetadata(brief);
+  findings.push(...checkCoverBrief(page, metadata));
 
   // A — cast the prose describes, `characters[]` omits. Possessive-aware by
   // construction: `Hans's attic` and `Daniel's phone torch` name a place and a
@@ -1112,7 +1162,9 @@ const REVIEWABLE = new Set(['cast_unlisted', 'cast_id_unresolved', 'interaction_
   // The review owns `timeOfDay` / `weather` (check 3a); a missing value is one
   // field on a page it already rewrites (sceneLight.js, 2026-09-24).
   'light_undeclared',
-  'textzone_character_collision', 'textzone_fullwidth_floor', 'textzone_top_floor', 'textzone_bottom_floor', 'textzone_half_streak']);
+  'textzone_character_collision', 'textzone_fullwidth_floor', 'textzone_top_floor', 'textzone_bottom_floor', 'textzone_half_streak',
+  // A cover page's two mechanical beat facts (checkCoverBrief, 2026-09-24).
+  'cover_gaze_not_viewer', 'cover_text_zone_mismatch']);
 
 // Reserved `action` labels for characters who are present but not acting. They
 // are values rather than an omitted field on purpose: when the field was
@@ -1147,7 +1199,7 @@ module.exports = {
   checkPage, checkScenes, renderFindingsBlock, knownIds, REVIEWABLE,
   checkObjectStateContradiction, checkObjectStateBase, statedEntries,
   checkBiblePageTable, bibleEntries, citedBaseIds, CITABLE_POOLS,
-  checkTextZoneDistribution, checkTextZoneCollision, parseTextPosition,
+  checkTextZoneDistribution, checkTextZoneCollision, parseTextPosition, checkCoverBrief,
   checkPopulationContradiction,
   checkShotOffPlate,
   checkLightDeclared,
