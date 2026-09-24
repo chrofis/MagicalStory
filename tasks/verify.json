@@ -1460,6 +1460,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "text-repair-keeps-payoff",
+      "title": "The text repair and the grammar check never drop a sentence that pays off an earlier plant",
+      "commits": [],
+      "addedAt": "2026-09-24",
+      "claim": "On a full story whose arc plants an object and pays it off later, the text repair keeps the page sentence that shows the plant doing its work: no textRefineReport ledger line lists it as removed, and if a rewrite lost it the grammar check restored it (baseline: job_1790277448294_5herh01j7 p17 lost 'Die Marroni in der Tüte lagen warm in ihrer Klaue.').",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "read the arc for each plant and its payoff; for each payoff page compare textRefineReport.pages before/after and the ledger's removed-sentence lines in textRefineReport.analysis; a payoff sentence present in BEFORE must be in the shipped text"
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }

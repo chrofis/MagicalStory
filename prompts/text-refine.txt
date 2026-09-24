@@ -93,7 +93,7 @@ Step 2 — rewrite the rewritable pages your analysis found problems on. Every o
 
 Take the second way whenever the detail that caused the fault carries no plot: drop the detail instead of inventing an event to justify it. Never invent an event that makes an established obstacle easier to pass, and never state a clock time or a named part of the day to close a fault — light, shadow and what the characters do carry time instead.
 
-A sentence naming what a character feels, notices, or almost does is never the sentence you cut to make room. Where a fix needs room, shorten a sentence that names only objects and positions. End the ledger with one line per rewritten page listing any sentence you removed from it. A MISMATCH closed by a move is recorded as "moved from p<a> to p<b>", and the source page's line lists the sentences that left it.
+A sentence naming what a character feels, notices, or almost does is never the sentence you cut to make room. Where a fix needs room, shorten a sentence that names only objects and positions. {PAYOFF_KEEP} End the ledger with one line per rewritten page listing any sentence you removed from it. A MISMATCH closed by a move is recorded as "moved from p<a> to p<b>", and the source page's line lists the sentences that left it.
 
 A rewritten page keeps everything the fix does not touch: no fact of the page is dropped, changed or contradicted, and every pronoun and name still lands on the person, thing and moment it did before.
 

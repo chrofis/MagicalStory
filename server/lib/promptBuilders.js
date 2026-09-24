@@ -5837,6 +5837,7 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     DO_NOT_WRITE_SECTION: doNotWriteSection,
     STYLE_RULEBOOK,
     MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
+    PAYOFF_KEEP: PAYOFF_KEEP_RULE,
   });
 }
 
@@ -9052,6 +9053,22 @@ const STYLE_RULEBOOK = [
 const MOTIVE_AT_THE_ACT_RULE = 'Where a character refuses, demands, flees, hides or lies for a reason the story reveals only later, the reader gets a glimpse of that reason at or before the act (a look, a half-said word, a feeling named) without giving the later reveal away. The reason is the story\'s own, so this invents nothing';
 
 /**
+ * A payoff survives every fix (owner, 2026-09-24). ONE string for every pass
+ * that can drop a sentence of page prose: the text repair (text-refine.txt,
+ * also its repetition_fix / length_fix rounds and the book-audit round) and
+ * the grammar check after it (story-text-diff.txt, whose RESTORE puts such a
+ * sentence back). The lector edits inside one sentence and cannot drop one.
+ * On staging job_1790277448294_5herh01j7 the repair closed two p17 findings
+ * and cut "Die Marroni in der Tüte lagen warm in ihrer Klaue." to make room:
+ * it names only objects and positions, which the repair was told to shorten
+ * first, and it was the payoff of the arc's central plant, so the p16 gift did
+ * nothing. The repair receives the arc, which states plant and payoff as
+ * story sentences but labels neither; the rule is written so the model finds
+ * them in the arc and the pages it already has.
+ */
+const PAYOFF_KEEP_RULE = 'A sentence that shows something an earlier page set up doing its work, or a payoff the story names, is never deleted by a fix. Where a finding touches it, the fix rewrites around it and keeps what it shows.';
+
+/**
  * The Art Director composition rules for a writer that authors its own scene
  * hints without an Art Director stage: trial and both unified variants. The
  * six bullets were reworded for a scene hint from scene-expansion(-all).txt
@@ -9974,7 +9991,7 @@ function buildTextDiffPrompt(inputData, pairs = []) {
       return `--- Page ${p.pageNumber} ---\nFINDINGS THE REWRITE ANSWERED:\n${answered || '(none)'}\n\nBEFORE:\n${numberedSentences(p.before, 'B')}\n\nAFTER:\n${numberedSentences(p.after, 'A')}`;
     })
     .join('\n\n');
-  return fillTemplate(template, { LANGUAGE: lang, PAGES: body, STYLE_RULEBOOK });
+  return fillTemplate(template, { LANGUAGE: lang, PAGES: body, STYLE_RULEBOOK, PAYOFF_KEEP: PAYOFF_KEEP_RULE });
 }
 
 /**
@@ -11524,6 +11541,7 @@ module.exports = {
   PAGE_OPENING_VARIETY_RULE,
   STYLE_RULEBOOK,
   MOTIVE_AT_THE_ACT_RULE,
+  PAYOFF_KEEP_RULE,
   AD_COMPOSITION_RULE,
   parseArcHints,
   parseArcCreate,

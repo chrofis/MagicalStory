@@ -60009,3 +60009,36 @@ constant on both sides keeps generator and critic from drifting (`beats-planner-
 `tests/unit/plan-shared-definitions.test.ts`, `scripts/admin/sibling-registry.json`, `tasks/verify.json`
 (`plan-check-ots-contact`).
 **Status:** ✅ committed, not pushed.
+
+## 2026-09-24 — A fix never deletes a payoff sentence
+
+**Context:** Staging job_1790277448294_5herh01j7. The writer's p17 read "Nebla rollte sich um den
+Laubhaufen und blies ihren Atem auf das Ei, lang und stetig. Die Marroni in der Tüte lagen warm in ihrer
+Klaue." The text repair (round `repair`) closed two p17 findings (INFERRED on the name Kachel, STYLE on a
+comparison) and its ledger lists the Marroni sentence as removed. It names only objects and positions,
+which text-refine.txt told the repair to shorten first when a fix needs room; it was also the payoff of
+the arc's central plant (arc s2, the warm bag Julian keeps; s16, he puts it in her claw), so the p16 gift
+now does nothing. The grammar check after it did not restore it: its RESTORE covers a lost fact of the
+story, and this sentence adds no new fact. What the repair receives: the final arc and its hints (plant
+and payoff are there as story sentences, labelled as neither), the plan lines, the scene outlines and the
+merged audit findings. The arc review's own plant/payoff pairing (arcReviewReport, "Marroni (1, 6) pays
+at 16") never reaches it. The diff pass receives only BEFORE/AFTER of rewritten pages and their findings.
+
+**Decision (owner, 2026-09-24):** one constant, `PAYOFF_KEEP_RULE` in `promptBuilders.js`, filled as
+`{PAYOFF_KEEP}` into text-refine.txt (right after the make-room rule it limits; every whole-page round
+and the book-audit round share that template) and story-text-diff.txt (a lost such sentence is
+restored). The rule is worded to act on what the passes already have: something an earlier page set up
+doing its work, or a payoff the story names. The lector edits inside one sentence and cannot drop one,
+so it does not get it.
+
+**Rationale:** a plant whose payoff line is cut turns the arc's central act into a gesture that does
+nothing. The rule points at inputs the passes already hold; no new input is added.
+
+**Validation:** the repair prompt rebuilt from the stored inputs of job_1790277448294_5herh01j7 is
+byte-identical to the stored one except for the rule, which appears once; the diff prompt rebuilt from
+the stored p16/p17 pairs carries it once. Model behaviour is unproven until a staging full-story run
+(`tasks/verify.json` `text-repair-keeps-payoff`).
+
+**Touched:** `server/lib/promptBuilders.js`, `prompts/text-refine.txt`, `prompts/story-text-diff.txt`,
+`tests/unit/text-style-rulebook.test.ts`, `tasks/verify.json`.
+**Status:** ✅ committed, not pushed.

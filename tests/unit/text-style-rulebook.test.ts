@@ -122,3 +122,38 @@ describe('the repair weighs findings instead of obeying them', () => {
     expect(repair).toMatch(/A declined finding does not make its page rewritable/);
   });
 });
+
+// Owner, 2026-09-24 (staging job_1790277448294_5herh01j7 p17): the repair cut
+// the sentence that paid off the arc's central plant. ONE constant, in the
+// repair (all its whole-page rounds share text-refine.txt) and in the grammar
+// check that can restore what the repair lost. The lector edits inside one
+// sentence and cannot drop one, so it does not carry the rule.
+describe('the payoff-keep rule reaches every pass that can drop a sentence', () => {
+  let built: Record<string, string>;
+  beforeAll(async () => {
+    await require('../../server/services/prompts').loadPromptTemplates();
+    built = {
+      repair: B.buildTextRefinePrompt(inputData, PAGES, 'FAULT[STYLE]: p1 — something', 'An arc.'),
+      diff: B.buildTextDiffPrompt(inputData, [{ pageNumber: 1, before: 'Mara zog am Seil. Die Tüte lag warm in ihrer Hand.', after: 'Mara zog am Seil.' }]),
+      lector: B.buildTextProofreadPrompt(inputData, PAGES),
+    };
+  });
+
+  for (const pass of ['repair', 'diff']) {
+    it(`${pass}: carries PAYOFF_KEEP_RULE exactly once and no unfilled placeholder`, () => {
+      expect(built[pass].split(B.PAYOFF_KEEP_RULE).length - 1).toBe(1);
+      expect(built[pass]).not.toContain('{PAYOFF_KEEP}');
+    });
+  }
+
+  it('the repair states it right after the make-room rule it limits', () => {
+    const at = built.repair.indexOf('shorten a sentence that names only objects and positions.');
+    expect(at).toBeGreaterThan(-1);
+    expect(built.repair.indexOf(B.PAYOFF_KEEP_RULE)).toBeGreaterThan(at);
+    expect(built.repair.indexOf(B.PAYOFF_KEEP_RULE) - at).toBeLessThan(80);
+  });
+
+  it('the lector does not carry it', () => {
+    expect(built.lector).not.toContain(B.PAYOFF_KEEP_RULE);
+  });
+});

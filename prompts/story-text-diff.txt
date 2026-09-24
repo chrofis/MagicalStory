@@ -4,6 +4,8 @@ You may make two kinds of edit and no other:
 1. FIX a sentence of AFTER: its grammar, spelling, punctuation, a word no fluent speaker of {LANGUAGE} would use there, or a pronoun that lands on the wrong person. Change only the faulty words and the agreement they force — the article, the preposition and its contraction, the adjective, the participle. The sentence keeps its meaning and stays one sentence.
 2. RESTORE a sentence of BEFORE that the rewrite lost, where losing it drops a fact of the story that no listed finding asked to change. It comes back word for word.
 
+{PAYOFF_KEEP} Such a sentence the rewrite lost is restored.
+
 Never write a sentence that neither BEFORE nor AFTER has, never join or split sentences, and never bring back what a listed finding asked to remove or change. A fix never breaks a rule below.
 
 {STYLE_RULEBOOK}
