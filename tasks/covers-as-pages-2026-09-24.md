@@ -314,7 +314,7 @@ cover plate in parallel; (c) render the cover plate at the cover aspect from the
 
 ## 11. Execution record (2026-09-24)
 
-Commit `6fbd2b599` (staging) — decisions.md "Full-story covers are pages".
+Commits `6fbd2b599` + `5906363cb` (the cover gaze exception reaches every brief author and the scene review) on staging — decisions.md "Full-story covers are pages".
 
 - [x] Cover beats in code (`coverBeats.js`), appended after the story beats; AD template's cover section deleted.
 - [x] Covers briefed in the one AD call and reviewed in the one scene review (Q3); checks `cover_gaze_not_viewer`,
@@ -339,7 +339,7 @@ Deviations from the plan, and why:
   and the page path has no composite route for covers.
 - The pixel calm-zone repair stays page-only: on a cover it would wash the baked title.
 
-Found, not fixed (trial path — the owner asked for no trial change without asking): the trial's
+Found and — on the owner's instruction — FIXED in `5d73ffa09` (bug `trial-back-cover-empty-hint`, no timing change): the trial's
 `parser.extractCoverHints()` returns a truthy EMPTY hint for every cover (the trial writer emits no COVER SCENE HINTS
 section), so the trial start block's "default hint" branches never run and the back cover renders from an empty hint:
 every one of the last 3 staging and 3 prod trials stored `coverHints.backCover.hint = ""` and a back-cover description
