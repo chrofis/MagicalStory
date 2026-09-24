@@ -21,6 +21,55 @@ superseded and link forward.
 
 ---
 
+## 2026-09-24 — Blind text audit recall measured: 🟡 keep — it adds real faults on one story in four, and recall is unstable
+
+**Context:** Prompt audit 05 left an owner call: is the blind text audit (`text_audit_blind`, grok-4.6,
+`prompts/story-text-audit-blind.txt`, pages only) worth its slot? It returned 0 faults on
+`job_1790100385959_1nitlympp`. Owner approved a Lab recall check 2026-09-24, cap CHF 1.00.
+**Method:** Stored data only, 4 staging stories, replayed on the WRITER text (`data.writerText`, the
+draft the production audits read) with the current prompt: Lab `audit_replay`, `level: text-blind`,
+new `params.fromWriterText`. Experiments **#1454** (4 targets; fcmlfa8kn came back empty, 0 chars
+after 4.4k reasoning tokens — the Lab has no empty-retry, production retries once) and **#1455**
+(fcmlfa8kn retried, 1nitlympp repeated). Answer key = listener-facing faults a reader of the text
+alone could notice, taken from the stored arc-informed audit (each checked against the writer text;
+arc-only LOADBEARING, picture MISMATCH and PULL findings excluded), `docs/audits/prompt-audit-2026-09-23/05-story-text.md`
+§1/§3/§4, and the 2026-09-24 "One place is one place" entry. Grammar slips (lector scope) excluded.
+23 key faults:
+- `job_1790100385959_1nitlympp` (8): deadline broken p7→p12/p17, refusal reversed p10→p16, fear never
+  shown p13, bag pressed to the lost egg p14, «die Jacken der Buben» p16, Nia cannot smell it p12,
+  vague ending p18, Turi glides «von der Mauer» p18 from a nest at the linden.
+- `job_1790107559778_fcmlfa8kn` (5): «cupped» p5, «zuriefrief» p7, phone laid down yet left on the
+  sill p6, hazards Aldric never listed p8, keys carried upstairs fall into leaves outside p4.
+- `job_1789853503332_riqncqg1i` (5): Silvan never heard the knock p7, «Zippis Mami» p12, Silvan back
+  at the hollow unexplained p13, snatcher now only asks p16, cold egg hatches against the stated limit p17.
+- `job_1789420511893_zly5rcdej` (5): at Hans's cart unexplained p7, Kilian behind them p11, Daniel at
+  the gangway p15, «abstiesspegelte» p16, the pirate costume/tricorn never introduced (p3, p14).
+**Result:**
+| | recall | notes |
+|---|---|---|
+| blind, current prompt (#1454/#1455) | **10/23 (43%)** — 4/8, 1/5, 1/5, 4/5 | 1nitlympp repeat: 3/8 |
+| blind, as stored at run time (older prompt) | 8/23 (35%) — 0/8, 3/5, 2/5, 3/5 | |
+| arc-informed, as stored (older prompt) | 16/23 (70%) — 2/8, 4/5, 5/5, 5/5 | |
+- Precision (non-STYLE lines, 5 runs): 20 flagged, 14 key faults, 2 plausible but unkeyed (goggles
+  never mentioned again, why the door stays shut never answered), 4 not faults (a backpack prop, an
+  ignored order, two ENDING lines on endings that state a feeling). 70% strict, 80% lenient.
+- Overlap: on 3 of 4 stories every blind catch was also an arc-informed catch. On 1nitlympp the blind
+  audit alone caught 4: refusal reversed, fear never shown, vague ending, Turi's move from the wall.
+- Instability: fcmlfa8kn fell from 3 catches (stored) to 1 (current); 1nitlympp 4 then 3 on an
+  identical input at temperature 0. It missed both non-words on two stories («zuriefrief»,
+  «abstiesspegelte»); the stored older prompt caught one.
+- STYLE lines are most of its output: 49 of 69 lines over the 5 runs.
+- Cost: $0.10–0.14 per story (4–22k output tokens), 270–410 s. It runs in parallel with the arc-informed
+  audit and behind the image phase, so it adds no wait time.
+**Decision:** Keep the call (🟡). It is the only text critic that caught 4 real faults on one story in
+four, at about $0.12. It does not replace the arc-informed audit. It is not stable enough to count on for
+any single fault class. Open, owner call (BACKLOG): whether its STYLE question crowds out recall (not
+measured), and a non-word check. Spend for this measurement: about $0.66.
+**Touched:** `server/lib/testlab.js` (`audit_replay` `params.fromWriterText`).
+**Status:** 🟡 conditional
+
+---
+
 ## 2026-09-24 — A page holds at most 5 paragraphs (was 4)
 
 **Context:** The 2026-09-23 text-stage round made the paragraph shape one constant
