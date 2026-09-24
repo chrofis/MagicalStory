@@ -3089,15 +3089,22 @@ export function StoryDisplay({
                         </div>
                       )}
 
+                      {block(L('Story-Logik des finalen Arcs', "Logique de l'histoire (arc final)", 'Story logic of the final arc'), ar?.logic)}
+                      {ar?.counts?.length ? block(
+                        L('Zählungen (Code)', 'Comptages (code)', 'Counts (code)'),
+                        ar.counts.map(k => `${k.round === 0 ? L('Erstellung', 'Création', 'Create') : `${L('Runde', 'Tour', 'Round')} ${k.round}`}: ${k.sentences} ${L('Sätze', 'phrases', 'sentences')} (${k.sentenceRange.lo}-${k.sentenceRange.hi}) · ${k.chainLinks} ${L('Kettenglieder', 'maillons', 'chain links')} (${k.chainRange.lo}-${k.chainRange.hi}) · ${k.invented.length}/${k.inventedAllowance} ${L('neue Figuren', 'nouvelles figures', 'new figures')}${k.invented.length ? `: ${k.invented.join(', ')}` : ''}`).join('\n'),
+                      ) : null}
                       {block(L('Kritik am finalen Arc', "Critique de l'arc final", 'Critique of the final arc'), ar?.critique)}
                       {block(L('Hinweise an die Beats', 'Indications aux beats', 'Hints handed to the beats'), ar?.arcHints)}
 
                       {ar?.committed && block(
-                        L(`Gewählter Arc (Arc ${ar.committedArc ?? '?'}) + Kritik`, `Arc retenu (Arc ${ar.committedArc ?? '?'}) + critique`, `Committed arc (Arc ${ar.committedArc ?? '?'}) + critique`),
+                        ar.committedArc != null
+                          ? L(`Gewählter Arc (Arc ${ar.committedArc}) + Kritik`, `Arc retenu (Arc ${ar.committedArc}) + critique`, `Committed arc (Arc ${ar.committedArc}) + critique`)
+                          : L('Erstellter Arc: Story-Logik, Arc und Kritik', "Arc créé : logique, arc et critique", 'Created arc: story logic, arc and critique'),
                         ar.committed,
                       )}
                       {block(L('Verworfener Arc', 'Arc écarté', 'Discarded arc'), ar?.discarded)}
-                      {block(L('Rohe Erstellung (beide Arcs, beide Kritiken)', 'Création brute (les deux arcs)', 'Raw creation (both arcs, both critiques)'), ar?.create)}
+                      {block(L('Rohe Erstellung', 'Création brute', 'Raw creation'), ar?.create)}
 
                       {rounds.map((r, i) => (
                         <details key={`arc-round-${r.round ?? i}`} className={`mt-3 ${c.card}`}>
@@ -3120,6 +3127,7 @@ export function StoryDisplay({
                               <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-sans">{pan.text}</pre>
                             </details>
                           ))}
+                          {block(L('Story-Logik dieser Runde', 'Logique de ce tour', 'Story logic from this round'), r.logic)}
                           {block(L('Arc nach dieser Runde', 'Arc après ce tour', 'Arc after this round'), r.finalArc)}
                           {block(L('Kritik dieser Runde', 'Critique de ce tour', 'Critique from this round'), r.critique)}
                           {block(L('Prompt — Panel', 'Prompt — panel', 'Prompt — panel'), r.panelPrompt)}

@@ -1070,6 +1070,8 @@ export interface ArcRound {
   panel?: ArcPanelist[];
   failedPanelists?: string[];
   retellModel?: string | null;
+  /** The updated STORY LOGIC the re-telling wrote first (2026-09-24). */
+  logic?: string;
   finalArc?: string;
   critique?: string;
   fixing?: string;
@@ -1084,7 +1086,9 @@ export interface ArcRound {
 }
 
 /**
- * The arc machine's record: create (two arcs, one committed) → panel → re-tell.
+ * The arc machine's record: create (one arc, its STORY LOGIC first) → panel →
+ * re-tell. Stories written before 2026-09-24 store the two-arc shape
+ * (`committedArc`, `discarded`); both shapes are read.
  *
  * This replaced a single draft-and-review shape, and the old field names
  * (`drafted`, `analysis`, `planModel`, `changed`) were left behind here while
@@ -1098,12 +1102,28 @@ export interface ArcReviewReport {
   roundsConfigured?: number;
   roundsRun?: number;
   durationMs?: number;
-  /** Raw creation output: both arcs, both critiques, the commitment line. */
+  /** Raw creation output: the story logic, the arc and its critique. */
   create?: string;
   createPrompt?: string | null;
-  /** Which arc won (1 or 2), and the two arcs as separate blocks. */
-  committedArc?: number;
+  /** The block the panel read: the create's logic, arc and critique. */
   committed?: string;
+  /** The STORY LOGIC the final arc was told from, and the create's own (2026-09-24). */
+  logic?: string;
+  createLogic?: string;
+  /** The names the story logic gives the commission's central figure; null for none. */
+  centralFigure?: string[] | null;
+  /** Code counts per round (round 0 = the create), logged against their ranges. */
+  counts?: Array<{
+    round: number;
+    sentences: number;
+    sentenceRange: { lo: number; hi: number };
+    chainLinks: number;
+    chainRange: { lo: number; hi: number };
+    invented: string[];
+    inventedAllowance: number;
+  }>;
+  /** Stories before 2026-09-24 only: which of two arcs won, and the other one. */
+  committedArc?: number;
   discarded?: string;
   rounds?: ArcRound[];
   finalArc?: string;
