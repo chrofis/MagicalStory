@@ -59102,3 +59102,33 @@ checklist and the bbox labels are non-empty (source: prompt). Rung 2: see the La
 `tests/unit/cover-key-elements-secondary.test.ts`, `tests/unit/vb-cell-no-size.test.ts`,
 `tests/unit/prompt-says-each-thing-once.test.ts`, `tests/manual/test-cover-prompt-builder.js` (deleted).
 **Status:** ✅ active on staging.
+
+## 2026-09-24 — The database refuses a landmark photo-slot gap (migration 042)
+
+**Context.** Contiguous slots were fixed in code and data earlier today, but one of the two gap producers
+was one-off SQL, which no code fix reaches.
+
+**Decision (owner).** Migration 042 adds CHECK `landmark_photo_slots_contiguous` on `landmark_index`:
+for N = 1..5, `photo_url_N IS NOT NULL OR photo_url_{N+1} IS NULL` — "empty" is `photo_url[_N] IS NULL`,
+the column serving (`HAS_PHOTO_SQL`) and `hasSlotGap()` use. 0 violations on prod (7,401 rows) and
+staging (7,447) before it was written; applied inside a rolled-back transaction on staging it accepted
+the data, rejected a slot-1 NULL on a two-photo row and accepted clearing all six. Writers checked:
+`saveLandmarkToIndex` packs (packed input COALESCEd onto a packed row stays packed); both compaction
+scripts and the 2026-09-04 repair rewrite all six slots in one UPDATE; `storeLandmarkPhoto` and the
+classifiers touch only R2/type columns; the sync upserts every photo column of a (contiguous) prod row
+in one statement — a row-level CHECK sees only the row a statement leaves, so upsert order cannot trip
+it; single-slot writers (`add-iconic-landmarks`, `broad-city-overviews`, `reindex-missing-cities`)
+write slot 1 only. `fetch-landmark-photos-free.js` wrote slots 1..4 unconditionally on any row whose
+slot 1 was empty; it now fills the first empty slots after the existing photos (`planFreePhotoFill`),
+skips URLs the row already has, refuses a row with a gap, and guards the UPDATE on the target slots
+still being empty. Pinned by `tests/unit/landmark-photo-slot-constraint.test.ts` (the CHECK equals
+`hasSlotGap` over all 64 slot patterns).
+
+**Rollout.** Migrations run at boot (`server/services/migrate.js`), so 042 applies to staging on this
+push's deploy and to prod on the next approved master deploy. A prod gap created before then would make
+the prod boot fail loudly — re-check with `compact-landmark-slots.js --dry-run` just before that deploy.
+
+**Touched:** `migrations/042_landmark_photo_slots_contiguous.sql`,
+`scripts/admin/fetch-landmark-photos-free.js`, `scripts/admin/sync-landmark-index-to-staging.js`
+(exports COLUMNS), `tests/unit/landmark-photo-slot-constraint.test.ts`, `docs/landmark-database.md`.
+**Status:** ✅ staging; prod on the next master deploy.

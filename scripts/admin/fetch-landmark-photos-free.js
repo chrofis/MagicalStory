@@ -23,10 +23,6 @@
 'use strict';
 
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env') });
-const { Pool } = require('pg');
-// Same licence guard saveLandmarkToIndex applies — one definition, not two.
-const { isFreelyLicensedImageUrl } = require('../../server/lib/landmarkPhotos');
 const fs = require('fs');
 
 const args = process.argv.slice(2);
@@ -117,12 +113,40 @@ async function attributionFor(fileUrl) {
   }
 }
 
-(async () => {
+const MAX_SLOTS = 4;   // photos this script gives a landmark, counting what it already has
+const slotCol = (field, slot) => (slot === 1 ? field : `${field}_${slot}`);
+
+/**
+ * Which slots to write for one landmark: the first empty slots AFTER its
+ * existing photos, never an occupied one, up to MAX_SLOTS photos in all.
+ * URLs already on the row are skipped. Slots must stay contiguous from 1
+ * (migration 042 enforces it; a gap hides a landmark from serving), so a row
+ * that already has a gap is refused rather than extended. Pure.
+ *
+ * @param {Object} row landmark_index row with photo_url[_2..6]
+ * @param {string[]} urls candidate URLs, best first
+ * @returns {Array<{slot: number, url: string}>}
+ */
+function planFreePhotoFill(row, urls, max = MAX_SLOTS) {
+  const filled = [1, 2, 3, 4, 5, 6].map(s => row[slotCol('photo_url', s)] || null);
+  const count = filled.filter(Boolean).length;
+  if (filled.slice(0, count).some(u => !u)) throw new Error(`landmark ${row.id} has a photo-slot gap — run compact-landmark-slots.js first`);
+  const have = new Set(filled.filter(Boolean));
+  const fresh = [...new Set(urls)].filter(u => u && !have.has(u));
+  return fresh.slice(0, Math.max(0, max - count)).map((url, i) => ({ slot: count + 1 + i, url }));
+}
+
+async function main() {
+  require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env') });
+  const { Pool } = require('pg');
+  // Same licence guard saveLandmarkToIndex applies — one definition, not two.
+  const { isFreelyLicensedImageUrl } = require('../../server/lib/landmarkPhotos');
   const url = STAGING ? process.env.STAGING_DATABASE_URL : process.env.DATABASE_URL;
   const pool = new Pool({ connectionString: url, ssl: { rejectUnauthorized: false } });
 
   const rows = (await pool.query(
-    `SELECT id, name, type, lang, wikipedia_page_id, wikidata_qid, nearest_city
+    `SELECT id, name, type, lang, wikipedia_page_id, wikidata_qid, nearest_city,
+            photo_url, photo_url_2, photo_url_3, photo_url_4, photo_url_5, photo_url_6
        FROM landmark_index
       WHERE photo_url IS NULL AND NOT (coalesce(type, 'x') = ANY($1))
       ORDER BY id DESC${LIMIT ? ` LIMIT ${LIMIT}` : ''}`, [NEVER_A_SETTING])).rows;
@@ -149,21 +173,28 @@ async function attributionFor(fileUrl) {
       .filter((u, i, a) => a.indexOf(u) === i);
     if (!urls.length) { none++; await sleep(150); continue; }
 
+    const plan = planFreePhotoFill(l, urls);
+    if (!plan.length) { none++; await sleep(150); continue; }
     if (!DRY) {
       const cols = [];
       const vals = [l.id];
-      for (const [i, u] of urls.slice(0, 4).entries()) {
-        const s = i === 0 ? '' : `_${i + 1}`;
+      for (const { slot, url: u } of plan) {
         vals.push(u);
-        cols.push(`photo_url${s} = $${vals.length}`);
+        cols.push(`${slotCol('photo_url', slot)} = $${vals.length}`);
         // Credit travels with the picture, in the SAME slot — pairing one
         // slot's photo with another's author names the wrong photographer.
         vals.push(await attributionFor(u));
-        cols.push(`photo_attribution${s} = $${vals.length}`);
+        cols.push(`${slotCol('photo_attribution', slot)} = $${vals.length}`);
         await sleep(120);
       }
-      await pool.query(
-        `UPDATE landmark_index SET ${cols.join(', ')}, photo_source = 'wikipedia-lead', updated_at = NOW() WHERE id = $1`, vals);
+      // photo_source describes slot 1: set it only when slot 1 is ours.
+      if (plan[0].slot === 1) cols.push(`photo_source = 'wikipedia-lead'`);
+      // Guarded on every target slot still being empty: a slot filled since the
+      // read is left alone, never overwritten.
+      const guard = plan.map(p => `${slotCol('photo_url', p.slot)} IS NULL`).join(' AND ');
+      const r = await pool.query(
+        `UPDATE landmark_index SET ${cols.join(', ')}, updated_at = NOW() WHERE id = $1 AND ${guard}`, vals);
+      if (r.rowCount !== 1) { console.log(`  ${l.name}: slots changed since the read — skipped`); continue; }
     }
     gallery.push({ name: l.name, type: l.type, city: l.nearest_city, url: urls[0] });
     filled++;
@@ -187,4 +218,8 @@ figcaption{padding:7px 9px;font-size:12px}.t{color:#9aa0ad}</style>
     console.log(`gallery: ${out}`);
   }
   await pool.end();
-})().catch(e => { console.error('ERR:', e.message); process.exit(1); });
+}
+
+module.exports = { planFreePhotoFill };
+
+if (require.main === module) main().catch(e => { console.error('ERR:', e.message); process.exit(1); });

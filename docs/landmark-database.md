@@ -46,7 +46,7 @@ not drawn, so it always ranks below one that has a picture.
 Migrations: `020_landmark_photo_type`, `025_landmark_fame`,
 `028_landmark_municipality`, `029_landmark_story_score`,
 `031_landmark_photo_scores`, `032_landmark_locality`,
-`033_landmark_photo_framing`, `035_landmark_photo_r2`. **Schema changes go in a new `migrations/*.sql`
+`033_landmark_photo_framing`, `035_landmark_photo_r2`, `042_landmark_photo_slots_contiguous`. **Schema changes go in a new `migrations/*.sql`
 only** — the DDL in `database.js` never runs.
 
 ---
@@ -326,6 +326,12 @@ columns in place. `compact-landmark-slots.js` closes existing gaps with the
 same `planCompaction` + `writeCompaction` (`--dry-run`, JSON backup, one
 transaction per landmark, refuses to lose a photo or a score). On 2026-09-24 it
 fixed 68 prod landmarks, 17 of them with slot 1 empty (decisions.md, 2026-09-24).
+Since migration 042 the database enforces it: CHECK
+`landmark_photo_slots_contiguous` (slot N empty ⇒ slot N+1 empty, on
+`photo_url[_N]`) rejects any write that would leave a gap, one-off SQL
+included. Writers that add photos fill the first empty slots after the existing
+ones (`fetch-landmark-photos-free.js` → `planFreePhotoFill`, guarded on the
+target slots still being empty); to remove one, compact.
 
 **Photos**
 `backfill-landmark-photos.js` (uses `findBestLandmarkImage`; aborts on
