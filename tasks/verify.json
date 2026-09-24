@@ -327,6 +327,24 @@
       "backlog": "tasks/BACKLOG.md 'Verification pending' — over-the-shoulder / ultra-wide line (OTS accepted as is by the owner 2026-09-23; subject-size idea untried)"
     },
     {
+      "id": "plan-check-ots-contact",
+      "title": "The plan check flags an over-the-shoulder page on a contact beat, and the re-plan gives it another shot",
+      "commits": [],
+      "addedAt": "2026-09-24",
+      "claim": "An over-the-shoulder page on a contact beat is flagged by plan-check question 14 and replanned: no shipped over-the-shoulder page has an interaction with hands:true on its near figure.",
+      "runShape": [
+        "full-story",
+        "needs-shot:over-the-shoulder"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "otsCropAndNoContact"
+      },
+      "status": "pending",
+      "evidence": [],
+      "backlog": "tasks/BACKLOG.md 'Verification pending' — over-the-shoulder / ultra-wide line (same check as ots-crop-no-contact; a first division with an over-the-shoulder contact page should show a check-14 entry in beatsReviewReport.modelFindings)"
+    },
+    {
       "id": "idea-no-slot-labels",
       "title": "A generated idea reaches the story as prose, never a labelled 'Satz 1 — setup' list",
       "commits": [

@@ -9701,6 +9701,11 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHi
     // rule the text critics read (buildCriticArcHintsSection); question 13
     // checks where each landed.
     ARC_HINTS: buildCriticArcHintsSection(arcHints),
+    // Question 14: the planner's over-the-shoulder contact rule (story-beats.txt
+    // {OTS_NO_CONTACT}), the same constant. The planner ignored it on
+    // job_1790277448294_5herh01j7 p12 (an ear pressed to what the near figure
+    // faced) and the checker, never given it, could not raise it.
+    OTS_NO_CONTACT: OTS_NO_CONTACT_RULE,
 
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: beats.length,

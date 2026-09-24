@@ -156,6 +156,29 @@ describe('plan-check Q6 nominates the peopleless page, and the planner is told',
   });
 });
 
+/**
+ * The over-the-shoulder contact rule (shotVocabulary.OTS_NO_CONTACT_RULE) is one
+ * constant filled into both sides: the planner's {OTS_NO_CONTACT} and the
+ * checker's question 14. Before 2026-09-24 only the planner had it, and an OTS
+ * page on a contact beat passed the check (job_1790277448294_5herh01j7 p12).
+ */
+describe('the over-the-shoulder contact rule reaches planner and checker from one constant', () => {
+  beforeAll(async () => { await loadPromptTemplates(); });
+  const { OTS_NO_CONTACT_RULE } = require('../../server/lib/shotVocabulary');
+  const count = (hay: string, needle: string) => hay.split(needle).length - 1;
+
+  it('the built plan check carries it exactly once, with no unfilled placeholder', () => {
+    const p = String(checker());
+    expect(count(p, OTS_NO_CONTACT_RULE)).toBe(1);
+    expect(p).not.toContain('{OTS_NO_CONTACT}');
+    expect(p).not.toMatch(/\{[A-Z_]{3,}\}/);
+  });
+
+  it('the built planner carries the same constant', () => {
+    expect(String(planner())).toContain(OTS_NO_CONTACT_RULE);
+  });
+});
+
 describe('parsePlanCheckPeoplelessPick reads the line as data', () => {
   const parse = pb.parsePlanCheckPeoplelessPick;
 

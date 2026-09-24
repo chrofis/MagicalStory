@@ -59985,3 +59985,24 @@ combined message, so callers that classify refusals by message substring are una
 
 **Touched:** `server/lib/images.js`, `tests/unit/grok-fallback-logged.test.ts`.
 **Status:** ✅ active on staging.
+
+## 2026-09-24 — The plan check is given the over-the-shoulder contact rule
+
+**Context:** Staging job_1790277448294_5herh01j7 planned "Page 12: over-the-shoulder — Kiaan — Kiaan
+presses his ear against the egg shell". The planner is told not to (`OTS_NO_CONTACT_RULE`,
+`story-beats.txt` `{OTS_NO_CONTACT}`) and ignored it; the plan check, which triggers the re-plan, had
+never been given the rule, so the page shipped and `otsCropAndNoContact` failed on it.
+
+**Decision (owner, 2026-09-24):** `plan-check.txt` gains question 14, which fills the SAME constant
+(`{OTS_NO_CONTACT}` in `buildPlanCheckPrompt`) and asks the checker to name every over-the-shoulder page
+whose near figure touches what they face and ask for another shot. The finding reaches the re-plan like
+every other model finding. Classification stays in the prompt; no code reads the beat text. Q14 is not
+in `REPLAN_MUST_FIX_CHECKS`, so it arrives under ALSO NOTED — promoting it is a severity call left open.
+
+**Rationale:** a rule the planner is given and the checker is not is a rule nothing enforces. One
+constant on both sides keeps generator and critic from drifting (`beats-planner-vs-plan-check`).
+
+**Touched:** `prompts/plan-check.txt`, `server/lib/promptBuilders.js`,
+`tests/unit/plan-shared-definitions.test.ts`, `scripts/admin/sibling-registry.json`, `tasks/verify.json`
+(`plan-check-ots-contact`).
+**Status:** ✅ committed, not pushed.
