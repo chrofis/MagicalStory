@@ -6336,7 +6336,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           description: img.sceneDescription,
           sceneDescription: img.sceneDescription,  // alias for backward compat
           // sceneMetadata carries the parsed setting.location + characters[].id
-          // + objects[].id + landmarkVariants the page render actually used.
+          // + objects[].id the page render actually used.
           // Without persisting it, the dev panel + downstream consumers had
           // to re-run extractSceneMetadata to recover the per-page VB tags,
           // and the UI showed empty for every trial page even though the
