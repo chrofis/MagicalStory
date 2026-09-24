@@ -1909,7 +1909,7 @@
       "impact": "The repair panel showed a number different from the stored score; redo decisions ran on it.",
       "status": "fixed",
       "fixedAt": "2026-09-24",
-      "fixedIn": "PENDING",
+      "fixedIn": "0765b1305",
       "fix": "scoring.entityIssuesForPage is the one entity reader (pipeline + route); the route stamps the evaluator result unmodified and returns finalScore/evalScore/entityPenalty/entity deductions from the stamped version; client reads the stored finalScore. Pinned by tests/unit/reevaluate-canonical-score.test.ts."
     }
   ]
