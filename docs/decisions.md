@@ -58756,3 +58756,35 @@ the canonical scorer. Pinned by `tests/unit/reevaluate-canonical-score.test.ts`.
 `client/src/components/generation/RepairWorkflowPanel.tsx`, `client/src/types/story.ts`,
 `client/src/services/storyService.ts`, `tests/unit/reevaluate-canonical-score.test.ts`.
 **Status:** ✅ active.
+
+## 2026-09-24 — Landmark photo slots are contiguous from slot 1; the indexer packs them, gaps are compacted
+
+**Context.** 68 prod landmarks had an empty photo slot followed by a filled one; 17 had slot 1 empty,
+which makes them invisible: every serving query filters on `photo_url IS NOT NULL` (slot 1), so
+Stadtturm (Baden, story_score 85), Wildnispark Zürich (72), Johanneskirche Bern (62) and the Zollmuseum
+(60) were never offered despite judged, usable photos. Two producers, read off the stored layouts:
+- **51 landmarks — the indexer's layout** (`indexLandmarksForCity`): exteriors to slots 1-3, interiors to
+  4-6, so any landmark with fewer than three exteriors got a hole (`XX.XX.`, `X..X..`, `...X..` — no
+  exterior at all means slot 1 empty). Still live: rows created 2026-09-06..09-23 had the same gaps.
+  A non-free URL dropped by `saveLandmarkToIndex`'s licence check left its slot empty the same way.
+- **17 landmarks — slots cleared in place** (`.X....`, `X.X...`, `.XXX..`): the 2026-09-01 non-free-image
+  cleanup (commit b38bad6b7, "url, description and credit cleared together") was ad-hoc SQL that NULLed
+  the columns without shifting the later slots or dropping the slot's score rows — the six corporate
+  logos it names (a bank, a tennis open, an airfield…) are exactly the landmarks whose orphaned slot-1
+  scores were removed earlier today.
+
+**Decision (owner, 2026-09-24).** Slots are contiguous from 1; position means nothing, `photo_type`
+carries interior/exterior. `saveLandmarkToIndex` packs its six slots (`packLandmarkPhotoSlots`, each
+photo with its own credit, description and kind), and the indexer now sets `photoType` on each photo.
+A photo is removed only by a compaction, never by NULLing columns. `merge-landmark-descriptions.js`'s
+compaction write is extracted as `writeCompaction` and reused by the new `compact-landmark-slots.js`
+(planCompaction with no discards): dry-run, JSON backup, one transaction per landmark, refuses to lose a
+photo or a score, checks the derived story score did not move (renumbering cannot change
+MAX(draw)/MAX(photo)). Run on prod: 68 compacted, 0 rolled back, 197 score rows re-keyed; mirrored to
+staging (79 stale slot-keyed score rows replaced). A DB CHECK constraint would also stop ad-hoc SQL
+from leaving a gap; not added — a schema change for the owner to decide.
+
+**Touched:** `server/lib/landmarkPhotos.js`, `scripts/admin/merge-landmark-descriptions.js`,
+`scripts/admin/compact-landmark-slots.js`, `tests/unit/landmark-photo-slots-contiguous.test.ts`,
+`docs/landmark-database.md`.
+**Status:** ✅ active.

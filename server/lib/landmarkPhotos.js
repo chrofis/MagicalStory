@@ -3195,6 +3195,33 @@ function isFreelyLicensedImageUrl(url) {
   return !/upload\.wikimedia\.org\/wikipedia\//.test(u);           // non-Wikimedia sources unaffected
 }
 
+/**
+ * The six photo slots of a landmark object, PACKED: every slot whose photo
+ * survives `normalize` (empty values and non-free URLs drop out), in slot
+ * order, then empty slots. Each photo keeps its own attribution, description
+ * and kind.
+ *
+ * Slots must be contiguous: every serving query filters on slot 1
+ * (HAS_PHOTO_SQL), so a landmark whose slot 1 is empty is invisible however
+ * good its later photos are. The indexer used to write exteriors to slots 1-3
+ * and interiors to 4-6, and a non-free URL dropped here left its slot empty —
+ * 68 prod landmarks had gaps, 17 of them an empty slot 1 (2026-09-24). Where a
+ * photo sits no longer says what it shows; photo_type does.
+ */
+const _SLOT_FIELD_KEYS = [1, 2, 3, 4, 5, 6].map(n => (n === 1
+  ? { url: ['photoUrl', 'photo_url'], attribution: ['attribution', 'photo_attribution'], description: ['photoDescription', 'photo_description'], type: ['photoType', 'photo_type'] }
+  : { url: [`photoUrl${n}`, `photo_url_${n}`], attribution: [`attribution${n}`, `photo_attribution_${n}`], description: [`photoDescription${n}`, `photo_description_${n}`], type: [`photoType${n}`, `photo_type_${n}`] }));
+function packLandmarkPhotoSlots(landmark, normalize) {
+  const pick = keys => keys.map(k => landmark[k]).find(v => v) || null;
+  const photos = _SLOT_FIELD_KEYS.map(k => ({
+    url: normalize(pick(k.url)),
+    attribution: normalize(pick(k.attribution)),
+    description: normalize(pick(k.description)),
+    type: normalizePhotoKind(pick(k.type)),
+  })).filter(p => p.url);
+  return Array.from({ length: 6 }, (_, i) => photos[i] || { url: null, attribution: null, description: null, type: null });
+}
+
 async function saveLandmarkToIndex(landmark) {
   const pool = getPool();
   if (!pool) return false;
@@ -3212,6 +3239,7 @@ async function saveLandmarkToIndex(landmark) {
     }
     return v;
   };
+  const slots = packLandmarkPhotoSlots(landmark, normalize);
 
   try {
     await pool.query(`
@@ -3275,31 +3303,16 @@ async function saveLandmarkToIndex(landmark) {
       normalize(landmark.type),
       landmark.boostAmount || landmark.boost_amount || 0,
       landmark.categories || [],
-      normalize(landmark.photoUrl || landmark.photo_url),
-      normalize(landmark.attribution || landmark.photo_attribution),
+      slots[0].url,
+      slots[0].attribution,
       normalize(landmark.source || landmark.photo_source) || 'wikimedia',
-      normalize(landmark.photoDescription || landmark.photo_description),
-      normalizePhotoKind(landmark.photoType || landmark.photo_type),
-      normalize(landmark.photoUrl2 || landmark.photo_url_2),
-      normalize(landmark.attribution2 || landmark.photo_attribution_2),
-      normalize(landmark.photoDescription2 || landmark.photo_description_2),
-      normalizePhotoKind(landmark.photoType2 || landmark.photo_type_2),
-      normalize(landmark.photoUrl3 || landmark.photo_url_3),
-      normalize(landmark.attribution3 || landmark.photo_attribution_3),
-      normalize(landmark.photoDescription3 || landmark.photo_description_3),
-      normalizePhotoKind(landmark.photoType3 || landmark.photo_type_3),
-      normalize(landmark.photoUrl4 || landmark.photo_url_4),
-      normalize(landmark.attribution4 || landmark.photo_attribution_4),
-      normalize(landmark.photoDescription4 || landmark.photo_description_4),
-      normalizePhotoKind(landmark.photoType4 || landmark.photo_type_4),
-      normalize(landmark.photoUrl5 || landmark.photo_url_5),
-      normalize(landmark.attribution5 || landmark.photo_attribution_5),
-      normalize(landmark.photoDescription5 || landmark.photo_description_5),
-      normalizePhotoKind(landmark.photoType5 || landmark.photo_type_5),
-      normalize(landmark.photoUrl6 || landmark.photo_url_6),
-      normalize(landmark.attribution6 || landmark.photo_attribution_6),
-      normalize(landmark.photoDescription6 || landmark.photo_description_6),
-      normalizePhotoKind(landmark.photoType6 || landmark.photo_type_6),
+      slots[0].description,
+      slots[0].type,
+      slots[1].url, slots[1].attribution, slots[1].description, slots[1].type,
+      slots[2].url, slots[2].attribution, slots[2].description, slots[2].type,
+      slots[3].url, slots[3].attribution, slots[3].description, slots[3].type,
+      slots[4].url, slots[4].attribution, slots[4].description, slots[4].type,
+      slots[5].url, slots[5].attribution, slots[5].description, slots[5].type,
       normalize(stripLandmarkAbbreviations(landmark.wikipediaExtract || landmark.wikipedia_extract)),
       landmark.commonsPhotoCount || landmark.commons_photo_count || 0,
       landmark.score || 0
@@ -3546,6 +3559,7 @@ async function indexLandmarksForCities(options = {}) {
                   landmark.photoUrl = exteriorImages[0].url;
                   landmark.attribution = exteriorImages[0].attribution;
                   landmark.photoDescription = exteriorImages[0].description;
+                  landmark.photoType = 'exterior';
                   landmark.photoScore = exteriorImages[0].score;
                   landmark.photoSource = bestResult.source;
                 }
@@ -3553,28 +3567,35 @@ async function indexLandmarksForCities(options = {}) {
                   landmark.photoUrl2 = exteriorImages[1].url;
                   landmark.attribution2 = exteriorImages[1].attribution;
                   landmark.photoDescription2 = exteriorImages[1].description;
+                  landmark.photoType2 = 'exterior';
                 }
                 if (exteriorImages.length > 2) {
                   landmark.photoUrl3 = exteriorImages[2].url;
                   landmark.attribution3 = exteriorImages[2].attribution;
                   landmark.photoDescription3 = exteriorImages[2].description;
+                  landmark.photoType3 = 'exterior';
                 }
 
-                // Save interior images (photo_url_4, photo_url_5, photo_url_6) - 3 variants
+                // Interior images (photo_url_4..6). saveLandmarkToIndex packs the
+                // slots, so fewer than three exteriors move these down; the
+                // photoType set on each keeps what the photo shows.
                 if (interiorImages.length > 0) {
                   landmark.photoUrl4 = interiorImages[0].url;
                   landmark.attribution4 = interiorImages[0].attribution;
                   landmark.photoDescription4 = interiorImages[0].description;
+                  landmark.photoType4 = 'interior';
                 }
                 if (interiorImages.length > 1) {
                   landmark.photoUrl5 = interiorImages[1].url;
                   landmark.attribution5 = interiorImages[1].attribution;
                   landmark.photoDescription5 = interiorImages[1].description;
+                  landmark.photoType5 = 'interior';
                 }
                 if (interiorImages.length > 2) {
                   landmark.photoUrl6 = interiorImages[2].url;
                   landmark.attribution6 = interiorImages[2].attribution;
                   landmark.photoDescription6 = interiorImages[2].description;
+                  landmark.photoType6 = 'interior';
                 }
 
                 // Add to landmark score based on photo quality
@@ -4357,6 +4378,7 @@ module.exports = {
 
   // Indexed landmarks (works for any city worldwide)
   getLandmarkPhotoOnDemand,
+  packLandmarkPhotoSlots,
   getIndexedLandmarksNearLocation,
   getIndexedLandmarks,
   getAllIndexedLandmarks,

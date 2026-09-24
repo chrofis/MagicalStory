@@ -133,6 +133,31 @@ function planCompaction(row, discards, kept) {
   return { filled, survivors, newSlotOf, layout, dropSlots, textAt, skipped };
 }
 
+// Writes a compaction plan inside the caller's transaction: all six slots of
+// every per-slot column rewritten from plan.layout, and the landmark's score
+// rows re-keyed to their photo's new slot (a score whose photo was dropped
+// goes). `scores` are the landmark's live landmark_photo_scores rows, read
+// under the same lock. Returns the number of score rows written.
+async function writeCompaction(client, id, plan, scores) {
+  const sets = [], vals = [id];
+  for (const l of plan.layout) for (const f of SLOT_FIELDS) { vals.push(l.values[f]); sets.push(`${colName(f, l.slot)} = $${vals.length}`); }
+  const u = await client.query(`UPDATE landmark_index SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $1`, vals);
+  if (u.rowCount !== 1) throw new Error(`landmark ${id}: UPDATE touched ${u.rowCount} rows`);
+
+  // Scores: drop every row for the landmark, re-insert survivors at their new slot.
+  await client.query(`DELETE FROM landmark_photo_scores WHERE landmark_id = $1`, [id]);
+  let n = 0;
+  for (const sr of scores) {
+    const ns = plan.newSlotOf[sr.slot];
+    if (!ns) continue;
+    await client.query(
+      `INSERT INTO landmark_photo_scores (landmark_id, slot, draw_score, photo_score, reason, judged_at, framing) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [id, ns, sr.draw_score, sr.photo_score, sr.reason, sr.judged_at, sr.framing]);
+    n++;
+  }
+  return n;
+}
+
 // Returns a reason string when the entry is malformed, else null.
 function validate(v) {
   if (!v || typeof v !== 'object') return 'not an object';
@@ -314,19 +339,7 @@ async function main() {
         await client.query('ROLLBACK'); skipped += plan.skipped.length; continue;
       }
 
-      const sets = [], vals = [id];
-      for (const l of plan.layout) for (const f of SLOT_FIELDS) { vals.push(l.values[f]); sets.push(`${colName(f, l.slot)} = $${vals.length}`); }
-      await client.query(`UPDATE landmark_index SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $1`, vals);
-
-      // Scores: drop every row for the landmark, re-insert survivors at their new slot.
-      await client.query(`DELETE FROM landmark_photo_scores WHERE landmark_id = $1`, [id]);
-      for (const sr of liveRows[id].scores) {
-        const ns = plan.newSlotOf[sr.slot];
-        if (!ns) continue;
-        await client.query(
-          `INSERT INTO landmark_photo_scores (landmark_id, slot, draw_score, photo_score, reason, judged_at, framing) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-          [id, ns, sr.draw_score, sr.photo_score, sr.reason, sr.judged_at, sr.framing]);
-      }
+      await writeCompaction(client, id, plan, liveRows[id].scores);
       // R2 objects of the discarded slots, read from the locked row BEFORE the
       // UPDATE overwrote the columns; deleted only once the commit is in.
       const droppedR2 = [...plan.dropSlots].map(s => liveRows[id][colName('photo_r2_url', s)]).filter(Boolean);
@@ -351,5 +364,5 @@ async function main() {
   if (failed) process.exit(1);
 }
 
-module.exports = { planCompaction, liveSlotOf, colName, SLOT_FIELDS };
+module.exports = { planCompaction, writeCompaction, liveSlotOf, colName, SLOT_FIELDS };
 if (require.main === module) main().catch(e => { console.error('ERR:', e.message); process.exit(1); });
