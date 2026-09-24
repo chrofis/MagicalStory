@@ -1,0 +1,811 @@
+{
+  "_readme": "VERIFICATION REGISTRY. A behaviour change whose proof needs a story run gets an entry here in the same push (pre-push gate scripts/admin/check-verify-coupling.js; escape: a `Verify: none (<reason>)` or `Verify: <entry-id>` commit trailer). After ANY validation run: `node scripts/admin/verify-run.js <storyId> [--env=prod] --write` judges every pending entry against that stored run and prints CONFIRMED / FAILED / HUMAN / NOT COVERED. A run is evidence only for commits its recorded build (stories.data.analytics.build.commitFull) contains; an absent run shape (no over-the-shoulder page, no iterate repair ...) is NOT COVERED, never a pass. Fields: id; title; commits (every one must be in the run's build); addedAt; claim (what a new run must show, one sentence); runShape (all must hold: any | full-story | trial | age-band:N (or N|M) | needs-shot:<shot> | needs-iterate-repair | needs-char-fix | needs-inpaint | needs-fresh-idea | needs-worn-off | needs-fresh-avatar-sheet | needs-composite — defined in scripts/admin/verify-checks.js SHAPES); check ({kind:'auto', fn} names a function in verify-checks.js, {kind:'human', what} says what to look at); status (pending | confirmed | failed | superseded); evidence[] (appended by verify-run.js --write or --mark; never edited by hand, never deleted). An auto FAILED stays pending and is printed loudly; only a human --mark sets failed. Entries are never deleted: a change that is replaced becomes superseded with a note.",
+  "entries": [
+    {
+      "id": "aerial-not-owed",
+      "title": "The aerial shot is allowed, never owed; the camera-position total is unchanged",
+      "commits": [
+        "147ce6a96"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "The page planner's prompt names no aerial floor and the plan counters raise no SHOT_AERIAL_COUNT, while the book still carries its camera-position pages.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "aerialNotOwed"
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "lettering-check-findings",
+      "title": "Unrequested lettering on a page becomes a rendered_text finding in code",
+      "commits": [
+        "1d4f1bcf1",
+        "67c617743"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "Readable writing a page did not declare is stored as a rendered_text finding with source lettering-check, its severity set by the inventory's placement/spelling class (overlay or misspelled CRITICAL, belonging sign silent).",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "letteringFindings"
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "sceneintent-no-mood-tag",
+      "title": "sceneIntent no longer ends on a verbless mood tag (the sentence that became a painted caption)",
+      "commits": [
+        "67c617743"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "At most 10% of briefs end sceneIntent on a sentence carrying mood/atmosphere/tension/standoff/feeling (measured baseline 36/177 = 20%).",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "sceneIntentMoodTag"
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "emotion-enum",
+      "title": "Emotion is one enum on both sides, compared in code",
+      "commits": [
+        "3d8f4871d"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "At least 90% of brief characters[] rows carry an emotion from the closed list, emotion-check findings appear with code-set severity, and every CRITICAL one is a real opposite-tone face (human look: false-CRITICAL risk).",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "emotionEnum"
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "arc-sense-lens",
+      "title": "The arc panel's SENSE lens: anything a reader would stop at is a fault",
+      "commits": [
+        "a11662c21",
+        "725a4cd45"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "The arc panel runs with the SENSE lens and its faults name turns the arc's own facts contradict (a lost thing its size would find at once, an avoidable danger); human read of the panel output.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "arcSenseLens"
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "size-look-rule",
+      "title": "Sizes and looks leave the arc and the plan; the prose makes no size comparison",
+      "commits": [
+        "2e696f6ed"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "The final arc, the page plan and the page text contain no size comparison ('as big as', 'the size of', '-sized', 'so gross wie', compound '-gross' ...); run 6 had several in each.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "sizeComparisons"
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "vb-cell-no-scale",
+      "title": "A Visual Bible description states no scale; page-side readers add it via withScaleNote",
+      "commits": [
+        "728494663",
+        "4434e7ca9"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "No newly authored Visual Bible animal description contains a SCALE_PHRASES string (run 6: 'stands knee-high to an adult' etc. in every animal).",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "vbCellNoScale"
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "ultra-wide-derived-plate",
+      "title": "An ultra-wide page on a shared vantage gets a derived plate pulled back to a size, and the page records it",
+      "commits": [
+        "b2751c799",
+        "5beac7c16"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "Every ultra-wide page sharing a vantage carries plateDerivedFor 'ultra-wide', its emptyScenePrompt carries the sized pull-back, and the plate image is visibly pulled far back from the base plate of the same place (human look).",
+      "runShape": [
+        "full-story",
+        "needs-shot:ultra-wide"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "ultraWideDerivedPlate"
+      },
+      "status": "pending",
+      "evidence": [],
+      "backlog": "tasks/BACKLOG.md 'Verification pending' — over-the-shoulder / ultra-wide line"
+    },
+    {
+      "id": "ots-crop-no-contact",
+      "title": "Over-the-shoulder: the near figure is a crop with the camera behind it, never on a contact page",
+      "commits": [
+        "50e150c21",
+        "be213ec9a"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "Every over-the-shoulder page gives its near figure perspective over-the-shoulder, the built image prompt carries the crop directive, the near figure touches nothing (no hands:true interaction), and the image shows the camera behind a cropped head and shoulder with the subject small and deep (human look).",
+      "runShape": [
+        "full-story",
+        "needs-shot:over-the-shoulder"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "otsCropAndNoContact"
+      },
+      "status": "pending",
+      "evidence": [],
+      "backlog": "tasks/BACKLOG.md 'Verification pending' — over-the-shoulder / ultra-wide line (OTS accepted as is by the owner 2026-09-23; subject-size idea untried)"
+    },
+    {
+      "id": "idea-no-slot-labels",
+      "title": "A generated idea reaches the story as prose, never a labelled 'Satz 1 — setup' list",
+      "commits": [
+        "1d6598368"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "The stored idea (idea_original / idea_used) of a run started from a generated idea carries no 'Satz N —' / slot label.",
+      "runShape": [
+        "needs-fresh-idea"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "ideaNoSlotLabels"
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "iterate-cast-from-rewrite",
+      "title": "An iterate rewrite's characters[] is the cast; parent VB citations are carried",
+      "commits": [
+        "32dce4da9"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "Every iterate version's sceneCharacters is a subset of its rewritten brief's characters[] (run 6 p17 drew four absent boys' reference cards).",
+      "runShape": [
+        "needs-iterate-repair"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "iterateCastFromRewrite"
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "char-fix-no-judge-text",
+      "title": "The char-fix prompt carries the finding's type as a fixed phrase, never the judge's sentence",
+      "commits": [
+        "319fa6054"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "No char-fix version prompt contains an 'Issues to fix:' judge sentence; defects appear only as 'Defect to fix:' fixed phrases.",
+      "runShape": [
+        "needs-char-fix"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "charFixNoJudgeText"
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "worn-off-grid",
+      "title": "A garment off by design is never charged as missing: the entity grid reads the page's worn state",
+      "commits": [
+        "17bbd887a"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "Every page where a character's garment is 'off' appears in that character's '--off:<id>' entity grid, never in the wearing grid.",
+      "runShape": [
+        "needs-worn-off"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "wornOffGrid"
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "diff-pass-ledger",
+      "title": "The text diff pass sees the findings the repair answered and invents no sentence",
+      "commits": [
+        "5a4672c7a"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "The stored diff prompt carries 'FINDINGS THE REWRITE ANSWERED' per page, and no applied diff correction introduces a sentence neither BEFORE nor AFTER had (human read of any the measure flags).",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "diffPassLedger"
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "text-style-rulebook",
+      "title": "One style rulebook for every prose pass; blind STYLE audit; motive at the act; ending on the act; the repair may decline",
+      "commits": [
+        "6d75a7efc",
+        "2da73ff15",
+        "668ab8809",
+        "f3f0b1af2"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "The blind audit files FAULT[STYLE] lines, the repair analysis names any finding it declines, and the final text has no bare narration fragments, no paired negations and ends on a concrete act (human read of the counts the check lists).",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "styleAuditAndDecline"
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "repair-descriptor-no-names",
+      "title": "One helper says WHO a fix is about; no cast name or age/gender fallback reaches the image model",
+      "commits": [
+        "dbdc6b1c2"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "No inpaint instruction names a cast character or uses 'the N-year-old male/female figure'; figures are identified by age noun, garment and position.",
+      "runShape": [
+        "needs-inpaint"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "repairDescriptorNoNames"
+      },
+      "status": "confirmed",
+      "evidence": [
+        {
+          "storyId": "job_1790100385959_1nitlympp",
+          "env": "staging",
+          "build": "b03c64b03abbfc5eaa6c2747267026eeeedbd8d3",
+          "runDate": "2026-09-22 20:06:26 CH",
+          "checkedAt": "2026-09-24 14:52:54 CH",
+          "result": "CONFIRMED",
+          "note": "7 inpaint instruction(s), no cast name, no fallback descriptor; outside this entry, a creature NAME reached Grok: p13 v1 Turi"
+        }
+      ]
+    },
+    {
+      "id": "grouped-face-fix-clothing",
+      "title": "A grouped face fix identifies each child by clothing and states the expression to remove AND to show",
+      "commits": [
+        "d49cbf0e0"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "Every multi-face emotion scene_fix names no cast character and gives each clause both a remove and a show half; the repainted faces show the declared beat (human look).",
+      "runShape": [
+        "needs-inpaint"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "groupedFaceFix"
+      },
+      "status": "pending",
+      "evidence": [
+        {
+          "storyId": "job_1790100385959_1nitlympp",
+          "env": "staging",
+          "build": "b03c64b03abbfc5eaa6c2747267026eeeedbd8d3",
+          "runDate": "2026-09-22 20:06:26 CH",
+          "checkedAt": "2026-09-24 14:52:54 CH",
+          "result": "HUMAN",
+          "note": "1 grouped face fix(es): clothing identifiers, remove + show per clause | LOOK: did the faces change as asked? p9 https://images-staging.magicalstory.ch/stories/job_1790100385959_1nitlympp/scene/p9/v0.jpg"
+        }
+      ]
+    },
+    {
+      "id": "arc-create-max-retell-medium",
+      "title": "Arc create at effort max, re-tell at medium (staging trial)",
+      "commits": [
+        "e4d4fe113"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "Arcs from create=max / retell=medium read at least as well as the high/high arcs at an acceptable cost; owner read before any master push, and whether the re-tell can be skipped.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "arcEffortCost"
+      },
+      "status": "pending",
+      "evidence": [],
+      "backlog": "tasks/BACKLOG.md 'Verification pending' — Arc create max / re-tell medium"
+    },
+    {
+      "id": "vb-element-overflow-remeasure",
+      "title": "Re-measure vb_element_overflow at birth on a post-trim-fix story before deciding how to count it",
+      "commits": [
+        "c16838db7"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "The number of pages over the VB element budget after the scene review is measured on a story whose bible trim was persisted; the owner then decides one-side counting vs AD citing from trimmed claims.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "vbElementOverflowCount"
+      },
+      "status": "pending",
+      "evidence": [
+        {
+          "storyId": "job_1790100385959_1nitlympp",
+          "env": "staging",
+          "build": "b03c64b03abbfc5eaa6c2747267026eeeedbd8d3",
+          "runDate": "2026-09-22 20:06:26 CH",
+          "checkedAt": "2026-09-24 14:52:54 CH",
+          "result": "HUMAN",
+          "note": "4/18 pages over the VB element budget after the scene review (p9: 5, p11: 5, p12: 5, p16: 5) | LOOK: owner decision: count one side, or make the AD cite from the trimmed claims (docs/decisions.md 2026-09-08 \"Art Director second pass\")"
+        }
+      ],
+      "backlog": "tasks/BACKLOG.md 'Verification pending' — vb_element_overflow at birth"
+    },
+    {
+      "id": "facing-per-character-remeasure",
+      "title": "facing_not_per_character fixes on crowded pages",
+      "commits": [
+        "52ba34d61"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "On pages with three or more figures, every figure whose characters[] row declares a perspective has its facing inside its own prose clause after the scene review.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "sceneReviewReport.analysis [facing_not_per_character] lines and briefUnfixed; then read sceneDescription of each 3+-figure page for a per-figure facing clause"
+      },
+      "status": "pending",
+      "evidence": [
+        {
+          "storyId": "job_1790100385959_1nitlympp",
+          "env": "staging",
+          "build": "b03c64b03abbfc5eaa6c2747267026eeeedbd8d3",
+          "runDate": "2026-09-22 20:06:26 CH",
+          "checkedAt": "2026-09-24 14:52:54 CH",
+          "result": "HUMAN",
+          "note": "human check | LOOK: sceneReviewReport.analysis [facing_not_per_character] lines and briefUnfixed; then read sceneDescription of each 3+-figure page for a per-figure facing clause"
+        }
+      ],
+      "backlog": "tasks/BACKLOG.md 'Verification pending' — facing_not_per_character"
+    },
+    {
+      "id": "trial-prompt-parity",
+      "title": "Trial prompt parity: page-opening variety, AD composition, creature tone, interactions[] on a real trial",
+      "commits": [
+        "5dee460e0"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "On a trial run at most 35% of pages open on a character name (baseline 45-48%) and every built page prompt carries EXACT POSES.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "trialPromptParity"
+      },
+      "status": "pending",
+      "evidence": [],
+      "backlog": "tasks/BACKLOG.md 'Verification pending' — Trial prompt parity"
+    },
+    {
+      "id": "trial-plate-per-vantage",
+      "title": "The trial renders one backdrop plate per vantage, not per page",
+      "commits": [
+        "bc8c55dd6"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "Trial pages that share a vantageId share one plate prompt.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "trialPlatePerVantage"
+      },
+      "status": "pending",
+      "evidence": [],
+      "backlog": "tasks/BACKLOG.md 'Verification pending' — 2026-09-13 commits line"
+    },
+    {
+      "id": "trial-plate-names-reference",
+      "title": "The trial plate prompt says what its attached reference IS",
+      "commits": [
+        "286086573"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "A trial page's plate prompt names what the attached reference image is, and the plate follows it.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "read each trial page's emptyScenePrompt for the sentence naming the attached reference; look at the plate (story_images empty_scene) against its landmark photo"
+      },
+      "status": "pending",
+      "evidence": [],
+      "backlog": "tasks/BACKLOG.md 'Verification pending' — 2026-09-13 commits line"
+    },
+    {
+      "id": "trial-sheet-season",
+      "title": "The trial avatar sheet is drawn for the story's season",
+      "commits": [
+        "d3771bf2c"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "A trial's avatar sheet wears clothing for the story's season.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "compare stories.data.season with the trial's styled avatar sheet (styledAvatarGeneration[].output / characterAvatars)"
+      },
+      "status": "pending",
+      "evidence": [],
+      "backlog": "tasks/BACKLOG.md 'Verification pending' — 2026-09-13 commits line"
+    },
+    {
+      "id": "avatar-sheet-shod",
+      "title": "The reference sheet states that the figure is shod",
+      "commits": [
+        "6643fef69"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "A freshly generated 2x4 styled avatar sheet shows footwear on every full-body pose.",
+      "runShape": [
+        "needs-fresh-avatar-sheet"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "open each styledAvatarGeneration[] output of this run and check the feet on every full-body cell"
+      },
+      "status": "pending",
+      "evidence": [
+        {
+          "storyId": "job_1790100385959_1nitlympp",
+          "env": "staging",
+          "build": "b03c64b03abbfc5eaa6c2747267026eeeedbd8d3",
+          "runDate": "2026-09-22 20:06:26 CH",
+          "checkedAt": "2026-09-24 14:52:54 CH",
+          "result": "HUMAN",
+          "note": "human check | LOOK: open each styledAvatarGeneration[] output of this run and check the feet on every full-body cell"
+        }
+      ],
+      "backlog": "tasks/BACKLOG.md 'Verification pending' — 2026-09-13 commits line"
+    },
+    {
+      "id": "landmark-list-licence",
+      "title": "The available-landmarks list is the only licence to tag a real landmark (writer templates)",
+      "commits": [
+        "3175f451b"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "Superseded: its three target templates no longer carry the text (two deleted by c3e92e2f0); the behaviour lives in scene-expansion-all.txt via adf6d38ee.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "none — superseded"
+      },
+      "status": "superseded",
+      "evidence": [],
+      "backlog": "tasks/BACKLOG.md 'Verification pending' — 2026-09-13 commits line"
+    },
+    {
+      "id": "unified-ad-composition",
+      "title": "The unified writer's AD composition rules (AD_COMPOSITION_RULE in the unified twins)",
+      "commits": [
+        "3d28c6e45"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "Superseded: prompts/story-unified.txt and story-unified-imagefirst.txt were deleted; beats and trial prompts were byte-identical before and after, so no live path moved.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "none — superseded"
+      },
+      "status": "superseded",
+      "evidence": [],
+      "backlog": "tasks/BACKLOG.md 'Verification pending' — unified writer composition rules"
+    },
+    {
+      "id": "age-band-1",
+      "title": "Age-band plot mode at age 1 (unrun)",
+      "commits": [
+        "bae4d540d"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "A trial for a one-year-old reads as the age-1 plot mode (simple, cause-and-effect, no peril) with an age-true drawn child.",
+      "runShape": [
+        "trial",
+        "age-band:1"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "read the story text and look at the pages for age fit (demo-agebands@ family; needs its own rotation entry)"
+      },
+      "status": "pending",
+      "evidence": [],
+      "backlog": "tasks/BACKLOG.md 'Verification pending' — Five age bands unrun"
+    },
+    {
+      "id": "age-band-2",
+      "title": "Age-band plot mode at age 2 (unrun)",
+      "commits": [
+        "bae4d540d"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "A trial for a two-year-old reads as the age-2 plot mode with an age-true drawn child.",
+      "runShape": [
+        "trial",
+        "age-band:2"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "read the story text and look at the pages for age fit"
+      },
+      "status": "pending",
+      "evidence": [],
+      "backlog": "tasks/BACKLOG.md 'Verification pending' — Five age bands unrun"
+    },
+    {
+      "id": "age-band-4",
+      "title": "Age-band plot mode at age 4 (unrun)",
+      "commits": [
+        "bae4d540d"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "A trial for a four-year-old reads as the age-4 plot mode with an age-true drawn child.",
+      "runShape": [
+        "trial",
+        "age-band:4"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "read the story text and look at the pages for age fit"
+      },
+      "status": "pending",
+      "evidence": [],
+      "backlog": "tasks/BACKLOG.md 'Verification pending' — Five age bands unrun"
+    },
+    {
+      "id": "age-band-5",
+      "title": "Age-band plot mode at age 5 (unrun)",
+      "commits": [
+        "bae4d540d"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "A trial for a five-year-old reads as the age-5 plot mode with an age-true drawn child.",
+      "runShape": [
+        "trial",
+        "age-band:5"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "read the story text and look at the pages for age fit"
+      },
+      "status": "pending",
+      "evidence": [],
+      "backlog": "tasks/BACKLOG.md 'Verification pending' — Five age bands unrun"
+    },
+    {
+      "id": "age-band-control",
+      "title": "Age-band plot mode control at age 8 or 12 (unrun)",
+      "commits": [
+        "bae4d540d"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "A trial for an eight- or twelve-year-old reads as its older plot mode; mark it on either age.",
+      "runShape": [
+        "trial",
+        "age-band:8|12"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "read the story text and look at the pages for age fit"
+      },
+      "status": "pending",
+      "evidence": [],
+      "backlog": "tasks/BACKLOG.md 'Verification pending' — Five age bands unrun"
+    },
+    {
+      "id": "avatars-before-pages",
+      "title": "T5: styled avatars complete before page generation (run-level proof)",
+      "commits": [],
+      "addedAt": "2026-09-24",
+      "claim": "The last styled avatar of the run is finished before the page-image stage starts.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "avatarsBeforePages"
+      },
+      "status": "confirmed",
+      "evidence": [
+        {
+          "storyId": "job_1790100385959_1nitlympp",
+          "env": "staging",
+          "build": "b03c64b03abbfc5eaa6c2747267026eeeedbd8d3",
+          "runDate": "2026-09-22 20:06:26 CH",
+          "checkedAt": "2026-09-24 14:52:54 CH",
+          "result": "CONFIRMED",
+          "note": "last styled avatar 605s before the page-image stage started (6 styled)"
+        }
+      ],
+      "backlog": "tasks/BACKLOG.md 'Verification pending' — T5"
+    },
+    {
+      "id": "redress-faithful",
+      "title": "T6: faithful redress draws the styled sheet in the story outfit",
+      "commits": [
+        "1ad718b4e"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "Every styled sheet of a complete run wears the story's outfit (clothingRequirements), not the stored-clothing reference.",
+      "runShape": [
+        "needs-fresh-avatar-sheet"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "compare each styledAvatarGeneration[] output with clothingRequirements / pageClothing for that character"
+      },
+      "status": "pending",
+      "evidence": [
+        {
+          "storyId": "job_1790100385959_1nitlympp",
+          "env": "staging",
+          "build": "b03c64b03abbfc5eaa6c2747267026eeeedbd8d3",
+          "runDate": "2026-09-22 20:06:26 CH",
+          "checkedAt": "2026-09-24 14:52:54 CH",
+          "result": "HUMAN",
+          "note": "human check | LOOK: compare each styledAvatarGeneration[] output with clothingRequirements / pageClothing for that character"
+        }
+      ],
+      "backlog": "tasks/BACKLOG.md 'Verification pending' — T6"
+    },
+    {
+      "id": "repair-one-figure-mask",
+      "title": "The repair path issues one /figure-mask call, not two",
+      "commits": [],
+      "addedAt": "2026-09-24",
+      "claim": "Each repaired version triggers exactly one /figure-mask analyzer call.",
+      "runShape": [
+        "needs-char-fix"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Railway logs of the run: count /figure-mask requests per repaired page/version (story_images figure_mask rows are a hint, not proof)"
+      },
+      "status": "pending",
+      "evidence": [
+        {
+          "storyId": "job_1790100385959_1nitlympp",
+          "env": "staging",
+          "build": "b03c64b03abbfc5eaa6c2747267026eeeedbd8d3",
+          "runDate": "2026-09-22 20:06:26 CH",
+          "checkedAt": "2026-09-24 14:52:54 CH",
+          "result": "HUMAN",
+          "note": "human check | LOOK: Railway logs of the run: count /figure-mask requests per repaired page/version (story_images figure_mask rows are a hint, not proof)"
+        }
+      ],
+      "backlog": "tasks/BACKLOG.md 'Verification pending' — one /figure-mask call"
+    },
+    {
+      "id": "redo-count-drop",
+      "title": "Redo counts drop end-to-end after the clothing fixes",
+      "commits": [],
+      "addedAt": "2026-09-24",
+      "claim": "A full run's redo_trigger / consistency_regen counts are below the 2026-07-20 baseline.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "redoCount"
+      },
+      "status": "pending",
+      "evidence": [
+        {
+          "storyId": "job_1790100385959_1nitlympp",
+          "env": "staging",
+          "build": "b03c64b03abbfc5eaa6c2747267026eeeedbd8d3",
+          "runDate": "2026-09-22 20:06:26 CH",
+          "checkedAt": "2026-09-24 14:52:54 CH",
+          "result": "HUMAN",
+          "note": "redo_trigger 11, consistency_regen 1, char_repair_run 1 over 18 pages | LOOK: compare with the pre-fix baseline in tasks/redo-clothing-analysis-2026-07-20.md"
+        }
+      ],
+      "backlog": "tasks/BACKLOG.md 'Verification pending' — One full showcase re-run to confirm redo counts drop"
+    },
+    {
+      "id": "composite-blend-v2",
+      "title": "Composite blend v2: one positive description",
+      "commits": [
+        "8c1baa515"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "A composite blend neither duplicates the occluded figure nor re-frames the scene.",
+      "runShape": [
+        "needs-composite"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "compositeDebug stage frames of each composited page: count figures before/after the blend and compare framing"
+      },
+      "status": "pending",
+      "evidence": [],
+      "backlog": "tasks/BACKLOG.md 'Verification pending' — Composite blend v2"
+    },
+    {
+      "id": "composite-stage-frames",
+      "title": "Composite stage frames kept in production, on success and on refusal",
+      "commits": [
+        "14bcc6330"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "A page that trips the composite gate stores its stage frames in compositeDebug.",
+      "runShape": [
+        "needs-composite"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "compositeDebug on each composited page: are the stage frames stored?"
+      },
+      "status": "pending",
+      "evidence": [],
+      "backlog": "tasks/BACKLOG.md 'Verification pending' — Composite stage frames"
+    }
+  ]
+}

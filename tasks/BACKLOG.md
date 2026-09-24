@@ -579,20 +579,21 @@ measurement, is lost).
 ---
 
 ## Verification pending (code shipped, proof not taken)
-- [ ] Over-the-shoulder / ultra-wide: judge on the next full dragon run (commission file ready). OTS accepted as is by owner 2026-09-23: camera behind + crop work (Lab 1420), subject still drawn large/close; untried idea = give the subject a measurable size in the shot definition (as the ultra-wide plate fix did). → docs/decisions.md 2026-09-23 over-the-shoulder entries
-- [ ] Arc create `max` / re-tell `medium` (staging trial, owner 2026-09-23): read the next staging stories' arcs and costs against high/high before any master push; open question whether the re-tell can be skipped when the first arc is good enough (today it always runs; the create critique always names 3-6 faults). → docs/decisions.md:55777
+Run verifications now live in **`tasks/verify.json`** (judge a stored run: `node scripts/admin/verify-run.js <storyId> --write`); the lines below point at their registry ids. Non-run chores (UI, admin, SEO, state files) stay here only.
+- [ ] Over-the-shoulder / ultra-wide (registry: `tasks/verify.json` ots-crop-no-contact, ultra-wide-derived-plate): judge on the next full dragon run (commission file ready). OTS accepted as is by owner 2026-09-23: camera behind + crop work (Lab 1420), subject still drawn large/close; untried idea = give the subject a measurable size in the shot definition (as the ultra-wide plate fix did). → docs/decisions.md 2026-09-23 over-the-shoulder entries
+- [ ] Arc create `max` / re-tell `medium` (staging trial, owner 2026-09-23; registry: `tasks/verify.json` arc-create-max-retell-medium): read the next staging stories' arcs and costs against high/high before any master push; open question whether the re-tell can be skipped when the first arc is good enough (today it always runs; the create critique always names 3-6 faults). → docs/decisions.md:55777
 
-- [ ] **The unified writer's composition rules changed and no story has run through them** (2026-09-15,
+- [ ] **The unified writer's composition rules changed and no story has run through them** (registry: `tasks/verify.json` unified-ad-composition = SUPERSEDED, the unified twins are deleted) (2026-09-15,
       `3d28c6e45`). `AD_COMPOSITION_RULE` replaced the unified twins' own two focal-point bullets with
       the six-bullet block; beats and trial built prompts are byte-identical to before, so only the
       unified path moved. Deployed on staging, never exercised. A 4-page run on the smoke account
       covers it → `prompts/story-unified.txt`, `prompts/story-unified-imagefirst.txt`,
       `server/lib/promptBuilders.js` `AD_COMPOSITION_RULE`
 
-- [ ] **Two of the seven 2026-09-13 commits ARE exercised, one is fully superseded, four need a run shape a full story cannot give** (measured 2026-09-19 against staging `job_1789759147125_p08djwhbl`, which ran on 09-18 code — five days after these commits, so the original "never exercised" line was stale). **Exercised, evidence in the stored story:** beats AD season block (`2548bcc36`) — `sceneImages[*].sceneDescriptionPrompt` carries its rule C8, "One season for the book. The season is **Autumn** on every page"; plate prompt/refs/vantageId persistence (`c936e1d06`) — 17/18 pages carry `emptyScenePrompt`, 15/18 carry `emptySceneGrokRefImages` as real R2 URLs, 16/18 carry `vantageId`. **SUPERSEDED, and can never be exercised:** the landmark-spec fix (`3175f451b`) edited `story-unified.txt`, `story-unified-imagefirst.txt` and `story-trial.txt`; the first two were DELETED by `c3e92e2f0`, and `story-trial.txt` now contains zero occurrences of AVAILABLE LANDMARKS. Not one of its three targets still carries its text. The BEHAVIOUR is live — but via `adf6d38ee`, which put the closed-world rule into `prompts/scene-expansion-all.txt`, the Art Director template that actually sets the flag in beats mode (353 `isRealLandmark` values in run 4, 206 true). `story-beats.txt` has never contained the rule (`git log -S` returns nothing) and does not need to. Close `3175f451b` as superseded rather than chasing a run for it. **Still unexercised and NOT reachable by a full story run:** the footwear sheet rule (`6643fef69`) lives in `prompts/styled-costumed-avatar-2x4.txt`, which runs only when a 2×4 sheet is GENERATED — this story emitted zero avatar rows (`story_images` has no `%avatar%` type for it) because the smoke account's characters carry cached styled avatars, so any run on saved characters skips it forever; the other three (`bc8c55dd6`, `286086573`, `d3771bf2c`) are trial-path only. A `/try` run reaches all four; the full story run does not reach any. → `tasks/session-findings-2026-09-13.md:3`
-- [ ] **Five age bands unrun — ages 1, 2, 4, 5 and an 8-or-12 control.** Characters and photos exist (`demo-agebands@magicalstory.ch`, family `agebands`); only age 3 has a rotation entry (`tests/helpers/trial-rotation.json:84`, index 6, Omar). The trial flow cannot use saved characters, so each age needs its own rotation entry feeding that age's photo; ~$0.63/run → `tasks/session-findings-2026-09-13.md:4`
+- [ ] (registry: `tasks/verify.json` trial-plate-per-vantage, trial-plate-names-reference, trial-sheet-season, avatar-sheet-shod; landmark-list-licence = superseded) **Two of the seven 2026-09-13 commits ARE exercised, one is fully superseded, four need a run shape a full story cannot give** (measured 2026-09-19 against staging `job_1789759147125_p08djwhbl`, which ran on 09-18 code — five days after these commits, so the original "never exercised" line was stale). **Exercised, evidence in the stored story:** beats AD season block (`2548bcc36`) — `sceneImages[*].sceneDescriptionPrompt` carries its rule C8, "One season for the book. The season is **Autumn** on every page"; plate prompt/refs/vantageId persistence (`c936e1d06`) — 17/18 pages carry `emptyScenePrompt`, 15/18 carry `emptySceneGrokRefImages` as real R2 URLs, 16/18 carry `vantageId`. **SUPERSEDED, and can never be exercised:** the landmark-spec fix (`3175f451b`) edited `story-unified.txt`, `story-unified-imagefirst.txt` and `story-trial.txt`; the first two were DELETED by `c3e92e2f0`, and `story-trial.txt` now contains zero occurrences of AVAILABLE LANDMARKS. Not one of its three targets still carries its text. The BEHAVIOUR is live — but via `adf6d38ee`, which put the closed-world rule into `prompts/scene-expansion-all.txt`, the Art Director template that actually sets the flag in beats mode (353 `isRealLandmark` values in run 4, 206 true). `story-beats.txt` has never contained the rule (`git log -S` returns nothing) and does not need to. Close `3175f451b` as superseded rather than chasing a run for it. **Still unexercised and NOT reachable by a full story run:** the footwear sheet rule (`6643fef69`) lives in `prompts/styled-costumed-avatar-2x4.txt`, which runs only when a 2×4 sheet is GENERATED — this story emitted zero avatar rows (`story_images` has no `%avatar%` type for it) because the smoke account's characters carry cached styled avatars, so any run on saved characters skips it forever; the other three (`bc8c55dd6`, `286086573`, `d3771bf2c`) are trial-path only. A `/try` run reaches all four; the full story run does not reach any. → `tasks/session-findings-2026-09-13.md:3`
+- [ ] (registry: `tasks/verify.json` age-band-1/-2/-4/-5/-control) **Five age bands unrun — ages 1, 2, 4, 5 and an 8-or-12 control.** Characters and photos exist (`demo-agebands@magicalstory.ch`, family `agebands`); only age 3 has a rotation entry (`tests/helpers/trial-rotation.json:84`, index 6, Omar). The trial flow cannot use saved characters, so each age needs its own rotation entry feeding that age's photo; ~$0.63/run → `tasks/session-findings-2026-09-13.md:4`
 - [ ] **`tests/trial-showcase-state.json` is uncommitted and this session's showcase overwrote another session's `nextIndex`/`lastEntry`** — the other session may need to restore its rotation position from its own side; nobody should commit the file blindly → `tasks/session-findings-2026-09-13.md:6`
-- [ ] **Trial prompt parity — measure the four ported rules on a real trial run.** Shipped 2026-09-13 (prompt-only:
+- [ ] **Trial prompt parity — measure the four ported rules on a real trial run.** (registry: `tasks/verify.json` trial-prompt-parity) Shipped 2026-09-13 (prompt-only:
       page-opening variety, six AD composition rules, `{CREATURE_TONE}`, `interactions[]` in the scene-hint schema).
       Verified in the BUILT prompt + unit tests only; no trial story has been generated against them. Re-measure the
       name-opening rate (baseline 45-48% trial vs 23% staging-full) and check EXACT POSES actually appears on trial
@@ -601,34 +602,34 @@ measurement, is lost).
       both unified variants as prose in 3bec4005a (2026-09-14); it is now one `PAGE_OPENING_VARIETY_RULE` constant filled into
       all four writer templates → `server/lib/promptBuilders.js`, `tests/unit/writer-shared-rules-reach.test.ts`
 
-- [ ] **`vb_element_overflow` at birth is 5/5 pages, not ~0, after the assignment trim — the check counts the UNION of
+- [ ] (registry: `tasks/verify.json` vb-element-overflow-remeasure) **`vb_element_overflow` at birth is 5/5 pages, not ~0, after the assignment trim — the check counts the UNION of
       trimmed bible claims and the Art Director's `objects[]` citations (pirate p12: 3 + 3 = 6), and `briefFixable`
       is false on 8/10 pages although the brief could withdraw its citations; round 2 ADDED ids on dragon p12/13/16.
       Decide: count only one side, or make the AD cite from the trimmed claims. → `docs/decisions.md` 2026-09-08 "Art Director second pass"
       **2026-09-11: the 5/5 was measured on the UNTRIMMED bible — the trim never reached the stored outline (fixed, docs/decisions.md 2026-09-11 "Visual Bible trim was never persisted"). Re-measure the union count on a post-fix story before deciding.**
-- [ ] **`facing_not_per_character` fixes are partial on crowded pages** — dragon p18 (Max, Kiaan) and pirate p16 (three
+- [ ] (registry: `tasks/verify.json` facing-per-character-remeasure) **`facing_not_per_character` fixes are partial on crowded pages** — dragon p18 (Max, Kiaan) and pirate p16 (three
       background figures) still had no facing clause after the reviewer's own rewrite. Re-measure on the next two
       stories before touching the check. → `docs/decisions.md` 2026-09-08 "Art Director second pass"
 - [ ] Run a full trial on staging as admin; query `trial_events` for the complete ordered row
       trail for one `visit_id` → `tasks/todo.md:49`
 - [ ] Confirm the admin card renders the funnel with real staging rows → `tasks/todo.md:51`
-- [ ] T5 — take the **run-level proof** that styled avatars complete before page generation. The CODE
+- [ ] (registry: `tasks/verify.json` avatars-before-pages — CONFIRMED on staging job_1790100385959_1nitlympp, 605 s margin) T5 — take the **run-level proof** that styled avatars complete before page generation. The CODE
       half is proven: `storyJobPipeline.js:1856-1866` `onClothingRequirementsReady` starts avatar styling
       and it is awaited before page images (~`:4870`), with a comment documenting the ordering
       → `tasks/sam-clothing-tasks-2026-07-20.md:39`
-- [ ] T6 — validate the redress fix (`1ad718b4`) on a complete run
+- [ ] (registry: `tasks/verify.json` redress-faithful) T6 — validate the redress fix (`1ad718b4`) on a complete run
       → `tasks/sam-clothing-tasks-2026-07-20.md:43`
-- [ ] Confirm the repair path issues one `/figure-mask` call, not two
+- [ ] (registry: `tasks/verify.json` repair-one-figure-mask) Confirm the repair path issues one `/figure-mask` call, not two
       → `tasks/sam-clothing-tasks-2026-07-20.md:31`
-- [ ] One full showcase re-run to confirm redo counts drop end-to-end
+- [ ] (registry: `tasks/verify.json` redo-count-drop) One full showcase re-run to confirm redo counts drop end-to-end
       → `tasks/redo-clothing-analysis-2026-07-20.md:124`
 - [x] ~~Composite blend fix (`3ad9e1a12`) unverified~~ — VERIFIED in exp 848 (2026-08-25): the
       size-neutral clause held, no enlargement onto the occluder. A DIFFERENT blend defect
       surfaced in the same run (duplicate figure + re-frame) → next line
-- [ ] Composite blend v2 (`8c1baa515`, positive description, 1635 chars) awaits its first
+- [ ] (registry: `tasks/verify.json` composite-blend-v2) Composite blend v2 (`8c1baa515`, positive description, 1635 chars) awaits its first
       measured run — exp 848 duplicated the occluded figure and re-framed at 5451 chars, both
       already forbidden in that prompt → `docs/decisions.md` 2026-08-25 blend-rewrite entry
-- [ ] Composite stage frames in production (`14bcc6330`) proven only offline against a spy —
+- [ ] (registry: `tasks/verify.json` composite-stage-frames) Composite stage frames in production (`14bcc6330`) proven only offline against a spy —
       the end-to-end proof is the next page that trips the gate → `docs/decisions.md`
       2026-08-24 stage-frames entry
 - [ ] Admin drafts: no admin UI (publishing is a raw POST); old demo accounts not consolidated;

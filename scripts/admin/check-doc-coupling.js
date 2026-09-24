@@ -66,6 +66,10 @@ function pushedFiles() {
   return null;
 }
 
+// check-verify-coupling.js reuses WATCHED: one list of behaviour files, two gates.
+module.exports = { WATCHED };
+if (require.main !== module) return;
+
 const files = pushedFiles();
 if (files === null) {
   console.log('check-doc-coupling: push range undeterminable — SKIPPING');

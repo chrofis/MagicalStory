@@ -76,6 +76,9 @@ items the index does not point at.
 
 Which file does a new item go in?
 - **A clear, reproduced bug** → `tasks/bugs.json`. It blocks every push while open. Fix it now.
+- **A behaviour change that needs a story run to prove it** → an entry in `tasks/verify.json`
+  (claim, runShape, check) in the same push — gate 4b blocks otherwise (`Verify: none (<reason>)` /
+  `Verify: <id>` trailers are the escape). After ANY validation run: `node scripts/admin/verify-run.js <storyId> --write`.
 - **Anything else open** (improvement, unbuilt feature, unrun experiment, deferred decision)
   → a line in `tasks/BACKLOG.md`, plus the detail wherever it belongs.
 - **A plan for the work you are doing right now** → `tasks/<topic>-<date>.md`, never the bare
