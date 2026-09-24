@@ -86,7 +86,7 @@ ELEMENTS and plate creature lines: still carry the phrase.
 
 **Status:** ✅ active
 
-## 2026-09-24 — Plate or fail: no render is ever built on a raw landmark photo (covers, trial pages, Gemini); cover edits send no photo; composite covers unchanged
+## 2026-09-24 — Plate or fail: no render is ever built on a raw landmark photo (covers, every story page, Gemini); cast-0 pages and composite covers are the named exemptions; cover edits send no photo
 
 **Context:** The 2026-09-23 trial-cover fix (entry below) left three paths where a missing plate still let
 `packReferences` promote the raw landmark photograph into the scene slot: full-account covers (streaming
@@ -125,6 +125,57 @@ prod trials and older staging trials that predate the persisted plate prompt.
 `tests/unit/plate-or-fail-covers-and-trial-pages.test.ts`, `tests/unit/trial-cover-plate-not-raw-photo.test.ts`,
 `docs/image-routing.md`, `docs/image-generation-methods.html`.
 **Status:** ✅ active on staging.
+
+**Extended the same day to every story page (owner, 2026-09-24).**
+- **One check, three named roles.** `server/lib/landmarkScene.js` owns the rule. `assertLandmarkScene` runs
+  in `generateImageOnly` (before the cache) and in the shared dispatch, so it covers Grok, Gemini and Runware.
+  A landmark photo with no plate throws `PlateRequiredError` unless the call declares a role:
+  - `'plate'`: the plate render itself. `emptyScenePlateRouting()` now returns it, which marks every plate
+    call site.
+  - `'castless'`: THE CAST-0 EXEMPTION, `landmarkPhotoIsPageScene`, the same cast count the router uses. The
+    2026-09-02 ruling stands, so a page with no named cast renders on its photo.
+  - `'composite'`: iterateCover's composite route, left as it was.
+- **packReferences no longer promotes the photo on its own.** The branch that made `landmarkPhotos[0]` the
+  scene anchor whenever no plate was given is deleted. The photo goes in the scene slot only under a declared
+  role, and a photo with no plate and no role throws there too. Gemini attaches the photo only under a role.
+- **Every mode plates a landmark page.** Phase 5a-pre plates `pageNeedsPlate` pages even with
+  `singlePassScene` or `generateEmptyScenes=false`; pages without a landmark keep the single-pass behaviour.
+  The per-page plate body is now `renderPagePlate(pageData)`, one mechanism for 5a-pre and the page retry.
+- **First render and retry.** A landmark page with no plate throws at the Phase 5a render and lands in the
+  existing page catch. The one retry then renders the missing plate with `renderPagePlate`, records it on the
+  page (`emptySceneImage`), and renders. If the plate cannot be made, the page fails
+  (`page_image_retry_failed`).
+- **Trial pages** follow the same rule, with the cast-0 exemption.
+- **Iterate and repair.** Plates are reused or rendered, never the raw photo:
+  - `iteratePageCore` resolves its plate in `resolveIteratePlate`. A landmark page ignores
+    `singlePassScene`, reuses the passed-in or stored plate (converted to a data URI), renders one with
+    `renderStoryPagePlate` when none is stored, and throws when that fails.
+  - The page regenerate, test-models and style-lab routes go through `ensureStoryPagePlate`, which does the
+    same.
+  - The calm-zone re-render (pipeline, repair pipeline, Lab mirror) and the repair pipeline's regenerate
+    branch go through `resolveRepairScene`, which uses the page's stored plate and fails without one.
+  - Iterative placement passes the plate. Its pass 2 (an edit of pass 1) sends no photo.
+- **Found while replaying.** The iterate route's `emptySceneCallbacks.load` returns raw base64 for R2-backed
+  rows, and packReferences only takes a `data:image` plate. So a UI iterate of a landmark page dropped its
+  stored plate and, with no plate, rendered on the raw photo. Staging `job_1790100385959_1nitlympp` p5's row
+  has `image_url` only. Landmark pages now convert the plate.
+- **Registry:** new set `page-plate-or-fail-callers`, anchored on `landmarkScene`.
+- **Validation (free; every provider call intercepted and refused):** staging `job_1790100385959_1nitlympp`.
+  - p5 (cast 1, stored plate): the plate is slot 0 and the photo is not packed.
+  - The same page with no plate: `PlateRequiredError` before any provider call.
+  - Stored plate removed and plate render refused: `ensureStoryPagePlate` throws.
+  - Iterate with the route's real DB loader under `singlePassScene`: reuses the stored plate, 0 plate calls.
+  - p3 (cast 0, no plate): role `castless`, slot 0 is the landmark photo.
+- **Not changed:** secondary landmarks (2nd+) still ride the VB grid as small photo cells; that is the grid,
+  not the scene slot. The Phase 5a-pre and iterate plate renderers are still two implementations, as they
+  were before this change.
+
+**Touched (extension):** `server/lib/landmarkScene.js` (new), `server/lib/grok.js`, `server/lib/images.js`,
+`server/config/models.js`, `storyJobPipeline.js`, `server/lib/repairPipeline.js`,
+`server/routes/regeneration.js`, `server/lib/testlab.js`, `server/lib/coverIterate.js`,
+`scripts/admin/sibling-registry.json`, `tests/unit/plate-or-fail-story-pages.test.ts`,
+`tests/unit/plate-or-fail-covers-and-trial-pages.test.ts`, `docs/image-routing.md`,
+`docs/image-generation-methods.html`.
 
 ## 2026-09-24 — A dotted id is a vantage, never a landmark photo; `landmarkView` picks the kind and the judged score ranks within it
 

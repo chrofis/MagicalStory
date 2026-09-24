@@ -678,6 +678,9 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
     // gemini-2.5-flash-image) — style-adherence routing tests. Null = prod default.
     imageModelOverride: params.imageModel || null,
     landmarkPhotos: genLandmarkPhotos,
+    // Plate or fail, as in production: only a cast-0 page may render on its
+    // landmark photo; any other landmark page needs the plate (emptyScene).
+    landmarkScene: require('./landmarkScene').pageLandmarkScene({ sceneMetadata: ctx.scene?.sceneMetadata || null }),
     visualBibleGrid,
     artStyle,
     sceneBackground: emptyScene,
@@ -4731,14 +4734,24 @@ async function runTextZoneStage(ctx, { experimentId, params = {} }) {
   const textAreaMask = getTextAreaMask(textPosition, ctx.languageLevel);
 
   // Same wrapper the pipeline builds (ensureCalmZone never imports images.js).
-  const generateImage = (repairPrompt, opts) => generateImageOnly(repairPrompt, ctx.referencePhotos, {
-    landmarkPhotos: ctx.landmarkPhotos,
-    previousImage: opts.previousImage,
-    textAreaMask: opts.textAreaMask,
-    pageNumber: ctx.pageNumber,
-    skipCache: true,
-    aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
-  });
+  // PLATE OR FAIL: a landmark page's repair re-render carries its stored plate, never the raw photo (server/lib/landmarkScene.js).
+  const generateImage = async (repairPrompt, opts) => {
+    const { resolveRepairScene } = require('./landmarkScene');
+    const repairScene = await resolveRepairScene({
+      page: { sceneMetadata: ctx.scene?.sceneMetadata || null }, landmarkPhotos: ctx.landmarkPhotos,
+      storyId: ctx.storyId, pageNumber: ctx.pageNumber, label: 'LAB TEXT-ZONE',
+    });
+    return generateImageOnly(repairPrompt, ctx.referencePhotos, {
+      landmarkPhotos: ctx.landmarkPhotos,
+      landmarkScene: repairScene.landmarkScene,
+      sceneBackground: repairScene.sceneBackground,
+      previousImage: opts.previousImage,
+      textAreaMask: opts.textAreaMask,
+      pageNumber: ctx.pageNumber,
+      skipCache: true,
+      aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
+    });
+  };
 
   const t0 = Date.now();
   const result = await ensureCalmZone({

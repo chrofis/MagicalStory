@@ -146,8 +146,10 @@ const {
   GEMINI_SAFETY_SETTINGS,
   IMAGE_QUALITY_THRESHOLD,
   compressImageToJPEG,
-  runVisualInventory
+  runVisualInventory,
+  ensureStoryPagePlate
 } = require('../lib/images');
+const { pageNeedsPlate, pageLandmarkScene } = require('../lib/landmarkScene');
 const { buildVisualBibleGrid, buildEmptySceneVbGrid } = require('../lib/referenceSheets');
 const { callClaudeAPI } = require('../lib/textModels');
 const {
@@ -791,9 +793,20 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
     // without this, regen falls through to the global 3:4 default and crops
     // square pages to portrait.
     const sceneAspect = currentImage?.imageAspect || null;
+    // PLATE OR FAIL (server/lib/landmarkScene.js): a landmark page is redone
+    // on its stored plate (rendered first when it has none), never on the raw
+    // photo; a cast-0 page keeps its exemption.
+    const regenScene = await ensureStoryPagePlate({
+      storyId: id, storyData, visualBible, pageNumber, sceneMetadata, sceneCharacters,
+      landmarkPhotos: pageLandmarkPhotos, textPosition: currentImage?.textPosition || null,
+      aspectRatio: sceneAspect || MODEL_DEFAULTS.pageAspect,
+      save: (pn, plate) => saveStoryImage(id, 'empty_scene', pn, plate), logTag: 'REGEN',
+    });
     const genResult = await generateImageOnly(imagePrompt, referencePhotos, {
       imageModelOverride: imageModelId,
       landmarkPhotos: pageLandmarkPhotos,
+      landmarkScene: regenScene.landmarkScene,
+      sceneBackground: regenScene.sceneBackground,
       visualBibleGrid,
       pageNumber,
       artStyle: storyData.artStyle || null,
@@ -1229,7 +1242,18 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
     // Resolve effective sceneBackground based on the singlePassScene flag.
     // If skipping the plate (single-pass), don't pass the saved background.
     // Otherwise reuse the saved one (no regeneration).
-    const effectiveSceneBackground = effSinglePass ? null : savedSceneBackground;
+    let effectiveSceneBackground = effSinglePass ? null : savedSceneBackground;
+    // PLATE OR FAIL: a landmark page (not cast-0) always renders on a plate —
+    // the saved one, else one rendered now (not saved: this is an A/B harness).
+    let testModelsLandmarkScene = null;
+    if (pageNumber > 0) {
+      const tmScene = await ensureStoryPagePlate({
+        storyId: id, storyData, visualBible, pageNumber, sceneMetadata,
+        landmarkPhotos, logTag: 'TEST-MODELS',
+      });
+      testModelsLandmarkScene = tmScene.landmarkScene;
+      if (tmScene.sceneBackground) effectiveSceneBackground = tmScene.sceneBackground;
+    }
     log.info(`🧪 [TEST-MODELS] Story ${id}, page ${pageNumber}: testing ${models?.length || 0} models${composite ? ' + composite' : ''} (refMode=${effRefMode}, singlePass=${effSinglePass}, plate=${effectiveSceneBackground ? 'reused' : 'none'}${iterativePlacement ? ', iterative-placement' : ''})`);
     // Pre-compute applied refs once — same for every model (only the model id varies)
     const refApplied = applyReferenceMode({
@@ -1329,13 +1353,13 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
         result = await generateWithIterativePlacement(prompt, refApplied.characterPhotos, sceneMetadata, {
           imageModelOverride: model, imageBackendOverride: IMAGE_MODELS[model].backend,
           landmarkPhotos: refApplied.landmarkPhotos, visualBibleGrid: refApplied.visualBibleGrid, pageNumber, artStyle: artStyleDesc,
-          sceneBackground: refApplied.sceneBackground,
+          sceneBackground: refApplied.sceneBackground, landmarkScene: testModelsLandmarkScene,
         });
       } else {
         result = await generateImageOnly(prompt, refApplied.characterPhotos, {
           imageModelOverride: model, imageBackendOverride: IMAGE_MODELS[model].backend,
           landmarkPhotos: refApplied.landmarkPhotos, visualBibleGrid: refApplied.visualBibleGrid, pageNumber, skipCache: true,
-          sceneBackground: refApplied.sceneBackground,
+          sceneBackground: refApplied.sceneBackground, landmarkScene: testModelsLandmarkScene,
         });
       }
       return {
@@ -2043,6 +2067,7 @@ router.post('/:id/style-lab/:pageNum', authenticateToken, async (req, res) => {
 
     // Resolve scene description, characters, and references (same as test-models)
     let characterPhotos, landmarkPhotos = [], visualBibleGrid = null;
+    let styleLabSceneMetadata = null;
     if (pageNumber < 0) {
       const coverType = getCoverType(pageNumber);
       if (!coverType) return res.status(400).json({ error: `Invalid cover page number: ${pageNumber}` });
@@ -2063,6 +2088,7 @@ router.post('/:id/style-lab/:pageNum', authenticateToken, async (req, res) => {
       characterPhotos = getCharacterPhotoDetails(chars, clothing, artStyle, clothingReqs);
       if (!clothing.startsWith('costumed')) characterPhotos = applyStyledAvatars(characterPhotos, artStyle);
       const sceneMetadata = extractSceneMetadata(desc);
+      styleLabSceneMetadata = sceneMetadata;
       // Phase 7: cell-crop refs from story-scoped 2×4 sheets when present.
       {
         const sav = require('../lib/storyAvatars');
@@ -2087,6 +2113,11 @@ router.post('/:id/style-lab/:pageNum', authenticateToken, async (req, res) => {
 
     const runId = existingRunId || crypto.randomUUID();
     log.info(`🧪 [STYLE-LAB] Story ${id}, page ${pageNumber}: run ${runId}, models: ${models.join(', ')}`);
+    // PLATE OR FAIL: a landmark page (not cast-0) renders on its plate — the
+    // stored one, else one rendered now (not saved: this is a style A/B lab).
+    const styleLabScene = pageNumber > 0
+      ? await ensureStoryPagePlate({ storyId: id, storyData, visualBible, pageNumber, sceneMetadata: styleLabSceneMetadata, landmarkPhotos, logTag: 'STYLE-LAB' })
+      : { sceneBackground: null, landmarkScene: null };
 
     // Build per-model prompts and generate in parallel
     const results = {};
@@ -2106,7 +2137,8 @@ router.post('/:id/style-lab/:pageNum', authenticateToken, async (req, res) => {
       const result = await generateImageOnly(prompt, characterPhotos, {
         imageModelOverride: model,
         imageBackendOverride: IMAGE_MODELS[model].backend,
-        landmarkPhotos, visualBibleGrid, pageNumber, skipCache: true
+        landmarkPhotos, visualBibleGrid, pageNumber, skipCache: true,
+        sceneBackground: styleLabScene.sceneBackground, landmarkScene: styleLabScene.landmarkScene,
       });
       const elapsed = Date.now() - start;
 

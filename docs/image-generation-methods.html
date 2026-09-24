@@ -311,6 +311,13 @@
 </tr>
 
 <tr>
+  <td>Plate or fail &mdash; which render may use a raw landmark photo</td>
+  <td><code>server/lib/landmarkScene.js</code> <code>assertLandmarkScene</code> (in <code>generateImageOnly</code> and <code>_dispatchImageGeneration</code>); <code>packReferences</code> (<code>server/lib/grok.js</code>)</td>
+  <td>All providers: the check runs before any of them</td>
+  <td>Since 2026-09-24 a render that carries landmark photos must carry a people-free plate (<code>sceneBackground</code>, a data URI) or pass <code>landmarkScene</code>: <code>'plate'</code> (the plate render &mdash; <code>emptyScenePlateRouting()</code> sets it), <code>'castless'</code> (a page with no named cast, <code>landmarkPhotoIsPageScene</code>), <code>'composite'</code> (iterateCover&rsquo;s composite route). Anything else throws <code>PlateRequiredError</code>. <code>packReferences</code> puts the photo in the scene slot only under a role. Page paths: Phase 5a render + retry (<code>renderPagePlate</code>), trial pages, <code>resolveIteratePlate</code>, <code>ensureStoryPagePlate</code> (regenerate / test-models / style-lab), <code>resolveRepairScene</code> (calm-zone, repair regenerate). decisions.md 2026-09-24 &ldquo;Plate or fail&rdquo;.</td>
+</tr>
+
+<tr>
   <td>Trial front cover references (plate + landmark + VB grid)</td>
   <td><code>storyJobPipeline.js</code> <code>onCoverScene</code> → <code>coverIterate.buildCoverReferences({ sceneBackground: &lt;page plate&gt;, requirePlate: true })</code> → <code>generateImageOnly(coverPrompt, coverPhotos, { sceneBackground, landmarkPhotos, visualBibleGrid })</code></td>
   <td>Grok edit, the people-free plate as slot 0 (magenta-extended to the cover aspect); the raw landmark photo is never packed</td>

@@ -637,6 +637,24 @@
         "server/lib/images.js"
       ],
       "severity": "block"
+    },
+    {
+      "id": "page-plate-or-fail-callers",
+      "axis": "page first render vs retry vs trial page vs iterate vs regenerate/test-models/style-lab vs calm-zone repair vs Lab mirror",
+      "reason": "Plate or fail (owner, 2026-09-24): a landmark page that is not cast-0 renders on its plate or fails, and only the declared roles in server/lib/landmarkScene.js ('plate', 'castless', 'composite') may take the raw photo with no plate. The rule is applied at every page render site - Phase 5a render and retry and the trial page (storyJobPipeline.js), iteratePageCore / ensureStoryPagePlate / the dispatch check (images.js), the calm-zone and regenerate repairs (repairPipeline.js), the page regenerate, test-models and style-lab routes (regeneration.js) and the Lab mirrors (testlab.js). A site that stops passing its plate or its role either fails every landmark page or, worse, is the one that quietly packs the photo again.",
+      "members": [
+        "storyJobPipeline.js",
+        "server/lib/images.js",
+        "server/lib/repairPipeline.js",
+        "server/routes/regeneration.js",
+        "server/lib/testlab.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "landmarkScene"
+        ]
+      }
     }
   ],
   "withinFile": [

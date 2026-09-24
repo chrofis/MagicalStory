@@ -1209,6 +1209,10 @@ async function packReferences(refs = {}, options = {}) {
     previousImage = null,
     sceneBackground = null,
     textAreaMask = null, // Pre-built black/white mask for empty scene text area
+    // Declared role of a raw landmark photo when no plate is given — 'plate'
+    // (this call renders the plate) or 'castless' (cast-0 page). See
+    // server/lib/landmarkScene.js. Without one, a photo with no plate throws.
+    landmarkScene = null,
   } = refs;
   const {
     aspectRatio = '1:1', pageLabel = '', padInputWithExtension = false,
@@ -1316,20 +1320,25 @@ async function packReferences(refs = {}, options = {}) {
     log.info(`🎨 ${tag} Slot ${slots.length}: previous/source image`);
   }
 
-  // Curated landmark photo from historical_locations becomes the SCENE ANCHOR
-  // when no scene background was generated (empty-scene gen disabled). This
-  // gives Grok the curated photo straight from the DB as slot 1, so the
-  // character composites that follow get composited onto the right scenery.
-  // When a scene background already exists, the landmark is assumed to be
-  // baked into it (the empty-scene gen path uses the landmark as input) and
-  // we skip — see the scene-bg slot above and the duplicate-skip log below.
-  if (landmarkBuffers.length > 0 && !hasSceneBackground && slots.length < maxSlots) {
-    const resized = await sharp(landmarkBuffers[0])
-      .resize({ height: 1024, withoutEnlargement: true })
-      .jpeg({ quality: 92 })
-      .toBuffer();
-    slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
-    log.info(`🎨 ${tag} Slot ${slots.length}: landmark photo (DB scene anchor)`);
+  // A raw landmark photo is the SCENE ANCHOR only for the two declared roles
+  // (server/lib/landmarkScene.js): the call that renders the plate from it, and
+  // a cast-0 page, which has no plate by design (owner, 2026-09-02). Every
+  // other render must bring a plate — the plate paints the landmark people-free,
+  // so the photo is skipped when one is present. A photo with no plate and no
+  // role is refused: the model would edit the photograph, strangers included
+  // (prod trial job_1790169018278_n57xpnufo).
+  if (landmarkBuffers.length > 0 && !hasSceneBackground) {
+    if (!landmarkScene) {
+      throw new Error(`${tag} landmark photo with no plate and no declared role — refused (plate or fail)`);
+    }
+    if (slots.length < maxSlots) {
+      const resized = await sharp(landmarkBuffers[0])
+        .resize({ height: 1024, withoutEnlargement: true })
+        .jpeg({ quality: 92 })
+        .toBuffer();
+      slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
+      log.info(`🎨 ${tag} Slot ${slots.length}: landmark photo (${landmarkScene === 'plate' ? 'plate source' : landmarkScene === 'castless' ? 'cast-0 page scene' : 'composite route'})`);
+    }
   }
 
   // Layout strategy (all char groups go through buildCharacterGroupSlot which

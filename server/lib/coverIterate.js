@@ -1395,6 +1395,10 @@ async function iterateCover(coverKey, storyData, options = {}) {
       previousImage,
       imageModelOverride: titleModeInfo.bakedModel || imageModel || null,
       landmarkPhotos: coverLandmarkPhotos,
+      // A rendered cover always carries its plate (use 'render') and an edit
+      // carries no photo (use 'edit'); only the composite route, left as it was
+      // (owner, 2026-09-24), may still reach this render on the raw photo.
+      landmarkScene: compositeOn ? 'composite' : null,
       visualBibleGrid: coverVbGrid,
       sceneBackground: coverSceneBackground,
       pageNumber: COVER_PAGE_NUMBERS[coverKey] ?? -1,

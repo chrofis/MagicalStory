@@ -413,6 +413,9 @@ async function doRun() {
   const result = await generateImageOnly(prompt, referencePhotos, {
     imageBackendOverride: 'grok',
     landmarkPhotos,
+    // Plate or fail, as in production: only a cast-0 page renders on its
+    // landmark photo; any other landmark page needs the cached empty_scene.
+    landmarkScene: require(path.join(ROOT, 'server/lib/landmarkScene')).pageLandmarkScene({ sceneMetadata: scene.sceneMetadata, sceneCharacters: scene.sceneCharacters }),
     visualBibleGrid: null,
     sceneBackground: sceneDataUri,
     textAreaMask: maskUri,

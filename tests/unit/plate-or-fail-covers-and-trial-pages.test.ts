@@ -161,17 +161,18 @@ describe("Gemini's branch", () => {
       }
       return realFetch(url, init);
     });
-    const run = (sceneBackground: string | null) => images.generateImageOnly('draw it', [], {
+    const run = (sceneBackground: string | null, landmarkScene: string | null = null) => images.generateImageOnly('draw it', [], {
       imageModelOverride: 'gemini-2.5-flash-image',
       imageBackendOverride: 'gemini',
       landmarkPhotos: [{ name: 'Old town square', photoData: `data:image/png;base64,${png}` }],
       sceneBackground,
+      landmarkScene,
       skipCache: true,
       aspectRatio: '3:4',
       pageNumber: 1,
     }).catch(() => null);
     await run(`data:image/png;base64,${png}`);
-    await run(null);
+    await run(null, 'castless'); // the cast-0 exemption: the photo is the scene
     const labels = (b: any) => (b?.contents?.[0]?.parts || []).map((p: any) => p.text).filter(Boolean).join('|');
     expect(bodies.length).toBeGreaterThanOrEqual(2);
     expect(labels(bodies[0])).toContain('[Background]');

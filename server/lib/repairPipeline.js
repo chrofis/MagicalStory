@@ -37,6 +37,7 @@ const getStoryHelpers = () => require('./storyHelpers');
 // Leaf module (parsers only) — safe to require eagerly, no cycle back here.
 const { resolveEvalSceneHint } = require('./sceneMetadata');
 const images = () => require('./images');
+const { resolveRepairScene } = require('./landmarkScene');
 
 function selectBestVersion(versions) {
   if (!versions || versions.length === 0) return null;
@@ -1179,10 +1180,17 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const regenPrompt = feedbackSuffix
         ? `${img.prompt}\n\n${feedbackSuffix}`
         : img.prompt;
+      // PLATE OR FAIL: a landmark page's repair re-render carries its stored plate, never the raw photo (server/lib/landmarkScene.js).
+      const regenScene = await resolveRepairScene({
+        page: img, landmarkPhotos: img.landmarkPhotos, plate: img.emptySceneImage || null,
+        storyId: storyData?.id || null, pageNumber: img.pageNumber, label: 'REGENERATE',
+      });
       result = await images().generateImageOnly(regenPrompt, img.characterPhotos, {
         imageModelOverride: modelOverrides.imageModel,
         imageBackendOverride: modelOverrides.imageBackend,
         landmarkPhotos: img.landmarkPhotos,
+        landmarkScene: regenScene.landmarkScene,
+        sceneBackground: regenScene.sceneBackground,
         visualBibleGrid: img.visualBibleGrid,
         pageNumber: img.pageNumber,
         skipCache: true
@@ -3264,17 +3272,26 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         || (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.imageAspect
         || null;
 
-      const generateImage = (repairPrompt, opts) => images().generateImageOnly(repairPrompt, img.characterPhotos || [], {
-        imageModelOverride: img.sceneMetadata?.pageImageModel || null,
-        imageBackendOverride: img.sceneMetadata?.pageImageBackend || null,
-        landmarkPhotos: img.landmarkPhotos || [],
-        visualBibleGrid: img.visualBibleGrid || null,
-        previousImage: opts.previousImage,
-        textAreaMask: opts.textAreaMask,
-        pageNumber,
-        skipCache: true,
-        aspectRatio,
-      });
+      // PLATE OR FAIL: a landmark page's repair re-render carries its stored plate, never the raw photo (server/lib/landmarkScene.js).
+      const generateImage = async (repairPrompt, opts) => {
+        const repairScene = await resolveRepairScene({
+          page: img, landmarkPhotos: img.landmarkPhotos, plate: img.emptySceneImage || null,
+          storyId: storyData?.id || null, pageNumber, label: 'POST-REPAIR-TEXT',
+        });
+        return images().generateImageOnly(repairPrompt, img.characterPhotos || [], {
+          imageModelOverride: img.sceneMetadata?.pageImageModel || null,
+          imageBackendOverride: img.sceneMetadata?.pageImageBackend || null,
+          landmarkPhotos: img.landmarkPhotos || [],
+          landmarkScene: repairScene.landmarkScene,
+          sceneBackground: repairScene.sceneBackground,
+          visualBibleGrid: img.visualBibleGrid || null,
+          previousImage: opts.previousImage,
+          textAreaMask: opts.textAreaMask,
+          pageNumber,
+          skipCache: true,
+          aspectRatio,
+        });
+      };
 
       const onUsage = (result) => {
         if (!result.usage || !usageTracker) return;

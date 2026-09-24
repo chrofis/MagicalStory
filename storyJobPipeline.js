@@ -18,6 +18,7 @@ const { upsertStory, saveStoryImage, rehydrateStoryImages } = require('./server/
 const { PROMPT_TEMPLATES, fillTemplate, buildEmptyScenePrompt } = require('./server/services/prompts');
 const { generateViewPdf } = require('./server/lib/pdf');
 const { generateImageOnly } = require('./server/lib/images');
+const { landmarkPhotoIsPageScene, pageNeedsPlate, pageLandmarkScene, resolveRepairScene } = require('./server/lib/landmarkScene');
 const { generateReferenceSheet, buildVisualBibleGrid, buildEmptySceneVbGrid } = require('./server/lib/referenceSheets');
 const { runUnifiedRepairPipeline } = require('./server/lib/repairPipeline');
 const {
@@ -1196,19 +1197,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // promoted the raw landmark PHOTOGRAPH into the slot instead — so the
           // page was an edit of a real photo while its styled plate landed
           // moments later, unused and paid for.
-          // A page whose plate failed is NOT rendered without it: with no plate
-          // packReferences promotes the raw landmark photo into the scene slot.
-          // The page fails here like any other trial page failure (the catch
-          // below returns null and the page goes through the normal page render).
+          // Whether a missing plate fails the page is decided below, once the
+          // page's cast and landmark photos are known (plate or fail).
           const platePromise = trialEmptyScenePromises.get(page.pageNumber);
-          if (platePromise) {
-            await platePromise;
-            if (!sceneBackgrounds[page.pageNumber]?.imageData) {
-              log.error(`❌ [TRIAL-PAGE] Page ${page.pageNumber}: plate failed — page not rendered on the raw photo`);
-              throw new Error(`page ${page.pageNumber} plate failed`);
-            }
-            log.info(`🎬 [TRIAL-PAGE] Page ${page.pageNumber}: plate ready`);
-          }
+          if (platePromise) await platePromise;
 
           // Build per-character clothing for this page.
           // Honour Claude's per-page clothing choices — including narrative
@@ -1296,10 +1288,26 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const trialLandmarkMisses = [];
           let pageLandmarkPhotos = await getLandmarkPhotosForScene(streamingVisualBible, sceneMetadata, { pageNumber: page.pageNumber, misses: trialLandmarkMisses });
           pageLandmarkPhotos = await ensureLandmarkPhotoBytes(pageLandmarkPhotos, { misses: trialLandmarkMisses });
-          if (pageLandmarkPhotos.length > 0 && !sceneBackgrounds[page.pageNumber]?.imageData) {
-            log.error(`❌ [TRIAL-PAGE] Page ${page.pageNumber}: landmark "${pageLandmarkPhotos[0].name}" but no plate — page not rendered on the raw photo`);
-            throw new Error(`page ${page.pageNumber} has a landmark photo and no plate`);
+          // PLATE OR FAIL (server/lib/landmarkScene.js). A page whose plate
+          // failed, or that carries a landmark photo with no plate, is not
+          // rendered here: with no plate the raw photo would be the scene. It
+          // fails like any other trial page (the catch below returns null and
+          // the page goes through the normal page render, which plates it).
+          // THE CAST-0 EXEMPTION: a page with no named cast renders on its
+          // landmark photo (owner ruling 2026-09-02).
+          const trialPageRef = { sceneMetadata, sceneCharacters };
+          const trialPlate = sceneBackgrounds[page.pageNumber]?.imageData || null;
+          if (!trialPlate && !landmarkPhotoIsPageScene(trialPageRef)) {
+            if (platePromise) {
+              log.error(`❌ [TRIAL-PAGE] Page ${page.pageNumber}: plate failed — page not rendered on the raw photo`);
+              throw new Error(`page ${page.pageNumber} plate failed`);
+            }
+            if (pageLandmarkPhotos.length > 0) {
+              log.error(`❌ [TRIAL-PAGE] Page ${page.pageNumber}: landmark "${pageLandmarkPhotos[0].name}" but no plate — page not rendered on the raw photo`);
+              throw new Error(`page ${page.pageNumber} has a landmark photo and no plate`);
+            }
           }
+          if (trialPlate) log.info(`🎬 [TRIAL-PAGE] Page ${page.pageNumber}: plate ready`);
           if (trialLandmarkMisses.length > 0) {
             log.warn(`⚠️ [LANDMARK] Trial page ${page.pageNumber} renders WITHOUT its landmark reference photo (${trialLandmarkMisses.map(m => `${m.name}: ${m.reason}`).join('; ')}) — downgraded to prose description`);
           }
@@ -1357,6 +1365,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             imageBackendOverride: pageImageBackend,
             pageNumber: page.pageNumber,
             landmarkPhotos: pageLandmarkPhotos,
+            landmarkScene: pageLandmarkScene(trialPageRef),
             visualBibleGrid: trialVbGrid,
             // Use the pre-rendered empty-scene plate as the background anchor.
             // The empty-scene block at line 3918 generates these in parallel
@@ -5041,29 +5050,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }
       }
 
-      // Phase 5a-pre: Generate empty scene backgrounds (no characters) for style anchoring
-      // Note: sceneBackgrounds may already have entries from trial mode early generation
-      // OR from Phase 5a-pre-vantage above (vantage canvas covers most pages).
-      if (modelOverrides.generateEmptyScenes !== false && !runSinglePassScene) {
-        log.info(`🎨 [UNIFIED] Phase 5a-pre: Generating ${pageDataArray.length} empty scene backgrounds...`);
-        const bgStartTime = Date.now();
-        const bgLimit = pLimit(50);
-
-        const emptyScenes = await Promise.all(
-          pageDataArray.map(pageData => bgLimit(async () => {
-            await checkCancellation();
-            // Skip if already generated (e.g., trial mode early generation from
-            // visual bible, or a shared vantage canvas fanned out above).
-            if (sceneBackgrounds[pageData.pageNumber]) return null;
-            // Cast-0 page: no plate. The plate anchors character placement, and
-            // with no characters the page render IS the scene (owner ruling,
-            // 2026-09-02). Skipping it also lets the page keep its location /
-            // vehicle VB grid cells (Phase 5a-pre-grid), which the plate would
-            // otherwise displace.
-            if (platelessByRoute(pageData.pageNumber)) {
-              log.info(`🎨 [EMPTY SCENE] Page ${pageData.pageNumber}: cast=0 → no plate generated (the render is the scene)`);
-              return null;
-            }
+      // ONE page's own empty-scene plate (render + QC + one fed-back retry).
+      // Phase 5a-pre renders every uncovered page with it, and the page-image
+      // retry below reuses it for a landmark page whose plate is missing —
+      // one plate mechanism for both. Returns null on failure (logged).
+      const renderPagePlate = async (pageData) => {
             const sceneMetadata = pageData.sceneMetadata;
             const settingDesc = sceneMetadata?.setting?.description || sceneMetadata?.imageSummary || '';
             // The page's plate: the outline hint's, then the cited vantage's
@@ -5358,9 +5349,61 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // (job_1787959478282: p1 and p3 were the only two pages without a
               // plate, and nothing in the story said why).
               log.warn(`⚠️ [EMPTY SCENE] Page ${pageData.pageNumber} failed: ${err.message}`);
-              genLog.warn('empty_scene_failed', `Page ${pageData.pageNumber} empty-scene generation failed: ${err.message} — page will render without a background plate`);
+              genLog.warn('empty_scene_failed', `Page ${pageData.pageNumber} empty-scene generation failed: ${err.message}`);
               return null;
             }
+      };
+      // Store a rendered plate in the page's slot (same shape for every caller).
+      const storePagePlate = (bg) => {
+        if (!bg?.imageData) return false;
+        sceneBackgrounds[bg.pageNumber] = {
+          imageData: bg.imageData,
+          prompt: bg.prompt,
+          // Refs packed into the plate call — same field name every other
+          // image call stores its packed refs under.
+          grokRefImages: bg.grokRefImages || null,
+          textAreaMask: bg.textAreaMask || null,
+          emptySceneVbGrid: bg.emptySceneVbGrid || null,
+          // Store QC data for dev mode comparison (v1 failed, v2 retry)
+          ...(bg.v1ImageData ? {
+            v1ImageData: bg.v1ImageData,
+            v1Issues: bg.v1Issues,
+            visionFeedback: bg.visionFeedback || null,
+            retryPrompt: bg.retryPrompt || null,
+          } : {}),
+        };
+        return true;
+      };
+
+      // Phase 5a-pre: Generate empty scene backgrounds (no characters) for style anchoring
+      // Note: sceneBackgrounds may already have entries from trial mode early generation
+      // OR from Phase 5a-pre-vantage above (vantage canvas covers most pages).
+      // PLATE OR FAIL: a landmark page is plated in EVERY mode — single-pass and
+      // generateEmptyScenes=false only switch plates off for the other pages
+      // (owner, 2026-09-24). Cast-0 pages never get one (the exemption).
+      const platesOn = modelOverrides.generateEmptyScenes !== false && !runSinglePassScene;
+      const platePageData = pageDataArray.filter(pd => platesOn || pageNeedsPlate(pd, pd.landmarkPhotos));
+      if (platePageData.length > 0) {
+        log.info(`🎨 [UNIFIED] Phase 5a-pre: Generating ${platePageData.length} empty scene backgrounds${platesOn ? '' : ' (landmark pages only — plates are off for the rest)'}...`);
+        const bgStartTime = Date.now();
+        const bgLimit = pLimit(50);
+
+        const emptyScenes = await Promise.all(
+          platePageData.map(pageData => bgLimit(async () => {
+            await checkCancellation();
+            // Skip if already generated (e.g., trial mode early generation from
+            // visual bible, or a shared vantage canvas fanned out above).
+            if (sceneBackgrounds[pageData.pageNumber]) return null;
+            // Cast-0 page: no plate. The plate anchors character placement, and
+            // with no characters the page render IS the scene (owner ruling,
+            // 2026-09-02). Skipping it also lets the page keep its location /
+            // vehicle VB grid cells (Phase 5a-pre-grid), which the plate would
+            // otherwise displace.
+            if (platelessByRoute(pageData.pageNumber)) {
+              log.info(`🎨 [EMPTY SCENE] Page ${pageData.pageNumber}: cast=0 → no plate generated (the render is the scene)`);
+              return null;
+            }
+            return renderPagePlate(pageData);
           }))
         );
 
@@ -5368,7 +5411,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Cast-0 pages are excluded — they have no plate BY DESIGN (see the
         // skip above), and warning about a deliberate omission sends the next
         // reader hunting a bug that doesn't exist.
-        const platelessPages = pageDataArray
+        const platelessPages = platePageData
           .map(pd => pd.pageNumber)
           .filter(pn => !platelessByRoute(pn))
           .filter(pn => !sceneBackgrounds[pn] && !emptyScenes.some(bg => bg?.pageNumber === pn && bg?.imageData));
@@ -5377,26 +5420,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           genLog.warn('empty_scene_missing', `No background plate for page(s) ${platelessPages.join(', ')} — those pages render without one`);
         }
 
-        for (const bg of emptyScenes) {
-          if (bg?.imageData) {
-            sceneBackgrounds[bg.pageNumber] = {
-              imageData: bg.imageData,
-              prompt: bg.prompt,
-              // Refs packed into the plate call — same field name every other
-              // image call stores its packed refs under.
-              grokRefImages: bg.grokRefImages || null,
-              textAreaMask: bg.textAreaMask || null,
-              emptySceneVbGrid: bg.emptySceneVbGrid || null,
-              // Store QC data for dev mode comparison (v1 failed, v2 retry)
-              ...(bg.v1ImageData ? {
-                v1ImageData: bg.v1ImageData,
-                v1Issues: bg.v1Issues,
-                visionFeedback: bg.visionFeedback || null,
-                retryPrompt: bg.retryPrompt || null,
-              } : {}),
-            };
-          }
-        }
+        for (const bg of emptyScenes) storePagePlate(bg);
         const bgElapsed = ((Date.now() - bgStartTime) / 1000).toFixed(1);
         log.info(`🎨 [UNIFIED] Phase 5a-pre: ${Object.keys(sceneBackgrounds).length}/${pageDataArray.length} empty scenes in ${bgElapsed}s`);
       }
@@ -5642,10 +5666,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               sceneBackground: sceneBackgrounds[pageData.pageNumber]?.imageData || null,
               sceneMetadata: pageData.sceneMetadata,
             });
+            // PLATE OR FAIL (server/lib/landmarkScene.js): a landmark page with no
+            // plate is not rendered on the raw photo. It fails here into the
+            // catch below; the one page retry renders its plate first.
+            if (pageNeedsPlate(pageData, refApplied.landmarkPhotos) && !refApplied.sceneBackground) {
+              log.error(`❌ [UNIFIED] Page ${pageData.pageNumber}: landmark "${refApplied.landmarkPhotos[0]?.name || 'unknown'}" has no plate — not rendered on the raw photo`);
+              throw new Error(`page ${pageData.pageNumber} has a landmark photo and no plate`);
+            }
             const genResult = await generateImageOnly(
               pageData.prompt,
               refApplied.characterPhotos,
               {
+                // THE CAST-0 EXEMPTION: a page with no named cast renders on its
+                // landmark photo (owner ruling 2026-09-02).
+                landmarkScene: pageLandmarkScene(pageData),
                 aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
                 imageModelOverride: pageData.pageImageModel,
                 imageBackendOverride: pageData.pageImageBackend,
@@ -6027,6 +6061,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const pageData = pageDataByNumber.get(raw.pageNumber);
         if (!pageData) continue;
         try {
+          // PLATE OR FAIL: the retry reuses the page's plate, or renders one
+          // with the same mechanism Phase 5a-pre uses — never the raw photo.
+          // No plate after that → the throw lands in the catch below and the
+          // page ships marked missing (page_image_retry_failed).
+          if (pageNeedsPlate(pageData, pageData.landmarkPhotos) && !sceneBackgrounds[pageData.pageNumber]?.imageData) {
+            log.info(`🎬 [UNIFIED] Page ${raw.pageNumber}: retry renders the missing plate first`);
+            const renderedPlate = await renderPagePlate(pageData);
+            if (!storePagePlate(renderedPlate)) {
+              log.error(`❌ [UNIFIED] Page ${raw.pageNumber}: plate could not be rendered — page not rendered on the raw photo`);
+              throw new Error(`page ${raw.pageNumber} has a landmark photo and its plate could not be rendered`);
+            }
+            raw.emptySceneImage = sceneBackgrounds[pageData.pageNumber].imageData;
+            raw.emptyScenePrompt = sceneBackgrounds[pageData.pageNumber].prompt || null;
+            raw.emptySceneGrokRefImages = sceneBackgrounds[pageData.pageNumber].grokRefImages || null;
+          }
           const retryResult = await generateImageOnly(
             pageData.prompt,
             pageData.characterPhotos,
@@ -6035,6 +6084,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               imageModelOverride: pageData.pageImageModel,
               imageBackendOverride: pageData.pageImageBackend,
               landmarkPhotos: pageData.landmarkPhotos,
+              landmarkScene: pageLandmarkScene(pageData),
               visualBibleGrid: pageData.visualBibleGrid,
               pageNumber: pageData.pageNumber,
               sceneBackground: sceneBackgrounds[pageData.pageNumber]?.imageData || null,
@@ -6246,17 +6296,26 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
             // Caller-supplied retry image generator. Wraps generateImageOnly so
             // ensureCalmZone doesn't import images.js (would be circular).
-            const generateImage = (repairPrompt, opts) => generateImageOnly(repairPrompt, img.characterPhotos || [], {
+            // PLATE OR FAIL: a landmark page's repair re-render carries its stored plate, never the raw photo (server/lib/landmarkScene.js).
+            const generateImage = async (repairPrompt, opts) => {
+              const repairScene = await resolveRepairScene({
+                page: img, landmarkPhotos: img.landmarkPhotos, plate: img.emptySceneImage || null,
+                storyId: jobId, pageNumber: img.pageNumber, label: 'CALM-ZONE',
+              });
+              return generateImageOnly(repairPrompt, img.characterPhotos || [], {
               imageModelOverride: img.sceneMetadata?.pageImageModel || null,
               imageBackendOverride: img.sceneMetadata?.pageImageBackend || null,
               landmarkPhotos: img.landmarkPhotos || [],
+              landmarkScene: repairScene.landmarkScene,
+              sceneBackground: repairScene.sceneBackground,
               visualBibleGrid: img.visualBibleGrid || null,
               previousImage: opts.previousImage,
               textAreaMask: opts.textAreaMask,
               pageNumber: img.pageNumber,
               skipCache: true,
               aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
-            });
+              });
+            };
 
             const onUsage = (result) => {
               if (!result.usage) return;
