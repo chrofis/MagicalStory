@@ -92,7 +92,7 @@ function checkUndeclaredLettering({ lettering, declared } = {}) {
       character: null,
       source: 'lettering-check',
       description,
-      fix: `Paint over the lettering${l?.surface ? ` on the ${l.surface}` : ''} as continuous scene material — no readable writing.`,
+      fix: `Paint over the lettering${l?.surface ? ` on ${l.surface}` : ''} as continuous scene material — no readable writing.`,
     });
   }
   return findings;

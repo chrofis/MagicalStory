@@ -89,3 +89,10 @@ describe('letteringRecord — what the check compared, stored on the version', (
     expect(rec.items[0].surface).toBe(null);
   });
 });
+
+describe('the fix line reads as a sentence', () => {
+  it('the inventory surface already carries its article — no "the a ..."', () => {
+    const [f] = checkUndeclaredLettering({ lettering: [{ text: 'OPEN', surface: 'a beige rectangular overlay', position: 'bottom-right', placement: 'overlay', spelling: 'correct' }] });
+    expect(f.fix).toBe('Paint over the lettering on a beige rectangular overlay as continuous scene material — no readable writing.');
+  });
+});
