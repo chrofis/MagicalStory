@@ -180,7 +180,9 @@ async function main() {
       console.log(`  PAID  ${t.k} clicks, ${money(t.c)} -> ${pt.t} trials (${per(t.c, pt.t).trim()}/trial) -> ${pt.b} buyers (${per(t.c, pt.b).trim()}/buyer)`);
       console.log('  ("no " = money spent and none of that outcome. clicks vs arrived: a paid click whose page never ran our code');
       console.log('   is not an arrival. med s = median seconds on site until the visitor first left; >1pg = viewed more');
-      console.log('   than the landing page. Arrivals are recorded from 2026-09-24 on.)');
+      console.log('   than the landing page. Both come from the exit event, which is sent while the page unloads and');
+      console.log('   arrived for ~95% of visits in testing (Chrome + Safari engine, 2026-09-24): an arrival with no exit');
+      console.log('   is a lost exit, not a visitor who never left. Arrivals are recorded from 2026-09-24 on.)');
     }
   }
 
