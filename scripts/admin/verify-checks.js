@@ -423,6 +423,13 @@ checks.otsCropAndNoContact = (ctx) => {
 };
 
 const SLOT_LABEL = /\b(?:Satz|Sentence|Phrase|Slot)\s*\d+\s*[—–:-]/i;
+/** c7b4eb1e1 — a story started from generated ideas records which card was picked. */
+checks.ideaPickRecorded = (ctx) => {
+  const pick = ctx.data?.ideaPick;
+  if (!pick) return { covered: true, pass: false, detail: 'stories.data.ideaPick is missing on a run started from a generated idea' };
+  return { covered: true, pass: true, detail: `ideaPick recorded (index ${pick.index ?? 'own premise'}, world ${pick.world ?? '-'})` };
+};
+
 /** 1d6598368 — a generated idea reaches the story with no slot labels. */
 checks.ideaNoSlotLabels = (ctx) => {
   const texts = [ctx.row?.idea_original, ctx.row?.idea_used].filter(Boolean);

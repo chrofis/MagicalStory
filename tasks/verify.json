@@ -42,7 +42,8 @@
       "id": "sceneintent-no-mood-tag",
       "title": "sceneIntent no longer ends on a verbless mood tag (the sentence that became a painted caption)",
       "commits": [
-        "67c617743"
+        "67c617743",
+        "a88a89622"
       ],
       "addedAt": "2026-09-24",
       "claim": "No brief ends sceneIntent on a sentence carrying mood/atmosphere/tension/standoff/feeling: the rule now asks for setting and light only (measured baseline 36/177 = 20%).",
@@ -880,6 +881,24 @@
       "status": "pending",
       "evidence": [],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — Re-plan regression guard"
+    },
+    {
+      "id": "idea-pick-recorded",
+      "title": "A story started from generated ideas records which card the customer picked",
+      "commits": [
+        "c7b4eb1e1"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "A run started from a generated idea stores stories.data.ideaPick and an idea_picked row in idea_events (staging now; production only after migration 039 is applied there).",
+      "runShape": [
+        "needs-fresh-idea"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "ideaPickRecorded"
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }
