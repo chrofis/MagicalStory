@@ -602,6 +602,8 @@ export const storyService = {
     sceneEvaluations: Array<{
       pageNumber: number;
       qualityScore: number | null;
+      /** Stored canonical score (applyScore stamp, mirrored on the scene/cover). */
+      finalScore?: number | null;
       verdict: string | null;
       issuesSummary: string | null;
       semanticScore: number | null;

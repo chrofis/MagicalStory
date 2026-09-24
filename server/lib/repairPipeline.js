@@ -729,62 +729,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // MIN_SEVERITY_TYPES on top of SEVERITY_POINTS — the same arithmetic the
   // consolidated score uses, so an entity finding cannot cost more here than
   // its type is allowed to cost there.
-  const { SEVERITY_POINTS: ENTITY_PENALTIES, deductionPoints } = require('./scoring');
-  // Returns { penalty, issues } so callers can persist BOTH the number AND the
-  // source issues on each version. Without the issues, the dev panel shows a
-  // mysterious "−N" deduction that the user can't drill into.
-  const getEntityPenaltyAndIssues = (pageNumber, report) => {
-    const out = { penalty: 0, issues: [] };
-    if (!report?.characters) return out;
-    for (const [charName, charData] of Object.entries(report.characters)) {
-      const charIssues = charData.issues || [];
-      for (const issue of charIssues) {
-        if (issue.pages?.includes(pageNumber) || issue.pagesToFix?.includes(pageNumber) || issue.pageNumber === pageNumber) {
-          // Charge through deductionPoints so the TYPE ceilings actually apply
-          // here. This path used to bill severity alone, so every
-          // MAX_SEVERITY_TYPES entry — accessory, unverified_absence,
-          // face_drift, hair_nuance — was silently ignored for entity
-          // findings: the bounding existed in code but not on the path that
-          // does the entity billing. Measured cost on one production book:
-          // 75 points across four pages and a cover for hair differing by a
-          // shade, which the owner reads as a nuance.
-          // { entity: true }: this IS the entity report, so its source-scoped
-          // zero (scoring.js ENTITY_ONLY_ZERO_POINT_TYPES) applies.
-          out.penalty += deductionPoints(issue, { entity: true });
-          out.issues.push({
-            name: charName,
-            // Carried so the ceiling is reproducible downstream and the dev
-            // panel can show WHY a MAJOR-looking finding cost 2 points.
-            type: issue.type || null,
-            subType: issue.subType || null,
-            severity: issue.severity,
-            description: require('./scoring').findingText(issue),
-            source: 'character',
-          });
-        }
-      }
-    }
-    // Also include object-level issues so the panel surfaces missing/wrong props.
-    for (const [objName, objData] of Object.entries(report.objects || {})) {
-      const objIssues = objData.issues || [];
-      for (const issue of objIssues) {
-        if (issue.pages?.includes(pageNumber) || issue.pagesToFix?.includes(pageNumber) || issue.pageNumber === pageNumber) {
-          out.penalty += deductionPoints(issue, { entity: true });
-          out.issues.push({
-            name: objName,
-            type: issue.type || null,
-            subType: issue.subType || null,
-            severity: issue.severity,
-            description: require('./scoring').findingText(issue),
-            source: 'object',
-          });
-        }
-      }
-    }
-    return out;
-  };
-  // Backward-compat shim — existing callers that only need the number.
-  const getEntityPenalty = (pageNumber, report) => getEntityPenaltyAndIssues(pageNumber, report).penalty;
+  // The entity report's per-page findings, billed through deductionPoints —
+  // the ONE implementation (scoring.js entityIssuesForPage), shared with the
+  // admin re-evaluate route so both land on the same score.
+  const { entityIssuesForPage: getEntityPenaltyAndIssues } = require('./scoring');
 
   // ---------------------------------------------------------------------
   // Eval consolidation (owner decision Jul 2026: "3-4 different evals, then

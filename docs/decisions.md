@@ -58548,3 +58548,40 @@ animal all present. Prod trial `job_1790169018278_n57xpnufo` front cover rebuilt
 
 **Touched:** `server/lib/images.js`, `tests/unit/cover-shrink-must-keep.test.ts`.
 **Status:** ✅ active on staging.
+
+## 2026-09-24 — The admin re-evaluate route scores through the pipeline's scorer; it keeps no sum of its own
+
+**Context.** `POST /:id/repair-workflow/re-evaluate` (server/routes/regeneration.js) summed
+`SEVERITY_POINTS` over every 'entity check' / 'image checks' issue and wrote `evaluation.score − that`
+into the version's `qualityScore`, into the stamp's input, into the scene fallback and into the
+response the repair panel shows. The sum ignored the per-type rules (`ZERO_POINT_TYPES`,
+`MAX_SEVERITY_TYPES`, `ENTITY_ONLY_ZERO_POINT_TYPES`): a crop artefact that costs 0 was charged 15. It also
+passed `collectAllIssuesForPage`'s list (retry-history issues from earlier images, and the entity
+findings a second time) to the stamp as if the evaluator had reported them, and its response carried no
+`finalScore`, so `findBadPages` (`computeFinalScore` → `score − entityPenalty`) subtracted the
+entity charge twice. The repair panel's collect-feedback step did the same on the client
+(`qualityScore − Σ`, entity issues stripped of their type, image checks priced though the scorer never
+charges them) and priced each listed issue on a 30/20/10 table nothing else uses.
+
+**Decision (owner-approved bug fix, 2026-09-24).** One scorer, one entity reader:
+- `scoring.js entityIssuesForPage(pageNumber, entityReport)` — moved verbatim from a repairPipeline
+  closure — is the only reader of an entity report for scoring. The pipeline and the route both call it.
+- The route stamps the active version with the evaluator's result unmodified plus that entity bucket
+  (the same inputs as repairPipeline's `stampAtCreation`), and everything it writes or returns —
+  `finalScore`, `evalScore`, `entityPenalty`, the entity deductions, `scoreBreakdown` — is read back
+  from the stamped version. `version.qualityScore` / `scene.qualityScore` mirror `evalScore`.
+- No fallback: a page with no active version to stamp returns an error for that page; nothing is
+  written on the evaluator's scale.
+- The client shows the stored `finalScore` (evaluation-data now returns it) and decides redo on it;
+  entity findings keep type/subType so their displayed price follows the per-type rules; image-check
+  findings are listed, not priced.
+
+**Evidence.** Replay over staging job_1790100385959_1nitlympp's stored back cover (v0 stamped 70 with a
+MAJOR entity-only `figure_completeness` crop finding): the new route path stamps 85, entity −0, equal to
+the canonical scorer. Pinned by `tests/unit/reevaluate-canonical-score.test.ts`.
+
+**Touched:** `server/routes/regeneration.js`, `server/lib/scoring.js`, `server/lib/repairPipeline.js`,
+`server/routes/stories.js`, `client/src/hooks/useRepairWorkflow.ts`,
+`client/src/components/generation/RepairWorkflowPanel.tsx`, `client/src/types/story.ts`,
+`client/src/services/storyService.ts`, `tests/unit/reevaluate-canonical-score.test.ts`.
+**Status:** ✅ active.

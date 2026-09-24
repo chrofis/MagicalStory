@@ -1453,6 +1453,7 @@ router.get('/:id/evaluation-data', authenticateToken, async (req, res) => {
       SELECT
         (s->>'pageNumber')::int as page_number,
         s->'qualityScore' as quality_score,
+        s->'finalScore' as final_score,
         s->>'verdict' as verdict,
         s->>'issuesSummary' as issues_summary,
         s->'semanticScore' as semantic_score,
@@ -1474,6 +1475,9 @@ router.get('/:id/evaluation-data', authenticateToken, async (req, res) => {
     const sceneEvaluations = evalRows.map(row => ({
       pageNumber: row.page_number,
       qualityScore: row.quality_score,
+      // The stored canonical score (the scene's mirror of its active version's
+      // applyScore stamp). The repair panel shows this instead of re-deriving one.
+      finalScore: row.final_score,
       verdict: row.verdict,
       issuesSummary: row.issues_summary,
       semanticScore: row.semantic_score,
@@ -1496,6 +1500,7 @@ router.get('/:id/evaluation-data', authenticateToken, async (req, res) => {
           sceneEvaluations.push({
             pageNumber: coverPageMap[coverType],
             qualityScore: cover.qualityScore ?? null,
+            finalScore: cover.finalScore ?? null,
             semanticScore: cover.semanticScore ?? null,
             verdict: cover.verdict ?? null,
             issuesSummary: cover.issuesSummary ?? null,

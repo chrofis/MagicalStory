@@ -21,7 +21,7 @@ import {
   Paintbrush,
   Eye,
 } from 'lucide-react';
-import { useRepairWorkflow } from '@/hooks/useRepairWorkflow';
+import { useRepairWorkflow, entityIssuePoints } from '@/hooks/useRepairWorkflow';
 import { REPAIR_DEFAULTS } from '@/config/repairDefaults';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
 import { EntityConsistencyView } from './EntityConsistencyView';
@@ -103,19 +103,21 @@ function StepStatusBadge({ status }: { status: StepStatus }) {
 
 // Re-evaluation result shape (from workflowState.reEvaluationResults.pages)
 interface ReEvalResult {
-  score?: number;
+  score?: number | null;
+  finalScore?: number | null;
   qualityScore: number;
   semanticScore?: number | null;
   entityPenalty?: number;
   verdict?: string;
-  fixableIssues?: Array<{ description?: string; issue?: string; severity: string; type?: string; fix?: string; source?: string }>;
+  fixableIssues?: Array<{ description?: string; issue?: string; severity: string; type?: string; subType?: string; fix?: string; source?: string }>;
   semanticResult?: PageFeedback['semanticResult'];
 }
 
-// Severity to numeric penalty mapping
-const severityPenalty = (s: string) =>
-  s === 'critical' || s === 'CRITICAL' ? 30 :
-  s === 'major' || s === 'MAJOR' ? 20 : 10;
+// Points one listed issue costs — the scorer's per-type rules (entityIssuePoints
+// mirrors scoring.js deductionPoints), with the entity-only zero applied to
+// findings the entity check reported. Replaces a 30/20/10 table no scorer used.
+const issuePoints = (issue: { severity: string; type?: string; subType?: string; source?: string }) =>
+  entityIssuePoints(issue, issue.source === 'entity check');
 
 // Page feedback card component
 function PageFeedbackCard({
@@ -190,13 +192,14 @@ function PageFeedbackCard({
 
   // Build a unified fixableIssues list: prefer reEvalResult's if available (already source-tagged),
   // otherwise fall back to feedback arrays
-  const allIssues: Array<{ description: string; severity: string; type?: string; source?: string }> = [];
+  const allIssues: Array<{ description: string; severity: string; type?: string; subType?: string; source?: string }> = [];
   if (reEvalResult?.fixableIssues && reEvalResult.fixableIssues.length > 0) {
     for (const issue of reEvalResult.fixableIssues) {
       allIssues.push({
         description: issue.description || issue.issue || JSON.stringify(issue),
         severity: issue.severity,
         type: issue.type,
+        subType: issue.subType,
         source: issue.source,
       });
     }
@@ -206,11 +209,11 @@ function PageFeedbackCard({
       allIssues.push({ description: issue.description, severity: issue.severity, type: issue.type, source: issue.source });
     }
     for (const issue of feedback.entityIssues) {
-      allIssues.push({ description: `[${issue.character}] ${issue.issue}`, severity: issue.severity, source: issue.source || 'entity check' });
+      allIssues.push({ description: `[${issue.character}] ${issue.issue}`, severity: issue.severity, type: issue.type, subType: issue.subType, source: issue.source || 'entity check' });
     }
     if (feedback.objectIssues) {
       for (const issue of feedback.objectIssues) {
-        allIssues.push({ description: `[${issue.object}] ${issue.issue}`, severity: issue.severity, source: issue.source || 'entity check' });
+        allIssues.push({ description: `[${issue.object}] ${issue.issue}`, severity: issue.severity, type: issue.type, subType: issue.subType, source: issue.source || 'entity check' });
       }
     }
     if (feedback.semanticIssues) {
@@ -248,7 +251,7 @@ function PageFeedbackCard({
     <div className="space-y-0.5">
       {issues.map((issue, idx) => (
         <div key={idx} className="flex gap-1 items-start">
-          <span className={`text-[10px] font-bold ${color} shrink-0`}>-{severityPenalty(issue.severity)}</span>
+          <span className={`text-[10px] font-bold ${color} shrink-0`}>-{issuePoints(issue)}</span>
           <span className="text-xs text-gray-700">{issue.description}</span>
         </div>
       ))}
