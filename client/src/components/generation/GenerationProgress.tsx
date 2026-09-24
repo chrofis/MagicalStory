@@ -3,7 +3,6 @@ import { Loader2, Mail, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { ProgressBar } from '@/components/common/ProgressBar';
-import type { CoverImages } from '@/types/story';
 import type { Character } from '@/types/character';
 import { getFaceThumb, getBodyThumb, getStandardAvatar } from '@/utils/characterPhotos';
 import {
@@ -12,33 +11,21 @@ import {
   EXAMPLE_STORY_CREDITS,
 } from '@/constants/credits';
 
-// Checkpoint → display % mapping (shared with Navigation bar)
-// Server sends checkpoint numbers: 1=start, 2=arcs, 3=title, 4=clothing, 5=plot,
-// 6=visualBible, 7=covers, 8=text done, 9=avatars, 10=scenes, 11-30=images,
-// 31=covers done, 32-72=quality pipeline, 73=finalize, 100=done
+// Server progress → display %. The server already reports a TIME-PROPORTIONAL
+// percent (story_jobs.progress): the beats text stages carry measured budgets
+// (1-57, eased between checkpoints by the text-phase heartbeat), avatars and
+// scenes 58-59, page images 60-64, the automatic repair 64-96, covers 97,
+// finalize 98, done 100. Measured on production 2026-09 (52-83 min, median
+// ~57): writing ~28-39 min, images ~2 min, repair 20-40 min, i.e. roughly
+// 57 / 4 / 35 % of the wall clock, which is what those numbers encode. The
+// old client table re-mapped an obsolete 1-73 checkpoint numbering on top of
+// that, so the bar sat at 3-12 % through the arc and at 90-98 % for the last
+// 40 minutes. The only job left here is clamping (docs/decisions.md,
+// 2026-09-24 "Progress bar shows the server percent").
 export function checkpointToPercent(cp: number): number {
-  if (cp <= 1) return 3;
-  if (cp <= 2) return 8;
-  if (cp <= 3) return 12;
-  if (cp <= 4) return 15;
-  if (cp <= 5) return 20;    // Plot streaming — exponential creep fills 20→50% during the wait
-  if (cp <= 6) return 48;
-  if (cp <= 7) return 49;
-  if (cp <= 8) return 50;    // Text complete
-  if (cp <= 9) return 52;
-  if (cp <= 10) return 55;
-  if (cp <= 30) return 55 + Math.round(((cp - 10) / 20) * 17);  // 55-72% for page images
-  if (cp <= 31) return 73;
-  if (cp <= 32) return 75;   // Quality eval starts
-  if (cp <= 40) return 80;
-  if (cp <= 50) return 83;
-  if (cp <= 55) return 86;
-  if (cp <= 65) return 90;
-  if (cp <= 68) return 92;
-  if (cp <= 72) return 95;
-  if (cp <= 73) return 97;
-  if (cp < 100) return 98;
-  return 100;
+  if (!Number.isFinite(cp) || cp <= 1) return 1;
+  if (cp >= 100) return 100;
+  return Math.min(99, Math.round(cp));
 }
 
 interface GenerationProgressProps {
@@ -46,7 +33,6 @@ interface GenerationProgressProps {
   total: number;
   message?: string;
   isGenerating?: boolean;
-  coverImages?: CoverImages;  // Optional partial cover images to display
   jobId?: string;  // Job ID for cancellation
   onCancel?: () => void;  // Callback when job is cancelled
   onMinimize?: () => void;  // Callback to minimize and continue in background
@@ -60,7 +46,6 @@ export function GenerationProgress({
   total,
   message: _message,
   isGenerating = true,
-  coverImages,
   jobId,
   onCancel,
   onMinimize,
@@ -74,22 +59,19 @@ export function GenerationProgress({
   const [isCancelling, setIsCancelling] = useState(false);
   const [rotationIndex, setRotationIndex] = useState(0);
 
-  // Pin the persistent banner — duration + close-tab + email-on-completion —
-  // after 20s. It was 60s, set when a story was believed to take 5–10 minutes.
-  // Measured 2026-08-26 on production 16–18 page stories: 41, 54, 59, 59, 61
-  // minutes, with the first page image at ~38 min (stage log of
-  // job_1787689073034_1v6ew0y1kae: outline 0–37, images 38, finalize 59). A
-  // reader facing an hour needs the "you can walk away" message early, not a
-  // minute in, so the spinner and carousel still run but the standing message
-  // settles almost immediately. Anything longer leaves them watching a rotation
-  // for the wrong reason.
-  const [showCloseHint, setShowCloseHint] = useState(false);
+  // THE HOUR MESSAGE (owner spec 2026-09-24). A story takes about an hour
+  // (production 2026-09: 52, 54, 57, 58, 83 min). The reader must learn that
+  // FIRST, together with "you can leave, we email you", so it opens as the
+  // prominent panel and after a few seconds settles into a small standing note
+  // under the spinner. It replaced a 20 s delayed email panel plus a rotating
+  // "30-60 minutes" tip, which said the same thing twice and the timing wrongly.
+  const [hourNoteSettled, setHourNoteSettled] = useState(false);
   useEffect(() => {
     if (!isGenerating) {
-      setShowCloseHint(false);
+      setHourNoteSettled(false);
       return;
     }
-    const timer = setTimeout(() => setShowCloseHint(true), 20_000);
+    const timer = setTimeout(() => setHourNoteSettled(true), 7_000);
     return () => clearTimeout(timer);
   }, [isGenerating]);
 
@@ -296,13 +278,10 @@ export function GenerationProgress({
   // Each character × avatar pair is a separate entry for maximum variety
   const rotationItems = useMemo(() => {
     const messages = [
-      { type: 'message' as const, key: 'timeInfo' },
       { type: 'message' as const, key: 'tipCharacters' },
       { type: 'message' as const, key: 'tipPrintedBook' },
       { type: 'message' as const, key: 'tipStoryPlot' },
       { type: 'message' as const, key: 'tipLearning' },
-      // canClose appears as the highlighted email-icon panel below — no need
-      // to also rotate the close-tab message through the tips carousel.
       { type: 'message' as const, key: 'tipLocations' },
       { type: 'message' as const, key: 'tipHistoric' },
       { type: 'message' as const, key: 'tipArtStyle' },
@@ -393,7 +372,7 @@ export function GenerationProgress({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rotationIndex, rotationItems, language]);
 
-  // Server sends sequential checkpoint numbers (1-73, then 100 for done).
+  // Server sends a time-proportional percent (1-98, then 100 for done).
   // We map these to target percentages and smoothly animate toward them —
   // the bar should always be increasing, just at different speeds.
   // NOTE: All hooks below MUST run before the `if (!isGenerating || total === 0)`
@@ -474,24 +453,11 @@ export function GenerationProgress({
     return null;
   }
 
-  // Helper to extract imageData from cover
-  const getImageData = (cover: { imageData?: string } | null | undefined): string | undefined => {
-    return cover?.imageData;
-  };
-
-  // Check which covers are available
-  const frontCoverData = getImageData(coverImages?.frontCover);
-  const initialPageData = getImageData(coverImages?.initialPage);
-  const backCoverData = getImageData(coverImages?.backCover);
-  const hasFrontCover = !!frontCoverData;
-  const hasInitialPage = !!initialPageData;
-  const hasBackCover = !!backCoverData;
-  const hasAnyCovers = hasFrontCover || hasInitialPage || hasBackCover;
-
   const translations = {
     en: {
       title: 'Creating Your Story!',
-      timeInfo: 'Your story takes 30–60 minutes. The writing comes first, so the pictures arrive in the second half.',
+      hourTitle: "Your story takes about an hour.",
+      hourBody: "You can leave this page. We'll email you as soon as it's ready.",
       tipCharacters: 'Children learn best when they see themselves in the story. That\'s the magic of personalized books!',
       tipStoryPlot: 'You can edit any text and regenerate any image after the story is created — make it perfect!',
       tipLocations: 'We include real photos of your hometown landmarks in the illustrations — select your location for a personal touch.',
@@ -501,19 +467,14 @@ export function GenerationProgress({
       tipHistoric: 'Explore history! Your child can experience the moon landing, meet dinosaurs, or discover local Swiss legends.',
       tipLearning: 'Personalized stories inspire children to read — much better than screen time arguments!',
       tipCredits: `Each page costs ${CREDITS_PER_PAGE} credits. A ${EXAMPLE_STORY_PAGES}-page story uses ${EXAMPLE_STORY_CREDITS} credits — you can create stories up to 25 pages, each with its own illustration!`,
-      coversPreview: 'Your book is taking shape',
-      frontCover: 'Cover',
-      initialPage: 'Dedication',
-      backCover: 'Back',
       cancelJob: 'Cancel Generation',
       cancelling: 'Cancelling...',
-      canCloseTitle: 'We\'ll email you when it\'s ready',
-      canClose: 'This takes 30–60 minutes. You can close this tab — your story keeps generating on our servers.',
       continueInBackground: 'Continue in Background',
     },
     de: {
       title: 'Geschichte wird erstellt!',
-      timeInfo: 'Deine Geschichte braucht 30–60 Minuten. Zuerst wird geschrieben, die Bilder kommen in der zweiten Hälfte.',
+      hourTitle: "Deine Geschichte braucht etwa eine Stunde.",
+      hourBody: "Du kannst diese Seite verlassen. Wir schicken dir eine E-Mail, sobald sie fertig ist.",
       tipCharacters: 'Kinder lernen am besten, wenn sie sich selbst in der Geschichte sehen. Das ist die Magie personalisierter Bücher!',
       tipStoryPlot: 'Du kannst jeden Text bearbeiten und jedes Bild neu generieren — mach die Geschichte perfekt!',
       tipLocations: 'Wir verwenden echte Fotos deiner Heimat-Sehenswürdigkeiten in den Illustrationen — wähle deinen Ort für eine persönliche Note.',
@@ -523,19 +484,14 @@ export function GenerationProgress({
       tipHistoric: 'Entdecke Geschichte! Dein Kind kann die Mondlandung erleben, Dinosaurier treffen oder lokale Schweizer Sagen entdecken.',
       tipLearning: 'Personalisierte Geschichten motivieren Kinder zum Lesen — viel besser als Diskussionen über Bildschirmzeit!',
       tipCredits: `Jede Seite kostet ${CREDITS_PER_PAGE} Credits. Eine ${EXAMPLE_STORY_PAGES}-Seiten-Geschichte braucht ${EXAMPLE_STORY_CREDITS} Credits — du kannst Geschichten bis zu 25 Seiten erstellen, jede mit eigener Illustration!`,
-      coversPreview: 'Dein Buch nimmt Gestalt an',
-      frontCover: 'Cover',
-      initialPage: 'Widmung',
-      backCover: 'Rückseite',
       cancelJob: 'Generierung abbrechen',
       cancelling: 'Wird abgebrochen...',
-      canCloseTitle: 'Wir schicken dir eine E-Mail, sobald es so weit ist',
-      canClose: 'Das dauert 30–60 Minuten. Du kannst den Tab schliessen — deine Geschichte wird auf unseren Servern weiter erstellt.',
       continueInBackground: 'Im Hintergrund fortsetzen',
     },
     fr: {
       title: 'Création de votre histoire!',
-      timeInfo: 'Votre histoire prend 30 à 60 minutes. Le texte s\'écrit d\'abord, les images arrivent dans la seconde moitié.',
+      hourTitle: "Votre histoire prend environ une heure.",
+      hourBody: "Vous pouvez quitter cette page. Nous vous enverrons un e-mail dès qu'elle sera prête.",
       tipCharacters: 'Les enfants apprennent mieux quand ils se voient dans l\'histoire. C\'est la magie des livres personnalisés !',
       tipStoryPlot: 'Vous pouvez modifier chaque texte et regénérer chaque image après la création — rendez-la parfaite !',
       tipLocations: 'Nous incluons de vraies photos de vos monuments locaux dans les illustrations — choisissez votre lieu pour une touche personnelle.',
@@ -545,19 +501,14 @@ export function GenerationProgress({
       tipHistoric: 'Explorez l\'histoire ! Votre enfant peut vivre l\'alunissage, rencontrer des dinosaures ou découvrir des légendes locales.',
       tipLearning: 'Les histoires personnalisées inspirent les enfants à lire — bien mieux que les disputes sur le temps d\'écran !',
       tipCredits: `Chaque page coûte ${CREDITS_PER_PAGE} crédits. Une histoire de ${EXAMPLE_STORY_PAGES} pages utilise ${EXAMPLE_STORY_CREDITS} crédits — vous pouvez créer des histoires jusqu'à 25 pages, chacune avec sa propre illustration !`,
-      coversPreview: 'Votre livre prend forme',
-      frontCover: 'Couverture',
-      initialPage: 'Dédicace',
-      backCover: 'Dos',
       cancelJob: 'Annuler la génération',
       cancelling: 'Annulation...',
-      canCloseTitle: 'Nous vous enverrons un e-mail quand prêt',
-      canClose: 'Cela prend 30 à 60 minutes. Vous pouvez fermer cet onglet — votre histoire continue sur nos serveurs.',
       continueInBackground: 'Continuer en arrière-plan',
     },
     it: {
       title: 'Stiamo creando la tua storia!',
-      timeInfo: 'La tua storia richiede 30–60 minuti. Prima si scrive, le immagini arrivano nella seconda metà.',
+      hourTitle: "La tua storia richiede circa un'ora.",
+      hourBody: "Puoi lasciare questa pagina. Ti mandiamo un'e-mail appena è pronta.",
       tipCharacters: 'I bambini imparano meglio quando si vedono nella storia. È la magia dei libri personalizzati!',
       tipStoryPlot: 'Puoi modificare ogni testo e rigenerare ogni immagine — rendi la storia perfetta!',
       tipLocations: 'Usiamo foto reali dei monumenti della tua zona nelle illustrazioni — scegli il tuo luogo per un tocco personale.',
@@ -567,53 +518,47 @@ export function GenerationProgress({
       tipHistoric: 'Scopri la storia! Tuo figlio può vivere lo sbarco sulla Luna, incontrare i dinosauri o scoprire leggende svizzere locali.',
       tipLearning: 'Le storie personalizzate invogliano i bambini a leggere — molto meglio delle discussioni sullo schermo!',
       tipCredits: `Ogni pagina costa ${CREDITS_PER_PAGE} crediti. Una storia di ${EXAMPLE_STORY_PAGES} pagine usa ${EXAMPLE_STORY_CREDITS} crediti — puoi creare storie fino a 25 pagine, ognuna con la sua illustrazione!`,
-      coversPreview: 'Il tuo libro prende forma',
-      frontCover: 'Copertina',
-      initialPage: 'Dedica',
-      backCover: 'Retro',
       cancelJob: 'Annulla generazione',
       cancelling: 'Annullamento...',
-      canCloseTitle: 'Ti scriviamo un\'e-mail appena è pronta',
-      canClose: 'Ci vogliono 30–60 minuti. Puoi chiudere questa scheda — la tua storia continua sui nostri server.',
       continueInBackground: 'Continua in background',
     },
   };
 
   const t = translations[language as keyof typeof translations] || translations.en;
 
-  // Helper to render a cover thumbnail — no green, no check icon. The
-  // thumbnail itself is the "ready" signal; waiting slots show a spinner.
-  const CoverThumbnail = ({ imageData, label, isReady }: { imageData?: string; label: string; isReady: boolean }) => (
-    <div className="flex flex-col items-center gap-1">
-      <div className="w-16 h-16 md:w-20 md:h-20 rounded-lg overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center">
-        {isReady && imageData ? (
-          <img src={imageData} alt={label} className="w-full h-full object-contain" />
-        ) : (
-          <Loader2 size={20} className="animate-spin text-gray-400" />
-        )}
-      </div>
-      <span className={`text-xs ${isReady ? 'text-gray-700' : 'text-gray-400'}`}>{label}</span>
-    </div>
-  );
-
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className={`bg-white rounded-2xl shadow-xl w-full p-6 md:p-8 ${hasAnyCovers ? 'max-w-lg' : 'max-w-md'}`}>
-        {/* Header — big spinner only before the covers start appearing.
-            Once covers are visible they (and their per-slot spinners)
-            carry the "still working" signal on their own. */}
+      <div className="bg-white rounded-2xl shadow-xl w-full p-6 md:p-8 max-w-md">
         <div className="text-center mb-6">
-          {!hasAnyCovers && (
-            <div className="relative inline-block mb-3">
-              <Loader2 size={48} className="animate-spin text-indigo-500" />
-              <span className="absolute -top-1 -right-1 text-xl">✨</span>
-            </div>
-          )}
+          <div className="relative inline-block mb-3">
+            <Loader2 size={48} className="animate-spin text-indigo-500" />
+            <span className="absolute -top-1 -right-1 text-xl">✨</span>
+          </div>
           <h2 className="text-xl md:text-2xl font-bold text-gray-800">{t.title}</h2>
+          {/* The hour message, settled: a small standing note under the spinner. */}
+          {hourNoteSettled && (
+            <p className="mt-2 text-xs text-gray-500 flex items-start justify-center gap-1.5">
+              <Mail className="w-3.5 h-3.5 shrink-0 mt-px" />
+              <span>{t.hourTitle} {t.hourBody}</span>
+            </p>
+          )}
         </div>
 
-        {/* Rotating display section - before covers appear */}
-        {!hasAnyCovers && rotationItems.length > 0 && (
+        {/* The hour message, first seconds: prominent, before anything else. */}
+        {!hourNoteSettled && (
+          <div className="mb-6 min-h-[220px] flex items-center justify-center">
+            <div className="flex items-start gap-3 bg-indigo-50 border border-indigo-200 rounded-xl p-5 max-w-sm animate-fade-in">
+              <Clock size={24} className="text-indigo-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-base font-semibold text-gray-900 mb-1">{t.hourTitle}</p>
+                <p className="text-sm text-gray-700">{t.hourBody}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Rotating tips and character avatars */}
+        {hourNoteSettled && rotationItems.length > 0 && (
           <div className="mb-6 min-h-[220px] flex items-center justify-center">
             {(() => {
               const currentItem = rotationItems[rotationIndex];
@@ -633,66 +578,15 @@ export function GenerationProgress({
               } else if (currentItem.type === 'message') {
                 const messageKey = currentItem.key as keyof typeof t;
                 const messageText = t[messageKey] || '';
-                const icon = messageKey === 'timeInfo' ? <Clock size={20} className="text-indigo-500 shrink-0" /> :
-                             <CheckCircle size={20} className="text-indigo-500 shrink-0" />;
                 return (
                   <div className="flex items-start gap-3 bg-gradient-to-r from-indigo-50 to-indigo-50 rounded-xl p-4 max-w-sm animate-fade-in">
-                    {icon}
+                    <CheckCircle size={20} className="text-indigo-500 shrink-0" />
                     <p className="text-sm text-gray-700">{messageText}</p>
                   </div>
                 );
               }
               return null; // Fallback while character display is being computed
             })()}
-          </div>
-        )}
-
-        {/* Cover preview section */}
-        {hasAnyCovers && (
-          <div className="mb-4 bg-gray-50 rounded-xl p-4">
-            <h3 className="text-sm font-medium text-gray-700 text-center mb-3">{t.coversPreview}</h3>
-            <div className="flex justify-center gap-4">
-              <CoverThumbnail
-                imageData={frontCoverData}
-                label={t.frontCover}
-                isReady={hasFrontCover}
-              />
-              <CoverThumbnail
-                imageData={initialPageData}
-                label={t.initialPage}
-                isReady={hasInitialPage}
-              />
-              <CoverThumbnail
-                imageData={backCoverData}
-                label={t.backCover}
-                isReady={hasBackCover}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Status message when covers are showing — header already has the
-            primary spinner, so don't duplicate it here. */}
-        {hasAnyCovers && (
-          <div className="mb-4 text-center">
-            <p className="text-sm text-gray-600">
-              {language === 'de'
-                ? 'Jede Seite wird jetzt gemalt ...'
-                : language === 'fr'
-                ? 'Chaque page est maintenant peinte ...'
-                : language === 'it'
-                ? 'Ora dipingiamo ogni pagina ...'
-                : 'Now painting each page ...'}
-            </p>
-            <p className="text-xs text-gray-500 mt-1">
-              {language === 'de'
-                ? 'Dies kann einige Minuten dauern. Du kannst den Browser schliessen.'
-                : language === 'fr'
-                ? 'Cela peut prendre quelques minutes. Vous pouvez fermer le navigateur.'
-                : language === 'it'
-                ? 'Può richiedere qualche minuto. Puoi chiudere il browser.'
-                : 'This may take a few minutes. You can close the browser.'}
-            </p>
           </div>
         )}
 
@@ -715,19 +609,6 @@ export function GenerationProgress({
           >
             {t.continueInBackground}
           </button>
-        )}
-
-        {/* After 60s — quiet reassurance below the CTA. Subordinate styling:
-            smaller text, lighter background, no border emphasis. The button
-            above is the primary action; this is just context. */}
-        {showCloseHint && (
-          <div className="mb-4 bg-gray-50 rounded-lg p-3 flex items-start gap-2.5">
-            <Mail className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="text-xs font-medium text-gray-800 mb-0.5">{t.canCloseTitle}</p>
-              <p className="text-xs text-gray-600">{t.canClose}</p>
-            </div>
-          </div>
         )}
 
         {/* Admin-only cancel — muted, kept small and at the bottom so it

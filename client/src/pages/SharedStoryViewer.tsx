@@ -87,6 +87,50 @@ export default function SharedStoryViewer() {
   const navigate = useNavigate();
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const { language, t } = useLanguage();
+  // Reader chrome strings. The header, toggle and page buttons were English in
+  // every language (owner report 2026-09-24).
+  const sv = ({
+    en: {
+      invalidLink: 'Invalid share link', unavailable: 'This story is no longer available or the link is invalid.', loadFailed: 'Failed to load story. Please try again later.', offline: 'Failed to load story. Please check your connection.',
+      loadingStory: 'Loading story...', notFound: 'Story Not Found', createOwn: 'Create Your Own Story',
+      printPreview: 'Print preview', printPreviewTitle: 'Text printed over the image — matches the printed book',
+      readMode: 'Read mode', readModeTitle: 'Text on a separate facing page — easier to read',
+      isPublic: 'Public', isPrivate: 'Private',
+      publicTitle: 'Public — anyone with the link can view', privateTitle: 'Private — only you can view',
+      share: 'Share', edit: 'Edit', menu: 'Menu',
+      prevPage: 'Previous page', nextPage: 'Next page', firstPage: 'Go to first page', storyPage: 'Story page',
+    },
+    de: {
+      invalidLink: 'Ungültiger Link', unavailable: 'Diese Geschichte ist nicht mehr verfügbar oder der Link ist ungültig.', loadFailed: 'Die Geschichte konnte nicht geladen werden. Bitte versuche es später erneut.', offline: 'Die Geschichte konnte nicht geladen werden. Bitte prüfe deine Internetverbindung.',
+      loadingStory: 'Geschichte wird geladen...', notFound: 'Geschichte nicht gefunden', createOwn: 'Eigene Geschichte erstellen',
+      printPreview: 'Druckansicht', printPreviewTitle: 'Text über dem Bild, so wie im gedruckten Buch',
+      readMode: 'Leseansicht', readModeTitle: 'Text auf einer eigenen Seite daneben. So liest es sich leichter.',
+      isPublic: 'Öffentlich', isPrivate: 'Privat',
+      publicTitle: 'Öffentlich: Alle mit dem Link können sie ansehen', privateTitle: 'Privat: Nur du kannst sie ansehen',
+      share: 'Teilen', edit: 'Bearbeiten', menu: 'Menü',
+      prevPage: 'Vorherige Seite', nextPage: 'Nächste Seite', firstPage: 'Zur ersten Seite', storyPage: 'Seite der Geschichte',
+    },
+    fr: {
+      invalidLink: 'Lien de partage invalide', unavailable: "Cette histoire n'est plus disponible ou le lien n'est pas valide.", loadFailed: "Impossible de charger l'histoire. Veuillez réessayer plus tard.", offline: "Impossible de charger l'histoire. Veuillez vérifier votre connexion.",
+      loadingStory: "Chargement de l'histoire...", notFound: 'Histoire introuvable', createOwn: 'Créer votre histoire',
+      printPreview: 'Aperçu impression', printPreviewTitle: "Texte sur l'image, comme dans le livre imprimé",
+      readMode: 'Lecture', readModeTitle: 'Texte sur une page séparée en regard, plus facile à lire',
+      isPublic: 'Publique', isPrivate: 'Privée',
+      publicTitle: 'Publique : toute personne ayant le lien peut la voir', privateTitle: 'Privée : vous seul pouvez la voir',
+      share: 'Partager', edit: 'Modifier', menu: 'Menu',
+      prevPage: 'Page précédente', nextPage: 'Page suivante', firstPage: 'Aller à la première page', storyPage: "Page de l'histoire",
+    },
+    it: {
+      invalidLink: 'Link non valido', unavailable: 'Questa storia non è più disponibile o il link non è valido.', loadFailed: 'Impossibile caricare la storia. Riprova più tardi.', offline: 'Impossibile caricare la storia. Controlla la connessione.',
+      loadingStory: 'Caricamento della storia...', notFound: 'Storia non trovata', createOwn: 'Crea la tua storia',
+      printPreview: 'Anteprima di stampa', printPreviewTitle: "Testo sopra l'immagine, come nel libro stampato",
+      readMode: 'Lettura', readModeTitle: 'Testo su una pagina a fianco, più facile da leggere',
+      isPublic: 'Pubblica', isPrivate: 'Privata',
+      publicTitle: 'Pubblica: chiunque abbia il link può vederla', privateTitle: 'Privata: solo tu puoi vederla',
+      share: 'Condividi', edit: 'Modifica', menu: 'Menu',
+      prevPage: 'Pagina precedente', nextPage: 'Pagina successiva', firstPage: 'Vai alla prima pagina', storyPage: 'Pagina della storia',
+    },
+  } as const)[(['en', 'de', 'fr', 'it'] as const).find(l => l === language) ?? 'en'];
   const [story, setStory] = useState<SharedStoryData | null>(null);
   // Slim header (title, cover existence, page count). Lands ~10× faster
   // than the full story payload because it skips the multi-MB JSONB blob
@@ -210,7 +254,7 @@ export default function SharedStoryViewer() {
 
   useEffect(() => {
     if (!shareToken) {
-      setError('Invalid share link');
+      setError(sv.invalidLink);
       setLoading(false);
       return;
     }
@@ -234,9 +278,9 @@ export default function SharedStoryViewer() {
         return;
       }
       if (status === 404) {
-        setError('This story is no longer available or the link is invalid.');
+        setError(sv.unavailable);
       } else {
-        setError('Failed to load story. Please try again later.');
+        setError(sv.loadFailed);
       }
       setLoading(false);
     };
@@ -287,7 +331,7 @@ export default function SharedStoryViewer() {
         setSharingEnabled(data.isShared || false);
       })
       .catch(() => {
-        if (!cancelled) setError('Failed to load story. Please check your connection.');
+        if (!cancelled) setError(sv.offline);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -477,7 +521,7 @@ export default function SharedStoryViewer() {
       <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-blue-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-indigo-500 mx-auto mb-4" />
-          <p className="text-indigo-800">Loading story...</p>
+          <p className="text-indigo-800">{sv.loadingStory}</p>
         </div>
       </div>
     );
@@ -488,14 +532,14 @@ export default function SharedStoryViewer() {
       <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-blue-50 flex items-center justify-center p-4">
         <div className="text-center max-w-md">
           <AlertCircle className="w-16 h-16 text-indigo-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-indigo-900 mb-2">Story Not Found</h1>
+          <h1 className="text-2xl font-bold text-indigo-900 mb-2">{sv.notFound}</h1>
           <p className="text-indigo-700 mb-6">{error}</p>
           <Link
             to="/"
             className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-blue-500 text-white px-6 py-3 rounded-full font-semibold hover:from-indigo-600 hover:to-blue-600 transition-all"
           >
             <Sparkles className="w-5 h-5" />
-            Create Your Own Story
+            {sv.createOwn}
           </Link>
         </div>
       </div>
@@ -524,25 +568,25 @@ export default function SharedStoryViewer() {
     <div className={`inline-flex rounded-full p-0.5 text-xs font-medium ${toggleBase}`} role="tablist">
       <button
         onClick={() => setReadingMode('inline')}
-        title="Text printed over the image — matches the printed book"
+        title={sv.printPreviewTitle}
         aria-pressed={readingMode === 'inline'}
         className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full transition-colors ${
           readingMode === 'inline' ? activeCls : inactiveCls
         }`}
       >
         <Eye size={13} />
-        <span className="hidden sm:inline short:hidden">Print preview</span>
+        <span className="hidden sm:inline short:hidden">{sv.printPreview}</span>
       </button>
       <button
         onClick={() => setReadingMode('sidepage')}
-        title="Text on a separate facing page — easier to read"
+        title={sv.readModeTitle}
         aria-pressed={readingMode === 'sidepage'}
         className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full transition-colors ${
           readingMode === 'sidepage' ? activeCls : inactiveCls
         }`}
       >
         <BookOpen size={13} />
-        <span className="hidden sm:inline short:hidden">Read mode</span>
+        <span className="hidden sm:inline short:hidden">{sv.readMode}</span>
       </button>
     </div>
   );
@@ -587,7 +631,7 @@ export default function SharedStoryViewer() {
                     onClick={toggleSharing}
                     disabled={sharingLoading}
                     className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors"
-                    title={sharingEnabled ? 'Public — anyone with the link can view' : 'Private — only you can view'}
+                    title={sharingEnabled ? sv.publicTitle : sv.privateTitle}
                   >
                     {sharingLoading ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -596,7 +640,7 @@ export default function SharedStoryViewer() {
                     ) : (
                       <Lock className="w-3.5 h-3.5" />
                     )}
-                    <span className="hidden sm:inline">{sharingEnabled ? 'Public' : 'Private'}</span>
+                    <span className="hidden sm:inline">{sharingEnabled ? sv.isPublic : sv.isPrivate}</span>
                   </button>
 
                   {/* Share — primary CTA on the dark bar */}
@@ -605,7 +649,7 @@ export default function SharedStoryViewer() {
                     className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white text-zinc-900 rounded-md text-xs font-semibold hover:bg-white/90 transition-colors"
                   >
                     <Share2 className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Share</span>
+                    <span className="hidden sm:inline">{sv.share}</span>
                   </button>
 
                   {/* Edit — ghost */}
@@ -614,7 +658,7 @@ export default function SharedStoryViewer() {
                     className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors"
                   >
                     <Pencil className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Edit</span>
+                    <span className="hidden sm:inline">{sv.edit}</span>
                   </Link>
                 </>
               )}
@@ -624,10 +668,10 @@ export default function SharedStoryViewer() {
                 <button
                   onClick={() => setShowMenu(!showMenu)}
                   className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors"
-                  aria-label="Menu"
+                  aria-label={sv.menu}
                 >
                   <Menu size={16} />
-                  <span className="hidden md:inline">Menu</span>
+                  <span className="hidden md:inline">{sv.menu}</span>
                 </button>
 
                 {showMenu && (
@@ -654,7 +698,7 @@ export default function SharedStoryViewer() {
               className="inline-flex items-center gap-1.5 bg-amber-700 text-white px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-semibold hover:bg-amber-800 transition-colors flex-shrink-0 shadow-sm"
             >
               <Sparkles className="w-4 h-4" />
-              <span className="hidden sm:inline">Create Your Own Story</span>
+              <span className="hidden sm:inline">{sv.createOwn}</span>
             </Link>
           </div>
         </header>
@@ -734,7 +778,7 @@ export default function SharedStoryViewer() {
             onClick={flipPrev}
             disabled={currentPage === 0}
             className="p-2 lg:p-3 rounded-full bg-white shadow-lg border border-indigo-200 text-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-indigo-50 transition-colors"
-            aria-label="Previous page"
+            aria-label={sv.prevPage}
           >
             <ChevronLeft className="w-6 h-6 lg:w-8 lg:h-8" />
           </button>
@@ -742,8 +786,8 @@ export default function SharedStoryViewer() {
             <button
               onClick={() => bookRef.current?.flipTo(0)}
               className="p-1.5 rounded-full bg-white shadow border border-indigo-200 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-              aria-label="Go to first page"
-              title="Go to first page"
+              aria-label={sv.firstPage}
+              title={sv.firstPage}
             >
               <ChevronsLeft className="w-4 h-4" />
             </button>
@@ -793,7 +837,7 @@ export default function SharedStoryViewer() {
           onClick={flipNext}
           disabled={currentPage >= totalPages - 1}
           className="hidden md:flex p-2 lg:p-3 rounded-full bg-white shadow-lg border border-indigo-200 text-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-indigo-50 transition-colors ml-3 lg:ml-6 flex-shrink-0"
-          aria-label="Next page"
+          aria-label={sv.nextPage}
         >
           <ChevronRight className="w-6 h-6 lg:w-8 lg:h-8" />
         </button>
@@ -808,7 +852,7 @@ export default function SharedStoryViewer() {
             <button
               onClick={() => bookRef.current?.flipTo(0)}
               className="p-1.5 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-400"
-              aria-label="Go to first page"
+              aria-label={sv.firstPage}
             >
               <ChevronsLeft className="w-4 h-4" />
             </button>
@@ -820,7 +864,7 @@ export default function SharedStoryViewer() {
           onClick={flipPrev}
           disabled={currentPage === 0}
           className="md:hidden p-2 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed"
-          aria-label="Previous page"
+          aria-label={sv.prevPage}
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
@@ -835,7 +879,7 @@ export default function SharedStoryViewer() {
           onClick={flipNext}
           disabled={currentPage >= totalPages - 1}
           className="md:hidden p-2 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed"
-          aria-label="Next page"
+          aria-label={sv.nextPage}
         >
           <ChevronRight className="w-5 h-5" />
         </button>
@@ -844,7 +888,7 @@ export default function SharedStoryViewer() {
       {/* Fullscreen image viewer */}
       <ImageLightbox
         src={fullscreenImage}
-        alt="Story page"
+        alt={sv.storyPage}
         onClose={() => setFullscreenImage(null)}
       />
 

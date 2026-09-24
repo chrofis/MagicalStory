@@ -59711,3 +59711,64 @@ p9 v0 unchanged. Pages 14 and −3 (Julian, non-wardrobe findings) unchanged.
 server/lib/repairLogic.js, server/lib/feedbackConsolidator.js, server/lib/images.js, server/routes/regeneration.js,
 tests/unit/entity-multipage-off-by-design.test.ts, tasks/bugs.json.
 **Status:** ✅ active on staging.
+
+## 2026-09-24 — A reader waits on the progress screen until the story is complete; the bar shows the server's time-proportional percent
+
+**Context:** a production story takes about an hour (2026-09: 52, 54, 57, 58, 83 min; writing
+~28-39 min, page images ~2 min, automatic repair 20-40 min). The wait screen still said "30-60
+minutes" in a rotating tip plus a separate email panel after 20 s, and closed itself at the first
+image, dropping the reader onto a book with pictures before text, pre-repair images and "Quality
+checks running" on every page for the remaining ~40 minutes. The bar ran through
+`checkpointToPercent`, a table for an obsolete 1-73 checkpoint numbering, applied on top of a server
+value that is already a percent: it sat at 3-12 % for the ~20-minute arc and at 90-98 % for the last
+~40 minutes.
+
+**Decision (owner, 2026-09-24):**
+- The progress modal stays until the job is COMPLETE (or the reader minimizes), then the reader is
+  taken to the finished story. No partial story, no stage text, no per-page state for readers; the
+  live partial view is kept only for an admin in developer mode (`showLivePartialStory` in
+  `StoryWizard.tsx`: modal closes at the first image and step 6 renders the in-progress book, as
+  before). The cover-thumbnail preview and "Now painting each page / this may take a few minutes"
+  lines are deleted from the modal.
+- The hour message opens prominently ("Your story takes about an hour. You can leave this page.
+  We'll email you as soon as it's ready."), then after 7 s settles into a small note under the
+  spinner and stays. It replaces the "30-60 minutes" tip and the 20 s email panel.
+- `checkpointToPercent` only clamps (1-99, 100 when done): `story_jobs.progress` is already
+  time-proportional — beats text stages 1-57 with measured budgets, eased by the text-phase
+  heartbeat; avatars/scenes 58-59; page images 60-64; repair 64-96. Two stale server writes that
+  pulled the value BACK after repair (covers 31, finalize 73, from the old numbering) are now 97 and
+  98, so the nav percent and My Stories card no longer drop at the end.
+
+**Rationale:** the percent split matches the measured production shares (~57 / 4 / 35 % of the
+wall clock), so the bar moves with time without a second client-side model of the pipeline. Nobody
+waits an hour watching a draft book; the email is the delivery channel.
+
+**Touched:** `client/src/components/generation/GenerationProgress.tsx`, `client/src/pages/StoryWizard.tsx`,
+`storyJobPipeline.js` (two progress writes).
+**Status:** ✅ active on staging.
+
+## 2026-09-24 — The idea stream sends only the final idea; draft and review never leave the server
+
+**Context:** `/api/generate-story-ideas-stream` streamed the model's raw output (`[DRAFT]` … `[REVIEW]`
+…) into the editable idea box every 50 characters, and the wizard cleared the card's loading state
+on the first chunk, so customers read the model's working notes until the `[FINAL]` text replaced
+them. When no `[FINAL]` marker came back, the whole raw response was sent as the idea. The pair
+endpoint `/api/generate-story-ideas` (no client caller today) likewise returned the whole response as
+one idea when parsing failed.
+
+**Decision:** each arm (`streamIdeaArm`, `server/routes/storyIdeas.js`) sends exactly one `story<N>`
+event carrying the `[FINAL]` section (`parseIdeaFinal`, last marker wins) when the call returns.
+While it runs, SSE comment lines (`: generating`) keep the proxy connection and the client's 2-minute
+idle timeout alive without any text. No `[FINAL]` section → an error event for that arm, never the
+raw text; the pair endpoint answers 502 instead of returning the raw response. The client needed no
+change: the card stays in its loading state until its one event arrives. Admins still get the full
+raw responses in the `done` event (dev panel).
+
+**Rationale:** fixing it at the source is the only way the scratch text cannot leak; a client-side
+filter over prose would be a guess. 6/6 stored production idea responses (the rows that still keep
+`ideaGeneration.rawResponse`) carry a `[FINAL]` section, so the new error path is not expected to fire
+on the happy path. The /try trial idea route is unchanged: it streams the idea text itself (its
+self-check block stripped), not a draft/review transcript.
+
+**Touched:** `server/routes/storyIdeas.js`, `tests/unit/idea-stream-final-only.test.ts`.
+**Status:** ✅ active on staging.

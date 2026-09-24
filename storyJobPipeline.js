@@ -7083,7 +7083,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         log.debug(`⏳ [UNIFIED] Waiting for cover images to finish (page images done first)...`);
         await dbPool.query(
           'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-          [31, 'Finishing cover images...', jobId]  // 31 = covers finishing
+          [97, 'Finishing cover images...', jobId]  // 97 = covers finishing (after repair, which ends at 96)
         );
       }
       const COVER_TIMEOUT_MS = 180000; // 3 minutes
@@ -7256,7 +7256,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     log.debug(`📝 [UNIFIED] Updating job status to 95% (finalizing)...`);
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      [73, 'Finalizing story...', jobId]  // 73 = finalizing
+      [98, 'Finalizing story...', jobId]  // 98 = finalizing
     );
 
     // Extract entity report from unified pipeline results (same on every page)

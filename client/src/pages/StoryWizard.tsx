@@ -129,6 +129,15 @@ const wizardHelperTexts: Record<string, Record<number, string>> = {
   },
 };
 
+// The customer-facing sentence for a failed story generation. The raw server
+// error stays out of it (owner report 2026-09-24: "Job stopped responding ...").
+function generationFailedText(language: string): string {
+  return language === 'de' ? 'Beim Erstellen deiner Geschichte ist etwas schiefgelaufen.'
+    : language === 'fr' ? 'Un problème est survenu lors de la création de votre histoire.'
+    : language === 'it' ? 'Qualcosa è andato storto durante la creazione della tua storia.'
+    : 'Something went wrong while creating your story.';
+}
+
 export default function StoryWizard() {
   // Warm the photo-analyzer workers the moment the user arrives (see hook).
   useAnalyzerPresence('wizard');
@@ -222,6 +231,10 @@ export default function StoryWizard() {
     useMagicApiRepair, setUseMagicApiRepair,
     modelSelections, setModelSelections,
   } = useDeveloperMode();
+  // Admin live view: the only place a story still being generated is shown
+  // (pages before their text, pre-repair images). Every reader waits on the
+  // progress modal until the job is complete (owner 2026-09-24).
+  const showLivePartialStory = developerMode && (user?.role === 'admin' || isImpersonating);
 
   // Story Type & Art Style settings - load from localStorage (used in step 4)
   const [storyType, setStoryType] = useState(() => {
@@ -1508,7 +1521,7 @@ export default function StoryWizard() {
             };
             const messages = {
               en: 'Your book order has been received and will be printed soon.',
-              de: 'Ihre Buchbestellung wurde entgegengenommen und wird bald gedruckt.',
+              de: 'Deine Buchbestellung wurde entgegengenommen und wird bald gedruckt.',
               fr: 'Votre commande de livre a été reçue et sera bientôt imprimée.',
               it: 'Il tuo ordine del libro è stato ricevuto e sarà presto stampato.',
             };
@@ -1540,7 +1553,7 @@ export default function StoryWizard() {
         log.info('Payment cancelled by user');
         const messages = {
           en: 'Payment was cancelled. You can try again when ready.',
-          de: 'Zahlung wurde abgebrochen. Sie können es erneut versuchen.',
+          de: 'Zahlung wurde abgebrochen. Du kannst es erneut versuchen.',
           fr: 'Paiement annulé. Vous pouvez réessayer quand vous êtes prêt.',
           it: 'Il pagamento è stato annullato. Puoi riprovare quando sei pronto.',
         };
@@ -2054,7 +2067,7 @@ export default function StoryWizard() {
       setIsGeneratingIdea1(false);
       setIsGeneratingIdea2(false);
       showError(language === 'de'
-        ? 'Zeitüberschreitung bei der Ideengenerierung. Bitte versuchen Sie es erneut.'
+        ? 'Zeitüberschreitung bei der Ideengenerierung. Bitte versuche es erneut.'
         : language === 'fr'
         ? 'Délai d\'attente de génération d\'idées. Veuillez réessayer.'
         : language === 'it' ? 'Timeout nella generazione delle idee. Riprova.' : 'Idea generation timed out. Please try again.');
@@ -2432,7 +2445,7 @@ export default function StoryWizard() {
         log.info(`📸 cooldown check: canRegenerate=${cooldown.canRegenerate}, waitSeconds=${cooldown.waitSeconds}`);
         if (!cooldown.canRegenerate) {
           const waitMsg = language === 'de'
-            ? `Bitte warten Sie ${cooldown.waitSeconds} Sekunden, bevor Sie ein neues Foto hochladen.`
+            ? `Bitte warte ${cooldown.waitSeconds} Sekunden, bevor du ein neues Foto hochlädst.`
             : language === 'fr'
             ? `Veuillez attendre ${cooldown.waitSeconds} secondes avant de télécharger une nouvelle photo.`
             : language === 'it'
@@ -3909,7 +3922,7 @@ export default function StoryWizard() {
         onError: (error) => {
           log.error('Failed to generate story ideas:', error);
           showError(language === 'de'
-            ? 'Fehler beim Generieren von Ideen. Bitte versuchen Sie es erneut.'
+            ? 'Fehler beim Generieren von Ideen. Bitte versuche es erneut.'
             : language === 'fr'
             ? 'Erreur lors de la génération d\'idées. Veuillez réessayer.'
             : language === 'it' ? 'Errore nella generazione delle idee. Riprova.' : 'Failed to generate ideas. Please try again.');
@@ -4528,11 +4541,10 @@ export default function StoryWizard() {
             isGenerating,
           },
         });
-        showError(language === 'de'
-          ? `Generierung fehlgeschlagen: ${errorMessage}`
-          : language === 'fr'
-          ? `Échec de la génération: ${errorMessage}`
-          : language === 'it' ? `Generazione non riuscita: ${errorMessage}` : `Generation failed: ${errorMessage}`);
+        // Customers get a plain sentence; the raw server text ("Job stopped
+        // responding ...") is for admins and the error report above only.
+        const isAdminViewer = user?.role === 'admin' || isImpersonating;
+        showError(generationFailedText(language) + (isAdminViewer ? ` (${errorMessage})` : ''));
       }
     } finally {
       stopTracking(); // Ensure global tracking is stopped
@@ -4733,10 +4745,12 @@ export default function StoryWizard() {
         const hasPlaceholders = sceneImages.some(img => img.hasImage) ||
           (coverImages.frontCover && typeof coverImages.frontCover === 'object' && coverImages.frontCover.hasImage);
         // Show if: 1) have story+images, 2) progressive mode, 3) generating, or 4) have title+placeholders (fast load)
-        if ((generatedStory && hasAnyImage) ||
+        // A story still generating is never shown to a reader, only to the admin live view.
+        const partialStoryHidden = isGenerating && !generatedStory && !showLivePartialStory;
+        if (!partialStoryHidden && ((generatedStory && hasAnyImage) ||
             (progressiveStoryData && hasAnyImage) ||
             (isGenerating && hasAnyImage) ||
-            (storyTitle && hasPlaceholders)) {
+            (storyTitle && hasPlaceholders))) {
           // Build scene images from progressive data if still generating
           const displaySceneImages = generatedStory
             ? sceneImages
@@ -5159,7 +5173,7 @@ export default function StoryWizard() {
                   });
                   // Show success message with option to open Gelato dashboard
                   const successMsg = language === 'de'
-                    ? `✅ Druckauftrag erfolgreich erstellt!\n\nOrder ID: ${result.orderId}\n${result.isDraft ? '(Entwurf - muss in Gelato bestätigt werden)' : ''}\n\nMöchten Sie das Gelato Dashboard öffnen, um den Auftrag zu verfolgen?`
+                    ? `✅ Druckauftrag erfolgreich erstellt!\n\nOrder ID: ${result.orderId}\n${result.isDraft ? '(Entwurf - muss in Gelato bestätigt werden)' : ''}\n\nMöchtest du das Gelato Dashboard öffnen, um den Auftrag zu verfolgen?`
                     : language === 'fr'
                     ? `✅ Commande d'impression créée avec succès!\n\nID de commande: ${result.orderId}\n${result.isDraft ? '(Brouillon - doit être confirmé dans Gelato)' : ''}\n\nVoulez-vous ouvrir le tableau de bord Gelato pour suivre la commande?`
                     : language === 'it' ? `✅ Ordine di stampa creato con successo!\n\nOrder ID: ${result.orderId}\n${result.isDraft ? '(Bozza - da confermare in Gelato)' : ''}\n\nVuoi aprire la dashboard Gelato per seguire l'ordine?` : `✅ Print order created successfully!\n\nOrder ID: ${result.orderId}\n${result.isDraft ? '(Draft - must be confirmed in Gelato)' : ''}\n\nWould you like to open the Gelato dashboard to track your order?`;
@@ -5782,8 +5796,11 @@ export default function StoryWizard() {
                   {language === 'de' ? 'Generierung fehlgeschlagen' : language === 'fr' ? 'La génération a échoué' : language === 'it' ? 'Generazione non riuscita' : 'Generation Failed'}
                 </h2>
                 <p className="text-red-600 mb-4 max-w-md mx-auto text-sm">
-                  {lastGenerationError}
+                  {generationFailedText(language)}
                 </p>
+                {(user?.role === 'admin' || isImpersonating) && (
+                  <p className="text-gray-400 mb-4 max-w-md mx-auto text-xs font-mono break-words">{lastGenerationError}</p>
+                )}
                 <p className="text-gray-500 mb-6 text-sm">
                   {language === 'de' ? 'Deine Credits wurden nicht belastet. Du kannst es erneut versuchen.'
                     : language === 'fr' ? 'Vos crédits n\'ont pas été débités. Vous pouvez réessayer.'
@@ -6161,15 +6178,16 @@ export default function StoryWizard() {
         </div>
       </div>
 
-      {/* Generation Progress Modal - Full story generation */}
-      {/* Show until we have an image to display (front cover or first page image), final story, or user minimizes */}
-      {/* Note: progressiveStoryData (text) alone does NOT dismiss — wait for at least one image */}
-      {isGenerating && !generatedStory && !coverImages.frontCover && Object.keys(completedPageImages).length === 0 && !isProgressMinimized && (
+      {/* Generation Progress Modal - Full story generation. Stays until the job
+          is COMPLETE (or the user minimizes): a story takes about an hour, and a
+          reader must never land on a partial, pre-repair book (owner 2026-09-24).
+          Only the admin live view closes it at the first image. */}
+      {isGenerating && !generatedStory && !isProgressMinimized &&
+        (!showLivePartialStory || (!coverImages.frontCover && Object.keys(completedPageImages).length === 0)) && (
         <GenerationProgress
           current={generationProgress.current}
           total={generationProgress.total}
           message={generationProgress.message}
-          coverImages={coverImages}
           characters={characters.filter(c => !excludedCharacters.includes(c.id))}
           jobId={jobId || undefined}
           isImpersonating={isImpersonating}
