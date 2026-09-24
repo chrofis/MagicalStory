@@ -7177,7 +7177,11 @@ function buildChallengeIdeasSection(inputData, count = 25) {
 // Q12 (each commissioned character's own action staged, owner 2026-09-23)
 // joined as must-fix: it names a picture the book needs, the same kind of
 // finding as Q4 and Q8.
-const REPLAN_MUST_FIX_CHECKS = new Set([4, 8, 12]);
+//
+// Q14 (over-the-shoulder page on a contact beat, owner 2026-09-24) joined as
+// must-fix: it asks only for another shot word on the named page, never for a
+// page to be spent or moved.
+const REPLAN_MUST_FIX_CHECKS = new Set([4, 8, 12, 14]);
 
 /**
  * THE SHOT-DISTRIBUTION BLOCK, declared ONCE (2026-09-20).

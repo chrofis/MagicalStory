@@ -59999,6 +59999,9 @@ whose near figure touches what they face and ask for another shot. The finding r
 every other model finding. Classification stays in the prompt; no code reads the beat text. Q14 is not
 in `REPLAN_MUST_FIX_CHECKS`, so it arrives under ALSO NOTED — promoting it is a severity call left open.
 
+**Update (owner, 2026-09-24):** Q14 is now in `REPLAN_MUST_FIX_CHECKS` (`{4, 8, 12, 14}`) and arrives
+under MUST FIX. Its answer is a different shot word on the named page, never a page spent or moved.
+
 **Rationale:** a rule the planner is given and the checker is not is a rule nothing enforces. One
 constant on both sides keeps generator and critic from drifting (`beats-planner-vs-plan-check`).
 

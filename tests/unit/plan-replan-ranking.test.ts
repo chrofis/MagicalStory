@@ -52,6 +52,8 @@ describe('re-plan ranking', () => {
     // Q9 detects the deed-and-effect page reliably, but the planner answers a
     // named climax page by destroying it rather than splitting it, so advisory.
     expect(replanRank({ kind: 'check', check: 9 })).toBe('also');
+    // Q14 (over-the-shoulder on a contact beat) is must-fix, owner 2026-09-24.
+    expect(replanRank({ kind: 'check', check: 14 })).toBe('must');
     expect(replanRank({ kind: 'counter', code: 'NO_FOCAL_PAGE' })).toBe('must');
     expect(replanRank({ kind: 'counter', code: 'SHOT_VARIETY' })).toBe('also');
     expect(replanRank('a legacy string')).toBe('also');
