@@ -58112,3 +58112,26 @@ offered and declined: it trades variety or coverage for a problem the existing l
 `landmark_photo_scores` + `landmark_index.story_score*` on prod via `merge-landmark-judgments.js` only.
 Staging receives it through `sync-landmark-index-to-staging.js` (not run — owner's call).
 **Status:** ✅ done.
+
+## 2026-09-24 — The staging landmark sync mirrors photo scores; it no longer only adds them
+
+**Context.** After the worldwide judging run was synced to staging, staging held 2,617 score rows that prod
+does not have: 2,607 on slots with no photo at all (the 2026-08-28 and 2026-09-05 judging runs, whose
+photos prod later dropped or compacted — prod has 8 such rows) and 10 on slots whose photo prod has since
+replaced, so the score described a different picture. 1,809 of them scored ≥ 40, so staging's
+`bestPhotoSlots` could pick a slot with no photo, and `servedLandmark` then paired slot 1's picture with
+an empty description and credit. The cause is the sync: it upserted score rows and never deleted one.
+
+**Decision (owner, 2026-09-24).** `sync-landmark-index-to-staging.js` mirrors `landmark_photo_scores` for
+every landmark it syncs: prod's rows are upserted (judged_at copied, as text — it is a naive TIMESTAMP),
+and every other staging score row of those landmarks is deleted. Staging-only landmarks are untouched.
+Delete + upsert are one transaction; the deleted rows are dumped to JSON first; `--dry-run` lists them.
+The selection is a pure function, `scoreRowsToDelete`, pinned by
+`tests/unit/landmark-sync-mirror-scores.test.ts`.
+
+**Run.** Dry run listed 2,617 rows (2,607 empty-slot, 10 wrong-photo); the real run deleted exactly those
+(backup in the session scratchpad, `landmark-sync-deleted-scores-2026-09-24.json`).
+
+**Touched:** `scripts/admin/sync-landmark-index-to-staging.js`,
+`tests/unit/landmark-sync-mirror-scores.test.ts`, `docs/landmark-database.md`.
+**Status:** ✅ active.

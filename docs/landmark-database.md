@@ -381,6 +381,17 @@ silhouette artist was served as the Parvis Notre-Dame (decisions.md, 2026-09-24)
 `sync-landmark-index-to-staging.js` (prod → staging **only**; never the reverse) ·
 `clean-blind-run-landmark-rows.js`
 
+The sync upserts `landmark_index` on `wikidata_qid` and **mirrors**
+`landmark_photo_scores`: for every landmark it syncs, staging ends up with exactly
+prod's score rows (matched through the qid, since ids differ), and any other
+staging score row of that landmark is deleted. Staging-only landmarks (no prod
+counterpart) and rows outside `--city` are untouched. The mirror runs in one
+transaction; the rows it deletes are written to a JSON backup first
+(`--backup=FILE`, default in `$TEMP`), and `--dry-run` lists them. Before
+2026-09-24 the scores were upsert-only, which left 2,617 staging scores behind
+on slots prod had emptied or refilled — 1,809 of them ≥ 40, so staging's
+`bestPhotoSlots` offered slots with no photo (decisions.md, 2026-09-24).
+
 **Licensing.** Commons content is overwhelmingly CC BY / CC BY-SA, where credit is
 a licence CONDITION. `photo_attribution` is therefore not decoration, and it is
 stored per slot — pairing one slot's picture with another's author names the
