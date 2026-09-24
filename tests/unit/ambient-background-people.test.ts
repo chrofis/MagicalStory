@@ -124,7 +124,7 @@ describe('derivePresenceFinding: ambient pages', () => {
     });
     expect(out.outcome).toBe('declined');
     expect(out.reason).toBe('ambient_background');
-    expect(out.finding).toBeNull();
+    expect(out.findings).toEqual([]);
   });
 
   it('still emits the CRITICAL on the same page when the brief says cast-only', () => {
@@ -134,7 +134,7 @@ describe('derivePresenceFinding: ambient pages', () => {
       referenceNames: ['Levin', 'Julian'],
     });
     expect(out.outcome).toBe('extra_character');
-    expect(out.finding.severity).toBe('CRITICAL');
+    expect(out.findings[0].severity).toBe('CRITICAL');
   });
 
   it('still catches the uncommissioned cast-scale figure on an AMBIENT quay', () => {
@@ -144,8 +144,8 @@ describe('derivePresenceFinding: ambient pages', () => {
       referenceNames: ['Emma', 'Noah', 'Daniel'],
     });
     expect(out.outcome).toBe('extra_character');
-    expect(out.finding.severity).toBe('CRITICAL');
-    expect(out.finding.description).toContain('1 more figure(s)');
+    expect(out.findings[0].severity).toBe('CRITICAL');
+    expect(out.findings.map((f: any) => f.type)).toEqual(['extra_character']);
   });
 
   it('declines on an ambient page whose figures carry labels but no boxes', () => {
@@ -198,7 +198,7 @@ describe('derivePresenceFinding: ambient pages', () => {
       detectedFigureCount: 2, detectorFigures: figs, referenceNames: ['Emma', 'Noah', 'Daniel'],
     });
     expect(out.outcome).toBe('missing_character');
-    expect(out.finding.character).toBe('Emma');
+    expect(out.findings[0].character).toBe('Emma');
   });
 });
 

@@ -10,9 +10,11 @@
  *
  * 2. A PAGE WRITTEN FOR NOBODY LOOPED ON CHAR-FIX. p7's declared cast is []; Grok
  *    drew two children, the entity check read one as a roster girl with a CRITICAL
- *    age_shift, and all three rounds went to char-fixes that produced no image. A
- *    cast-0 page now routes drawn figures to iterate, and a char-fix that failed
- *    on a version is never repeated on that version.
+ *    age_shift, and all three rounds went to char-fixes that produced no image.
+ *    Under the three-case presence model (owner, 2026-09-24) p7 is the EXTRA case
+ *    (remove the figures); a name outside the declared cast is never char-fixed;
+ *    the MIXED case redraws the unmatched figure as the missing name; a char-fix
+ *    that failed on a version is never repeated on that version.
  */
 import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
@@ -22,6 +24,7 @@ import path from 'node:path';
 const require = createRequire(import.meta.url);
 const { attributeReaderFindings, decideRepairMethod } = require('../../server/lib/repairLogic');
 const { derivePresenceFinding } = require('../../server/lib/evalPipeline');
+const { resolveFigureBbox } = require('../../server/lib/charRepairTarget');
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const pipelineSrc = readFileSync(path.join(here, '../../server/lib/repairPipeline.js'), 'utf8');
@@ -63,30 +66,30 @@ describe('reader findings belong to the version the audit read', () => {
   });
 });
 
-describe('a page written for nobody is never char-fixed', () => {
-  const ROSTER = [{ name: 'Sophie' }, { name: 'Lukas' }];
+describe('presence routing: a name the page does not hold is never char-fixed; EXTRA is removed; MIXED is redrawn', () => {
+  const ROSTER = [{ name: 'Sophie' }, { name: 'Lukas' }, { name: 'Dan' }];
   const SCORES = { scoreBreakdown: { visual: { score: 70 }, semantic: { score: 60 } }, finalScore: 30, qualityScore: 70 };
   const ENTITY_CRIT = {
     characters: {
       Sophie: { issues: [{ type: 'age_shift', subType: 'age_shift', severity: 'CRITICAL', pageNumber: 7, pagesToFix: [7], description: 'looks younger' }] },
     },
   };
-  const EXTRA = { type: 'extra_character', severity: 'critical', sources: ['quality'], description: 'Two person-figures present despite EXPECTED CAST of 0' };
-  const EMOTION = { type: 'emotion', severity: 'major', character: 'girl', sources: ['semantic'], description: 'smiling' };
+  const EXTRA = { type: 'extra_character', severity: 'CRITICAL', character: 'figure 1', figure: 1, description: 'surplus figure', fix: 'Remove this figure: it is not one of the characters this page holds.' };
 
-  it('p7 shape: extra_character + entity CRITICAL on a roster name → iterate, not char-fix', () => {
-    const d = decideRepairMethod(7, { ...SCORES, consolidatedPlan: { deduped_issues: [EXTRA, EMOTION] } }, ENTITY_CRIT,
+  it('p7 shape (cast [], extra_character + entity CRITICAL on a roster name) → inpaint removal, not char-fix', () => {
+    const d = decideRepairMethod(7, { ...SCORES, fixableIssues: [EXTRA, { ...EXTRA, figure: 2, character: 'figure 2' }] }, ENTITY_CRIT,
       { characters: ROSTER, expectedCast: [] });
-    expect(d.method).toBe('iterate');
-    expect(d.reason).toMatch(/expected cast is empty/);
+    expect(d.method).toBe('inpaint');
   });
 
-  it('an entity CRITICAL alone on a cast-0 page also routes to iterate', () => {
-    const d = decideRepairMethod(7, { ...SCORES, fixableIssues: [] }, ENTITY_CRIT, { characters: ROSTER, expectedCast: [] });
-    expect(d.method).toBe('iterate');
+  it('an entity CRITICAL on a name outside the declared cast never becomes a char-fix', () => {
+    for (const expectedCast of [[], [{ name: 'Lukas' }], ['Lukas']]) {
+      const d = decideRepairMethod(7, { ...SCORES, fixableIssues: [] }, ENTITY_CRIT, { characters: ROSTER, expectedCast });
+      expect(d.method).not.toBe('char-fix');
+    }
   });
 
-  it('a clothing finding on a cast-0 page is not a figure redo', () => {
+  it('a clothing finding on a name outside the declared cast is not a figure redo', () => {
     const d = decideRepairMethod(7, {
       ...SCORES,
       fixableIssues: [{ type: 'clothing', severity: 'MAJOR', character: 'Sophie', description: 'wrong coat' }],
@@ -105,15 +108,41 @@ describe('a page written for nobody is never char-fixed', () => {
     expect(d.method).toBe('char-fix');
   });
 
-  it('the derived extra_character on a roster of 0 asks for removal, not a redraw as a cast entry', () => {
+  it('MIXED: a derived character_identity (missing name + figure id) → char-fix AT that figure', () => {
     const r = derivePresenceFinding({
       figures: [{ id: 1 }, { id: 2 }],
-      matches: [{ figure: 1, reference: 'unmatched', confidence: 0 }, { figure: 2, reference: 'unmatched', confidence: 0 }],
-      cast: { names: [], count: 0, declared: true, crowdExpected: false, block: '' },
+      matches: [{ figure: 1, reference: 'Lukas', confidence: 0.9 }, { figure: 2, reference: 'unmatched', confidence: 0 }],
+      cast: { names: ['Lukas', 'Dan'], count: 2, declared: true, crowdExpected: false, block: '' },
       detectedFigureCount: 2,
     });
-    expect(r.outcome).toBe('extra_character');
-    expect(r.finding.fix).toBe('Remove this figure: the page is written with no one in it.');
+    const d = decideRepairMethod(4, { ...SCORES, fixableIssues: r.findings }, null,
+      { characters: ROSTER, expectedCast: [{ name: 'Lukas' }, { name: 'Dan' }] });
+    expect(d).toMatchObject({ method: 'char-fix', charName: 'Dan', targetFigure: 2 });
+    expect(d.repairParams.faceOnly).toBe(false);
+    // It never deletes the figure: the type stays out of inpaint.
+    const again = decideRepairMethod(4, { ...SCORES, fixableIssues: r.findings }, null,
+      { characters: ROSTER, expectedCast: [{ name: 'Lukas' }, { name: 'Dan' }], failedMethods: ['char-fix'] });
+    expect(again.method).toBe('iterate');
+  });
+
+  it('MIXED on a photo-less / invented name falls to the orphan gate (iterate), never to removal', () => {
+    const d = decideRepairMethod(4, {
+      ...SCORES,
+      fixableIssues: [{ type: 'character_identity', severity: 'CRITICAL', character: 'Silvan', figure: 2, description: 'x' }],
+    }, null, { characters: ROSTER, expectedCast: [{ name: 'Lukas' }, { name: 'Silvan' }] });
+    expect(d.method).toBe('iterate');
+  });
+
+  it('resolveFigureBbox reads the figure box from the evaluation and swaps [x1,y1,x2,y2] to [ymin,xmin,ymax,xmax]', () => {
+    const bestEval = { matches: [{ figure: 2, reference: 'unmatched', body_bbox: [0.33, 0.56, 0.5, 0.99], face_bbox: null }] };
+    expect(resolveFigureBbox(2, { bestEval })).toEqual({ faceBbox: null, bodyBbox: [0.56, 0.33, 0.99, 0.5], source: 'eval-figure-2' });
+    expect(resolveFigureBbox(9, { bestEval })).toEqual({ faceBbox: null, bodyBbox: null, source: null });
+  });
+
+  it('the char-fix executor and the Lab both target by figure', () => {
+    expect(pipelineSrc).toMatch(/resolveFigureBbox\(decision\.targetFigure, \{ bestEval \}\)/);
+    const lab = readFileSync(path.join(here, '../../server/lib/testlab.js'), 'utf8');
+    expect(lab).toMatch(/resolveFigureBbox\(decision\.targetFigure, \{ bestEval: latestEval \}\)/);
   });
 });
 

@@ -1384,13 +1384,18 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // so they can't disagree. detectAllBoundingBoxes is NOT re-called on miss;
     // its internal safety+model retries already exhausted before storing the
     // result, so a re-call just burns another API hit.
-    const targetResolved = resolveCharBbox(charName, {
-      bestEval, entityReport: currentEntityReport, pageNumber, imageData: currentImageData,
-    });
+    // A decision carrying `targetFigure` (the presence model's MIXED case)
+    // paints THAT figure into `charName`; the name is on no figure yet.
+    const byFigure = decision.targetFigure != null;
+    const targetResolved = byFigure
+      ? require('./charRepairTarget').resolveFigureBbox(decision.targetFigure, { bestEval })
+      : resolveCharBbox(charName, {
+        bestEval, entityReport: currentEntityReport, pageNumber, imageData: currentImageData,
+      });
     const faceBbox = targetResolved.faceBbox;
     const bodyBbox = targetResolved.bodyBbox;
     if (!faceBbox && !bodyBbox) {
-      return { pageNumber, imageData: null, error: `no bbox for ${charName}` };
+      return { pageNumber, imageData: null, error: byFigure ? `no box for figure ${decision.targetFigure} (target ${charName})` : `no bbox for ${charName}` };
     }
 
     // SAME GUARD THE MANUAL ENDPOINT USES. The detector distributes the names
@@ -1399,8 +1404,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // borrowed label. Repainting the face under a borrowed label destroys a
     // bystander — an automatic repair does it without anyone watching, which is
     // worse than the manual case, not better.
+    // Not for a figure-targeted repaint: there the figure is chosen by id from
+    // the evaluation, and no detector label is borrowed.
     const { findBorrowedLabel } = require('./charRepairTarget');
-    const borrowed = findBorrowedLabel({
+    const borrowed = !byFigure && findBorrowedLabel({
       figures: Array.isArray(targetResolved.figures) ? targetResolved.figures : null,
       sceneCharacters: img.sceneCharacters || [],
       sceneMetadata: img.sceneMetadata || {},
@@ -1478,7 +1485,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // derivation. Prefer the intent the decision already emitted (repairParams),
     // but finalise faceOnly here since only now do we know a face box exists.
     const { resolveRepairAxes } = require('./faceRepair');
-    const repairAxes = resolveRepairAxes(decision.issueDescription, { hasFaceBbox: !!faceBbox, issueTypes: decision.issueTypes || null });
+    // A figure repainted INTO another character is a whole-figure redraw, never
+    // a face patch.
+    const repairAxes = resolveRepairAxes(decision.issueDescription, { hasFaceBbox: !!faceBbox, issueTypes: decision.issueTypes || null, ...(byFigure ? { forceTarget: 'body' } : {}) });
     const useFaceOnly = repairAxes.faceOnly;
     // THE FIGURE BOX, for a face repair too — the face goes separately as
     // `faceBbox`, and the face crop is built from that. Passing the face box

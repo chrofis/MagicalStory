@@ -147,7 +147,7 @@ describe('the real defect must still fire', () => {
       referenceNames: ['Emma', 'Noah', 'Daniel'],
     });
     expect(out.outcome).toBe('extra_character');
-    expect(out.finding?.type).toBe('extra_character');
+    expect(out.findings[0]?.type).toBe('extra_character');
   });
 
   it('and it still fires even if that page HAD shown an ambient plate — the extra is cast-scale', () => {

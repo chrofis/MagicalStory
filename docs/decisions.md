@@ -252,6 +252,69 @@ and `shot_off_plate` findings). Lab re-run of the same stage: see the commit / r
 
 ---
 
+## 2026-09-24 — Character presence is THREE cases from the match data: missing → add, extra → remove, mixed → redraw the figure as the missing character (owner reversal of 2026-09-13)
+
+**Context:** Owner reversal ("Forget my rules"), 2026-09-24, of the 2026-09-13 entry "Character
+presence is ONE code-derived signal, mutually exclusive by construction" (commit 0f25e7f25, "an extra
+figure is reconciled with the cast, never deleted"). Evidence: production `job_1790107559778_fcmlfa8kn`
+p7 — declared cast `[]`, Grok drew two children, the entity check read one as a roster girl with a
+CRITICAL `age_shift`, three char-fixes failed ("no usable image") and the page shipped with two
+invented children. Under the 2026-09-13 rule the only repair that could remove them was closed:
+`extra_character` was barred from inpaint, and its fix text told the model to redraw the figure "as
+the EXPECTED CAST entry it should be" — on a page whose cast is empty. The count-based outcomes
+(figures < cast / > cast / ==) also could not say WHICH figure is which when a cast member was
+absent AND an unknown figure stood in the frame.
+
+**Decision:** `evalPipeline.derivePresenceFinding` derives findings from `matches[]` (each figure's
+`reference` or `unmatched`) and the declared cast list alone — no text is read:
+- **MISSING** — a cast name no figure claims and no unmatched figure → `missing_character`
+  ("Add <name> …"), routed as before (inpaint with the character's reference attached).
+- **EXTRA** — every cast name claimed and an unmatched figure → `extra_character` ("Remove this
+  figure: it is not one of the characters this page holds."). A declared-empty cast is this case.
+  `extra_character` LEAVES `NOT_INPAINTABLE_TYPES`: the type now means a confirmed surplus, so the
+  whole-frame Grok edit that removes figures can no longer erase a commissioned character — the
+  danger the 2026-09-13 closure guarded against. Chosen over iterate because iterate re-rolls the
+  whole page from a brief the renderer already ignored once (p7's brief held nobody), while the
+  edit removes exactly the figure; one type, one route, no special case.
+- **MIXED** — both → `character_identity` naming the missing member, with the unmatched figure's id
+  in a structured `figure` field ("Redraw figure N as <name> …"), never a removal.
+  `decideRepairMethod` gate 2a routes it to a char-fix with `targetFigure`; the executor
+  (`repairPipeline.executeCharFixAction`) and the Test Lab repair stage paint THAT figure, whose box
+  comes from the same evaluation (`charRepairTarget.resolveFigureBbox`, axes swapped once from the
+  evaluator's `[x1,y1,x2,y2]`), as a whole-figure redraw. A name with no roster entry falls to the
+  orphan gate (iterate). `character_identity` stays barred from inpaint.
+- **Unequal counts** pair deterministically: unmatched figures in figure-id order (on an ambient page
+  the non-background `zone`s first) against missing names in cast order, photo-less names FIRST — a
+  figure the evaluator could not match because it held no image for that name is that name, and the
+  pair makes no finding (the 2026-09-13 reference rule, kept). Leftover figures are EXTRA, leftover
+  names MISSING. One finding per figure or name.
+- Declines are unchanged (roster not declared, no detector count, broken matches contract, witnesses
+  disagree), plus: a crowd page with any unmatched figure declines (a crowd member cannot be told
+  from a cast member drawn wrong); an ambient page drops background-scale figures by geometry first.
+- The evaluator prompt's D-04b (`image-evaluation.txt`) states the same three cases, so a page the
+  derivation declines on (covers — no detector count) is judged by the same model. The consolidator
+  (`feedback-consolidator.txt`) may remove an `extra_character` figure and keeps a MIXED
+  `character_identity` as a redraw.
+- A char-fix is never aimed at a name outside the version's declared cast (`charFixImpossible`,
+  canonical names) — the figure is not that character; the EXTRA case owns it. This replaces the
+  cast-0 gate 1e of the 2026-09-23 entry below, which routed p7 to iterate; the failed-char-fix flip
+  of that entry stays.
+
+**Rationale:** Replayed over every stored prod version from the last 12 days that carries
+`matches[]` (87): 16 EXTRA, 4 MIXED, 1 MISSING, 66 reconciled. p7 v0 → two `extra_character`
+(figures 1, 2) → inpaint removal instead of three failed char-fixes. MIXED fixture
+`job_1789227389389_z18dmvnt6` p6 v0 (cast [Liz], one unmatched figure) → char-fix Liz at figure 1;
+p13 v0 (cast [Ayan], two unmatched) → figure 1 redrawn as Ayan, figure 2 removed. MISSING fixture
+`job_1789945743706_8ayo2w19e` p3 v1 → add both names.
+
+**Touched:** `server/lib/evalPipeline.js`, `server/lib/repairLogic.js`, `server/lib/repairPipeline.js`,
+`server/lib/charRepairTarget.js`, `server/lib/testlab.js`, `prompts/image-evaluation.txt`,
+`prompts/feedback-consolidator.txt`, `docs/SETTLED.md`, tests (`extra-character-type`,
+`ambient-background-people`, `eval-vb-secondary-reference`, `plate-population`, `inpaint-routing`,
+`inpaint-scene-fix-gate`, `repair-reader-attribution-and-cast0`).
+
+**Status:** ✅ active. Supersedes 2026-09-13 "Character presence is ONE code-derived signal".
+
 ## 2026-09-23 — A reader finding is charged to the version the audit read; a page written for nobody routes drawn figures to iterate; a failed char-fix is not repeated on the same version
 
 **Context:** Production `job_1790107559778_fcmlfa8kn`, two repair-loop bugs (owner-approved fixes).
@@ -304,7 +367,7 @@ version from its plan. Replay over the stored rounds: p5 v3 on its own evidence 
 `tests/unit/repair-reader-attribution-and-cast0.test.ts`, `tests/unit/extra-character-type.test.ts`,
 `tests/unit/repair-reference-and-finding-ledger.test.ts`.
 
-**Status:** ✅ active
+**Status:** ✅ active — except its cast-0 gate 1e and the D-04b cast-0 exception, superseded by 2026-09-24 (three-case presence model).
 
 ## 2026-09-23 — The trial front cover is rendered on a people-free plate, never on the raw landmark photo; it shares buildCoverReferences with the full-account cover
 
@@ -42122,7 +42185,7 @@ two-witness call site + rescore), `server/lib/identityAgreement.js`,
 `tests/manual/test-compliance-severity-cap.js`,
 `tasks/presence-signal-rewrite-2026-09-13.md`.
 
-**Status:** ✅ active (staging only at the time of writing — not on master).
+**Status:** 🗄 superseded by 2026-09-24 "Character presence is THREE cases from the match data" (owner reversal).
 
 ---
 

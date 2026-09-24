@@ -767,9 +767,10 @@ function selectCharRepairTasks(entityReport, options = {}) {
  *
  * Decision order:
  *   1. Catastrophic visual / semantic break    → iterate (regenerate)
- *   1e. Figures on a page whose declared cast is empty → iterate (removal)
  *   2. Major/critical entity (character) issue → char-fix (iterate when a
  *      char-fix already failed on this version)
+ *   2a. Presence MIXED (an unmatched figure is a missing cast member) →
+ *      char-fix at that figure
  *   2c. A CRITICAL no method owns (not inpaintable, no roster entry to
  *       char-fix from) and nothing else to execute → iterate
  *   3. Has fixable quality / semantic content   → inpaint
@@ -792,9 +793,8 @@ function selectCharRepairTasks(entityReport, options = {}) {
  *        gates decline a figure with no roster entry (charFixReferenceGap) instead of
  *        routing a repaint that has no reference to paint from. Absent, no opinion.
  * @param {Array|null} [options.expectedCast] - the DECLARED cast of the version being
- *        repaired (resolveDeclaredCast). `[]` means the page is written with nobody in
- *        it: no figure on it is a roster character, so char-fix is declined and drawn
- *        figures route to iterate (gate 1e). null/absent = not declared, no opinion.
+ *        repaired (resolveDeclaredCast). A name outside it is never char-fixed — the
+ *        figure is not that character. null/absent = not declared, no opinion.
  * @param {string[]} [options.failedMethods] - bare repair methods that already FAILED
  *        (produced no image) on the version being repaired. A failed char-fix is not
  *        repeated on the same pixels: the page flips to iterate.
@@ -942,16 +942,22 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   // through to the gates below exactly as it would with no entity finding.
   // `options.characters` absent ⇒ no opinion, every name stays routable (the
   // unit tests and any caller that does not carry the roster).
-  // A PAGE WRITTEN WITH NOBODY ON IT (2026-09-23). Its declared cast is `[]`, so
-  // any figure drawn there is one the book never commissioned — even when the
-  // entity check maps it onto a roster name. Production job_1790107559778_fcmlfa8kn
-  // p7: two invented children, one read as a roster girl with a CRITICAL
-  // age_shift, and all three rounds went to char-fixes that repainted nothing.
-  // Structured data only: the declared cast, never a finding's prose.
-  const castEmpty = Array.isArray(options.expectedCast) && options.expectedCast.length === 0;
+  // A NAME THE PAGE DOES NOT HOLD IS NOT A CHAR-FIX TARGET (2026-09-23/24). A
+  // figure the entity check maps onto a roster name that the version's DECLARED
+  // cast does not contain is not that character — it is a figure the page never
+  // commissioned, and the presence model's EXTRA case (remove) owns it.
+  // Production job_1790107559778_fcmlfa8kn p7: cast [], two invented children,
+  // one read as a roster girl with a CRITICAL age_shift, and all three rounds
+  // went to char-fixes that repainted nothing. Structured data only: the
+  // declared cast, compared by canonical name, never a finding's prose.
+  // `expectedCast` not an array ⇒ undeclared, no opinion.
+  const { canonicalName: canonName } = require('./castResolver');
+  const pageCast = Array.isArray(options.expectedCast)
+    ? new Set(options.expectedCast.map(c => canonName(typeof c === 'string' ? c : c?.name || '')).filter(Boolean))
+    : null;
   const charFixImpossible = (name) => {
-    if (castEmpty) {
-      return { reason: 'page-cast-empty', message: `the page's expected cast is empty, so ${name || 'the figure'} is not a character this page holds — there is nobody to char-fix` };
+    if (pageCast && !pageCast.has(canonName(name || ''))) {
+      return { reason: 'not-in-page-cast', message: `${name || 'the figure'} is not in this page's declared cast (${pageCast.size ? [...pageCast].join(', ') : 'nobody'}), so the figure is not that character — there is nobody to char-fix` };
     }
     if (!Array.isArray(options.characters)) return null;
     const { charFixReferenceGap } = require('./charRepairTarget');
@@ -967,33 +973,6 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
     method: 'iterate',
     reason: `${what} — char-fix already failed on this version (no usable image), flipping to iterate`,
   });
-
-  // 1e. FIGURES ON A PAGE WRITTEN FOR NOBODY → iterate. The repair is REMOVAL,
-  // and inpaint is closed to `extra_character` (NOT_INPAINTABLE_TYPES, owner
-  // 2026-09-13), so the re-render from the brief — which holds no one — is the
-  // method that removes them. The evidence is either an `extra_character`
-  // finding (declared type) or an entity CRITICAL on this page (a figure the
-  // entity check found on it). Like a spec conflict, the salvage floor is not
-  // consulted: no local repair exists.
-  if (pageNumber > 0 && castEmpty) {
-    const surplus = severityIssues.find(i => String(i?.type || '').toLowerCase() === 'extra_character'
-      && /^(critical|catastrophic)$/i.test(String(i?.severity || '')));
-    let entityFigure = null;
-    for (const [charName, charResult] of Object.entries(entityReport?.characters || {})) {
-      for (const issue of (charResult.issues || [])) {
-        if (String(issue.severity || '').toLowerCase() !== 'critical') continue;
-        const pages = issue.pagesToFix || (issue.pageNumber ? [issue.pageNumber] : []);
-        if (pages.includes(pageNumber)) { entityFigure = charName; break; }
-      }
-      if (entityFigure) break;
-    }
-    if (surplus || entityFigure) {
-      return {
-        method: 'iterate',
-        reason: `figures drawn on a page whose expected cast is empty${entityFigure ? ` (one read as ${entityFigure})` : ''} — re-render without them; a char-fix would repaint an uncommissioned figure`,
-      };
-    }
-  }
 
   if (pageNumber > 0 && entityReport?.characters) {
     let worst = null; // {severity, charName, issue}
@@ -1042,6 +1021,39 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
         issueDescription,
         issueTypes,
         repairParams,
+      };
+    }
+  }
+
+  // 2a. THE PRESENCE MODEL'S MIXED CASE → char-fix AT THE FIGURE (owner,
+  // 2026-09-24). A cast member is absent and an unmatched figure stands in the
+  // frame: that figure IS the missing character drawn wrong, so it is redrawn
+  // as them — never deleted. The finding carries both halves as structured
+  // fields: `character` (the missing name) and `figure` (the evaluator's figure
+  // id, whose box the repair paints). A name with no roster entry has nothing to
+  // paint from and is left to gate 2c.
+  if (pageNumber > 0) {
+    const identity = severityIssues.find(i => String(i?.type || '').toLowerCase() === 'character_identity'
+      && /^(critical|catastrophic)$/i.test(String(i?.severity || ''))
+      && Number.isFinite(Number(i?.figure)) && i?.figure !== null
+      && String(i?.character || '').trim()
+      && !charFixImpossible(String(i.character).trim()));
+    if (identity) {
+      const charName = String(identity.character).trim();
+      if (charFixAlreadyFailed) return flippedFromFailedCharFix(`figure ${identity.figure} is ${charName} drawn wrong`);
+      const issueDescription = require('./scoring').findingText(identity);
+      const { resolveRepairAxes } = require('./faceRepair');
+      return {
+        method: 'char-fix',
+        reason: `figure ${identity.figure} is ${charName} drawn wrong — redraw it as ${charName}`,
+        charName,
+        // The figure the repaint targets. The missing name is by definition NOT
+        // on any figure, so the name-based bbox ladder cannot locate it.
+        targetFigure: Number(identity.figure),
+        severity: String(identity.severity).toLowerCase(),
+        issueDescription,
+        issueTypes: ['character_identity'],
+        repairParams: resolveRepairAxes(issueDescription, { hasFaceBbox: true, forceTarget: 'body' }),
       };
     }
   }
@@ -1366,12 +1378,13 @@ const NOT_INPAINTABLE_TYPES = new Set([
   'clothing', 'clothing_inconsistent', 'clothing_detail', 'garment_colour', 'garment_color',
   // body form
   'scale',
-  // extra_character: the finding is an identity reconciliation, not a deletion
-  // (owner, 2026-09-13). Inpaint was the removal route — a Grok whole-frame
-  // edit executing "remove this figure" erased a commissioned child from a
-  // cover. The finding stays scored and stays in the shippedDefective report;
-  // only its ROUTE is closed, like every other entry here.
-  'extra_character',
+  // extra_character is NOT here (owner, 2026-09-24, superseding 2026-09-13).
+  // Under the three-case presence model an `extra_character` means every cast
+  // member is already matched and this figure is surplus, so removing it cannot
+  // erase a commissioned character — the danger that closed the route. The
+  // removal is an inpaint (whole-frame Grok edit), the method that can actually
+  // take a figure out; a figure that might BE a missing cast member is the
+  // MIXED case (`character_identity`), which stays here and goes to char-fix.
   // cutout_artifact: see CROP_ARTIFACT_TYPES — the page has no such defect.
   'cutout_artifact',
 ]);

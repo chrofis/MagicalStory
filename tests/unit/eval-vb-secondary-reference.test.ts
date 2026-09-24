@@ -88,11 +88,11 @@ describe('a VB secondary is judged against her visual-bible cell', () => {
     const before = derivePresenceFinding({ ...args, referenceNames: ['Max'] });
     expect(before.outcome).toBe('reconciled');
     expect(before.reason).toBe('unclaimed_cast_has_no_reference');
-    expect(before.finding).toBeNull();
+    expect(before.findings).toEqual([]);
 
     const after = derivePresenceFinding({ ...args, referenceNames: ['Max', 'Silvan'] });
     expect(after.outcome).toBe('character_identity');
-    expect(after.finding.severity).toBe('CRITICAL');
-    expect(after.finding.character).toBe('Silvan');
+    expect(after.findings[0].severity).toBe('CRITICAL');
+    expect(after.findings[0].character).toBe('Silvan');
   });
 });
