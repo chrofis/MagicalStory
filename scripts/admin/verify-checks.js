@@ -212,15 +212,15 @@ checks.coverBriefedLikeAPage = (ctx) => {
 };
 
 const MOOD_TAG = /\b(mood|atmosphere|tension|standoff|feeling)\b/i;
-/** 67c617743 — sceneIntent no longer ends on a verbless mood tag (baseline 36/177 = 20%). */
+/** 67c617743 + the 2026-09-24 rule change — sceneIntent carries no mood sentence at all (baseline 36/177 = 20%). */
 checks.sceneIntentMoodTag = (ctx) => {
   const intents = pages(ctx).map(p => ({ pn: p.pageNumber, s: String(brief(p).sceneIntent || '').trim() })).filter(x => x.s);
   if (!intents.length) return notCovered('no sceneIntent on any brief');
   const tagged = intents.filter(x => { const ss = splitSentences(x.s); return MOOD_TAG.test(ss[ss.length - 1] || ''); });
   const share = tagged.length / intents.length;
-  const detail = `${tagged.length}/${intents.length} briefs (${Math.round(share * 100)}%) end sceneIntent on a mood sentence (baseline 20%, pass <= 10%)`
+  const detail = `${tagged.length}/${intents.length} briefs (${Math.round(share * 100)}%) end sceneIntent on a mood sentence (baseline 20%; pass = none)`
     + (tagged.length ? `: ${tagged.slice(0, 6).map(x => `p${x.pn} "${trunc(splitSentences(x.s).pop(), 60)}"`).join('; ')}` : '');
-  return { covered: true, pass: share <= 0.10, detail };
+  return { covered: true, pass: tagged.length === 0, detail };
 };
 
 /** 3d8f4871d — briefs declare characters[].emotion from the enum; emotion-check emits findings. */

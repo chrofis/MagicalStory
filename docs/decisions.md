@@ -59187,3 +59187,15 @@ persisted, so zero lettering findings cannot be told from "check did not run" �
 **Touched:** tasks/verify.json, scripts/admin/verify-run.js, scripts/admin/verify-checks.js,
 scripts/admin/check-verify-coupling.js, scripts/admin/check-doc-coupling.js (exports WATCHED), .githooks/pre-push,
 tests/unit/verify-registry.test.ts, tasks/BACKLOG.md, CLAUDE.md.
+
+## 2026-09-24 — sceneIntent sentence 3 is setting and light only; the mood clause is gone
+
+**Context:** `SCENE_INTENT_FIELD_RULE` asked for "Sentence 3: setting, lighting, and the mood as it shows — in faces,
+posture, light or weather, never as a mood word." The model follows the order and drops the qualifier: 36 of 177
+staging pages (20%, 11 stories) and 8 of 18 in dragon run 6 end sceneIntent on a verbless mood tag, and that sentence
+heads the image prompt (THIS IMAGE DEPICTS) — p6 of run 6 painted it as a caption. Fixing the four examples
+(67c617743) removed one push; the rule itself still ordered the sentence.
+**Decision (owner):** Sentence 3 is "the setting and the light." A character's feeling comes from its per-character
+emotion field (the shared enum, 3d8f4871d), the light carries the rest. The verify entry `sceneintent-no-mood-tag`
+now passes only when no brief ends on a mood sentence; the earlier "pass <= 10%" bar had no basis.
+**Touched:** server/lib/promptBuilders.js, scripts/admin/verify-checks.js, tasks/verify.json.

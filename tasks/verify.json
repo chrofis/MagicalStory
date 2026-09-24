@@ -45,7 +45,7 @@
         "67c617743"
       ],
       "addedAt": "2026-09-24",
-      "claim": "At most 10% of briefs end sceneIntent on a sentence carrying mood/atmosphere/tension/standoff/feeling (measured baseline 36/177 = 20%).",
+      "claim": "No brief ends sceneIntent on a sentence carrying mood/atmosphere/tension/standoff/feeling: the rule now asks for setting and light only (measured baseline 36/177 = 20%).",
       "runShape": [
         "full-story"
       ],
