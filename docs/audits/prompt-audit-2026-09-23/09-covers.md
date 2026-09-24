@@ -13,12 +13,12 @@ Checked against staging `31fd7db0c` (after the evening fix round). FIXED = the c
   - C9: the consolidator makes one cause one entry (prompt).
   - C12: the card legend forbids recolouring to a frame, not the outfit colours.
 - OPEN: C9's semantic `element` field carries prose instead of an id, so the inpaint has no reference image.
+- FIXED 2026-09-24 (owner: "log only"): C7 — an entity-only `figure_completeness` costs 0, is never critical and its fix is dropped from the plan (decisions.md 2026-09-24 "A `figure_completeness` only the entity check reported…"). The consolidator's relabel itself is unchanged.
+- PARTLY DONE 2026-09-24: the face text is shorter in the one shared builder, pages and covers alike (−184 chars per four-child cover); the front cover still loses REQUIRED CAST. Removing the face text entirely would keep it (replayed) — owner call.
 - OWNER CALL:
-  - C7: the entity check typed a crop artefact `figure_completeness`. Fix it in the entity prompt, or with a code ceiling for entity-sourced `figure_completeness`.
   - C8: the age label disagrees with HEIGHT ORDER. This touches the "description must match avatar" doctrine.
   - C10: the layout bands have no critic. Adding one adds a judged rule. The "bottom band without a dedication" part is NOT A FINDING: `PUT /dedication` can add a dedication and restamp later.
   - C11: the root `prompt` is the inpaint text. The 2026-09-19 decision chose the shipped version's prompt.
-  - Covers are still over the cap. The face-feature text in CHARACTERS IN THIS IMAGE is the remaining lever, and it touches the 2026-08-26 "covers identical to pages" decision.
 
 ---
 

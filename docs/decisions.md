@@ -21,6 +21,181 @@ superseded and link forward.
 
 ---
 
+## 2026-09-24 — Plate or fail: no render is ever built on a raw landmark photo (covers, trial pages, Gemini); cover edits send no photo; composite covers unchanged
+
+**Context:** The 2026-09-23 trial-cover fix (entry below) left three paths where a missing plate still let
+`packReferences` promote the raw landmark photograph into the scene slot: full-account covers (streaming
+and `iterateCover`, via `buildCoverReferences`, whose plate failure was only a warning), trial pages
+(`plate unavailable (rendering without it)` then the raw photo was packed), and Gemini's branch of
+`generateImageOnly`, which attached the primary landmark photo as its own part even beside a `[Background]`
+plate. Owner ruling 2026-09-24: fail loudly everywhere, with two scope rules — an edit of an existing cover
+is exempt from the plate provided it sends no photo, and the composite cover route stays as it is.
+**Decision:**
+- `buildCoverReferences` takes `use` instead of `requirePlate`: `'render'` (the default — every streaming,
+  trial and from-scratch iterate cover) is ALWAYS plated, whatever `singlePassScene` says, and a landmark
+  with no plate logs an error and throws, so that cover fails (`cover_failed` in the stored genLog);
+  `'edit'` (iterateCover with a `previousImage`) renders no plate and returns NO landmark photo — the edit
+  used to get the photo packed as an extra slot beside the image being edited; `'composite'` (iterateCover's
+  composite route and regeneration.js's scene-composite route) keeps the old behaviour exactly. iterateCover
+  now decides `compositeOn` before it builds its references. The streaming cover's `singlePassScene` /
+  `generateEmptyScenes` skip is deleted (it only ever switched usage tracking off).
+- Trial page: a plate that failed, or a landmark photo with no plate, throws in the streaming render; the
+  page then goes through the normal page render like any other failed trial page (Phase 5a-pre plates it).
+- Gemini: no primary landmark part when a `sceneBackground` plate is present — the rule packReferences
+  already applies on the Grok side.
+- Sibling registry: `cover-and-plate-reference-builders` (storyJobPipeline.js, coverIterate.js,
+  regeneration.js; anchor `buildCoverReferences`) and `scene-slot-landmark-rule` (grok.js, images.js).
+**Rationale:** NO FALLBACKS — a render quietly built on a photograph is worse than a failed one, and the
+failed one is visible. Edits never used the plate (A1 withholds it), so requiring one there would only fail
+edits; removing the photo from them is what keeps strangers off an edited cover. Composite is the owner's call.
+**Evidence / validation (free replays):** staging full-account `job_1790100385959_1nitlympp` front cover
+(Lindenhof square): render + stored plate → slot 1 plate, photo not packed; render with the plate stubbed to
+fail → throws; edit → 0 landmarks, slots = source image + characters; composite with a failed plate → returns
+with the photo (unchanged); Gemini parts with the plate = `[Background]` only. Prod trial
+`job_1790169018278_n57xpnufo` cover: page plate reused, 0 plate calls, photo not packed. Recent prod trials
+all carried a plate on every landmark page; the landmark-without-plate pages found were two early-September
+prod trials and older staging trials that predate the persisted plate prompt.
+**Touched:** `server/lib/coverIterate.js`, `storyJobPipeline.js`, `server/routes/regeneration.js`,
+`server/lib/images.js`, `scripts/admin/sibling-registry.json`,
+`tests/unit/plate-or-fail-covers-and-trial-pages.test.ts`, `tests/unit/trial-cover-plate-not-raw-photo.test.ts`,
+`docs/image-routing.md`, `docs/image-generation-methods.html`.
+**Status:** ✅ active on staging.
+
+## 2026-09-24 — A dotted id is a vantage, never a landmark photo; `landmarkView` picks the kind and the judged score ranks within it
+
+**Context.** Staging `job_1790100385959_1nitlympp` (Lindenhof, 18 pages). The Visual Bible gave the real
+landmark five vantages (`LOC002.1`–`.5`) and the Art Director cited them, as it cites any vantage.
+`getLandmarkPhotosForScene` / `sceneMetadata` still read every `LOC###.N` as an explicit PHOTO slot
+(`landmarkVariants` → `explicitVariant`), and `decideLandmarkPhotoSource` took it before
+`pickVariantForView(landmarkView)`. Stored `sceneImages[].landmarkPhotos`: p3-5 (`.2`) got slot 2, an
+aerial rooftop panorama; p6-11 (`.3`) got slot 3, a riverside guild-house front that is not the Lindenhof
+at all; p12-16 (`.4` / `.5`, no such slot) were answered with slot 1 by `loadLandmarkPhotoVariant`'s
+same-vantage / first-variant substitution. The `.N`-is-a-photo convention (and `.0` = attach nothing,
+2026-08-11) predates vantages; since vantages exist the two meanings share one namespace.
+
+**Is there real data linking a vantage to a photo?** No. A vantage is an Art-Director camera position
+(`name`, `shot`, `description`, `pages`); a photo is an index slot (`photo_type`, `framing`,
+`photo_score`). Nothing joins them, and deriving a kind from the vantage's `shot` is the guess the
+`landmark_view_missing` entry below already rejected.
+
+**Decision.**
+1. The photo is picked by `pickVariantForView` alone: `landmarkView` → accepted kinds in order
+   (missing = the exterior list), and within the first kind that has a photo the judged `photoScore`
+   ranks (slot order breaks ties and orders unjudged photos). A photo judged below `MIN_USABLE_PHOTO`
+   is not a candidate — the same cutoff serving applies. `variantsFromIndexRow` now carries each
+   slot's `photoScore` (`PHOTO_SCORES_SQL`, both index queries). Measured: in 45% of judged kind
+   groups (staging 1,862 / 4,013; prod 2,131 / 4,797) the first slot is not the best-judged one, and
+   in 131 / 185 the first slot is below the usable cutoff.
+2. Deleted: `landmarkVariants` (both metadata parsers), `explicitVariant` / `.0`, and
+   `loadLandmarkPhotoVariant`'s cross-slot substitution — a slot the location does not have is an
+   error and attaches nothing.
+3. Generators that wrote `.N` as a photo number now say what the reader reads: the trial writer's
+   PHOTO ANGLES / `[LOC###.N]` instruction becomes a `landmarkView` field in the trial scene hint (the
+   landmark block still lists what each photo shows); the two iterate templates cite a real landmark
+   by its bare id and let `landmarkView` pick. The Art Director already said so.
+
+**Validation.** Replay of the fixed picker over the stored briefs (free; variants re-read from staging
+with scores): p3-p11 change from slot 2 / 3 to slot 1 (the terrace square with its wall and linden
+trees — the place the vantages "giant linden roots" and "low stone wall" describe); p1-2 and p12-18
+keep slot 1, which they now get by rule rather than by substitution.
+
+**Touched files.** `server/lib/landmarkPhotos.js`, `server/lib/storyHelpers.js`,
+`server/lib/sceneMetadata.js`, `server/lib/promptBuilders.js`, `prompts/story-trial.txt`,
+`prompts/scene-iteration.txt`, `prompts/scene-iteration-free.txt`,
+`tests/unit/landmark-vantage-id-not-photo.test.ts`, `tests/unit/landmark-plate-resolve.test.ts`,
+`tests/unit/landmark-photo-kind-to-prompt.test.ts`, `tasks/bugs.json`, `tasks/BACKLOG.md`.
+Supersedes the 2026-08-11 "variant 0" convention. **Status:** ✅ active.
+
+---
+
+## 2026-09-24 — One shorter face, everywhere: pages and covers still describe a character identically, now shorter
+
+**Context.** Four-child covers of staging `job_1790100385959_1nitlympp` are still 1.3-2.3k characters
+over Grok's 7,900 cap after 769c655ff, and the front cover loses REQUIRED CAST to the shrinker (entry
+below, "Not solved here"). The per-child face text in CHARACTERS IN THIS IMAGE was named as the
+largest remaining block. Owner, 2026-09-24: "Shorten each child's face everywhere. Same logic. If a
+normal page is too long it is same logic."
+
+**Measured.** Over 149 stored staging faces (character-analysis.txt's fixed scale): 147 carry
+"neutral chin", 147 "medium cheekbones", 140 "medium lips", 141 "straight nose with rounded tip";
+the jawline is "soft" or "rounded" on 141. Mean face text 91 characters. The midpoint descriptors
+separate nobody — the reference card carries the face itself.
+
+**Decision.** ONE builder, `buildFaceDescription` (promptBuilders.js), drops the descriptors at their
+scale's midpoint (`neutral …`, `medium …`) after the usual age-word strip; any non-midpoint value
+(full lips, high cheekbones, a dimpled chin) stays. Every face path goes through it: the cover's
+CHARACTERS IN THIS IMAGE line and the entity judge / consolidator / detector rich line
+(`buildCharacterPhysicalDescription`), the Art Director's cast input for pages
+(`buildLabeledPhysicalParts`), the detector identity line (`buildCastIdentityDescription`, which also
+gains the age-word strip it lacked) and the single-page repair prompt
+(`entityConsistency.buildPhysicalTraitsDescription`, which had its own copy). The 2026-08-26 rule is
+NOT reversed: covers and pages describe a character identically — now shorter — and the critic reads
+the same face the generator got. Mean 91 → 46 characters. The avatar-sheet override line
+(`avatarOverrides.js`, a user-declared "Face shape") is not a page or cover prompt and is unchanged.
+
+**Over-cap logic is one path.** Pages and covers are both shrunk by `shrinkPromptForModel`
+(images.js, the image-gen entry both call), with 769c655ff's ranked cut and parity anchors.
+
+**Evidence (rung 1, free).** 769c655ff's replay (stored sent prompts + the logged dropped blocks,
+current templates), face text swapped for the new builder's, run through the real shrinker:
+
+| render | built before → after | sent before → after | still cut |
+|---|---|---|---|
+| p12 | 9,943 → 9,943 | 7,834 → 7,834 | COUNTS, DEPTH, all Composition |
+| initialPage | 9,437 → 9,253 | 7,885 → 7,701 | COUNTS, DEPTH, facing, size |
+| backCover | 9,407 → 9,223 | 7,855 → 7,671 | COUNTS, DEPTH, facing, size |
+| frontCover | 10,202 → 10,018 | 7,569 → 7,385 | COUNTS, DEPTH, all Composition, REQUIRED CAST |
+
+Page prompts carry no face geometry at all (the Art Director weaves wardrobe, not jawlines — 0 of 18
+stored briefs contain one), so p12 is unchanged; the page effect is on the Art Director's input. The
+covers gain 184 characters each and no block survives that did not before. Dropping the face text
+entirely was also replayed: the front cover then keeps REQUIRED CAST (9,830 → 7,721). That is a
+different decision (remove, not shorten) and is left to the owner.
+
+**Touched:** `server/lib/promptBuilders.js`, `server/lib/entityConsistency.js`,
+`tests/unit/face-description-shared.test.ts`.
+
+**Status:** ✅ active
+
+---
+
+## 2026-09-24 — A `figure_completeness` only the entity check reported is logged, costs 0 and is never repaired
+
+**Context.** Staging `job_1790100385959_1nitlympp` back cover: the entity check filed jagged white
+edges on one child's arm as `cutout_artifact` (correct — it exists only in the grid crop). The
+consolidator relabelled it `figure_completeness` MAJOR with `sources: ['entity']`; the cover lost 15
+points (85 → 70) and its plan carried "Fill the arm and jacket to remove white cropping artifacts".
+Same on p16 v1 ("Large white cutout artifact obscuring lower body", entity-only, −15). Owner:
+"log only".
+
+**Decision** (owner-approved shape: a severity rule in code, keyed on type and source, no text):
+- `scoring.js` `ENTITY_ONLY_ZERO_POINT_TYPES = {figure_completeness}` + `isEntitySourced`:
+  `deductionPoints` charges 0 when the finding came from the entity check alone (`source: 'entity'`,
+  `sources` all `entity`, or `{ entity: true }` from a caller reading the entity report —
+  `repairPipeline.getEntityPenaltyAndIssues`). The same type from quality, or merged with any other
+  source, keeps its full cost (image-evaluation D-11 sees the page).
+- `repairLogic.isCropArtifact` covers it too, so neither char-fix gate routes it and
+  `collectCriticalFindings` never counts it (nor a `cutout_artifact`) as making a page critical.
+- `feedbackConsolidator.dropCropArtifactFixes`: a per-character fix whose declared types are all crop
+  artefacts moves to `dropped_issues` before the 3-fix cap; the finding stays in `deduped_issues`.
+- Client mirror `useRepairWorkflow.entityIssuePoints` prices it 0 for entity issues.
+
+**Evidence (rung 1, free).** All 32 stored versions of the story rescored from their stored
+deductions: 3 change — backCover v0 70 → 85 and its fix dropped; p16 v1 20 → 35 and its fix dropped;
+p14 v0 score unchanged (its `cutout_artifact` already cost 0), its already-uninpaintable fix now
+dropped at the plan. No other score moves.
+
+**Not changed:** the consolidator still relabels `cutout_artifact` despite its type-list note that the type is kept (a prompt
+matter); the finding is logged and free either way.
+
+**Touched:** `server/lib/scoring.js`, `server/lib/repairLogic.js`, `server/lib/repairPipeline.js`,
+`server/lib/feedbackConsolidator.js`, `client/src/hooks/useRepairWorkflow.ts`,
+`tests/unit/entity-crop-figure-completeness.test.ts`.
+
+**Status:** ✅ active
+
+---
+
 ## 2026-09-24 — `landmark_view_missing` is deleted; the plan's shot wins over the review and over `shot_off_plate`
 
 **Context.** Test Lab experiment **1433** (`scene_review_replay` on staging
@@ -77,6 +252,123 @@ and `shot_off_plate` findings). Lab re-run of the same stage: see the commit / r
 
 ---
 
+## 2026-09-24 — Character presence is THREE cases from the match data: missing → add, extra → remove, mixed → redraw the figure as the missing character (owner reversal of 2026-09-13)
+
+**Context:** Owner reversal ("Forget my rules"), 2026-09-24, of the 2026-09-13 entry "Character
+presence is ONE code-derived signal, mutually exclusive by construction" (commit 0f25e7f25, "an extra
+figure is reconciled with the cast, never deleted"). Evidence: production `job_1790107559778_fcmlfa8kn`
+p7 — declared cast `[]`, Grok drew two children, the entity check read one as a roster girl with a
+CRITICAL `age_shift`, three char-fixes failed ("no usable image") and the page shipped with two
+invented children. Under the 2026-09-13 rule the only repair that could remove them was closed:
+`extra_character` was barred from inpaint, and its fix text told the model to redraw the figure "as
+the EXPECTED CAST entry it should be" — on a page whose cast is empty. The count-based outcomes
+(figures < cast / > cast / ==) also could not say WHICH figure is which when a cast member was
+absent AND an unknown figure stood in the frame.
+
+**Decision:** `evalPipeline.derivePresenceFinding` derives findings from `matches[]` (each figure's
+`reference` or `unmatched`) and the declared cast list alone — no text is read:
+- **MISSING** — a cast name no figure claims and no unmatched figure → `missing_character`
+  ("Add <name> …"), routed as before (inpaint with the character's reference attached).
+- **EXTRA** — every cast name claimed and an unmatched figure → `extra_character` ("Remove this
+  figure: it is not one of the characters this page holds."). A declared-empty cast is this case.
+  `extra_character` LEAVES `NOT_INPAINTABLE_TYPES`: the type now means a confirmed surplus, so the
+  whole-frame Grok edit that removes figures can no longer erase a commissioned character — the
+  danger the 2026-09-13 closure guarded against. Chosen over iterate because iterate re-rolls the
+  whole page from a brief the renderer already ignored once (p7's brief held nobody), while the
+  edit removes exactly the figure; one type, one route, no special case.
+- **MIXED** — both → `character_identity` naming the missing member, with the unmatched figure's id
+  in a structured `figure` field ("Redraw figure N as <name> …"), never a removal.
+  `decideRepairMethod` gate 2a routes it to a char-fix with `targetFigure`; the executor
+  (`repairPipeline.executeCharFixAction`) and the Test Lab repair stage paint THAT figure, whose box
+  comes from the same evaluation (`charRepairTarget.resolveFigureBbox`, axes swapped once from the
+  evaluator's `[x1,y1,x2,y2]`), as a whole-figure redraw. A name with no roster entry falls to the
+  orphan gate (iterate). `character_identity` stays barred from inpaint.
+- **Unequal counts** pair deterministically: unmatched figures in figure-id order (on an ambient page
+  the non-background `zone`s first) against missing names in cast order, photo-less names FIRST — a
+  figure the evaluator could not match because it held no image for that name is that name, and the
+  pair makes no finding (the 2026-09-13 reference rule, kept). Leftover figures are EXTRA, leftover
+  names MISSING. One finding per figure or name.
+- Declines are unchanged (roster not declared, no detector count, broken matches contract, witnesses
+  disagree), plus: a crowd page with any unmatched figure declines (a crowd member cannot be told
+  from a cast member drawn wrong); an ambient page drops background-scale figures by geometry first.
+- The evaluator prompt's D-04b (`image-evaluation.txt`) states the same three cases, so a page the
+  derivation declines on (covers — no detector count) is judged by the same model. The consolidator
+  (`feedback-consolidator.txt`) may remove an `extra_character` figure and keeps a MIXED
+  `character_identity` as a redraw.
+- A char-fix is never aimed at a name outside the version's declared cast (`charFixImpossible`,
+  canonical names) — the figure is not that character; the EXTRA case owns it. This replaces the
+  cast-0 gate 1e of the 2026-09-23 entry below, which routed p7 to iterate; the failed-char-fix flip
+  of that entry stays.
+
+**Rationale:** Replayed over every stored prod version from the last 12 days that carries
+`matches[]` (87): 16 EXTRA, 4 MIXED, 1 MISSING, 66 reconciled. p7 v0 → two `extra_character`
+(figures 1, 2) → inpaint removal instead of three failed char-fixes. MIXED fixture
+`job_1789227389389_z18dmvnt6` p6 v0 (cast [Liz], one unmatched figure) → char-fix Liz at figure 1;
+p13 v0 (cast [Ayan], two unmatched) → figure 1 redrawn as Ayan, figure 2 removed. MISSING fixture
+`job_1789945743706_8ayo2w19e` p3 v1 → add both names.
+
+**Touched:** `server/lib/evalPipeline.js`, `server/lib/repairLogic.js`, `server/lib/repairPipeline.js`,
+`server/lib/charRepairTarget.js`, `server/lib/testlab.js`, `prompts/image-evaluation.txt`,
+`prompts/feedback-consolidator.txt`, `docs/SETTLED.md`, tests (`extra-character-type`,
+`ambient-background-people`, `eval-vb-secondary-reference`, `plate-population`, `inpaint-routing`,
+`inpaint-scene-fix-gate`, `repair-reader-attribution-and-cast0`).
+
+**Status:** ✅ active. Supersedes 2026-09-13 "Character presence is ONE code-derived signal".
+
+## 2026-09-23 — A reader finding is charged to the version the audit read; a page written for nobody routes drawn figures to iterate; a failed char-fix is not repeated on the same version
+
+**Context:** Production `job_1790107559778_fcmlfa8kn`, two repair-loop bugs (owner-approved fixes).
+(1) The book audit reads each page's picked version, but its IMG faults went into a page-keyed map
+(`readerFindingsByPage`) handed to the NEXT round's consolidation of the version that round had
+just painted — a version the audit never saw. p5 v3 was billed a CATASTROPHIC reader line
+("the book is held by Lukas") read off v0's pixels (audit round 2, 23:15:33 CH; v3 scored
+23:19:33 CH): without it v3 scores 68 against v0's 58. p8 v2 was billed "the root is not visible"
+from the audit of v1 although the inpaint had painted the root. The structural effect: reader
+findings penalised every new version and never the one they described. (2) p7's declared cast
+is `[]`; Grok drew two children, the entity check read one as a roster girl with a CRITICAL
+`age_shift`, gate 2 routed char-fix, and char-fix failed ("no usable image") in all three rounds —
+a failed char-fix makes no version, the same version stays best, and nothing flipped the method.
+
+**Decision:**
+- `repairLogic.attributeReaderFindings(imgFaults, auditedVersionByPage)` binds each page-scoped
+  IMG fault to the version OBJECT the audit read (the same map `buildAuditPages` reads from).
+  `runBookAuditRound` re-consolidates THAT version — its own evaluation + entity issues + the reader
+  findings — and re-stamps it with `applyScore`. Its plan is what the next round repairs from.
+  Every other `consolidatePageEval` call (round versions, recolours, rescue) passes no reader
+  findings: a new version is judged on its own evidence. The page-keyed map is deleted. A later
+  audit of the same version replaces its findings; a failed consolidation leaves the version as it
+  was and logs an error. This applies on every audit, the final one included: a version the final
+  reader faulted may lose the pick to another version on the strength of that charge.
+- `decideRepairMethod` takes `options.expectedCast` (the version's declared cast via
+  `resolveDeclaredCast`, an iterate rewrite's own cast first). On `[]`, char-fix is declined for
+  any name (`charFixImpossible`), and gate 1e routes the page to iterate when it carries an
+  `extra_character` CRITICAL/CATASTROPHIC or an entity CRITICAL on this page — the repair is
+  removal, inpaint is closed to `extra_character` (2026-09-13), so the re-render from a brief
+  that holds nobody is the method. Structured data only; no finding text is read.
+- `decideRepairMethod` takes `options.failedMethods`: the round loop records every failed repair
+  on the version it was attempted on (`version.failedRepairs`, via `roundParent`), and a char-fix
+  that already failed on the version being repaired flips to iterate (gates 2 and 2b).
+- The extra_character fix text on a roster of 0 is "Remove this figure: the page is written with
+  no one in it." — in the presence derivation (`evalPipeline.derivePresenceFinding`) and in
+  `image-evaluation.txt` D-04b. This is a narrow exception to the 2026-09-13 "D-04b never instructs
+  a removal": that ruling protects commissioned figures, and a roster of 0 has none; with any cast
+  the fix stays an identity reconciliation. The route is unchanged (still not inpaintable).
+- Test Lab `repair` stage passes `expectedCast` the same way (it still does not pass `characters` —
+  a pre-existing Lab/prod difference, not changed here).
+
+**Rationale:** A score must describe the pixels it is attached to (the same invariant as
+`evalImageFp`). Attributing the finding to the audited version keeps the owner's 2026-08-27
+directive — audit findings feed the next round's repair — because the next round repairs the best
+version from its plan. Replay over the stored rounds: p5 v3 on its own evidence 68 (was 23); p8 v2
+3 (was -14); p7 routes iterate instead of char-fix; a char-fix that failed on the version flips.
+
+**Touched:** `server/lib/repairLogic.js`, `server/lib/repairPipeline.js`, `server/lib/testlab.js`,
+`server/lib/evalPipeline.js`, `prompts/image-evaluation.txt`, `storyJobPipeline.js` (comment),
+`tests/unit/repair-reader-attribution-and-cast0.test.ts`, `tests/unit/extra-character-type.test.ts`,
+`tests/unit/repair-reference-and-finding-ledger.test.ts`.
+
+**Status:** ✅ active — except its cast-0 gate 1e and the D-04b cast-0 exception, superseded by 2026-09-24 (three-case presence model).
+
 ## 2026-09-23 — The trial front cover is rendered on a people-free plate, never on the raw landmark photo; it shares buildCoverReferences with the full-account cover
 
 **Context:** Owner-reported, prod trial `job_1790169018278_n57xpnufo`. The front cover's packed slot 0
@@ -99,11 +391,8 @@ the failure lands in the stored genLog (`cover_failed`) instead of a silent `nul
 Visual Bible time, and it keeps the cover in the same painted place as the pages. The square page plate is
 brought to the 3:4 cover aspect by the same slot-0 magenta extension that used to extend the landscape raw
 photo. No fallback to the photo: a cover without a plate is not rendered (NO FALLBACKS).
-**Not changed (open, owner call):** the full-account callers (streaming cover, `iterateCover`,
-regeneration.js) do not pass `requirePlate`, so a failed plate there still leaves the raw photo to be promoted
-to slot 0. Trial PAGES do the same when their plate fails (`plate unavailable (rendering without it)` then the
-raw photo is packed). Gemini's branch of `generateImageOnly` adds the primary landmark photo as its own part
-even beside a `[Background]` plate (only reached on a Grok failure for Grok-routed covers).
+**Not changed here:** full-account covers, trial pages and the Gemini branch — all three closed by the
+2026-09-24 "Plate or fail" entry above, which also replaced `requirePlate` with `use`.
 **Touched:** `storyJobPipeline.js` (`trialPlatesByLoc`, `onCoverScene`), `server/lib/coverIterate.js`
 (`buildCoverReferences` `sceneBackground`/`requirePlate`, `trialCoverLocationId`,
 `trialCoverPlateDescription`), `tests/unit/trial-cover-plate-not-raw-photo.test.ts`,
@@ -322,6 +611,9 @@ Before this change all four lost both anchors, REQUIRED CAST, DEPTH and COUNTS.
 on covers is the per-character face description in CHARACTERS IN THIS IMAGE (~150 characters per
 child: jawline, chin, nose, cheekbones, lips), which the reference card already carries. Trimming it
 would change the 2026-08-26 "covers identical to pages" builder, so that is an owner decision.
+→ Owner decided 2026-09-24: shorten it in the ONE shared builder, pages and covers alike (entry
+"One shorter face, everywhere", above). It saves 184 characters per four-child cover; the front
+cover still loses REQUIRED CAST.
 
 **Touched:** `server/lib/images.js` (`cutBlocks`, `paragraphUnit` / `regexUnit` / `bulletUnit`,
 `sectionAwareCut`), `server/lib/promptBuilders.js` (`SPLIT_STATE_MARKINGS_RULE`, the cover SHOT skip,
@@ -22721,6 +23013,10 @@ Covers get one more pass for text, that is it. Otherwise they are identical"):
   through the SAME builder pages use (`buildCharacterPromptBlock` in `prose`
   form), so the garment sits inside its wearer's own description.
 
+**2026-09-24 note (not a reversal):** still identical — the face inside each character's line is
+now the shorter `buildFaceDescription` text on pages and covers alike (entry "One shorter face,
+everywhere").
+
 **Scope check.** `includeClothing` is set at exactly three call sites, all
 covers, so no page prompt changes shape.
 
@@ -41889,7 +42185,7 @@ two-witness call site + rescore), `server/lib/identityAgreement.js`,
 `tests/manual/test-compliance-severity-cap.js`,
 `tasks/presence-signal-rewrite-2026-09-13.md`.
 
-**Status:** ✅ active (staging only at the time of writing — not on master).
+**Status:** 🗄 superseded by 2026-09-24 "Character presence is THREE cases from the match data" (owner reversal).
 
 ---
 
@@ -58013,8 +58309,10 @@ on the Title Page when the story centred on it; `story-trial.txt` allowed only t
    paths; an authored `description` stands.
 6. **Warn-only check** (`warnTitleNamedEntitiesMissingFromCover`) now scans animals, secondary characters,
    artifacts and vehicles; front cover only; adds nothing.
-7. **Sibling registry:** new set `cover-element-carriers` (storyJobPipeline.js trial + streaming covers,
-   coverIterate.js iterate, regeneration.js) with a parity anchor on `buildCoverReferences(`.
+7. **Sibling registry:** the four cover builders (storyJobPipeline.js trial + streaming covers, coverIterate.js
+   iterate, regeneration.js) are the set `cover-and-plate-reference-builders`, added by a parallel session the
+   same day with the same members and a `buildCoverReferences` parity anchor; a duplicate set written here was
+   dropped at merge.
 
 **Downstream audit (what carries an ANI/VEH, per builder).** Reference cells: every builder goes through
 `buildCoverReferences` → `getElementReferenceImagesByIds`, which already searched animals and vehicles.
@@ -58045,6 +58343,29 @@ ran the superseded title-only wording.
 
 **Touched:** `prompts/scene-expansion-all.txt`, `prompts/story-trial.txt`, `server/lib/promptBuilders.js`,
 `server/lib/visualBible.js`, `server/lib/outlineParser/unified.js`, `server/lib/coverIterate.js`,
-`scripts/admin/sibling-registry.json`, `tests/unit/cover-objects-any-element.test.ts`,
+`tests/unit/cover-objects-any-element.test.ts`,
 `tests/unit/cover-title-named-cast-warning.test.ts`.
 **Status:** ✅ active on staging.
+
+## 2026-09-24 — The staging landmark sync mirrors photo scores; it no longer only adds them
+
+**Context.** After the worldwide judging run was synced to staging, staging held 2,617 score rows that prod
+does not have: 2,607 on slots with no photo at all (the 2026-08-28 and 2026-09-05 judging runs, whose
+photos prod later dropped or compacted — prod has 8 such rows) and 10 on slots whose photo prod has since
+replaced, so the score described a different picture. 1,809 of them scored ≥ 40, so staging's
+`bestPhotoSlots` could pick a slot with no photo, and `servedLandmark` then paired slot 1's picture with
+an empty description and credit. The cause is the sync: it upserted score rows and never deleted one.
+
+**Decision (owner, 2026-09-24).** `sync-landmark-index-to-staging.js` mirrors `landmark_photo_scores` for
+every landmark it syncs: prod's rows are upserted (judged_at copied, as text — it is a naive TIMESTAMP),
+and every other staging score row of those landmarks is deleted. Staging-only landmarks are untouched.
+Delete + upsert are one transaction; the deleted rows are dumped to JSON first; `--dry-run` lists them.
+The selection is a pure function, `scoreRowsToDelete`, pinned by
+`tests/unit/landmark-sync-mirror-scores.test.ts`.
+
+**Run.** Dry run listed 2,617 rows (2,607 empty-slot, 10 wrong-photo); the real run deleted exactly those
+(backup in the session scratchpad, `landmark-sync-deleted-scores-2026-09-24.json`).
+
+**Touched:** `scripts/admin/sync-landmark-index-to-staging.js`,
+`tests/unit/landmark-sync-mirror-scores.test.ts`, `docs/landmark-database.md`.
+**Status:** ✅ active.

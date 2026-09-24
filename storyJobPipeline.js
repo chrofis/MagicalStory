@@ -1196,10 +1196,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // promoted the raw landmark PHOTOGRAPH into the slot instead — so the
           // page was an edit of a real photo while its styled plate landed
           // moments later, unused and paid for.
+          // A page whose plate failed is NOT rendered without it: with no plate
+          // packReferences promotes the raw landmark photo into the scene slot.
+          // The page fails here like any other trial page failure (the catch
+          // below returns null and the page goes through the normal page render).
           const platePromise = trialEmptyScenePromises.get(page.pageNumber);
           if (platePromise) {
             await platePromise;
-            log.info(`🎬 [TRIAL-PAGE] Page ${page.pageNumber}: plate ${sceneBackgrounds[page.pageNumber] ? 'ready' : 'unavailable (rendering without it)'}`);
+            if (!sceneBackgrounds[page.pageNumber]?.imageData) {
+              log.error(`❌ [TRIAL-PAGE] Page ${page.pageNumber}: plate failed — page not rendered on the raw photo`);
+              throw new Error(`page ${page.pageNumber} plate failed`);
+            }
+            log.info(`🎬 [TRIAL-PAGE] Page ${page.pageNumber}: plate ready`);
           }
 
           // Build per-character clothing for this page.
@@ -1288,6 +1296,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const trialLandmarkMisses = [];
           let pageLandmarkPhotos = await getLandmarkPhotosForScene(streamingVisualBible, sceneMetadata, { pageNumber: page.pageNumber, misses: trialLandmarkMisses });
           pageLandmarkPhotos = await ensureLandmarkPhotoBytes(pageLandmarkPhotos, { misses: trialLandmarkMisses });
+          if (pageLandmarkPhotos.length > 0 && !sceneBackgrounds[page.pageNumber]?.imageData) {
+            log.error(`❌ [TRIAL-PAGE] Page ${page.pageNumber}: landmark "${pageLandmarkPhotos[0].name}" but no plate — page not rendered on the raw photo`);
+            throw new Error(`page ${page.pageNumber} has a landmark photo and no plate`);
+          }
           if (trialLandmarkMisses.length > 0) {
             log.warn(`⚠️ [LANDMARK] Trial page ${page.pageNumber} renders WITHOUT its landmark reference photo (${trialLandmarkMisses.map(m => `${m.name}: ${m.reason}`).join('; ')}) — downgraded to prose description`);
           }
@@ -1876,10 +1888,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // so v0 / iterate / legacy streaming all share one source of truth.
         const { buildCoverReferences } = require('./server/lib/coverIterate');
         const coverKeyForRefs = coverType === 'frontCover' ? 'frontCover' : coverType;
-        const skipEmptyScene = (typeof modelOverrides.singlePassScene === 'boolean'
-          ? modelOverrides.singlePassScene
-          : MODEL_DEFAULTS.singlePassScene === true)
-          || modelOverrides.generateEmptyScenes === false;
+        // A rendered cover is always plated (use 'render', the default): a
+        // landmark photo with no plate throws and this cover fails, instead of
+        // the raw photo becoming the scene. singlePassScene does not apply.
         if (coverKeyForRefs === 'frontCover') {
           // Title-named creature/character missing from the Title Page objects: WARN ONLY.
           require('./server/lib/coverIterate').warnTitleNamedEntitiesMissingFromCover({
@@ -1895,7 +1906,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           coverHint: hint, // hint.objects carries LOC + ART IDs from the unified prompt
           sceneMetadata: coverExpandedMetadata, // pre-computed by scene expansion
           emptyScenePromptOverride: coverExpandedMetadata?.emptyScenePrompt || null,
-          usageTracker: skipEmptyScene ? null : (usage, modelId) => {
+          usageTracker: (usage, modelId) => {
             const isRunware = modelId?.startsWith('runware:');
             const isGrok = modelId?.startsWith('grok-imagine');
             const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
@@ -2484,8 +2495,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // helper every full-account cover uses. The plate is the one the
             // trial pages already rendered for this location when there is one
             // (no extra call); otherwise the helper renders a cover plate from
-            // the setting alone. requirePlate: a landmark photo never reaches
-            // this render as its scene anchor — packReferences would promote it
+            // the setting alone. A landmark photo never reaches this render
+            // as its scene anchor: with no plate the helper throws — packReferences would promote it
             // and the cover became an edit of the photograph, strangers
             // included (prod job_1790169018278_n57xpnufo).
             const {
@@ -2513,7 +2524,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               sceneMetadata,
               emptyScenePromptOverride: trialCoverPlateDescription(coverScene),
               sceneBackground: reusedPlate,
-              requirePlate: true,
               usageTracker: (usage, modelId) => {
                 const isGrok = modelId?.startsWith('grok-imagine');
                 addUsage(isGrok ? 'grok' : 'gemini_image', usage, 'trial_empty_scene', modelId);
@@ -6337,7 +6347,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           description: img.sceneDescription,
           sceneDescription: img.sceneDescription,  // alias for backward compat
           // sceneMetadata carries the parsed setting.location + characters[].id
-          // + objects[].id + landmarkVariants the page render actually used.
+          // + objects[].id the page render actually used.
           // Without persisting it, the dev panel + downstream consumers had
           // to re-run extractSceneMetadata to recover the per-page VB tags,
           // and the UI showed empty for every trial page even though the
@@ -7281,7 +7291,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // consumers (client, server/routes, and the dev panel never read it), and
     // finalChecksReport.bookAudit / data.bookAuditReport had none either. The
     // MID-LOOP audits (repairPipeline.js, MID-LOOP BOOK AUDIT) are unaffected —
-    // they feed live repair rounds via readerFindingsByPage and stay exactly as
+    // their findings are charged to the version each audit read (repairLogic.js
+    // attributeReaderFindings) and they stay exactly as
     // they were. The capability itself is not gone: run it on demand via the
     // Test Lab "book_audit" stage (server/lib/testlab.js runBookAuditStage) on
     // any completed story. See docs/decisions.md 2026-09-01.

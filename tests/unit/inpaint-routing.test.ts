@@ -26,13 +26,12 @@ describe('NOT_INPAINTABLE_TYPES', () => {
   it('covers the classes inpaint must never be asked to repaint', () => {
     for (const t of ['hair', 'hair_change', 'clothing', 'clothing_inconsistent',
       'clothing_detail', 'character_identity', 'face_mismatch', 'face_drift',
-      'age_shift', 'skin_tone', 'scale',
-      // extra_character (owner, 2026-09-13): an identity reconciliation, never
-      // a deletion. Inpaint was the removal route and erased a commissioned
-      // child from a cover; the finding still scores, only its route is closed.
-      'extra_character']) {
+      'age_shift', 'skin_tone', 'scale']) {
       expect(NOT_INPAINTABLE_TYPES.has(t), `${t} should be blocked`).toBe(true);
     }
+    // extra_character is REMOVED by inpaint since the owner's 2026-09-24
+    // reversal: it now means a confirmed surplus (every cast member matched).
+    expect(NOT_INPAINTABLE_TYPES.has('extra_character')).toBe(false);
   });
 
   it('leaves the classes inpaint exists for alone', () => {

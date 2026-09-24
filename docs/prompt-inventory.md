@@ -96,7 +96,7 @@ left alone. (`docs/decisions.md`, 2026-09-21.)
 | Template | Consumer | Stage |
 |---|---|---|
 | empty-scene.txt | prompts.js `buildEmptyScenePrompt` (→ images.js, server.js, coverIterate.js) | Background-only scene generation |
-| image-generation.txt | storyHelpers.js `buildImagePrompt`; testlab.js | Page illustration prompt (single unified template) |
+| image-generation.txt | storyHelpers.js `buildImagePrompt`; testlab.js | Page illustration prompt (single unified template). Every character face text in it and in the cover's CHARACTERS IN THIS IMAGE line comes from ONE builder, `buildFaceDescription` (2026-09-24: midpoint descriptors dropped, same on pages, covers, detector and repair) |
 | image-system-instruction.txt | images.js (~212) | System instruction for image calls |
 | art-styles.txt | styledAvatars.js `loadArtStylePrompts`; avatars.js | Art-style descriptor per style. ⚠ duplicated hardcoded copies exist in sceneComposite.js (~893) and character2x4Sheet.js (~395) — keep aligned |
 | iterative-placement-pass1.txt | images.js `generateWithIterativePlacement` (LOCAL_PROMPTS) | Iterative placement pass 1 (dev/test-models path) |
@@ -141,7 +141,7 @@ Sizes measured 2026-08-09.
 | image-visual-inventory.txt | 5,377 | 138 | regeneration.js (admin route: shown as `prompt` only, the call it makes sends image-inventory-unified.txt); testlab.js `split_p1` arm | **Not the production inventory** (corrected 2026-09-23): `runVisualInventory` (evalPipeline.js:98) loads image-inventory-unified.txt |
 | image-inspection.txt | 2,457 | 52 | images.js `inspectImageForErrors` | Image error inspection |
 | generated-image-analysis.txt | 1,106 | 39 | sceneValidator.js `analyzeGeneratedImage` | Generated-image analysis |
-| feedback-consolidator.txt | 26,306 | 194 | feedbackConsolidator.js `consolidateFeedback` | Merges all four evaluators into `deduped_issues[]` — **this list is what scoring charges**; no model-computed score since 2026-09-23 (the audit-only `final_score` section was deleted) |
+| feedback-consolidator.txt | 26,306 | 194 | feedbackConsolidator.js `consolidateFeedback` | Merges all four evaluators into `deduped_issues[]` — **this list is what scoring charges**; no model-computed score since 2026-09-23 (the audit-only `final_score` section was deleted). Since 2026-09-24 a per-character fix whose types are all crop artefacts (`cutout_artifact`, or a `figure_completeness` only the entity check reported) is moved to `dropped_issues` (`dropCropArtifactFixes`); the finding stays in `deduped_issues` at 0 points |
 | repair-verification.txt | 1,799 | 48 | repairVerification.js `verifyRepairWithGemini` | Verifies a repair changed the target region |
 | story-text-quality-judge.txt | 2,880 | 48 | textQualityJudge.js `judgeStoryText` | Test Lab text-only harness: scores story TEXT on 5 criteria (cross-model judge) |
 | story-scorecard-judge.txt | 2,398 | 50 | testlab.js `runStoryScorecardStage` / storyScorecard.js | Test Lab `story_scorecard` stage: LLM judge rates 4 final artifacts (beats/scene/text/VB) on a 4×5 rubric for model comparison |
@@ -167,7 +167,7 @@ Sizes measured 2026-08-09.
 | Template | Consumer | Stage |
 |---|---|---|
 | entity-consistency-check.txt | entityConsistency.js `evaluateEntityConsistency` | Cross-page entity consistency eval |
-| entity-single-page-repair.txt | entityConsistency.js `repairSinglePage` | Single-page entity repair |
+| entity-single-page-repair.txt | entityConsistency.js `repairSinglePage` | Single-page entity repair. Its physical-traits face comes from `buildFaceDescription`, the page/cover face builder (2026-09-24) |
 | incremental-consistency-check.txt | images.js `evaluateIncrementalConsistency` | Incremental consistency |
 | ~~final-consistency-check.txt~~ | — | **DELETED 2026-07-26** — `runFinalConsistencyChecks`/`evaluateSingleBatch` chain was dead (imported, never called); removed in the Pt 10 cleanup (decisions.md) |
 | visual-bible-analysis.txt | visualBible.js `analyzeVisualBibleElements` | VB element analysis |
@@ -194,7 +194,7 @@ Sizes measured 2026-08-09.
 
 | Template | Consumer | Stage |
 |---|---|---|
-| cover-composition.txt | promptBuilders.js `buildCoverPrompt` (`coverComposition`) | Cover-only composition bullets (front / initialPage / back), injected into image-generation.txt. RETIRED 2026-08-26: front-cover.txt, back-cover.txt, initial-page-with-dedication.txt, initial-page-no-dedication.txt and the derived textless variants — a cover is now built from the SAME image-generation template as a page, plus the typography pass. |
+| cover-composition.txt | promptBuilders.js `buildCoverPrompt` (`coverComposition`) | Cover-only composition bullets (front / initialPage / back), injected into image-generation.txt. RETIRED 2026-08-26: front-cover.txt, back-cover.txt, initial-page-with-dedication.txt, initial-page-no-dedication.txt and the derived textless variants — a cover is now built from the SAME image-generation template as a page, plus the typography pass. 2026-09-24: the per-child face in CHARACTERS IN THIS IMAGE is the shared shorter `buildFaceDescription` text (−46 chars per child on the stored four-child covers). |
 
 Note: `PROMPT_TEMPLATES.coverImageEvaluation` is referenced in regeneration.js but the file
 was deliberately deleted — callers guard and fall back to `imageEvaluation`. By design.

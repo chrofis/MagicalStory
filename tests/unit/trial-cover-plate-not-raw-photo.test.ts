@@ -10,8 +10,8 @@
  * is no plate. Trial pages and the full-account cover always sent a plate.
  *
  * Fix: the trial cover goes through buildCoverReferences (the full-account
- * helper) with the trial pages' plate for its location, and requirePlate —
- * a landmark with no plate throws instead of reaching the render.
+ * helper) with the trial pages' plate for its location; a rendered cover is
+ * always plated and a landmark with no plate throws instead of reaching the render.
  */
 import { describe, it, expect, afterEach, beforeAll } from 'vitest';
 import { createRequire } from 'module';
@@ -82,7 +82,6 @@ const baseArgs = {
   coverHint: { objects: ['LOC001'], characters: ['Mia'] },
   sceneMetadata: { objects: COVER_SCENE.objects, fullData: COVER_SCENE, characters: COVER_SCENE.characters },
   emptyScenePromptOverride: coverIterate.trialCoverPlateDescription(COVER_SCENE),
-  requirePlate: true,
 };
 
 describe('buildCoverReferences with a trial plate', () => {
@@ -118,10 +117,11 @@ describe('buildCoverReferences with a trial plate', () => {
       .rejects.toThrow(/no people-free plate/);
   });
 
-  it('without requirePlate a failed plate still returns (full-account behaviour unchanged)', async () => {
+  it('the composite route keeps its old behaviour: a failed plate returns, the photo stays', async () => {
     stubRefs({ plateResult: new Error('grok 500') });
-    const refs = await coverIterate.buildCoverReferences({ ...baseArgs, sceneBackground: null, requirePlate: false });
+    const refs = await coverIterate.buildCoverReferences({ ...baseArgs, sceneBackground: null, use: 'composite' });
     expect(refs.sceneBackground).toBeNull();
+    expect(refs.landmarkPhotos).toEqual([LANDMARK]);
   });
 });
 
@@ -163,11 +163,11 @@ describe('the trial cover call site', () => {
   const end = pipeline.indexOf('onCoverHints:', start);
   const site = pipeline.slice(start, end);
 
-  it('uses the shared cover helper with the page plate and requirePlate', () => {
+  it('uses the shared cover helper with the page plate (render use, the default)', () => {
     expect(site).toContain('buildCoverReferences: buildTrialCoverReferences');
     expect(site).toContain('trialPlatesByLoc.get(coverLocId)');
     expect(site).toContain('sceneBackground: reusedPlate');
-    expect(site).toContain('requirePlate: true');
+    expect(site).not.toContain('use:'); // default 'render': plated or fails
     expect(site).toContain('sceneBackground: coverSceneBackground');
   });
 

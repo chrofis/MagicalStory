@@ -1593,8 +1593,7 @@ function supersedePresenceFindings(threeStageResult) {
 }
 
 /**
- * THE PRESENCE SIGNAL (owner, 2026-09-13). One page, one outcome, mutually
- * exclusive by construction.
+ * THE PRESENCE SIGNAL (owner, 2026-09-13; three-case model 2026-09-24).
  *
  * Four layers used to argue about "is this figure really extra?" — D-04, D-04b
  * and D-04c in the evaluator prompt, an exception clause in the consolidator,
@@ -1609,10 +1608,13 @@ function supersedePresenceFindings(threeStageResult) {
  * the arithmetic, which is mechanical: a count and a list the model declared.
  * No prose is read; no finding's description is interpreted.
  *
- *   figures <  cast                      -> missing_character
- *   figures >  cast                      -> extra_character  (unless the brief declared a crowd)
- *   figures == cast, an unmatched figure -> character_identity, naming who it should be
- *   figures == cast, all matched         -> nothing
+ * Three cases, decided from `matches[]` (who each figure is, or `unmatched`)
+ * and the cast list — owner, 2026-09-24, superseding the count-based outcomes:
+ *   MISSING  a cast name no figure claims, no unmatched figure -> missing_character (add)
+ *   EXTRA    every cast name claimed, an unmatched figure      -> extra_character (remove)
+ *   MIXED    both -> character_identity: redraw the unmatched figure as the missing
+ *            name; leftovers on either side are removed / added
+ * One finding per figure or name; see the body for the deterministic pairing.
  *
  * And four reasons to say nothing at all rather than guess:
  *   - the roster was never declared (`declared: false`) — no cast, no arithmetic;
@@ -1646,7 +1648,7 @@ function supersedePresenceFindings(threeStageResult) {
  *        HANDED a labelled `Reference: <name>` image for on this call. An array
  *        (empty included) gates the identity branch; `undefined` means the caller
  *        could not say, and the branch behaves as before.
- * @returns {{outcome: string, reason: string|null, finding: object|null}}
+ * @returns {{outcome: string, reason: string|null, findings: object[]}}
  */
 /**
  * The runMetrics counter name for one presence derivation.
@@ -1690,7 +1692,7 @@ function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, de
   // RESOLVE (castIndex, when the caller has one) + COMPARE (everything else:
   // both sides of every name test below are strings this same run produced).
   const { canonicalName, resolveEntity, isNonHuman } = getCastResolver();
-  const decline = (reason) => ({ outcome: 'declined', reason, finding: null });
+  const decline = (reason) => ({ outcome: 'declined', reason, findings: [] });
 
   if (!cast || cast.declared !== true) return decline('roster_not_declared');
   const det = Number(detectedFigureCount);
@@ -1747,126 +1749,105 @@ function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, de
   // without it the derivation would read back as a judge's opinion.
   const mark = (finding) => ({ ...finding, severity: 'CRITICAL', derivedBy: PRESENCE_DERIVED_MARKER, sources: [FINDING_SOURCES.FINAL_CHECKS] });
 
-  if (det < castCount) {
-    const who = unclaimedCast[0] || null;
-    return {
-      outcome: 'missing_character',
-      reason: null,
-      finding: mark({
-        type: 'missing_character',
-        // `character` for every per-figure reader; `item` because the inpaint
-        // reference attach reads `missing.item` to find the VB cell to show.
-        character: who,
-        item: who,
-        description: `${det} person-figure(s) are in the frame for an EXPECTED CAST of ${castCount} person(s)`
-          + (who ? `; ${who} is absent.` : '.'),
-        fix: who
-          ? `Add ${who} to the scene, matching that entry's reference and CLOTHING CONTRACT.`
-          : `Add the missing EXPECTED CAST member, matching that entry's reference and CLOTHING CONTRACT.`,
-      }),
-    };
-  }
-
-  if (det > castCount) {
-    // N-09 in arithmetic form. A page the brief wrote as populated has unnamed
-    // background people on purpose; the surplus is the crowd, not a defect.
-    if (cast.population === 'crowd' || cast.crowdExpected === true) return decline('crowd_expected');
-    // AMBIENT IS NOT A CROWD, AND IT IS NOT CAST EITHER (2026-09-19). On a page
-    // the Art Director declared `population: "ambient"` — a square, a park, a
-    // quay — distant background people belong in the frame. They are dropped
-    // from the count by SCALE (bboxDetection.countAmbientFigures: geometry
-    // only, never a label or a description), and whatever surplus remains is
-    // still a real surplus. That is what keeps the uncommissioned cast-scale
-    // figure catchable: job_1789420511893_zly5rcdej p16's fourth child is 1.8x
-    // the smallest genuine cast figure and survives the filter.
-    //
-    // Without the detector's figures there is no geometry to measure, so the
-    // page is treated like a crowd page and nothing is derived — a declined
-    // outcome, never a CRITICAL guessed at. The evaluator's own D-04b still
-    // stands there, reading the same SETTING POPULATION line.
-    let ambientDropped = 0;
-    if (cast.population === 'ambient') {
-      const bbox = require('./bboxDetection');
-      // GEOMETRY, NOT JUST AN ARRAY. The detector's VLM fallback returns figures
-      // with a label and no box; measuring size over those is blind, not
-      // conservative, so the page declines rather than billing a CRITICAL the
-      // filter never had a chance to clear.
-      if (!bbox.hasAmbientGeometry(detectorFigures)) return decline('ambient_without_geometry');
-      ambientDropped = bbox.countAmbientFigures(detectorFigures);
-      if (det - ambientDropped <= castCount) return decline('ambient_background');
-    }
-    const fig = unmatchedFigures[0];
-    const figId = fig && (fig.figure ?? fig.id);
-    return {
-      outcome: 'extra_character',
-      reason: null,
-      finding: mark({
-        type: 'extra_character',
-        character: figId !== undefined && figId !== null ? `figure ${figId}` : null,
-        // On a cast-only page this is the sentence it has always been. Only an
-        // ambient page, where background life was subtracted, says so.
-        description: `${det - ambientDropped}${ambientDropped ? ' cast-scale' : ''} person-figure(s) are in the frame for an EXPECTED CAST of ${castCount} person(s)`
-          + ` — ${det - ambientDropped - castCount} more figure(s) than the page was written to hold.`
-          + (ambientDropped ? ` (${ambientDropped} distant background figure(s) belong to the setting and were not counted.)` : ''),
-        fix: "Redraw this figure as the EXPECTED CAST entry it should be, matching that entry's reference and CLOTHING CONTRACT.",
-      }),
-    };
-  }
-
-  // Counts reconcile. An unmatched figure alongside an unclaimed cast name is
-  // ONE recognition failure, not an absence plus a surplus — the old D-04c,
-  // now arithmetic.
-  if (unmatchedFigures.length === 0) return { outcome: 'reconciled', reason: null, finding: null };
-
-  // UNMATCHED IS ONLY EVIDENCE WHEN THERE WAS SOMETHING TO MATCH AGAINST
-  // (2026-09-13). `matches[]` is produced by comparing each figure to the
-  // labelled `Reference: <name>` images attached to the critique — the page's
-  // photo-backed cast. A Visual Bible secondary joins this roster from the
-  // brief and used to carry NO such image, so the only answer the evaluator
-  // could give for the figure that is her was `unmatched`, whether she was
-  // drawn right or wrong. Since 2026-09-21 a secondary WITH a rendered
-  // reference-sheet cell is handed that cell (vbCellReferencesForCast), so she
-  // is reference-backed and her name IS claimable here; what remains below is
-  // the cast entry that reached the judge with no image of any kind. Billing a CRITICAL on that is a false positive by construction:
-  // job_1789207854566_l43qgl34w p3 (one figure, roster [Frau Amrein], zero
-  // references attached) and p4/p13 (roster [Fiona, Frau Amrein], Fiona
-  // matched, the second figure unmatched because she is the secondary).
-  //
-  // So the branch needs a reference-backed cast entry to name. Not a decline:
-  // the counts DID reconcile, which is a real outcome — the derivation still
-  // owns the pair and still drops the evaluator's arithmetically impossible
-  // surplus on those pages. It just has no identity claim to make.
+  // THE THREE-CASE MODEL (owner, 2026-09-24 — supersedes the 2026-09-13
+  // count-based outcomes). Decided from the figure↔cast match data alone:
+  //   MISSING  a cast name no figure claims, and no unmatched figure → ADD it
+  //   EXTRA    every cast name claimed, and an unmatched figure       → REMOVE it
+  //   MIXED    both                                                     → the
+  //            unmatched figure IS the missing character drawn wrong → REDRAW
+  //            it as that character, never delete it
+  // Unequal counts pair DETERMINISTICALLY: unmatched figures in figure-id order
+  // (on an ambient page the non-background ones first) against missing names in
+  // cast order, photo-less names FIRST — a figure the evaluator could not match
+  // because it held no image for that name is that name, and pairs with no
+  // finding (the 2026-09-13 reference rule). What is left over on either side
+  // is a surplus figure (remove) or a missing name (add).
   const refs = Array.isArray(referenceNames)
     ? new Set(referenceNames.map(n => canonicalName(n || '')).filter(Boolean))
     : null;
-  const referenced = refs ? unclaimedCast.filter(n => refs.has(canonicalName(n))) : unclaimedCast;
-  // At equal counts an unmatched figure always leaves a cast name unclaimed
-  // (distinct claims <= figures - unmatched < castCount), so this is exactly
-  // the question "is the entry it should be one the evaluator had an image of".
-  // A page that got no reference at all (`refs.size === 0`) is the same answer.
-  if (refs && referenced.length === 0) {
-    return { outcome: 'reconciled', reason: 'unclaimed_cast_has_no_reference', finding: null };
+  const hasRef = (n) => !refs || refs.has(canonicalName(n));
+  let unmatched = [...unmatchedFigures].sort((a, b) => Number(a?.figure ?? a?.id ?? 0) - Number(b?.figure ?? b?.id ?? 0));
+
+  if (unmatched.length > 0) {
+    // N-09 in arithmetic form. On a page the brief wrote as populated the
+    // unmatched figures are the crowd, and a crowd member cannot be told from
+    // a cast member drawn wrong — nothing is derived.
+    if (cast.population === 'crowd' || cast.crowdExpected === true) return decline('crowd_expected');
+    // AMBIENT IS NOT A CROWD, AND IT IS NOT CAST EITHER (2026-09-19). Distant
+    // background people belong in the frame; they are subtracted by SCALE
+    // (bboxDetection.countAmbientFigures: geometry only). Without geometry the
+    // page declines rather than guessing.
+    if (cast.population === 'ambient') {
+      const bbox = require('./bboxDetection');
+      if (!bbox.hasAmbientGeometry(detectorFigures)) return decline('ambient_without_geometry');
+      const ambientDropped = bbox.countAmbientFigures(detectorFigures);
+      // Which unmatched figures are the background ones is read from the
+      // evaluator's own `zone` (a closed vocabulary), never from prose.
+      const zoneOf = (m) => String((figs.find(f => Number(f?.id) === Number(m?.figure))?.zone) || '');
+      unmatched = [
+        ...unmatched.filter(m => !/background$/.test(zoneOf(m))),
+        ...unmatched.filter(m => /background$/.test(zoneOf(m))),
+      ].slice(0, Math.max(0, unmatched.length - ambientDropped));
+      if (unmatched.length === 0 && unclaimedCast.length === 0) return decline('ambient_background');
+    }
   }
 
-  const fig = unmatchedFigures[0];
-  const figId = fig && (fig.figure ?? fig.id);
-  const who = referenced[0] || null;
-  const figLabel = figId !== undefined && figId !== null ? `figure ${figId}` : 'the unmatched figure';
-  return {
-    outcome: 'character_identity',
-    reason: null,
-    finding: mark({
-      type: 'character_identity',
-      // The cast member is what a repair has to paint; the figure is named in
-      // the description so the target is unambiguous either way.
-      character: who || (figId !== undefined && figId !== null ? `figure ${figId}` : null),
-      description: `${figLabel} matches no EXPECTED CAST entry while the frame holds exactly the cast (${castCount})`
-        + (who ? `; it should be ${who}.` : '.'),
-      fix: who
-        ? `Redraw ${figLabel} as ${who}, matching that entry's reference and CLOTHING CONTRACT.`
-        : `Redraw ${figLabel} as the EXPECTED CAST entry it should be, matching that entry's reference and CLOTHING CONTRACT.`,
-    }),
+  const missingOrdered = [...unclaimedCast.filter(n => !hasRef(n)), ...unclaimedCast.filter(n => hasRef(n))];
+  const figLabel = (m) => {
+    const id = m?.figure ?? m?.id;
+    return id !== undefined && id !== null ? `figure ${id}` : 'the unmatched figure';
   };
+  const figId = (m) => {
+    const id = Number(m?.figure ?? m?.id);
+    return Number.isFinite(id) ? id : null;
+  };
+  const findings = [];
+  let photoLessPairs = 0;
+  const pairs = Math.min(unmatched.length, missingOrdered.length);
+  for (let i = 0; i < pairs; i++) {
+    const who = missingOrdered[i];
+    const m = unmatched[i];
+    if (!hasRef(who)) { photoLessPairs++; continue; }
+    findings.push(mark({
+      type: 'character_identity',
+      // The cast member is what the repair paints; `figure` is WHICH figure it
+      // paints (the router targets a char-fix at it by this id).
+      character: who,
+      figure: figId(m),
+      description: `${figLabel(m)} matches no EXPECTED CAST entry while ${who} is not in the frame; it is ${who} drawn wrong.`,
+      fix: `Redraw ${figLabel(m)} as ${who}, matching that entry's reference and CLOTHING CONTRACT.`,
+    }));
+  }
+  for (const m of unmatched.slice(pairs)) {
+    findings.push(mark({
+      type: 'extra_character',
+      character: figLabel(m),
+      figure: figId(m),
+      description: `${figLabel(m)} matches no EXPECTED CAST entry and every cast member is already in the frame (EXPECTED CAST ${castCount}).`,
+      fix: 'Remove this figure: it is not one of the characters this page holds.',
+    }));
+  }
+  for (const who of missingOrdered.slice(pairs)) {
+    findings.push(mark({
+      type: 'missing_character',
+      // `character` for every per-figure reader; `item` because the inpaint
+      // reference attach reads `missing.item` to find the VB cell to show.
+      character: who,
+      item: who,
+      description: `${who} is not in the frame and no figure in it could be ${who}.`,
+      fix: `Add ${who} to the scene, matching that entry's reference and CLOTHING CONTRACT.`,
+    }));
+  }
+
+  if (findings.length === 0) {
+    return { outcome: 'reconciled', reason: photoLessPairs > 0 ? 'unclaimed_cast_has_no_reference' : null, findings };
+  }
+  const has = (t) => findings.some(f => f.type === t);
+  // Pairing exhausts one side, so a page carries identity + one leftover kind
+  // at most; the counter names the case.
+  const outcome = has('character_identity') ? 'character_identity'
+    : has('extra_character') ? 'extra_character' : 'missing_character';
+  return { outcome, reason: null, findings };
 }
 
 /**
@@ -3240,8 +3221,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       if (matches.length > 0) {
         log.info(`📊 [EVAL] Character matches: ${matches.map(m => `Figure ${m.figure} → ${m.reference} (${Math.round(m.confidence * 100)}%)`).join(', ')}`);
       }
-      // THE PRESENCE SIGNAL (owner, 2026-09-13). Code does the arithmetic and
-      // emits at most one outcome — see derivePresenceFinding. When it speaks,
+      // THE PRESENCE SIGNAL (owner, 2026-09-13; three cases 2026-09-24). Code
+      // derives the findings from the match data — see derivePresenceFinding. When it speaks,
       // it OWNS the pair: the evaluator's own missing/extra findings are
       // dropped first, so a page can never carry both at once. When it declines
       // (no detector count — covers today; witnesses disagreeing) the
@@ -3266,10 +3247,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           const before = fixableIssues.length;
           fixableIssues = fixableIssues.filter(i => !PRESENCE_COUNT_TYPES.has(String(i?.type || '').toLowerCase()));
           const dropped = before - fixableIssues.length;
-          if (presence.finding) fixableIssues.push(presence.finding);
+          fixableIssues.push(...presence.findings);
           log.info(`👥 [PRESENCE] ${pageContext || 'page'}: ${detectedPeopleCount} person-figure(s) vs EXPECTED CAST ${expectedCast.count}`
             + `${expectedCast.nonHumanNames?.length ? ` (minus non-human ${expectedCast.nonHumanNames.join(', ')})` : ''}`
-            + ` → ${presence.outcome}${presence.reason ? ` [${presence.reason}]` : ''}${presence.finding?.character ? ` (${presence.finding.character})` : ''}`
+            + ` → ${presence.outcome}${presence.reason ? ` [${presence.reason}]` : ''}${presence.findings.length ? ` (${presence.findings.map(f => `${f.type} ${f.character}`).join('; ')})` : ''}`
             + `${dropped ? `; dropped ${dropped} evaluator presence finding(s)` : ''}`);
         } else {
           log.info(`👥 [PRESENCE] ${pageContext || 'page'}: declined (${presence.reason})`

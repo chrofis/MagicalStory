@@ -613,9 +613,9 @@
       "severity": "block"
     },
     {
-      "id": "cover-element-carriers",
-      "axis": "trial cover vs streaming cover vs iterate vs user regeneration",
-      "reason": "Four cover builders carry a cover's Visual Bible elements (ART/ANI/VEH) to the image call - the trial front cover and the streaming full-account covers in storyJobPipeline.js, iterateCover in coverIterate.js, and the regenerate route in regeneration.js. Each must hand the cover's element ids to the ONE reference builder (coverIterate.buildCoverReferences) and the ONE state resolver: on 2026-09-23 the trial cover parsed objects[] as strings while its JSON wrote {id}, so no trial cover ever got a reference cell, and a prod crown painted as loose leaves because the cover cell sites resolved no page. An element type or id shape handled at one builder and not the others reaches three covers and misses the fourth.",
+      "id": "cover-and-plate-reference-builders",
+      "axis": "trial cover vs streaming cover vs iterateCover vs regeneration cover route vs trial page plate",
+      "reason": "Every cover render gets its landmark photo, plate and VB grid from coverIterate.buildCoverReferences, and its `use` ('render' plated-or-fail, 'edit' no plate and no photo, 'composite' unchanged) is picked at each call site: the trial and streaming covers and the trial page plate path in storyJobPipeline.js, iterateCover in coverIterate.js, the scene-composite cover route in regeneration.js. The trial cover once hand-rolled its own references and sent the raw landmark photo with no plate (prod job_1790169018278_n57xpnufo: strangers from the photo painted beside the child); a reference or plate rule changed at one site belongs at all of them.",
       "members": [
         "storyJobPipeline.js",
         "server/lib/coverIterate.js",
@@ -624,9 +624,19 @@
       "severity": "block",
       "parity": {
         "anchors": [
-          "buildCoverReferences("
+          "buildCoverReferences"
         ]
       }
+    },
+    {
+      "id": "scene-slot-landmark-rule",
+      "axis": "Grok reference packing vs Gemini parts",
+      "reason": "What fills the scene slot is decided twice: grok.js packReferences promotes landmarkPhotos[0] only when no plate is given, and images.js's Gemini branch attaches the primary landmark photo only when no plate is given (since 2026-09-24; before, it sent the raw photo beside the plate). A change to when a raw landmark photo may reach a render belongs on both providers.",
+      "members": [
+        "server/lib/grok.js",
+        "server/lib/images.js"
+      ],
+      "severity": "block"
     }
   ],
   "withinFile": [

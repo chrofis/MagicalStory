@@ -152,224 +152,163 @@ describe('extra_character — scoring and taxonomy', () => {
     expect(deductionPoints({ type: 'extra_character', severity: 'MINOR' })).toBe(SEVERITY_POINTS.minor);
   });
 
-  it('shares the character_presence bucket with missing_character (regen route, not a face patch)', () => {
+  it('shares the character_presence bucket with missing_character', () => {
     expect(bucketForType('extra_character')).toBe('character_presence');
     expect(bucketForType('missing_character')).toBe('character_presence');
   });
 
-  // Owner decision 2026-09-13: the type stays scored, but it may never cause a
-  // figure to be deleted. Inpaint was the removal route (a Grok whole-frame
-  // edit executing the old "Remove this figure" fix erased a commissioned child
-  // from a cover), so the route is closed at the type.
-  it('is barred from inpaint — the removal route is closed', () => {
-    expect(NOT_INPAINTABLE_TYPES.has('extra_character')).toBe(true);
+  // Owner reversal 2026-09-24 (supersedes 2026-09-13): an `extra_character`
+  // now means every cast member is matched and the figure is surplus, so the
+  // removal cannot erase a commissioned character — inpaint may take it out.
+  // The figure that might BE a missing member is `character_identity`, which
+  // stays barred from inpaint and goes to a figure-targeted char-fix.
+  it('is inpaintable (a confirmed surplus is removed); character_identity is not', () => {
+    expect(NOT_INPAINTABLE_TYPES.has('extra_character')).toBe(false);
+    expect(NOT_INPAINTABLE_TYPES.has('character_identity')).toBe(true);
   });
 });
 
-describe('derivePresenceFinding — the one presence signal', () => {
-  // ONE PAGE, ONE OUTCOME (owner, 2026-09-13). The evaluator observes
-  // (`figures[]` + `matches[]`, one match per figure, same ids and order); code
-  // does the arithmetic. Four layers used to argue about "is this figure really
-  // extra?" and their disagreement was destructive — an `extra_character` sent
-  // to inpaint erased a commissioned child from a cover while the same page
-  // also carried a `missing_character` for the child it had just erased.
-
+describe('derivePresenceFinding — the three-case presence model (owner, 2026-09-24)', () => {
+  // The evaluator observes (`figures[]` + `matches[]`, one match per figure,
+  // same ids and order); code derives from the match data alone:
+  //   MISSING  a cast name no figure claims, no unmatched figure -> add it
+  //   EXTRA    every cast name claimed, an unmatched figure      -> remove it
+  //   MIXED    both -> redraw the unmatched figure as the missing name
   const roster = (names: string[], extra: object = {}) =>
     ({ names, count: names.length, declared: true, crowdExpected: false, block: '', ...extra });
   const figs = (n: number) => Array.from({ length: n }, (_, i) => ({ id: i + 1 }));
   const matched = (refs: (string | null)[]) =>
     refs.map((r, i) => ({ figure: i + 1, reference: r ?? 'unmatched', confidence: r ? 0.9 : 0 }));
   const run = (o: object) => derivePresenceFinding(o);
+  const types = (r: any) => r.findings.map((f: any) => f.type);
+  const REMOVAL = /remove|delete|erase|paint out|take out/i;
 
-  it('figures < cast -> missing_character, naming who, with `item` for the inpaint reference attach', () => {
+  it('MISSING: a cast name no figure claims and no unmatched figure -> add, never a removal', () => {
     const r = run({
       figures: figs(3), matches: matched(['Aaron', 'Ben', 'Carl']),
       cast: roster(['Aaron', 'Ben', 'Carl', 'Dan']), detectedFigureCount: 3,
     });
     expect(r.outcome).toBe('missing_character');
-    expect(r.finding.type).toBe('missing_character');
-    expect(r.finding.severity).toBe('CRITICAL');
-    expect(r.finding.character).toBe('Dan');
-    // images.js reads `missing.item` to attach the VB reference cell for inpaint.
-    expect(r.finding.item).toBe('Dan');
-    // Never a removal instruction — that is the whole reason this rewrite exists.
-    expect(r.finding.fix).not.toMatch(/remove|delete|erase|paint out|take out/i);
+    expect(r.findings).toHaveLength(1);
+    const [f] = r.findings;
+    expect(f).toMatchObject({ type: 'missing_character', severity: 'CRITICAL', character: 'Dan', item: 'Dan' });
+    expect(f.fix).toMatch(/^Add Dan/);
+    expect(f.fix).not.toMatch(REMOVAL);
   });
 
-  it('figures > cast -> extra_character against the unmatched figure', () => {
+  it('EXTRA: every cast name claimed and an unmatched figure -> remove that figure', () => {
     const r = run({
       figures: figs(5), matches: matched(['Aaron', 'Ben', 'Carl', 'Dan', null]),
       cast: roster(['Aaron', 'Ben', 'Carl', 'Dan']), detectedFigureCount: 5,
     });
     expect(r.outcome).toBe('extra_character');
-    expect(r.finding.type).toBe('extra_character');
-    expect(r.finding.character).toBe('figure 5');
-    expect(r.finding.fix).not.toMatch(/remove|delete|erase|paint out|take out/i);
+    expect(r.findings).toHaveLength(1);
+    expect(r.findings[0]).toMatchObject({ type: 'extra_character', character: 'figure 5', figure: 5 });
+    expect(r.findings[0].fix).toBe('Remove this figure: it is not one of the characters this page holds.');
   });
 
-  it('the crowd flag suppresses the surplus branch, and only that branch', () => {
-    const crowd = roster(['Aaron', 'Ben', 'Carl', 'Dan'], { crowdExpected: true });
-    expect(run({ figures: figs(9), matches: matched(['Aaron', 'Ben', 'Carl', 'Dan', null, null, null, null, null]), cast: crowd, detectedFigureCount: 9 }))
-      .toMatchObject({ outcome: 'declined', reason: 'crowd_expected', finding: null });
-    // A shortfall on a crowd page is still a shortfall.
-    expect(run({ figures: figs(3), matches: matched(['Aaron', 'Ben', 'Carl']), cast: crowd, detectedFigureCount: 3 }).outcome)
-      .toBe('missing_character');
+  it('EXTRA includes a declared-empty roster (production job_1790107559778_fcmlfa8kn p7)', () => {
+    const r = run({ figures: figs(2), matches: matched([null, null]), cast: roster([]), detectedFigureCount: 2 });
+    expect(r.outcome).toBe('extra_character');
+    expect(types(r)).toEqual(['extra_character', 'extra_character']);
+    expect(r.findings.map((f: any) => f.figure)).toEqual([1, 2]);
+    expect(run({ figures: [], matches: [], cast: roster([]), detectedFigureCount: 0 }))
+      .toEqual({ outcome: 'reconciled', reason: null, findings: [] });
   });
 
-  it('figures == cast with an unmatched figure -> character_identity naming the cast member it should be', () => {
-    // The old D-04c, now arithmetic: an absence plus a surplus on a page whose
-    // counts reconcile is ONE recognition failure, not two findings.
+  it('MIXED: a missing name and an unmatched figure -> redraw that figure as the name, never delete', () => {
     const r = run({
       figures: figs(4), matches: matched(['Aaron', 'Ben', 'Carl', null]),
       cast: roster(['Aaron', 'Ben', 'Carl', 'Dan']), detectedFigureCount: 4,
     });
     expect(r.outcome).toBe('character_identity');
-    expect(r.finding.type).toBe('character_identity');
-    expect(r.finding.character).toBe('Dan');
-    expect(r.finding.description).toMatch(/figure 4/);
-    expect(r.finding.description).toMatch(/Dan/);
+    expect(r.findings).toHaveLength(1);
+    expect(r.findings[0]).toMatchObject({ type: 'character_identity', character: 'Dan', figure: 4 });
+    expect(r.findings[0].fix).toMatch(/^Redraw figure 4 as Dan/);
+    expect(r.findings[0].fix).not.toMatch(REMOVAL);
   });
 
-  it('figures == cast, all matched -> nothing', () => {
+  it('unequal counts: 1 missing + 2 unmatched -> the lower figure id is redrawn, the other removed', () => {
+    const r = run({
+      figures: figs(4), matches: matched(['Aaron', null, 'Ben', null]),
+      cast: roster(['Aaron', 'Ben', 'Carl']), detectedFigureCount: 4,
+    });
+    expect(r.outcome).toBe('character_identity');
+    expect(r.findings.map((f: any) => [f.type, f.character, f.figure])).toEqual([
+      ['character_identity', 'Carl', 2],
+      ['extra_character', 'figure 4', 4],
+    ]);
+  });
+
+  it('unequal counts: 2 missing + 1 unmatched -> the first missing (roster order) is redrawn, the other added', () => {
+    const r = run({
+      figures: figs(2), matches: matched(['Aaron', null]),
+      cast: roster(['Aaron', 'Ben', 'Carl']), detectedFigureCount: 2,
+    });
+    expect(r.findings.map((f: any) => [f.type, f.character])).toEqual([
+      ['character_identity', 'Ben'],
+      ['missing_character', 'Carl'],
+    ]);
+  });
+
+  it('all matched -> nothing', () => {
     expect(run({
       figures: figs(4), matches: matched(['Aaron', 'Ben', 'Carl', 'Dan']),
       cast: roster(['Aaron', 'Ben', 'Carl', 'Dan']), detectedFigureCount: 4,
-    })).toEqual({ outcome: 'reconciled', reason: null, finding: null });
+    })).toEqual({ outcome: 'reconciled', reason: null, findings: [] });
   });
 
-  it('a declared-empty roster still counts: any figure at all is a surplus', () => {
-    expect(run({ figures: figs(3), matches: matched([null, null, null]), cast: roster([]), detectedFigureCount: 3 }).outcome)
-      .toBe('extra_character');
-    expect(run({ figures: [], matches: [], cast: roster([]), detectedFigureCount: 0 }).outcome).toBe('reconciled');
+  it('a crowd page with unmatched figures declines; a shortfall on a crowd page is still a shortfall', () => {
+    const crowd = roster(['Aaron', 'Ben', 'Carl', 'Dan'], { crowdExpected: true });
+    expect(run({ figures: figs(9), matches: matched(['Aaron', 'Ben', 'Carl', 'Dan', null, null, null, null, null]), cast: crowd, detectedFigureCount: 9 }))
+      .toMatchObject({ outcome: 'declined', reason: 'crowd_expected', findings: [] });
+    expect(run({ figures: figs(3), matches: matched(['Aaron', 'Ben', 'Carl']), cast: crowd, detectedFigureCount: 3 }).outcome)
+      .toBe('missing_character');
   });
 
-  describe('the identity branch needs a reference to accuse', () => {
+  describe('a photo-less cast entry explains an unmatched figure without a finding', () => {
     // UNMATCHED IS ONLY EVIDENCE WHEN THERE WAS SOMETHING TO MATCH AGAINST
-    // (2026-09-13). `matches[]` comes from comparing each figure to the
-    // labelled `Reference: <name>` images attached to the critique. A Visual
-    // Bible secondary joins the roster from the brief and has no such image,
-    // so `unmatched` is the only answer available for her — right or wrong.
-    // Measured on job_1789207854566_l43qgl34w p3 / p4 / p13.
-
+    // (2026-09-13, kept). A Visual Bible secondary with no reference image can
+    // only ever come back `unmatched`, so it pairs with an unmatched figure
+    // FIRST and no finding is made. Measured on job_1789207854566_l43qgl34w.
     it('a photo-less secondary alone on the page emits NOTHING (p3)', () => {
-      const r = run({
+      expect(run({
         figures: figs(1), matches: matched([null]),
-        cast: roster(['Frau Amrein']), detectedFigureCount: 1,
-        referenceNames: [],
-      });
-      expect(r).toEqual({ outcome: 'reconciled', reason: 'unclaimed_cast_has_no_reference', finding: null });
+        cast: roster(['Frau Amrein']), detectedFigureCount: 1, referenceNames: [],
+      })).toEqual({ outcome: 'reconciled', reason: 'unclaimed_cast_has_no_reference', findings: [] });
     });
 
-    it('a photo-less secondary beside a matched lead emits NOTHING (p4/p13)', () => {
+    it('a photo-less secondary beside a matched lead emits NOTHING (p4/p13), and is reconciled, not declined', () => {
       const r = run({
         figures: figs(2), matches: matched(['Fiona', null]),
-        cast: roster(['Fiona', 'Frau Amrein']), detectedFigureCount: 2,
-        referenceNames: ['Fiona'],
+        cast: roster(['Fiona', 'Frau Amrein']), detectedFigureCount: 2, referenceNames: ['Fiona'],
       });
-      expect(r.finding).toBeNull();
-      expect(r.reason).toBe('unclaimed_cast_has_no_reference');
+      expect(r).toEqual({ outcome: 'reconciled', reason: 'unclaimed_cast_has_no_reference', findings: [] });
     });
 
-    it('but it is RECONCILED, not declined — the derivation still owns the pair', () => {
-      // The wiring drops the evaluator's own missing/extra findings whenever
-      // the outcome is not `declined`. p4/p13 carried an arithmetically
-      // impossible `extra_character` on a 2-vs-2 page; that must still go.
-      const r = run({
-        figures: figs(2), matches: matched(['Fiona', null]),
-        cast: roster(['Fiona', 'Frau Amrein']), detectedFigureCount: 2,
-        referenceNames: ['Fiona'],
-      });
-      expect(r.outcome).toBe('reconciled');
-      expect(r.outcome).not.toBe('declined');
-    });
-
-    it('a REFERENCE-BACKED cast member unmatched on a reconciled page still emits character_identity', () => {
-      const r = run({
-        figures: figs(4), matches: matched(['Aaron', 'Ben', 'Carl', null]),
-        cast: roster(['Aaron', 'Ben', 'Carl', 'Dan']), detectedFigureCount: 4,
-        referenceNames: ['Aaron', 'Ben', 'Carl', 'Dan'],
-      });
-      expect(r.outcome).toBe('character_identity');
-      expect(r.finding.character).toBe('Dan');
-    });
-
-    it('names the reference-backed unclaimed entry, not merely the first one', () => {
+    it('photo-less names pair first; the reference-backed missing name takes the next figure', () => {
       const r = run({
         figures: figs(3), matches: matched(['Aaron', null, null]),
         cast: roster(['Aaron', 'Frau Amrein', 'Dan']), detectedFigureCount: 3,
         referenceNames: ['Aaron', 'Dan'],
       });
-      expect(r.outcome).toBe('character_identity');
-      expect(r.finding.character).toBe('Dan');
+      expect(r.findings.map((f: any) => [f.type, f.character, f.figure])).toEqual([['character_identity', 'Dan', 3]]);
     });
 
     it('matching is case-insensitive on both sides', () => {
       const r = run({
         figures: figs(2), matches: matched(['aaron', null]),
-        cast: roster(['Aaron', 'Dan']), detectedFigureCount: 2,
-        referenceNames: ['AARON', ' dan '],
+        cast: roster(['Aaron', 'Dan']), detectedFigureCount: 2, referenceNames: ['AARON', ' dan '],
       });
-      expect(r.outcome).toBe('character_identity');
-      expect(r.finding.character).toBe('Dan');
+      expect(r.findings[0]).toMatchObject({ type: 'character_identity', character: 'Dan' });
     });
 
-    it('at equal counts an unmatched figure always leaves a cast name unclaimed', () => {
-      // Why the gate can ask about the CAST ENTRY and nothing else: distinct
-      // claims <= figures - unmatched < castCount, so `unclaimedCast` is never
-      // empty on this branch. Swept rather than asserted in prose.
-      const names = ['Aaron', 'Ben', 'Carl', 'Dan'];
-      for (let n = 1; n <= 4; n++) {
-        for (let claims = 0; claims < n; claims++) {
-          const refs = Array.from({ length: n }, (_, i) => (i < claims ? names[i] : null));
-          const r = run({
-            figures: figs(n), matches: matched(refs), cast: roster(names.slice(0, n)),
-            detectedFigureCount: n, referenceNames: names,
-          });
-          expect(r.outcome).toBe('character_identity');
-          expect(names).toContain(r.finding.character);
-        }
-      }
-    });
-
-    it('no referenceNames supplied at all -> the branch behaves exactly as before', () => {
+    it('no referenceNames supplied at all -> every name counts as reference-backed', () => {
       const r = run({
         figures: figs(2), matches: matched(['Fiona', null]),
         cast: roster(['Fiona', 'Frau Amrein']), detectedFigureCount: 2,
       });
-      expect(r.outcome).toBe('character_identity');
-      expect(r.finding.character).toBe('Frau Amrein');
-    });
-
-    it('the OTHER branches are untouched by the gate', () => {
-      const refless = { referenceNames: [] };
-      expect(run({ figures: figs(1), matches: matched(['Aaron']), cast: roster(['Aaron', 'Ben']), detectedFigureCount: 1, ...refless }).outcome)
-        .toBe('missing_character');
-      expect(run({ figures: figs(3), matches: matched([null, null, null]), cast: roster(['Aaron']), detectedFigureCount: 3, ...refless }).outcome)
-        .toBe('extra_character');
-      expect(run({ figures: figs(1), matches: matched(['Aaron']), cast: roster(['Aaron']), detectedFigureCount: 1, ...refless }))
-        .toEqual({ outcome: 'reconciled', reason: null, finding: null });
-    });
-
-    it('MUTUAL EXCLUSION still holds with the gate on', () => {
-      const names = ['Aaron', 'Ben', 'Carl', 'Dan'];
-      for (let castSize = 0; castSize <= 4; castSize++) {
-        for (let figCount = 0; figCount <= 5; figCount++) {
-          for (let namedRefs = 0; namedRefs <= figCount; namedRefs++) {
-            for (const refList of [[], ['Aaron'], names]) {
-              const refs = Array.from({ length: figCount }, (_, i) => (i < namedRefs ? names[i % 4] : null));
-              const r = run({
-                figures: figs(figCount), matches: matched(refs),
-                cast: roster(names.slice(0, castSize)), detectedFigureCount: figCount,
-                referenceNames: refList,
-              });
-              const emitted = r.finding ? [r.finding.type] : [];
-              expect(emitted.includes('missing_character') && emitted.includes('extra_character')).toBe(false);
-              if (r.outcome === 'declined') expect(r.finding).toBeNull();
-              else expect(r.outcome).toBe(r.finding ? r.finding.type : 'reconciled');
-            }
-          }
-        }
-      }
+      expect(r.findings[0]).toMatchObject({ type: 'character_identity', character: 'Frau Amrein' });
     });
   });
 
@@ -398,12 +337,8 @@ describe('derivePresenceFinding — the one presence signal', () => {
     });
 
     it('THE WITNESSES DISAGREE — the folded two-witness rule', () => {
-      // The detector saw 4 real figures, the evaluator enumerated 5. Two
-      // readings of one picture; when they differ the count is not trustworthy
-      // for this page, so no claim is made at all. This replaces the absence
-      // filter that used to delete claims one at a time after the fact.
-      expect(run({ ...base, detectedFigureCount: 4 })).toMatchObject({ outcome: 'declined', reason: 'witnesses_disagree', finding: null });
-      expect(run({ ...base, detectedFigureCount: 6 })).toMatchObject({ outcome: 'declined', reason: 'witnesses_disagree', finding: null });
+      expect(run({ ...base, detectedFigureCount: 4 })).toMatchObject({ outcome: 'declined', reason: 'witnesses_disagree', findings: [] });
+      expect(run({ ...base, detectedFigureCount: 6 })).toMatchObject({ outcome: 'declined', reason: 'witnesses_disagree', findings: [] });
     });
   });
 
@@ -413,11 +348,11 @@ describe('derivePresenceFinding — the one presence signal', () => {
       { figures: figs(5), matches: matched(['Aaron', 'Ben', 'Carl', 'Dan', null]), cast: roster(['Aaron', 'Ben', 'Carl', 'Dan']), detectedFigureCount: 5 },
       { figures: figs(4), matches: matched(['Aaron', 'Ben', 'Carl', null]), cast: roster(['Aaron', 'Ben', 'Carl', 'Dan']), detectedFigureCount: 4 },
     ];
-    for (const c of cases) expect(run(c).finding.derivedBy).toBe(PRESENCE_DERIVED_MARKER);
+    for (const c of cases) for (const f of run(c).findings) expect(f.derivedBy).toBe(PRESENCE_DERIVED_MARKER);
   });
 
   it('a derived finding is a real, routable, scored finding', () => {
-    const f = run({ figures: figs(5), matches: matched(['Aaron', 'Ben', 'Carl', 'Dan', null]), cast: roster(['Aaron', 'Ben', 'Carl', 'Dan']), detectedFigureCount: 5 }).finding;
+    const [f] = run({ figures: figs(5), matches: matched(['Aaron', 'Ben', 'Carl', 'Dan', null]), cast: roster(['Aaron', 'Ben', 'Carl', 'Dan']), detectedFigureCount: 5 }).findings;
     expect(bucketForType(f.type)).toBe('character_presence');
     const [d] = composeDeductions({ evalResult: { fixableIssues: [f] } }).quality;
     expect(deductionPoints(d)).toBe(25);
@@ -435,35 +370,35 @@ describe('derivePresenceFinding — the one presence signal', () => {
     expect(JSON.stringify({ figures, matches, cast })).toBe(snapshot);
   });
 
-  // THE INVARIANT. This is the whole design: the two presence types are
-  // mutually exclusive BY CONSTRUCTION, so no input can ever produce both.
-  // Exhaustive over the shape space rather than over a few hand-picked cases.
-  it('MUTUAL EXCLUSION: no input yields both presence types, ever', () => {
+  // THE INVARIANTS of the three-case model, swept over the shape space:
+  //   - a figure is never removed while a cast name it could be is still missing;
+  //   - a name is never reported missing while an unmatched figure could be it;
+  //   - one finding per unmatched figure / missing name, no more.
+  it('never removes a figure that could be a missing cast member, never adds a name a figure could be', () => {
     const names = ['Aaron', 'Ben', 'Carl', 'Dan'];
     const outcomes = new Set<string>();
     for (let castSize = 0; castSize <= 4; castSize++) {
       for (let figCount = 0; figCount <= 6; figCount++) {
         for (let namedRefs = 0; namedRefs <= figCount; namedRefs++) {
-          for (const crowd of [false, true]) {
-            for (const det of [figCount, figCount + 1, null]) {
-              const refs = Array.from({ length: figCount }, (_, i) => (i < namedRefs ? names[i % 4] : null));
-              const r = run({
-                figures: figs(figCount), matches: matched(refs),
-                cast: roster(names.slice(0, castSize), { crowdExpected: crowd }),
-                detectedFigureCount: det,
-              });
-              outcomes.add(r.outcome);
-              const emitted = r.finding ? [r.finding.type] : [];
-              expect(emitted.filter(t => t === 'missing_character' || t === 'extra_character').length).toBeLessThanOrEqual(1);
-              expect(emitted.includes('missing_character') && emitted.includes('extra_character')).toBe(false);
-              if (r.outcome === 'declined') expect(r.finding).toBeNull();
-              else expect(r.outcome).toBe(r.finding ? r.finding.type : 'reconciled');
-            }
+          for (const det of [figCount, figCount + 1, null]) {
+            const refs = Array.from({ length: figCount }, (_, i) => (i < namedRefs ? names[i % 4] : null));
+            const r = run({
+              figures: figs(figCount), matches: matched(refs),
+              cast: roster(names.slice(0, castSize)), detectedFigureCount: det,
+            });
+            outcomes.add(r.outcome);
+            const t = types(r);
+            expect(t.includes('extra_character') && t.includes('missing_character')).toBe(false);
+            if (r.outcome === 'declined') { expect(r.findings).toEqual([]); continue; }
+            const unmatched = refs.filter(x => x === null).length;
+            const claimed = new Set(refs.filter(Boolean));
+            const missing = names.slice(0, castSize).filter(n => !claimed.has(n)).length;
+            expect(t.filter((x: string) => x !== 'missing_character').length).toBe(unmatched);
+            expect(t.filter((x: string) => x !== 'extra_character').length).toBe(missing);
           }
         }
       }
     }
-    // The sweep actually reached every branch, so the invariant is not vacuous.
     expect(outcomes).toEqual(new Set(['missing_character', 'extra_character', 'character_identity', 'reconciled', 'declined']));
   });
 });
@@ -527,13 +462,15 @@ describe('extra_character — prompt vocabulary', () => {
     expect(t).toMatch(/D-04b `extra_character` → CRITICAL\.\*\* A person or animal figure that matches no EXPECTED CAST entry and that N-09 does not excuse/);
   });
 
-  it('D-04b never instructs a removal (owner, 2026-09-13)', () => {
-    // Pins the PROPERTY, not the wording: whatever D-04b's fix says, it may not
-    // ask for the figure to be taken out of the frame.
+  it('D-04b states the three presence cases (owner, 2026-09-24)', () => {
+    // Removal only for a CONFIRMED surplus (every cast entry matched); an
+    // unmatched figure while an entry is unmatched is that entry drawn wrong.
     const t = String(PROMPT_TEMPLATES.imageEvaluation || '');
     const rule = t.split('\n').find(l => l.includes('D-04b `extra_character`')) || '';
-    expect(rule).not.toBe('');
-    expect(rule).not.toMatch(/\b(remove|delete|erase|paint out|take out)\b/i);
+    expect(rule).toMatch(/when EVERY EXPECTED CAST entry is matched[^.]*surplus/);
+    expect(rule).toContain('"Remove this figure: it is not one of the characters this page holds."');
+    expect(rule).toMatch(/When an EXPECTED CAST entry is matched by NO figure, the unmatched figure is that entry drawn wrong — code `character_identity`/);
+    expect(rule).toMatch(/— never a removal\./);
   });
 
   it('buildEvaluationPrompt renders the roster into the template', () => {
@@ -620,7 +557,7 @@ describe('derivePresenceFinding — COUNT PEOPLE AGAINST PEOPLE', () => {
       cast: roster(['Liz', 'Ayan', 'Green Fairy', 'Yellow Fairy'], ['Green Fairy', 'Yellow Fairy']),
       detectedFigureCount: 2,
     });
-    expect(r).toEqual({ outcome: 'reconciled', reason: null, finding: null });
+    expect(r).toEqual({ outcome: 'reconciled', reason: null, findings: [] });
   });
 
   it('never bills a CRITICAL absence against a non-human roster entry', () => {
@@ -631,8 +568,10 @@ describe('derivePresenceFinding — COUNT PEOPLE AGAINST PEOPLE', () => {
       const r = derivePresenceFinding({
         figures: figs(3), matches: matched(['Liz', 'Ayan', 'Green Fairy']), cast, detectedFigureCount: det,
       });
-      expect(String(r.finding?.character || '')).not.toMatch(/fairy/i);
-      expect(String(r.finding?.item || '')).not.toMatch(/fairy/i);
+      for (const f of r.findings) {
+        expect(String(f.character || '')).not.toMatch(/fairy/i);
+        expect(String(f.item || '')).not.toMatch(/fairy/i);
+      }
     }
   });
 
@@ -647,7 +586,7 @@ describe('derivePresenceFinding — COUNT PEOPLE AGAINST PEOPLE', () => {
       detectedFigureCount: 2,
     });
     expect(r.outcome).toBe('reconciled');
-    expect(r.finding).toBeNull();
+    expect(r.findings).toEqual([]);
   });
 
   it('the witnesses-disagree gate compares two PEOPLE counts, both ways', () => {
@@ -660,7 +599,7 @@ describe('derivePresenceFinding — COUNT PEOPLE AGAINST PEOPLE', () => {
     // readings really do differ, and the derivation still refuses to rule.
     expect(derivePresenceFinding({
       figures: figs(2), matches: matched(['Liz', 'Blue Fairy']), cast, detectedFigureCount: 2,
-    })).toMatchObject({ outcome: 'declined', reason: 'witnesses_disagree', finding: null });
+    })).toMatchObject({ outcome: 'declined', reason: 'witnesses_disagree', findings: [] });
     // A figure the evaluator left UNMATCHED is of unknown kind and stays in the
     // people count — an unexplained figure is never explained away as an animal.
     expect(derivePresenceFinding({
@@ -674,9 +613,9 @@ describe('derivePresenceFinding — COUNT PEOPLE AGAINST PEOPLE', () => {
       cast: roster(['Liz', 'Yellow Fairy'], ['Yellow Fairy']), detectedFigureCount: 2,
     });
     expect(r.outcome).toBe('extra_character');
-    expect(r.finding.character).toBe('figure 3');
-    // The numbers it states are the people numbers it actually compared.
-    expect(r.finding.description).toMatch(/2 person-figure\(s\).*EXPECTED CAST of 1 person\(s\)/);
+    expect(r.findings.map((f: any) => f.character)).toEqual(['figure 3']);
+    // The cast size it states is the PEOPLE cast it actually compared.
+    expect(r.findings[0].description).toMatch(/EXPECTED CAST 1\)/);
   });
 
   it('a short-form roster token for a VB animal is still subtracted (Kapitanin Rossa / Rossa)', () => {
@@ -692,7 +631,7 @@ describe('derivePresenceFinding — COUNT PEOPLE AGAINST PEOPLE', () => {
     const r = derivePresenceFinding({
       figures: figs(2), matches: matched(['Liz', 'Rossa']), cast, detectedFigureCount: 1,
     });
-    expect(r).toEqual({ outcome: 'reconciled', reason: null, finding: null });
+    expect(r).toEqual({ outcome: 'reconciled', reason: null, findings: [] });
   });
 
   it('a human-only page is unchanged, with or without the field', () => {
@@ -703,11 +642,11 @@ describe('derivePresenceFinding — COUNT PEOPLE AGAINST PEOPLE', () => {
       ...args, cast: { names: ['Aaron', 'Ben', 'Carl', 'Dan'], count: 4, declared: true, crowdExpected: false, block: '' },
     });
     expect(withField.outcome).toBe('missing_character');
-    expect(withField.finding.character).toBe('Dan');
+    expect(withField.findings.map((f: any) => f.character)).toEqual(['Dan']);
     expect(legacy).toEqual(withField);
   });
 
-  it('still emits at most ONE presence outcome — no input yields both types', () => {
+  it('never yields both a removal and an addition — rosters mixing people and animals', () => {
     // The mutual-exclusion invariant, re-checked against rosters that mix
     // people and animals in every proportion.
     const names = ['Liz', 'Ayan', 'Pink Fairy', 'Blue Fairy'];
@@ -723,7 +662,8 @@ describe('derivePresenceFinding — COUNT PEOPLE AGAINST PEOPLE', () => {
           });
           expect(['declined', 'reconciled', 'missing_character', 'extra_character', 'character_identity'])
             .toContain(r.outcome);
-          if (r.finding) expect(r.finding.type).toBe(r.outcome);
+          const t = r.findings.map((f: any) => f.type);
+          expect(t.includes('extra_character') && t.includes('missing_character')).toBe(false);
         }
       }
     }

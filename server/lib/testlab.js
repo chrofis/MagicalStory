@@ -5420,9 +5420,13 @@ async function runRepairRoundStage(ctx, { experimentId, params = {} }) {
     latestEval = fresh;
   }
   const entityReport = params.entityReport || storyData.finalChecksReport?.entity || null;
-  const decision = decideRepairMethod(ctx.pageNumber, latestEval, entityReport);
+  // The page's DECLARED cast, as production passes it: a name the page does
+  // not hold is never char-fixed.
+  const decision = decideRepairMethod(ctx.pageNumber, latestEval, entityReport, {
+    expectedCast: require('./repairLogic').resolveDeclaredCast(ctx.scene.sceneCharacters),
+  });
 
-  const base = { decision: { method: decision.method, reason: decision.reason, charName: decision.charName || null } };
+  const base = { decision: { method: decision.method, reason: decision.reason, charName: decision.charName || null, targetFigure: decision.targetFigure ?? null } };
   // decideOnly: report the routing decision + the scores that drove it and
   // STOP — no repair executed, no image credits spent. For "is the routing
   // reliable on this page" experiments.
@@ -5453,9 +5457,17 @@ async function runRepairRoundStage(ctx, { experimentId, params = {} }) {
     return { ...base, ...r };
   }
   if (decision.method === 'char-fix') {
+    // A figure-targeted decision (presence MIXED case) paints THAT figure into
+    // the missing character — same box resolver production uses.
+    let figureBox = {};
+    if (decision.targetFigure != null) {
+      const fb = require('./charRepairTarget').resolveFigureBbox(decision.targetFigure, { bestEval: latestEval });
+      if (!fb.bodyBbox && !fb.faceBbox) throw new Error(`char-fix targets figure ${decision.targetFigure}, but the evaluation carries no box for it`);
+      figureBox = { bbox: fb.bodyBbox || fb.faceBbox, faceBbox: fb.faceBbox || null, whiteoutTarget: 'body' };
+    }
     const r = await runCharRepairStage(ctx, {
       experimentId,
-      params: { ...params, characterName: decision.charName, repairMode: 'auto' },
+      params: { ...params, ...figureBox, characterName: decision.charName, repairMode: 'auto' },
     });
     return { ...base, ...r };
   }

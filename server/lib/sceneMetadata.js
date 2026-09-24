@@ -983,23 +983,10 @@ function extractSceneMetadata(sceneDescription) {
     // Objects are string IDs in prose format (e.g., ["LOC001", "ART002"])
     const objectIds = (metadata.objects || []).filter(o => typeof o === 'string');
 
-    // Extract landmark variants from object IDs (e.g., "LOC003.2")
-    const landmarkVariants = {};
-    for (const objStr of objectIds) {
-      const variantMatch = objStr.match(/LOC(\d+)\.(\d+)/i);
-      if (variantMatch) {
-        landmarkVariants[`LOC${variantMatch[1].padStart(3, '0')}`] = parseInt(variantMatch[2]);
-      }
-    }
-
     // Scene complexity from character depth data
     let sceneComplexity = 'simple';
     if ((metadata.characters || []).some(c => (c.depth || '').toLowerCase() === 'background')) {
       sceneComplexity = 'complex';
-    }
-
-    if (Object.keys(landmarkVariants).length > 0) {
-      log.info(`[SCENE META] Landmark variants (prose format): ${Object.entries(landmarkVariants).map(([id, v]) => `${id}.${v}`).join(', ')}`);
     }
 
     // Character interactions: structured list of character-to-object contacts
@@ -1061,7 +1048,6 @@ function extractSceneMetadata(sceneDescription) {
       // reference photo by kind (landmarkPhotos.pickVariantForView).
       landmarkView: metadata.landmarkView || null,
       imageSummary: prose,
-      landmarkVariants: Object.keys(landmarkVariants).length > 0 ? landmarkVariants : null,
       setting: null, // Setting details are in the prose, not structured
       sceneComplexity,
       // VB id of the vehicle/structure the camera stands on or inside — makes
@@ -1153,33 +1139,14 @@ function extractSceneMetadata(sceneDescription) {
       return null;
     }).filter(Boolean);
 
-    // Extract per-landmark variant selections from LOC IDs like "LOC003.2"
-    const landmarkVariants = {};
-    for (const objStr of objectIds) {
-      const variantMatch = objStr.match(/\[LOC(\d+)\.(\d+)\]/i);
-      if (variantMatch) {
-        landmarkVariants[`LOC${variantMatch[1].padStart(3, '0')}`] = parseInt(variantMatch[2]);
-      }
-    }
-
-    // Also extract location from setting.location (e.g., "Kurpark [LOC001]" or "Kurpark [LOC001.2]")
-    // This ensures landmark photos are passed to image generation
+    // Also extract location from setting.location (e.g., "Kurpark [LOC001]")
+    // This ensures landmark photos are passed to image generation. The photo
+    // itself is picked by the scene's `landmarkView` (getLandmarkPhotosForScene).
     if (parsedData.setting?.location) {
-      const locMatch = parsedData.setting.location.match(/\[LOC(\d+)(?:\.(\d+))?\]/i);
-      if (locMatch) {
+      if (/\[LOC\d+(?:\.\d+)?\]/i.test(parsedData.setting.location)) {
         objectIds.push(parsedData.setting.location);
         log.debug(`[SCENE META] Found location with LOC ID: "${parsedData.setting.location}"`);
-        // Extract variant from setting.location too
-        const locId = `LOC${locMatch[1].padStart(3, '0')}`;
-        if (locMatch[2]) {
-          landmarkVariants[locId] = parseInt(locMatch[2]);
-        }
       }
-    }
-
-    // Log per-landmark variant selections
-    if (Object.keys(landmarkVariants).length > 0) {
-      log.info(`[SCENE META] Landmark variants: ${Object.entries(landmarkVariants).map(([id, v]) => `${id}.${v}`).join(', ')}`);
     }
 
     // Detect scene complexity: explicit field or fallback from character positions
@@ -1222,8 +1189,6 @@ function extractSceneMetadata(sceneDescription) {
       translatedSummary: parsedData.translatedSummary || null,
       // Extract image summary (English) — new format uses 'description', old uses 'imageSummary'
       imageSummary: parsedData.imageSummary || parsedData.description || null,
-      // Per-landmark photo variant selections (e.g., {LOC003: 2, LOC005: 1})
-      landmarkVariants: Object.keys(landmarkVariants).length > 0 ? landmarkVariants : null,
       // Store setting for reference
       setting: parsedData.setting || null,
       // Scene complexity for model routing ('simple' | 'complex' | null)
@@ -1321,7 +1286,6 @@ function extractSceneMetadata(sceneDescription) {
         thinking: null,
         translatedSummary: null,
         imageSummary: prose,
-        landmarkVariants: null,
         setting: null,
         sceneComplexity: 'simple',
         population: 'cast_only',
