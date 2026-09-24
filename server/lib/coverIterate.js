@@ -2037,9 +2037,6 @@ async function buildCoverReferences({
   let visualBibleGrid = null;
   if (visualBible) {
     let elementRefs = getElementReferenceImagesForPage(visualBible, coverPageNumber, COVER_ELEMENT_REF_CAP);
-    if (sceneBackground) {
-      elementRefs = elementRefs.filter(e => e.type !== 'location');
-    }
     // Merge IDs from coverHint.objects + sceneMetadata.fullData.
     const sceneIds = [];
     for (const id of coverHint?.objects || []) {

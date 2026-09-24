@@ -551,7 +551,7 @@ function elementKindSentence(el) {
 
 // The pool labels getElementsNeedingReferenceImages stamps as `type` when an
 // entry has no free-text type of its own.
-const POOL_LABELS = new Set(['artifact', 'vehicle', 'animal', 'location', 'clothing']);
+const POOL_LABELS = new Set(['artifact', 'vehicle', 'animal', 'clothing']);
 const article = (noun) => (/^[aeiou]/i.test(String(noun || '')) ? 'an' : 'a');
 
 /**
@@ -1176,8 +1176,8 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
     maxElements = null,
     storyId = null,    // when present, each generated reference image is
                        // uploaded to R2 and the URL is stored on the VB entry.
-    // Aspect ratio for non-character element grids (locations/vehicles/
-    // artifacts/animals) — should be the story's actual page/plate aspect
+    // Aspect ratio for non-character element grids (vehicles/artifacts/
+    // animals) — should be the story's actual page/plate aspect
     // (e.g. MODEL_DEFAULTS.pageAspect, or square for a square-format book).
     // Character batches are unaffected and keep the avatarAspect portrait.
     // Falls back to MODEL_DEFAULTS.pageAspect (via resolveOutputAspect) if
@@ -1206,7 +1206,6 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
   log.info(`  - Artifacts: ${visualBible?.artifacts?.length || 0}`);
   log.info(`  - Animals: ${visualBible?.animals?.length || 0}`);
   log.info(`  - Vehicles: ${visualBible?.vehicles?.length || 0}`);
-  log.info(`  - Locations (non-landmark): ${(visualBible?.locations || []).filter(l => !l.isRealLandmark).length}`);
 
   // Log each element with page appearances for debugging
   const logEntries = (entries, type) => {
@@ -1220,7 +1219,6 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
   logEntries(visualBible?.artifacts, 'artifact');
   logEntries(visualBible?.animals, 'animal');
   logEntries(visualBible?.vehicles, 'vehicle');
-  logEntries((visualBible?.locations || []).filter(l => !l.isRealLandmark), 'location');
 
   // Import the function here to avoid circular dependency
   const { getElementsNeedingReferenceImages, updateElementReferenceImage } = require('./visualBible');
@@ -1530,10 +1528,12 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
  * @returns {Promise<Buffer|null>} - JPEG buffer of the grid image, or null if no elements
  */
 /**
- * Build a VB grid filtered for EMPTY SCENE generation: vehicles + non-landmark locations only.
- * Skips characters, animals, and artifacts (these belong on the populated page, not the
- * empty background — and including artifacts caused doubling, e.g. a book rendered both
- * in the background and later in the character's hand).
+ * Build a VB grid filtered for EMPTY SCENE generation: vehicles and large (building-scale)
+ * artifacts only. Skips characters, animals and ordinary artifacts (these belong on the
+ * populated page, not the empty background — and including artifacts caused doubling,
+ * e.g. a book rendered both in the background and later in the character's hand).
+ * No location ever enters it: an invented location is built from its Visual Bible TEXT,
+ * a real one from its landmark photo (owner, 2026-09-24).
  *
  * @param {Object} visualBible - Story visual bible
  * @param {number} pageNumber - Page number to filter elements for
@@ -1550,8 +1550,8 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
 async function buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos = [], aboardId = null, sceneObjects = null) {
   if (!visualBible) return null;
   // ONE reference family per plate (owner, 2026-08-29): a landmark photo when
-  // the plate's location is a real landmark, otherwise the VB element
-  // render(s). Never both — two competing "this is the place" references on the
+  // the plate's location is a real landmark, otherwise the VB vehicle /
+  // structure render(s). Never both — two competing "this is the place" references on the
   // same call make the model average them, and the photographic one wins on
   // colour while the render wins on construction. The landmark photo is the
   // stronger anchor, so it takes the slot and the grid is dropped.
@@ -1560,25 +1560,24 @@ async function buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos
     return null;
   }
   const { getEmptySceneElementReferences } = require('./visualBible');
-  const vehicleAndLocationRefs = getEmptySceneElementReferences(visualBible, pageNumber, 9, aboardId, sceneObjects);
+  const structureRefs = getEmptySceneElementReferences(visualBible, pageNumber, 9, aboardId, sceneObjects);
   // A landmark photo NEVER enters the grid (owner, 2026-08-18). The grid is a
   // composite of style-rendered element cells; pasting a real photograph among
   // them feeds photographic pixels into a stylised render and corrupts it —
   // worst in realistic/concept styles, where the model cannot tell the cell
   // from the target style. Every landmark travels as its own reference photo
   // on the empty-scene call, which is the one place a real photo belongs.
-  if (vehicleAndLocationRefs.length === 0) return null;
-  return buildVisualBibleGrid(vehicleAndLocationRefs, []);
+  if (structureRefs.length === 0) return null;
+  return buildVisualBibleGrid(structureRefs, []);
 }
 
 /**
  * Composite references for a PAGE render: which VB elements + landmarks go
  * into the grid, with the canonical filter rules (single source of truth —
  * the iterate path and the Test Lab image stage both call this):
- *   - background plate set → vehicles/locations/landmarks are already painted
- *     into the plate; drop them all.
- *   - other refs present (original image, landmark photos) → drop locations
- *     only (the location anchor is covered), keep the rest.
+ *   - background plate set → plate-borne elements (vehicles, building-scale
+ *     artifacts) and landmarks are already painted into the plate; drop them.
+ *   - no location ever arrives here: locations carry no cell (2026-09-24).
  *   - `aboardId` set → the element the camera stands on/inside never enters the
  *     grid, plate or no plate. Its render is an exterior three-quarter view and
  *     an exterior image on a deck-level page paints a second copy of the vessel
@@ -1586,13 +1585,13 @@ async function buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos
  * Returns { visualBibleGrid, landmarkPhotos } — landmarkPhotos is what the
  * caller should pass to image generation (emptied when the plate covers it).
  */
-async function buildPageCompositeRefs(visualBible, pageNumber, landmarkPhotos = [], { hasBackground = false, hasOtherRefs = false, logTag = 'PAGE-REFS', sceneObjectIds = null, aboardId = null, sceneMetadata = null } = {}) {
+async function buildPageCompositeRefs(visualBible, pageNumber, landmarkPhotos = [], { hasBackground = false, logTag = 'PAGE-REFS', sceneObjectIds = null, aboardId = null, sceneMetadata = null } = {}) {
   const { getElementReferenceImagesForPage } = require('./visualBible');
   // Cap 4, not 6 (owner, 2026-08-29). The whole grid shares ONE of Grok's three
   // reference slots, so cell size scales as 1/n — a 6-cell grid renders each
   // element too small to carry identity. Census of staging
   // job_1787959478282_bz19gm36h: 10 of 14 pages selected 5-6 elements, and
-  // every page spent cells on the vehicle and the locations its plate already
+  // every page spent cells on the vehicle and the location its plate already
   // painted. The empty-scene grid keeps its own cap of 9
   // (buildEmptySceneVbGrid) — it is a different grid, sent to a call with no
   // character slots competing for space.
@@ -1611,9 +1610,9 @@ async function buildPageCompositeRefs(visualBible, pageNumber, landmarkPhotos = 
   // plate is set it is already painted into the plate.
   let finalLandmarkPhotos = landmarkPhotos || [];
   if (hasBackground) {
-    // A plate IS sent, so everything plate-borne drops: vehicles and locations
-    // by type (the pre-2026-09-15 rule, and the `scaleClass === null` fallback
-    // for every stored bible), plus any element the bible classed at vehicle,
+    // A plate IS sent, so everything plate-borne drops: vehicles by type (the
+    // pre-2026-09-15 rule, and the `scaleClass === null` fallback for every
+    // stored bible), plus any element the bible classed at vehicle,
     // building or landscape scale — a building-scale ARTIFACT belongs to the
     // plate for exactly the same reason a ship does (owner, 2026-09-15).
     // Gated on the SAME brief the plate is gated on (2026-09-15): an element the
@@ -1622,9 +1621,7 @@ async function buildPageCompositeRefs(visualBible, pageNumber, landmarkPhotos = 
     const { isPlateBorneElement } = require('./visualBible');
     elementReferences = elementReferences.filter(e => !isPlateBorneElement(e, sceneObjectIds));
     finalLandmarkPhotos = [];
-    log.debug(`🔲 [${logTag}] Page ${pageNumber}: sceneBackground set — dropping vehicles/locations/landmarks from composite refs`);
-  } else if (hasOtherRefs || (landmarkPhotos || []).length > 0) {
-    elementReferences = elementReferences.filter(e => e.type !== 'location');
+    log.debug(`🔲 [${logTag}] Page ${pageNumber}: sceneBackground set — dropping plate-borne elements and landmarks from composite refs`);
   }
   if (aboardId) {
     const before = elementReferences.length;
@@ -1661,7 +1658,7 @@ async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = [], op
   };
   const allElements = [];
 
-  // Add VB elements (secondary chars, animals, artifacts, vehicles, locations).
+  // Add VB elements (secondary chars, animals, artifacts, vehicles).
   // loadVbReferenceBytes returns base64; wrap as a data URI so the grid
   // composer treats every entry uniformly.
   //

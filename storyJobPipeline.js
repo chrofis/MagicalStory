@@ -5519,9 +5519,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // it matters on the plateless cast-0 pages this phase now feeds.
           const aboardId = pageData.sceneMetadata?.aboard || null;
           // LARGE ELEMENTS BELONG TO THE PLATE (owner, 2026-09-15). Same
-          // question as buildPageCompositeRefs asks: vehicles and locations by
-          // TYPE (the pre-2026-09-15 rule and the `scaleClass === null`
-          // fallback for stored bibles), plus anything the bible classed at
+          // question as buildPageCompositeRefs asks: vehicles by TYPE (the
+          // pre-2026-09-15 rule and the `scaleClass === null` fallback for
+          // stored bibles), plus anything the bible classed at
           // vehicle, building or landscape scale — a building-scale ARTIFACT
           // belongs to the plate for the same reason a ship does.
           //
@@ -5559,10 +5559,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           if (typeof pageData.makeImagePrompt === 'function') {
             pageData.prompt = pageData.makeImagePrompt(kept.map(e => e.id).filter(Boolean));
           }
-          log.info(`🔲 [VB-GRID] Page ${pageData.pageNumber}: ${kept.length}/${refs.length} cell(s) — ${hasPlate ? `plate sent, dropped location/vehicle` : `no plate sent, location/vehicle kept`}${aboardId ? ` (aboard ${aboardId} withheld)` : ''}`);
+          log.info(`🔲 [VB-GRID] Page ${pageData.pageNumber}: ${kept.length}/${refs.length} cell(s) — ${hasPlate ? `plate sent, dropped plate-borne vehicle/structure` : `no plate sent, vehicle/structure kept`}${aboardId ? ` (aboard ${aboardId} withheld)` : ''}`);
         }
         if (filteredPages > 0) {
-          log.info(`🔲 [UNIFIED] Phase 5a-pre-grid: dropped ${droppedCells} cell(s) across ${filteredPages} page(s) (plate-covered location/vehicle + aboard elements)`);
+          log.info(`🔲 [UNIFIED] Phase 5a-pre-grid: dropped ${droppedCells} cell(s) across ${filteredPages} page(s) (plate-covered vehicle/structure + aboard elements)`);
         }
       }
 

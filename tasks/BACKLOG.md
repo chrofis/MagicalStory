@@ -52,7 +52,7 @@ Last full sweep: **2026-09-06**.
 ## Image quality — unresolved render defects
 
 - [ ] An eye-level page grouped into an angled vantage (`shot_off_plate` with the page's shot = the plan's): the fault is the vantage's `shot`, which the scene review cannot edit — needs an Art-Director / bible-side fix (e.g. vantage shot = base class when any of its pages is eye level). Lab 1433 p16 → docs/decisions.md (2026-09-24 entry, item 3)
-- [ ] Location reference cells drawn as isolated objects (kitchen = miniature on plinth, door with no wall) → tasks/lukas-story-diagnosis-2026-09-23.md:15
+- [x] Location reference cells drawn as isolated objects (kitchen = miniature on plinth, door with no wall) → tasks/lukas-story-diagnosis-2026-09-23.md:15
 - [ ] Shared vantage plate hands its representative page's weather/time to every page (rain on p4-p6) → tasks/lukas-story-diagnosis-2026-09-23.md:20
 - [ ] Plate geometry skips sentences > 240 chars ("at night" lost); sceneIntent has no time of day → tasks/lukas-story-diagnosis-2026-09-23.md:24
 - [ ] Writer/AD put an interior door outdoors; no interior/exterior contradiction check → tasks/lukas-story-diagnosis-2026-09-23.md:27

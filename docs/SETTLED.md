@@ -64,8 +64,9 @@ Machine-checkable lines are enforced by `scripts/admin/check-settled.js` (runs i
   three; locations ruling 2026-09-08, superseding the 2026-09-06 count that included invented locations: "Do not
   count it as it is the empty scene not an artifact"). `VB_ELEMENT_BUDGET` (= 4, `vbElementBudget.js`) counts
   secondary characters, animals, artifacts and vehicles; a LOC, real or invented, never counts — the location is the
-  plate the cast is composited into. The page's location cell rides LAST and is the cell that gives way when a page
-  uses all four elements (Grok's `VB_SLOT_MAX_ELEMENTS` = 4). The budget is a PROMPT rule — the Art Director is given
+  plate the cast is composited into. Since 2026-09-24 an invented location has no reference cell at all — it is
+  TEXT, and its plate is built from that text (decisions.md 2026-09-24 "Invented locations are TEXT only"); the
+  budget and Grok's `VB_SLOT_MAX_ELEMENTS` are both 4. The budget is a PROMPT rule — the Art Director is given
   it and the scene review is handed each overflow as a fault; no code trims a brief (every code-side enforcer was
   removed 2026-09-11), an overflow is reported (`vbElementOverflow`) and ships. Do not re-add locations to
   `ELEMENT_COLLECTIONS` or to the AD's "all count" line, and do not re-add a code enforcer. (Line refreshed

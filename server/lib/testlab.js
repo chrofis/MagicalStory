@@ -510,7 +510,7 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
   const textAreaMask = textInImage && ctx.textPosition ? getTextAreaMask(ctx.textPosition, ctx.languageLevel) : null;
 
   // Visual Bible grid + landmark refs — production's shared helper (a plate
-  // background drops vehicles/locations/landmarks; otherwise locations only).
+  // background drops plate-borne elements and landmarks).
   let visualBibleGrid = null;
   let genLandmarkPhotos = ctx.landmarkPhotos;
   if (ctx.visualBible) {
@@ -8945,7 +8945,12 @@ async function runVbElementCellStage(target, { experimentId, promptOverride = nu
   if (!vb) throw new Error('Story has no visualBible');
   const elementId = String(params.elementId || '').trim().toUpperCase();
   if (!elementId) throw new Error('params.elementId is required (e.g. ART001)');
-  const POOLS = { secondaryCharacters: 'character', artifacts: 'artifact', animals: 'animal', vehicles: 'vehicle', locations: 'location' };
+  // Locations have no reference cell in production (owner, 2026-09-24): an
+  // invented location is built from its bible text, a real one from its photo.
+  if ((vb.locations || []).some(e => String(e.id || '').toUpperCase() === elementId)) {
+    throw new Error(`${elementId} is a location — locations have no reference cell (the plate is built from the bible text)`);
+  }
+  const POOLS = { secondaryCharacters: 'character', artifacts: 'artifact', animals: 'animal', vehicles: 'vehicle' };
   let entry = null;
   let type = null;
   for (const [pool, t] of Object.entries(POOLS)) {

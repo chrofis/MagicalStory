@@ -12,11 +12,13 @@ p5/p6 door in the rain, p3 Lukas too big, p1 object behind the boy, most pages f
 - Uetliberg photo_description_2 wrongly "metal lattice"; plate QC enforced the text over the photo.
 
 ## Open design items (BACKLOG.md)
-- [ ] **Location reference cells are drawn as isolated objects.** `prompts/reference-sheet.txt:5,15`
+- [x] **Location reference cells are drawn as isolated objects.** `prompts/reference-sheet.txt:5,15`
       ("ONE element in isolation", "no detailed scenes"), no LOCATIONS section; non-landmark
       locations are batched with props (`server/lib/referenceSheets.js` generateReferenceSheet
       ~1209-1223). LOC001 kitchen became a miniature on a plinth, copied into the p1/p3 plate;
       LOC002 door became a free-standing door slab (p2/p4/p5/p6). Cell gate passed both.
+      FIXED 2026-09-24 (owner decision): locations get no cell at all; the plate is built from the
+      bible text, stored location cells are ignored (decisions.md "Invented locations are TEXT only").
 - [ ] **Shared vantage plate carries the representative page's weather/time to every page.**
       `storyJobPipeline.js` repPageData (~4637/4741 staging). p2/p4/p5/p6 plates byte-identical
       with p2's "heavy rain"; p3 got p1's morning light. Page prompt tells Grok to copy the

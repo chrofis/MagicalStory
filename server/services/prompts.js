@@ -651,7 +651,8 @@ function guardPromptString(prompt, context = 'unknown') {
  *   buildEmptySceneVbGrid so prompt and reference grid agree.
  * @param {number} [opts.pageNumber]       - Page number, for sanitizer logging
  * @param {'landmark'|'element'} [opts.referenceKind] - Which single reference family
- *   is attached to this plate call (landmark photo XOR Visual Bible element render).
+ *   is attached to this plate call (landmark photo XOR Visual Bible vehicle/structure
+ *   render — never an invented location, which is built from its text).
  *   Adds the REFERENCE line telling the model to render the visible PART of it.
  * @returns {string} Filled prompt ready for the image model.
  */
@@ -735,13 +736,17 @@ function buildEmptyScenePrompt(opts = {}) {
   }
 
   // The plate call carries exactly ONE family of visual reference: a landmark
-  // photo when the location is real, otherwise the Visual Bible element
-  // render(s) — never both (owner, 2026-08-29; enforced in
+  // photo when the location is real, otherwise the Visual Bible vehicle /
+  // structure render(s) — never both (owner, 2026-08-29; enforced in
   // buildEmptySceneVbGrid). This line tells the model what the attached
   // reference IS, and that it renders the visible part rather than the whole
-  // object. Same wording for both families.
-  if (opts.referenceKind === 'landmark' || opts.referenceKind === 'element') {
-    description += `\n\n**REFERENCE:** The place or vessel in this scene is the one shown in the attached reference image — render the part of it the camera sees, consistent in colour and construction.`;
+  // object. An invented location is never an attached image (owner,
+  // 2026-09-24): it is built from the description above, so the element line
+  // names only the vessel or structure.
+  if (opts.referenceKind === 'landmark') {
+    description += `\n\n**REFERENCE:** The place in this scene is the one shown in the attached reference image — render the part of it the camera sees, consistent in colour and construction.`;
+  } else if (opts.referenceKind === 'element') {
+    description += `\n\n**REFERENCE:** The vessel or structure in this scene is the one shown in the attached reference image — render the part of it the camera sees, consistent in colour and construction.`;
   }
 
   // Geometry only, and only when the caller has the page's scene prose. Always

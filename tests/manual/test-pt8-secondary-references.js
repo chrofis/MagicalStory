@@ -15,7 +15,7 @@
  *     so it gets its own reference and doesn't borrow the primary's face,
  *   - EXCLUDES a secondary that already has a reference,
  *   - EXCLUDES a secondary with no pages (can't be placed),
- *   - keeps the 2-page gate for LOCATIONS (a one-page place needs no reference),
+ *   - EXCLUDES every location (locations have no reference cell, 2026-09-24),
  *   - applies the SAME single-page rule in trial mode.
  *
  * Deterministic, no network / DB.
@@ -82,8 +82,8 @@ check('1-page article-role "a guard" IS included (no name filter)', names.includ
 check('group entry "villagers" IS included (gets its own reference)', names.includes('villagers:character'));
 check('already-referenced "Otto" is EXCLUDED', !names.some(n => n.startsWith('Otto')));
 check('no-page "Grandpa Max" is EXCLUDED', !names.some(n => n.startsWith('Grandpa Max')));
-check('1-page LOCATION "Cave" is EXCLUDED (locations keep 2-page gate)', !names.some(n => n.startsWith('Cave')));
-check('2-page LOCATION "Castle" IS included', names.includes('Castle:location'));
+check('1-page LOCATION "Cave" is EXCLUDED (locations have no cell)', !names.some(n => n.startsWith('Cave')));
+check('2-page LOCATION "Castle" is EXCLUDED (locations have no cell)', !names.some(n => n.startsWith('Castle')));
 
 // ── trial mode uses the SAME single-page rule ───────────────────────────────
 console.log('trial mode (characterMinAppearances=1, same as full):');

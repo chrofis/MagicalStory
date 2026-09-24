@@ -1354,18 +1354,11 @@ async function packReferences(refs = {}, options = {}) {
   // the char composite, and 3 chars get the same.
   //
   // Visual Bible elements: bundle them INTO the last character slot (as a row
-  // of cells below the char composite) so the scene stays clean. Filter out
-  // location elements since those are already painted in the scene background.
-  // Location elements NEVER ride in the character-row VB strip — they should
-  // be the standalone scene reference, either via the scene background slot
-  // (when empty-scene gen is on) or via the landmark slot below. Bundling a
-  // landmark into the character composite shrinks it to a tiny cell beside
-  // the avatars and Grok treats it as another character prop instead of the
-  // scene anchor. Previously the filter only ran when hasSceneBackground was
-  // true, so disabling empty-scene gen routed the landmark into the character
-  // slot. Now it's filtered unconditionally.
+  // of cells below the char composite) so the scene stays clean. No location
+  // arrives here: a location carries no cell (2026-09-24) — the setting rides
+  // as the scene background slot or the landmark slot below.
   const rawVbElements = (visualBibleGrid && Array.isArray(visualBibleGrid.rawElements))
-    ? visualBibleGrid.rawElements.filter(e => e.type !== 'location')
+    ? visualBibleGrid.rawElements
     : [];
 
   // Pack character photos — ONE char per slot when space allows. Bundle only

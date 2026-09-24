@@ -71,6 +71,63 @@ separate them.
 
 ---
 
+## 2026-09-24 — Invented locations are TEXT only: no location reference cell is rendered or attached anywhere (amends 2026-08-29 "one reference family per plate")
+
+**Context.** The owner's intent has always been that an invented (non-landmark) location lives in the
+Visual Bible as prose and its background plate is built from that prose. The code did otherwise:
+`getElementsNeedingReferenceImages` rendered a cell for every non-landmark location on ≥2 pages
+("imaginary locations need reference images"), drew it with the isolated-object prop template, and
+`getEmptySceneElementReferences` → `buildEmptySceneVbGrid` attached it as the plate's only image, with the
+REFERENCE line "The place or vessel in this scene is the one shown in the attached reference image". The
+same cell also rode the page grid (`getElementReferenceImagesForPage`, LAST, on plateless pages) and the
+cover grid (`getElementReferenceImagesByIds`). A read-only survey (2026-09-24) found **6-11 of 65 recent
+location cells were dioramas or isolated objects**, and the plates copied the cell almost pixel for pixel —
+camera, plinth and pillar bars included: **5 of 6 bad cells gave bad plates**. Prod
+`job_1790107559778_fcmlfa8kn`: LOC001 kitchen = a miniature on a plinth (plates for p1/p3), LOC002 = a
+wall-less door (p2, p4-6). `docs/image-routing.md` implied the text-only behaviour already held.
+
+**Decision (owner, 2026-09-24).**
+1. No reference cell is ever generated for a location. The locations loop in
+   `getElementsNeedingReferenceImages` is deleted, not gated.
+2. No location cell is ever attached: the location loops in `getEmptySceneElementReferences`,
+   `getElementReferenceImagesForPage` and `getElementReferenceImagesByIds` are deleted, and with them the
+   now-dead `type === 'location'` branches (`isPlateBorneElement`, the `buildPageCompositeRefs`
+   "other refs → drop locations" branch and its `hasOtherRefs` option, the cover-grid and Grok
+   character-row filters, the `'location'` pool label). Plates, covers, iterate, repair, plateless pages
+   and every Test Lab stage go through these selectors, so all of them build an invented location from
+   the text. The Lab's `vb_element_cell` stage refuses a LOC id.
+3. The plate REFERENCE line is split by family: a landmark photo is "the place in this scene", a VB grid
+   is "the vessel or structure in this scene". Neither can now refer to a location cell.
+4. Unchanged: real landmarks keep their photo path; vehicles and building-scale artifacts keep their cells
+   and still ride the plate; the one-reference-family rule (landmark photo XOR element grid) still holds
+   for those.
+5. **Old stories** that already carry a location cell (`referenceImageUrl` on a `visualBible.locations`
+   entry): the stored cell stays in the data (diagnostics are kept) but is ignored by every selector, so
+   every re-render, iterate, repair and cover regeneration builds that location from its text. No
+   migration is needed or wanted.
+
+**Rationale.** A location is the whole setting; a cell is a small isolated render with its own camera and
+ground. When a plate is an edit anchored on such a cell, the model reproduces the cell's framing instead of
+building a room around the cast. The text already carries what the place looks like (the vantage
+LOCATION/VANTAGE lines and the Art Director's FRAMING block), and the vantage plate is what keeps a
+location consistent across the pages that share it. This amends 2026-08-29 decision 2 only in what the
+"element" family may contain; SETTLED.md's "LOCATIONS ARE NOT ELEMENTS" line is refreshed factually (the
+page no longer carries a location cell that "gives way").
+
+**Plateless pages.** A page that is sent no plate now carries no image of an invented location either; its
+setting comes from the Art Director's scene prose. The page prompt's REQUIRED OBJECTS block still skips
+location entries (`promptBuilders.js`), as before.
+
+**Touched:** `server/lib/visualBible.js`, `server/lib/referenceSheets.js`, `server/lib/coverIterate.js`,
+`server/lib/grok.js`, `server/lib/images.js`, `server/lib/testlab.js`, `server/lib/vbElementBudget.js`
+(comments), `server/services/prompts.js`, `storyJobPipeline.js` (comments/logs),
+`tests/unit/location-text-only.test.ts` (new), `tests/unit/vb-plate-routing.test.ts`,
+`tests/unit/recurring-creature-slot.test.ts`, `tests/unit/vb-element-cell-prompt.test.ts`,
+`tests/manual/test-pt8-secondary-references.js`, `docs/image-routing.md`, `docs/SETTLED.md`.
+**Status:** ✅ active
+
+---
+
 ## 2026-09-24 — Image prompts say each thing once; the shrinker's cut order is one named list the docs render
 
 **Context.** Staging `job_1790100385959_1nitlympp`: every four-character image prompt (pages and
@@ -30466,6 +30523,10 @@ ships, a ship inside a cave, and wheels on dry land.
    `referenceKind` and emits one REFERENCE line — identical wording for both
    families: the place or vessel in the scene is the one in the reference,
    render the part the camera sees, consistent in colour and construction.
+   *(Amended 2026-09-24: the element family no longer contains location
+   cells — invented locations are text only, and the REFERENCE line now names
+   a landmark as "the place" and an element grid as "the vessel or structure".
+   See "Invented locations are TEXT only".)*
 3. **VEHICLES asks for the visible part.** "Render it exactly to its
    description" becomes "match its colour, construction and named parts",
    plus a camera-aboard clause: when the camera stands on board, show the

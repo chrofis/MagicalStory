@@ -3081,7 +3081,8 @@ function injectHistoricalLocations(visualBible, historicalLocations) {
  * Returns elements that:
  * 1. Meet the per-type appearance gate (secondary characters: 1+ page; others: minAppearances)
  * 2. Don't already have reference images
- * 3. Are secondary characters or important artifacts (not locations which have landmark photos)
+ * 3. Are secondary characters, animals, artifacts or vehicles. Locations never get a
+ *    cell: an invented one is built from its text, a real one from its photo (2026-09-24).
  *
  * Owner rule (2026-07-26): EVERY secondary character must be in the visual bible
  * with its own reference image even when it appears in a SINGLE scene — the old
@@ -3136,25 +3137,11 @@ function getElementsNeedingReferenceImages(visualBible, minAppearances = 2, char
   checkEntries(visualBible.animals, 'animal');
   checkEntries(visualBible.vehicles, 'vehicle');
 
-  // Include non-landmark locations (imaginary locations need reference images; real landmarks have photos)
-  if (visualBible.locations) {
-    for (const loc of visualBible.locations) {
-      // Skip real landmarks (they have landmark photos)
-      if (loc.isRealLandmark) continue;
-      // Skip if already has reference image
-      if (loc.referenceImageGenerated) continue;
-      if (loc.referenceImageData) continue;
-      // Skip if fewer than minAppearances
-      if (!loc.appearsInPages || loc.appearsInPages.length < minAppearances) continue;
-
-      needsReference.push({
-        ...loc,
-        kind: typeof loc.type === 'string' && loc.type.trim() ? loc.type.trim() : null,
-        type: 'location',
-        pageCount: loc.appearsInPages.length
-      });
-    }
-  }
+  // LOCATIONS GET NO CELL (owner, 2026-09-24). An invented location lives in
+  // the bible as TEXT and its plate is built from that text; a real landmark
+  // travels as its photo. The location cell was drawn with the isolated-object
+  // template, and the plate copied it pixel for pixel — plinth, cut-away walls
+  // and all (docs/decisions.md 2026-09-24). visualBible.locations is not walked.
 
   // Sort by page count (most appearances first)
   needsReference.sort((a, b) => b.pageCount - a.pageCount);
@@ -3338,9 +3325,6 @@ function isLargeScaleClass(value) {
  */
 function isPlateBorneElement(ref, sceneObjects = null) {
   if (!ref) return false;
-  // A location rides the plate on its `appearsInPages` membership alone — the
-  // locations loop below is not AD-gated, so neither is the drop.
-  if (ref.type === 'location') return true;
   // A FIGURE IS NEVER PLATE-BORNE, at any scale. The plate prompt says verbatim
   // "never draw a figure named anywhere in this prompt" (prompts/empty-scene.txt)
   // and its STRUCTURES block calls what it lists a "vessel, vehicle or built
@@ -3408,24 +3392,9 @@ function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9, ab
     });
   }
 
-  // Non-landmark locations (real landmarks use real photos via getLandmarkPhotosForScene)
-  for (const entry of visualBible.locations || []) {
-    if (skip(entry)) continue;
-    if (entry.isRealLandmark) continue;
-    if (!hasRef(entry)) continue;
-    if (!entry.appearsInPages || !entry.appearsInPages.includes(pageNumber)) continue;
-    const { cell } = elementRefCell(entry);
-    refs.push({
-      id: entry.id,
-      name: entry.name,
-      type: 'location',
-      scaleClass: entry.scaleClass || null,
-      description: entry.extractedDescription || entry.description,
-      referenceImageData: cell.referenceImageData,
-      referenceImageUrl: cell.referenceImageUrl,
-      priority: 2,
-    });
-  }
+  // No location cell rides the plate (2026-09-24): an invented location
+  // reaches the plate as its bible TEXT, a real one as its landmark photo. A
+  // stored story that still carries a location cell ignores it here.
 
   // LARGE ELEMENTS FROM ANY COLLECTION (2026-09-15). A building-scale artifact
   // — a monument, a mill, a bridge, a pole-with-banner — is part of the
@@ -3680,32 +3649,14 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
     }
   };
 
-  // Priority order: characters > animals > artifacts > vehicles > locations
+  // Priority order: characters > animals > artifacts > vehicles
   checkEntries(visualBible.secondaryCharacters, 'character', 1);
   checkEntries(visualBible.animals, 'animal', 2);
   checkEntries(visualBible.artifacts, 'artifact', 3);
   checkEntries(visualBible.vehicles, 'vehicle', 4);
 
-  // Add non-landmark locations (landmarks use real photos via getLandmarkPhotosForScene instead)
-  for (const entry of visualBible.locations || []) {
-    // Skip landmarks - they use real photos, not generated reference images
-    if (entry.isRealLandmark) continue;
-    // Must have generated reference image (inline OR R2 URL) and appear on this page
-    if (!hasRef(entry)) continue;
-    if (!entry.appearsInPages || !entry.appearsInPages.includes(pageNumber)) continue;
-
-    const { cell: locCell } = elementRefCell(entry);
-    relevantRefs.push({
-      id: entry.id,
-      name: entry.name,
-      type: 'location',
-      scaleClass: entry.scaleClass || null,
-      description: entry.extractedDescription || entry.description,
-      referenceImageData: locCell.referenceImageData,
-      referenceImageUrl: locCell.referenceImageUrl,
-      priority: 5 // Lower priority than objects/characters
-    });
-  }
+  // No location cells (2026-09-24): an invented location is text, a real one
+  // a landmark photo. Stored location cells are ignored.
 
   // WORN-ITEM DEDUPE (owner ruling 2026-09-06). An element that is also part of
   // a character's outfit (`wornAs`) and whose owner is on this page is ALREADY
@@ -3758,19 +3709,11 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
     log.info(`[VB-REFS] Page ${pageNumber}: worn-item dedupe KEPT ${wornKeptOff.join(', ')} — the plate is its only reference`);
   }
 
-  // Sort by priority and limit. LOCATIONS ARE NOT ELEMENTS (owner ruling,
-  // 2026-09-08: "Do not count it as it is the empty scene not an artifact") —
-  // an invented location is the plate the cast is composited into, so it is
-  // not one of the `maxRefs` elements; it rides along LAST, at most one, so
-  // the page holds at most maxRefs + 1 cells (3 + 1 = 4 = VB_SLOT_MAX_ELEMENTS
-  // on the page path). Real landmarks never reached this list at all.
+  // Sort by priority and limit to the element budget. LOCATIONS ARE NOT
+  // ELEMENTS (owner ruling, 2026-09-08) and, since 2026-09-24, carry no cell at
+  // all — every ref here is one of the `maxRefs` elements.
   relevantRefs.sort((a, b) => a.priority - b.priority);
-  const elements = relevantRefs.filter(r => r.type !== 'location');
-  const locations = relevantRefs.filter(r => r.type === 'location');
-  if (locations.length > 1) {
-    log.warn(`[VB-REFS] Page ${pageNumber}: ${locations.length} invented locations claim this page (${locations.map(l => l.id).join(', ')}) — only ${locations[0].id} rides as the location cell`);
-  }
-  const kept = [...elements.slice(0, maxRefs), ...locations.slice(0, 1)];
+  const kept = relevantRefs.slice(0, maxRefs);
   const pinned = kept.filter(r => r.recurring).map(r => `${r.name} (${r.id})`);
   if (pinned.length > 0) {
     log.info(`🔲 [VB-REFS] Page ${pageNumber}: recurring creature pinned to the element refs — ${pinned.join(', ')}`);
@@ -3796,7 +3739,7 @@ function getElementReferenceImagesByIds(visualBible, elementIds, pageNumber) {
   const results = [];
   const idSet = new Set(elementIds.map(id => id.toUpperCase()));
 
-  const priorities = { character: 1, animal: 2, artifact: 3, vehicle: 4, location: 5 };
+  const priorities = { character: 1, animal: 2, artifact: 3, vehicle: 4 };
   const searchArrays = [
     [visualBible.secondaryCharacters, 'character'],
     [visualBible.animals, 'animal'],
@@ -3821,22 +3764,6 @@ function getElementReferenceImagesByIds(visualBible, elementIds, pageNumber) {
         priority: priorities[type]
       });
     }
-  }
-
-  // Non-landmark locations
-  for (const entry of visualBible.locations || []) {
-    if (entry.isRealLandmark) continue;
-    if (!hasRef(entry)) continue;
-    if (!entry.id || !idSet.has(entry.id.toUpperCase())) continue;
-    results.push({
-      id: entry.id,
-      name: entry.name,
-      type: 'location',
-      description: entry.extractedDescription || entry.description,
-      referenceImageData: entry.referenceImageData,
-      referenceImageUrl: entry.referenceImageUrl,
-      priority: priorities.location
-    });
   }
 
   return results;

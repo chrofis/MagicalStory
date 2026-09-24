@@ -5026,12 +5026,11 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     lockedTextPosition, sceneAspect, imageModelOverride,
   });
 
-  // Build VB grid — when sceneBackground is set, vehicles/locations/landmarks are already
-  // painted into the empty scene plate, so drop them from the composite refs.
+  // Build VB grid — when sceneBackground is set, vehicles/large structures/landmarks are
+  // already painted into the empty scene plate, so drop them from the composite refs.
   const pageRefs = visualBible
     ? await buildPageCompositeRefs(visualBible, pageNumber, pageLandmarkPhotos, {
         hasBackground: !!sceneBackground,
-        hasOtherRefs: !!useOriginalAsReference,
         logTag: 'ITERATE',
         // Keep the grid in step with what the page prompt describes — the
         // prompt is built from the scene's objects[], so a prop named there
