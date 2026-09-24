@@ -3740,7 +3740,16 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
           // Same entity-grid vocabulary guard as inpaintPage — image models
           // draw what the prompt names ("cells A, D, F" ends up painted).
           const { sanitizeIssueForInpaint } = require('../lib/imageCompositing');
-          const sentInstruction = `Fix these issues in this children's book illustration: ${sanitizeIssueForInpaint(editInstruction)}`;
+          // The image model knows no names (owner, 2026-09-24): every cast and
+          // bible-figure name in the findings becomes its descriptor, through
+          // the same map inpaintPage uses.
+          const { buildPageRepairNameMap, nameRepairText } = require('../lib/repairLogic');
+          const repairNames = buildPageRepairNameMap({
+            storyData, pageNumber,
+            sceneDescription: currentScene.sceneDescription || currentScene.description || '',
+            detectedFigures: currentScene.bboxDetection?.figures || null,
+          });
+          const sentInstruction = `Fix these issues in this children's book illustration: ${sanitizeIssueForInpaint(nameRepairText(editInstruction, repairNames))}`;
           const editResult = await editImageWithPrompt(currentImageData, sentInstruction);
           if (editResult?.imageData) {
             repairResult = {
@@ -5955,6 +5964,11 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
                   return txt || (character?.description || '');
                 })(),
                 textPosition: sceneImage.textPosition || null,
+                // Pose lines name other figures by sight, never by name.
+                repairNames: require('../lib/repairLogic').buildPageRepairNameMap({
+                  storyData, sceneDescription: sceneDesc, pageNumber, artStyle,
+                  detectedFigures: ladderFigures || sceneImage.bboxDetection?.figures || null,
+                }),
               }),
               // Mode flags are not part of the canonical request — they pick the
               // method, and the adapter maps them onto the axes.

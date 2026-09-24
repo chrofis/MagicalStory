@@ -3199,6 +3199,8 @@ async function generateSceneComposite(opts) {
           bbox: nb,
           charName: c.name,
           defectTypes: ['placeholder_figure'],
+          // Pose lines name other figures by sight (repairLogic.buildRepairNameMap).
+          repairNames: opts.repairNames || null,
           clothingDescription: c.clothing || null,
           sceneDescription: scene?.description || '',
           artStyle: scene?.artStyle || null,

@@ -576,7 +576,13 @@ async function callModel({ model, prompt, treatedUri, avatarUri, aspect, cropW, 
 // held and did (job_1790100385959 p14: the chestnut at the mouth was gone).
 // The lines come from the page's own EXACT POSES builder, so the repair carries
 // the pose sentence the page was drawn from.
-function buildActionContext(sceneDescription, charName, visualBible = null) {
+//
+// NAMES BY SIGHT (owner, 2026-09-24). A pose line names the other figures it
+// involves (cast, creatures, secondary characters) and the repair model has a
+// reference only for the target. Every other name goes through the one repair
+// name map (repairLogic.nameRepairText); the target keeps its name, which
+// travels with its reference image. No map with pose lines present: throws.
+function buildActionContext(sceneDescription, charName, visualBible = null, repairNames = null) {
   if (!sceneDescription || !charName) return '';
   const { extractSceneMetadata } = require('./storyHelpers');
   const { buildExactPosesBlock, splitInteractionActors } = require('./promptBuilders');
@@ -598,7 +604,9 @@ function buildActionContext(sceneDescription, charName, visualBible = null) {
   const perspective = typeof charData?.perspective === 'string' ? charData.perspective.trim() : '';
   const parts = [block, perspective ? `VIEW: ${charName} is seen ${perspective}` : ''].filter(Boolean);
   if (!parts.length) return '';
-  return `\n\n${charName} in this scene — keep this pose, hold, expression and gaze:\n${parts.join('\n')}`;
+  const { nameRepairText } = require('./repairLogic');
+  const lines = parts.join('\n').split('\n').map(l => nameRepairText(l, repairNames, { keep: charName }));
+  return `\n\n${charName} in this scene — keep this pose, hold, expression and gaze:\n${lines.join('\n')}`;
 }
 
 // Quiet-zone instruction for the text overlay position.
@@ -687,7 +695,7 @@ async function buildPrompt({ treatment, regionSource, faceOnly, charName, opts, 
   // prompt — only its structured type, as a fixed phrase. See charFixDefectContext.
   const issueContext = charFixDefectContext(opts.defectTypes);
   const textPositionContext = opts.textPositionContext || buildTextPositionContext(opts.textPosition, opts.sceneDescription);
-  const actionContext = opts.actionContext || buildActionContext(opts.sceneDescription, charName);
+  const actionContext = opts.actionContext || buildActionContext(opts.sceneDescription, charName, null, opts.repairNames);
 
   if (treatment === 'whiteout' && faceOnly) {
     const sharp = require('sharp');

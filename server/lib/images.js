@@ -24,7 +24,7 @@ const r2Lib = require('./r2');
 const { photoAnalyzerUrl: _photoAnalyzerUrl, withAnalyzerSlot } = require('./photoAnalyzerClient');
 // sanitizeIssueForInpaint moved to imageCompositing.js with the rest of the
 // mask/edit cluster; the inpaint prompt builders here still call it.
-const { sanitizeIssueForInpaint, stripCharacterNames } = require('./imageCompositing');
+const { sanitizeIssueForInpaint } = require('./imageCompositing');
 const { blackoutIssueRegions } = require('./imageInpainting');
 const { buildEmptySceneVbGrid, buildPageCompositeRefs } = require('./referenceSheets');
 const { GROK_ASPECT_PRESETS, closestGrokAspect } = require('./grokAspect');
@@ -3303,10 +3303,10 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   // WHO A FIX IS ABOUT, by sight: every cast and bible-figure name this page's
   // repair text may carry, mapped to its descriptor. Built once, read by the
   // shortcut check below and by the plan's name strip.
-  const repairNameMap = require('./repairLogic').buildRepairNameMap({
-    characters, visualBible, characterClothing, clothingRequirements, artStyle, detectedFigures,
+  const { buildRepairNameMap, nameRepairText, resolveRepairIds } = require('./repairLogic');
+  const repairNameMap = buildRepairNameMap({
+    characters, visualBible, characterClothing, clothingRequirements, artStyle, detectedFigures, pageNumber,
   });
-  const resolveIds = (text) => getStoryHelpers().sanitizeVbIdsInPrompt(text, visualBible, pageNumber);
 
   const soleDirectFix = (() => {
     if (inpaintableIssues.length !== 1) return null;
@@ -3316,8 +3316,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // Rule 3 is the consolidator’s to enforce: if a name is present — written,
     // or as a figure id that resolves to one — it has real work to do and we
     // do not shortcut past it.
-    const resolved = resolveIds(fix);
-    if (stripCharacterNames(resolved, { names: repairNameMap.names }) !== resolved) return null;
+    if (nameRepairText(fix, repairNameMap) !== resolveRepairIds(fix, repairNameMap)) return null;
     return fix;
   })();
 
@@ -3386,7 +3385,6 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // The bible's named figures — creatures and secondary characters — are in
     // the same map (owner, 2026-09-24): a creature's name means nothing to the
     // image model either.
-    const { names: figureNames, fallbackByName: descriptorByName } = repairNameMap;
     // ONE PASS, NEVER RE-SCANNING WHAT WE INJECTED (owner, 2026-08-26). This
     // looped name-by-name, replacing into the running result. A
     // `visual_identifier` legitimately mentions other characters to locate its
@@ -3400,15 +3398,11 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // A single alternation over the ORIGINAL text fixes it by construction:
     // replacement output is never re-examined. Longest name first so a name
     // that contains another ("Anna Maria" over "Anna") wins.
-    // VB ids resolve FIRST: sanitizeVbIdsInPrompt turns a figure's id into its
-    // name (the page prompt's identity anchor), so an id left for the later
-    // pass would come back as the very name this strip removes.
-    const stripNames = (text, ownVisualId, ownName = null) => stripCharacterNames(resolveIds(text), {
-      names: figureNames,
-      vidByName: visualIdByName,
-      fallbackByName: descriptorByName,
-      ownVisualId,
-      ownName,
+    // VB ids resolve FIRST (nameRepairText): sanitizeVbIdsInPrompt turns a
+    // figure's id into its name, so an id left for the later pass would come
+    // back as the very name this strip removes.
+    const stripNames = (text, ownVisualId, ownName = null) => nameRepairText(text, repairNameMap, {
+      vidByName: visualIdByName, ownVisualId, ownName,
     });
 
     const sceneInstrRaw = consolidatedPlan.scene_fix?.instruction || '';

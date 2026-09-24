@@ -59235,3 +59235,38 @@ the same way today, so "same as characters" does not decide them.
 **Touched:** server/lib/repairLogic.js, server/lib/images.js, scripts/admin/verify-checks.js, tasks/verify.json,
 tests/unit/repair-descriptor-vb-figures.test.ts, tests/unit/inpaint-direct-fix.test.ts.
 **Status:** ✅ active — verify entry `repair-descriptor-vb-figures`.
+
+## 2026-09-24 — Char-fix pose lines and the manual repair route name figures by sight too
+
+**Context:** follow-up to "Creatures and secondary characters are named by sight in repair instructions" (same
+day). Two repair paths still handed names to an image model: the manual `POST /:id/repair/image/:pageNum` route
+joined the judges' raw finding text (cast and creature names, figure ids) into its Grok instruction with no
+strip, and char-fix `buildActionContext` copied the page's pose lines, which name the other figures they involve,
+into a prompt whose only reference image is the target.
+
+**Decision (owner approved both, 2026-09-24):** both go through the one map.
+- `repairLogic.nameRepairText(text, map, { keep })` resolves figure ids, then replaces every cast and
+  bible-figure name with its `describeFigureForRepair` descriptor. `inpaintPage` now calls it too, so there is one
+  strip for all three paths. `buildPageRepairNameMap({ storyData, sceneDescription, detectedFigures, pageNumber })`
+  builds the map for callers that hold the story.
+- Char-fix: `repairNames` joins `CHAR_REPAIR_REQUEST_KEYS`; the pipeline, the entity single-page repair, the
+  manual "Figur reparieren" route and the Lab stages (char repair, qwen insert, composite `charRepair`) send it.
+  The target keeps its name — it travels with its reference image. No map with pose lines present: throws.
+- Manual repair route: its instruction is `nameRepairText(findings, map)` before the entity-grid sanitizer.
+
+**Replay (rung 1, run 6, no paid call):** char-fix Kiaan p16, pose line before "…while Nia digs the leaves
+clear at the wall" → after "…while the terrier-mix dog with scruffy light brown and white coat (floppy ears,
+short tail), on the far right digs the leaves clear at the wall". Manual-route payload rebuilt from p13's
+findings: "Turi is lying on his belly…" → "the young dragon with warm rust-red smooth scales (rounded snout,
+single pair of short blunt-tipped horns on head) is lying on his belly…". Run 6 stored no manual-route payload.
+
+**Limit:** stored char-fix versions carry no target name (retryHistory `charName` is null on run 6), so the verify
+check judges bible-figure names on char-fix prompts always and other cast names only when the record names the
+target.
+
+**Touched:** server/lib/repairLogic.js, server/lib/images.js, server/lib/faceRepair.js,
+server/lib/charRepairRequest.js, server/lib/repairPipeline.js, server/lib/entityConsistency.js,
+server/routes/regeneration.js, server/lib/testlab.js, server/lib/sceneComposite.js, scripts/admin/verify-checks.js,
+tasks/verify.json, tests/unit/repair-descriptor-vb-figures.test.ts, tests/unit/char-fix-page-state.test.ts,
+tests/unit/inpaint-direct-fix.test.ts.
+**Status:** ✅ active — verify entry `repair-descriptor-vb-figures`.

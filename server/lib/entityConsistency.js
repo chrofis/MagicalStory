@@ -3503,6 +3503,11 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
           })(),
           { storyId: storyData.id, pageNumber },
         ),
+        // Pose lines name other figures by sight, never by name.
+        repairNames: require('./repairLogic').buildPageRepairNameMap({
+          storyData, sceneDescription: sceneDesc, pageNumber, artStyle,
+          detectedFigures: (storyData.sceneImages || []).find(x => x.pageNumber === pageNumber)?.bboxDetection?.figures || null,
+        }),
       })
     );
 

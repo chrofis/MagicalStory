@@ -9,6 +9,12 @@ import { describe, it, expect } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const faceRepair = require('../../server/lib/faceRepair');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { buildRepairNameMap } = require('../../server/lib/repairLogic');
+// Pose lines name other figures by sight (2026-09-24): every call carries the map.
+const NAMES = buildRepairNameMap({ characters: [
+  { name: 'CharA', age: 5, gender: 'male' }, { name: 'CharB', age: 7, gender: 'female' }, { name: 'CharC', age: 6, gender: 'male' },
+] });
 
 const meta = (m: Record<string, unknown>) => `Prose of the page.\n\n---METADATA---\n${JSON.stringify(m)}`;
 
@@ -25,38 +31,39 @@ const BRIEF = meta({
 
 describe('char-fix page state', () => {
   it('carries the held object and action from interactions[]', () => {
-    const ctx = faceRepair.buildActionContext(BRIEF, 'CharA');
+    const ctx = faceRepair.buildActionContext(BRIEF, 'CharA', null, NAMES);
     expect(ctx).toContain('holds one roasted chestnut up and bites into it');
     expect(ctx).toContain('eyes relaxed, mouth chewing softly');
     expect(ctx).toContain('eyes turned away');
   });
 
   it('a row naming several actors reaches each of them', () => {
-    const ctx = faceRepair.buildActionContext(BRIEF, 'CharA');
+    const ctx = faceRepair.buildActionContext(BRIEF, 'CharA', null, NAMES);
     expect(ctx).toContain('rake the leaves with both hands');
-    const b = faceRepair.buildActionContext(BRIEF, 'CharB');
+    const b = faceRepair.buildActionContext(BRIEF, 'CharB', null, NAMES);
     expect(b).toContain('rake the leaves with both hands');
     expect(b).not.toContain('chestnut');
   });
 
   it('carries looksAt and perspective', () => {
-    const b = faceRepair.buildActionContext(BRIEF, 'CharB');
-    expect(b).toContain('eyes on CharA');
+    const b = faceRepair.buildActionContext(BRIEF, 'CharB', null, NAMES);
+    expect(b).toContain('eyes on the 5-year-old boy');
+    expect(b).not.toMatch(/CharA/);
     expect(b).toContain('back view');
   });
 
   it('never emits a raw Visual Bible id', () => {
-    expect(faceRepair.buildActionContext(BRIEF, 'CharA')).not.toMatch(/\bART\d{3}\b/);
+    expect(faceRepair.buildActionContext(BRIEF, 'CharA', null, NAMES)).not.toMatch(/\bART\d{3}\b/);
   });
 
   it('a character the brief does not name gets nothing', () => {
-    expect(faceRepair.buildActionContext(BRIEF, 'Nobody')).toBe('');
+    expect(faceRepair.buildActionContext(BRIEF, 'Nobody', null, NAMES)).toBe('');
   });
 
   it('the state reaches the built repair prompt', async () => {
     const prompt = await faceRepair.buildPrompt({
       treatment: 'crosshatch', regionSource: 'box', faceOnly: false, charName: 'CharA',
-      opts: { sceneDescription: BRIEF, artStyle: 'watercolor' },
+      opts: { sceneDescription: BRIEF, artStyle: 'watercolor', repairNames: NAMES },
     });
     expect(prompt).toContain('holds one roasted chestnut up and bites into it');
   });

@@ -141,3 +141,62 @@ describe('inpaintPage: the instruction the image model receives', () => {
     expect(sent).toHaveLength(0);
   }, 30000);
 });
+
+// ---------------------------------------------------------------------------
+// The other two repair paths that hand text to an image model (owner approved
+// 2026-09-24): char-fix pose lines and the manual repair route.
+// ---------------------------------------------------------------------------
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+const faceRepair = require_('../../server/lib/faceRepair');
+const { nameRepairText, buildPageRepairNameMap } = require_('../../server/lib/repairLogic');
+const { CHAR_REPAIR_REQUEST_KEYS } = require_('../../server/lib/charRepairRequest');
+const src = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
+
+const STORY = { characters: CAST, visualBible: VB, clothingRequirements: null, artStyle: 'watercolor' };
+const BRIEF = `Prose.\n\n---METADATA---\n${JSON.stringify({
+  characters: [{ name: 'Mika', looksAt: 'ANI001', expression: 'wide-eyed' }, { name: 'Lotte', expression: 'calm' }],
+  interactions: [{ character: 'Mika', object: 'ANI001', where: "strokes Bramble's snout while Lotte and Oldwick watch", hands: true }],
+})}`;
+
+describe('char-fix pose lines (faceRepair.buildActionContext)', () => {
+  const names = buildPageRepairNameMap({ storyData: STORY, sceneDescription: BRIEF, pageNumber: 5, detectedFigures: FIGURES });
+
+  it('names the creature, other cast and a secondary character by sight; the target keeps its name', () => {
+    const ctx = faceRepair.buildActionContext(BRIEF, 'Mika', null, names);
+    expect(ctx).not.toMatch(/Bramble|Lotte|Oldwick|ANI001/);
+    expect(ctx).toContain("the young dragon with warm rust-red smooth scales (rounded snout, single pair of short blunt horns), second from the left's snout");
+    expect(ctx).toContain('the 7-year-old girl, on the far right');
+    expect(ctx).toContain('the 60-year-old figure in dark grey woollen tunic falling to the knees');
+    expect(ctx).toMatch(/^\n\nMika in this scene/);
+    expect(ctx).toContain('- Mika: strokes');
+  });
+
+  it('throws when the map is missing — no name reaches the model by omission', () => {
+    expect(() => faceRepair.buildActionContext(BRIEF, 'Mika')).toThrow(/repair name map/);
+  });
+
+  it('the map is part of the one char-repair contract, and every caller sends it', () => {
+    expect(CHAR_REPAIR_REQUEST_KEYS).toContain('repairNames');
+    for (const f of ['../../server/lib/repairPipeline.js', '../../server/lib/entityConsistency.js', '../../server/routes/regeneration.js']) {
+      expect(src(f)).toMatch(/repairNames: require\('\.\.?\/(?:lib\/)?repairLogic'\)\.buildPageRepairNameMap\(/);
+    }
+    expect(src('../../server/lib/testlab.js')).toContain('repairNames: labRepairNames(ctx)');
+    expect(src('../../server/lib/testlab.js')).toContain('labRepairNames(ctx)) || \'\'');
+  });
+});
+
+describe('manual repair route (POST /:id/repair/image/:pageNum)', () => {
+  it('finding text reaches the model with cast and creature named by sight', () => {
+    const names = buildPageRepairNameMap({ storyData: STORY, sceneDescription: BRIEF, pageNumber: 5, detectedFigures: FIGURES });
+    const out = nameRepairText("Bramble is lying down instead of sitting. Mika's gaze misses ANI001", names);
+    expect(out).not.toMatch(/Bramble|Mika|ANI001/);
+    expect(out).toContain('the young dragon with warm rust-red smooth scales');
+    expect(out).toContain("the 5-year-old boy, on the far left's gaze");
+  });
+
+  it('the route sends its instruction through that map', () => {
+    const route = src('../../server/routes/regeneration.js');
+    expect(route).toContain("sanitizeIssueForInpaint(nameRepairText(editInstruction, repairNames))");
+  });
+});

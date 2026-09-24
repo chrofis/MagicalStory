@@ -1583,6 +1583,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         // back in a different rendering from the page they were painted into.
         artStyle: storyData?.artStyle || artStyle || null,
         includeDebug: true,
+        // Pose lines name other figures by sight, never by name.
+        repairNames: require('./repairLogic').buildPageRepairNameMap({
+          storyData, sceneDescription: sceneDesc, pageNumber, artStyle,
+          detectedFigures: img?.sharedBboxDetection?.figures || img?.bboxDetection?.figures || null,
+        }),
       }));
     } catch (err) {
       // Literal, not a bare `method`: this closure has no such binding (the

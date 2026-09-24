@@ -1791,6 +1791,17 @@ async function resolveCharacterBox(ctx, imageData, charName, { detection = null 
   return fresh ? { ...fresh, source: 'fresh-detection' } : null;
 }
 
+// The repair name map for a Lab page context — the production builder
+// (repairLogic.buildPageRepairNameMap), fed from the fields the context loads.
+function labRepairNames(ctx) {
+  return require('./repairLogic').buildPageRepairNameMap({
+    storyData: { characters: ctx.characters, visualBible: ctx.visualBible, clothingRequirements: ctx.clothingRequirements, artStyle: ctx.artStyle },
+    sceneDescription: ctx.scene?.sceneDescription || ctx.scene?.description || '',
+    detectedFigures: ctx.scene?.bboxDetection?.figures || null,
+    pageNumber: ctx.pageNumber,
+  });
+}
+
 async function runCharRepairStage(ctx, opts) {
   let { experimentId, params = {} } = opts;
   // Blend replay: reuse a past run's model output + pinned detection, so an A/B
@@ -2087,6 +2098,8 @@ async function runCharRepairStage(ctx, opts) {
     protectedBodies,
     textPosition: ctx.textPosition,
     includeDebug: true,
+    // SAME AS PRODUCTION: pose lines name other figures by sight.
+    repairNames: labRepairNames(ctx),
     // Axis overrides — omitted unless the experiment names one, so an unset run
     // resolves exactly as production does. This is what lets the Lab A/B a
     // treatment (blur vs whiteout on a face) instead of only a legacy mode.
@@ -5224,6 +5237,8 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
     aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
     skipBlend: !wantBlend,
     figureMethod,
+    // figureMethod 'charRepair' runs the character-repair prompt: pose lines name others by sight.
+    repairNames: labRepairNames(ctx),
     // Same creature resolution production uses — the Lab has to reproduce the
     // plate the pipeline would build, or a composite bug shows up in one and
     // not the other.
@@ -6308,7 +6323,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   if (params.repairMode && !params._faceMode) {
     try {
       const { buildActionContext } = require('./faceRepair');
-      bodyActionContext = buildActionContext(ctx.scene.sceneDescription || ctx.scene.text || '', ref.name) || '';
+      bodyActionContext = buildActionContext(ctx.scene.sceneDescription || ctx.scene.text || '', ref.name, null, labRepairNames(ctx)) || '';
     } catch { /* optional enrichment */ }
   }
 

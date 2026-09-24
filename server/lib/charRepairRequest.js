@@ -39,6 +39,7 @@ const CHAR_REPAIR_REQUEST_KEYS = Object.freeze([
   'protectedBodies',
   'textPosition',          // keeps the repaint out of the text zone
   'includeDebug',          // per-step debug images
+  'repairNames',           // repairLogic.buildRepairNameMap — pose lines name other figures by sight, never by name
   // THE THREE AXES, selectable. The spine has always read opts.treatment /
   // regionSource / faceOnly, but nothing could set them: callers could only
   // pick a legacy flag combination and take whatever mapping fell out. That

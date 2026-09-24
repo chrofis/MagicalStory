@@ -1669,11 +1669,14 @@ function describeVbFigure(entry, pool) {
  * that hands text to an image model (images.inpaintPage, the manual repair
  * endpoint), so none of them keeps its own list.
  *
- * @returns {{ names: string[], fallbackByName: Map<string,string> }}
+ * Carries the bible and page along so nameRepairText can resolve figure ids
+ * (which sanitizeVbIdsInPrompt turns into names) before the strip.
+ *
+ * @returns {{ names: string[], fallbackByName: Map<string,string>, visualBible, pageNumber }}
  */
 function buildRepairNameMap({
   characters = null, visualBible = null, characterClothing = null, clothingRequirements = null,
-  artStyle = null, detectedFigures = null,
+  artStyle = null, detectedFigures = null, pageNumber = null,
 } = {}) {
   const names = [];
   const fallbackByName = new Map();
@@ -1690,9 +1693,54 @@ function buildRepairNameMap({
   for (const pool of VB_FIGURE_POOLS) {
     for (const e of (visualBible?.[pool] || [])) { add(e?.name, 'the figure'); add(e?.properName, 'the figure'); }
   }
-  return { names, fallbackByName };
+  return { names, fallbackByName, visualBible, pageNumber };
+}
+
+/**
+ * The name map for one page of a stored story: cast, bible and wardrobe from
+ * the story, the page's clothing categories from its own brief. For the repair
+ * paths that hold the story rather than the pieces (char-fix callers, the
+ * manual repair route).
+ */
+function buildPageRepairNameMap({ storyData, sceneDescription = '', detectedFigures = null, pageNumber = null, artStyle = null } = {}) {
+  const { parseCharacterClothing } = require('./clothingResolve');
+  return buildRepairNameMap({
+    characters: storyData?.characters || null,
+    visualBible: storyData?.visualBible || null,
+    characterClothing: parseCharacterClothing(sceneDescription || '') || {},
+    clothingRequirements: storyData?.clothingRequirements || null,
+    artStyle: storyData?.artStyle || artStyle || null,
+    detectedFigures,
+    pageNumber,
+  });
+}
+
+/** Bible ids in repair text resolved as the page prompt resolves them (a figure id becomes its name). */
+function resolveRepairIds(text, nameMap) {
+  if (!text || typeof text !== 'string' || !nameMap?.visualBible) return text;
+  return require('./storyHelpers').sanitizeVbIdsInPrompt(text, nameMap.visualBible, nameMap.pageNumber);
+}
+
+/**
+ * Repair text as the image model may read it: ids resolved, then every cast
+ * and bible-figure name replaced by its descriptor (imageCompositing
+ * stripCharacterNames, one pass). `keep` exempts one name — the char-fix
+ * target, whose name travels with its reference image. The other options are
+ * stripCharacterNames' own (a plan's visual identifiers, the entry's subject).
+ */
+function nameRepairText(text, nameMap, { keep = null, vidByName, ownVisualId = null, ownName = null } = {}) {
+  if (!text || typeof text !== 'string') return text;
+  if (!nameMap) throw new Error('nameRepairText: no repair name map (buildRepairNameMap) — a name would reach the image model');
+  const kept = keep ? String(keep).trim().toLowerCase() : null;
+  const { stripCharacterNames } = require('./imageCompositing');
+  return stripCharacterNames(resolveRepairIds(text, nameMap), {
+    names: kept ? nameMap.names.filter(n => n.toLowerCase() !== kept) : nameMap.names,
+    fallbackByName: nameMap.fallbackByName,
+    ...(vidByName ? { vidByName } : {}),
+    ownVisualId, ownName,
+  });
 }
 
 module.exports = {
-  describeFigureForRepair, buildRepairNameMap,
+  describeFigureForRepair, buildRepairNameMap, buildPageRepairNameMap, nameRepairText, resolveRepairIds,
   repairAttemptFromResult, detectionForRetryEntry, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, attributeReaderFindings, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, CROP_ARTIFACT_TYPES, isCropArtifact, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX };
