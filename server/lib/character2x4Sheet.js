@@ -1029,6 +1029,10 @@ function scoreHeadsReport(report) {
 
 const STYLE_AXES = ['layout', 'identity', 'style', 'clean', 'bodyFace', 'age', 'solo', 'background']
   .map(n => [n, r => r[`${n}Score`] ?? r[n]?.score]);
+// The style-judge axes a styled sheet may NOT fail and still ship: a different
+// person (identity) or extra people in the sheet (solo). Every other axis ships
+// with a warning on the final strike — see generateCharacter2x4Sheet.
+const STYLED_IDENTITY_AXES = ['identity', 'solo'];
 function scoreStyleReport(report) {
   const verdict = lowestAxis(report, STYLE_AXES, 'style-eval');
   // The flat xScore fields are what runStyleTransferPass logs and stores.
@@ -1480,57 +1484,48 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
   // in api_usage). Pass 2 always runs for a non-realistic style; the flag is
   // forwarded so the pass itself takes 1 attempt and skips its own reviews.
   const wantStyleTransfer = artStyle && artStyle !== 'realistic';
+  // NO REALISTIC FALLBACK (owner, 2026-09-24). In a non-realistic story the
+  // realistic Pass-1 sheet is never shipped as the character's avatar: that
+  // child then looks unlike every other figure in the book. Three outcomes:
+  //   - an attempt passes the style judge → ship it;
+  //   - every attempt fails the style judge, at least one on a non-identity
+  //     axis only → ship the higher-scoring of those WITH A WARNING (gates are
+  //     guidelines: the final strike ships and says so);
+  //   - no attempt produced pixels, or every one failed IDENTITY (a different
+  //     person, or extra people painted in) → throw. A wrong person on every
+  //     page is not a lesser version of the right avatar.
+  // A throw here reaches convertAvatarToStyle, which records it in the styled-
+  // avatar audit log the dev panel renders, then rethrows.
   let pass2 = null;
   if (wantStyleTransfer) {
-    // Pass-2 failure must NEVER destroy the avatar: the Pass-1 realistic
-    // sheet is a complete identity anchor on its own, so any throw here is
-    // downgraded to "ship Pass 1 unstyled". runStyleTransferPass already
-    // catches per-attempt backend errors + does an alternate-engine retry;
-    // this outer catch is defence in depth for anything unexpected.
-    try {
-      pass2 = await runStyleTransferPass({
-        pass1ImageData: pass1.imageData,
-        facePhoto,
-        artStyle,
-        characterName: character?.name,
-        characterAge: character?.age,
-        usageTracker,
-        skipQualityEval,
-      });
-    } catch (err) {
-      log.error(`[CHARACTER 2×4] ${character?.name} Pass 2 threw unexpectedly: ${err.message} — shipping realistic Pass 1 sheet unstyled`);
-      pass2 = null;
+    pass2 = await runStyleTransferPass({
+      pass1ImageData: pass1.imageData,
+      facePhoto,
+      artStyle,
+      characterName: character?.name,
+      characterAge: character?.age,
+      usageTracker,
+      skipQualityEval,
+    });
+    if (!pass2.shippable) {
+      const reasons = (pass2.finalVerdict?.failureReasons || []).join('; ') || 'no reason given';
+      throw new Error(`[CHARACTER 2×4] ${character?.name} Pass 2: every styled attempt (${pass2.attempts?.length || 0}) failed IDENTITY (${pass2.identityFailing.join(', ')}; best score=${pass2.finalScore}/10: ${reasons}) — no styled sheet ships, and the realistic sheet is not a substitute`);
     }
   }
 
-  // The function's primary return value (`imageData`) is the styled sheet
-  // when Pass 2 ran successfully, otherwise the realistic Pass 1 output.
-  // Downstream consumers (composite, ref attachment) get the story-style
-  // sheet by default. Pass 1's realistic anchor is on `realisticImageData`
-  // for inspection.
-  //
-  // A REJECTED styled sheet now falls back the same way a thrown one does
-  // (owner, 2026-08-20). Pass 2 previously shipped its best attempt no matter
-  // how bad — staging job_1787252581387_6sn8z0nh2 shipped a 1/10 sheet with the
-  // style anchor's three figures painted over an adult character, and reported
-  // success. A photoreal-but-correct Pass-1 sheet is recoverable downstream;
-  // a sheet showing the wrong people is not. Pass 2 stays on `passes.pass2` so
-  // the dev panel can still show what was rejected and why.
-  const styleTransferUsable = !!pass2?.imageData && pass2.valid !== false;
-  if (pass2 && !styleTransferUsable) {
-    const reasons = (pass2.finalVerdict?.failureReasons || []).join('; ') || 'no reason given';
-    log.warn(`[CHARACTER 2×4] ${character?.name} Pass 2 REJECTED after ${pass2.attempts?.length || 0} attempt(s) (score=${pass2.finalScore}/10: ${reasons}) — shipping realistic Pass 1 sheet unstyled`);
+  // `styleJudgeRejected`: the shipped styled sheet was judged and failed the
+  // style judge on a non-identity axis. It ships; the caller surfaces the
+  // warning (styled-avatar audit entry + log).
+  const styleJudgeRejected = !!pass2 && pass2.valid === false;
+  const styleJudgeReasons = styleJudgeRejected ? (pass2.finalVerdict?.failureReasons || []) : [];
+  if (styleJudgeRejected) {
+    log.warn(`⚠️ [CHARACTER 2×4] ${character?.name} Pass 2 failed the style judge on all ${pass2.attempts?.length || 0} attempt(s) — shipping the best styled attempt (#${pass2.selectedAttempt}, score=${pass2.finalScore}/10: ${styleJudgeReasons.join('; ') || 'no reason given'})`);
   }
-  const finalImage = (styleTransferUsable ? pass2.imageData : null) || pass1.imageData;
+  const shipped = pass2 || pass1;
   return {
-    imageData: finalImage,
-    // Whether the sheet on `imageData` actually carries the story's art style.
-    // False when Pass 2 was wanted but did not ship, so callers can log/report
-    // an unstyled avatar instead of silently treating it as converted.
-    // NOT named `styled`: character objects already carry an `avatars.styled`
-    // URL elsewhere, and two different meanings under one name is how a reader
-    // ends up wiring the wrong one.
-    styleTransferShipped: wantStyleTransfer ? styleTransferUsable : true,
+    imageData: shipped.imageData,
+    styleJudgeRejected,
+    styleJudgeReasons,
     realisticImageData: pass1.imageData,
     usage: composed.usage,
     prompt: pass1.prompt,
@@ -1540,18 +1535,13 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
       facePhoto,
     },
     passes: { pass1, pass2 },
-    // Legacy fields — kept so existing callers don't break. The styled
-    // (Pass 2) attempt history is what the dev panel renders by default, and it
-    // stays pass 2's even on the unstyled fallback: the rejected attempts are
-    // exactly what the owner needs to see to know WHY the avatar is unstyled.
+    // The styled (Pass 2) attempt history is what the dev panel renders.
     attemptHistory: pass2?.attempts || pass1.attempts,
     selectedAttempt: pass2?.selectedAttempt ?? pass1.selectedAttempt,
-    // Score of the sheet that ACTUALLY SHIPPED. On the unstyled fallback that is
-    // Pass 1's, not the rejected Pass 2's — reporting 1/10 for a sheet we did
-    // not ship would make the caller's gate fire on the wrong image. The
-    // fallback itself is surfaced by `styleTransferShipped: false` + the warning.
-    finalScore: styleTransferUsable ? pass2.finalScore : pass1.finalScore,
-    finalVerdict: (styleTransferUsable ? pass2.finalVerdict : null) || pass1.finalVerdict,
+    // Score of the sheet that ACTUALLY SHIPPED — the styled one whenever Pass 2
+    // ran, including a style-judge-rejected one shipped with a warning.
+    finalScore: shipped.finalScore,
+    finalVerdict: (pass2 ? pass2.finalVerdict : null) || pass1.finalVerdict,
   };
 }
 
@@ -1575,7 +1565,12 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
   if (styleAnchor) log.info(`[CHARACTER 2×4] ${characterName} Pass 2 using style anchor (style-anchor-${artStyle})`);
   const totalAttempts = 1 + MAX_SHEET_RETRIES;
   const attempts = [];
+  // `best` = the highest-scoring attempt that may SHIP (identity not failed).
+  // `bestIdentityRejected` = the highest-scoring attempt the judge rejected on
+  // identity — never shipped, returned only so the dev panel / Test Lab can
+  // show what came back.
   let best = null;
+  let bestIdentityRejected = null;
   // The style judge's prompt (text only). It depends on the art style and age
   // alone, so one copy covers every attempt.
   let judgePrompt = null;
@@ -1618,8 +1613,9 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
     // changing the inputs under the experiment would corrupt its own result.
     //
     // AND THE ANCHOR IS NEVER ATTACHED WHEN NOTHING CAN JUDGE THE RESULT
-    // (2026-09-07). Both defences above — the reject-and-fall-back-to-Pass-1
-    // gate and the anchor-dropping retry — key off the Gemini verdict. A trial
+    // (2026-09-07). Both defences — the identity/solo rejection (a sheet with
+    // extra people never ships) and the anchor-dropping retry — key off the
+    // Gemini verdict. A trial
     // passes skipQualityEval, so the loop breaks on attempt 1 with no verdict:
     // the dice are rolled once, with the contaminant attached, and whatever
     // comes back ships as the character's identity reference on every page.
@@ -1703,18 +1699,25 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
       }));
       log.info(`[CHARACTER 2×4]   Pass 2 eval: layout=${verdict.layoutScore} identity=${verdict.identityScore} style=${verdict.styleScore} clean=${verdict.cleanScore} bodyFace=${verdict.bodyFaceScore} age=${verdict.ageScore ?? '-'} background=${verdict.backgroundScore ?? '-'} final=${verdict.finalScore} valid=${verdict.valid}`);
     } catch (err) {
-      // Mirror Pass-1 behaviour: a Gemini eval failure must NOT lock in this
-      // attempt at the maximum score and break the retry loop. Score it
-      // neutrally and continue so a later attempt that DOES eval successfully
-      // can win the best-of-N comparison.
-      log.warn(`[CHARACTER 2×4] Pass 2 eval error attempt ${attempt}: ${err.message} — counting as neutral (score=5) and continuing retries`);
-      const candidate = { result, attempt, score: 5, verdict: null, prompt, layoutValid };
-      attempts.push({ attempt, stage: 'eval-error', score: 5, reason: err.message, imageData: result.imageData, sentToGrok: result.sentToGrok || null, usedAnchor: !!anchorForAttempt });
+      // A Gemini eval failure must NOT lock in this attempt and break the retry
+      // loop. It is UNSCORED (null), so it ranks below every judged attempt: a
+      // later attempt the judge actually saw — its identity verified — wins
+      // (2026-09-24; it used to count as a neutral 5 and could beat a judged 4).
+      log.warn(`[CHARACTER 2×4] Pass 2 eval error attempt ${attempt}: ${err.message} — unscored, continuing retries`);
+      const candidate = { result, attempt, score: null, verdict: null, prompt, layoutValid };
+      attempts.push({ attempt, stage: 'eval-error', score: null, evaluated: false, reason: err.message, imageData: result.imageData, sentToGrok: result.sentToGrok || null, usedAnchor: !!anchorForAttempt });
       if (!best || rank(candidate.score) > rank(best.score)) best = candidate;
       continue;
     }
 
     const score = verdict.finalScore ?? 0;
+    // IDENTITY is the one axis a styled sheet may never fail and still ship
+    // (owner, 2026-09-24): a sheet showing a different person (identity) or
+    // extra people (solo — the style anchor's figures painted in) is a wrong
+    // person on every page. Every other axis is a quality gate that ships with
+    // a warning on the final strike.
+    const identityFailing = STYLED_IDENTITY_AXES
+      .filter(n => typeof verdict[`${n}Score`] === 'number' && verdict[`${n}Score`] < SHEET_VALID_MIN);
     attempts.push({
       attempt,
       stage: verdict.valid ? 'valid' : 'invalid',
@@ -1724,17 +1727,24 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
       styleScore: verdict.styleScore,
       cleanScore: verdict.cleanScore,
       bodyFaceScore: verdict.bodyFaceScore,
+      ageScore: verdict.ageScore,
+      soloScore: verdict.soloScore,
       backgroundScore: verdict.backgroundScore,
       reasons: verdict.failureReasons || [],
       imageData: result.imageData,
       sentToGrok: result.sentToGrok || null,
       usedAnchor: !!anchorForAttempt,
       layoutValid,
+      identityRejected: identityFailing.length > 0,
     });
-    const candidate = { result, attempt, score, verdict, prompt, layoutValid };
-    if (!best || rank(candidate.score) > rank(best.score)) best = candidate;
+    const candidate = { result, attempt, score, verdict, prompt, layoutValid, identityFailing };
+    if (identityFailing.length) {
+      if (!bestIdentityRejected || rank(candidate.score) > rank(bestIdentityRejected.score)) bestIdentityRejected = candidate;
+    } else if (!best || rank(candidate.score) > rank(best.score)) {
+      best = candidate;
+    }
     if (verdict.valid) break;
-    log.warn(`[CHARACTER 2×4] ${characterName} Pass 2 attempt ${attempt} score=${score} (valid=false)`);
+    log.warn(`[CHARACTER 2×4] ${characterName} Pass 2 attempt ${attempt} score=${score} (valid=false${identityFailing.length ? `, IDENTITY failed: ${identityFailing.join(', ')}` : ''})`);
   }
 
   // A sheet whose two rows disagree on garment colour is caught by the STYLE
@@ -1744,36 +1754,42 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
   // and force its own retry; it was removed because it could not separate a
   // pale garment (chroma 9.8) from JPEG speckle on the white backdrop (4-8),
   // and both of its failure modes still measured "rows agree".
-  // Every attempt threw before producing pixels. Explicit, because the caller's
-  // contract below keys off `valid` — leaving this to a TypeError on
-  // `best.result` and relying on the outer catch worked, but only by accident.
-  if (!best) throw new Error(`[CHARACTER 2×4] ${characterName} Pass 2 produced no image in ${totalAttempts} attempt(s)`);
+  // Every attempt threw before producing pixels: no styled sheet exists, and the
+  // caller lets this propagate — the realistic Pass-1 sheet is never shipped in
+  // its place (owner, 2026-09-24).
+  if (!best && !bestIdentityRejected) throw new Error(`[CHARACTER 2×4] ${characterName} Pass 2 produced no image in ${totalAttempts} attempt(s)`);
 
-  const winningImage = best.result.imageData;
-  // `valid` is the caller's ship/fall-back signal (2026-08-20). It is false ONLY
-  // when the evaluator actually judged the winning sheet and rejected it — the
-  // unjudgeable paths (skipQualityEval, no Gemini key, eval threw) carry a null
-  // verdict and stay valid, preserving the fail-open behaviour those branches
-  // were written for. Without this the caller could not tell a 9/10 sheet from
-  // the 1/10 sheet that shipped with three strangers painted over the character.
-  const valid = best.verdict ? best.verdict.valid !== false : true;
+  // `shippable` is false only when EVERY attempt that produced pixels failed
+  // identity. The caller then fails loudly — there is no realistic Pass-1
+  // substitute (owner, 2026-09-24). The rejected sheet is still returned so the
+  // dev panel and Test Lab can show it.
+  const shippable = !!best;
+  const chosen = best || bestIdentityRejected;
+  // `valid` is the style judge's verdict on the chosen sheet. False = judged
+  // and rejected on a non-identity axis: the caller SHIPS it with a warning.
+  // The unjudgeable paths (skipQualityEval, no Gemini key, eval threw) carry a
+  // null verdict and stay valid — the trial must never lose its styled sheet
+  // to an eval outage.
+  const valid = chosen.verdict ? chosen.verdict.valid !== false : true;
 
   return {
-    imageData: winningImage,
+    imageData: chosen.result.imageData,
+    shippable,
+    identityFailing: shippable ? [] : chosen.identityFailing,
     valid,
-    selectedAttempt: best.attempt,
-    finalScore: best.score,
-    finalVerdict: best.verdict,
+    selectedAttempt: chosen.attempt,
+    finalScore: chosen.score,
+    finalVerdict: chosen.verdict,
     // Echo the backend/model that actually produced the winning sheet, so
     // callers (Test Lab) record the true model per result instead of a label.
-    provider: best.result.provider || null,
-    modelId: best.result.modelId || null,
+    provider: chosen.result.provider || null,
+    modelId: chosen.result.modelId || null,
     attempts,
     // The winning attempt's own prompt — attempt 2 drops the anchor, so the two
     // attempts no longer share one prompt string.
-    prompt: best.prompt,
+    prompt: chosen.prompt,
     judgePrompt,
-    sentToGrok: best.result.sentToGrok || null,
+    sentToGrok: chosen.result.sentToGrok || null,
   };
 }
 

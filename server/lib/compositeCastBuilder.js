@@ -320,11 +320,10 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
         });
         sheetUri = gen.imageData;
         // Sibling of the styledAvatars.js path: this lazy-gen entry point also
-        // has to say so when the style transfer was rejected and what arrived
-        // is the realistic Pass-1 sheet, or an unstyled avatar reaches the
-        // scene refs with nothing in the log to explain it.
-        if (gen.styleTransferShipped === false) {
-          log.warn(`⚠️ [CAST] ${name}/${artStyleKey} sheet is UNSTYLED — every style-transfer attempt was rejected; realistic Pass-1 sheet cached instead`);
+        // has to say so when every styled attempt failed the style judge and
+        // the best of them shipped anyway.
+        if (gen.styleJudgeRejected) {
+          log.warn(`⚠️ [CAST] ${name}/${artStyleKey} style judge rejected every attempt — best styled attempt cached at ${gen.finalScore}/10 (${(gen.styleJudgeReasons || []).join('; ') || 'no reason given'})`);
         }
         // Cache on the in-memory character at the canonical styled-avatar field.
         character.avatars = character.avatars || {};

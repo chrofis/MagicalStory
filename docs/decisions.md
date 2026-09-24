@@ -24146,7 +24146,8 @@ not on the asset being safe.
 - `server/lib/compositeCastBuilder.js` — sibling lazy-gen path logs the unstyled case
 - `tests/manual/avatarStyleAnchorRetry.test.js` — 32 assertions against the real
   sliced function source
-**Status:** ✅ active
+**Status:** ✅ anchor-drop retry active; 🔁 the realistic fallback is SUPERSEDED 2026-09-24
+("No realistic fallback for a style-rejected avatar sheet")
 
 ## 2026-08-20 — The arc is drafted and reviewed BEFORE the pages exist (plan sonnet / review grok)
 
@@ -59387,3 +59388,57 @@ entity bill is identical to the old reader's (penalty 0), and the replayed canon
 client/src/hooks/useRepairWorkflow.ts, client/src/services/storyService.ts,
 tests/unit/entity-findings-one-reader.test.ts, tasks/bugs.json.
 **Status:** ✅ active
+
+## 2026-09-24 — No realistic fallback for a style-rejected avatar sheet: the best styled attempt ships with a warning
+
+**Supersedes** the "a rejected Pass 2 falls back to the realistic Pass-1 sheet" half of
+"2026-08-20 — The Pass-2 retry drops the style anchor, and a rejected Pass 2 ships unstyled".
+The anchor-drop retry from that entry stays.
+
+**Context:** when the Pass-2 styled 2×4 sheet failed its style judge on both attempts,
+`generateCharacter2x4Sheet` shipped the realistic Pass-1 sheet, so that child looked unlike
+the art style of every other figure in the book. The 2026-09-23 judge axes (background,
+hair/skin colour drift against the pass-1 sheet) make a both-attempts rejection likelier.
+Owner, 2026-09-24: "ship the BETTER of the two styled attempts (by the judge's computed final
+score) and log a warning. Never fall back to the realistic sheet." — the gates-are-guidelines
+rule (final strike ships with a warning), with two explicit exceptions: never ship a wrong
+person, and fail loudly rather than silently use Pass 1.
+
+**Decision:**
+- An attempt the style judge (`sheet-2x4-style-eval.txt`) scored below 6 on **identity** or
+  **solo** never ships (`STYLED_IDENTITY_AXES`). Identity = same person as the source photo,
+  hair/skin as the pass-1 sheet; solo = no extra or ghosted people — the style-anchor
+  contamination of job_1787252581387_6sn8z0nh2, which was the reason for the 2026-08-20
+  fallback. Both are "a wrong person on every page". Every other axis (layout, style, clean,
+  bodyFace, age, background) is a quality gate.
+- Among the remaining attempts the highest judge `finalScore` ships. An attempt whose judge
+  call threw is unscored and ranks below every judged one (it used to count as a neutral 5
+  and could beat a judged 4 whose identity had been verified).
+- Shipped but style-rejected → `styleJudgeRejected: true` + `styleJudgeReasons` on the result,
+  `log.warn`, and the styled-avatar audit entry is `success: false` with a `warning` naming
+  the score and failed axes — the red card in the dev panel's "Styled Avatars" section.
+- No attempt produced an image, or every attempt failed identity/solo → the sheet generation
+  **throws**. `convertAvatarToStyle` records the error in the audit log and rethrows; the
+  existing downstream handling (costumed→standard retry, `ensureStyledAvatarCoverage`
+  backstop with its `[AVATAR] ❌` logs) is unchanged. The outer try/catch that downgraded a
+  thrown Pass 2 to "ship Pass 1 unstyled" is deleted. `styleTransferShipped` is deleted.
+- Unchanged: realistic art style ships Pass 1 (no style transfer wanted); unjudgeable runs
+  (trial `skipQualityEval`, no Gemini key) ship their single attempt as before; Test Lab
+  `avatar_style` keeps the sheet either way and now records `shippable` / `styleJudgeValid`.
+
+**Evidence (free replay of stored `styledAvatarGeneration` records):** staging
+job_1790100385959_1nitlympp — 6 entries, none fell back before; the rule picks the same sheet
+for all 6. Kiaan's attempt 1 (score 1, failed solo) would be identity-rejected under the new
+rule; attempt 2 passed at 9 and ships either way. Across all staging stories of the last 30
+days exactly one entry fell back (job_1788555701112_99txp8evx, Emma: both attempts 1/10 on
+`clean`, identity 9) — it would now ship the styled attempt with a warning. Production, last
+30 days: zero fallbacks.
+
+**Touched:** `server/lib/character2x4Sheet.js` (`runStyleTransferPass` returns
+`shippable`/`identityFailing`, stores `soloScore`/`ageScore` per attempt;
+`generateCharacter2x4Sheet`), `server/lib/styledAvatars.js`,
+`server/lib/compositeCastBuilder.js`, `server/lib/testlab.js`,
+`tests/unit/avatar-styled-no-realistic-fallback.test.ts` (new) + sandbox constants in the
+four existing Pass-2 vm tests and `tests/manual/avatarStyleAnchorRetry.test.js`,
+`docs/prompt-inventory.md`, `docs/image-routing.md`, `docs/image-generation-methods.html`.
+**Status:** ✅ active (staging)

@@ -2635,7 +2635,11 @@ async function runAvatarStyleStage(target, { experimentId, promptOverride, param
   return {
     character: character.name, imageType: 'tl_avatar', versionIndex,
     pass: 2, artStyle, realisticVersionIndex,
-    finalScore: result.finalScore ?? null, elapsedMs: Date.now() - t0,
+    finalScore: result.finalScore ?? null,
+    // Production ships this sheet only when shippable (identity and solo
+    // passed); the Lab keeps it either way so a rejected output can be seen.
+    shippable: result.shippable, styleJudgeValid: result.valid,
+    elapsedMs: Date.now() - t0,
   };
 }
 

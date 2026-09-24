@@ -384,16 +384,16 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
     // verified pass — staging job_1788763045123_z8so79ngb stored a corrupt sheet
     // at 10/10 on every axis with no judge call made).
     const innerFinal = typeof result.finalScore === 'number' ? result.finalScore : null;
-    // styled === false means Pass 2 was wanted but every attempt was rejected,
-    // so what shipped is the realistic Pass-1 sheet in a painted story. That is
-    // a real defect and must not read as success: this gate previously scored
-    // ONLY Pass 1's face/clothing (9/9 for a sheet whose Pass 2 came back at
-    // 1/10 with the style anchor's three figures painted over the character),
-    // so the run logged "passed" and the corruption reached the covers.
-    const styleTransferShipped = result.styleTransferShipped !== false;
+    // styleJudgeRejected = every styled attempt failed the style judge, and the
+    // best one shipped anyway (owner, 2026-09-24: gates are guidelines, the
+    // realistic sheet is never a substitute). It must not read as success:
+    // this gate once scored ONLY Pass 1's face/clothing, so a 1/10 styled sheet
+    // logged "passed".
+    const styleJudgeRejected = result.styleJudgeRejected === true;
+    const styleJudgeReasons = (result.styleJudgeReasons || []).join('; ') || 'no reason given';
     const passed = (faceMatchScore == null || faceMatchScore >= MIN_FACE_MATCH_SCORE)
                 && (clothingMatchScore == null || clothingMatchScore >= MIN_CLOTHING_MATCH_SCORE)
-                && styleTransferShipped;
+                && !styleJudgeRejected;
 
     const logEntry = {
       timestamp: new Date().toISOString(),
@@ -414,10 +414,9 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       // as a pass; they are unknown.
       evaluated: !(evalSkipped || evalFailed),
       evalSkipped,
-      // False = the shipped sheet is the realistic Pass-1 fallback, not a
-      // style-converted one. Read by the dev panel so an unstyled avatar is
-      // visible as such instead of looking like a normal pass.
-      styleTransferShipped,
+      // True = the shipped styled sheet failed the style judge on every attempt
+      // and shipped as the best of them, with the warning below.
+      styleJudgeRejected,
       evalFailed,
       innerAttemptHistory: result.attemptHistory || null,
       passes: result.passes || null,
@@ -430,9 +429,9 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
         facePhoto: usedFace ? { sizeKB: getImageSizeKB(usedFace), imageData: usedFace } : null,
       },
       output: { sizeKB: getImageSizeKB(downsizedSheet), imageData: downsizedSheet },
-      ...(passed ? {} : { warning: styleTransferShipped
-        ? `face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10, inner=${innerFinal}/10`
-        : `style transfer REJECTED — shipped unstyled realistic sheet (face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10)` }),
+      ...(passed ? {} : { warning: styleJudgeRejected
+        ? `style judge rejected every attempt — shipped the best styled attempt at ${innerFinal}/10 (${styleJudgeReasons})`
+        : `face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10, inner=${innerFinal}/10` }),
     };
     {
       const scope = cacheContext.getStore() || _STYLED_LOG_UNSCOPED;
@@ -453,8 +452,8 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       log.warn(`⚠️ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} shipped UNSCORED — row eval failed (${evalFailed}); sheet kept but not judged`);
     } else if (passed) {
       log.info(`✅ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} passed (face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10, inner=${innerFinal}/10)`);
-    } else if (!styleTransferShipped) {
-      log.warn(`⚠️ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} shipped UNSTYLED — every style-transfer attempt was rejected; the realistic sheet ships instead so the character keeps a correct identity anchor`);
+    } else if (styleJudgeRejected) {
+      log.warn(`⚠️ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} style judge rejected every attempt — shipping the best styled attempt at ${innerFinal}/10 (${styleJudgeReasons})`);
     } else {
       log.warn(`⚠️ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} below threshold (face=${faceMatchScore}, clothing=${clothingMatchScore}, inner=${innerFinal}) — shipping anyway`);
     }
