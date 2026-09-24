@@ -23,7 +23,7 @@ const { assessSceneReview, assertReviewedArtifactUsable, pickReviewedBrief } = r
 // Production's arguments for the beats writer/Art-Director calls, resolved from
 // a stored story. Every replay stage builds its inputs through these so a
 // divergent, thinner expression cannot be written a fourth time.
-const { buildReplayTextArgs, buildReplaySceneOptions, resolveReplayArc, resolveReplayArcHints } = require('./beatsReplayInputs');
+const { buildReplayTextArgs, buildReplaySceneOptions, resolveReplayArc, resolveReplayArcHints, resolveReplayCentralFigure } = require('./beatsReplayInputs');
 // Production's evalOptions for evaluateImageQuality, resolved from a stored
 // story. Same rule as above: every eval stage builds its options through this
 // so a thinner, silently-check-disabling expression cannot be written again.
@@ -4164,6 +4164,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     plannerPrompt = buildBeatsPrompt(storyData, pageCount, {
       finalArc: resolveReplayArc(storyData, { parseBeats }),
       arcHints: resolveReplayArcHints(storyData),
+      centralFigure: resolveReplayCentralFigure(storyData),
     });
     if (!plannerPrompt) throw new Error('story-beats template unavailable');
     if (promptOverride) plannerPrompt = promptOverride;
@@ -8235,7 +8236,7 @@ async function runWriterCompareStage(target, { params = {} }) {
         if (stage === 'plan') {
           // Production: buildBeatsPrompt(inputData, pageCount, { finalArc: approvedArc, arcHints })
           // — beatsPipeline.js:935. arcHints was missing here.
-          const r = await call(SH.buildBeatsPrompt(storyData, expectedPages, { finalArc: textArgs.arc, arcHints: textArgs.arcHints }), model, 'plan');
+          const r = await call(SH.buildBeatsPrompt(storyData, expectedPages, { finalArc: textArgs.arc, arcHints: textArgs.arcHints, centralFigure: textArgs.centralFigure }), model, 'plan');
           const parsed = SH.parsePlanResponse(r.text, []);
           arm.stages.plan = { ...WC.scorePlan(parsed.pages || [], expectedPages), cost: r.cost, elapsedMs: r.elapsedMs, outTok: r.usage?.output_tokens };
         } else if (stage === 'bible') {
@@ -8328,7 +8329,8 @@ async function runWriterCompareStage(target, { params = {} }) {
  * production does (parseArcCreate), and scores each committed arc with the
  * same judges arc_rounds uses. Cost and quality land side by side.
  *
- * params: { efforts, model, judgeModels, stage, promptFrom }   target: { storyId }
+ * params: { efforts, model, judgeModels, stage, promptFrom, challengesFromStory, baselineFromStory }
+ *   target: { storyId }
  *
  * params.stage      'create' (default) sweeps params.efforts over the create
  *   call. 'pipeline' runs production's arc machine once: create at
@@ -8339,11 +8341,20 @@ async function runWriterCompareStage(target, { params = {} }) {
  *   SENT (its sentPrompts) instead of building a fresh one. A fresh build draws
  *   the challenge ideas anew, so this is the only way a later model's arms see
  *   the identical draw — and identical template text — as an earlier sweep.
+ *   Throws once the template has changed since that run (by design).
+ * params.challengesFromStory  build the prompt fresh from TODAY's template but
+ *   with the story's own stored challenge draw, lifted verbatim from
+ *   arcReviewReport.createPrompt — so a new arc format sees the SAME draw the
+ *   stored arc did, and the comparison has one variable (2026-09-24).
+ * params.baselineFromStory  also score the story's stored arcs — the committed
+ *   create arc and arcReviewReport.finalArc — with the same judges and the same
+ *   judge context, as arms `baseline-create` / `baseline-final` (no model call
+ *   beyond the judges), so old and new are read with one ruler (2026-09-24).
  */
 async function runArcEffortStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
-  const { buildArcCreatePrompt, buildArcPanelPrompt, buildArcRetellPrompt, parseArcCreate, parseArcRetell, drawChallengeIdeas } = require('./storyHelpers');
+  const { buildArcCreatePrompt, buildArcPanelPrompt, buildArcRetellPrompt, parseArcCreate, parseArcRetell, arcShapeCounts, drawChallengeIdeas } = require('./storyHelpers');
   const { callTextModelStreaming } = require('./textModels');
   const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
   const sc = require('./storyScorecard');
@@ -8376,6 +8387,8 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
   // The drawn section itself — the pipeline's re-telling must be handed the
   // SAME draw the creator saw (production passes one `challengeIdeas` to both).
   let challengeIdeas;
+  const flag = v => v === true || v === 'true';
+  if (params.promptFrom && flag(params.challengesFromStory)) throw new Error('promptFrom and challengesFromStory are exclusive');
   if (params.promptFrom) {
     if (promptOverride) throw new Error('promptFrom and promptOverride are exclusive');
     const { dbQuery } = require('../services/database');
@@ -8400,8 +8413,13 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
     if (end < 0) throw new Error(`promptFrom ${expId}: the text after the challenge section no longer matches today's template — cannot recover its draw`);
     challengeIdeas = prompt.slice(pre.length, end);
   } else {
-    const draw = drawChallengeIdeas(storyData, {});
-    challengeIdeas = draw.section;
+    if (flag(params.challengesFromStory)) {
+      challengeIdeas = storedChallengeSection(storyData);
+      promptSource = 'built fresh from today\'s template, with the story\'s stored challenge draw';
+    } else {
+      challengeIdeas = drawChallengeIdeas(storyData, {}).section;
+      promptSource = 'built fresh (new challenge draw)';
+    }
     // withTemplates, not `PROMPT_TEMPLATES.x = override` + finally: that global
     // mutation is what kept the Lab single-flight, because a second experiment's
     // override is what this builder would read (prompts.js, 2026-08-25).
@@ -8410,7 +8428,6 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
       { arcCreate: promptOverride },
       () => buildArcCreatePrompt(storyData, pageCount, { challengeIdeas }),
     );
-    promptSource = 'built fresh (new challenge draw)';
   }
   if (!prompt) throw new Error('arc-create prompt could not be built');
 
@@ -8445,7 +8462,7 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
       const visible = String(res.text || '');
       let commit = null, parseError = null;
       try { commit = phase === 'retell' ? parseArcRetell(visible) : parseArcCreate(visible); } catch (e) { parseError = String(e.message || e); }
-      const arcText = phase === 'retell' ? (commit?.finalArc || visible) : (commit?.arc || commit?.chosen || visible);
+      const arcText = phase === 'retell' ? (commit?.finalArc || visible) : (commit?.arc || visible);
       const scored = commit ? await scoreArc(arcText) : { draws: [], mean: null };
       const out = res.usage?.output_tokens || 0;
       // The gap IS the finding: billed output minus what came back as text.
@@ -8463,6 +8480,11 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
           judgeDraws: scored.draws,
           judgeCost: scored.draws.reduce((s, d) => s + (d.cost || 0), 0),
           arc: arcText,
+          // The story logic, the critique and the code counts production logs
+          // (arcShapeCounts), so a reader can set logic against arc.
+          logic: commit?.logic?.text || null,
+          critique: commit?.critique || null,
+          counts: commit ? arcShapeCounts({ sentences: commit.sentences, logic: commit.logic, inputData: storyData, pageCount }) : null,
         },
         commit,
       };
@@ -8474,6 +8496,23 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
   // Serial: these are large Opus calls and the point is a clean per-arm cost.
   const arms = [];
   let panel = null;
+  if (flag(params.baselineFromStory)) {
+    const report = storyData.arcReviewReport || {};
+    const baselines = [
+      ['baseline-create', storedCommittedArc(report)],
+      ['baseline-final', String(report.finalArc || '').trim()],
+    ];
+    for (const [phase, arcText] of baselines) {
+      if (!arcText) throw new Error(`baselineFromStory: the story stores no ${phase === 'baseline-final' ? 'arcReviewReport.finalArc' : 'committed create arc'}`);
+      const scored = await scoreArc(arcText);
+      arms.push({
+        phase, effort: null, ok: true, cost: 0,
+        score: scored.mean, judgeDraws: scored.draws,
+        judgeCost: scored.draws.reduce((s, d) => s + (d.cost || 0), 0),
+        arc: arcText,
+      });
+    }
+  }
   if (stage === 'create') {
     for (const effort of efforts) arms.push((await runArm('create', prompt, effort)).arm);
   } else {
@@ -8517,7 +8556,9 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
     panel,
     totalCost: Number((arms.reduce((s, a) => s + (a.cost || 0) + (a.judgeCost || 0), 0) + panelCost).toFixed(4)),
     summary: [
-      ...arms.map(a => (a.ok
+      ...arms.map(a => (a.ok && a.phase.startsWith('baseline')
+        ? `${a.phase}: score ${a.score == null ? 'n/a' : a.score.toFixed(2)} (stored arc, judges only)`
+        : a.ok
         ? `${a.phase} ${a.effort}: $${a.cost.toFixed(4)} | out ${a.outputTokens} tok (${a.invisibleShare != null ? Math.round(a.invisibleShare * 100) : '?'}% not returned) | score ${a.score == null ? 'n/a' : a.score.toFixed(2)}`
           + (stage === 'create' && base && a !== base ? ` | ${(((a.cost - base.cost) / base.cost) * 100).toFixed(0)}% cost vs high` : '')
           + (a.parseError ? ` | PARSE FAILED: ${a.parseError}` : '')
@@ -8526,6 +8567,42 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
     ],
   };
 }
+/**
+ * The story's own stored challenge draw: the "# CHALLENGE IDEAS" section of
+ * arcReviewReport.createPrompt, verbatim up to the next top-level heading.
+ * Throws when the prompt or the section is missing — a fresh draw would be a
+ * second variable, never a stand-in.
+ */
+function storedChallengeSection(storyData) {
+  const prompt = String(storyData?.arcReviewReport?.createPrompt || '');
+  if (!prompt) throw new Error('challengesFromStory: the story stores no arcReviewReport.createPrompt');
+  const start = prompt.search(/^# CHALLENGE IDEAS/m);
+  if (start < 0) throw new Error('challengesFromStory: the stored create prompt has no # CHALLENGE IDEAS section');
+  const rest = prompt.slice(start);
+  const next = rest.slice(1).search(/^# /m);
+  return (next >= 0 ? rest.slice(0, next + 1) : rest).trimEnd();
+}
+
+/**
+ * The committed create arc of a stored story, without its critique.
+ *
+ * READ-COMPAT, NOT A FALLBACK: stories written before 2026-09-24 store the
+ * two-arc shape (`committed` = "ARC N:" + critique + the "Stronger:" line) and
+ * cannot be migrated; newer ones store "STORY LOGIC:" + "ARC:" + "CRITIQUE:".
+ * Both are data at rest; the live pipeline writes only the new one.
+ */
+function storedCommittedArc(report = {}) {
+  const committed = String(report.committed || '');
+  if (!committed.trim()) return '';
+  if (/^\s*(?:\*\*|#+\s*)?STORY LOGIC/mi.test(committed)) {
+    return require('./storyHelpers').parseArcCreate(committed).arc;
+  }
+  const crit = committed.search(/^\s*(?:\*\*|#+\s*)?CRITIQUE\s*:?/mi);
+  return (crit >= 0 ? committed.slice(0, crit) : committed)
+    .replace(/^\s*(?:\*\*|#+\s*)?ARC\s*\d\s*:?\**\s*/i, '')
+    .trim();
+}
+
 /**
  * arc_amend — the bake-off for repairing the arc in place.
  *
@@ -8874,7 +8951,9 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
   const report = storyData.arcReviewReport || {};
   // The committed block is what production handed the panel, verbatim. Without
   // it there is nothing to replay against and a reconstruction would not be the
-  // same input, so this fails rather than approximating.
+  // same input, so this fails rather than approximating. Stories from before
+  // 2026-09-24 store the two-arc block (no STORY LOGIC); it replays as stored,
+  // and the re-telling writes a logic block of its own.
   const committed = String(report.committed || '').trim();
   if (!committed) throw new Error('story has no stored arcReviewReport.committed block to replay');
 
@@ -8964,6 +9043,7 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
         elapsedMs: Date.now() - t,
         cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
         fixing: parsed.fixing, keeping: parsed.keeping, used: parsed.used,
+        logic: parsed.logic.text,
         finalArc: parsed.finalArc, critique: parsed.critique,
         maxSeverity: H.critiqueMaxSeverity(parsed.critique),
       };
@@ -9922,6 +10002,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
 
   const approvedArc = resolveReplayArc(storyData, { parseBeats });
   const arcHints = resolveReplayArcHints(storyData);
+  const centralFigure = resolveReplayCentralFigure(storyData);
 
   const checkModel = params.checkModel || MODEL_DEFAULTS.planCheckModel;
   const planModel = params.planModel || MODEL_DEFAULTS.outline;
@@ -9946,7 +10027,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
   // runCheck: the model call, its roster, the counters on that roster, and the
   // findings structured the way the re-plan and the round guard read them.
   const runCheckOn = async (pages, planText, usageLabel) => {
-    const prompt = buildPlanCheckPrompt(storyData, pages, approvedArc, planText, { arcHints });
+    const prompt = buildPlanCheckPrompt(storyData, pages, approvedArc, planText, { arcHints, centralFigure });
     if (!prompt) throw new Error('plan-check template unavailable');
     const res = await callTextModelStreaming(prompt, null, null, checkModel, {
       usageLabel,
@@ -9956,7 +10037,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
     const modelFindings = parsePlanCheck(res.text || '');
     const roster = parsePlanCheckRoster(res.text || '');
     const counters = runPlanCounters({
-      pages, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, roster,
+      pages, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, roster, centralFigure,
     });
     return {
       prompt, res, roster, counters,
@@ -9984,7 +10065,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
   });
   const coverageRule = require('./castCoverage').castCoverage({ pageCount, castCount: commission.listed.length });
   const replanSection = buildReplanSection(pagePlan, findings, { pageCount, keep });
-  const replanPrompt = buildBeatsPrompt(storyData, pageCount, { finalArc: approvedArc, arcHints, replan: replanSection });
+  const replanPrompt = buildBeatsPrompt(storyData, pageCount, { finalArc: approvedArc, arcHints, centralFigure, replan: replanSection });
   if (!replanPrompt) throw new Error('story-beats template unavailable');
   t = Date.now();
   const rpRes = await callTextModelStreaming(replanPrompt, null, null, planModel, { usageLabel: 'testlab_beats_replan' });

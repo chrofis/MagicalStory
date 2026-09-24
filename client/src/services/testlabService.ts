@@ -587,7 +587,9 @@ export const TESTLAB_STAGES = [
   // no output_config, so Opus 5 runs adaptive thinking at effort `high` and bills
   // it inside output_tokens — measured 30,674 output tokens against ~4,000 of
   // visible text. Same prompt each arm, judged by the arc judges.
-  { id: 'arc_effort', label: 'Arc effort sweep (create or retell; params model, efforts, stage, promptFrom — cost vs judged arc quality)', producesImage: false, overridable: true, storyLevel: true },
+  // challengesFromStory reuses the story's stored challenge draw with today's
+  // template; baselineFromStory scores the stored arcs with the same judges.
+  { id: 'arc_effort', label: 'Arc effort sweep (create or retell; params model, efforts, stage, promptFrom, challengesFromStory, baselineFromStory — cost vs judged arc quality)', producesImage: false, overridable: true, storyLevel: true },
   // Re-judge stored rounds with a DIFFERENT judge (params.scoreIds + params.judgeModel).
   // Nothing is rewritten — it measures the judge, so two judges' scores of the
   // identical text sit side by side on the Scores page.
