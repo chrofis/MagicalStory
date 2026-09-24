@@ -26,7 +26,7 @@ p5/p6 door in the rain, p3 Lukas too big, p1 object behind the boy, most pages f
 - [ ] **Plate geometry drops sentences > 240 chars** (`server/lib/sceneGeometry.js` ~173
       `if (s.length > 240) continue;`) — p10's "at night" sentence (247) was lost; an action
       clause leaked into the plate geometry instead. `sceneIntent` also carries no time of day.
-- [ ] **Writer/AD geography: an interior door placed outdoors.** Outline beat 4 drags the key
+- [x] **Writer/AD geography: an interior door placed outdoors.** (2026-09-24: arc PLACE rule + panel lens, AD one-place rule — Lab #1444 3/3 panelists flag it, #1451 keeps the two doors apart; decisions.md) Outline beat 4 drags the key
       drawer "outside to try every key on the door"; AD merged the tower front door and the
       reading-room door into one outdoor LOC002. No check catches interior/exterior contradictions.
 - [ ] **Semantic judge contradicts the VB reference** (p6 "pliers instead of nutcracker" — the VB

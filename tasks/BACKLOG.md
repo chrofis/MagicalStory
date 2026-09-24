@@ -55,7 +55,7 @@ Last full sweep: **2026-09-06**.
 - [x] Location reference cells drawn as isolated objects (kitchen = miniature on plinth, door with no wall) → tasks/lukas-story-diagnosis-2026-09-23.md:15
 - [ ] Shared vantage plate hands its representative page's weather/time to every page (rain on p4-p6) → tasks/lukas-story-diagnosis-2026-09-23.md:20
 - [ ] Plate geometry skips sentences > 240 chars ("at night" lost); sceneIntent has no time of day → tasks/lukas-story-diagnosis-2026-09-23.md:24
-- [ ] Writer/AD put an interior door outdoors; no interior/exterior contradiction check → tasks/lukas-story-diagnosis-2026-09-23.md:27
+- [x] Writer/AD put an interior door outdoors; no interior/exterior contradiction check (2026-09-24: ARC_PLACE_RULE + panel PLACE lens, AD one-place rule; decisions.md) → tasks/lukas-story-diagnosis-2026-09-23.md:27
 - [ ] Judge contradicts VB reference ("pliers") + consolidator escalates severity MAJOR→CATASTROPHIC → tasks/lukas-story-diagnosis-2026-09-23.md:30
 - [ ] Text refinement runs after images; audit compares new words to old pictures → tasks/lukas-story-diagnosis-2026-09-23.md:33
 - [ ] Scene review deletes a page's "no figures" instruction (p7 empty page lost its emptiness) → tasks/lukas-story-diagnosis-2026-09-23.md:36

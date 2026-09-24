@@ -62,6 +62,21 @@ corrects `states[]`), so the fault shipped.
 two places share one plate, every page of them is drawn on the wrong backdrop and no later stage can
 separate them.
 
+**Validation (rung 2, staging Test Lab, the prod story copied to staging):**
+- `arc_panel_replay` #1444 (#1439 was reaped mid-run by another session's deploy) on the stored
+  committed arc, the three production panelists: **3 of 3 now flag sentence 4** (grok-4.6 "Sophie
+  works the door from outdoor leaves while Lukas later lies on an interior floor at the same door";
+  deepseek-v4-pro "PLACE — MAJOR MISSED ISSUE … an inside door … spill lands on outside ground";
+  gpt-5.6-luna-pro M1 "whether the reading-room door opens from the tower interior or the yard").
+  Production's panel on the same arc: 0 of 3. $0.11.
+- `beats_scenes` #1451 (stored plan lines p1-p6, no scene review, gemini-3.1-pro as in production):
+  the front door (p2) is now its own `LOC003 "Tower Main Entrance"`, apart from the reading-room door
+  `LOC002` (p4-p6, three vantages). Production merged them into one LOC002. **Partial on the inside
+  half:** LOC002 stays `outdoor` and p5 lies "on the cold stone" in front of the door — the stored p4
+  plan line itself says "on the step outside the reading-room door … wet leaves", and the plan line is
+  the Art Director's authority. The contradiction is authored in the arc, which the PLACE lens now
+  catches before the planner sees it. $0.26.
+
 **Touched:** `server/lib/promptBuilders.js` (`ARC_PLACE_RULE`, `PLACE_SEPARATE_RULE`,
 `PLACE_INSIDE_OUTSIDE_RULE`, telling rules, panel / arc-review / both Art Director builders),
 `prompts/arc-panel.txt`, `prompts/story-arc-review.txt`, `prompts/scene-expansion-all.txt`,
