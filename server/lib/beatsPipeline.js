@@ -110,9 +110,9 @@ const {
   buildReplanSection,
   parsePlanChanges,
   replanRank,
-  convergenceMustFixCount,
   countsTowardConvergence,
   replanRoundConverged,
+  replanRoundRegressed,
   findingPages,
   buildClothingReviewPrompt,
   parseClothingReview,
@@ -1530,7 +1530,6 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // ultra-wide finding fell.
       let bestBeats = beats;
       let bestPagePlan = pagePlan;
-      let bestMustFix = convergenceMustFixCount(check1);
       // The review's refusals from the round before, told to the next round.
       let lastRefusals = [];
       const coverageRule = castCoverage({ pageCount: beats.length, castCount: commission.listed.length });
@@ -1793,23 +1792,33 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         // The subset the round-keeping decision is made on: cast/focal only.
         const stillConverging = stillMustFix.filter(countsTowardConvergence);
         const shotOnly = stillMustFix.length - stillConverging.length;
-        if (stillConverging.length >= bestMustFix && round > 1) {
-          const detail = `cast/focal must-fix ${bestMustFix} → ${stillConverging.length}`
+        // THE GUARD — every round, round 1 included (owner, 2026-09-24). Until
+        // then `&& round > 1` exempted round 1, and 8 of 32 stored books shipped
+        // a round-1 division with MORE cast/focal must-fix findings than the
+        // division it replaced (job_1790100385959_1nitlympp: 5 → 7). A round
+        // that regresses is discarded on any round; a round 2+ must also reduce
+        // (it is bought only to mop up). See `replanRoundRegressed` for the
+        // measure, which sets aside a model verdict that flips on a page the
+        // round never touched.
+        const verdict = replanRoundRegressed(pendingCheck, check2, changedThisRound, { round });
+        if (verdict.discard) {
+          const noiseNote = verdict.noise.length ? `, ${verdict.noise.length} checker verdict(s) on untouched pages set aside` : '';
+          const detail = `cast/focal must-fix ${verdict.before} → ${verdict.after}${noiseNote}`
             + ` (${stillMustFix.length} must-fix in total, ${shotOnly} of them shot-distribution, which do not count toward convergence)`;
-          log.warn(`⚠️ [BEATS] Round ${round} did not reduce the cast/focal must-fix count (${detail}) — discarding it, the previous division stands`);
-          gl.warn('beats_replan_discarded', `Round ${round} did not reduce the cast/focal must-fix count (${detail}) — the round was discarded and the previous division stands`, null, {
-            round, before: bestMustFix, after: stillConverging.length,
+          const what = verdict.regressed ? 'raised' : 'did not reduce';
+          log.warn(`⚠️ [BEATS] Round ${round} ${what} the cast/focal must-fix count (${detail}) — discarding it, the previous division stands`);
+          gl.warn('beats_replan_discarded', `Round ${round} ${what} the cast/focal must-fix count (${detail}) — the round was discarded and the previous division stands`, null, {
+            round, before: verdict.before, after: verdict.after, noise: verdict.noise.map(f => f.line),
             totalMustFixAfter: stillMustFix.length, shotMustFixAfter: shotOnly,
           });
           roundRecord.kept = false;
-          roundRecord.discardReason = `did not reduce the cast/focal must-fix count (${detail})`;
+          roundRecord.discardReason = `${what} the cast/focal must-fix count (${detail})`;
           beats = bestBeats;
           pagePlan = bestPagePlan;
           break;
         }
         bestBeats = beats;
         bestPagePlan = pagePlan;
-        bestMustFix = stillConverging.length;
         if (stillMustFix.length === 0) break;
         // A FURTHER ROUND MUST BE MOPPING UP, NOT RE-ROLLING (2026-09-21).
         //

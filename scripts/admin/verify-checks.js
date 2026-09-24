@@ -171,6 +171,30 @@ checks.aerialNotOwed = (ctx) => {
   return { covered: true, pass: true, detail: `planner prompt names no aerial floor, no SHOT_AERIAL_COUNT finding; ${info}` };
 };
 
+/** replan-round-1-regression — no KEPT re-plan round raised the cast/focal must-fix count. */
+checks.replanRoundNeverRegresses = (ctx) => {
+  const b = ctx.data?.beatsReviewReport;
+  if (!b) return notCovered('no beats plan report stored');
+  const discarded = Array.isArray(b.discardedRounds) ? b.discardedRounds : [];
+  const kept = Array.isArray(b.replanPrompts) ? b.replanPrompts.map(e => e.round) : [];
+  if (!kept.length && !discarded.length) return notCovered('no re-plan round ran');
+  const { replanRoundRegressed } = require('../../server/lib/promptBuilders');
+  const structured = rec => [
+    ...(rec?.counterFindings || []).map(line => ({ kind: 'counter', code: (/^PLAN\[([A-Z_0-9]+)\]/.exec(String(line)) || [])[1], line })),
+    ...(rec?.modelFindings || []).map(f => ({ kind: 'check', check: f.check, line: `CHECK[${f.check}]: ${f.text}` })),
+  ];
+  const fired = discarded.filter(d => /raised the cast\/focal must-fix count/.test(String(d.reason || '')));
+  // Only a single kept round can be re-measured from the row: the report keeps
+  // the first check and the LAST kept round's recheck.
+  if (kept.length === 1 && b.recheck) {
+    const v = replanRoundRegressed({ findings: structured(b) }, { findings: structured(b.recheck) }, b.changedPages || [], { round: 1 });
+    if (v.regressed) return { covered: true, pass: false, detail: `round 1 was KEPT with cast/focal must-fix ${v.before} → ${v.after}` };
+    return { covered: true, pass: true, detail: `round 1 kept at cast/focal must-fix ${v.before} → ${v.after}${fired.length ? `; guard discarded round(s) ${fired.map(d => d.round).join(', ')}` : ''}` };
+  }
+  if (fired.length) return { covered: true, pass: true, detail: `the guard discarded round(s) ${fired.map(d => d.round).join(', ')}: ${trunc(fired[0].reason, 120)}` };
+  return notCovered(`${kept.length} kept round(s), ${discarded.length} discarded for other reasons — nothing the guard judged`);
+};
+
 /** 1d4f1bcf1 + 67c617743 — unrequested lettering becomes a lettering-check finding. */
 checks.letteringFindings = (ctx) => {
   const ps = pages(ctx);

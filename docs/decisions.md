@@ -40,6 +40,74 @@ sentence band or to the shape cannot make the two contradict each other.
 
 ---
 
+## 2026-09-24 — Every re-plan round faces the regression guard, round 1 included; a checker verdict that flips on an untouched page is set aside (SUPERSEDES the `round > 1` exemption of 2026-09-20)
+
+**Context:** Owner, 2026-09-24, asked how often the page plan's re-plan makes the plan worse: *"That
+is a serious defect and must be fixed."* The 2026-09-20 convergence entry says "a round that raises
+the cast/focal count is discarded", but the code read `>= bestMustFix && round > 1`, so round 1 could
+never be discarded; its own "Not changed" paragraph left that to the owner, and the 2026-09-23 audit
+corrections (item 5, audit 02 W4) recorded staging `job_1790100385959_1nitlympp` shipping a round 1
+that took the cast/focal must-fix count 5 → 7.
+
+**Measured (rung 1, zero paid calls)** over every stored `beatsReviewReport` with a round-1 recheck on
+staging AND prod — 31 distinct books (34 rows; two prod stories also live on staging), 2026-09-06 to
+2026-09-22 CH, all before today's page-plan fixes (4b708f0cd, 094052d45; no post-fix story exists yet):
+
+| round 1, cast/focal must-fix (current scoring) | books |
+|---|---|
+| **higher than the first check — and shipped** | **8 (26%)** |
+| equal | 6 |
+| lower | 17 |
+
+By class across all 34 rows (count up / same / down per book): focal 8/7/13, Q4 wanted picture 4/8/8,
+Q8 ending 5/9/5, cast (NO_COMMISSIONED) 4/18/6, peopleless 4/11/3. 30 of 34 rechecks mint at least one
+cast/focal must-fix the first check did not raise. Of the 71 minted findings, **56 name a page the
+round re-planned, 11 are whole-book** (NO_PEOPLELESS_PAGE, NO_FOCAL_PAGE — the swap moved the gap to
+someone else) **and 4 name only pages the round never touched** — the checker disagreeing with itself.
+Of the minted findings on re-planned pages (distinct books), 22 of 48 fall on shapes today's keep-list already protects
+(the last page, a character's only focal page; WANTED/ACTION pages cannot be measured on rows older than
+2026-09-23), and the largest remaining class is a page rewritten into an establishing shot that empties
+it of every commissioned character (NO_COMMISSIONED_ON_PAGE 11, MAIN_UNDER_HALF 5,
+UNDER_COVERED_CHARACTER 5). Round 2 ran on 4 books, all discarded; in one (`8ayo2w19e`) a Q8 ending
+finding fixed in round 1 reappeared in round 2. The check's roster of an untouched page drifted on
+**0 of 39** stored pages, so the counters (arithmetic over the roster) are stable between rounds; the
+model's Q4/Q8/Q12 verdicts are not.
+
+**Decision:**
+1. **The guard applies to every round.** `replanRoundRegressed(givenCheck, recheck, changedPages,
+   { round })` (promptBuilders.js) returns `discard` when the round ends with MORE cast/focal must-fix
+   findings than it was given — on any round, round 1 included — and, for a round 2+, also when it does
+   not reduce (unchanged: a later round is bought only to mop up). Round 1 may tie: it also answers the
+   shot and noted findings this measure deliberately does not count, and a book whose first check raised
+   no cast/focal must-fix starts at zero and can only tie. A discarded round 1 ships the first division,
+   which stays on the ledger exactly as any discarded round does (`discardedRounds`).
+2. **The stable measure.** Same scoring as the convergence test (`countsTowardConvergence`), with one
+   correction: a MODEL finding (plan-check question, no counter code) that names only pages the round
+   did not change, and appears in just one of the two checks, is left out of BOTH counts. Its plan
+   line is byte-identical in both checks, so its flip is checker noise, not the round's doing. Counter
+   findings always count (0/39 roster drift), and a finding naming no page always counts.
+3. **The Test Lab `beats_replan` stage behaves the same:** it now rechecks the applied division and
+   reports the same guard verdict (`report.guard`), with round-1 semantics. One extra plan-check call
+   per Lab run.
+
+**Replay of the stored rounds through the new guard:** 7 of 31 books would have discarded round 1 and
+shipped the first division; `1nitlympp` reads 5 → 6 (the Q4 on untouched page 16 is set aside) and is
+discarded; `riqncqg1i` reads raw 4 → 5 but its new Q4 names only untouched page 18, so 4 → 4 and round 1
+is kept.
+
+**Not changed:** the "no further round" gate (`replanRoundConverged`) and the per-change review. The
+establishing-shot class above is left to the guard until a post-fix story shows whether today's
+keep-list closes it (BACKLOG).
+
+**Touched:** `server/lib/promptBuilders.js` (`replanRoundRegressed`, export), `server/lib/storyHelpers.js`
+(facade), `server/lib/beatsPipeline.js` (the guard, `round > 1` removed, `bestMustFix` deleted),
+`server/lib/testlab.js` (`beats_replan` recheck + guard), `scripts/admin/verify-checks.js`
+(`replanRoundNeverRegresses`), `tasks/verify.json`,
+`tests/unit/replan-round-regression-guard.test.ts`.
+**Status:** ✅ active — staging.
+
+---
+
 ## 2026-09-24 — One place is one place: the arc keeps inside and outside apart, and the Art Director never folds two named places or an indoor page into one outdoor location
 
 **Context:** Prod `job_1790107559778_fcmlfa8kn`. The committed arc (sentence 4) had a child "carry the
@@ -53027,6 +53095,7 @@ is the open alternative, and is a prompt-side change the owner should see first.
 ## 2026-09-20 — The re-plan convergence test counts CAST/FOCAL must-fix findings, not the raw must-fix total
 
 > → corrected 2026-09-23 ("a round that raises the cast/focal count is discarded" holds for round 2+ only), see "2026-09-23 — Prompt audit of job_1790100385959: corrections to earlier entries", item 5.
+> → 🗄 the `round > 1` exemption is SUPERSEDED 2026-09-24: every round, round 1 included, is discarded when it raises the count — see "2026-09-24 — Every re-plan round faces the regression guard, round 1 included".
 
 **Context:** `beatsPipeline.js` decides whether to keep or discard a re-plan
 round by comparing must-fix counts before and after: `stillMustFix.length >=
@@ -57612,6 +57681,8 @@ to, and which prompts are not stored, is in `docs/prompt-inventory.md` ("What ea
    (beatsPipeline.js:1702): round 1 is never discarded, and a tie is. The entry's own "Not changed"
    paragraph discloses `round > 1` and leaves it to the owner. On run 6 round 1 raised cast/focal
    must-fix from 5 to 7 and shipped (audit 02 W4). Still an owner decision; nothing changed.
+   → Decided and fixed 2026-09-24 (owner: "must be fixed"): see "2026-09-24 — Every re-plan round
+   faces the regression guard, round 1 included".
 6. **"A wardrobe correction re-renders its avatar" (2026-09-15)** justifies the re-render as serving "a
    rare conflict". The `reconcile` kind (`checkWardrobeAgainstBible`, clothingCheck.js:653) fires
    whenever a `wornAs` element words a garment differently, even when it is the same garment. On run 6

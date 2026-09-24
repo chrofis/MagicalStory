@@ -1923,6 +1923,18 @@
       "fixedAt": "2026-09-24",
       "fixedIn": "c64661d60",
       "fix": "scoring.entityFindingsForPage is the one page reader of an entity report (root issues, characters + objects); entityIssuesForPage bills it, collectAllIssuesForPage lists it, and the evaluation-data route returns each page's entityIssuesForPage list, which the client shows instead of reading the report itself. Pinned by tests/unit/entity-findings-one-reader.test.ts; replayed over the stored back cover (list now has Julian's crop artefact, canonical score 85 unchanged)."
+    },
+    {
+      "id": "replan-round-1-kept-when-worse",
+      "title": "A page-plan re-plan round 1 that raised the cast/focal must-fix count was never discarded - the worse division shipped",
+      "reportedAt": "2026-09-24",
+      "source": "Owner, 2026-09-24: 'That is a serious defect and must be fixed.' Staging job_1790100385959_1nitlympp: round 1 took the cast/focal must-fix count 5 -> 7 and shipped (audit docs/audits/prompt-audit-2026-09-23/02-page-plan.md W4). Measured over every stored round-1 recheck on staging and prod: 8 of 31 distinct books (26%) shipped a round 1 that raised the count.",
+      "rootCause": "beatsPipeline.js discarded a round only when `stillConverging.length >= bestMustFix && round > 1`; the `round > 1` clause exempted round 1, so the convergence test could never fire on it. The comparison also counted a plan-check verdict that flipped on a page the round never touched (checker noise) as the round's doing.",
+      "impact": "One book in four shipped a page division with more cast/focal must-fix findings than the division it replaced: lost focal pages, a commissioned character missing from a page, the ending's wanted picture gone.",
+      "status": "fixed",
+      "fixedAt": "2026-09-24",
+      "fixedIn": "pending",
+      "fix": "promptBuilders.replanRoundRegressed is the one guard: every round, round 1 included, is discarded when it ends with more cast/focal must-fix findings than it was given (a round 2+ must also reduce, unchanged); a model finding naming only untouched pages that appears in just one of the two checks is set aside on both sides. The Test Lab beats_replan stage rechecks and applies the same guard. Replayed free over the stored rounds: 7 of 31 books would have discarded round 1, including 1nitlympp (5 -> 6 after noise). Pinned by tests/unit/replan-round-regression-guard.test.ts."
     }
   ]
 }

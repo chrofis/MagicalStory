@@ -9854,7 +9854,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
   const {
     buildBeatsPrompt, buildPlanCheckPrompt, parsePlanCheck, parsePlanCheckRoster,
     parsePlanCheckObstacles, buildReplanSection, getHistoricalLocations, getHistoricalObjects,
-    parsePlanCheckWanted, parsePlanCheckActions, replanKeepPages,
+    parsePlanCheckWanted, parsePlanCheckActions, replanKeepPages, replanRoundRegressed,
   } = require('./promptBuilders');
   const { parseBeats } = require('./storyHelpers');
   const { runPlanCounters, collectPlaceNames } = require('./planCounters');
@@ -9903,25 +9903,35 @@ async function runBeatsReplanStage(target, { params = {} }) {
   const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
 
   // ── the plan check ────────────────────────────────────────────────────────
-  const checkPrompt = buildPlanCheckPrompt(storyData, standing, approvedArc, pagePlan, { arcHints });
-  if (!checkPrompt) throw new Error('plan-check template unavailable');
+  // One helper for the check and the recheck, shaped as beatsPipeline's
+  // runCheck: the model call, its roster, the counters on that roster, and the
+  // findings structured the way the re-plan and the round guard read them.
+  const runCheckOn = async (pages, planText, usageLabel) => {
+    const prompt = buildPlanCheckPrompt(storyData, pages, approvedArc, planText, { arcHints });
+    if (!prompt) throw new Error('plan-check template unavailable');
+    const res = await callTextModelStreaming(prompt, null, null, checkModel, {
+      usageLabel,
+      ...(TEXT_MODELS[checkModel]?.provider === 'anthropic' ? {} : { temperature: 0 }),
+    });
+    if (!String(res.text || '').trim()) throw new Error(`plan checker ${checkModel} returned an empty response — provider failure, not a result`);
+    const modelFindings = parsePlanCheck(res.text || '');
+    const roster = parsePlanCheckRoster(res.text || '');
+    const counters = runPlanCounters({
+      pages, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, roster,
+    });
+    return {
+      prompt, res, roster, counters,
+      findings: [
+        ...counters.findings.map((f, i) => ({ kind: 'counter', code: f.code, line: counters.lines[i] })),
+        ...modelFindings.map(f => ({ kind: 'check', check: f.check, line: `CHECK[${f.check}]: ${f.text}` })),
+      ],
+    };
+  };
   let t = Date.now();
-  const checkRes = await callTextModelStreaming(checkPrompt, null, null, checkModel, {
-    usageLabel: 'testlab_beats_replan_check',
-    ...(TEXT_MODELS[checkModel]?.provider === 'anthropic' ? {} : { temperature: 0 }),
-  });
-  if (!String(checkRes.text || '').trim()) throw new Error(`plan checker ${checkModel} returned an empty response — provider failure, not a result`);
+  const firstCheck = await runCheckOn(standing, pagePlan, 'testlab_beats_replan_check');
   const checkMs = Date.now() - t;
-  const modelFindings = parsePlanCheck(checkRes.text || '');
-  const roster = parsePlanCheckRoster(checkRes.text || '');
+  const { prompt: checkPrompt, res: checkRes, roster, counters, findings } = firstCheck;
   const obstacles = parsePlanCheckObstacles(checkRes.text || '');
-  const counters = runPlanCounters({
-    pages: standing, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, roster,
-  });
-  const findings = [
-    ...counters.findings.map((f, i) => ({ kind: 'counter', code: f.code, line: counters.lines[i] })),
-    ...modelFindings.map(f => ({ kind: 'check', check: f.check, line: `CHECK[${f.check}]: ${f.text}` })),
-  ];
   if (findings.length === 0) {
     throw new Error('the plan check raised no finding against this division — there is nothing for a re-plan to answer, so pick a story whose check fires');
   }
@@ -9954,23 +9964,46 @@ async function runBeatsReplanStage(target, { params = {} }) {
     keep,
   });
 
+  // ── the recheck and the round guard, as beatsPipeline runs them ───────────
+  // Production rechecks every round the corruption guards let through and
+  // discards one that raises the cast/focal must-fix count
+  // (`replanRoundRegressed`, round 1 semantics — this stage is one round). A
+  // round the guards already discarded, or one that changed nothing, is never
+  // rechecked there, so it is not rechecked here.
+  let recheck = null;
+  let guard = null;
+  let recheckMs = 0;
+  if (!verdict.discardReason && verdict.changedPagesApplied.length > 0) {
+    const appliedText = verdict.appliedPlan.map(pg => `Page ${pg.pageNumber}: ${pg.planLine}`).join('\n');
+    t = Date.now();
+    recheck = await runCheckOn(verdict.appliedPlan, appliedText, 'testlab_beats_replan_recheck');
+    recheckMs = Date.now() - t;
+    const g = replanRoundRegressed({ findings }, { findings: recheck.findings }, verdict.changedPagesApplied, { round: 1 });
+    guard = {
+      before: g.before, after: g.after, noise: g.noise.map(f => f.line),
+      kept: !g.discard,
+      discardReason: g.discard ? `raised the cast/focal must-fix count (${g.before} → ${g.after})` : null,
+    };
+  }
+
   const { appliedPlan, ...reportFields } = verdict;
+  const calls = [checkRes, rpRes, ...(recheck ? [recheck.res] : [])];
 
   return {
     storyId: target.storyId,
     pages: pageCount,
     models: { checkModel, checkModelId: checkRes.modelId || checkModel, planModel, planModelId: rpRes.modelId || planModel },
-    elapsedMs: checkMs + replanMs,
-    cost: costOf(checkRes) + costOf(rpRes),
+    elapsedMs: checkMs + replanMs + recheckMs,
+    cost: calls.reduce((a, r) => a + costOf(r), 0),
     usage: {
-      input_tokens: (checkRes.usage?.input_tokens || 0) + (rpRes.usage?.input_tokens || 0),
-      output_tokens: (checkRes.usage?.output_tokens || 0) + (rpRes.usage?.output_tokens || 0),
+      input_tokens: calls.reduce((a, r) => a + (r.usage?.input_tokens || 0), 0),
+      output_tokens: calls.reduce((a, r) => a + (r.usage?.output_tokens || 0), 0),
     },
-    note: `${verdict.passed}/${verdict.checks.length} plumbing checks pass — ${verdict.changesParsed} change(s) on ${verdict.changeLines} line(s), ${verdict.formatViolations.length} format violation(s), ${verdict.refusals.length} refusal(s) — ${verdict.noOp ? 'the round WOULD have been a no-op' : `${verdict.changedPagesApplied.length} page(s) survive to the book`}${verdict.discardReason ? ` (round discarded: ${verdict.discardReason})` : ''}`,
+    note: `${verdict.passed}/${verdict.checks.length} plumbing checks pass — ${verdict.changesParsed} change(s) on ${verdict.changeLines} line(s), ${verdict.formatViolations.length} format violation(s), ${verdict.refusals.length} refusal(s) — ${verdict.noOp ? 'the round WOULD have been a no-op' : `${verdict.changedPagesApplied.length} page(s) survive to the book`}${verdict.discardReason ? ` (round discarded: ${verdict.discardReason})` : ''}${guard ? ` — guard: cast/focal must-fix ${guard.before} → ${guard.after}, round ${guard.kept ? 'KEPT' : 'DISCARDED'}` : ''}`,
     // `report` is what the Lab renders for this stage (client TestLab.tsx).
     // The applied division travels beside it rather than inside: the rendered
     // block stays the verdict, not a second copy of the page plan.
-    report: reportFields,
+    report: { ...reportFields, guard, recheckFindings: recheck ? recheck.findings.map(f => f.line) : null },
     appliedPlan,
     standingPlan: standing,
     findings: findings.map(f => f.line),
@@ -9982,6 +10015,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
     checkPrompt,
     replanPrompt,
     checkRawResponse: (checkRes.text || '').slice(0, 40000),
+    recheckRawResponse: recheck ? (recheck.res.text || '').slice(0, 40000) : null,
     replanRawResponse: (rpRes.text || '').slice(0, 40000),
   };
 }
