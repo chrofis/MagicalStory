@@ -1019,14 +1019,17 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
           // it is mechanically fixable, so it must not charge severity points or
           // trigger a redraw (decisions.md 2026-08-06).
           garmentColourMismatches: [],
-          // The wardrobe state each page's brief declares for this character
-          // ({ [page]: [offIds] }, pages with a garment OFF only), from the
-          // same per-appearance stamp that keys the grids. scoring.js
-          // entityFindingsForPage reads it so a wardrobe finding judged in any
-          // other state costs nothing on that page (owner, 2026-09-24).
+          // The wardrobe state each page's brief declares for this character,
+          // for pages that take a garment OFF only: { [page]: { offIds, stateIds } }.
+          // offIds = the garments truly removed (wardrobeVariants.removedIdsForCharacter);
+          // stateIds = the page's whole grid key, which also holds any outfit
+          // VERSION it wears. A version-wearing page with nothing removed gets
+          // no entry. scoring.js offByDesignFinding reads it so a wardrobe
+          // finding judged in any other state costs nothing on that page
+          // (owner, 2026-09-24).
           declaredOffByPage: Object.fromEntries(appearances
-            .filter(a => Array.isArray(a.offIds) && a.offIds.length > 0)
-            .map(a => [a.pageNumber, a.offIds])),
+            .filter(a => Array.isArray(a.removedIds) && a.removedIds.length > 0)
+            .map(a => [a.pageNumber, { offIds: a.removedIds, stateIds: a.offIds || [] }])),
           overallConsistent: true,
           overallScore: 10,
           totalIssues: 0
@@ -2096,9 +2099,12 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
           continue;
         }
         const clothing = normalizeClothingCategory(rawClothing);
-        const { offIdsForCharacter } = require('./wardrobeVariants');
+        const { offIdsForCharacter, removedIdsForCharacter } = require('./wardrobeVariants');
         const { isOffForCharacter } = require('./wornItems');
         const offIds = offIdsForCharacter(charName, pageWornResolved);
+        // The garments this page truly takes OFF — offIds also carries an
+        // outfit version the page WEARS (same key algebra), which is no removal.
+        const removedIds = removedIdsForCharacter(charName, pageWornResolved);
         // The garments' own declared names, for the judge's clothing context.
         const offItemNames = offIds.length === 0 ? [] : pageWornResolved
           .filter(r => offIds.includes(String(r.id).toUpperCase()) && isOffForCharacter(r, charName))
@@ -2136,6 +2142,7 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
           // or a reference sheet.
           offIds,
           ...(offItemNames.length > 0 && { offItemNames }),
+          removedIds,
           confidence,
           // Stamp which bytes these boxes belong to — char repair verifies
           // this before applying a stored appearance box to a page image
