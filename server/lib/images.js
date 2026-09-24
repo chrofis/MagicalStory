@@ -994,17 +994,22 @@ function sectionAwareCut(prompt, maxLen, logLabel) {
     // (owner, 2026-08-17): the head is written in reading order, so slicing at
     // a byte offset deletes the LAST-described characters outright while the
     // evaluator still scores the render against a contract they were cut from.
-    const objIdx = out.indexOf('**REQUIRED OBJECTS');
-    const tailStart = objIdx >= 0 ? objIdx : out.indexOf('**ART STYLE');
+    const tailStart = protectedTailStart(out);
     if (tailStart < 0) {
+      // Not an image prompt (the Grok edit body, the composite blend): no
+      // section markers, nothing must-keep to protect.
       const truncated = truncatePromptForModel(out, maxLen, logLabel);
       return { text: truncated, dropped, proseCut: out.length - truncated.length };
     }
     const tail = out.slice(tailStart);
     const headBudget = maxLen - tail.length - 5;
     if (headBudget < 500) {
-      const truncated = truncatePromptForModel(out, maxLen, logLabel);
-      return { text: truncated, dropped, proseCut: out.length - truncated.length };
+      // The MUST-KEEP tail alone leaves no room for the scene. A blunt cut here
+      // would delete must-keep text (it used to: truncatePromptForModel sliced
+      // the end off, ART STYLE first). Fail the render instead (owner,
+      // 2026-09-23: must-keep sections are never cut; if it cannot fit, fail
+      // loudly).
+      throw new Error(`prompt-shrink [${logLabel}]: ${out.length} chars after every drop, cap ${maxLen}; the must-keep sections alone are ${tail.length} chars — refusing to cut them`);
     }
     let head = out.slice(0, tailStart);
     const keep = head.slice(0, headBudget);
@@ -1022,13 +1027,31 @@ function sectionAwareCut(prompt, maxLen, logLabel) {
 }
 
 /**
+ * THE MUST-KEEP SECTIONS. Everything from the first of these to the end of the
+ * prompt is the protected tail: the shrink never trims into it, and fails
+ * loudly rather than cut it (sectionAwareCut). REQUIRED OBJECTS and ART STYLE
+ * were the only two markers until 2026-09-23, so a prompt with no REQUIRED
+ * OBJECTS block — every full-path cover — had its tail start at ART STYLE, and
+ * the last-resort prose trim ate KEY STORY ELEMENTS, SEASON and COMPOSITION
+ * GUIDELINES first, because the template places them just before ART STYLE:
+ * staging job_1789853503332_riqncqg1i's back cover shipped with all three gone
+ * (owner, 2026-09-23: those three are must-keep on every cover path).
+ */
+const MUST_KEEP_MARKERS = ['**REQUIRED OBJECTS', '**KEY STORY ELEMENTS:**', '**SEASON:**', '**COMPOSITION GUIDELINES:**', '**ART STYLE'];
+
+/** Index where the protected tail begins (the earliest must-keep marker), or -1. */
+function protectedTailStart(prompt) {
+  const hits = MUST_KEEP_MARKERS.map(m => prompt.indexOf(m)).filter(i => i >= 0);
+  return hits.length ? Math.min(...hits) : -1;
+}
+
+/**
  * The scene block of a prompt: everything strictly before the protected tail
- * (`**REQUIRED OBJECTS` / `**ART STYLE`). Returns '' when there is no tail
- * marker, so a caller can tell "no scene block found" from a real one.
+ * (protectedTailStart). Returns '' when there is no tail marker, so a caller
+ * can tell "no scene block found" from a real one.
  */
 function sceneHeadOf(prompt) {
-  const o = prompt.indexOf('**REQUIRED OBJECTS');
-  const tailStart = o >= 0 ? o : prompt.indexOf('**ART STYLE');
+  const tailStart = protectedTailStart(prompt);
   return tailStart > 0 ? prompt.slice(0, tailStart).trim() : '';
 }
 

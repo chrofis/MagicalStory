@@ -58510,3 +58510,41 @@ page rewritable. Applies to every finding category, not only STYLE. No audit-sid
 **Rationale:** The judgement belongs to the stage that holds the full context; audit precision stops being a
 rewrite risk.
 **Touched:** prompts/text-refine.txt, tests/unit/text-style-rulebook.test.ts.
+
+## 2026-09-23 — KEY STORY ELEMENTS, SEASON and COMPOSITION GUIDELINES are must-keep in the prompt shrink
+
+**Context.** The shrink (`images.shrinkPromptForModel` → `sectionAwareCut`) protects a TAIL verbatim and
+pays for an over-cap prompt out of the head: first by the ranked, exact-text drop units (2026-09-21 /
+769c655ff), then — last resort — by trimming the head's END at a sentence boundary. The tail began at
+`**REQUIRED OBJECTS`, or at `**ART STYLE` when a prompt has none. Full-path covers have no REQUIRED OBJECTS
+block, and `image-generation.txt` places `{VISUAL_BIBLE}` (KEY STORY ELEMENTS), `{SEASON_NOTE}` and
+`{COVER_COMPOSITION}` directly before ART STYLE — i.e. at the very end of the trimmable head, the first text
+the last-resort trim removes. Staging `job_1789853503332_riqncqg1i`'s back cover shipped with all three gone
+(stored sent prompt 7,880 chars; its animal survived only as "holds the Zippi"). The comment above the drop
+list already said the season was "not droppable at all"; the trim did not honour it.
+
+**Decision (owner-approved).**
+1. `MUST_KEEP_MARKERS` = REQUIRED OBJECTS, KEY STORY ELEMENTS, SEASON, COMPOSITION GUIDELINES, ART STYLE; the
+   protected tail starts at the EARLIEST one present (`protectedTailStart`), on every prompt. Pages with a
+   REQUIRED OBJECTS block are byte-identical (it already came first); the change reaches full-path covers
+   (streaming, iterate, regeneration) and pages without REQUIRED OBJECTS, whose season is now protected.
+2. Lower-value text still goes first and in the same order — the ranked drop units, then the sentence-boundary
+   trim of the scene prose — and never reaches into the tail, by construction.
+3. **Fail loudly.** When the must-keep tail alone leaves under 500 chars for the scene, the shrink THROWS
+   instead of the old blunt `truncatePromptForModel` slice (which cut from the end — ART STYLE first). The
+   render fails; nothing ships with its must-keep sections cut. Non-image prompts with no section marker (Grok
+   edit body, composite blend) keep the plain truncation.
+4. `sceneHeadOf` (the `compressedScene` the batch eval judges against) uses the same boundary, so it is the
+   scene block alone, never the must-keep sections.
+5. The "a drop removes its own block" guard is untouched: the drop units still remove only their exact text,
+   and none of them contains a must-keep marker.
+
+**Validation.** Rung 1: the back cover of staging `job_1789853503332_riqncqg1i` rebuilt with the real builders
+(9,326 chars against grok-imagine-image-2.0's 7,900 cap) → 7,774 chars, drops only (COUNTS, two Composition
+bullets, DEPTH AND SIZE), KEY STORY ELEMENTS / SEASON / COMPOSITION GUIDELINES / ART STYLE / the cast / the
+animal all present. Prod trial `job_1790169018278_n57xpnufo` front cover rebuilt (9,149) → 7,595 at the cap and
+5,499 at a forced 6,000 cap, all must-keep sections present. Unit: `tests/unit/cover-shrink-must-keep.test.ts`
+(prose trimmed, must-keep whole; tail too large → throws; REQUIRED OBJECTS prompts unchanged).
+
+**Touched:** `server/lib/images.js`, `tests/unit/cover-shrink-must-keep.test.ts`.
+**Status:** ✅ active on staging.
