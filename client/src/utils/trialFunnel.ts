@@ -15,7 +15,7 @@
 const VISIT_KEY = 'trial_visit_id';
 const ATTR_KEY = 'trial_visit_attribution';
 
-/** Steps must match TRIAL_FUNNEL_STEPS in server/routes/trial.js. */
+/** Steps must match TRIAL_FUNNEL_STEPS in server/routes/trial.js (pinned by tests/unit/trial-funnel-steps.test.ts). */
 export type TrialStep =
   | 'landing'
   | 'intro_start'
@@ -36,6 +36,22 @@ export type TrialStep =
   | 'email_submitted'
   /** Terminal: a real account exists, via either auth method (meta.method). */
   | 'account_created';
+
+/**
+ * Site-visit events for AD-TAGGED arrivals, recorded on whatever page the ad lands on. Deliberately NOT
+ * trial funnel steps: the funnel's baseline is `landing` (/try opened), and these happen before and
+ * mostly without it. Must match SITE_VISIT_STEPS in server/routes/trial.js.
+ *
+ * Why (owner, 2026-09-24): Google reported 3 paid clicks and none reached /try — and a visitor who reads
+ * the landing page and leaves wrote no row at all, so "the page never loaded", "left in 2 seconds" and
+ * "read for a minute and left" were indistinguishable. Those call for opposite fixes (the click / the ad
+ * match / the page), and dwell time is readable after a dozen clicks where trial counts need hundreds.
+ */
+export type SiteVisitStep =
+  /** A page opened with campaign tags or a gclid in its URL. meta.bootMs = ms from navigation start. */
+  | 'site_arrival'
+  /** First time that visit hid or left the page. meta.seconds on site, meta.pages viewed. */
+  | 'site_exit';
 
 interface Attribution {
   utmSource?: string;
@@ -115,10 +131,22 @@ export function captureAttribution(): Attribution {
     }
   } catch { /* fall through and re-derive */ }
 
-  let attribution: Attribution = {};
+  const attribution = attributionFromUrl();
+  try {
+    // Persist only once there is something worth attributing, so an untagged
+    // first pageview cannot poison a later tagged one.
+    if (isTagged(attribution)) {
+      localStorage.setItem(ATTR_KEY, JSON.stringify(attribution));
+    }
+  } catch { /* storage blocked — the events still send, just unattributed */ }
+  return attribution;
+}
+
+/** The attribution THIS page's URL carries (not the stored one). */
+function attributionFromUrl(): Attribution {
   try {
     const params = new URLSearchParams(window.location.search);
-    attribution = {
+    return {
       utmSource: params.get('utm_source') || undefined,
       utmMedium: params.get('utm_medium') || undefined,
       utmCampaign: params.get('utm_campaign') || undefined,
@@ -126,13 +154,14 @@ export function captureAttribution(): Attribution {
       gclid: params.get('gclid') || undefined,
       referrer: document.referrer || undefined,
     };
-    // Persist only once there is something worth attributing, so an untagged
-    // first pageview cannot poison a later tagged one.
-    if (attribution.utmSource || attribution.gclid) {
-      localStorage.setItem(ATTR_KEY, JSON.stringify(attribution));
-    }
-  } catch { /* storage blocked — the events still send, just unattributed */ }
-  return attribution;
+  } catch {
+    return {};
+  }
+}
+
+/** The one rule for "this identifies a source": a UTM source or a Google click id. */
+function isTagged(a: Attribution): boolean {
+  return Boolean(a.utmSource || a.gclid);
 }
 
 /**
@@ -146,6 +175,10 @@ export function captureAttribution(): Attribution {
  *   typed, and never the child's name.
  */
 export function trackTrialStep(step: TrialStep, meta?: Record<string, unknown>): void {
+  sendEvent(step, meta);
+}
+
+function sendEvent(step: TrialStep | SiteVisitStep, meta?: Record<string, unknown>): void {
   try {
     const attribution = captureAttribution();
     const payload = JSON.stringify({
@@ -181,4 +214,49 @@ export function trackTrialStep(step: TrialStep, meta?: Record<string, unknown>):
       body: payload,
     }).catch(() => {});
   } catch { /* never let measurement break the wizard */ }
+}
+
+// ── Site visits (ad-tagged arrivals) ──────────────────────────────────────────────────────────────────
+let siteVisit: { startedAt: number; pages: number; lastPath: string; exited: boolean } | null = null;
+
+/**
+ * Call once at app mount (App.tsx). Captures attribution as before; if THIS page's URL carries a campaign
+ * tag or a gclid, records `site_arrival` and arms a one-shot `site_exit` for when the visitor hides or
+ * leaves the page. Untagged visits record nothing here — the scope is "what did the ad click do".
+ *
+ * `site_exit` fires on the FIRST hide: on a phone, switching apps counts as leaving. That is the standard
+ * beacon definition of a visit's end, and it is the only moment a mobile browser reliably lets us send.
+ * The server keeps one row per (visit, step), so a repeat ad click from the same browser on a later day
+ * keeps the first visit's rows.
+ */
+export function startSiteVisitTracking(): void {
+  captureAttribution();
+  try {
+    if (siteVisit || !isTagged(attributionFromUrl())) return;
+    siteVisit = { startedAt: Date.now(), pages: 1, lastPath: window.location.pathname, exited: false };
+    sendEvent('site_arrival', { bootMs: Math.round(performance.now()) });
+
+    const exit = () => {
+      if (!siteVisit || siteVisit.exited) return;
+      siteVisit.exited = true;
+      sendEvent('site_exit', {
+        seconds: Math.round((Date.now() - siteVisit.startedAt) / 1000),
+        pages: siteVisit.pages,
+      });
+    };
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') exit(); });
+    window.addEventListener('pagehide', exit);
+  } catch { /* never let measurement break the page */ }
+}
+
+/**
+ * Count a client-side route change toward the tagged visit's page total (called from RouteTracker).
+ * Counts a page only when the PATH changes, so it does not depend on whether RouteTracker's first effect
+ * runs before or after tracking starts (React runs a child's effect before its parent's), and a query-string
+ * change on the same page is not a new page.
+ */
+export function noteSiteNavigation(pathname: string): void {
+  if (!siteVisit || siteVisit.exited || pathname === siteVisit.lastPath) return;
+  siteVisit.pages += 1;
+  siteVisit.lastPath = pathname;
 }
