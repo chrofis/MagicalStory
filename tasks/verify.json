@@ -329,7 +329,9 @@
     {
       "id": "plan-check-ots-contact",
       "title": "The plan check flags an over-the-shoulder page on a contact beat, and the re-plan gives it another shot",
-      "commits": [],
+      "commits": [
+        "8559c9afa"
+      ],
       "addedAt": "2026-09-24",
       "claim": "An over-the-shoulder page on a contact beat is flagged by plan-check question 14 and replanned: no shipped over-the-shoulder page has an interaction with hands:true on its near figure.",
       "runShape": [
