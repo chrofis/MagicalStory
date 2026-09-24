@@ -812,10 +812,13 @@ router.post('/generate-story-ideas', authenticateToken, storyIdeasLimiter, async
     const idea1 = idea1Match ? idea1Match[1].trim() : '';
     const idea2 = idea2Match ? idea2Match[1].trim() : '';
 
-    // If parsing failed, treat the whole response as a single idea
-    const storyIdeas = (idea1 && idea2)
-      ? [idea1, idea2]
-      : [responseText];
+    // No parsable final ideas = no ideas. The raw response is the model's
+    // draft/review working text and never goes to the customer (2026-09-24).
+    if (!idea1 || !idea2) {
+      log.error(`  Idea response has no parsable final ideas (${responseText.length} chars) - not sent`);
+      return res.status(502).json({ error: 'Failed to generate story ideas' });
+    }
+    const storyIdeas = [idea1, idea2];
 
     log.debug(`  Generated ${storyIdeas.length} idea(s)`);
 
@@ -853,6 +856,62 @@ router.post('/generate-story-ideas', authenticateToken, storyIdeasLimiter, async
     res.status(500).json({ error: err.message || 'Failed to generate story ideas' });
   }
 });
+
+// The [FINAL] section of one idea response, or null when there is none.
+//
+// IMPORTANT: Uses the LAST [FINAL] marker, not the first. The LLM
+// sometimes writes "[FINAL]" inside the [REVIEW] section (e.g. mentioning
+// "the [FINAL] instructions" while explaining its own process), which
+// used to make the parser grab from the first mention all the way to EOF
+// — pulling in the tail of the review, a literal second [FINAL] header,
+// and then the actual story. Taking the last marker gives us the real
+// final section since the prompt structure is [DRAFT] → [REVIEW] → [FINAL].
+function parseIdeaFinal(text) {
+  const matches = [...String(text || '').matchAll(/\[FINAL\]\s*/gi)];
+  if (matches.length === 0) return null;
+  const lastMatch = matches[matches.length - 1];
+  let result = text.slice(lastMatch.index + lastMatch[0].length).trim();
+  // Strip Claude extended thinking artifacts that may leak into output
+  result = result.replace(/<budget:[^>]*>[\s\S]*?<\/budget:[^>]*>/gi, '').trim();
+  result = result.replace(/<[a-z_]+:[^>]*>[\s\S]*?<\/[a-z_]+:[^>]*>/gi, '').trim();
+  return result || null;
+}
+
+// One idea arm of the streaming endpoint. The model writes
+// [DRAFT] -> [REVIEW] -> [FINAL]; only the [FINAL] section is ever sent to the
+// browser, as ONE `story<N>` event once the call returns. The draft and review
+// are working notes: streaming them into the editable idea box showed
+// customers the model's scratch text until the final replaced it (owner report
+// 2026-09-24). While the call runs, SSE comment lines keep the connection and
+// the client's idle timeout alive without carrying any text. No [FINAL]
+// section = no idea: the arm sends an error event, never the raw response.
+// Resolves (never rejects) with what the call produced, for the funnel record.
+function streamIdeaArm({ arm, prompt, res, callStreaming, model }) {
+  const key = `story${arm + 1}`;
+  let fullText = '';
+  let lastPing = 0;
+  return callStreaming(prompt, null, (delta, text) => {
+    fullText = text;
+    if (text.length > lastPing + 200) {
+      res.write(': generating\n\n');
+      lastPing = text.length;
+    }
+  }, model).then((streamResult) => {
+    const finalContent = parseIdeaFinal(fullText);
+    if (finalContent) {
+      res.write(`data: ${JSON.stringify({ [key]: finalContent, isFinal: true })}\n\n`);
+      log.debug(`  Idea ${arm + 1} final: ${finalContent.length} chars`);
+    } else {
+      log.error(`  Idea ${arm + 1}: response has no [FINAL] section (${fullText.length} chars) - not sent`);
+      res.write(`data: ${JSON.stringify({ error: `Idea ${arm + 1} has no final text` })}\n\n`);
+    }
+    return { fullText, usage: streamResult?.usage || null, modelId: streamResult?.modelId || null };
+  }).catch((err) => {
+    log.error(`  Idea ${arm + 1} generation failed:`, err.message);
+    res.write(`data: ${JSON.stringify({ error: `Failed to generate story idea ${arm + 1}` })}\n\n`);
+    return { fullText, usage: null, modelId: null };
+  });
+}
 
 // SSE Streaming endpoint for story ideas - streams each story as it completes
 router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter, async (req, res) => {
@@ -951,26 +1010,6 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
 
     log.debug(`  Using model: ${modelToUse}${ideaModel && req.user.role === 'admin' ? ' (admin override)' : ' (default)'}`);
 
-    // Helper function to parse [FINAL] from streaming text.
-    //
-    // IMPORTANT: Uses the LAST [FINAL] marker, not the first. The LLM
-    // sometimes writes "[FINAL]" inside the [REVIEW] section (e.g. mentioning
-    // "the [FINAL] instructions" while explaining its own process), which
-    // used to make the parser grab from the first mention all the way to EOF
-    // — pulling in the tail of the review, a literal second [FINAL] header,
-    // and then the actual story. Taking the last marker gives us the real
-    // final section since the prompt structure is [DRAFT] → [REVIEW] → [FINAL].
-    const parseFinal = (text) => {
-      const matches = [...text.matchAll(/\[FINAL\]\s*/gi)];
-      if (matches.length === 0) return null;
-      const lastMatch = matches[matches.length - 1];
-      let result = text.slice(lastMatch.index + lastMatch[0].length).trim();
-      // Strip Claude extended thinking artifacts that may leak into output
-      result = result.replace(/<budget:[^>]*>[\s\S]*?<\/budget:[^>]*>/gi, '').trim();
-      result = result.replace(/<[a-z_]+:[^>]*>[\s\S]*?<\/[a-z_]+:[^>]*>/gi, '').trim();
-      return result;
-    };
-
     // Resolve which world each idea plays in (null = legacy split, no labels)
     const ideaWorlds = resolveIdeaWorlds({ storyCategory, storyTheme, location: locationForPrompt, worldMode });
 
@@ -1006,81 +1045,13 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
     // wizard can label each card before/while the ideas stream in
     res.write(`data: ${JSON.stringify({ status: 'generating', prompt: prompt1, model: modelToUse, ideaWorlds, premiseShapes: ctx.premiseShapes.map(sh => ({ id: sh.id, name: sh.name })) })}\n\n`);
 
-    // Track state for both stories
-    // Usage per arm: the two calls are independent, so the funnel's cost is
-    // their sum, not one of them.
-    let usage1 = null;
-    let usage2 = null;
-    let streamModelId = null;
-    let fullResponse1 = '';
-    let fullResponse2 = '';
-    let lastStory1Length = 0;
-    let lastStory2Length = 0;
-    let story1Started = false;
-    let story2Started = false;
-
     log.debug('  Starting parallel story generation...');
-
-    // Stream Story 1 - progressively send raw content as it arrives
-    const streamStory1 = callTextModelStreaming(prompt1, null, (delta, fullText) => {
-      fullResponse1 = fullText;
-      // Stream raw content progressively (every 50 chars) - don't wait for [FINAL]
-      if (fullText.length > 50 && fullText.length > lastStory1Length + 50) {
-        res.write(`data: ${JSON.stringify({ story1: fullText.trim() })}\n\n`);
-        lastStory1Length = fullText.length;
-        if (!story1Started) {
-          log.debug('  Story 1 streaming started');
-          story1Started = true;
-        }
-      }
-    }, modelToUse).then((streamResult) => {
-      usage1 = streamResult?.usage || null;
-      streamModelId = streamResult?.modelId || streamModelId;
-      // Send final story 1 content (extract [FINAL] if present for clean output)
-      const extractedFinal = parseFinal(fullResponse1);
-      const finalContent = extractedFinal || fullResponse1.trim();
-      // Always send final content - if [FINAL] was extracted, it replaces the streamed raw content
-      if (finalContent) {
-        res.write(`data: ${JSON.stringify({ story1: finalContent, isFinal: true })}\n\n`);
-        log.debug(`  Story 1 final: ${extractedFinal ? 'extracted [FINAL] section' : 'using full response'} (${finalContent.length} chars)`);
-      }
-      log.debug('  Story 1 complete');
-    }).catch(err => {
-      log.error('  Story 1 generation failed:', err.message);
-      res.write(`data: ${JSON.stringify({ error: 'Failed to generate first story idea' })}\n\n`);
-    });
-
-    // Stream Story 2 - progressively send raw content as it arrives
-    const streamStory2 = callTextModelStreaming(prompt2, null, (delta, fullText) => {
-      fullResponse2 = fullText;
-      // Stream raw content progressively (every 50 chars) - don't wait for [FINAL]
-      if (fullText.length > 50 && fullText.length > lastStory2Length + 50) {
-        res.write(`data: ${JSON.stringify({ story2: fullText.trim() })}\n\n`);
-        lastStory2Length = fullText.length;
-        if (!story2Started) {
-          log.debug('  Story 2 streaming started');
-          story2Started = true;
-        }
-      }
-    }, modelToUse).then((streamResult) => {
-      usage2 = streamResult?.usage || null;
-      streamModelId = streamResult?.modelId || streamModelId;
-      // Send final story 2 content (extract [FINAL] if present for clean output)
-      const extractedFinal = parseFinal(fullResponse2);
-      const finalContent = extractedFinal || fullResponse2.trim();
-      // Always send final content - if [FINAL] was extracted, it replaces the streamed raw content
-      if (finalContent) {
-        res.write(`data: ${JSON.stringify({ story2: finalContent, isFinal: true })}\n\n`);
-        log.debug(`  Story 2 final: ${extractedFinal ? 'extracted [FINAL] section' : 'using full response'} (${finalContent.length} chars)`);
-      }
-      log.debug('  Story 2 complete');
-    }).catch(err => {
-      log.error('  Story 2 generation failed:', err.message);
-      res.write(`data: ${JSON.stringify({ error: 'Failed to generate second story idea' })}\n\n`);
-    });
-
-    // Wait for both to complete
-    await Promise.all([streamStory1, streamStory2]);
+    // Two independent calls; the funnel's cost is their sum.
+    const [arm1, arm2] = await Promise.all([
+      streamIdeaArm({ arm: 0, prompt: prompt1, res, callStreaming: callTextModelStreaming, model: modelToUse }),
+      streamIdeaArm({ arm: 1, prompt: prompt2, res, callStreaming: callTextModelStreaming, model: modelToUse }),
+    ]);
+    const streamModelId = arm1.modelId || arm2.modelId || null;
 
     recordIdeaEvent({
       event: 'idea_generated',
@@ -1091,14 +1062,14 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
       worlds: ideaWorlds ? ideaWorlds.map(w => w.world) : null,
       shapes: ctx.premiseShapes,
       model: streamModelId || modelToUse,
-      costUsd: (ideaCallCost(streamModelId || modelToUse, usage1) || 0)
-             + (ideaCallCost(streamModelId || modelToUse, usage2) || 0),
-      detail: { streaming: true, chars1: fullResponse1.length, chars2: fullResponse2.length, worldSeeds: ctx.worldSeeds },
+      costUsd: (ideaCallCost(streamModelId || modelToUse, arm1.usage) || 0)
+             + (ideaCallCost(streamModelId || modelToUse, arm2.usage) || 0),
+      detail: { streaming: true, chars1: arm1.fullText.length, chars2: arm2.fullText.length, worldSeeds: ctx.worldSeeds },
     });
     log.debug('  Both stories complete, sending done event...');
 
     // Send completion with full responses for dev mode
-    const combinedResponse = `=== STORY 1 ===\n${fullResponse1}\n\n=== STORY 2 ===\n${fullResponse2}`;
+    const combinedResponse = `=== STORY 1 ===\n${arm1.fullText}\n\n=== STORY 2 ===\n${arm2.fullText}`;
     res.write(`data: ${JSON.stringify({ done: true, fullResponse: combinedResponse })}\n\n`);
     log.debug('  Done event sent, closing stream');
     // Small delay before closing to let HTTP/2 proxy flush the final event
@@ -1120,3 +1091,5 @@ module.exports.resolveIdeaWorlds = resolveIdeaWorlds;
 module.exports.buildVariantInstructions = buildVariantInstructions;
 module.exports.pickPremiseShapes = pickPremiseShapes;
 module.exports.premiseShapeInstruction = premiseShapeInstruction;
+module.exports.parseIdeaFinal = parseIdeaFinal;
+module.exports.streamIdeaArm = streamIdeaArm;
