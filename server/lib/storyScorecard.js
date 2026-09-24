@@ -271,20 +271,20 @@ function buildBriefContext(d = {}, { arc = false } = {}) {
       ? `Cast: ${d.characters.map(c => c && (c.age ? `${c.name} (${c.age})` : c.name)).filter(Boolean).join(', ')}` : null,
     d.storyDetails ? `\nCommissioned idea:\n${String(d.storyDetails).slice(0, 3000)}` : null,
   ].filter(Boolean);
-  // The computed allowance the artifacts were written under, so `fit` is judged
-  // against the real budget rather than a guess. Lazy require: promptBuilders
-  // does not require this module, so there is no cycle.
+  // The sections the arc itself was given, so `fit` is judged against what the
+  // arc was asked for. Since 2026-09-24 that is the premise view of the age band
+  // and no budgets: the arc is no longer given event or action budgets, so the
+  // judge is not either. Lazy require: promptBuilders does not require this
+  // module, so there is no cycle.
   try {
-    const { buildStoryShapeSection, buildAgeModeSection, buildArcBudgetSection } = require('./promptBuilders');
+    const { buildStoryShapeSection, buildAgeModeSection } = require('./promptBuilders');
     const pages = parseInt(d.pages, 10) || (Array.isArray(d.sceneImages) ? d.sceneImages.length : 0);
     if (pages) {
       const shape = buildStoryShapeSection(d, pages, arc ? { arc: true } : undefined);
       if (shape) lines.push(`\n${shape}`);
       if (arc) {
-        const ageMode = buildAgeModeSection(d);
+        const ageMode = buildAgeModeSection(d, { bandView: 'premise' });
         if (ageMode && String(ageMode).trim()) lines.push(`\n${String(ageMode).trim()}`);
-        const budgets = buildArcBudgetSection(d, pages);
-        if (budgets && String(budgets).trim()) lines.push(`\n${String(budgets).trim()}`);
       }
     }
   } catch { /* judge context degrades to the plain brief */ }

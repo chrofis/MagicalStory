@@ -568,6 +568,48 @@ function consecutiveRuns(sorted) {
 }
 
 /**
+ * The thirds of the book in which no page's roster holds the central figure.
+ * Presence is the who column as the check read it — `people`, `things` and
+ * `covers` — so an object or an unnamed creature counts too. A name matches a
+ * roster entry case-insensitively, whole or as whole words inside it ("egg" is
+ * in "golden egg", never the reverse: "dragon" does not match "dragon egg"),
+ * after the article is dropped the way the roster drops it.
+ *
+ * @param {Array<{pageNumber:number}>} rows  the counter rows, in page order
+ * @param {Map} roster  parsePlanCheckRoster output
+ * @param {string[]|null} centralFigure  the arc's names for the figure
+ * @returns {Array<{third:string, pages:number[], names:string[]}>}
+ */
+function centralFigureAbsentThirds(rows, roster, centralFigure) {
+  const names = (Array.isArray(centralFigure) ? centralFigure : [])
+    .map(n => String(n || '').trim().replace(/^(?:the|a|an)\s+/i, '').toLowerCase())
+    .filter(Boolean);
+  const n = rows.length;
+  if (!names.length || !roster || n < 3) return [];
+  const escape = t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const matches = (entry) => {
+    const e = String(entry || '').trim().toLowerCase();
+    return names.some(name => e === name
+      || new RegExp(`(^|[^\\p{L}])${escape(name)}([^\\p{L}]|$)`, 'u').test(e));
+  };
+  const present = (pageNumber) => {
+    const r = roster.get(Number(pageNumber));
+    if (!r) return false;
+    return [...(r.people || []), ...(r.things || []), ...(r.covers || [])].some(matches);
+  };
+  const a = Math.round(n / 3);
+  const b = Math.round((2 * n) / 3);
+  const thirds = [
+    { third: 'setup', rows: rows.slice(0, a) },
+    { third: 'middle', rows: rows.slice(a, b) },
+    { third: 'ending', rows: rows.slice(b) },
+  ];
+  return thirds
+    .filter(t => t.rows.length && !t.rows.some(r => present(r.pageNumber)))
+    .map(t => ({ third: t.third, pages: t.rows.map(r => r.pageNumber), names: centralFigure }));
+}
+
+/**
  * Run every code-side counter over a divided plan.
  *
  * @param {Object} args
@@ -587,7 +629,7 @@ function consecutiveRuns(sorted) {
  *   is the names a page reaches without naming them (`coveredNames`).
  * @returns {{findings: Array, lines: string[], stats: Object, cast: Object|null, skipped?: string}}
  */
-function runPlanCounters({ pages = [], commissionedNames = [], listedNames = null, placeNames = [], maxCharactersPerScene = 3, declaredInvented = null, inventedAllowance = null, roster = null, peoplelessPick = null } = {}) {
+function runPlanCounters({ pages = [], commissionedNames = [], listedNames = null, placeNames = [], maxCharactersPerScene = 3, declaredInvented = null, inventedAllowance = null, roster = null, peoplelessPick = null, centralFigure = null } = {}) {
   const findings = [];
   const add = (code, pageList, detail) => findings.push({ code, pages: pageList, detail });
 
@@ -983,6 +1025,21 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
     }
   }
 
+  // 8b. THE CENTRAL FIGURE IN EACH THIRD (owner, 2026-09-24, d4). The arc's
+  //     critique used to certify "the central figure acts in every third"
+  //     itself; the arc now only NAMES the figure in its STORY LOGIC
+  //     ("Central figure:"), and this counts, on the check's roster, whether
+  //     any page of each third holds it. The names are the arc's own (an egg
+  //     and the creature it hatches into are two names for one figure), read
+  //     as data, never found in the prose. The planner and plan-check Q12 are
+  //     told the same rule (castCoverage.centralFigureActionRule); whether it
+  //     ACTS on those pages is Q12's ACTION line, not arithmetic.
+  const centralAbsent = centralFigureAbsentThirds(rows, roster, centralFigure);
+  for (const gap of centralAbsent) {
+    add('CENTRAL_FIGURE_ABSENT_THIRD', gap.pages,
+      `the central figure (${gap.names.join(' / ')}) is in frame on no page of the ${gap.third} (pages ${gap.pages[0]}-${gap.pages[gap.pages.length - 1]}); stage it on one of them`);
+  }
+
   // 9. Consecutive pages differ: never the same shot AND the same number of
   //    named characters twice in a row. Pairs whose shot did not classify, or
   //    whose plan line is incomplete, are skipped rather than compared.
@@ -1174,6 +1231,8 @@ const REPLAN_FINDING_DIRECTION = new Map([
   // table.
   ['INVENTED_DOMINANT_EXCESS', 'more'],
   ['INVENTED_DOMINANT_CONSECUTIVE', 'more'],
+  // The central figure missing from a third is answered by putting it in frame.
+  ['CENTRAL_FIGURE_ABSENT_THIRD', 'more'],
   ['CAST_OVER_CEILING', 'fewer'],
   ['NO_SOLO_PAGE', 'fewer'],
   ['NO_PEOPLELESS_PAGE', 'fewer'],

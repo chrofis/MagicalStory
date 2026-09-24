@@ -88,6 +88,21 @@ function resolveReplayArcHints(storyData) {
 }
 
 /**
+ * The central figure production passes to the planner and the plan check
+ * (`{ centralFigure }`, 2026-09-24): the names the arc's STORY LOGIC gave it,
+ * stored on arcReviewReport.centralFigure. Null for "none", and for a story
+ * written before the logic-first arc — nothing was named then, so nothing is
+ * passed, exactly as production passed nothing.
+ *
+ * @param {Object} storyData
+ * @returns {string[]|null}
+ */
+function resolveReplayCentralFigure(storyData) {
+  const names = storyData?.arcReviewReport?.centralFigure;
+  return Array.isArray(names) && names.length ? names : null;
+}
+
+/**
  * The locked scene briefs production hands the text writer (`finalExpansions`).
  *
  * On a stored story the final, post-review brief for a page IS
@@ -130,6 +145,7 @@ function buildReplayTextArgs(storyData, beats, { parseBeats, overrides = {} } = 
     expansions: resolveReplayExpansions(storyData),
     arc: resolveReplayArc(storyData, { parseBeats }),
     arcHints: resolveReplayArcHints(storyData),
+    centralFigure: resolveReplayCentralFigure(storyData),
   };
   for (const key of Object.keys(overrides)) {
     if (overrides[key] !== undefined) resolved[key] = overrides[key];
@@ -165,6 +181,7 @@ function buildReplaySceneOptions(storyData, { availableAvatars = '', maxCharacte
 module.exports = {
   resolveReplayArc,
   resolveReplayArcHints,
+  resolveReplayCentralFigure,
   resolveReplayExpansions,
   buildReplayTextArgs,
   buildReplaySceneOptions,

@@ -482,8 +482,9 @@ function measurePages(pages = []) {
  * job_1788727233899_1dpnym94p (18 pages, 1st-grade, budget 25-50) carried 66
  * action clauses against a 6-event budget it did meet; 13 of 18 pages ran
  * 61-128 words, 11 drew a LENGTH fault, and the refiner obeyed by deleting
- * causality. The real fix is upstream — the arc's action budget
- * (buildArcBudgetSection) — so this stage no longer forces the impossible cut;
+ * causality. The real fix is upstream — the arc's action budget until
+ * 2026-09-24, the page plan's one-action rule (story-beats.txt, plan-check Q9)
+ * since the arc went logic-first — so this stage no longer forces the impossible cut;
  * it may overrun by a few words rather than delete an action.
  *
  * SENTENCES AND PARAGRAPHS (2026-09-23). The reading level also sets a

@@ -2,6 +2,10 @@ You review the finished story arc of a children's picture book. Answer in ENGLIS
 
 {STORY_BRIEF}
 
+# THE STORY LOGIC
+
+{STORY_LOGIC}
+
 # THE FINAL ARC
 
 {FINAL_ARC}
@@ -16,4 +20,4 @@ You review the finished story arc of a children's picture book. Answer in ENGLIS
 
 Name the top 3 remaining issues, judged on story consistency and how relatable the characters are. Output exactly 3 lines, nothing else, each:
 ISSUE (s<N>): <one sentence> → CHANGE: <one sentence>
-(s<N>) names the numbered arc sentence the change lands in — (s7), or (s14-15) for a span. Each change stays inside the existing structure and costs no suspense.
+(s<N>) names the numbered arc sentence the change lands in — (s7), or (s14-15) for a span. Each change stays inside the existing structure and costs no suspense. A change never contradicts the story logic; where it must, it names the fact it changes.

@@ -7253,6 +7253,11 @@ const REPLAN_MUST_FIX_CODES = new Set([
   // both rounds, was answered with a tagged change each time, and still shipped
   // 0 for 1 — which is why the FINDING TEXT now names the verb that answers it.
   'NO_PEOPLELESS_PAGE',
+  // The commission's central figure absent from a whole third of the book
+  // (owner, 2026-09-24, d4). The arc's critique certified "acts in every
+  // third" itself until then; the page plan is where it can be counted, and
+  // the re-plan answers it by putting the figure in frame on one page.
+  'CENTRAL_FIGURE_ABSENT_THIRD',
   // THE SHOT DISTRIBUTION JOINED 2026-09-20 (owner), the whole block of it:
   // SHOT_MEDIUM_WIDE_EXCESS, SHOT_CLOSEUP_COUNT, SHOT_ULTRAWIDE_COUNT,
   // SHOT_OTS_COUNT and SHOT_NO_CAMERA_POSITION (SHOT_AERIAL_COUNT retired 2026-09-23 with the aerial floor).
@@ -7922,7 +7927,9 @@ ${HINT_ANCHOR_RULE}
 ${hints}`;
 }
 
-function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', replan = '' } = {}) {
+// `centralFigure`: the names the arc's STORY LOGIC gives the commission's
+// central figure (arcReviewReport.centralFigure), null when it named none.
+function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', replan = '', centralFigure = null } = {}) {
   const template = PROMPT_TEMPLATES.storyBeats;
   if (!template) {
     log.error('[PROMPT] storyBeats template not loaded — beats planning unavailable');
@@ -7978,7 +7985,8 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // 2026-09-23): a focal page each when the book has room, 3-4 pages in
     // frame scaled down as the cast grows. The SAME castCoverage() object the
     // plan counters measure NO_FOCAL_PAGE and UNDER_COVERED_CHARACTER against.
-    CAST_COVERAGE: castCoverageRule(castCoverage({ pageCount, castCount: (inputData?.characters || []).filter(c => c && c.name).length })),
+    // The central figure's sentence rides in the same rule (2026-09-24, d4).
+    CAST_COVERAGE: castCoverageRule(castCoverage({ pageCount, castCount: (inputData?.characters || []).filter(c => c && c.name).length }), { centralFigure }),
     // The output scope follows the mode. A first plan (no replan section)
     // owes every page; a re-plan owes only the pages it changes under RE-DIVIDE
     // — the merge in beatsPipeline restores every other page from the division
@@ -8121,25 +8129,29 @@ function planInstant(planLine) {
  * Arc sentence budget, scaled to the book: roughly 0.8-1.0 numbered sentences
  * per page (owner, 2026-08-30). 10 pages → "8-10", 16 → "13-16", 20 → "16-20".
  */
-function arcLengthRange(pageCount) {
+function arcLengthBounds(pageCount) {
   const pages = Math.max(4, parseInt(pageCount, 10) || 10);
-  return `${Math.round(pages * 0.8)}-${pages}`;
+  return { lo: Math.round(pages * 0.8), hi: pages };
+}
+
+function arcLengthRange(pageCount) {
+  return rangeLabel(arcLengthBounds(pageCount));
 }
 
 /**
- * Concrete budgets for the arc prompts ({ARC_BUDGETS} in arc-create and
- * arc-retell).
+ * The arc's STRUCTURAL numbers, computed in code (logic-first arc, owner
+ * 2026-09-24). The arc used to receive them as a # BUDGETS section and certify
+ * its own counts in its critique; it now receives a chain length to fill and
+ * one sentence about invented figures, and code counts what it wrote
+ * (beatsPipeline, `arcShapeCounts`).
  *
- * EVENT budget (2026-09-07, supersedes the 2026-09-05 reading-level-only
+ * EVENT range (2026-09-07, supersedes the 2026-09-05 reading-level-only
  * arithmetic): plot complexity is keyed on the AGE BAND, and only gently on
- * page count. Two independent knobs — the band says how hard the story is
- * allowed to be, page count and reading level say how long it is. Extra pages
- * buy INSTANCES (another place searched, another try), not proportionally more
- * plot. Owner anchors: a simple 3-year-old story carries 1 event at 5 pages and
- * 3-4 at 20. The slope steepens with age. Emitted as a RANGE so the arc may use
- * fewer. Floor 1 — the old `Math.max(3, ...)` forced three events into a
- * five-page toddler book. At 6+ no band applies, so the reading level stands in
- * as the maturity proxy.
+ * page count. Extra pages buy INSTANCES (another place searched, another try),
+ * not proportionally more plot. Owner anchors: a simple 3-year-old story
+ * carries 1 event at 5 pages and 3-4 at 20. Floor 1. At 6+ no band applies, so
+ * the reading level stands in as the maturity proxy. The event range is no
+ * longer stated to the model: it sizes the CHAIN (`arcChainRange`).
  *
  * Invented-named-figure allowance: a per-band ceiling minus half the commissioned
  * cast, floored at 2 — a story structurally needs an antagonist and a helper, so
@@ -8147,13 +8159,9 @@ function arcLengthRange(pageCount) {
  * with the band (and with the reading level at 6+); page count does not enter
  * the calculation at all.
  *
- * ACTION budget (2026-09-07): an event may hold any number of actions, but
- * words are spent per ACTION, so the event budget alone does not bound page
- * length. Per page by reading level: 1-2 at 1st-grade, 2-4 at standard, 5-8 at
- * advanced; total = pages x per-page. Evidence:
- * job_1788727233899_1dpnym94p (18 pages, 1st-grade) sat AT its 6-event budget
- * yet carried 66 action clauses (3.0/page) and overran the 25-50 word band on
- * 13 of 18 pages.
+ * The per-page ACTION shape left the arc on 2026-09-24 (the arc has no pages):
+ * story-beats.txt "One action per page", plan-check Q9 and the word counter
+ * (textRefine.buildWordBudgetFindings) carry it. docs/decisions.md 2026-09-24.
  */
 // Event divisors per band: [lo, hi] pages-per-event. A flat number means the
 // band carries that many events whatever the page count.
@@ -8186,15 +8194,6 @@ const INVENTED_FIGURE_BASE_STANDARD = {
   '1st-grade': 3,
   standard: 6,
   advanced: 9,
-};
-
-// Per-page action shape at 6+ where no PACING band applies. Every band, and the
-// 1st-grade level here, gets the young shape (one action, at most two).
-// advanced dropped 5-8 -> 3-4 on measured evidence: an advanced arc wrote
-// 2.17 actions/page unprompted, less than half its old band.
-const ACTION_SHAPE_STANDARD = {
-  standard: 'two to three',
-  advanced: 'three to four',
 };
 
 // Who the 1st-grade book is read aloud to. Derived from the band, not
@@ -8256,57 +8255,39 @@ function twoThreadsAllowed(inputData = {}) {
   return age !== null && age >= 6;
 }
 
-function buildArcBudgetSection(inputData, pageCount) {
+/**
+ * The event range the band allows this book: `{ lo, hi }`, lo <= hi, floor 1.
+ * PACING band throughout: the table prices what the reader can carry, not the
+ * shape of the plot.
+ */
+function arcEventRange(inputData, pageCount) {
   const pages = Math.max(4, parseInt(pageCount, 10) || 10);
   const lvl = String(inputData?.languageLevel || 'standard').toLowerCase();
-  // PACING band throughout this builder: every table it reads (EVENT_BUDGETS,
-  // ACTION_SHAPE_STANDARD, READER_AGE_BY_BAND, and arcInventedAllowance inside
-  // it) prices what the reader can carry, not the shape of the plot.
   const band = resolvePacingBand(inputData);
   const rule = EVENT_BUDGETS[band]
     || EVENT_BUDGETS_STANDARD[lvl]
     || EVENT_BUDGETS_STANDARD.standard;
-  let lo;
-  let hi;
-  if (rule.flat) {
-    lo = rule.flat;
-    hi = rule.flat;
-  } else {
-    lo = Math.max(1, Math.round(pages / rule.lo));
-    hi = Math.max(1, Math.round(pages / rule.hi));
-  }
-  hi = Math.max(lo, hi);
-  const events = lo === hi ? `${lo} event${lo === 1 ? '' : 's'}` : `${lo}-${hi} events`;
-  const allowance = arcInventedAllowance(inputData);
-  const chain = lvl === '1st-grade' ? ', one obstacle chain' : '';
-  // Per-page SHAPE, never a book total: a total is an arithmetic claim the
-  // model re-granulates until it passes (two models self-certified compliance
-  // while overrunning it). A shape has nothing to count.
-  // `band` here is the PACING band, so 'standard' still means "6 and up".
-  const olderShape = band === 'standard' ? (ACTION_SHAPE_STANDARD[lvl] || null) : null;
-  const actionsLine = olderShape
-    ? `- A page carries ${olderShape} actions, and one of them is the main one — the picture renders that one. An action is one thing a character does that changes something: a step taken, an object taken or given, a question asked and answered, a decision acted on. Steps inside one event each count as an action.`
-    : '- A page carries ONE main action — at most two. An action is one thing a character does that changes something: a step taken, an object taken or given, a question asked and answered, a decision acted on. Steps inside one event each count as an action. A page where several things happen at once is too much for this reader.';
-  return [
-    '# BUDGETS',
-    `- This book carries at most ${events}${chain}. An event is a happening a child would retell on its own — a meeting, a loss, a discovery, a confrontation; steps within one happening count as one event.`,
-    ...(SIMPLE_BANDS.has(band) ? ['- Pages beyond what the events need are more of the same kind of thing — another place looked in, another try, another animal seen — never another happening.'] : []),
-    // Telling was FREE against both limits above: a speech is one happening and
-    // changes nothing, so backstory the arc had to deliver was cheapest as one
-    // character explaining it, and the budget pushed it there. Measured on
-    // job_1789147573901_m3uam0nxi, whose arc packed the theft, the thieves,
-    // where the thing now is, when a second piece broke and why the owner is
-    // stuck into ONE event — one page, one speech. The clause routes the
-    // surplus rather than banning it: a bare ban makes the model drop facts,
-    // which is how a length rule once deleted a story's causality (2026-09-07).
-    '- One telling carries one thing the reader did not already know. Further facts arrive where they are needed — at the page that turns on them — or are found and shown rather than said.',
-    actionsLine,
-    ...(lvl === '1st-grade' ? [`- This book is read aloud to ${readerAgeLabel(inputData, band)} and must be simple to follow: one question open at a time, ${twoThreadsAllowed(inputData) ? 'at most two threads' : 'one thread'}, and every turn traceable to something already shown on the page.`] : []),
-    `- Invented named figures: this book has room for ${allowance} beyond the commissioned cast; each one past that carries one line of justification on its own line before the numbered arc, never inside a numbered sentence.`,
-    '- A figure counts when the story gives it a name and the commission did not: persons, animals and creatures alike, including one who appears on a single page, one who never speaks, and any adult who frames a scene — a parent, grandparent, teacher, shopkeeper or neighbour who sets a rule, waits, permits or welcomes. Standing in the background does not take a figure off the list.',
-    `- Not counted: the commissioned cast, which is ${COMMISSIONED_CAST_DEF}; places, buildings, landmarks, rivers, mountains, vehicles and objects, however named; a group named collectively; ${UNNAMED_FIGURE_EXEMPT}.`,
-    '- A figure the story needs and cannot drop stays on the list; taking its name away is not a way off it.',
-  ].join('\n');
+  if (rule.flat) return { lo: rule.flat, hi: rule.flat };
+  const lo = Math.max(1, Math.round(pages / rule.lo));
+  const hi = Math.max(lo, Math.max(1, Math.round(pages / rule.hi)));
+  return { lo, hi };
+}
+
+/**
+ * THE CHAIN IS THE EVENT BUDGET (owner, 2026-09-24, D3). The STORY LOGIC
+ * block's chain has one link per event plus the last link, which says why the
+ * solution works now: the event range plus one. The journey band at 18 pages
+ * gives 5-6, the owner's anchor. ONE source for the number the prompt states
+ * and the number `arcShapeCounts` checks; the model counts nothing.
+ */
+function arcChainRange(inputData, pageCount) {
+  const { lo, hi } = arcEventRange(inputData, pageCount);
+  return { lo: lo + 1, hi: hi + 1 };
+}
+
+/** "5-6", or "2" when the range is one number. */
+function rangeLabel({ lo, hi }) {
+  return lo === hi ? `${lo}` : `${lo}-${hi}`;
 }
 
 /**
@@ -9004,8 +8985,10 @@ const PAGE_OPENING_VARIETY_RULE = "Vary how each page begins: not always with a 
 
 /**
  * SIZES AND LOOKS BELONG TO THE PICTURES (owner, 2026-09-23). ONE string for
- * every stage that writes the story: the arc ({TELLING_RULES}), the page plan
- * ({SIZE_LOOK_RULE} in story-beats.txt) and every prose pass (STYLE_RULEBOOK).
+ * the page plan ({SIZE_LOOK_RULE} in story-beats.txt) and every prose pass
+ * (STYLE_RULEBOOK). The arc carried it in {TELLING_RULES} until 2026-09-24
+ * (D7): the arc now states only its positive half, as a FACTS line of the
+ * STORY LOGIC ("a size or a look only where the plot turns on it").
  * The Art Director sizes every Visual Bible element itself (`scaleClass`,
  * SCALE_CLASS_SPEC); the story stages spend words on a size or a look only
  * where the plot turns on it. On staging job_1790100385959_1nitlympp the arc
@@ -9028,9 +9011,12 @@ const SIZE_LOOK_RULE = 'A size or a look is stated only where the plot turns on 
  * repair's framing say "write/rewrite to these"; the diff pass and the lector
  * say "a correction never breaks these" and stay out of style otherwise.
  *
- * The size/look line is SIZE_LOOK_RULE, the same string the arc and the plan
- * get: a repair or diff pass that treats a dropped size as a dropped fact
- * would put it back.
+ * The size/look line is SIZE_LOOK_RULE, the same string the plan gets: a
+ * repair or diff pass that treats a dropped size as a dropped fact would put
+ * it back.
+ *
+ * The voice line joined 2026-09-24 (D6): it left the arc, whose factual
+ * register cannot carry a voice, and no prose pass had it.
  */
 const STYLE_RULEBOOK = [
   'Every sentence is complete and finishes: no sentence broken off for effect, no bare fragment standing as a sentence, no caption-style line describing the scene like a stage direction. The story is told aloud.',
@@ -9038,6 +9024,7 @@ const STYLE_RULEBOOK = [
   'No sentence tells what an event meant or sums up who the characters have become ("they had become something else", "he had done his part"). The telling shows the event and moves on.',
   'The narrator never justifies, excuses or explains an action to the reader ("he had given his share, so now he could eat too"). A reason the story needs comes through a character\'s words, thoughts or feelings in the moment.',
   SIZE_LOOK_RULE,
+  'Each named character who speaks has a voice of their own: word choice and rhythm a listener could tell apart without the name.',
   'The last page ends on the concrete act or spoken line the story ends with and lands one feeling, plainly and warmly. A string of short solemn sentences is not an ending, and neither is a closing sentence that sums up the story.',
 ].map(r => `- ${r}`).join('\n');
 
@@ -9108,14 +9095,13 @@ const AD_COMPOSITION_RULE = [
 const COMMISSIONED_CAST_DEF = "the character list plus any named figure the premise supplies or a character's saved details name — a sibling, a friend, a pet, a companion";
 
 /**
- * The two figure lists the arc emits ahead of its critique. A PARSER CONTRACT
- * (parseFigureList / INVENTED_BLOCK_STOP): the headings and the dash-line shape
- * keep their wording. ONE string each, filled into the create critique spec and
- * the re-tell template — the re-tell carried its own hand-kept copy until
- * 2026-09-23.
+ * THE LOGIC CHECK — one string, two readers (owner, 2026-09-24): the creator's
+ * own critique ("Logic:", arcCritiqueSpec) and the panel's first lens (LOGIC,
+ * arc-panel.txt). Both read the numbered sentences against the STORY LOGIC
+ * block the creator wrote first. On staging job_1790277448294_5herh01j7 the
+ * Opus-max arc carried logic holes its counting critique never looked for.
  */
-const PREMISE_FIGURES_SPEC = `"Premise figures:" then one dash line per commissioned figure outside the character list (the commissioned cast is ${COMMISSIONED_CAST_DEF}), "- <name> — <what it is in the story, three words>". These are commissioned, never invented: they belong on this list and never on the next one. Never numbered. Write the heading even when no figure is on the list; an empty list is the heading alone, with no dash line.`;
-const INVENTED_FIGURES_SPEC = '"Invented figures:" then one dash line per named figure outside the commissioned cast, counted by the rule in the budgets, "- <name> — <what it is in the story, three words>", then one line "Allowed: <N>. Written: <M>." Never numbered. Write the heading and the two counts even when no figure is on the list; an empty list has no dash line.';
+const ARC_LOGIC_CHECK = "Read each sentence against the story logic: a figure who acts against the want, the reason or the ability the logic gives them; a \"why don't they just …?\" the logic leaves open; a fact that contradicts an earlier one; a fact the plot needs that the logic does not carry; a last link that does not say why the solution works now and did not before.";
 
 /**
  * Generator-side twins of three arc-panel lenses (ENTRANCE, ASSUMED, SENSE).
@@ -9149,8 +9135,10 @@ const ARC_PLACE_RULE = 'Every place the story stages is inside or outside, and a
  * then faulted: on job_1790100385959_1nitlympp two of four commissioned boys
  * were kept moment-less by that line and the final critique called one of them
  * removable. The arc half only — how many PICTURES each child is in is the
- * page plan's coverage target, a separate rule. ONE string: STORY SHAPE (the
- * generator), the critique's check and the panel's ACTION lens (the critics).
+ * page plan's coverage target, a separate rule. STORY SHAPE carries it to the
+ * arc. The critique's per-child check and the panel's ACTION lens left on
+ * 2026-09-24 (a per-child tally is a count): plan-check Q12 asks it of every
+ * commissioned character on the pages, from castCoverage.castActionRule.
  */
 const EVERY_CHILD_ACTS_RULE = 'Every child on the character list does at least one thing of their own that matters to the plot — never only present. Only where the book is too short for its cast do several children share one action, and no child is left with nothing.';
 
@@ -9161,11 +9149,16 @@ const EVERY_CHILD_ACTS_RULE = 'Every child on the character list does at least o
  * character — duplicating the hero-competence rule and never testing the
  * creature it was built for. An egg cannot "choose, move, speak" until it
  * hatches, so the rule also says how a figure that cannot act yet acts.
+ *
+ * Since 2026-09-24 the arc NAMES it in its STORY LOGIC ("Central figure:") and
+ * code checks its presence in each third of the page plan
+ * (planCounters CENTRAL_FIGURE_ABSENT_THIRD); the planner and plan-check Q12
+ * read the same sentence (castCoverage.castActionRule).
  */
 const CENTRAL_FIGURE_DEF = 'the creature, title figure or object the story idea is about, never the main character';
 
 /**
- * # RULES OF THE TELLING for the arc prompts ({TELLING_RULES} in arc-create and
+ * # RULES OF THE LOGIC for the arc prompts ({TELLING_RULES} in arc-create and
  * arc-retell). Interpolated rather than baked into the templates because four
  * of its lines demanded exactly what the simple bands forbid: escalation, a
  * low point near the end, an unyielding blocker and a rival thread, against
@@ -9173,8 +9166,16 @@ const CENTRAL_FIGURE_DEF = 'the creature, title figure or object the story idea 
  * for good" (measured 2026-09-07 across seven arc runs). The simple bands get
  * the repetition shape instead — a simple book still has a shape.
  *
- * `landmarks` adds the create-only landmark line; that is the sole difference
- * between the two templates' blocks.
+ * TRIMMED TO THE LOGIC (owner, 2026-09-24; tasks/arc-logic-first-2026-09-24.md
+ * table b). Rules that shape the telling of pages rather than the logic left:
+ * feelings at each turn and the stake said aloud (story-text-from-beats.txt),
+ * coverage by deeds, entrances in ones and twos (story-beats.txt, plan-check
+ * Q2), the remembered last page (STYLE_RULEBOOK, ENDING_EVENT_DEF), the
+ * travelling animal's name, the vessel names, the written backstory (merged
+ * into grounded reasons), the rival's "once more" count, the distinctive voice
+ * (STYLE_RULEBOOK, D6) and SIZE_LOOK_RULE (its positive half is a FACTS line,
+ * D7). The cost-and-low-point shape and "therefore or but" moved into the
+ * CHAIN spec (arcLogicSpec).
  */
 // The landmark rule is NOT here. It used to be — a bullet saying landmarks join
 // "at most on the opening page before the adventure leaves home, or not at all"
@@ -9190,89 +9191,92 @@ function buildTellingRulesSection(inputData = {}) {
   // clause ("include practical tips or coping strategies woven into the
   // narrative") that no other beats stage carries. Restored to the arc rules
   // 2026-09-14 (docs/decisions.md). Gated OFF for the simple bands, whose own
-  // life-skill guidelines say "no tips, no strategies, no moral" — a scoped
-  // clause beats an overridden one, and this file exists because four telling
-  // rules once demanded what those bands forbid.
+  // life-skill guidelines say "no tips, no strategies, no moral".
   const lifeSkillStrategy = String(inputData?.storyCategory || '') === 'life-challenge' && !simple;
-  // TWO STORYLINES FROM AGE 6 (owner, 2026-09-23: "allow it"). The old test
-  // read the SHAPE band, which has not returned 'standard' since the
-  // 2026-09-14 band split, so every book was held to one path.
+  // TWO STORYLINES FROM AGE 6 (owner, 2026-09-23: "allow it").
   const noSplit = !twoThreadsAllowed(inputData);
   return [
-    '# RULES OF THE TELLING',
+    '# RULES OF THE LOGIC',
     '- Factual register: plain declarative sentences stating what happens and why. No imagery, no metaphors, no inner monologue, no emotional narration, no decorative adjectives.',
-    '- Every sentence follows from the one before — therefore, or but. Never "and then".',
-    '- Name what the main figures feel at each turn, as plain fact — a feeling stated is part of the story.',
     '- Each character\'s nature causes a problem or solves one.',
-    '- The main character wants something from the start, and their situation is different at the end. One character carries a visible change: early they refuse, fail or need help at something; late they do it themselves. Early on, a character says aloud what must happen and why.',
-    simple
-      ? '- The shape is repetition, not escalation: the same want, the same call, the same kind of try, page after page, until the last one works. Nothing gets worse, nothing is lost for good, and the goal never looks lost.'
-      : '- Each challenge is met at a cost, each harder because the last was not clean; near the end the goal looks lost before it is won. No obstacle is removed in the moment that introduces it; passing one costs something named — time, a possession, a plan, help asked for.',
+    '- The main character wants something from the start, and their situation is different at the end. One character carries a visible change: early they refuse, fail or need help at something; late they do it themselves.',
     '- The children resolve it themselves. No adult, rescuer, lucky arrival or accident removes an obstacle; adults may comfort, permit or watch.',
     ...(lifeSkillStrategy ? ['- One thing the main character does to handle the topic works, and a child listening could do the same thing: it happens on the page, in what they do, never explained, recommended or named as a lesson.'] : []),
     '- Challenges belong to the story, never dealt out one per character in turn; what the youngest does stays within a very young child\'s reach — noticing, holding, fetching, naming, offering, refusing.',
-    '- Serve character coverage by giving several characters deeds inside the same event — never by opening a new event per character.',
     simple
       ? '- Nothing stands in the way on purpose. What holds the main character up is a thing or a circumstance — out of reach, missing, not working yet — never anyone unwilling, and whoever they meet is friendly.'
-      : '- Whoever or whatever stands in the way wants something of their own, presses on the story to the end and stands in the scene at the turning point; they do not yield on request.',
+      : '- Whoever or whatever stands in the way wants something of their own, presses on the story to the end and stands in the scene at the turning point; they do not yield on request. A rival\'s thread ends with the rival present — arriving too late, seeing what they lost, paying; a defeat only reported is an open thread.',
     '- Reasons are grounded, not announced: a sign, an inscription or a rule stated once to license a turn is not a reason — it comes from who someone is, what a place is for, or what someone needs.',
-    '- A figure who can speak never records what it could say: backstory a present character knows is spoken aloud, never carved, written, scratched or drawn for the cast to read.',
     '- An obstacle exists for its own reasons: never shaped around a thing a character carries, and never a barrier whose only solution a character already holds. Obstacles come from the story\'s own world — weather, distance, a rival, a broken or missing or guarded thing, a character\'s own flaw; no puzzle door, riddle, trick lock or test set by no one, unless the commission establishes it.',
-    ...(simple ? [] : ['- A rival\'s thread ends with the rival present — arriving too late, seeing what they lost, paying; a defeat only reported is an open thread. Between their first and last appearance the rival appears at least once more.']),
     '- Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level; a refusal, a loss, a delay or a broken promise carries the peril instead. Nobody looks monstrous, no familiar character turns frightening, and anyone separated or lost is reunited.',
     RISK_FRAMING_RULE,
     `- ${ANIMAL_FATE_RULE}`,
     '- The story ends with the children safe and together, one of them feeling something a child can name. A container or reveal the story promises opens before the end, and a story that enters through a doorway, portal or frame returns through it.',
-    '- The ending is the page the child remembers: one emotion or one image that stays — never bookkeeping, never a stated moral. Settle debts and props before the final page; the last page belongs to the feeling.',
     '- Close every thread: a question raised is answered, and anything that resolves the conflict has an origin — an earlier setup, an in-world rule, a legend. A character singled out — the only one who can help, waited for, chosen — has a stated reason.',
     '- Use the fewest characters the story needs: invent no figure an existing character could be, and merge two roles into one where the plot allows.',
-    // ONE stay-together line per book (2026-09-23): the general "unless it has
-    // a reason to separate" sat beside the noSplit "never two groups", and a
-    // noSplit book was told both.
     noSplit
       ? '- The cast stays together on one path — never two groups going separate ways; where the commission itself splits them, keep them together and justify it in one line.'
       : '- The group stays together unless it has a reason to separate and a reason to meet again.',
-    '- Characters enter in ones or twos — never more than three at once — and each gets one line of their own on first appearance, doing or saying something only they would.',
     `- ${ARC_ENTRANCE_RULE}`,
     `- ${ARC_GIVEN_RULE}`,
     `- ${ARC_SENSE_RULE}`,
     `- ${ARC_PLACE_RULE}`,
-    `- ${SIZE_LOOK_RULE} A size or a look the commission itself gives is kept once, in its words, where the thing first appears.`,
-    '- Each named character speaks with a distinctive voice — word choice and rhythm a child could tell apart with eyes closed.',
-    '- An animal or creature that travels with the children is named by them where they decide to help it, and goes by that name after.',
-    '- Names the commission gives stand as written; every other vessel, vehicle or place name is invented fresh and distinctive — never a variant of a given name, and two vessels never share a word.',
+    '- Names the commission gives stand as written.',
     '- When the deadline is a time of day, the story starts at an hour the book\'s length can cross to reach it.',
-    `- The commission's central figure — ${CENTRAL_FIGURE_DEF} — acts in every third of the story: chooses, moves, speaks, changes something; never cargo another figure carries. One that cannot act yet acts through what it does to the others — it stirs, warms, calls, gives a sign.`,
+    `- The commission's central figure — ${CENTRAL_FIGURE_DEF} — acts: chooses, moves, speaks, changes something; never cargo another figure carries. One that cannot act yet acts through what it does to the others — it stirs, warms, calls, gives a sign.`,
+  ].join('\n');
+}
+
+/**
+ * THE STORY LOGIC SPEC — what the arc writes BEFORE its numbered sentences
+ * (owner, 2026-09-24). ONE source, filled as {ARC_LOGIC_SPEC} into arc-create
+ * and arc-retell.
+ *
+ * PARSER CONTRACT (parseStoryLogic): the labels "Want and stakes:",
+ * "Opposition:", "Facts:", "Central figure:" and "Chain:"; a figure line is a
+ * dash line whose name is followed by "(commissioned)" or "(new)"; chain links
+ * are dash lines, never numbered, so no link can reach arcActSpans or
+ * critiqueMaxSeverity.
+ *
+ * The figure tags replace the "Premise figures:" / "Invented figures:" lists
+ * (D1-A): code counts the (new) tags against arcInventedAllowance, and the
+ * (commissioned) names outside the character list feed commissionedCast. The
+ * chain length is arcChainRange (D3). The model states facts; it counts nothing.
+ */
+function arcLogicSpec(inputData = {}, pageCount = 10) {
+  const simple = SIMPLE_BANDS.has(resolveAgeBand(inputData));
+  const lvl = String(inputData?.languageLevel || 'standard').toLowerCase();
+  const links = rangeLabel(arcChainRange(inputData, pageCount));
+  const shape = simple
+    ? 'The shape is repetition, not escalation: the same want, the same kind of try, until the last one works. Nothing gets worse, nothing is lost for good, and the goal never looks lost. Pages beyond what the links need are more of the same kind of thing — another place looked in, another try — never another happening.'
+    : 'Each challenge is met at a cost — time, a possession, a plan, help asked for — and each is harder because the last was not clean; no obstacle is removed in the link that introduces it. Near the end one link is the low point, where the goal looks lost.';
+  const readAloud = lvl === '1st-grade'
+    ? ` This book is read aloud to ${readerAgeLabel(inputData, resolvePacingBand(inputData))}: one question open at a time, ${twoThreadsAllowed(inputData) ? 'at most two threads' : 'one thread'}, and every link traceable to something already shown.`
+    : '';
+  return [
+    '"STORY LOGIC:" first, in labelled lines and dash lines, never numbered:',
+    'Want and stakes: what the main characters want, what is lost if they fail, and the deadline if there is one.',
+    'Opposition: who or what stands in the way, what it wants and why, and what it knows.',
+    `Facts: one dash line per named figure the plot runs on, "- <name> (commissioned) — can …; cannot …" or "- <name> (new) — can …; cannot …". Commissioned is ${COMMISSIONED_CAST_DEF}. New is every other named figure — a person, an animal or a creature, including one on a single page, one who never speaks, and an adult who sets a rule, waits or permits. Not listed: places, vehicles and objects, a group named collectively, and ${UNNAMED_FIGURE_EXEMPT}. A figure the story needs stays listed; taking its name away does not take it off. This book has room for ${arcInventedAllowance(inputData)} new named figures. Then one dash line per rule of the world the plot runs on — what keeps a thing alive, open, warm or hidden — and a size or a look only where the plot turns on it, stated as that fact.`,
+    `Central figure: ${CENTRAL_FIGURE_DEF}, by the name the story calls it — two names separated by " / " where it changes name (an egg that hatches into a named creature) — or "none" where the idea is about the main character.`,
+    `Chain: ${links} dash lines from the call to the ending, each opening with "because" or "but", never "and then". ${shape}${readAloud} The last link says why the solution works now and did not before.`,
   ].join('\n');
 }
 
 /**
  * THE ARC CRITIQUE SPEC — ONE source, both arc templates (owner, 2026-09-19).
  *
- * It lived as a 3,145-char paragraph pasted into arc-create.txt and
- * arc-retell.txt, already differing by the words " that remain". Two hand-kept
- * copies of an evaluator spec is the drift the sibling gate exists to stop.
+ * LOGIC FIRST, NO COUNTING (owner, 2026-09-24, superseding the 2026-09-19
+ * "Checks:" block). The critique reads the numbered sentences against the
+ * STORY LOGIC block with the same ARC_LOGIC_CHECK the panel's LOGIC lens reads.
+ * Every count the old "Checks:" block asked the model to certify is code now
+ * (arcShapeCounts: sentences, chain links, invented figures; planCounters
+ * CENTRAL_FIGURE_ABSENT_THIRD) or the plan check's (Q12, each child's action).
+ * "Commission honored" stays: it is a judgement, not a count.
  *
- * Two structural faults went with the duplication, both measured on staging
- * job_1789759147125_p08djwhbl:
- *
- *   1. It said "ten questions" and asked twelve, unnumbered, inside one
- *      paragraph — so neither the model nor a reader could check coverage.
- *   2. FIVE of them carried a mandatory MAJOR verdict (events, action load,
- *      invented figures, central-figure thirds, commission honored) while the
- *      output budget was "3 to 6 numbered faults". Four mechanical verdicts
- *      firing left room for one narrative fault, which is the only thing this
- *      stage exists to find. The counts now report in their own block and the
- *      budget belongs to story faults alone.
- *
- * The per-page questions are GONE (owner, 2026-09-19): the arc is numbered
- * SENTENCES with no page mapping, and prompts/plan-check.txt Q9 ("Deed and
- * effect") already does per-page action load on the page plan, where pages
- * exist.
- *
- * The "Premise figures:" / "Invented figures:" headings and their dash-line
- * shape are a PARSER CONTRACT (parseFigureList / INVENTED_BLOCK_STOP). They
- * keep their wording and their position ahead of everything else.
+ * The numbered "Faults:" lines and their [CRITICAL]/[MAJOR]/[MINOR] tags are a
+ * PARSER CONTRACT (critiqueMaxSeverity, beatsPipeline.fixingBelowMajor). The
+ * "Logic:" lines are dash lines so they never read as faults.
  *
  * @param {Object} opts
  *   retell  the arc-retell variant — the same spec against a final arc, whose
@@ -9280,44 +9284,25 @@ function buildTellingRulesSection(inputData = {}) {
  */
 function arcCritiqueSpec({ retell = false, inputData = {} } = {}) {
   const remain = retell ? ' that remain' : '';
-  // The judge persona is the book's own reader (2026-09-23). It was a fixed
-  // "eight-year-old listener" from 2026-08-30, before the age-mode section
-  // existed, and sat in the same prompt as "The child this book is for is
-  // five" (audit 01 #11). Same resolver as the budgets' read-aloud line.
+  // The judge persona is the book's own reader (2026-09-23).
   const reader = readerAgeLabel(inputData, resolvePacingBand(inputData));
-  // The re-tell template declares "Premise figures:" and "Invented figures:" as
-  // its OWN top-level output bullets, ahead of "Fixing:" — so the spec must not
-  // ask for them a second time inside the critique.
-  const figureLists = retell ? [] : [
-    'The critique opens with these two lists, ahead of everything else and never numbered:',
-    PREMISE_FIGURES_SPEC,
-    '',
-    INVENTED_FIGURES_SPEC,
-    '',
-  ];
   return [
-    ...figureLists,
-    '"Checks:" and these six lines, each ending in OK or a tag. They are counts and allowances, not story faults, and they never take a place in the numbered list below:',
-    '- Events: <N> against the stated budget. An event is a happening a child would retell on its own. More events than the budget is MAJOR: cut whole events, never compress them.',
-    '- Surplus facts: name any event in which one figure tells more than one thing the reader did not already know.',
-    '- Invented figures: <M> written against <N> allowed, by the counting rule in the budgets. A figure written past the allowance without its one-line cannot-work-without justification outside the numbered arc, or with that justification written inside a numbered sentence, is MAJOR.',
-    `- Central figure: name it — ${CENTRAL_FIGURE_DEF} — or write "none" where the idea is about the main character. Does it act in each third of the story? A stretch where it is only carried, held or talked about and does nothing to the others is MAJOR.`,
-    `- Each child's action: ${EVERY_CHILD_ACTS_RULE} Name each child on the character list with the number of the sentence where they do it. A child with none is MAJOR.`,
-    '- Commission honored: are the central quest and the named elements delivered as commissioned? A goal inverted, a trigger dropped, a destination replaced is named here, and the next telling fixes it or justifies it in one line.',
+    `"Logic:" then one dash line per sentence that breaks the story logic, "- s<N>: <what breaks>", or the single word "none". ${ARC_LOGIC_CHECK}`,
     '',
-    `"Questions:" and these six, numbered 1 to 6, answered as ${reader} reader:`,
+    '"Commission honored:" one line: are the central quest and the named elements delivered as commissioned? A goal inverted, a trigger dropped, a destination replaced is named here, and the next telling fixes it or justifies it in one line.',
+    '',
+    `"Questions:" and these five, numbered 1 to 5, answered as ${reader} reader:`,
     '1. Where does the story lose them — confusion, boredom, disbelief?',
-    '2. Does each thing follow from what came before?',
-    '3. Is there a question they need answered, with the outcome in doubt to the end?',
-    '4. Are the figures people a child likes, roots for, and can tell apart?',
-    '5. Where the commission states a theme, topic or life skill, is the story genuinely rich in its material — introduced where it first matters, not present in name only — does it drive the climax, and does the character who most needs it visibly act on it before the end, acted on and never stated as a moral?',
-    '6. Does every planted object or flaw pay off, and does every payoff trace to a plant — an orphan on either side is cut?',
+    '2. Is there a question they need answered, with the outcome in doubt to the end?',
+    '3. Are the figures people a child likes, roots for, and can tell apart?',
+    '4. Where the commission states a theme, topic or life skill, is the story genuinely rich in its material — introduced where it first matters, not present in name only — does it drive the climax, and does the character who most needs it visibly act on it before the end, acted on and never stated as a moral?',
+    '5. Does every planted object or flaw pay off, and does every payoff trace to a plant — an orphan on either side is cut?',
     '',
-    `"Faults:" and 3 to 6 numbered story-level faults${remain}; they usually look like: an event without a cause, a stake that cannot be lost or that never bites (announced but never felt), a cost the world undoes for free — a thing taken, blocked or used up whose replacement is lying all around and nothing closes that way, a turn the story's own facts contradict or the characters could plainly avoid — anything a reader would stop at to ask "but why don't they just …?", weighed against what the story has already made true about sizes, sounds, light, distances and who is watching, a removable character, a rival who stops pressing, knowledge nobody could have, a premise the commission forbids, an action that does not accomplish what the sentence claims it accomplishes, a mechanism that runs on rules instead of sight — a contraption needing more than one rule to understand, or a stated rule about what would happen that is never seen happening (a fault whenever a child cannot retell how it works in one sentence, or a single picture cannot show it working), a character who is anyone — nothing they do comes from who they are, an interaction no real person would have — a reaction the plot needs but the person would not give. The last three are MAJOR by default; a main cast of interchangeable figures is CRITICAL. Numeric precision and sourced measurements and times are not arc faults — later stages fix those; never list one. The arc has no pages: no fault names a page number or a position in pages. Tag every fault [CRITICAL] — the story is broken; [MAJOR] — a real story fault repairable inside the existing structure; or [MINOR] — a blemish.`,
+    `"Faults:" and 3 to 6 numbered story-level faults${remain}, logic faults first; they usually look like: a sentence the story logic contradicts, an event without a cause, a stake that cannot be lost or that never bites (announced but never felt), a cost the world undoes for free — a thing taken, blocked or used up whose replacement is lying all around and nothing closes that way, a turn the characters could plainly avoid — anything a reader would stop at to ask "but why don't they just …?", a removable character, a rival who stops pressing, knowledge nobody could have, a premise the commission forbids, an action that does not accomplish what the sentence claims it accomplishes, a mechanism that runs on rules instead of sight — a contraption needing more than one rule to understand, or a stated rule about what would happen that is never seen happening (a fault whenever a child cannot retell how it works in one sentence, or a single picture cannot show it working), a character who is anyone — nothing they do comes from who they are, an interaction no real person would have — a reaction the plot needs but the person would not give. The last three are MAJOR by default; a main cast of interchangeable figures is CRITICAL. No fault is a count. Numeric precision and sourced measurements and times are not arc faults — later stages fix those; never list one. The arc has no pages: no fault names a page number or a position in pages. Tag every fault [CRITICAL] — the story is broken; [MAJOR] — a real story fault repairable inside the existing structure; or [MINOR] — a blemish.`,
   ].join('\n');
 }
 
-/** CREATE: the creator writes two arcs with self-critiques and commits to one. */
+/** CREATE: the creator writes ONE arc, its story logic first, then its self-critique. */
 function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null } = {}) {
   const template = PROMPT_TEMPLATES.arcCreate;
   if (!template) {
@@ -9328,11 +9313,14 @@ function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null } = 
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: pageCount,
     STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true }),
-    AGE_MODE: buildAgeModeSection(inputData),
+    // The premise view (premise + mechanics): the band's craft lines belong to
+    // the planner and the text writer; the low point they carried is stated in
+    // the CHAIN spec (owner, 2026-09-24).
+    AGE_MODE: buildAgeModeSection(inputData, { bandView: 'premise' }),
     AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote),
-    ARC_BUDGETS: buildArcBudgetSection(inputData, pageCount),
     TELLING_RULES: buildTellingRulesSection(inputData),
     CHALLENGE_IDEAS: challengeIdeas ?? buildChallengeIdeasSection(inputData),
+    ARC_LOGIC_SPEC: arcLogicSpec(inputData, pageCount),
     ARC_CRITIQUE_SPEC: arcCritiqueSpec({ inputData }),
     ARC_LENGTH: arcLengthRange(pageCount),
   });
@@ -9350,18 +9338,14 @@ function buildArcPanelPrompt(inputData, committedBlock) {
     STORY_BRIEF: ctx.STORY_BRIEF,
     CHARACTER_DETAILS: ctx.CHARACTER_DETAILS,
     COMMITTED_ARC: String(committedBlock || '').trim(),
-    // The panel is the only INDEPENDENT reader of the arc; until 2026-09-09 it
-    // was never told the allowance, so nobody but the author (grading itself in
-    // the same call) could audit the invented cast.
-    INVENTED_ALLOWANCE: arcInventedAllowance(inputData),
-    // The same definition the creator's budgets and figure lists carry.
-    COMMISSIONED_CAST_DEF,
-    // The lenses a creator rule mirrors read that rule's own string.
+    // The lenses a creator rule mirrors read that rule's own string. LOGIC is
+    // the creator critique's own check (2026-09-24). The CAST and ACTION lenses
+    // left the same day: both were counts, now code's and plan-check Q12's.
+    ARC_LOGIC_CHECK,
     ARC_ENTRANCE_RULE,
     ARC_GIVEN_RULE,
     ARC_SENSE_RULE,
     ARC_PLACE_RULE,
-    EVERY_CHILD_ACTS_RULE,
     // A14: the REAL LANDMARKS block is one constant with three consumers
     // (create, panel, retell). The panel is the only independent reader of the
     // arc; without the list it cannot see a real place the arc invented, and
@@ -9387,14 +9371,12 @@ function buildArcRetellPrompt(inputData, pageCount, committedBlock, panelSolutio
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: pageCount,
     STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true }),
-    AGE_MODE: buildAgeModeSection(inputData),
-    ARC_BUDGETS: buildArcBudgetSection(inputData, pageCount),
+    AGE_MODE: buildAgeModeSection(inputData, { bandView: 'premise' }),
     TELLING_RULES: buildTellingRulesSection(inputData),
     COMMITTED_ARC: String(committedBlock || '').trim(),
     PANEL_SOLUTIONS: String(panelSolutions || '').trim(),
+    ARC_LOGIC_SPEC: arcLogicSpec(inputData, pageCount),
     ARC_CRITIQUE_SPEC: arcCritiqueSpec({ retell: true, inputData }),
-    PREMISE_FIGURES_SPEC,
-    INVENTED_FIGURES_SPEC,
     ARC_LENGTH: arcLengthRange(pageCount),
     // A14: same block the creator got (see buildArcPanelPrompt).
     AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote),
@@ -9405,10 +9387,18 @@ function buildArcRetellPrompt(inputData, pageCount, committedBlock, panelSolutio
  * HINT PASS (lean flow, owner 2026-09-01): one outside look at the FINAL arc.
  * The hints ride into the beats and text-writer prompts; nothing re-tells.
  */
-function buildArcHintsPrompt(inputData, finalArc) {
+// `storyLogic`: the final STORY LOGIC block (parseStoryLogic().text). The hint
+// pass is a critic of the settled arc, and a hint that breaks a stated fact
+// would reach the planner (owner, 2026-09-24). Required: without it the pass
+// cannot keep that rule, so the build fails and the pass is skipped loudly.
+function buildArcHintsPrompt(inputData, finalArc, storyLogic) {
   const template = PROMPT_TEMPLATES.arcHints;
   if (!template) {
     log.error('[PROMPT] arcHints template not loaded — arc hint pass unavailable');
+    return null;
+  }
+  if (!String(storyLogic || '').trim()) {
+    log.error('[PROMPT] arcHints: no STORY LOGIC block — the hint pass cannot check its changes against it');
     return null;
   }
   const ctx = buildStoryContextFields(inputData);
@@ -9422,6 +9412,7 @@ function buildArcHintsPrompt(inputData, finalArc) {
     CHARACTER_SOURCE_RULE: characterSourceRule({ master: 'arc' }),
     CHARACTER_DETAILS: ctx.CHARACTER_DETAILS,
     FINAL_ARC: String(finalArc || '').trim(),
+    STORY_LOGIC: String(storyLogic).trim(),
   });
 }
 
@@ -9470,43 +9461,24 @@ function parseArcHints(raw) {
 }
 
 /**
- * Read the "Invented figures:" block the arc critique emits (2026-09-09). The
- * block is UNNUMBERED by contract — `critiqueMaxSeverity` reads numbered lines
- * only, and a numbered list here would mint phantom MAJOR faults — and it sits
- * in the head, beside the other contract lines, so it never leaks into the arc
- * text. Same block-read shape as "Challenges taken:". Optional: an absent block
- * yields an empty reading and the caller degrades to the pre-2026-09-09
- * behaviour; nothing here throws.
+ * The heading that opens each arc output block. Markdown-tolerant: a model may
+ * write "STORY LOGIC:", "**STORY LOGIC:**" or "# STORY LOGIC".
  */
-const INVENTED_BLOCK_STOP = /^\s*(?:\*\*|#+\s*)?(?:Premise figures|Invented figures|Fixing|Keeping|Challenges taken|Used|FINAL ARC|CRITIQUE|ARC\s*\d)\s*:?/mi;
+const arcHeadingRe = (label, flags = 'mi') => new RegExp(`^\\s*(?:\\*\\*|#+\\s*)?${label}(?:\\s*\\*\\*)?\\s*(?::|$)`, flags);
 
 /**
- * The arc's PREMISE FIGURES — named figures the commission's own premise
- * supplies that its character list does not (a sibling, a friend, a pet).
- *
- * They are commissioned, not invented: the budget rule has always said so
- * ("Not counted: anyone the commission named, including any animal or
- * companion it supplied"), but nothing carried their NAMES out of the arc, so
- * the plan counters — which only ever saw `inputData.characters` — charged them
- * against the invented allowance. Measured on job_1789147573901_m3uam0nxi: the
- * premise reads "<child> and his dog <name>", and the dog was counted invented.
+ * Where the STORY LOGIC block ends: the next top-level output heading of the
+ * create or the re-tell reply.
  */
-function parsePremiseFigures(raw) {
-  return parseFigureList(raw, 'Premise figures');
-}
-
-function parseInventedFigures(raw) {
-  return parseFigureList(raw, 'Invented figures');
-}
+const LOGIC_BLOCK_STOP = /^\s*(?:\*\*|#+\s*)?(?:Fixing|Keeping|Challenges taken|Used|FINAL ARC|ARC|CRITIQUE)(?:\s*\*\*)?\s*(?::|$)/mi;
 
 /**
- * The explicit "there are none" answers a figure list may carry, tested on the
- * answer's head: the text before any qualifier. A qualifier opens with a
- * parenthesis (closed or not — the " — " split cuts an unclosed one), a comma,
- * a semicolon or a colon. A wholly parenthesised answer is tested on its
- * content: `- (none)`, and `- (none — …)`, which the split leaves as "(none"
- * (staging job_1790100385959_1nitlympp: "(none" became a commissioned character
- * and drew two plan-counter findings against itself on both plan rounds).
+ * The explicit "there are none" answers a figure line or the central-figure
+ * line may carry, tested on the answer's head: the text before any qualifier.
+ * A qualifier opens with a parenthesis (closed or not), a comma, a semicolon or
+ * a colon. A wholly parenthesised answer is tested on its content: `(none)`,
+ * and `(none — …)` (staging job_1790100385959_1nitlympp: "(none" became a
+ * commissioned character and drew two plan-counter findings against itself).
  */
 const NEGATIVE_FIGURE_ANSWERS = new Set(['none', 'no one', 'noone', 'nobody', 'n/a', 'na', 'keine', 'aucun']);
 
@@ -9516,85 +9488,126 @@ function isNegativeFigureAnswer(name) {
   return head === '' || NEGATIVE_FIGURE_ANSWERS.has(head);
 }
 
-function parseFigureList(raw, heading) {
-  const src = String(raw || '');
-  const h = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const idx = src.search(new RegExp(`^\\s*(?:\\*\\*)?${h}\\s*:`, 'mi'));
-  if (idx < 0) return { present: false, names: [], allowed: null, written: null };
-  const tail = src.slice(idx).replace(new RegExp(`^\\s*(?:\\*\\*)?${h}\\s*:\\**[^\\n]*\\n?`, 'i'), '');
-  const stop = tail.search(INVENTED_BLOCK_STOP);
-  const block = stop >= 0 ? tail.slice(0, stop) : tail;
-  const names = [];
-  for (const line of block.split('\n')) {
-    const t = line.replace(/\*\*/g, '').trim();
-    if (!t) continue;
-    if (/^Allowed\s*:/i.test(t)) break;
-    const m = t.match(/^[-–—*•]\s*(.+)$/);
-    if (!m) break;
-    const name = m[1].split(/\s+[—–]\s+|\s+-\s+/)[0].replace(/[.,;:]+$/, '').trim();
-    // A NEGATIVE ANSWER IS AN EMPTY LIST, NOT A NAME (2026-09-17). The sentinel
-    // test was anchored, so the arc's own phrasing walked straight past it:
-    // staging job_1789584708605_rts4wqupm wrote `- none (the creature in the
-    // egg is unnamed in the commission)` under "Premise figures:", and that
-    // whole clause became a commissioned CHARACTER. It then earned two of the
-    // five plan-counter findings against itself (`NO_FOCAL_PAGE`,
-    // `UNDER_COVERED_CHARACTER`) and bought a re-plan of three pages.
-    // The qualifier a model appends is a parenthetical, so it is removed
-    // structurally before the sentinel is tested — never by matching prose.
-    if (name && !isNegativeFigureAnswer(name)) names.push(name);
+const LOGIC_LABELS = ['Want and stakes', 'Opposition', 'Facts', 'Central figure', 'Chain'];
+const LOGIC_LABEL_RE = new RegExp(`^\\s*(?:[-*•]\\s*)?(?:\\*\\*|#+\\s*)?(${LOGIC_LABELS.join('|')})(?:\\s*\\*\\*)?\\s*:\\s*(?:\\*\\*)?\\s*(.*)$`, 'i');
+
+/**
+ * Parse the STORY LOGIC block the arc writes first (owner, 2026-09-24).
+ *
+ * THROWS when the block is missing or incomplete — no heading, no tagged
+ * figure line, no "Central figure:" line, no chain link. There is no degraded
+ * reading: the invented-figure count, the commissioned names and the
+ * central-figure counter all read this block, so a reply without it is a
+ * failed reply and the caller's one retry applies (NO FALLBACKS).
+ *
+ * @returns {{ text: string, want: string, opposition: string,
+ *   figures: {name: string, tag: 'commissioned'|'new'}[],
+ *   commissioned: string[], invented: string[],
+ *   centralFigure: string[]|null, facts: string[], chain: string[] }}
+ *   `text` is the block body without its heading; `centralFigure` is the
+ *   list of names the figure goes by, or null for "none".
+ */
+function parseStoryLogic(raw) {
+  const full = String(raw || '');
+  const idx = full.search(arcHeadingRe('STORY LOGIC'));
+  if (idx < 0) throw new Error('no "STORY LOGIC:" block');
+  // The heading search may start on a blank line ahead of the heading (a
+  // multiline ^\s* consumes it), so the strip skips whitespace first.
+  const tail = full.slice(idx).replace(/^\s*[^\n]*\n?/, '');
+  const stop = tail.search(LOGIC_BLOCK_STOP);
+  const text = (stop >= 0 ? tail.slice(0, stop) : tail).trim();
+  const sections = {};
+  let current = null;
+  for (const line of text.split('\n')) {
+    const m = line.match(LOGIC_LABEL_RE);
+    if (m) {
+      current = LOGIC_LABELS.find(l => l.toLowerCase() === m[1].toLowerCase());
+      sections[current] = sections[current] || [];
+      const rest = m[2].replace(/\*\*/g, '').trim();
+      if (rest) sections[current].push(rest);
+      continue;
+    }
+    if (current && line.trim()) sections[current].push(line.trim());
   }
-  const am = block.match(/Allowed\s*:\s*(\d+)[^\d]{0,12}Written\s*:\s*(\d+)/i);
+  const dashLines = (lines = []) => lines
+    .map(l => l.replace(/\*\*/g, '').trim())
+    .map(l => (l.match(/^(?:[-–—*•]|\d{1,2}[.)])\s+(.+)$/) || [, ''])[1].trim())
+    .filter(Boolean);
+  // A figure line anywhere in the block counts: the tag is the contract, not
+  // the section it sits in.
+  const figures = [];
+  for (const line of text.split('\n')) {
+    const m = line.replace(/\*\*/g, '').match(/^\s*[-–—*•]\s*(.+?)\s*\((commissioned|new)\)/i);
+    if (!m) continue;
+    const name = m[1].replace(/[.,;:]+$/, '').trim();
+    if (name && !isNegativeFigureAnswer(name)) figures.push({ name, tag: m[2].toLowerCase() });
+  }
+  if (!figures.length) throw new Error('STORY LOGIC names no figure tagged (commissioned) or (new)');
+  if (!sections['Central figure']) throw new Error('STORY LOGIC has no "Central figure:" line');
+  const centralRaw = sections['Central figure'].join(' ').split(/\s+[—–]\s+|\s+-\s+/)[0].trim();
+  const centralFigure = isNegativeFigureAnswer(centralRaw)
+    ? null
+    : centralRaw.split(/\s*\/\s*/).map(n => n.replace(/^["'(]+|["'.,;:)]+$/g, '').trim()).filter(Boolean);
+  const chain = dashLines(sections.Chain);
+  if (!chain.length) throw new Error('STORY LOGIC has no chain links');
+  const facts = dashLines(sections.Facts).filter(l => !/\((?:commissioned|new)\)/i.test(l));
   return {
-    present: true,
-    names,
-    allowed: am ? parseInt(am[1], 10) : null,
-    written: am ? parseInt(am[2], 10) : null,
+    text,
+    want: (sections['Want and stakes'] || []).join(' '),
+    opposition: (sections.Opposition || []).join(' '),
+    figures,
+    commissioned: figures.filter(f => f.tag === 'commissioned').map(f => f.name),
+    invented: figures.filter(f => f.tag === 'new').map(f => f.name),
+    centralFigure: centralFigure && centralFigure.length ? centralFigure : null,
+    facts,
+    chain,
   };
 }
 
+/** The highest numbered sentence of an arc (the same reading arcActSpans uses). */
+function arcSentenceCount(arcText) {
+  let n = 0;
+  for (const m of String(arcText || '').matchAll(/^\s*(\d{1,3})[.)]\s+\S/gm)) n = Math.max(n, parseInt(m[1], 10));
+  return n;
+}
+
 /**
- * Parse the arc-create output: "ARC 1:" + CRITIQUE, "ARC 2:" + CRITIQUE, then
- * a "Stronger: Arc N — why" commitment line. Throws on a missing commitment or
- * boundary — the caller re-creates once, then gives up.
+ * Parse the arc-create output: "STORY LOGIC:", then "ARC:" and its numbered
+ * sentences, then "CRITIQUE:". Throws on a missing or incomplete logic block,
+ * a missing "ARC:" heading or an empty arc — the caller re-creates once, then
+ * gives up.
+ *
+ * `committed` is the block a panelist reads: the logic, the arc and the
+ * creator's own critique, each under its heading.
  */
 function parseArcCreate(raw) {
   const full = String(raw || '');
-  const m = full.match(/Stronger:\s*(?:\*\*)?\s*Arc\s*(\d)/i);
-  if (!m) throw new Error('no "Stronger: Arc N" commitment line');
-  const n = parseInt(m[1], 10);
-  const strongerLine = (full.match(/^.*Stronger:.*$/mi) || [''])[0].replace(/\*\*/g, '').trim();
-  const arc2idx = full.search(/^\s*(?:\*\*|#+\s*)?ARC\s*2\s*:?/mi);
-  if (arc2idx < 0) throw new Error('cannot find the "ARC 2:" boundary');
-  const stripStronger = s => s.replace(/^.*Stronger:.*$/gmi, '').trim();
-  const block1 = stripStronger(full.slice(0, arc2idx));
-  const block2 = stripStronger(full.slice(arc2idx));
-  const chosen = n === 1 ? block1 : block2;
-  const critIdx = chosen.search(/^\s*(?:\*\*|#+\s*)?CRITIQUE\s*:?/mi);
+  const logic = parseStoryLogic(full);
+  const arcIdx = full.search(arcHeadingRe('ARC'));
+  if (arcIdx < 0) throw new Error('no "ARC:" block');
+  const after = full.slice(arcIdx).replace(/^\s*[^\n]*\n?/, '');
+  const critIdx = after.search(arcHeadingRe('CRITIQUE'));
+  const arc = (critIdx >= 0 ? after.slice(0, critIdx) : after).trim();
+  if (!arc) throw new Error('ARC block is empty');
+  const critique = critIdx >= 0 ? after.slice(critIdx).replace(/^\s*[^\n]*\n?/, '').trim() : '';
   return {
-    n,
-    strongerLine,
-    // The block a panelist reads: the chosen arc, its critique, and why it won.
-    committed: `${chosen}\n\n${strongerLine}`,
-    discarded: n === 1 ? block2 : block1,
-    arc: (critIdx > 0 ? chosen.slice(0, critIdx) : chosen)
-      .replace(/^\s*(?:\*\*|#+\s*)?ARC\s*\d\s*:?\**\s*/i, '')
-      .trim(),
-    critique: critIdx >= 0 ? chosen.slice(critIdx).replace(/^\s*(?:\*\*|#+\s*)?CRITIQUE\s*:?\**\s*/i, '').trim() : '',
-    invented: parseInventedFigures(chosen),
-    premiseFigures: parsePremiseFigures(chosen),
+    logic,
+    arc,
+    critique,
+    sentences: arcSentenceCount(arc),
+    committed: `STORY LOGIC:\n${logic.text}\n\nARC:\n${arc}\n\nCRITIQUE:\n${critique}`,
   };
 }
 
 /**
- * Parse the arc-retell output: the "Fixing:" / "Keeping:" contract lines, the
- * "Challenges taken:" list, the "Used:" line, the FINAL ARC, and the fresh
- * CRITIQUE. Order-tolerant: the current contract declares everything before
- * FINAL ARC, older tellings placed Challenges/Used after it. A head-positioned
+ * Parse the arc-retell output: the updated "STORY LOGIC:" block, the
+ * "Fixing:" / "Keeping:" contract lines, the "Challenges taken:" list, the
+ * "Used:" line, the FINAL ARC, and the fresh CRITIQUE. A head-positioned
  * challenges list is re-appended to the arc text so downstream consumers
  * (cross-story challenge memory, the beats prompt) keep seeing one arc block
  * that carries its list. Fixing/Keeping/Used are optional (non-compliant
- * tellings yield ''); throws only when no FINAL ARC exists — the caller
- * re-tells once, then gives up.
+ * tellings yield ''); throws when no FINAL ARC exists and when the STORY LOGIC
+ * block is missing or incomplete — the caller re-tells once, then gives up.
  */
 function parseArcRetell(raw) {
   const full = String(raw || '');
@@ -9603,6 +9616,7 @@ function parseArcRetell(raw) {
   // The contract lines precede FINAL ARC; take them from the head so a
   // critique line that happens to start with the same word cannot shadow them.
   const head = full.slice(0, fa);
+  const logic = parseStoryLogic(head);
   const contractLine = (src, label) =>
     (src.match(new RegExp(`^\\s*(?:\\*\\*)?${label}\\s*:\\s*(.*)$`, 'mi')) || [, ''])[1].replace(/\*\*/g, '').trim();
   const fixing = contractLine(head, 'Fixing') || contractLine(full, 'Fixing');
@@ -9630,8 +9644,6 @@ function parseArcRetell(raw) {
     // reads as a VB cell reference.
     headChallenges = headChallenges.replace(/\[(?:C\d+|own)\]\s*/gi, '');
   }
-  // A stray "Changing:" block (briefly in the contract, dropped by owner
-  // reversal 2026-08-30) sits ahead of FINAL ARC and is simply ignored.
   const after = full.slice(fa).replace(/^\s*(?:\*\*|#+\s*)?FINAL ARC\s*:?\**\s*/i, '');
   const usedIdx = after.search(/^\s*(?:\*\*)?Used\s*:/mi);
   const critIdx = after.search(/^\s*(?:\*\*|#+\s*)?CRITIQUE\s*:?/mi);
@@ -9639,13 +9651,46 @@ function parseArcRetell(raw) {
   const arcEnd = cuts.length ? Math.min(...cuts) : after.length;
   let finalArc = after.slice(0, arcEnd).trim();
   if (!finalArc) throw new Error('FINAL ARC block is empty');
+  // Counted before the challenges list is appended: that list is numbered too.
+  const sentences = arcSentenceCount(finalArc);
   if (headChallenges) finalArc = `${finalArc}\n\n${headChallenges}`;
   const used = contractLine(head, 'Used')
     || (after.match(/^\s*(?:\*\*)?Used\s*:\s*(.*)$/mi) || [, ''])[1].replace(/\*\*/g, '').trim();
   const critique = critIdx >= 0
     ? after.slice(critIdx).replace(/^\s*(?:\*\*|#+\s*)?CRITIQUE\s*:?\**\s*/i, '').trim()
     : '';
-  return { finalArc, used, critique, fixing, keeping, takenIds, invented: parseInventedFigures(head), premiseFigures: parsePremiseFigures(head) };
+  return { finalArc, used, critique, fixing, keeping, takenIds, logic, sentences };
+}
+
+/**
+ * THE CODE COUNTS of one arc (owner, 2026-09-24; plan counters d1-d3): what
+ * the old critique asked the model to certify, done as arithmetic over lists
+ * the model wrote as content. d1 and d2 are logged only (D4); d3 is the one
+ * that may force a round (beatsPipeline).
+ *
+ * @param {Object} args
+ * @param {number} args.sentences  the arc's numbered sentences (arcSentenceCount)
+ * @param {Object} args.logic      a parseStoryLogic result
+ * @returns {{ sentences, sentenceRange, sentencesInRange, chainLinks, chainRange,
+ *   chainInRange, invented, inventedAllowance, inventedOver }}
+ */
+function arcShapeCounts({ sentences, logic, inputData, pageCount }) {
+  const sentenceRange = arcLengthBounds(pageCount);
+  const chainRange = arcChainRange(inputData, pageCount);
+  const chainLinks = (logic?.chain || []).length;
+  const invented = [...(logic?.invented || [])];
+  const inventedAllowance = arcInventedAllowance(inputData);
+  return {
+    sentences,
+    sentenceRange,
+    sentencesInRange: sentences >= sentenceRange.lo && sentences <= sentenceRange.hi,
+    chainLinks,
+    chainRange,
+    chainInRange: chainLinks >= chainRange.lo && chainLinks <= chainRange.hi,
+    invented,
+    inventedAllowance,
+    inventedOver: invented.length > inventedAllowance,
+  };
 }
 
 /**
@@ -9693,7 +9738,7 @@ function critiqueMaxSeverity(critique) {
  * here so the signature states the contract: this prompt's inputs are the arc
  * and the page plan, and the counting happens downstream of its answer.
  */
-function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHints = '' } = {}) {
+function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHints = '', centralFigure = null } = {}) {
   const template = PROMPT_TEMPLATES.planCheck;
   if (!template) {
     log.error('[PROMPT] planCheck template not loaded — plan check unavailable');
@@ -9713,7 +9758,9 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHi
     // sentence the planner is told (castActionRule, owner 2026-09-23). The
     // appearance counts stay with the counters: shown "3 to 4 pages", the
     // checker read the range as a cap and faulted every child above it.
-    CAST_ACTION: castActionRule(castCoverage({ pageCount: beats.length, castCount: (inputData?.characters || []).filter(c => c && c.name).length })),
+    // With the central figure's sentence when the arc named one — the same
+    // string the planner's {CAST_COVERAGE} carries (2026-09-24, d4).
+    CAST_ACTION: castActionRule(castCoverage({ pageCount: beats.length, castCount: (inputData?.characters || []).filter(c => c && c.name).length }), { centralFigure }),
     // THE HINTS THE DIVISION WAS ASKED TO APPLY (2026-09-23). The planner gets
     // them under FIX WHILE DIVIDING; the checker never saw them, so a hint put
     // on the wrong page could not be judged — on job_1790100385959_1nitlympp a
@@ -11464,14 +11511,19 @@ module.exports = {
   buildArcRetellPrompt,
   buildArcHintsPrompt,
   buildArcAmendPrompt,
-  buildArcBudgetSection,
   buildTellingRulesSection,
+  arcLogicSpec,
+  arcChainRange,
+  arcEventRange,
+  arcLengthRange,
+  arcLengthBounds,
+  arcShapeCounts,
+  arcSentenceCount,
   twoThreadsAllowed,
   characterSourceRule,
   arcCritiqueSpec,
+  ARC_LOGIC_CHECK,
   COMMISSIONED_CAST_DEF,
-  PREMISE_FIGURES_SPEC,
-  INVENTED_FIGURES_SPEC,
   ARC_ENTRANCE_RULE,
   ARC_GIVEN_RULE,
   ARC_SENSE_RULE,
@@ -11546,8 +11598,8 @@ module.exports = {
   parseArcHints,
   parseArcCreate,
   parseArcRetell,
-  parseInventedFigures,
-  parsePremiseFigures,
+  parseStoryLogic,
+  isNegativeFigureAnswer,
   arcInventedAllowance,
   critiqueMaxSeverity,
   buildPlanCheckPrompt,

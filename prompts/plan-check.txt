@@ -43,7 +43,7 @@ Answer only these fourteen:
 
 11. Obstacles. Name every page whose instant works against what a character is doing — a way blocked, a place kept, a thing taken or withheld, a refusal. For each, give that page an OBSTACLES line naming that character, and say whether the page's plan line names them. A page whose obstacle is held by a character the plan line does not name is a finding.
 
-12. Each character's own action. {CAST_ACTION} For each commissioned character, give an ACTION line: the sentence where the story gives them an action of their own, and the page whose instant stages it. A character whose action no page stages as its instant is a finding.
+12. Each character's own action. {CAST_ACTION} For each commissioned character, and for the central figure when one is named here, give an ACTION line: the sentence where the story gives them an action of their own, and the page whose instant stages it. A character whose action no page stages as its instant is a finding, and so is a central figure that is only carried where it appears.
 
 13. Order. Name every page whose instant stages a moment the story reaches only in a later sentence, or that needs something a later page first brings about. A change listed under HINTS belongs where its own words place it in the story.
 14. Over-the-shoulder. {OTS_NO_CONTACT} Name every over-the-shoulder page whose instant has the figure nearest the camera touching what they face, and ask for another shot.
@@ -66,7 +66,7 @@ Then one line per act, in story order:
 
 WANTED <setup, middle or ending>: sentence <number> — page <number, or none>
 
-Then one line per commissioned character:
+Then one line per commissioned character, and one for the central figure when one is named:
 
 ACTION <name>: sentence <number> — page <number, or none>
 

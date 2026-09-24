@@ -16,22 +16,34 @@ const { loadPromptTemplates } = require('../../server/services/prompts.js');
 const realStreaming = textModels.callTextModelStreaming;
 afterEach(() => { textModels.callTextModelStreaming = realStreaming; });
 
+const LOGIC = (want: string) => [
+  'STORY LOGIC:',
+  `Want and stakes: ${want}`,
+  'Opposition: the cold.',
+  'Facts:',
+  '- Mila (commissioned) — can carry the egg; cannot climb the wall',
+  '- An egg left cold does not hatch.',
+  'Central figure: the egg',
+  'Chain:',
+  '- because the egg is cold, Mila carries it home',
+  '- but the door is shut, so she warms it in her coat',
+].join('\n');
+
 const CREATE = [
-  'ARC 1:',
+  LOGIC('Mila wants to return the egg before night.'),
+  '',
+  'ARC:',
   '1. The child finds a lost egg.',
   '2. The child returns it.',
   'CRITIQUE:',
+  'Logic:',
+  '- none',
+  'Faults:',
   '1. [MINOR] the ending is quiet.',
-  '',
-  'ARC 2:',
-  '1. The child builds a nest.',
-  'CRITIQUE:',
-  '1. [MAJOR] nothing goes wrong.',
-  '',
-  'Stronger: Arc 1 — it has a turn.',
 ].join('\n');
 
 const RETELL = [
+  LOGIC('Mila wants to return the egg to its mother before night.'),
   'Fixing: nothing above MINOR.',
   'Keeping: the return.',
   'Used: Panelist A',
@@ -51,8 +63,10 @@ describe('arc machine — create and retell effort', () => {
   it('sends arcCreateEffort on arc_create and arcRetellEffort on arc_retell, uncapped', async () => {
     await loadPromptTemplates();
     const calls: { label: string; maxTokens: any; model: string; opts: any }[] = [];
+    const prompts: Record<string, string> = {};
     textModels.callTextModelStreaming = async (_p: string, maxTokens: any, _c: any, model: string, opts: any) => {
       calls.push({ label: opts?.usageLabel, maxTokens, model, opts });
+      prompts[opts?.usageLabel] = _p;
       const text = opts?.usageLabel === 'arc_create' ? CREATE
         : opts?.usageLabel === 'arc_retell' ? RETELL
           : 'Solution: give the child one failed attempt first.';
@@ -84,5 +98,10 @@ describe('arc machine — create and retell effort', () => {
     expect(retell[0].maxTokens).toBeNull();
     // The panel is not a creator call and gets no effort.
     for (const p of calls.filter(c => c.label === 'arc_panel')) expect(p.opts.effort).toBeUndefined();
+    // One arc, logic first (2026-09-24): the panel and the re-telling read the
+    // create's STORY LOGIC with its arc and critique.
+    expect(prompts.arc_panel).toContain('Want and stakes: Mila wants to return the egg before night.');
+    expect(prompts.arc_retell).toContain('Want and stakes: Mila wants to return the egg before night.');
+    expect(prompts.arc_panel).not.toMatch(/Stronger:|ARC 2/);
   }, 30000);
 });

@@ -76,14 +76,30 @@ const pagesWord = n => `${n} page${n === 1 ? '' : 's'}`;
  * finding against every child who appeared more often (validation call on
  * job_1790100385959_1nitlympp, 2026-09-23). The counts are the counters' job.
  *
+ * THE CENTRAL FIGURE (owner, 2026-09-24, d4): when the arc's STORY LOGIC names
+ * one, the same sentence tells the planner and the checker that it acts in each
+ * third of the book. The arc's critique used to certify "acts in every third"
+ * itself; the per-third presence is now the counter CENTRAL_FIGURE_ABSENT_THIRD
+ * and "acts, never carried" is judged on the pages by Q12's ACTION line.
+ *
  * @param {ReturnType<typeof castCoverage>} cov
- * @returns {string} '' when there is no cast, or one character
+ * @param {{ centralFigure?: string[]|null }} [opts] the names the arc gave the figure
+ * @returns {string} '' when there is no cast rule and no central figure
  */
-function castActionRule(cov) {
-  if (!cov || cov.castCount === 1) return '';
-  return cov.focalEach
-    ? 'Every commissioned character gets a focal page of their own whose instant is the action the story gives them.'
-    : 'This cast is too large for a focal page each: the characters share group moments, and each character\'s own action from the story is the instant of some page.';
+function castActionRule(cov, { centralFigure = null } = {}) {
+  const cast = !cov || cov.castCount === 1
+    ? ''
+    : cov.focalEach
+      ? 'Every commissioned character gets a focal page of their own whose instant is the action the story gives them.'
+      : 'This cast is too large for a focal page each: the characters share group moments, and each character\'s own action from the story is the instant of some page.';
+  return [cast, centralFigureActionRule(centralFigure)].filter(Boolean).join(' ');
+}
+
+/** The central-figure sentence of castActionRule; '' when the arc named none. */
+function centralFigureActionRule(centralFigure) {
+  const names = (Array.isArray(centralFigure) ? centralFigure : []).map(n => String(n || '').trim()).filter(Boolean);
+  if (!names.length) return '';
+  return `The story's central figure, ${names.join(' / ')}, acts in each third of the book — it chooses, moves, speaks or changes something in a page's instant, never only carried.`;
 }
 
 /**
@@ -95,10 +111,11 @@ function castActionRule(cov) {
  * @param {ReturnType<typeof castCoverage>} cov
  * @returns {string}
  */
-function castCoverageRule(cov) {
-  const action = castActionRule(cov);
-  if (!action) return '';
-  return `${action} Every commissioned character is in frame on at least ${pagesWord(cov.appearances.min)}.`;
+function castCoverageRule(cov, { centralFigure = null } = {}) {
+  const floor = cov && cov.castCount !== 1
+    ? `Every commissioned character is in frame on at least ${pagesWord(cov.appearances.min)}.`
+    : '';
+  return [castActionRule(cov, { centralFigure }), floor].filter(Boolean).join(' ');
 }
 
 /**
@@ -109,7 +126,8 @@ function castCoverageRule(cov) {
  *             the family entered. They owe the book the coverage above.
  *   supplied  figures the commission names outside that list — in the premise,
  *             or in a character's saved details (a sibling, a friend, a pet, a
- *             companion) — as the arc reports them under "Premise figures:".
+ *             companion) — as the arc's STORY LOGIC tags them "(commissioned)"
+ *             (since 2026-09-24; the "Premise figures:" list before).
  *             Commissioned, never invented, and owe the book no page.
  *   all       both, the set the invented-cast counters subtract.
  *
@@ -118,7 +136,7 @@ function castCoverageRule(cov) {
  * from a scan of that text.
  *
  * @param {Object} inputData  the job input (its `characters` list)
- * @param {string[]} [suppliedNames]  the arc's "Premise figures:" names
+ * @param {string[]} [suppliedNames]  the arc's (commissioned)-tagged figure names
  * @returns {{listed:string[], supplied:string[], all:string[]}}
  */
 function commissionedCast(inputData, suppliedNames = []) {
@@ -138,6 +156,7 @@ module.exports = {
   commissionedCast,
   castCoverage,
   castActionRule,
+  centralFigureActionRule,
   castCoverageRule,
   PAGE_CAST_TYPICAL,
   APPEARANCES_TARGET_MAX,

@@ -21,18 +21,18 @@ Characters: {CHARACTER_NAMES}
 
 {AGE_MODE}
 
-{ARC_BUDGETS}
-
 {TELLING_RULES}
 
 # YOUR TASK
 
-Write TWO different arcs, marked exactly "ARC 1:" and "ARC 2:" — genuinely different stories, not variants. Each arc is {ARC_LENGTH} numbered sentences.
+Write ONE arc. Work out its logic first, then tell it from that logic.
 
-After each arc, a blunt self-critique marked "CRITIQUE:", built exactly like this:
+{ARC_LOGIC_SPEC}
+
+Then "ARC:" and {ARC_LENGTH} numbered sentences, told from the story logic: each follows from the one before — therefore, or but, never "and then" — and no sentence carries a fact the logic contradicts.
+
+Then a blunt self-critique marked "CRITIQUE:", built exactly like this:
 
 {ARC_CRITIQUE_SPEC}
 
-No final version — stop after the second critique.
-
-Last line, exactly: "Stronger: Arc <N> — <one sentence why>".
+Nothing after the critique.

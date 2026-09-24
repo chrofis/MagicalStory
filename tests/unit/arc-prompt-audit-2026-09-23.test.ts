@@ -33,7 +33,7 @@ const build = (data: any) => ({
   create: PB.buildArcCreatePrompt(data, 18),
   panel: PB.buildArcPanelPrompt(data, 'ARC: a committed arc'),
   retell: PB.buildArcRetellPrompt(data, 18, 'ARC: a committed arc', 'SOLUTION: one'),
-  hints: PB.buildArcHintsPrompt(data, '1. A story.'),
+  hints: PB.buildArcHintsPrompt(data, '1. A story.', 'Want and stakes: the egg.'),
 });
 
 describe('arc prompts after the 2026-09-23 audit', () => {
@@ -46,17 +46,17 @@ describe('arc prompts after the 2026-09-23 audit', () => {
     }
   });
 
-  it('one definition of the commissioned cast reaches the budgets, both figure lists and the panel', () => {
+  // Since 2026-09-24 the definition reaches the arc once, in the FACTS spec of
+  // the STORY LOGIC (create and retell); the panel's CAST lens left with the
+  // counting it carried.
+  it('one definition of the commissioned cast reaches the creator and the re-teller', () => {
     const b = build(input());
-    // Budgets (create + retell), the create critique's Premise-figures list,
-    // the re-tell's own list, and the panel's CAST lens.
-    expect(b.create.split(PB.COMMISSIONED_CAST_DEF).length - 1).toBeGreaterThanOrEqual(2);
-    expect(b.retell.split(PB.COMMISSIONED_CAST_DEF).length - 1).toBeGreaterThanOrEqual(2);
-    expect(b.panel).toContain(PB.COMMISSIONED_CAST_DEF);
+    const spec = PB.arcLogicSpec(input(), 18);
+    expect(spec).toContain(PB.COMMISSIONED_CAST_DEF);
+    expect(b.create).toContain(spec);
+    expect(b.retell).toContain(spec);
+    expect(b.panel).not.toContain(PB.COMMISSIONED_CAST_DEF);
     expect(PB.COMMISSIONED_CAST_DEF).toMatch(/saved details/);
-    expect(b.retell).toContain(PB.PREMISE_FIGURES_SPEC);
-    expect(b.retell).toContain(PB.INVENTED_FIGURES_SPEC);
-    expect(PB.arcCritiqueSpec()).toContain(PB.PREMISE_FIGURES_SPEC);
   });
 
   it('the panel and the hint pass are told their working language', () => {
@@ -74,7 +74,7 @@ describe('arc prompts after the 2026-09-23 audit', () => {
     }
   });
 
-  it('every commissioned child acts: the shape tells the creator, the critique and the panel check it', () => {
+  it('every commissioned child acts: the shape tells the creator and the re-teller; the page plan checks it', () => {
     // Four children, two mains: the two others used to be told "No moment of
     // their own" (owner reversed it 2026-09-23).
     const four = input({
@@ -82,19 +82,25 @@ describe('arc prompts after the 2026-09-23 audit', () => {
       mainCharacters: ['0', '1', '2', '3'],
     });
     const b = build(four);
-    for (const stage of ['create', 'retell', 'panel'] as const) {
+    for (const stage of ['create', 'retell'] as const) {
       expect(b[stage], stage).toContain(PB.EVERY_CHILD_ACTS_RULE);
       expect(b[stage], stage).not.toMatch(/No moment of their own/);
       expect(b[stage], stage).not.toMatch(/at most two carry a book/);
     }
-    expect(PB.arcCritiqueSpec({ inputData: four })).toContain(PB.EVERY_CHILD_ACTS_RULE);
-    expect(PB.arcCritiqueSpec({ retell: true, inputData: four })).toContain(PB.EVERY_CHILD_ACTS_RULE);
+    // The per-child tally left the critique and the panel (2026-09-24): plan-check
+    // Q12 asks it of every commissioned character on the pages.
+    expect(PB.arcCritiqueSpec({ inputData: four })).not.toContain(PB.EVERY_CHILD_ACTS_RULE);
+    expect(b.panel).not.toContain(PB.EVERY_CHILD_ACTS_RULE);
+    const check = PB.buildPlanCheckPrompt(four, [{ pageNumber: 1 }, { pageNumber: 2 }], '1. A story.', 'Page 1: wide — Anna — x — y');
+    expect(check).toMatch(/give an ACTION line/);
   });
 
-  it('the central figure is defined once, in the rule and in its check', () => {
+  it('the central figure is defined once, in the rule and in the STORY LOGIC line that names it', () => {
     const rules = PB.buildTellingRulesSection(input());
     expect(rules).toContain(PB.CENTRAL_FIGURE_DEF);
-    expect(PB.arcCritiqueSpec()).toContain(PB.CENTRAL_FIGURE_DEF);
+    expect(PB.arcLogicSpec(input(), 18)).toContain(PB.CENTRAL_FIGURE_DEF);
+    // The per-third tally is code's now (CENTRAL_FIGURE_ABSENT_THIRD), not the critique's.
+    expect(PB.arcCritiqueSpec()).not.toContain(PB.CENTRAL_FIGURE_DEF);
     expect(PB.CENTRAL_FIGURE_DEF).toMatch(/never the main character/);
   });
 
@@ -125,9 +131,10 @@ describe('arc prompts after the 2026-09-23 audit', () => {
       expect(PB.twoThreadsAllowed(at(age)), `age ${age}`).toBe(false);
       expect(PB.buildTellingRulesSection(at(age))).toContain('never two groups going separate ways');
     }
-    // The 1st-grade read-aloud line no longer says "one thread" beside a split it allows.
-    expect(PB.buildArcBudgetSection(at(6, '1st-grade'), 18)).toContain('at most two threads');
-    expect(PB.buildArcBudgetSection(at(5, '1st-grade'), 18)).toContain('one thread');
+    // The 1st-grade read-aloud line (in the CHAIN spec since 2026-09-24) never
+    // says "one thread" beside a split it allows.
+    expect(PB.arcLogicSpec(at(6, '1st-grade'), 18)).toContain('at most two threads');
+    expect(PB.arcLogicSpec(at(5, '1st-grade'), 18)).toContain('one thread');
   });
 
   it('the topic guide reaches the arc with its use rule and without the avatar COSTUME field', () => {

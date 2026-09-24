@@ -1476,6 +1476,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "arc-logic-first",
+      "title": "The arc is written logic first: one arc, a STORY LOGIC block, a critique that checks logic and counts nothing",
+      "commits": [],
+      "addedAt": "2026-09-24",
+      "claim": "On a full story the arc machine writes one arc whose STORY LOGIC block (want and stakes, opposition, tagged figure facts, central figure, because/but chain) parses on the first create, the final arc carries no fact its logic block contradicts, and arcReviewReport.counts shows the chain and sentence counts in range (baseline: job_1790277448294_5herh01j7, whose Opus-max arc had logic holes the counting critique missed).",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "read arcReviewReport.logic against arcReviewReport.finalArc sentence by sentence: name every sentence that contradicts a stated want, reason, ability or world rule, and every fact the plot needs that the logic does not state; also read arcReviewReport.counts and the arc_chain_out_of_range / arc_length_out_of_range warnings"
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }

@@ -1,9 +1,10 @@
 /**
  * Sizes and looks belong to the pictures (owner, 2026-09-23).
  *
- * ONE string, SIZE_LOOK_RULE, reaches every stage that writes the story — the
- * arc creator and re-teller (inside {TELLING_RULES}), the page planner
- * ({SIZE_LOOK_RULE} in story-beats.txt) and every prose pass (STYLE_RULEBOOK).
+ * ONE string, SIZE_LOOK_RULE, reaches the page planner ({SIZE_LOOK_RULE} in
+ * story-beats.txt) and every prose pass (STYLE_RULEBOOK). The arc carried it
+ * until 2026-09-24 (D7): it now states only the positive half, as a FACTS line
+ * of its STORY LOGIC — a size the plot turns on is a fact.
  * The Visual Bible author still decides every element's size: `scaleClass`
  * stays required at both authoring sites.
  *
@@ -29,7 +30,7 @@ const input = (extra: any = {}) => ({
   ...extra,
 });
 
-describe('SIZE_LOOK_RULE — one rule for arc, plan and prose', () => {
+describe('SIZE_LOOK_RULE — one rule for plan and prose', () => {
   beforeAll(async () => { await loadPromptTemplates(); });
 
   it('is exported and non-empty', () => {
@@ -37,13 +38,17 @@ describe('SIZE_LOOK_RULE — one rule for arc, plan and prose', () => {
     expect(PB.SIZE_LOOK_RULE.length).toBeGreaterThan(40);
   });
 
-  it('reaches the arc creator and the re-teller, at every age band', () => {
+  it('leaves the arc; the arc keeps a size the plot turns on as a fact, at every age band', () => {
     // A simple band and the standard band build different TELLING_RULES.
     for (const data of [input(), input({ characters: [{ id: 'a', name: 'Anna', age: 2, gender: 'female' }], mainCharacters: ['a'] })]) {
       const create = PB.buildArcCreatePrompt(data, 18);
       const retell = PB.buildArcRetellPrompt(data, 18, 'ARC: a committed arc', 'SOLUTION: one');
-      expect(create).toContain(PB.SIZE_LOOK_RULE);
-      expect(retell).toContain(PB.SIZE_LOOK_RULE);
+      expect(create).not.toContain(PB.SIZE_LOOK_RULE);
+      expect(retell).not.toContain(PB.SIZE_LOOK_RULE);
+      const spec = PB.arcLogicSpec(data, 18);
+      expect(spec).toMatch(/a size or a look only where the plot turns on it/);
+      expect(create).toContain(spec);
+      expect(retell).toContain(spec);
       // The SENSE rule still lets the arc reason about how big things are.
       expect(create).toContain(PB.ARC_SENSE_RULE);
     }

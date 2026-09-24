@@ -30,7 +30,7 @@ const { carryForwardWornItems, resolveWornItemsForPage } = require_('../../serve
 const { checkDeclaredSet, normalizeCitedHandles, carryParentObjects } = require_('../../server/lib/iterateBeat');
 const { extractSceneMetadata } = require_('../../server/lib/sceneMetadata');
 const { planBookAuditRound } = require_('../../server/lib/repairLogic');
-const { parsePremiseFigures, buildImagePrompt } = require_('../../server/lib/promptBuilders');
+const { parseStoryLogic, buildImagePrompt } = require_('../../server/lib/promptBuilders');
 
 const read = (p: string) => fs.readFileSync(path.join(process.cwd(), p), 'utf8');
 
@@ -288,24 +288,36 @@ describe('B — the round loop stops at the configured cap, audit grant included
   });
 });
 
-describe('C2 — a "none" answer to a figure list is an empty list', () => {
+// Since 2026-09-24 the figure lists are the tagged FACTS lines of the arc's
+// STORY LOGIC; a negative answer there is still no figure.
+const logicWith = (figureLines: string[]) => [
+  'STORY LOGIC:',
+  'Want and stakes: keep the egg warm.',
+  'Opposition: the wind.',
+  'Facts:',
+  '- Ramon (new) — older rival boy; can run; cannot climb',
+  ...figureLines,
+  'Central figure: none',
+  'Chain:',
+  '- because the egg knocks, they keep it',
+].join('\n');
+
+describe('C2 — a "none" answer to a figure line is no figure', () => {
   it('the run\'s real line: "- none (the creature in the egg is unnamed in the commission)"', () => {
-    const parsed = parsePremiseFigures(
-      'Premise figures:\n- none (the creature in the egg is unnamed in the commission)\n\nInvented figures:\n- Ramon — older rival boy\nAllowed: 2. Written: 2.\n',
-    );
-    expect(parsed.present).toBe(true);
-    expect(parsed.names).toEqual([]);
+    const parsed = parseStoryLogic(logicWith(['- none (the creature in the egg is unnamed in the commission) (commissioned)']));
+    expect(parsed.commissioned).toEqual([]);
+    expect(parsed.invented).toEqual(['Ramon']);
   });
 
   it('a bare sentinel, and the other explicit negatives', () => {
-    for (const line of ['- none', '- None.', '- nobody', '- n/a', '- keine (nothing in the premise)']) {
-      expect(parsePremiseFigures(`Premise figures:\n${line}\n`).names).toEqual([]);
+    for (const line of ['- none (commissioned)', '- None. (commissioned)', '- nobody (commissioned)', '- n/a (commissioned)', '- keine (nothing in the premise) (commissioned)']) {
+      expect(parseStoryLogic(logicWith([line])).commissioned, line).toEqual([]);
     }
   });
 
   it('NEGATIVE CONTROL — a real figure with a parenthetical keeps its name', () => {
-    const parsed = parsePremiseFigures("Premise figures:\n- Nia (Max's commissioned dog)\n");
-    expect(parsed.names).toEqual(["Nia (Max's commissioned dog)"]);
+    const parsed = parseStoryLogic(logicWith(["- Nia (Max's commissioned dog) (commissioned) — can track"]));
+    expect(parsed.commissioned).toEqual(["Nia (Max's commissioned dog)"]);
   });
 });
 

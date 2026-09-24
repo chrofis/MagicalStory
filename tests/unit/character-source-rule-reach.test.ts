@@ -67,7 +67,7 @@ describe('the character-source rule reaches every stage that claims one', () => 
    * deleted from the book.
    */
   it('the hint pass answers to the ARC — it reads a settled one', () => {
-    const p = buildArcHintsPrompt(input(), '1. Four boys meet as strangers at the pond.');
+    const p = buildArcHintsPrompt(input(), '1. Four boys meet as strangers at the pond.', 'Want and stakes: find the owner.');
     expect(p).toBeTruthy();
     expect(p).toContain('The arc above is settled');
     expect(p).toContain('the arc stands');

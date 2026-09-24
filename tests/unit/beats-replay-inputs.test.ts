@@ -232,8 +232,15 @@ describe('wiring — production still passes what the resolver mirrors', () => {
     expect(call).toContain('maxCharactersPerScene');
   });
 
-  it('production hands the beats planner the approved arc and arcHints', () => {
-    expect(beatsSrc).toContain('buildBeatsPrompt(inputData, pageCount, { finalArc: approvedArc, arcHints })');
+  it('production hands the beats planner the approved arc, arcHints and the central figure', () => {
+    expect(beatsSrc).toContain('buildBeatsPrompt(inputData, pageCount, { finalArc: approvedArc, arcHints, centralFigure: arcCentralFigure })');
+  });
+
+  it('the replay resolves the central figure the arc stored, and nothing for an older story', () => {
+    const { resolveReplayCentralFigure } = require('../../server/lib/beatsReplayInputs');
+    expect(resolveReplayCentralFigure({ arcReviewReport: { centralFigure: ['the egg', 'Fünkli'] } })).toEqual(['the egg', 'Fünkli']);
+    expect(resolveReplayCentralFigure({ arcReviewReport: { centralFigure: null } })).toBeNull();
+    expect(resolveReplayCentralFigure({ arcReviewReport: { finalArc: '1. x' } })).toBeNull();
   });
 
   it('beats is the pipeline in every environment — which is why this matters', () => {

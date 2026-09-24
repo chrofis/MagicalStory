@@ -18,13 +18,11 @@ Reading level: {READING_LEVEL}
 
 {AGE_MODE}
 
-{ARC_BUDGETS}
-
 {TELLING_RULES}
 
 {CHALLENGE_IDEAS}
 
-# THE COMMITTED ARC AND ITS CRITIQUE
+# THE COMMITTED ARC, ITS STORY LOGIC AND ITS CRITIQUE
 
 {COMMITTED_ARC}
 
@@ -34,13 +32,17 @@ Reading level: {READING_LEVEL}
 
 # YOUR TASK
 
-The arc stands above with its critique. A panel proposed solutions. Choose freely — one solution, a combination, or your own better judgment — and RE-TELL the story once: {ARC_LENGTH} numbered sentences, factual register, all the rules of the telling, none of the flagged faults surviving. Never edit or patch the old arc.
+The arc stands above with its story logic and its critique. A panel proposed solutions. Choose freely — one solution, a combination, or your own better judgment — and RE-TELL the story once: {ARC_LENGTH} numbered sentences, factual register, all the rules above, none of the flagged faults surviving. Never edit or patch the old arc.
+
+Update the story logic first: every fix that adds, removes or changes a fact, a motive or a link does it there, and the sentences are then told from the updated logic. A sentence never carries a fact the logic contradicts.
 
 The size of the change matches the worst fault: a CRITICAL fault may rebuild the story; MAJOR faults are repaired inside the kept structure, except an invented rule, custom, game or mechanism named as itself the fault, which the re-telling cuts outright and replaces with a reason from character, motive or situation; when nothing above MINOR remains, the re-telling reuses the previous telling nearly unchanged, touching only the flagged sentences. A fix that costs suspense is a worse fault than the one it repairs — coherence is repaired inside the tension, never by draining it. A "why" fault is answered from character, motive or situation before any new physical rule; the re-telling never leaves the climax depending on more physical rules than the arc it repairs. The re-telling changes only what Fixing names.
 
 Output, in this order:
-- {PREMISE_FIGURES_SPEC}
-- {INVENTED_FIGURES_SPEC}
+- The updated story logic, built exactly like this:
+
+{ARC_LOGIC_SPEC}
+
 - One line "Fixing:" — which faults, by what approach.
 - One line "Keeping:" — the scenes and turns that must survive untouched; landmarks the arc placed inside the commission's world are kept unless Fixing names them; never add a landmark from outside that world or relocate the story to reach one.
 - "Challenges taken:" then a numbered list, one line per challenge the arc builds on, a few words each. Each line opens with the [C###] tag of the drawn challenge it builds on, or with [own] where the challenge is the arc's own invention. The tag names the source only; it is never written into a story sentence.

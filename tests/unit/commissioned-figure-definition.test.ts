@@ -23,9 +23,10 @@ const input = () => ({
   storyCategory: 'adventure', storyType: 'adventure', artStyle: 'watercolor',
 });
 
-describe('the arc budget states the exemption the counter applies', () => {
-  it('UNNAMED_FIGURE_EXEMPT reaches the budget rule', () => {
-    expect(PB.buildArcBudgetSection(input(), 18)).toContain(PB.UNNAMED_FIGURE_EXEMPT);
+describe('the arc states the exemption the counter applies', () => {
+  // Since 2026-09-24 the counting rule is the FACTS spec of the STORY LOGIC.
+  it('UNNAMED_FIGURE_EXEMPT reaches the FACTS spec of both arc prompts', () => {
+    expect(PB.arcLogicSpec(input(), 18)).toContain(PB.UNNAMED_FIGURE_EXEMPT);
   });
 });
 

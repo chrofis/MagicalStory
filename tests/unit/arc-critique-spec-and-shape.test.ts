@@ -46,35 +46,48 @@ describe('the arc critique spec is one source', () => {
 
   it('the questions are numbered and the count is honest', () => {
     const spec = arcCritiqueSpec();
-    expect(spec).toContain('numbered 1 to 6');
-    for (const n of [1, 2, 3, 4, 5, 6]) expect(spec).toMatch(new RegExp(`^${n}\. `, 'm'));
-    expect(spec).not.toContain('ten questions');
+    const m = spec.match(/numbered 1 to (\d+)/);
+    expect(m).toBeTruthy();
+    const n = Number(m![1]);
+    for (let i = 1; i <= n; i++) expect(spec).toMatch(new RegExp(`^${i}\\. `, 'm'));
+    expect(spec).not.toMatch(new RegExp(`^${n + 1}\\. `, 'm'));
   });
 
-  it('mechanical verdicts report outside the 3-6 fault budget', () => {
+  // Logic-first (owner, 2026-09-24): the critique checks the sentences against
+  // the STORY LOGIC first and counts nothing. Every count is code's.
+  it('checks logic first, with the one check the panel also reads, and counts nothing', () => {
     const spec = arcCritiqueSpec();
-    expect(spec).toContain('"Checks:"');
-    expect(spec).toContain('they never take a place in the numbered list below');
-    for (const check of ['- Events:', '- Surplus facts:', '- Invented figures:', '- Central figure:', '- Commission honored:']) {
-      expect(spec).toContain(check);
-    }
+    const { ARC_LOGIC_CHECK } = require('../../server/lib/promptBuilders');
+    expect(spec.indexOf('"Logic:"')).toBe(0);
+    expect(spec).toContain(ARC_LOGIC_CHECK);
+    expect(spec).toContain('"Commission honored:"');
+    // No self-certified count survives: no events tally, no figure tally, no
+    // per-third or per-child tally, no Allowed/Written line.
+    expect(spec).not.toContain('"Checks:"');
+    expect(spec).not.toMatch(/Allowed: <N>/);
+    expect(spec).not.toMatch(/in each third/);
+    expect(spec).not.toMatch(/Invented figures/);
     expect(spec).toContain('3 to 6 numbered story-level faults');
+  });
+
+  it('the logic lines cannot mint a fault: they are dash lines, the faults are numbered', () => {
+    const { critiqueMaxSeverity } = require('../../server/lib/promptBuilders');
+    expect(arcCritiqueSpec()).toContain('"- s<N>: <what breaks>"');
+    const critique = ['Logic:', '- s4: the dog digs where nothing was buried', 'Commission honored: yes', 'Faults:', '1. [MINOR] a blemish.'].join('\n');
+    expect(critiqueMaxSeverity(critique)).toBe('MINOR');
   });
 
   it('the per-page questions are gone — the arc has sentences, not pages', () => {
     const spec = arcCritiqueSpec();
     expect(spec).not.toContain('action load per page');
     expect(spec).not.toContain('name the page each surplus fact belongs on');
-    // The event half of the surplus-facts check survives.
-    expect(spec).toContain('one figure tells more than one thing the reader did not already know');
   });
 
-  it('keeps the parser contract: the figure lists open the create critique, and are not repeated in the re-tell', () => {
-    expect(arcCritiqueSpec()).toContain('"Premise figures:"');
-    expect(arcCritiqueSpec()).toContain('"Invented figures:"');
-    expect(arcCritiqueSpec()).toContain('"Allowed: <N>. Written: <M>."');
-    // arc-retell.txt declares both as its own top-level output bullets.
-    expect(arcCritiqueSpec({ retell: true })).not.toContain('"Premise figures:"');
+  it('the figure lists are gone from both variants: the STORY LOGIC carries the figures', () => {
+    for (const spec of [arcCritiqueSpec(), arcCritiqueSpec({ retell: true })]) {
+      expect(spec).not.toContain('"Premise figures:"');
+      expect(spec).not.toContain('"Invented figures:"');
+    }
   });
 
   it('the re-tell variant judges what remains', () => {

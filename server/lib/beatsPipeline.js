@@ -99,6 +99,7 @@ const {
   parseArcCreate,
   parseArcRetell,
   arcInventedAllowance,
+  arcShapeCounts,
   critiqueMaxSeverity,
   buildPlanCheckPrompt,
   parsePlanCheck,
@@ -965,6 +966,10 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // alone and charged them against the invented allowance.
   let arcPremiseNames = [];
   let arcInventedLimit = null;
+  // The commission's central figure as the arc's STORY LOGIC names it (null =
+  // "none", or no arc). The planner, plan-check Q12 and the
+  // CENTRAL_FIGURE_ABSENT_THIRD counter read it (owner, 2026-09-24, d4).
+  let arcCentralFigure = null;
   // The machine's full trail. Kept under the arcReviewReport key so the
   // storyJobPipeline persistence and the dev-mode wiring stay untouched.
   let arcReviewReport = null;
@@ -986,8 +991,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         try {
           const res = await textModels.callTextModelStreaming(prompt, null, onChunk, arcCreatorModel, { usageLabel: label, ...tempFor(arcCreatorModel, temp), ...(effort ? { effort } : {}) });
           if (!String(res?.text || '').trim()) throw new Error('empty response');
-          // A cut arc parses as a shorter arc (missing ARC 2, missing critique
-          // lines) — treat it as a failed attempt, never as the creator's answer.
+          // A cut arc parses as a shorter arc (missing critique lines, a short
+          // chain) — treat it as a failed attempt, never as the creator's answer.
           if (res.truncation?.suspected) throw new Error(`reply ${textModels.describeTruncation(res.truncation)}`);
           return res;
         } catch (err) {
@@ -998,8 +1003,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       throw new Error(`${label} failed after retry: ${lastErr?.message || 'unknown error'}`);
     };
 
-    // CREATE. A parse miss (no commitment line, no ARC 2 boundary) gets one
-    // full re-create, then throws into the outer containment.
+    // CREATE: ONE arc, its STORY LOGIC first (owner, 2026-09-24). A parse miss
+    // (no or incomplete logic block, no ARC block) gets one full re-create,
+    // then throws into the outer containment.
     await stage(1, 'Shaping the story arc...', { next: 2, ms: 90000 });
     const createPrompt = buildArcCreatePrompt(inputData, pageCount, { challengeIdeas });
     if (!createPrompt) throw new Error('arc-create template unavailable');
@@ -1014,8 +1020,21 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         if (attempt === 2) throw parseErr;
       }
     }
-    gl.info('arc_create', `Arc creator ${createRes.modelId || arcCreatorModel} wrote two arcs and committed to Arc ${commit.n}`, null, {
-      model: createRes.modelId || arcCreatorModel, committed: commit.n, stronger: commit.strongerLine,
+    // THE CODE COUNTS (d1-d3): what the old critique certified itself. d1 and
+    // d2 are logged only (D4); d3 drives the forced round below.
+    const logArcCounts = (label, round, counts) => {
+      if (!counts.sentencesInRange) {
+        gl.warn('arc_length_out_of_range', `${label}: ${counts.sentences} numbered sentences against a range of ${counts.sentenceRange.lo}-${counts.sentenceRange.hi}`, null, { round, sentences: counts.sentences, range: counts.sentenceRange });
+      }
+      if (!counts.chainInRange) {
+        gl.warn('arc_chain_out_of_range', `${label}: ${counts.chainLinks} chain links against a range of ${counts.chainRange.lo}-${counts.chainRange.hi}`, null, { round, chainLinks: counts.chainLinks, range: counts.chainRange });
+      }
+    };
+    const createCounts = arcShapeCounts({ sentences: commit.sentences, logic: commit.logic, inputData, pageCount });
+    logArcCounts('arc create', 0, createCounts);
+    gl.info('arc_create', `Arc creator ${createRes.modelId || arcCreatorModel} wrote one arc (${commit.sentences} sentences, ${createCounts.chainLinks} chain links, ${commit.logic.invented.length} new figure(s))`, null, {
+      model: createRes.modelId || arcCreatorModel, sentences: commit.sentences, chainLinks: createCounts.chainLinks,
+      invented: commit.logic.invented, commissioned: commit.logic.commissioned, centralFigure: commit.logic.centralFigure,
     });
     // Defaults if every panel round comes back empty: the committed arc stands,
     // its own critique as the known weak points.
@@ -1025,6 +1044,10 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // PANEL + RE-TELL rounds. Round k>1 feeds the previous FINAL ARC + its
     // critique back to the same panel, then the same creator re-tells again.
     let currentBlock = commit.committed;
+    // The story logic the current arc was told from — the create's, then each
+    // re-telling's updated block.
+    let currentLogic = commit.logic;
+    const countsTrail = [{ round: 0, ...createCounts }];
     // The critique the NEXT re-telling's Fixing line answers — the create
     // critique for round 1, then each round's fresh critique.
     let prevCritique = commit.critique;
@@ -1033,11 +1056,13 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // arc declares against it. Code re-counts the DECLARED LIST only — never
     // the arc prose (planCounters.js:227 documents why a regex cast extraction
     // over narrative is banned).
+    // The list is the (new)-tagged figures of the STORY LOGIC (D1-A); the
+    // (commissioned) ones feed commissionedCast, which drops the listed cast.
     const inventedAllowance = arcInventedAllowance(inputData);
     arcInventedLimit = inventedAllowance;
-    let arcInvented = commit.invented || { present: false, names: [] };
-    if (commit.premiseFigures?.names?.length) arcPremiseNames = commit.premiseFigures.names;
-    if (arcInvented.present) arcInventedNames = arcInvented.names;
+    arcInventedNames = commit.logic.invented;
+    arcPremiseNames = commit.logic.commissioned;
+    arcCentralFigure = commit.logic.centralFigure;
     // A forced round may extend the budget by one, never past the clamp, and
     // at most once per story.
     let roundBudget = arcRounds;
@@ -1097,6 +1122,10 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         }
       }
       approvedArc = retold.finalArc;
+      currentLogic = retold.logic;
+      const retellCounts = arcShapeCounts({ sentences: retold.sentences, logic: retold.logic, inputData, pageCount });
+      countsTrail.push({ round, ...retellCounts });
+      logArcCounts(`arc re-tell round ${round}`, round, retellCounts);
       // Which of the drawn challenges this book actually built on, by catalogue
       // id — the join between what was offered and what shipped. The last
       // re-telling wins: it is the one whose arc becomes the story.
@@ -1114,17 +1143,18 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // Worst surviving fault (untagged lines count as MAJOR, so pre-tag
       // output keeps working); null = the critique names no faults at all.
       const maxSeverity = critiqueMaxSeverity(retold.critique);
-      // INVENTED-FIGURE RE-COUNT (2026-09-09). The arc used to grade its own
-      // cast inside the same call and self-certify: job_1788903616404_iqvhj4l8m
-      // wrote four invented figures on an allowance of two and reported
-      // "Invented figures past allowance: none — Fenno and Nolo, exactly two".
-      // Arithmetic on the model's own emitted list, nothing else.
-      arcInvented = retold.invented && retold.invented.present ? retold.invented : arcInvented;
-      if (retold.premiseFigures?.names?.length) arcPremiseNames = retold.premiseFigures.names;
-      const inventedCount = (arcInvented.names || []).length;
-      if (arcInvented.present) arcInventedNames = arcInvented.names;
-      if (MODEL_DEFAULTS.arcForceRoundOnInventedOvercount && arcInvented.present && inventedCount > inventedAllowance) {
-        const detail = { round, names: arcInvented.names, counted: inventedCount, allowance: inventedAllowance, declaredWritten: arcInvented.written, declaredAllowed: arcInvented.allowed };
+      // INVENTED-FIGURE RE-COUNT (2026-09-09; source moved 2026-09-24). The
+      // arc used to grade its own cast inside the same call and self-certify:
+      // job_1788903616404_iqvhj4l8m wrote four invented figures on an
+      // allowance of two and reported "exactly two". The count is arithmetic
+      // on the (new)-tagged figures of the STORY LOGIC, nothing else.
+      const arcInvented = { names: retold.logic.invented };
+      arcInventedNames = arcInvented.names;
+      arcPremiseNames = retold.logic.commissioned;
+      arcCentralFigure = retold.logic.centralFigure;
+      const inventedCount = arcInvented.names.length;
+      if (MODEL_DEFAULTS.arcForceRoundOnInventedOvercount && inventedCount > inventedAllowance) {
+        const detail = { round, names: arcInvented.names, counted: inventedCount, allowance: inventedAllowance };
         if (inventedRoundForced) {
           log.warn(`⚠️ [ARC] Round ${round}: ${inventedCount} invented figure(s) [${arcInvented.names.join(', ')}] against an allowance of ${inventedAllowance} — a round was already forced for this story; shipping with the overrun`);
           gl.warn('arc_invented_overcount', `Round ${round}: ${inventedCount} invented figures (${arcInvented.names.join(', ')}) against an allowance of ${inventedAllowance} — one round was already forced; the arc ships with the overrun`, null, detail);
@@ -1151,11 +1181,11 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         panelPrompt,
         retellPrompt,
         // The re-telling's raw reply (2026-09-23). The parsed fields below drop
-        // its "Premise figures:" / "Invented figures:" / "Challenges taken:"
-        // head and strip the [C###] tags, so without the raw nothing they were
-        // parsed from could be audited.
+        // its "Challenges taken:" head and strip the [C###] tags, so without
+        // the raw nothing they were parsed from could be audited.
         retellRaw: retellRes.text,
         retellModel: retellRes.modelId || arcCreatorModel,
+        logic: retold.logic.text,
         finalArc: retold.finalArc,
         used: retold.used,
         fixing: retold.fixing,
@@ -1189,7 +1219,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         break;
       }
       prevCritique = retold.critique;
-      currentBlock = `FINAL ARC:\n${retold.finalArc}\n\nCRITIQUE:\n${retold.critique}`;
+      currentBlock = `STORY LOGIC:\n${retold.logic.text}\n\nFINAL ARC:\n${retold.finalArc}\n\nCRITIQUE:\n${retold.critique}`;
     }
 
     // GROK HINT PASS (owner verdict 2026-09-01, lean flow): one outside look
@@ -1202,7 +1232,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     let hintsRaw = null;
     const hintsModel = MODEL_DEFAULTS.arcHintsModel || 'grok-4.6';
     try {
-      hintsPrompt = buildArcHintsPrompt(inputData, approvedArc);
+      hintsPrompt = buildArcHintsPrompt(inputData, approvedArc, currentLogic.text);
       if (!hintsPrompt) throw new Error('arc-hints template unavailable');
       // null maxTokens = the model's own maximum; temp 0 on the non-Anthropic paths.
       const hintsRes = await textModels.callTextModelStreaming(hintsPrompt, null, onChunk, hintsModel, { usageLabel: 'arc_hints', ...tempFor(hintsModel, 0) });
@@ -1230,9 +1260,16 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       durationMs: meta.timings.arcMs,
       create: createRes.text,
       createPrompt,
-      committedArc: commit.n,
+      // The block the panel read: the create's logic, arc and critique.
       committed: commit.committed,
-      discarded: commit.discarded,
+      // The STORY LOGIC the final arc was told from, and the create's own.
+      // Stored here only (D5-a): finalArc keeps its shape for every reader.
+      logic: currentLogic.text,
+      createLogic: commit.logic.text,
+      centralFigure: arcCentralFigure,
+      // The code counts per round (round 0 = the create): sentences, chain
+      // links and (new) figures against their ranges (D4: logged only).
+      counts: countsTrail,
       rounds: roundReports,
       finalArc: approvedArc,
       fixing: roundReports.length ? roundReports[roundReports.length - 1].fixing : '',
@@ -1266,7 +1303,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // 2026-09-02 the stage emits ONE thing per page: the plan line. The beat
   // prose it used to write measured as the lossiest step in the chain
   // (Lab #973) and is gone — see docs/decisions.md.
-  const planPrompt = buildBeatsPrompt(inputData, pageCount, { finalArc: approvedArc, arcHints });
+  const planPrompt = buildBeatsPrompt(inputData, pageCount, { finalArc: approvedArc, arcHints, centralFigure: arcCentralFigure });
   if (!planPrompt) throw new Error('story-beats template unavailable — beats pipeline cannot run');
 
   /**
@@ -1338,7 +1375,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // the commission supplied elsewhere, which are never invented.
   const commission = commissionedCast(inputData, arcPremiseNames);
   const commissionedNames = commission.all;
-  if (arcPremiseNames.length) log.info(`👪 [BEATS] Premise figures counted as commissioned: ${arcPremiseNames.join(', ')}`);
+  if (arcPremiseNames.length) log.info(`👪 [BEATS] Figures the arc tagged (commissioned), counted as commissioned: ${arcPremiseNames.join(', ')}`);
   // The counters must never read a PLACE as a person. The names come from the
   // same authoritative data the planner itself was given — the resolved
   // landmark list, the family's town, and (historical stories) the canonical
@@ -1401,7 +1438,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     try {
       // No counter findings ride in: they do not exist yet. See the builder's
       // header — the counters read this call's ROSTER, so they run below.
-      prompt = buildPlanCheckPrompt(inputData, pages, approvedArc, planText, { arcHints });
+      prompt = buildPlanCheckPrompt(inputData, pages, approvedArc, planText, { arcHints, centralFigure: arcCentralFigure });
       if (!prompt) throw new Error('plan-check template unavailable');
       const res = await textModels.callTextModelStreaming(prompt, null, onChunk, planCheckModel, {
         usageLabel: label,
@@ -1434,7 +1471,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       log.error(`❌ [BEATS] Plan check (${label}) failed (${err.message}) — NO ROSTER, so the entire plan-counter layer is skipped this round`);
       gl.error(`${label}_failed`, `Plan check failed: ${err.message} — no roster, so every plan counter (cast, invented cast, shot variety, focal pages) is skipped this round`, null, { error: err.message, model: planCheckModel });
     }
-    const counters = runPlanCounters({ pages, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit, roster, peoplelessPick });
+    const counters = runPlanCounters({ pages, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit, roster, peoplelessPick, centralFigure: arcCentralFigure });
     // NO FALLBACK, NO SYNTHESIS. The finding degrades to its page-less
     // sentence when Q6 nominated nothing; code never picks the page itself.
     // The miss is loud so a checker that stops answering Q6 is visible.
@@ -1546,6 +1583,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         const replanPrompt = buildBeatsPrompt(inputData, pageCount, {
           finalArc: approvedArc,
           arcHints,
+          centralFigure: arcCentralFigure,
           replan: buildReplanSection(pagePlan, pendingCheck.findings, { pageCount: beats.length, keep, refused: lastRefusals }),
         });
         if (!replanPrompt) throw new Error('story-beats template unavailable');

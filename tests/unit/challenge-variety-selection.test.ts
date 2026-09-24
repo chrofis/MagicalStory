@@ -164,6 +164,14 @@ describe('the draw is auditable back to the catalogue', () => {
 
 describe('parseArcRetell records which drawn challenges the arc took', () => {
   const retell = (taken: string) => [
+    'STORY LOGIC:',
+    'Want and stakes: get home.',
+    'Opposition: the river.',
+    'Facts:',
+    '- Levin (commissioned) — can swim; cannot row',
+    'Central figure: none',
+    'Chain:',
+    '- because the bridge is down, they build a raft',
     'Fixing: the orphaned payoff.',
     'Keeping: the rescue.',
     'Challenges taken:',

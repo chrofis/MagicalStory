@@ -88,9 +88,11 @@ describe('DEFECT fixed: the re-telling knows the book language', () => {
   });
 
   it('the re-telling is the stage that invents names, so it needs it', () => {
-    // TELLING_RULES sends the creator off to invent fresh vessel/place names,
-    // and every round re-tells the arc whole — the FINAL arc is a retell output.
-    expect(built['arc-retell']).toMatch(/invented fresh/i);
+    // The re-telling writes the updated STORY LOGIC, whose FACTS name every
+    // figure the plot runs on — the (new) ones are names it invents — and every
+    // round re-tells the arc whole: the FINAL arc is a retell output.
+    const { arcLogicSpec } = require('../../server/lib/promptBuilders');
+    expect(built['arc-retell']).toContain(arcLogicSpec(inputData, 4));
   });
 });
 
