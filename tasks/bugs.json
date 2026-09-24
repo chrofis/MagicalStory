@@ -1839,6 +1839,18 @@
       "fixedAt": "2026-09-24",
       "fixedIn": "a387828f0",
       "fix": "landmark_view_missing deleted (no derivation: the default is the exterior photo and the views that differ are not in any structured field). shotVocabulary.CLOSEUP_KEPT_RULE shared by AD 11c, scene-review 7b / 10 and shot_widened; shot_off_plate keeps a planned shot and offers only a vantage; 9e / C7 place by the place. Pinned by tests/unit/art-director-audit-2026-09-23.test.ts. docs/decisions.md 2026-09-24."
+    },
+    {
+      "id": "vehicle-description-undefined-on-covers",
+      "title": "A cover's KEY STORY ELEMENTS defined a vehicle as \"**Vehicle**: undefined\"",
+      "reportedAt": "2026-09-23",
+      "source": "Staging job_1789343124794_z2c779f7i coverImages.initialPage.prompt; its visualBible.vehicles[0] (VEH001 tram) carries colorAndDetails + signatureElement and no description. 4 of 51 staging vehicles and 1 of 3 prod vehicles (job_1790107559778_fcmlfa8kn) in the last 30 days lack the field.",
+      "rootCause": "The live Visual Bible parse (outlineParser/unified.js) keeps the authored vehicle shape raw; only the uncalled visualBible.parseVisualBible derived `description`, and every consumer reads `description`.",
+      "impact": "A vehicle listed on a cover reached the image model with no definition, only the word undefined.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "30f2c6913",
+      "fix": "visualBible.vehicleDescription derives it (authored description stands) in both parse paths. Stored rows keep the gap (parse-time fix; recorded in decisions.md). Pinned by tests/unit/cover-objects-any-element.test.ts."
     }
   ]
 }
