@@ -29,6 +29,7 @@ const { blackoutIssueRegions } = require('./imageInpainting');
 const { buildEmptySceneVbGrid, buildPageCompositeRefs } = require('./referenceSheets');
 const { GROK_ASPECT_PRESETS, closestGrokAspect } = require('./grokAspect');
 const { assessImageResponse, describeImageBlock } = require('./imageReplyGuard');
+const { assertLandmarkScene, pageNeedsPlate, pageLandmarkScene, toPlateDataUri, PlateRequiredError } = require('./landmarkScene');
 
 /**
  * The evaluator-derived EVIDENCE fields that every result-assembly whitelist in
@@ -799,7 +800,7 @@ function dedupeIdenticalBullets(prompt) {
 //      the drop in front of it: the front cover of the same story lost its
 //      whole cast block — every garment, age and height — because the
 //      `**CHARACTERS IN THIS IMAGE` header was not a marker. Blocks are now
-//      removed by their EXACT text, read from the template that emitted them,
+//      removed by their EXACT text, read from the template or constant that emitted them,
 //      so there is no range to overrun and no list to keep in sync.
 //
 // The scene prose, the reference-card colour map, the cast blocks, REQUIRED
@@ -816,7 +817,10 @@ function dedupeIdenticalBullets(prompt) {
 // lost both (docs/audits/prompt-audit-2026-09-23/08-page-images.md S3,
 // 09-covers.md C3). REQUIRED TEXT is protected the same way. None of them is a
 // unit below, and cutBlocks() throws if a unit would ever remove one.
-const { NO_CHARACTER_MARKING_RULE, HANDS_HOLD_ONLY_NAMED_RULE } = require('./promptBuilders');
+const {
+  NO_CHARACTER_MARKING_RULE, HANDS_HOLD_ONLY_NAMED_RULE,
+  COMPOSITION_HEADER, COMPOSITION_FACING_BULLET, COMPOSITION_GROUND_BULLET, COMPOSITION_SIZE_BULLET, COUNTS_RULE,
+} = require('./promptBuilders');
 
 /**
  * A literal paragraph of prompts/image-generation.txt, by its opening text.
@@ -836,111 +840,180 @@ function templateParagraph(prefix) {
   const tpl = PROMPT_TEMPLATES.imageGeneration || IMAGE_GENERATION_TEMPLATE_ON_DISK;
   const para = tpl.split(/\n{2,}/).map(x => x.trim()).find(x => x.startsWith(prefix));
   if (!para) {
-    throw new Error(`prompt-shrink: prompts/image-generation.txt has no paragraph starting "${prefix}" — the drop list is stale`);
+    throw new Error(`prompt-shrink: prompts/image-generation.txt has no paragraph starting "${prefix}" — the cut order is stale`);
   }
   return para;
 }
 
-/** A whole template paragraph, removed by its exact text (every occurrence). */
-function paragraphUnit(label, prefix) {
-  const text = templateParagraph(prefix);
-  return {
-    label,
-    apply(s) {
-      const n = s.split(text).length - 1;
-      return { text: n ? s.split(text).join('') : s, entitled: n * text.length };
-    },
+/** An exact string, removed wherever it occurs. */
+function exactTextUnit(text) {
+  return (s) => {
+    const n = s.split(text).length - 1;
+    return { text: n ? s.split(text).join('') : s, entitled: n * text.length };
   };
 }
 
 /** A block found by a regex (one match) — the cast-derived page facts. */
-function regexUnit(label, re) {
-  return {
-    label,
-    apply(s) {
-      const m = s.match(re);
-      return m ? { text: s.replace(re, ''), entitled: m[0].length } : { text: s, entitled: 0 };
-    },
+function regexUnit(re) {
+  return (s) => {
+    const m = s.match(re);
+    return m ? { text: s.replace(re, ''), entitled: m[0].length } : { text: s, entitled: 0 };
   };
 }
 
 /**
- * ONE BULLET of a bulleted template paragraph. Composition used to go whole —
- * 1,176 chars on p12 of staging job_1790100385959_1nitlympp, which was ~110
- * chars over the cap when its turn came — so a page lost its feet-on-the-ground
- * rule to pay for one sentence. Bullets go one at a time, in rank order; the
- * header goes with the last one, so no empty heading is ever sent.
+ * ONE BULLET of the Composition block (promptBuilders.buildCompositionBlock).
+ * Composition used to go whole — 1,176 chars on p12 of staging
+ * job_1790100385959_1nitlympp, which was ~110 chars over the cap when its turn
+ * came — so a page lost its feet-on-the-ground rule to pay for one sentence.
+ * Bullets go one at a time; the header goes with the last one, so no empty
+ * heading is ever sent.
  */
-function bulletUnit(label, paragraphPrefix, bulletPrefix) {
-  const para = templateParagraph(paragraphPrefix);
-  const [header, ...bullets] = para.split('\n');
-  const line = bullets.find(b => b.startsWith(`- ${bulletPrefix}`));
-  if (!line) {
-    throw new Error(`prompt-shrink: the "${paragraphPrefix}" paragraph has no bullet starting "- ${bulletPrefix}" — the drop list is stale`);
-  }
-  const escaped = header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function compositionBulletUnit(bullet) {
+  const escaped = COMPOSITION_HEADER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const orphanHeader = new RegExp(`^${escaped}[ \\t]*(?!\\n- )(?=\\n|$)`, 'm');
-  const needle = `\n${line}`;
-  return {
-    label,
-    apply(s) {
-      const n = s.split(needle).length - 1;
-      if (!n) return { text: s, entitled: 0 };
-      let out = s.split(needle).join('');
-      let entitled = n * needle.length;
-      if (orphanHeader.test(out)) {
-        out = out.replace(orphanHeader, '');
-        entitled += header.length;
-      }
-      return { text: out, entitled };
-    },
+  const needle = `\n${bullet}`;
+  return (s) => {
+    const n = s.split(needle).length - 1;
+    if (!n) return { text: s, entitled: 0 };
+    let out = s.split(needle).join('');
+    let entitled = n * needle.length;
+    if (orphanHeader.test(out)) {
+      out = out.replace(orphanHeader, '');
+      entitled += COMPOSITION_HEADER.length;
+    }
+    return { text: out, entitled };
   };
 }
 
 /**
- * The droppable units, LEAST LOAD-BEARING FIRST. Built lazily (the templates
- * are loaded asynchronously at boot) and cached.
+ * THE CUT ORDER — what shrinkPromptForModel removes, and in which order, when a
+ * built image prompt is over the model's cap (Grok: 7,900 chars,
+ * models.js maxPromptLength). ONE list. The shrinker walks it top to bottom and
+ * stops the moment the prompt fits; docs/image-generation-methods.html and
+ * docs/prompt-inventory.md render THIS array (scripts/admin/sync-prompt-cut-order-docs.js,
+ * pinned by tests/unit/prompt-cut-order-docs.test.ts) — there is no second copy.
  *
- * THE RANK (2026-09-23). A unit goes early when something else in the prompt
- * already carries most of what it says, or when it binds few pages:
- *   - COUNTS binds only a page that states a number of like things.
- *   - the Composition SIZE bullet restates what the REQUIRED OBJECTS scale
- *     riders and DEPTH AND SIZE ("a size stated for an element always wins")
- *     state per element.
- *   - the Composition FACING bullet yields to every declared facing, and EXACT
- *     POSES / EXPRESSIONS AND EYES declare one per figure on a page (a cover
- *     declares "eyes on the viewer" for everyone).
- *   - DEPTH AND SIZE defines the brief's foreground/midground/background words.
- *   - the Composition GROUND bullet is a page's only feet-on-the-ground rule
- *     (a cover carries a short one of its own).
- *   - REQUIRED CAST puts in every figure the prose gives no action to.
- * Then the page facts — height, age, the reference-photo binding, the frame
- * rule — last to go, as the 2026-09-21 ranking set them.
+ * Each step removes its block's EXACT text and nothing else. A step whose block
+ * is not in the prompt (a cover has no facing bullet or COUNTS; a one-character
+ * page has no HEIGHT ORDER) removes nothing and is not logged.
+ *
+ * THE RANK (2026-09-23, docs/decisions.md "The shrink ranks its cuts"): a block
+ * goes early when something else in the prompt already carries most of what it
+ * says or when it binds few pages; the page facts — height, age, the
+ * reference-photo binding, the frame rule — go last, as the 2026-09-21 ranking
+ * set them. `approxChars` is the block's size on a typical page (staging
+ * job_1790100385959_1nitlympp, measured 2026-09-24).
  */
+const PROMPT_CUT_ORDER = [
+  {
+    label: 'COUNTS',
+    what: 'the "three or fewer" counting rule',
+    why: 'binds only a page whose prose states a number of like things; never built on a cover',
+    approxChars: 235,
+    unit: () => exactTextUnit(COUNTS_RULE),
+  },
+  {
+    label: 'Composition: size',
+    what: 'the vessel / building / vehicle true-size bullet',
+    why: 'the REQUIRED OBJECTS scale riders and DEPTH AND SIZE ("a size stated for an element always wins") state it per element',
+    approxChars: 305,
+    unit: () => compositionBulletUnit(COMPOSITION_SIZE_BULLET),
+  },
+  {
+    label: 'Composition: facing',
+    what: 'the "faces the target, not the camera" bullet',
+    why: 'yields to every declared facing, and EXACT POSES / EXPRESSIONS AND EYES declare one per figure; never built on a cover',
+    approxChars: 367,
+    unit: () => compositionBulletUnit(COMPOSITION_FACING_BULLET),
+  },
+  {
+    label: 'DEPTH AND SIZE',
+    what: 'the foreground / midground / background definitions',
+    why: 'defines the brief\'s depth words; the prose still places every figure',
+    approxChars: 647,
+    unit: () => exactTextUnit(templateParagraph('**DEPTH AND SIZE:**')),
+  },
+  {
+    label: 'Composition: ground',
+    what: 'the feet-on-the-ground bullet (the header goes with it)',
+    why: 'the one feet-on-the-ground rule for pages and covers; kept longer than the generic rules above',
+    approxChars: 600,
+    unit: () => compositionBulletUnit(COMPOSITION_GROUND_BULLET),
+  },
+  {
+    label: 'REQUIRED CAST',
+    what: 'every named character in frame, exactly one of each, nobody added',
+    why: 'the generator half of D-03 / D-04b; the prose and the character lines still name the cast, so it is the last generic rule to go',
+    approxChars: 500,
+    unit: () => exactTextUnit(templateParagraph('**REQUIRED CAST:**')),
+  },
+  // Page facts. Last to go.
+  {
+    label: 'HEIGHT ORDER',
+    what: 'the shortest-to-tallest line',
+    why: 'a page fact: the relative size the height judge compares',
+    approxChars: 140,
+    unit: () => regexUnit(/^\*\*HEIGHT ORDER[^\n]*\n/m),
+  },
+  {
+    label: 'AGE & PROPORTIONS',
+    what: 'the per-age head-count proportions',
+    why: 'a page fact: without it an infant is drawn as a preschooler',
+    approxChars: 485,
+    unit: () => regexUnit(/^AGE & PROPORTIONS[\s\S]*?(?=\n\n|$)/m),
+  },
+  {
+    label: 'reference-photo rule',
+    what: 'which attached photo is a place and which is a person',
+    why: 'a page fact: the plate-vs-identity binding of the attached images',
+    approxChars: 512,
+    unit: () => exactTextUnit(templateParagraph('When the FIRST reference photo')),
+  },
+  {
+    label: 'single-illustration rule',
+    what: 'one full-bleed picture, no lettering, ids are not painted',
+    why: 'the frame rule; the very last block the cut may spend',
+    approxChars: 503,
+    unit: () => exactTextUnit(templateParagraph('Generate a SINGLE illustration')),
+  },
+];
+
+/**
+ * NEVER CUT. None of these is a step above, and no step may reach one:
+ * cutBlocks() throws if a step would remove an exact-text entry (`text`).
+ * Entries with a `marker` open the PROTECTED TAIL — everything from the first
+ * of them to the end of the prompt (protectedTailStart). Once every step has
+ * run, only the text before that tail (the scene prose and the page's own
+ * lines) is trimmed, at a sentence boundary; if the tail alone leaves no room
+ * the render fails loudly instead (owner, 2026-09-23).
+ */
+const PROMPT_NEVER_CUT = [
+  { label: 'NO MARKS', why: 'generator half of D-24 (sibling-registry page-image-generator-vs-critics parity anchor)', text: () => NO_CHARACTER_MARKING_RULE },
+  { label: 'HANDS', why: 'generator half of D-16b (same parity anchor set)', text: () => HANDS_HOLD_ONLY_NAMED_RULE },
+  { label: 'REQUIRED TEXT', why: 'the baked cover title and any lettering a Visual Bible element must carry (SETTLED: baked title)', text: () => '**REQUIRED TEXT:**' },
+  { label: 'REQUIRED OBJECTS', why: 'the commissioned elements of the page', marker: '**REQUIRED OBJECTS' },
+  { label: 'SEASON', why: 'the book-wide season, even against a reference photo from another season', marker: '**SEASON:**' },
+  { label: 'LIGHT', why: "the page's declared time of day and weather, which wins over the plate's light (sceneLight.js)", marker: '**LIGHT:**' },
+  { label: 'COMPOSITION GUIDELINES', why: 'a cover\'s own composition: title-safe top third, group, bottom margin', marker: '**COMPOSITION GUIDELINES:**' },
+  { label: 'ART STYLE', why: 'the style the book is commissioned in', marker: '**ART STYLE' },
+  { label: 'SHOT', why: 'the page\'s declared framing (a cover carries none)' },
+  { label: 'EXACT POSES / EXPRESSIONS AND EYES', why: 'the declared pose and gaze per figure' },
+];
+
 let CUT_BLOCKS = null;
 function cutBlocks() {
   if (CUT_BLOCKS) return CUT_BLOCKS;
-  const units = [
-    paragraphUnit('COUNTS', '**COUNTS:**'),
-    bulletUnit('Composition: size', '**Composition:**', 'A vessel, building or vehicle'),
-    bulletUnit('Composition: facing', '**Composition:**', 'Each character does a specific action'),
-    paragraphUnit('DEPTH AND SIZE', '**DEPTH AND SIZE:**'),
-    bulletUnit('Composition: ground', '**Composition:**', 'A standing character stands'),
-    paragraphUnit('REQUIRED CAST', '**REQUIRED CAST:**'),
-    // Page facts. Last to go.
-    regexUnit('HEIGHT ORDER', /^\*\*HEIGHT ORDER[^\n]*\n/m),
-    regexUnit('AGE & PROPORTIONS', /^AGE & PROPORTIONS[\s\S]*?(?=\n\n|$)/m),
-    paragraphUnit('reference-photo rule', 'When the FIRST reference photo'),
-    paragraphUnit('single-illustration rule', 'Generate a SINGLE illustration'),
-  ];
-  // The anchors are protected by construction; this makes a unit added later
+  const units = PROMPT_CUT_ORDER.map((step, i) => ({ step: i + 1, label: step.label, apply: step.unit() }));
+  // The anchors are protected by construction; this makes a step added later
   // that would reach one fail at the first shrink instead of shipping.
   const tpl = PROMPT_TEMPLATES.imageGeneration || IMAGE_GENERATION_TEMPLATE_ON_DISK;
-  for (const anchor of [NO_CHARACTER_MARKING_RULE, HANDS_HOLD_ONLY_NAMED_RULE]) {
+  for (const keep of PROMPT_NEVER_CUT.filter(k => k.text)) {
+    const anchor = keep.text();
     let probe = `${tpl}\n\n${anchor}`;
     for (const unit of units) probe = unit.apply(probe).text;
     if (!probe.includes(anchor)) {
-      throw new Error('prompt-shrink: a drop unit removes a generator↔critic parity anchor — anchors are never cut');
+      throw new Error(`prompt-shrink: a cut step removes ${keep.label} — it is on the never-cut list`);
     }
   }
   CUT_BLOCKS = units;
@@ -954,11 +1027,12 @@ function cutBlocks() {
 const BLANK_RUN_SLACK = 64;
 
 /**
- * @returns {{ text: string, dropped: string[], proseCut: number }}
+ * @returns {{ text: string, dropped: string[], droppedSteps: Array<{step:number,label:string,chars:number}>, proseCut: number }}
  */
 function sectionAwareCut(prompt, maxLen, logLabel) {
   let out = prompt;
   const dropped = [];
+  const droppedSteps = [];
   for (const block of cutBlocks()) {
     if (out.length <= maxLen) break;
     const before = out.length;
@@ -984,7 +1058,10 @@ function sectionAwareCut(prompt, maxLen, logLabel) {
       // cheaper prompt, it is the wrong picture (CLAUDE.md — no fallbacks).
       throw new Error(`prompt-shrink: dropping "${block.label}" removed ${removed} chars but that block is only ${entitled} — the cut reached past it into the page's own facts`);
     }
-    if (removed > 0) dropped.push(block.label);
+    if (removed > 0) {
+      dropped.push(block.label);
+      droppedSteps.push({ step: block.step, label: block.label, chars: removed });
+    }
   }
 
   let proseCut = 0;
@@ -994,17 +1071,22 @@ function sectionAwareCut(prompt, maxLen, logLabel) {
     // (owner, 2026-08-17): the head is written in reading order, so slicing at
     // a byte offset deletes the LAST-described characters outright while the
     // evaluator still scores the render against a contract they were cut from.
-    const objIdx = out.indexOf('**REQUIRED OBJECTS');
-    const tailStart = objIdx >= 0 ? objIdx : out.indexOf('**ART STYLE');
+    const tailStart = protectedTailStart(out);
     if (tailStart < 0) {
+      // Not an image prompt (the Grok edit body, the composite blend): no
+      // section markers, nothing must-keep to protect.
       const truncated = truncatePromptForModel(out, maxLen, logLabel);
-      return { text: truncated, dropped, proseCut: out.length - truncated.length };
+      return { text: truncated, dropped, droppedSteps, proseCut: out.length - truncated.length };
     }
     const tail = out.slice(tailStart);
     const headBudget = maxLen - tail.length - 5;
     if (headBudget < 500) {
-      const truncated = truncatePromptForModel(out, maxLen, logLabel);
-      return { text: truncated, dropped, proseCut: out.length - truncated.length };
+      // The MUST-KEEP tail alone leaves no room for the scene. A blunt cut here
+      // would delete must-keep text (it used to: truncatePromptForModel sliced
+      // the end off, ART STYLE first). Fail the render instead (owner,
+      // 2026-09-23: must-keep sections are never cut; if it cannot fit, fail
+      // loudly).
+      throw new Error(`prompt-shrink [${logLabel}]: ${out.length} chars after every drop, cap ${maxLen}; the must-keep sections alone are ${tail.length} chars — refusing to cut them`);
     }
     let head = out.slice(0, tailStart);
     const keep = head.slice(0, headBudget);
@@ -1016,19 +1098,44 @@ function sectionAwareCut(prompt, maxLen, logLabel) {
   }
 
   log.warn(`✂️ [${logLabel}] Section-aware cut: ${prompt.length}→${out.length} chars`
-    + (dropped.length ? `, dropped ${dropped.join(' + ')}` : '')
+    + (droppedSteps.length ? `, cut in order: ${describeCutSteps(droppedSteps)}` : '')
     + (proseCut ? `, AND ${proseCut} chars of scene prose — a character may be missing` : ''));
-  return { text: out, dropped, proseCut };
+  return { text: out, dropped, droppedSteps, proseCut };
+}
+
+/** "#1 COUNTS (-235) > #2 Composition: size (-305)" — step numbers are PROMPT_CUT_ORDER positions. */
+function describeCutSteps(steps) {
+  return steps.map(s => `#${s.step} ${s.label} (-${s.chars})`).join(' > ');
+}
+
+/**
+ * THE MUST-KEEP SECTIONS (the `marker` entries of PROMPT_NEVER_CUT). Everything from the first of these to the end of the
+ * prompt is the protected tail: the shrink never trims into it, and fails
+ * loudly rather than cut it (sectionAwareCut). REQUIRED OBJECTS and ART STYLE
+ * were the only two markers until 2026-09-23, so a prompt with no REQUIRED
+ * OBJECTS block — every full-path cover — had its tail start at ART STYLE, and
+ * the last-resort prose trim ate the cover's Visual Bible block, SEASON and
+ * COMPOSITION GUIDELINES first, because the template places them just before
+ * ART STYLE: staging job_1789853503332_riqncqg1i's back cover shipped with all
+ * three gone (owner, 2026-09-23: must-keep on every cover path). Every cover now
+ * carries REQUIRED OBJECTS like a page, and the separate cover block (KEY STORY
+ * ELEMENTS) is deleted.
+ */
+const MUST_KEEP_MARKERS = PROMPT_NEVER_CUT.filter(k => k.marker).map(k => k.marker);
+
+/** Index where the protected tail begins (the earliest must-keep marker), or -1. */
+function protectedTailStart(prompt) {
+  const hits = MUST_KEEP_MARKERS.map(m => prompt.indexOf(m)).filter(i => i >= 0);
+  return hits.length ? Math.min(...hits) : -1;
 }
 
 /**
  * The scene block of a prompt: everything strictly before the protected tail
- * (`**REQUIRED OBJECTS` / `**ART STYLE`). Returns '' when there is no tail
- * marker, so a caller can tell "no scene block found" from a real one.
+ * (protectedTailStart). Returns '' when there is no tail marker, so a caller
+ * can tell "no scene block found" from a real one.
  */
 function sceneHeadOf(prompt) {
-  const o = prompt.indexOf('**REQUIRED OBJECTS');
-  const tailStart = o >= 0 ? o : prompt.indexOf('**ART STYLE');
+  const tailStart = protectedTailStart(prompt);
   return tailStart > 0 ? prompt.slice(0, tailStart).trim() : '';
 }
 
@@ -1073,7 +1180,7 @@ async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName
   // 2. Guarantee: drop ranked blocks, generic guidance before page facts.
   const cut = sectionAwareCut(out, maxPromptLength, logLabel);
   recordPromptShrink({ logLabel, modelName, branch: 'cut', before: prompt.length, after: cut.text.length,
-    cap: maxPromptLength, dropped: cut.dropped, proseCut: cut.proseCut });
+    cap: maxPromptLength, dropped: cut.dropped, droppedSteps: cut.droppedSteps, proseCut: cut.proseCut });
   if (meta) meta.compressedScene = sceneHeadOf(cut.text) || undefined;
   return cut.text;
 }
@@ -1087,13 +1194,13 @@ async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName
  * per page, so a whole book could ship with AGE & PROPORTIONS missing from
  * every prompt and nothing in the story record said so.
  */
-function recordPromptShrink({ logLabel, modelName, branch, before, after, cap, dropped, proseCut }) {
+function recordPromptShrink({ logLabel, modelName, branch, before, after, cap, dropped, droppedSteps = [], proseCut }) {
   const genLog = getCurrentLogger();
   if (!genLog) return;  // not in a generation context (ad-hoc Lab / script call)
   const details = { label: logLabel, model: modelName || null, branch, before, after, cap,
-    charsCut: before - after, dropped, proseCut };
+    charsCut: before - after, dropped, droppedSteps, proseCut };
   const msg = `${logLabel}: ${before}→${after} chars (cap ${cap}) via ${branch}`
-    + (dropped.length ? `, dropped ${dropped.join(' + ')}` : '')
+    + (droppedSteps.length ? `, cut in order: ${describeCutSteps(droppedSteps)}` : '')
     + (proseCut ? `, ${proseCut} chars of scene prose trimmed` : '');
   if (dropped.length || proseCut) genLog.warn('prompt_shrink', msg, null, details);
   else genLog.info('prompt_shrink', msg, null, details);
@@ -1157,6 +1264,10 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
     visualBibleGrid = null,
     sceneBackground = null,
     textAreaMask = null,                 // gen-only threads this into primary-Grok packReferences
+    // What a raw landmark photo may be on this call when no plate is sent:
+    // 'plate' (this call renders the plate) | 'castless' (cast-0 page) | null.
+    // See server/lib/landmarkScene.js — anything else with a photo throws.
+    landmarkScene = null,
     onImageReady = null,
     outputAspect,                        // pre-resolved aspect (eval: resolveOutputAspect(evalType, override); gen-only: aspectRatio option)
     evaluationType = null,               // used only for the primary-Grok log line (eval path)
@@ -1175,6 +1286,10 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
     // against the description that was actually sent.
     promptMeta = null,
   } = opts;
+
+  // PLATE OR FAIL: a landmark photo with no plate and no declared role never
+  // reaches a provider (server/lib/landmarkScene.js).
+  assertLandmarkScene({ landmarkPhotos, sceneBackground, landmarkScene, label: logLabel || 'IMAGE' });
 
   // Whether slot-0 scene plates get magenta-extension padding (gen-only only).
   const slot0IsScenePlate = usePadExtension && !!(sceneBackground || (Array.isArray(landmarkPhotos) && landmarkPhotos.length) || previousImage);
@@ -1237,7 +1352,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
 
     try {
       const refImages = await packReferences(
-        { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground, textAreaMask },
+        { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground, textAreaMask, landmarkScene },
         { aspectRatio: grokAspect, pageLabel, padInputWithExtension: slot0IsScenePlate, ...(maxRefSlots ? { maxSlots: maxRefSlots } : {}), ...(vbColumnFraction ? { vbColumnFraction } : {}) }
       );
 
@@ -1379,7 +1494,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
   if (hasScenePlate && landmarkPhotos?.length > 0) {
     log.info(`🌍 [${logLabel}] Plate present — raw landmark photo "${landmarkPhotos[0]?.name || 'unknown'}" not attached`);
   }
-  if (!hasScenePlate && landmarkPhotos && landmarkPhotos.length > 0) {
+  if (!hasScenePlate && landmarkScene && landmarkPhotos && landmarkPhotos.length > 0) {
     const primaryLandmark = landmarkPhotos[0];
     const candidates = [primaryLandmark.photoUrl, primaryLandmark.photoData].filter(s => typeof s === 'string' && s.length > 0);
     if (candidates.length > 0) {
@@ -1481,7 +1596,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
         log.info(`🎨 [GROK] Avatar mode: ${refImages.length} reference images as separate slots`);
       } else {
         refImages = await packReferences(
-          { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground },
+          { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground, landmarkScene },
           { aspectRatio: grokAspect, pageLabel, padInputWithExtension: slot0IsScenePlate }
         );
       }
@@ -1991,7 +2106,12 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     maxRefSlots = null,
     // Test Lab only: widen the VB element column (cell-geometry experiment).
     vbColumnFraction = null,
+    // Role of a raw landmark photo when no plate is sent ('plate' | 'castless'
+    // | null) — server/lib/landmarkScene.js. Checked BEFORE the cache, so a
+    // cached render can never stand in for a refused one.
+    landmarkScene = null,
   } = options;
+  assertLandmarkScene({ landmarkPhotos, sceneBackground, landmarkScene, label: `IMAGE GEN-ONLY P${pageNumber ?? '?'}` });
 
   if (captureLabel) {
     require('./promptCapture').recordPrompt(captureLabel, imageModelOverride, prompt, { kind: 'image' });
@@ -2040,6 +2160,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     visualBibleGrid,
     sceneBackground,
     textAreaMask,
+    landmarkScene,
     onImageReady,
     outputAspect: aspectRatio,
     evaluationType: null,
@@ -2365,6 +2486,10 @@ async function generateWithIterativePlacement(prompt, allCharacterPhotos, sceneM
     visualBibleGrid = null,
     pageNumber = null,
     artStyle = '',
+    // Plate or fail (server/lib/landmarkScene.js): the page's plate, and the
+    // role of its landmark photo when it has none (cast-0 only).
+    sceneBackground = null,
+    landmarkScene = null,
   } = options;
 
   // 1. Split characters by depth from sceneMetadata.fullData (the parsed JSON scene object)
@@ -2389,7 +2514,7 @@ async function generateWithIterativePlacement(prompt, allCharacterPhotos, sceneM
   if (backgroundChars.length === 0 || sceneChars.length <= 1) {
     log.info(`🎯 [ITERATIVE] No background characters found (${sceneChars.length} chars, ${backgroundChars.length} bg), using single-pass generation`);
     return generateImageOnly(prompt, allCharacterPhotos, {
-      imageModelOverride, imageBackendOverride, landmarkPhotos, visualBibleGrid, pageNumber, skipCache: true
+      imageModelOverride, imageBackendOverride, landmarkPhotos, landmarkScene, sceneBackground, visualBibleGrid, pageNumber, skipCache: true
     });
   }
 
@@ -2427,7 +2552,7 @@ async function generateWithIterativePlacement(prompt, allCharacterPhotos, sceneM
   let pass1Result;
   try {
     pass1Result = await generateImageOnly(pass1Prompt, foregroundPhotos, {
-      imageModelOverride, imageBackendOverride, landmarkPhotos, visualBibleGrid, pageNumber, skipCache: true
+      imageModelOverride, imageBackendOverride, landmarkPhotos, landmarkScene, sceneBackground, visualBibleGrid, pageNumber, skipCache: true
     });
   } catch (err) {
     log.error(`🎯 [ITERATIVE] Pass 1 threw: ${err.message}`);
@@ -2463,7 +2588,8 @@ async function generateWithIterativePlacement(prompt, allCharacterPhotos, sceneM
     pass2Result = await generateImageOnly(pass2Prompt, backgroundPhotos, {
       imageModelOverride, imageBackendOverride,
       previousImage: pass1Result.imageData,
-      landmarkPhotos, visualBibleGrid,
+      // Pass 2 edits pass 1, which already carries the scene — no landmark photo.
+      landmarkPhotos: [], visualBibleGrid,
       pageNumber, skipCache: true
     });
   } catch (err) {
@@ -3698,6 +3824,188 @@ async function inpaintPage(imageData, evaluation, options = {}) {
 // ============================================================================
 
 /**
+ * Render ONE fresh people-free plate for a stored page from its plate
+ * description (the brief's emptyScenePrompt). Shared by iteratePageCore and
+ * the page regenerate route, so a repair renders its plate the one way.
+ * Returns the plate data URI, or null on failure (logged).
+ */
+async function renderStoryPagePlate({
+  storyData, visualBible, pageNumber, sceneMetadata = null, landmarkPhotos = [],
+  plateDescription, textPosition = null, aspectRatio = null, imageModelOverride = null,
+  save = null, logTag = 'ITERATE',
+}) {
+  if (!plateDescription) return null;
+  try {
+        const { resolveArtStyleForEmptyScene, resolveArtStyle: resolveStyleForEmpty } = getStoryHelpers();
+        const iterBackend = imageModelOverride ? (IMAGE_MODELS[imageModelOverride]?.backend || null) : null;
+        const artStyleDesc = resolveArtStyleForEmptyScene(storyData.artStyle || 'pixar', iterBackend)
+          || resolveArtStyleForEmptyScene('pixar')
+          || resolveStyleForEmpty(storyData.artStyle || 'pixar', iterBackend)
+          || '';
+        const textPos = textPosition || sceneMetadata?.textPosition || null;
+        const { buildTextZoneInstruction, buildEraGuard } = getStoryHelpers();
+        const iterateTextZoneDesc = sceneMetadata?.textZoneDescription || null;
+        const iterateEra = sceneMetadata?.era || null;
+        // Named landmark-fidelity block when this page attaches a landmark
+        // photo (landmarkPhotos below) — '' otherwise. Shared builder
+        // in storyHelpers; used to be built only on the TRIAL empty-scene
+        // path while every other caller shipped the generic unnamed block.
+        const iterateAboardId = sceneMetadata?.aboard || null;
+        const { buildEmptyScenePrompt } = require('../services/prompts');
+        const { buildLandmarkFidelityBlock } = getStoryHelpers();
+        // Built BEFORE the prompt: which reference family is attached decides
+        // the REFERENCE line (referenceKind below), exactly as at the
+        // production page/vantage plate call sites and the Lab stage.
+        const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, landmarkPhotos, iterateAboardId, sceneMetadata?.objects || null);
+        const emptyPrompt = buildEmptyScenePrompt({
+          style: artStyleDesc,
+          description: plateDescription,
+          textAreaInstruction: textPos ? buildTextZoneInstruction(textPos, iterateTextZoneDesc, (storyData?.languageLevel === '1st-grade' ? '10%' : storyData?.languageLevel === 'advanced' ? '40%' : '30%'), { isEmptyScene: true }) : '',
+          eraGuard: buildEraGuard(iterateEra),
+          landmarkFidelity: buildLandmarkFidelityBlock(landmarkPhotos?.[0], { era: iterateEra }),
+          // Tells the model what the attached reference IS (prompts.js
+          // REFERENCE line). Same expression every other plate call site uses —
+          // without it the repaired page's fresh plate got the landmark photo
+          // as pixels but no line saying the place in the scene IS that photo.
+          referenceKind: (landmarkPhotos?.length > 0) ? 'landmark' : (emptySceneVbGrid ? 'element' : null),
+          visualBible,
+          pageNumber,
+          aboardId: iterateAboardId,
+          // AD objects[] gates which vehicles enter the plate prompt + grid
+          // (AD is the authority on vehicle presence; VB pages is only the menu).
+          sceneObjects: sceneMetadata?.objects || null,
+          // The page's declared time of day and weather (sceneLight.js).
+          light: require('./sceneLight').declaredLight(sceneMetadata),
+        });
+        const isCoverPage = pageNumber < 0;
+        const emptyResult = await generateImageOnly(emptyPrompt, [], {
+          // Plates stay on the Standard tier regardless of the page tier.
+          ...emptyScenePlateRouting(),
+          landmarkPhotos: landmarkPhotos,
+          visualBibleGrid: emptySceneVbGrid,
+          pageNumber,
+          skipCache: true,
+          aspectRatio: isCoverPage ? CONFIG_DEFAULTS.coverAspect : (aspectRatio || CONFIG_DEFAULTS.pageAspect)
+        });
+        if (!emptyResult?.imageData) return null;
+        if (save) await save(pageNumber, emptyResult.imageData);
+        log.info(`🎬 [${logTag}] Page ${pageNumber}: fresh empty scene generated${save ? ' and saved' : ''}`);
+        return emptyResult.imageData;
+  } catch (e) {
+    log.warn(`⚠️ [${logTag}] Page ${pageNumber}: fresh empty scene failed: ${e.message}`);
+    return null;
+  }
+}
+
+/**
+ * PLATE OR FAIL for a render of a STORED page outside the pipeline (page
+ * regenerate, the dev test-models / style-lab routes). A landmark page that is
+ * not cast-0 renders on its stored plate; with none stored, one is rendered
+ * (renderStoryPagePlate); with neither, it throws. Returns the render's
+ * { sceneBackground, landmarkScene } — other pages get { null, role }.
+ */
+async function ensureStoryPagePlate({
+  storyId, storyData, visualBible, pageNumber, sceneMetadata = null, sceneCharacters = null,
+  landmarkPhotos = [], textPosition = null, aspectRatio = null, imageModelOverride = null,
+  save = null, logTag = 'PAGE',
+}) {
+  const { loadStoredPagePlate } = require('./landmarkScene');
+  const page = { sceneMetadata, sceneCharacters };
+  if (!pageNeedsPlate(page, landmarkPhotos)) {
+    return { sceneBackground: null, landmarkScene: pageLandmarkScene(page) };
+  }
+  let sceneBackground = await loadStoredPagePlate(storyId, pageNumber);
+  if (sceneBackground) {
+    log.info(`🎬 [${logTag}] Page ${pageNumber}: reusing the stored plate`);
+  } else {
+    const { resolvePagePlate } = getStoryHelpers();
+    const plateDescription = sceneMetadata?.emptyScenePrompt
+      || resolvePagePlate({ pageNumber, sceneMetadata, visualBible, outlinePlate: null })?.text
+      || null;
+    log.info(`🎬 [${logTag}] Page ${pageNumber}: landmark page has no stored plate — rendering one`);
+    sceneBackground = await toPlateDataUri(await renderStoryPagePlate({
+      storyData, visualBible, pageNumber, sceneMetadata, landmarkPhotos,
+      plateDescription, textPosition, aspectRatio, imageModelOverride, save, logTag,
+    }));
+  }
+  if (!sceneBackground) {
+    log.error(`❌ [${logTag}] Page ${pageNumber}: landmark "${landmarkPhotos[0]?.name || 'unknown'}" has no plate and none could be rendered — not rendered on the raw photo`);
+    throw new PlateRequiredError(`${logTag} page ${pageNumber}: landmark page has no plate and none could be rendered`);
+  }
+  return { sceneBackground, landmarkScene: null };
+}
+
+/**
+ * The plate an ITERATE render of a page uses (iteratePageCore). Kept apart so
+ * the decision replays without the scene rewrite around it.
+ * PLATE OR FAIL (server/lib/landmarkScene.js): a landmark page that is not
+ * cast-0 always renders on a plate — the one passed in or stored, else a fresh
+ * one, else it throws. singlePassScene does not apply to it.
+ * @returns {Promise<{sceneBackground: string|null, iteratePageRef: Object}>}
+ */
+async function resolveIteratePlate({
+  pageNumber, storyData, visualBible, iterateSceneMetadata = null, sceneCharacters = null,
+  pageLandmarkPhotos = [], sceneBackgroundIn = null, effectiveSinglePass = false,
+  emptySceneCallbacks = null, lockedTextPosition = null, sceneAspect = null, imageModelOverride = null,
+}) {
+  // Resolve empty scene background.
+  // If sceneBackgroundIn was pre-supplied (pipeline), use it directly.
+  // If emptySceneCallbacks are provided (UI route), load/generate based on scene metadata.
+  // singlePassScene flag forces a one-pass render with no plate.
+  // One fresh plate for this page (shared renderer, renderStoryPagePlate).
+  const renderFreshPlate = (plateDescription) => renderStoryPagePlate({
+    storyData, visualBible, pageNumber, sceneMetadata: iterateSceneMetadata,
+    landmarkPhotos: pageLandmarkPhotos, plateDescription, textPosition: lockedTextPosition,
+    aspectRatio: sceneAspect, imageModelOverride, save: emptySceneCallbacks?.save || null,
+  });
+
+  // PLATE OR FAIL (server/lib/landmarkScene.js): a landmark page that is not
+  // cast-0 always renders on a plate — the stored one when it exists, else a
+  // fresh one, else it fails. singlePassScene does not apply to it.
+  const iteratePageRef = { sceneMetadata: iterateSceneMetadata, sceneCharacters };
+  const iterateNeedsPlate = pageNeedsPlate(iteratePageRef, pageLandmarkPhotos);
+
+  let sceneBackground = sceneBackgroundIn;
+  if (effectiveSinglePass && !iterateNeedsPlate) {
+    sceneBackground = null;
+    log.info(`🎛️ [ITERATE] Page ${pageNumber}: singlePassScene=true — skipping empty-scene plate`);
+  } else if (!sceneBackground && emptySceneCallbacks) {
+    // A landmark page reuses its stored plate unless the setting changed.
+    if (iterateSceneMetadata?.reuseEmptyScene || (iterateNeedsPlate && iterateSceneMetadata?.reuseEmptyScene !== false)) {
+      try {
+        const existing = await emptySceneCallbacks.load(pageNumber);
+        if (existing) {
+          sceneBackground = existing;
+          log.info(`🎬 [ITERATE] Page ${pageNumber}: reusing empty scene as style anchor`);
+        }
+      } catch (e) {
+        log.debug(`[ITERATE] No empty scene for page ${pageNumber}: ${e.message}`);
+      }
+    } else if (iterateSceneMetadata?.reuseEmptyScene === false && iterateSceneMetadata?.emptyScenePrompt) {
+      log.info(`🎬 [ITERATE] Page ${pageNumber}: generating fresh empty scene (setting changed)`);
+      sceneBackground = await renderFreshPlate(iterateSceneMetadata.emptyScenePrompt);
+    }
+  }
+  // Stored plates can arrive as raw base64 or a URL; the render only takes a
+  // data URI (anything else is silently not sent), and a landmark page must
+  // not lose its plate that way.
+  if (iterateNeedsPlate) sceneBackground = await toPlateDataUri(sceneBackground);
+  if (iterateNeedsPlate && !sceneBackground) {
+    const { resolvePagePlate } = getStoryHelpers();
+    const plateText = iterateSceneMetadata?.emptyScenePrompt
+      || resolvePagePlate({ pageNumber, sceneMetadata: iterateSceneMetadata, visualBible, outlinePlate: null })?.text
+      || null;
+    log.info(`🎬 [ITERATE] Page ${pageNumber}: landmark page has no stored plate — rendering one`);
+    sceneBackground = await toPlateDataUri(await renderFreshPlate(plateText));
+    if (!sceneBackground) {
+      log.error(`❌ [ITERATE] Page ${pageNumber}: landmark "${pageLandmarkPhotos[0]?.name || 'unknown'}" has no plate and none could be rendered — not rendered on the raw photo`);
+      throw new PlateRequiredError(`ITERATE page ${pageNumber}: landmark page has no plate and none could be rendered`);
+    }
+  }
+  return { sceneBackground, iteratePageRef };
+}
+
+/**
  * Core iterate function — shared by the pipeline (executeIterateAction) and the
  * UI route (POST /:id/iterate/:pageNum).  Analyzes the current image, re-expands
  * the scene description with Claude's 17-check prompt, then regenerates.
@@ -4438,6 +4746,21 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     }
   }
 
+  // THE DECLARED LIGHT IS CARRIED FORWARD (2026-09-24, sceneLight.js). A
+  // rewrite that states no `timeOfDay` / `weather` keeps the parent brief's, in
+  // the brief text itself, so the page prompt's LIGHT line, the stored brief
+  // the judges read and the next rewrite all see it. A rewrite that states a
+  // value wins. Loud: the omission is logged.
+  {
+    const { carryForwardLightInBrief } = require('./sceneLight');
+    const lightCarry = carryForwardLightInBrief(newSceneDescription, parentSceneMetadata);
+    if (lightCarry) {
+      log.warn(`🌗 [ITERATE] Page ${pageNumber}: the rewrite dropped ${lightCarry.carried.join(' and ')} — carried forward from the parent brief`);
+      newSceneDescription = lightCarry.brief;
+      newSceneMetadata = extractSceneMetadata(newSceneDescription);
+    }
+  }
+
   // A REWRITE THAT DROPS A CITED VB ID MUST SAY SO (2026-09-14, story B
   // job_1789343124794_z2c779f7i p17). The `iterate-round-1` rewrite there —
   // commissioned for a hammer artefact, a facing error and stray leaves —
@@ -4715,96 +5038,18 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
 
   const iterateImageBackend = imageModelOverride ? (IMAGE_MODELS[imageModelOverride]?.backend || null) : null;
 
-  // Resolve empty scene background.
-  // If sceneBackgroundIn was pre-supplied (pipeline), use it directly.
-  // If emptySceneCallbacks are provided (UI route), load/generate based on scene metadata.
-  // singlePassScene flag forces a one-pass render with no plate.
-  let sceneBackground = sceneBackgroundIn;
-  if (effectiveSinglePass) {
-    sceneBackground = null;
-    log.info(`🎛️ [ITERATE] Page ${pageNumber}: singlePassScene=true — skipping empty-scene plate`);
-  } else if (!sceneBackground && emptySceneCallbacks) {
-    if (iterateSceneMetadata?.reuseEmptyScene) {
-      try {
-        const existing = await emptySceneCallbacks.load(pageNumber);
-        if (existing) {
-          sceneBackground = existing;
-          log.info(`🎬 [ITERATE] Page ${pageNumber}: reusing empty scene as style anchor`);
-        }
-      } catch (e) {
-        log.debug(`[ITERATE] No empty scene for page ${pageNumber}: ${e.message}`);
-      }
-    } else if (iterateSceneMetadata?.reuseEmptyScene === false && iterateSceneMetadata?.emptyScenePrompt) {
-      log.info(`🎬 [ITERATE] Page ${pageNumber}: generating fresh empty scene (setting changed)`);
-      try {
-        const { resolveArtStyleForEmptyScene, resolveArtStyle: resolveStyleForEmpty } = getStoryHelpers();
-        const iterBackend = imageModelOverride ? (IMAGE_MODELS[imageModelOverride]?.backend || null) : null;
-        const artStyleDesc = resolveArtStyleForEmptyScene(storyData.artStyle || 'pixar', iterBackend)
-          || resolveArtStyleForEmptyScene('pixar')
-          || resolveStyleForEmpty(storyData.artStyle || 'pixar', iterBackend)
-          || '';
-        const textPos = lockedTextPosition || iterateSceneMetadata?.textPosition || null;
-        const { buildTextZoneInstruction, buildEraGuard } = getStoryHelpers();
-        const iterateTextZoneDesc = iterateSceneMetadata?.textZoneDescription || null;
-        const iterateEra = iterateSceneMetadata?.era || null;
-        // Named landmark-fidelity block when this page attaches a landmark
-        // photo (pageLandmarkPhotos below) — '' otherwise. Shared builder
-        // in storyHelpers; used to be built only on the TRIAL empty-scene
-        // path while every other caller shipped the generic unnamed block.
-        const iterateAboardId = iterateSceneMetadata?.aboard || null;
-        const { buildEmptyScenePrompt } = require('../services/prompts');
-        const { buildLandmarkFidelityBlock } = getStoryHelpers();
-        // Built BEFORE the prompt: which reference family is attached decides
-        // the REFERENCE line (referenceKind below), exactly as at the
-        // production page/vantage plate call sites and the Lab stage.
-        const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos, iterateAboardId, iterateSceneMetadata?.objects || null);
-        const emptyPrompt = buildEmptyScenePrompt({
-          style: artStyleDesc,
-          description: iterateSceneMetadata.emptyScenePrompt,
-          textAreaInstruction: textPos ? buildTextZoneInstruction(textPos, iterateTextZoneDesc, (storyData?.languageLevel === '1st-grade' ? '10%' : storyData?.languageLevel === 'advanced' ? '40%' : '30%'), { isEmptyScene: true }) : '',
-          eraGuard: buildEraGuard(iterateEra),
-          landmarkFidelity: buildLandmarkFidelityBlock(pageLandmarkPhotos?.[0], { era: iterateEra }),
-          // Tells the model what the attached reference IS (prompts.js
-          // REFERENCE line). Same expression every other plate call site uses —
-          // without it the repaired page's fresh plate got the landmark photo
-          // as pixels but no line saying the place in the scene IS that photo.
-          referenceKind: (pageLandmarkPhotos?.length > 0) ? 'landmark' : (emptySceneVbGrid ? 'element' : null),
-          visualBible,
-          pageNumber,
-          aboardId: iterateAboardId,
-          // AD objects[] gates which vehicles enter the plate prompt + grid
-          // (AD is the authority on vehicle presence; VB pages is only the menu).
-          sceneObjects: iterateSceneMetadata?.objects || null,
-        });
-        const isCoverPage = pageNumber < 0;
-        const emptyResult = await generateImageOnly(emptyPrompt, [], {
-          // Plates stay on the Standard tier regardless of the page tier.
-          ...emptyScenePlateRouting(),
-          landmarkPhotos: pageLandmarkPhotos,
-          visualBibleGrid: emptySceneVbGrid,
-          pageNumber,
-          skipCache: true,
-          aspectRatio: isCoverPage ? CONFIG_DEFAULTS.coverAspect : sceneAspect
-        });
-        if (emptyResult?.imageData) {
-          sceneBackground = emptyResult.imageData;
-          if (emptySceneCallbacks.save) {
-            await emptySceneCallbacks.save(pageNumber, sceneBackground);
-          }
-          log.info(`🎬 [ITERATE] Page ${pageNumber}: fresh empty scene generated and saved`);
-        }
-      } catch (e) {
-        log.warn(`⚠️ [ITERATE] Page ${pageNumber}: fresh empty scene failed: ${e.message}`);
-      }
-    }
-  }
+  // Resolve empty scene background (resolveIteratePlate — plate or fail).
+  const { sceneBackground, iteratePageRef } = await resolveIteratePlate({
+    pageNumber, storyData, visualBible, iterateSceneMetadata, sceneCharacters,
+    pageLandmarkPhotos, sceneBackgroundIn, effectiveSinglePass, emptySceneCallbacks,
+    lockedTextPosition, sceneAspect, imageModelOverride,
+  });
 
-  // Build VB grid — when sceneBackground is set, vehicles/locations/landmarks are already
-  // painted into the empty scene plate, so drop them from the composite refs.
+  // Build VB grid — when sceneBackground is set, vehicles/large structures/landmarks are
+  // already painted into the empty scene plate, so drop them from the composite refs.
   const pageRefs = visualBible
     ? await buildPageCompositeRefs(visualBible, pageNumber, pageLandmarkPhotos, {
         hasBackground: !!sceneBackground,
-        hasOtherRefs: !!useOriginalAsReference,
         logTag: 'ITERATE',
         // Keep the grid in step with what the page prompt describes — the
         // prompt is built from the scene's objects[], so a prop named there
@@ -4908,6 +5153,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       pageNumber,
       artStyle: iterArtStyleDesc,
       sceneBackground: refApplied.sceneBackground,
+      landmarkScene: pageLandmarkScene(iteratePageRef),
     });
   } else {
     // Shared page generation — same entry Phase 5a uses. Eval + detection run
@@ -4918,6 +5164,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       previousImage,
       imageModelOverride,
       landmarkPhotos: refApplied.landmarkPhotos,
+      landmarkScene: pageLandmarkScene(iteratePageRef),
       visualBibleGrid: refApplied.visualBibleGrid,
       sceneBackground: refApplied.sceneBackground,
       pageNumber,
@@ -5813,6 +6060,9 @@ module.exports = {
   ...evalPipelineModule,
   ...bboxDetectionModule,
   carryEvalEvidence,
+  renderStoryPagePlate,
+  ensureStoryPagePlate,
+  resolveIteratePlate,
 
   // Gemini plumbing consumed by imageInpainting via lazy accessors (the
   // inpaint LLM-verify path); exported for that one consumer.
@@ -5930,5 +6180,7 @@ module.exports = {
   resolveOutputAspect,
   truncatePromptForModel,
   shrinkPromptForModel,
+  PROMPT_CUT_ORDER,
+  PROMPT_NEVER_CUT,
   extractDataImageUrls
 };

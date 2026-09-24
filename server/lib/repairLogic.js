@@ -233,6 +233,8 @@ function attributeReaderFindings(imgFaults, auditedVersionByPage) {
     if (!out.has(f.page)) out.set(f.page, { version, findings: [] });
     out.get(f.page).findings.push({
       severity: f.severity || null,
+      // The reader's closed-list type (bookAudit.parseRoutes), verbatim.
+      type: f.type || null,
       line: f.line,
       // PROVENANCE (2026-09-14): a finding from the READER pass carries it.
       sources: fs_.mergeSources(fs_.sourcesOf(f), [fs_.FINDING_SOURCES.READER]),

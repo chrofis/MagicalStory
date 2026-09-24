@@ -13,6 +13,7 @@ const { callTextModel } = require('./textModels');
 const { TEXT_MODELS } = require('../config/models');
 const r2 = require('./r2');
 const { servedPhotoUrl } = require('./landmarkPhotoStore');
+const { SHOT_TYPES, resolveShotId } = require('./shotVocabulary');
 
 // Simple in-memory cache (24-hour TTL)
 const photoCache = new Map();
@@ -2790,11 +2791,14 @@ const MIN_USABLE_PHOTO = 40;
 
 const JUDGED_USABLE_SQL = `(story_score IS NULL OR story_score >= ${MIN_USABLE_PHOTO})`;
 
-// Each slot's judged photo_score as {slot: score}, selected beside the slot
-// columns so variantsFromIndexRow can hand every variant its own score and
-// pickVariantForView can rank photos of one kind. NULL when never judged.
+// Each slot's judged photo_score and framing as {slot: value}, selected beside
+// the slot columns so variantsFromIndexRow can hand every variant its own
+// judgement: pickVariantForView ranks by the score and matches the page's shot
+// against the framing. NULL when never judged.
 const PHOTO_SCORES_SQL = `(SELECT jsonb_object_agg(s.slot, s.photo_score)
-          FROM landmark_photo_scores s WHERE s.landmark_id = landmark_index.id) AS photo_scores`;
+          FROM landmark_photo_scores s WHERE s.landmark_id = landmark_index.id) AS photo_scores,
+        (SELECT jsonb_object_agg(s.slot, s.framing)
+          FROM landmark_photo_scores s WHERE s.landmark_id = landmark_index.id AND s.framing IS NOT NULL) AS photo_framings`;
 
 // Fame is a GLOBAL measure, so inside one town it ranks the wrong way round: a
 // synagogue 7km away in another village (5 language editions) beat the town's
@@ -3191,6 +3195,33 @@ function isFreelyLicensedImageUrl(url) {
   return !/upload\.wikimedia\.org\/wikipedia\//.test(u);           // non-Wikimedia sources unaffected
 }
 
+/**
+ * The six photo slots of a landmark object, PACKED: every slot whose photo
+ * survives `normalize` (empty values and non-free URLs drop out), in slot
+ * order, then empty slots. Each photo keeps its own attribution, description
+ * and kind.
+ *
+ * Slots must be contiguous: every serving query filters on slot 1
+ * (HAS_PHOTO_SQL), so a landmark whose slot 1 is empty is invisible however
+ * good its later photos are. The indexer used to write exteriors to slots 1-3
+ * and interiors to 4-6, and a non-free URL dropped here left its slot empty —
+ * 68 prod landmarks had gaps, 17 of them an empty slot 1 (2026-09-24). Where a
+ * photo sits no longer says what it shows; photo_type does.
+ */
+const _SLOT_FIELD_KEYS = [1, 2, 3, 4, 5, 6].map(n => (n === 1
+  ? { url: ['photoUrl', 'photo_url'], attribution: ['attribution', 'photo_attribution'], description: ['photoDescription', 'photo_description'], type: ['photoType', 'photo_type'] }
+  : { url: [`photoUrl${n}`, `photo_url_${n}`], attribution: [`attribution${n}`, `photo_attribution_${n}`], description: [`photoDescription${n}`, `photo_description_${n}`], type: [`photoType${n}`, `photo_type_${n}`] }));
+function packLandmarkPhotoSlots(landmark, normalize) {
+  const pick = keys => keys.map(k => landmark[k]).find(v => v) || null;
+  const photos = _SLOT_FIELD_KEYS.map(k => ({
+    url: normalize(pick(k.url)),
+    attribution: normalize(pick(k.attribution)),
+    description: normalize(pick(k.description)),
+    type: normalizePhotoKind(pick(k.type)),
+  })).filter(p => p.url);
+  return Array.from({ length: 6 }, (_, i) => photos[i] || { url: null, attribution: null, description: null, type: null });
+}
+
 async function saveLandmarkToIndex(landmark) {
   const pool = getPool();
   if (!pool) return false;
@@ -3208,6 +3239,7 @@ async function saveLandmarkToIndex(landmark) {
     }
     return v;
   };
+  const slots = packLandmarkPhotoSlots(landmark, normalize);
 
   try {
     await pool.query(`
@@ -3271,31 +3303,16 @@ async function saveLandmarkToIndex(landmark) {
       normalize(landmark.type),
       landmark.boostAmount || landmark.boost_amount || 0,
       landmark.categories || [],
-      normalize(landmark.photoUrl || landmark.photo_url),
-      normalize(landmark.attribution || landmark.photo_attribution),
+      slots[0].url,
+      slots[0].attribution,
       normalize(landmark.source || landmark.photo_source) || 'wikimedia',
-      normalize(landmark.photoDescription || landmark.photo_description),
-      normalizePhotoKind(landmark.photoType || landmark.photo_type),
-      normalize(landmark.photoUrl2 || landmark.photo_url_2),
-      normalize(landmark.attribution2 || landmark.photo_attribution_2),
-      normalize(landmark.photoDescription2 || landmark.photo_description_2),
-      normalizePhotoKind(landmark.photoType2 || landmark.photo_type_2),
-      normalize(landmark.photoUrl3 || landmark.photo_url_3),
-      normalize(landmark.attribution3 || landmark.photo_attribution_3),
-      normalize(landmark.photoDescription3 || landmark.photo_description_3),
-      normalizePhotoKind(landmark.photoType3 || landmark.photo_type_3),
-      normalize(landmark.photoUrl4 || landmark.photo_url_4),
-      normalize(landmark.attribution4 || landmark.photo_attribution_4),
-      normalize(landmark.photoDescription4 || landmark.photo_description_4),
-      normalizePhotoKind(landmark.photoType4 || landmark.photo_type_4),
-      normalize(landmark.photoUrl5 || landmark.photo_url_5),
-      normalize(landmark.attribution5 || landmark.photo_attribution_5),
-      normalize(landmark.photoDescription5 || landmark.photo_description_5),
-      normalizePhotoKind(landmark.photoType5 || landmark.photo_type_5),
-      normalize(landmark.photoUrl6 || landmark.photo_url_6),
-      normalize(landmark.attribution6 || landmark.photo_attribution_6),
-      normalize(landmark.photoDescription6 || landmark.photo_description_6),
-      normalizePhotoKind(landmark.photoType6 || landmark.photo_type_6),
+      slots[0].description,
+      slots[0].type,
+      slots[1].url, slots[1].attribution, slots[1].description, slots[1].type,
+      slots[2].url, slots[2].attribution, slots[2].description, slots[2].type,
+      slots[3].url, slots[3].attribution, slots[3].description, slots[3].type,
+      slots[4].url, slots[4].attribution, slots[4].description, slots[4].type,
+      slots[5].url, slots[5].attribution, slots[5].description, slots[5].type,
       normalize(stripLandmarkAbbreviations(landmark.wikipediaExtract || landmark.wikipedia_extract)),
       landmark.commonsPhotoCount || landmark.commons_photo_count || 0,
       landmark.score || 0
@@ -3542,6 +3559,7 @@ async function indexLandmarksForCities(options = {}) {
                   landmark.photoUrl = exteriorImages[0].url;
                   landmark.attribution = exteriorImages[0].attribution;
                   landmark.photoDescription = exteriorImages[0].description;
+                  landmark.photoType = 'exterior';
                   landmark.photoScore = exteriorImages[0].score;
                   landmark.photoSource = bestResult.source;
                 }
@@ -3549,28 +3567,35 @@ async function indexLandmarksForCities(options = {}) {
                   landmark.photoUrl2 = exteriorImages[1].url;
                   landmark.attribution2 = exteriorImages[1].attribution;
                   landmark.photoDescription2 = exteriorImages[1].description;
+                  landmark.photoType2 = 'exterior';
                 }
                 if (exteriorImages.length > 2) {
                   landmark.photoUrl3 = exteriorImages[2].url;
                   landmark.attribution3 = exteriorImages[2].attribution;
                   landmark.photoDescription3 = exteriorImages[2].description;
+                  landmark.photoType3 = 'exterior';
                 }
 
-                // Save interior images (photo_url_4, photo_url_5, photo_url_6) - 3 variants
+                // Interior images (photo_url_4..6). saveLandmarkToIndex packs the
+                // slots, so fewer than three exteriors move these down; the
+                // photoType set on each keeps what the photo shows.
                 if (interiorImages.length > 0) {
                   landmark.photoUrl4 = interiorImages[0].url;
                   landmark.attribution4 = interiorImages[0].attribution;
                   landmark.photoDescription4 = interiorImages[0].description;
+                  landmark.photoType4 = 'interior';
                 }
                 if (interiorImages.length > 1) {
                   landmark.photoUrl5 = interiorImages[1].url;
                   landmark.attribution5 = interiorImages[1].attribution;
                   landmark.photoDescription5 = interiorImages[1].description;
+                  landmark.photoType5 = 'interior';
                 }
                 if (interiorImages.length > 2) {
                   landmark.photoUrl6 = interiorImages[2].url;
                   landmark.attribution6 = interiorImages[2].attribution;
                   landmark.photoDescription6 = interiorImages[2].description;
+                  landmark.photoType6 = 'interior';
                 }
 
                 // Add to landmark score based on photo quality
@@ -3746,16 +3771,26 @@ function normalizePhotoKind(raw) {
  * job_1790100385959_1nitlympp served a riverside promenade on six Lindenhof
  * pages because vantage 3 was read as slot 3; docs/decisions.md 2026-09-24).
  *
- * Within the first accepted kind that has a photo, the judged `photoScore`
- * ranks (slot order breaks ties and orders unjudged photos); a photo judged
- * below MIN_USABLE_PHOTO is not a candidate, the same cutoff serving applies.
+ * THE PAGE'S CAMERA PICKS THE FRAMING (owner, 2026-09-24: "For ultra wide a
+ * different one than for a normal image. If we have landmark variants that
+ * match. If not we use the same one."). Among the photos of the view's accepted
+ * kinds, one whose judged `framing` fits the page's shot wins
+ * (SHOT_PHOTO_FRAMINGS; framing preference, then photoScore, then slot). When
+ * none fits, the page gets the normal choice below — the same photo a medium
+ * page gets.
+ *
+ * The normal choice: within the first accepted kind that has a photo, the
+ * judged `photoScore` ranks (slot order breaks ties and orders unjudged
+ * photos). A photo judged below MIN_USABLE_PHOTO is never a candidate, the same
+ * cutoff serving applies.
  *
  * @param {Object} location - VB location with photoVariants[] carrying `kind`
- *   and, when judged, `photoScore`
+ *   and, when judged, `photoScore` and `framing`
  * @param {string|null} view - scene's landmark view
+ * @param {string|null} [shot] - the page's camera shot (shotVocabulary word)
  * @returns {number|null} variantNumber to attach, or null for "no photo"
  */
-function pickVariantForView(location, view) {
+function pickVariantForView(location, view, shot = null) {
   const variants = (location?.photoVariants || []).filter(v => v?.url && v.kind !== 'bad'
     && !(Number.isFinite(v.photoScore) && v.photoScore < MIN_USABLE_PHOTO));
   if (variants.length === 0) return null;
@@ -3768,8 +3803,18 @@ function pickVariantForView(location, view) {
     interior: ['interior'],
     'view-from': ['view-from'],
   };
+  const kinds = ACCEPTS[v] || ACCEPTS.exterior;
   const score = x => (Number.isFinite(x.photoScore) ? x.photoScore : -1);
-  for (const kind of (ACCEPTS[v] || ACCEPTS.exterior)) {
+
+  const wanted = photoFramingsForShot(shot);
+  const fitting = variants.filter(x => kinds.includes(x.kind) && wanted.includes(x.framing));
+  if (fitting.length > 0) {
+    fitting.sort((a, b) => wanted.indexOf(a.framing) - wanted.indexOf(b.framing)
+      || score(b) - score(a) || a.variantNumber - b.variantNumber);
+    return fitting[0].variantNumber;
+  }
+
+  for (const kind of kinds) {
     const ofKind = variants.filter(x => x.kind === kind);
     if (ofKind.length === 0) continue;
     ofKind.sort((a, b) => score(b) - score(a) || a.variantNumber - b.variantNumber);
@@ -3777,6 +3822,50 @@ function pickVariantForView(location, view) {
   }
   return null;
 }
+
+/**
+ * Which judged photo framings (landmark_photo_scores.framing — docs/
+ * landmark-judging-instructions.md) fit a page's camera shot, best first.
+ *
+ * Only the two shots whose camera is far from the PLACE have their own photo.
+ * The judge's `wide` is "the place sits small inside a landscape or a
+ * townscape" — the page's ULTRA-WIDE, not its `wide` (which "shows the full
+ * setting" and is drawn from a medium photo like every eye-level page).
+ * `aerial` and `ultra-wide` each take the other far framing second.
+ * A close-up is close to a FIGURE, not to the place: a child waist-up in front
+ * of a tower is not a `closeup` detail of the tower (the same reason `shot`
+ * never derives `landmarkView`, decisions.md 2026-09-24), so it keeps the
+ * normal photo. A camera POSITION (high-angle, low-angle, over-the-shoulder)
+ * states no distance and gets the normal photo too, as does a page with no shot.
+ */
+const SHOT_PHOTO_FRAMINGS = {
+  'ultra-wide': ['wide', 'aerial'],
+  aerial: ['aerial', 'wide'],
+};
+const NORMAL_PHOTO_FRAMINGS = ['medium'];
+if (Object.keys(SHOT_PHOTO_FRAMINGS).some(id => !SHOT_TYPES.includes(id))) {
+  throw new Error('landmarkPhotos: SHOT_PHOTO_FRAMINGS names a shot shotVocabulary does not define');
+}
+
+function photoFramingsForShot(shot) {
+  return SHOT_PHOTO_FRAMINGS[resolveShotId(shot)] || NORMAL_PHOTO_FRAMINGS;
+}
+
+/**
+ * The index's kind for a photo whose `photo_type` was never classified, read
+ * from the judge's framing of the same photo. Used only where photo_type is
+ * NULL (~8,700 of ~16,250 judged photos, 2026-09-24): the slot convention
+ * (1-3 exterior, 4-6 interior) it replaces was wrong for ~1,100 usable ones —
+ * 553 interiors in slots 1-3, 554 non-interiors in slots 4-6.
+ */
+const KIND_FROM_FRAMING = {
+  medium: 'exterior',
+  closeup: 'close',
+  wide: 'distant',
+  aerial: 'distant',
+  interior: 'interior',
+  'view-from': 'view-from',
+};
 
 /**
  * Build the photoVariants array for one landmark_index row (slots 1-6).
@@ -3801,17 +3890,20 @@ function variantsFromIndexRow(row) {
     if (cfg.url) {
       // kind = the indexer's own classification of this photo
       // (exterior | distant | close | interior | view-from; 'bad' = reject).
-      // Slot position is only a fallback for rows indexed before the
-      // classification existed — the slot convention (1-3 exterior,
-      // 4-6 interior) is a guess, the column is data.
-      const kind = normalizePhotoKind(cfg.kind) || (cfg.num >= 4 ? 'interior' : 'exterior');
+      // Unclassified: the judge's framing of the same photo says it
+      // (KIND_FROM_FRAMING). Slot position only for a photo never judged
+      // either — the slot convention (1-3 exterior, 4-6 interior) is a guess.
+      const framing = row.photo_framings?.[String(cfg.num)] || null;
+      const kind = normalizePhotoKind(cfg.kind) || KIND_FROM_FRAMING[framing]
+        || (cfg.num >= 4 ? 'interior' : 'exterior');
       if (kind === 'bad') continue;
       const judged = row.photo_scores?.[String(cfg.num)];
       variants.push({
         variantNumber: cfg.num,
         kind,
-        // Judged photo_score (landmark_photo_scores); null = never judged.
+        // Judged photo_score and framing (landmark_photo_scores); null = never judged.
         photoScore: Number.isFinite(judged) ? judged : null,
+        framing,
         vantage: kind === 'interior' ? 'interior' : 'exterior',
         url: cfg.url,
         sourceUrl: cfg.sourceUrl,
@@ -4286,6 +4378,7 @@ module.exports = {
 
   // Indexed landmarks (works for any city worldwide)
   getLandmarkPhotoOnDemand,
+  packLandmarkPhotoSlots,
   getIndexedLandmarksNearLocation,
   getIndexedLandmarks,
   getAllIndexedLandmarks,
@@ -4302,6 +4395,7 @@ module.exports = {
   // Lazy photo variant loading
   loadLandmarkPhotoDescriptions,
   pickVariantForView,
+  photoFramingsForShot,
   variantsFromIndexRow,
   loadLandmarkPhotoVariant,
 

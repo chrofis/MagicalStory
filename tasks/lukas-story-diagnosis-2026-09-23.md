@@ -12,26 +12,35 @@ p5/p6 door in the rain, p3 Lukas too big, p1 object behind the boy, most pages f
 - Uetliberg photo_description_2 wrongly "metal lattice"; plate QC enforced the text over the photo.
 
 ## Open design items (BACKLOG.md)
-- [ ] **Location reference cells are drawn as isolated objects.** `prompts/reference-sheet.txt:5,15`
+- [x] **Location reference cells are drawn as isolated objects.** `prompts/reference-sheet.txt:5,15`
       ("ONE element in isolation", "no detailed scenes"), no LOCATIONS section; non-landmark
       locations are batched with props (`server/lib/referenceSheets.js` generateReferenceSheet
       ~1209-1223). LOC001 kitchen became a miniature on a plinth, copied into the p1/p3 plate;
       LOC002 door became a free-standing door slab (p2/p4/p5/p6). Cell gate passed both.
-- [ ] **Shared vantage plate carries the representative page's weather/time to every page.**
+      FIXED 2026-09-24 (owner decision): locations get no cell at all; the plate is built from the
+      bible text, stored location cells are ignored (decisions.md "Invented locations are TEXT only").
+- [x] **Shared vantage plate carries the representative page's weather/time to every page.** *(fixed 2026-09-24 — decisions.md "A page declares its time of day and weather")*
       `storyJobPipeline.js` repPageData (~4637/4741 staging). p2/p4/p5/p6 plates byte-identical
       with p2's "heavy rain"; p3 got p1's morning light. Page prompt tells Grok to copy the
       plate's light. Related: BACKLOG D18, M1, shared-plate camera decision.
-- [ ] **Plate geometry drops sentences > 240 chars** (`server/lib/sceneGeometry.js` ~173
+- [x] **Plate geometry drops sentences > 240 chars** *(fixed 2026-09-24 — clauses salvaged; light is a declared field)* (`server/lib/sceneGeometry.js` ~173
       `if (s.length > 240) continue;`) — p10's "at night" sentence (247) was lost; an action
       clause leaked into the plate geometry instead. `sceneIntent` also carries no time of day.
-- [ ] **Writer/AD geography: an interior door placed outdoors.** Outline beat 4 drags the key
+- [x] **Writer/AD geography: an interior door placed outdoors.** (2026-09-24: arc PLACE rule + panel lens, AD one-place rule — Lab #1444 3/3 panelists flag it, #1451 keeps the two doors apart; decisions.md) Outline beat 4 drags the key
       drawer "outside to try every key on the door"; AD merged the tower front door and the
       reading-room door into one outdoor LOC002. No check catches interior/exterior contradictions.
-- [ ] **Semantic judge contradicts the VB reference** (p6 "pliers instead of nutcracker" — the VB
+- [x] **Semantic judge contradicts the VB reference** (p6 "pliers instead of nutcracker" — the VB
       nutcracker cell is plier-shaped) and **consolidator escalates severity** (reader MAJOR →
       character_identity CATASTROPHIC on p6 v3).
-- [ ] **Text refinement runs after images** and rewrote all 10 pages; the audit then compared new
+      2026-09-24: the judge was right about the picture — the VB cell itself is plier-shaped. Fixed: the
+      consolidator vote clamp (p6 v3 CATASTROPHIC → MAJOR on replay) and the VB description now opens
+      with the label noun. The cell gate was NOT changed: naming the object in the gate question made
+      flash-lite pass the known-bad cells (decisions.md 2026-09-24); gate options are in BACKLOG.
+- [x] **Text refinement runs after images** and rewrote all 10 pages; the audit then compared new
       words against old pictures (p7 "Manuel absent", p9 "Sophie and Manuel not visible").
+      2026-09-24: shown NOT to be the cause — the pre-refine text already had that content. The real
+      cause was the book-audit reader lacking each page's cast; it now gets the brief (sceneIntent +
+      cast roster). Replay on the shipped book: 0 off-cast absence faults (stored final round: 3).
 
 - [ ] **Scene review deletes a "no figures" instruction.** p7 before: "completely devoid of figures, a silent, empty
       expanse"; after: "a silent expanse" (`[negation_named]` rewrite). An empty page loses its only emptiness statement.

@@ -31,7 +31,7 @@ not drawn, so it always ranks below one that has a picture.
 | Identity | `id`, `name`, `wikipedia_page_id`, `wikidata_qid`, `lang` | `wikidata_qid` is UNIQUE and is the upsert key |
 | Place | `latitude`, `longitude`, `nearest_city`, `municipality`, `locality`, `country`, `region` | three-level model, §3 |
 | Classification | `type`, `categories[]`, `boost_amount`, `score` | `boost_amount`/`score` are legacy, superseded by §5 |
-| Photos ×6 | `photo_url[_2..6]`, `photo_attribution[_2..6]`, `photo_description[_2..6]`, `photo_type[_2..6]`, `photo_r2_url[_2..6]` | slot 1 has no suffix; `photo_url` = Commons source (provenance), `photo_r2_url` = our R2 copy (what is fetched), §11 Photo storage |
+| Photos ×6 | `photo_url[_2..6]`, `photo_attribution[_2..6]`, `photo_description[_2..6]`, `photo_type[_2..6]`, `photo_r2_url[_2..6]` | slot 1 has no suffix; `photo_url` = Commons source (provenance), `photo_r2_url` = our R2 copy (what is fetched), §11 Photo storage. **Slots are contiguous from 1** — see below the table |
 | Photo meta | `photo_source`, `commons_photo_count` | |
 | Text | `wikipedia_extract` | fed to the writer as DESCRIPTION |
 | Fame | `fame_sitelinks`, `fame_pageviews`, `fame_updated_at` | migration 025 |
@@ -46,7 +46,7 @@ not drawn, so it always ranks below one that has a picture.
 Migrations: `020_landmark_photo_type`, `025_landmark_fame`,
 `028_landmark_municipality`, `029_landmark_story_score`,
 `031_landmark_photo_scores`, `032_landmark_locality`,
-`033_landmark_photo_framing`, `035_landmark_photo_r2`. **Schema changes go in a new `migrations/*.sql`
+`033_landmark_photo_framing`, `035_landmark_photo_r2`, `042_landmark_photo_slots_contiguous`. **Schema changes go in a new `migrations/*.sql`
 only** — the DDL in `database.js` never runs.
 
 ---
@@ -150,6 +150,16 @@ returns the best slot **per framing**, so a scene set inside a castle can reach
 the interior shot. Serving takes **every field from the same slot**: no
 cross-slot fallback, because pairing slot 3's photo with slot 1's credit names
 the wrong photographer, and attribution is a CC licence condition.
+
+**Per page, the camera picks the framing** (owner, 2026-09-24; `docs/decisions.md`).
+`variantsFromIndexRow` carries each slot's `framing` beside its `photo_score`
+(`PHOTO_SCORES_SQL` selects both), and `pickVariantForView(loc, landmarkView, shot)`
+serves an `ultra-wide` page a `wide` (then `aerial`) photo and an `aerial` page an
+`aerial` (then `wide`) photo when the landmark has one scoring ≥ 40; every other
+shot — and any page whose far framing has no photo — gets the normal choice
+(`medium` first, then best score within the view's kind). The shot is the page's
+own, else its vantage's. A slot with no `photo_type` takes its kind from its
+framing (`KIND_FROM_FRAMING`), not from the slot number.
 
 Judging is done by **Claude agents reading the image files directly — $0**, not
 by a vision API. See `docs/landmark-judging-instructions.md`,
@@ -303,6 +313,25 @@ a private one, so landmarks it discovered were invisible to the pipeline.
 **Discovery / coverage**
 `discover-missing-city-landmarks.js` · `add-iconic-landmarks.js` ·
 `broad-city-overviews.js` (+ `-fallback`) · `reindex-missing-cities.js`
+
+**Slot gaps (never leave one).** Every serving query filters on slot 1
+(`HAS_PHOTO_SQL`), so a landmark with an empty slot 1 is invisible whatever its
+later slots hold, and a gap further down leaves an unused hole. Slots must be
+contiguous from slot 1; where a photo sits says nothing about what it shows
+(`photo_type` does). `saveLandmarkToIndex` packs its six slots
+(`packLandmarkPhotoSlots`) — the indexer used to put exteriors in 1-3 and
+interiors in 4-6. A photo is removed only through a compaction
+(`merge-landmark-descriptions.js --apply-discards`), never by NULLing its
+columns in place. `compact-landmark-slots.js` closes existing gaps with the
+same `planCompaction` + `writeCompaction` (`--dry-run`, JSON backup, one
+transaction per landmark, refuses to lose a photo or a score). On 2026-09-24 it
+fixed 68 prod landmarks, 17 of them with slot 1 empty (decisions.md, 2026-09-24).
+Since migration 042 the database enforces it: CHECK
+`landmark_photo_slots_contiguous` (slot N empty ⇒ slot N+1 empty, on
+`photo_url[_N]`) rejects any write that would leave a gap, one-off SQL
+included. Writers that add photos fill the first empty slots after the existing
+ones (`fetch-landmark-photos-free.js` → `planFreePhotoFill`, guarded on the
+target slots still being empty); to remove one, compact.
 
 **Photos**
 `backfill-landmark-photos.js` (uses `findBestLandmarkImage`; aborts on

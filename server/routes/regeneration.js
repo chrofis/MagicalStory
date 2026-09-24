@@ -146,14 +146,15 @@ const {
   GEMINI_SAFETY_SETTINGS,
   IMAGE_QUALITY_THRESHOLD,
   compressImageToJPEG,
-  runVisualInventory
+  runVisualInventory,
+  ensureStoryPagePlate
 } = require('../lib/images');
+const { pageNeedsPlate, pageLandmarkScene } = require('../lib/landmarkScene');
 const { buildVisualBibleGrid, buildEmptySceneVbGrid } = require('../lib/referenceSheets');
 const { callClaudeAPI } = require('../lib/textModels');
 const {
   getVisualBibleEntriesForPage,
   getElementReferenceImagesForPage,
-  buildFullVisualBiblePrompt
 } = require('../lib/visualBible');
 const { applyStyledAvatars } = require('../lib/styledAvatars');
 const { runEntityConsistencyChecks, repairSinglePage, getStyledAvatarForClothing, collectEntityAppearances, buildClothingDescription } = require('../lib/entityConsistency');
@@ -791,9 +792,20 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
     // without this, regen falls through to the global 3:4 default and crops
     // square pages to portrait.
     const sceneAspect = currentImage?.imageAspect || null;
+    // PLATE OR FAIL (server/lib/landmarkScene.js): a landmark page is redone
+    // on its stored plate (rendered first when it has none), never on the raw
+    // photo; a cast-0 page keeps its exemption.
+    const regenScene = await ensureStoryPagePlate({
+      storyId: id, storyData, visualBible, pageNumber, sceneMetadata, sceneCharacters,
+      landmarkPhotos: pageLandmarkPhotos, textPosition: currentImage?.textPosition || null,
+      aspectRatio: sceneAspect || MODEL_DEFAULTS.pageAspect,
+      save: (pn, plate) => saveStoryImage(id, 'empty_scene', pn, plate), logTag: 'REGEN',
+    });
     const genResult = await generateImageOnly(imagePrompt, referencePhotos, {
       imageModelOverride: imageModelId,
       landmarkPhotos: pageLandmarkPhotos,
+      landmarkScene: regenScene.landmarkScene,
+      sceneBackground: regenScene.sceneBackground,
       visualBibleGrid,
       pageNumber,
       artStyle: storyData.artStyle || null,
@@ -1229,7 +1241,18 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
     // Resolve effective sceneBackground based on the singlePassScene flag.
     // If skipping the plate (single-pass), don't pass the saved background.
     // Otherwise reuse the saved one (no regeneration).
-    const effectiveSceneBackground = effSinglePass ? null : savedSceneBackground;
+    let effectiveSceneBackground = effSinglePass ? null : savedSceneBackground;
+    // PLATE OR FAIL: a landmark page (not cast-0) always renders on a plate —
+    // the saved one, else one rendered now (not saved: this is an A/B harness).
+    let testModelsLandmarkScene = null;
+    if (pageNumber > 0) {
+      const tmScene = await ensureStoryPagePlate({
+        storyId: id, storyData, visualBible, pageNumber, sceneMetadata,
+        landmarkPhotos, logTag: 'TEST-MODELS',
+      });
+      testModelsLandmarkScene = tmScene.landmarkScene;
+      if (tmScene.sceneBackground) effectiveSceneBackground = tmScene.sceneBackground;
+    }
     log.info(`🧪 [TEST-MODELS] Story ${id}, page ${pageNumber}: testing ${models?.length || 0} models${composite ? ' + composite' : ''} (refMode=${effRefMode}, singlePass=${effSinglePass}, plate=${effectiveSceneBackground ? 'reused' : 'none'}${iterativePlacement ? ', iterative-placement' : ''})`);
     // Pre-compute applied refs once — same for every model (only the model id varies)
     const refApplied = applyReferenceMode({
@@ -1329,13 +1352,13 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
         result = await generateWithIterativePlacement(prompt, refApplied.characterPhotos, sceneMetadata, {
           imageModelOverride: model, imageBackendOverride: IMAGE_MODELS[model].backend,
           landmarkPhotos: refApplied.landmarkPhotos, visualBibleGrid: refApplied.visualBibleGrid, pageNumber, artStyle: artStyleDesc,
-          sceneBackground: refApplied.sceneBackground,
+          sceneBackground: refApplied.sceneBackground, landmarkScene: testModelsLandmarkScene,
         });
       } else {
         result = await generateImageOnly(prompt, refApplied.characterPhotos, {
           imageModelOverride: model, imageBackendOverride: IMAGE_MODELS[model].backend,
           landmarkPhotos: refApplied.landmarkPhotos, visualBibleGrid: refApplied.visualBibleGrid, pageNumber, skipCache: true,
-          sceneBackground: refApplied.sceneBackground,
+          sceneBackground: refApplied.sceneBackground, landmarkScene: testModelsLandmarkScene,
         });
       }
       return {
@@ -2043,6 +2066,7 @@ router.post('/:id/style-lab/:pageNum', authenticateToken, async (req, res) => {
 
     // Resolve scene description, characters, and references (same as test-models)
     let characterPhotos, landmarkPhotos = [], visualBibleGrid = null;
+    let styleLabSceneMetadata = null;
     if (pageNumber < 0) {
       const coverType = getCoverType(pageNumber);
       if (!coverType) return res.status(400).json({ error: `Invalid cover page number: ${pageNumber}` });
@@ -2063,6 +2087,7 @@ router.post('/:id/style-lab/:pageNum', authenticateToken, async (req, res) => {
       characterPhotos = getCharacterPhotoDetails(chars, clothing, artStyle, clothingReqs);
       if (!clothing.startsWith('costumed')) characterPhotos = applyStyledAvatars(characterPhotos, artStyle);
       const sceneMetadata = extractSceneMetadata(desc);
+      styleLabSceneMetadata = sceneMetadata;
       // Phase 7: cell-crop refs from story-scoped 2×4 sheets when present.
       {
         const sav = require('../lib/storyAvatars');
@@ -2087,6 +2112,11 @@ router.post('/:id/style-lab/:pageNum', authenticateToken, async (req, res) => {
 
     const runId = existingRunId || crypto.randomUUID();
     log.info(`🧪 [STYLE-LAB] Story ${id}, page ${pageNumber}: run ${runId}, models: ${models.join(', ')}`);
+    // PLATE OR FAIL: a landmark page (not cast-0) renders on its plate — the
+    // stored one, else one rendered now (not saved: this is a style A/B lab).
+    const styleLabScene = pageNumber > 0
+      ? await ensureStoryPagePlate({ storyId: id, storyData, visualBible, pageNumber, sceneMetadata: styleLabSceneMetadata, landmarkPhotos, logTag: 'STYLE-LAB' })
+      : { sceneBackground: null, landmarkScene: null };
 
     // Build per-model prompts and generate in parallel
     const results = {};
@@ -2106,7 +2136,8 @@ router.post('/:id/style-lab/:pageNum', authenticateToken, async (req, res) => {
       const result = await generateImageOnly(prompt, characterPhotos, {
         imageModelOverride: model,
         imageBackendOverride: IMAGE_MODELS[model].backend,
-        landmarkPhotos, visualBibleGrid, pageNumber, skipCache: true
+        landmarkPhotos, visualBibleGrid, pageNumber, skipCache: true,
+        sceneBackground: styleLabScene.sceneBackground, landmarkScene: styleLabScene.landmarkScene,
       });
       const elapsed = Date.now() - start;
 
@@ -4104,44 +4135,44 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
           log.info(`📊 [REPAIR-WORKFLOW] ${pageLabel} - issues: ${evaluation.issuesSummary}`);
         }
 
-        // Update scene with new evaluation (finalScore = the combined number)
-        scene.qualityScore = evaluation.qualityScore ?? evaluation.score;
-        scene.finalScore = evaluation.score ?? null;
+        // The score lands on the ACTIVE version; the scene only mirrors it.
+        // A page with no version to stamp has nowhere to put a canonical score
+        // — fail that page loudly rather than write an evaluator-scale number.
+        const activeDbIdx = await getActiveVersion(id, versionKey);
+        const activeVersion = scene.imageVersions?.[arrayIndexForDb(scene.imageVersions, activeDbIdx, versionType)];
+        if (!activeVersion) {
+          log.error(`❌ [RE-EVALUATE] ${pageLabel}: no active image version (db index ${activeDbIdx}) to stamp the score on — page not re-scored`);
+          pages[pageNumber] = {
+            qualityScore: null,
+            fixableIssues: [],
+            error: 'No active image version to score'
+          };
+          return;
+        }
+
+        // Update scene with the evaluation's findings. Scores are NOT written
+        // here — they come from the stamped version below.
         scene.qualityReasoning = evaluation.reasoning;
         scene.semanticScore = evaluation.semanticScore ?? null;
         scene.semanticResult = evaluation.semanticResult ?? null;
         scene.fixTargets = evaluation.fixTargets || evaluation.enrichedFixTargets || [];
         scene.fixableIssues = evaluation.fixableIssues || [];
 
-        // Collect ALL issues for this page (quality eval + entity + imageChecks + retries)
+        // Collect ALL issues for this page (quality eval + entity + imageChecks
+        // + retries) — the LIST the panel and the repair steps work from. It is
+        // not what the score is computed from: retry-history issues belong to
+        // earlier images, and entity findings are billed once, in their own
+        // capped bucket, below.
         const allIssues = collectAllIssuesForPage(scene, storyData, pageNumber);
 
-        // Compute entity/image-check penalties + collect the issues that
-        // produced them so the dev panel can list them.
-        // CANONICAL TABLE + CANONICAL CAP. This used to carry its own
-        // {critical:30, major:20, else:10} literal and no cap — a third entity
-        // scale alongside SEVERITY_POINTS (25/15/5/2, what the score actually
-        // charges) and the pipeline's derived table. Re-evaluating a page
-        // therefore rewrote its scores onto a scale no other code path uses.
-        const { SEVERITY_POINTS: REEVAL_SEV_POINTS, capEntityPenalty: reevalCapEntity } = require('../lib/scoring');
-        let entityPenaltyRaw = 0;
-        const entityIssues = [];
-        for (const issue of allIssues) {
-          if (issue.source === 'entity check' || issue.source === 'image checks') {
-            entityPenaltyRaw += REEVAL_SEV_POINTS[String(issue.severity || '').toLowerCase()] || 0;
-            entityIssues.push({
-              name: issue.character || issue.element || '',
-              severity: issue.severity,
-              description: require('../lib/scoring').findingText(issue),
-              source: issue.source === 'entity check' ? 'character' : 'image-checks',
-            });
-          }
-        }
-        const entityPenalty = reevalCapEntity(entityPenaltyRaw);
-        const adjustedScore = Math.max(0, evaluation.score - entityPenalty);
-        if (entityPenalty > 0) {
-          log.info(`📊 [RE-EVALUATE] ${pageLabel}: entity penalty ${entityPenalty} (raw ${entityPenaltyRaw}, cap ${entityPenalty}) — audit only; scene.finalScore is re-read from the version after stampCanonicalScore`);
-        }
+        // Entity findings for THIS page, read by the same function the unified
+        // pipeline uses (scoring.js entityIssuesForPage), so a re-evaluated page
+        // lands on the score the pipeline stamps. This route used to keep its
+        // own severity-only sum, which ignored the per-type rules (a crop
+        // artefact that costs 0 was charged 15) and went into the panel's
+        // score, the stamp's input and the response (2026-09-24).
+        const { entityIssuesForPage, computeFinalScore } = require('../lib/scoring');
+        const entityResult = entityIssuesForPage(pageNumber, storyData.finalChecksReport?.entity);
 
         // Run bbox enrichment — always run to keep bboxDetection in sync with active image
         {
@@ -4168,64 +4199,51 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
 
         // Store combined issues + bbox results on scene and active version
         scene.fixableIssues = allIssues;
-        const activeDbIdx = await getActiveVersion(id, versionKey);
-        const activeVersion = scene.imageVersions?.[arrayIndexForDb(scene.imageVersions, activeDbIdx, versionType)];
-        if (activeVersion) {
-          activeVersion.fixTargets = scene.fixTargets;
-          activeVersion.fixableIssues = allIssues;
-          activeVersion.qualityScore = adjustedScore;
-          activeVersion.rawQualityScore = evaluation.qualityScore ?? evaluation.score;
-          activeVersion.semanticScore = evaluation.semanticScore ?? null;
-          activeVersion.entityPenalty = entityPenalty || 0;
-          activeVersion.entityIssues = entityIssues;
-          activeVersion.evaluatedAt = new Date().toISOString();
-          activeVersion.issuesSummary = evaluation.issuesSummary || '';
-          activeVersion.bboxDetection = scene.bboxDetection || null;
-          // Canonical scoring fields alongside legacy (legacy kept for in-flight
-          // consumers — step-6 cleanup will drop them once frontend + DB
-          // writer migrations land).
-          await stampCanonicalScore(activeVersion, {
-            score: adjustedScore,
-            qualityScore: evaluation.qualityScore ?? evaluation.score,
-            fixableIssues: allIssues,
-            reasoning: evaluation.reasoning,
-            semanticResult: evaluation.semanticResult || null,
-            threeStageResult: evaluation.threeStageResult || null,
-            requiredTexts: evaluation.requiredTexts || [],
-          }, {
-            entityIssues,
-            entityPenalty: entityPenalty || 0,
-            consolidation: {
-              sceneDescription: scene.description || scene.prompt || '',
-              characters: storyData.characters || [],
-              storyId: id,
-              pageNumber,
-            },
-          });
-        }
+        activeVersion.fixTargets = scene.fixTargets;
+        activeVersion.fixableIssues = allIssues;
+        activeVersion.rawQualityScore = evaluation.qualityScore ?? evaluation.score;
+        activeVersion.semanticScore = evaluation.semanticScore ?? null;
+        activeVersion.entityIssues = entityResult.issues;
+        activeVersion.evaluatedAt = new Date().toISOString();
+        activeVersion.issuesSummary = evaluation.issuesSummary || '';
+        activeVersion.bboxDetection = scene.bboxDetection || null;
+        // The evaluator's own result goes in unmodified — the same input the
+        // pipeline's stamp takes (repairPipeline stampAtCreation) — and the
+        // entity report's findings go in as the entity bucket. applyScore is
+        // the only writer of finalScore / evalScore / entityPenalty.
+        await stampCanonicalScore(activeVersion, evaluation, {
+          entityIssues: entityResult.issues,
+          entityPenalty: entityResult.penalty,
+          consolidation: {
+            sceneDescription: scene.description || scene.prompt || '',
+            characters: storyData.characters || [],
+            storyId: id,
+            pageNumber,
+          },
+        });
+        // Legacy mirror of the canonical pre-entity score (older readers).
+        activeVersion.qualityScore = activeVersion.evalScore;
 
         // Scene-level scores are MIRRORS of the stamped version's canonical
-        // record — never independently computed. Identical rule to the
-        // generation pipeline (images.js buildSceneEntry): qualityScore = the
-        // version's evalScore, finalScore = computeFinalScore(version).
-        // Writing `adjustedScore` (evaluator scale, eval.score − entity) into
-        // BOTH fields put a number on a different scale than the one
-        // applyScore had just written onto the very version this scene mirrors
-        // — the two disagreeing scores the owner sees in the UI.
-        if (activeVersion) {
-          const { computeFinalScore: reevalFinalScore } = require('../lib/scoring');
-          scene.qualityScore = activeVersion.evalScore ?? adjustedScore;
-          scene.finalScore = reevalFinalScore(activeVersion);
-        } else {
-          scene.qualityScore = adjustedScore;
-          scene.finalScore = adjustedScore;
-        }
+        // record — identical rule to the generation pipeline (images.js
+        // buildSceneEntry): qualityScore = the version's evalScore, finalScore
+        // = computeFinalScore(version).
+        scene.qualityScore = activeVersion.evalScore;
+        scene.finalScore = computeFinalScore(activeVersion);
 
+        // Everything the panel shows is read back from the stamped version, so
+        // it cannot disagree with the stored score.
         pages[pageNumber] = {
-          score: adjustedScore,                       // Combined final score (quality - semantic - entity penalties)
-          qualityScore: evaluation.qualityScore ?? evaluation.score,  // Visual quality only
+          score: activeVersion.finalScore,            // legacy alias of finalScore
+          finalScore: activeVersion.finalScore,
+          evalScore: activeVersion.evalScore,
+          qualityScore: evaluation.qualityScore ?? evaluation.score,  // Visual evaluator's own number
           semanticScore: evaluation.semanticScore ?? null,            // Semantic fidelity only
-          entityPenalty: entityPenalty || 0,           // Penalty from entity/image-check issues
+          entityPenalty: activeVersion.entityPenalty,
+          // The entity findings as the canonical deductions bill them (after
+          // consolidation relabelling and the per-type rules).
+          entityIssues: activeVersion.deductions?.entity || [],
+          scoreBreakdown: activeVersion.scoreBreakdown || null,
           verdict: evaluation.verdict,
           issuesSummary: evaluation.issuesSummary || '',
           reasoning: evaluation.reasoning,

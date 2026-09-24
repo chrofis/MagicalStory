@@ -49,9 +49,8 @@ const bible = (states: any[] | undefined): any => ({
 let composition: string[] = [];
 beforeAll(async () => {
   await loadPromptTemplates();
-  const para = String(PROMPT_TEMPLATES.imageGeneration).split(/\r?\n\r?\n/).map((p: string) => p.trim())
-    .find((p: string) => p.startsWith('**Composition:**'))!;
-  composition = para.split(/\r?\n/);
+  // Code-built since 2026-09-24 (promptBuilders.buildCompositionBlock).
+  composition = PB.buildCompositionBlock().split('\n');
 });
 
 describe('the split-state markings rule is emitted only where a listed element has states', () => {

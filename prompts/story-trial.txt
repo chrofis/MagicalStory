@@ -57,11 +57,12 @@ It must be detailed enough to illustrate without additional context.
       "location": "[Location Name [LOC001]]" or "none",
       "indoorOutdoor": "[indoor/outdoor]",
       "description": "[visual setting details: colors, textures, atmosphere]",
-      "lighting": "[time of day + light quality]",
-      "weather": "[sunny/cloudy/rainy/snowy/n/a]",
+      "lighting": "[light quality and the direction it comes from]",
       "camera": "[close-up|medium|wide|ultra-wide]",
       "depthLayers": "[describe what's in foreground, midground, background]"
     },
+    "timeOfDay": "[{TIME_OF_DAY_ENUM}]",
+    "weather": "[{WEATHER_ENUM}]",
     "landmarkView": "[exterior|distant|close|interior|view-from|none — OMIT unless setting.location is a real landmark]",
     "characters": [
       {
@@ -98,7 +99,7 @@ It must be detailed enough to illustrate without additional context.
 - `objects`: include visual bible items visible in the scene with their IDs. `size` restates the object's scale for this page's shot, in the same shape the visual bible uses; it overrides the bible entry where they differ.
 - `background`: describes crowd/environment density. Tells image generator if scene feels isolated or populated.
 - `interactions`: 1-4 visible character-to-object or character-to-character contacts, one row per foreground/midground character. `priority: "essential"` for the page's central action, `"low"` for incidental gaze or pose. When several characters use ONE object together, join their names with ` + ` in one row — separate rows with the same object render as duplicate objects. Omit pure ground/floor contact, leaning on walls and sitting on generic chairs. Every row also appears in the story text as the same physical contact.
-- Use `"n/a"` for weather in indoor scenes.
+- `timeOfDay` and `weather` (required on every scene): {SCENE_LIGHT_FIELD}
 
 **Composition — every scene hint obeys these:**
 {AD_COMPOSITION}
@@ -120,7 +121,7 @@ TITLE: [A creative, specific title in {LANGUAGE}, containing the name {MAIN_CHAR
     { "id": "ANI001", "name": "[Name]", "pages": [1, 2], "scaleClass": "{SCALE_CLASS_SPEC}", "generic": "[OMIT for every element that must look the same on every page it appears on. Set to true only when any instance of the thing would serve: swap it between two pages and no reader could tell. A generic element gets no entry beyond this one, no id and no reference image — it is written into the page prose by name and nothing else. If the story ever refers back to THIS one — it is found, lost, given, marked, recognised, or a character owns it — it is not generic.]", "species": "[type and breed]", "coloring": "[exact colours and full pattern]", "features": "[collar, markings, accessories]" }
   ],
   "artifacts": [
-    { "id": "ART001", "label": "[the one English name every prompt uses for this element: one to four words ending in the noun, unique in this bible, never a bare category, never a proper noun, never a word from the story language]", "name": "[plain English description of the object, e.g. 'toy treasure chest' — never a proper noun; a name the story gives it goes in properName]", "properName": "[OMIT unless the story names this object]", "pages": [2, 3, 4], "scaleClass": "{SCALE_CLASS_SPEC}", "generic": "[OMIT for every element that must look the same on every page it appears on. Set to true only when any instance of the thing would serve: swap it between two pages and no reader could tell. A generic element gets no entry beyond this one, no id and no reference image — it is written into the page prose by name and nothing else. If the story ever refers back to THIS one — it is found, lost, given, marked, recognised, or a character owns it — it is not generic.]", "type": "[the category the reference-sheet gate checks the cell against, in English: 'hand tool', 'sea chest']", "text": "[OMIT unless the story asks a reader to read words on this object; then the exact characters, in the order they must appear — a few words, or a run of letters or digits]", "description": "[appearance: shape, colour, material, distinctive features. No lettering unless this entry names the exact characters it carries in `text`; otherwise its writing is illegible]", "states": "[OMIT unless the story alters this object. Otherwise the COMPLETE set of looks it wears, the unaltered look FIRST, at most 4 in all: {\"name\": \"[one or two words]\", \"delta\": \"[what distinguishes this look, one clause, at most 15 words, never a feature `description` already carries]\", \"pages\": [X]}]" }
+    { "id": "ART001", "label": "[the one English name every prompt uses for this element: one to four words ending in the noun, unique in this bible, never a bare category, never a proper noun, never a word from the story language]", "name": "[plain English description of the object, e.g. 'toy treasure chest' — never a proper noun; a name the story gives it goes in properName]", "properName": "[OMIT unless the story names this object]", "pages": [2, 3, 4], "scaleClass": "{SCALE_CLASS_SPEC}", "generic": "[OMIT for every element that must look the same on every page it appears on. Set to true only when any instance of the thing would serve: swap it between two pages and no reader could tell. A generic element gets no entry beyond this one, no id and no reference image — it is written into the page prose by name and nothing else. If the story ever refers back to THIS one — it is found, lost, given, marked, recognised, or a character owns it — it is not generic.]", "type": "[the category the reference-sheet gate checks the cell against, in English: 'hand tool', 'sea chest']", "text": "[OMIT unless the story asks a reader to read words on this object; then the exact characters, in the order they must appear — a few words, or a run of letters or digits]", "description": "[appearance, its first noun the noun its `label` ends in — the word that names the thing, never the family in `type`: shape, colour, material, distinctive features. No lettering unless this entry names the exact characters it carries in `text`; otherwise its writing is illegible]", "states": "[OMIT unless the story alters this object. Otherwise the COMPLETE set of looks it wears, the unaltered look FIRST, at most 4 in all: {\"name\": \"[one or two words]\", \"delta\": \"[what distinguishes this look, one clause, at most 15 words, never a feature `description` already carries]\", \"pages\": [X]}]" }
   ],
   "locations": [
     { "id": "LOC001", "name": "[Location name]", "pages": [1, 2, 3], "scaleClass": "{SCALE_CLASS_SPEC}", "setting": "[indoor/outdoor, type]", "colors": "[specific colors]", "features": "[distinctive visual elements]", "signatureElement": "[ONE unique detail]", "isRealLandmark": false, "landmarkQuery": null }
@@ -192,11 +193,12 @@ Front cover scene hint. The main character ({MAIN_CHARACTER_NAME}) is the only p
       "location": "[Location Name [LOC001]]",
       "indoorOutdoor": "[indoor/outdoor]",
       "description": "[visual setting details]",
-      "lighting": "[time of day + light quality]",
-      "weather": "[weather]",
+      "lighting": "[light quality and the direction it comes from]",
       "camera": "wide",
       "depthLayers": "[foreground, midground, background description]"
     },
+    "timeOfDay": "[{TIME_OF_DAY_ENUM}]",
+    "weather": "[{WEATHER_ENUM}]",
     "characters": [
       {
         "id": null,
@@ -223,7 +225,7 @@ TEXT:
 
 SCENE HINT:
 ```json
-{"scene":{"imageSummary":"...","setting":{"location":"...","indoorOutdoor":"...","description":"...","lighting":"...","weather":"...","camera":"medium","depthLayers":"..."},"characters":[{"id":"CHR001","name":"...","position":"...","action":"...","expression":"...","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[]}}
+{"scene":{"imageSummary":"...","setting":{"location":"...","indoorOutdoor":"...","description":"...","lighting":"...","camera":"medium","depthLayers":"..."},"timeOfDay":"...","weather":"...","characters":[{"id":"CHR001","name":"...","position":"...","action":"...","expression":"...","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[]}}
 ```
 
 --- Page 2 ---
@@ -232,7 +234,7 @@ TEXT:
 
 SCENE HINT:
 ```json
-{"scene":{"imageSummary":"...","setting":{"location":"...","indoorOutdoor":"...","description":"...","lighting":"...","weather":"...","camera":"medium","depthLayers":"..."},"characters":[{"id":"CHR001","name":"...","position":"...","action":"...","expression":"...","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[]}}
+{"scene":{"imageSummary":"...","setting":{"location":"...","indoorOutdoor":"...","description":"...","lighting":"...","camera":"medium","depthLayers":"..."},"timeOfDay":"...","weather":"...","characters":[{"id":"CHR001","name":"...","position":"...","action":"...","expression":"...","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[]}}
 ```
 
 ... continue for ALL {PAGES} pages ...

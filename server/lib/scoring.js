@@ -1139,6 +1139,67 @@ function shouldRedo(version) {
   return false;
 }
 
+/**
+ * The entity report's findings for ONE page, billed per issue through
+ * deductionPoints. The single reader of an entity report for scoring: the
+ * unified pipeline (repairPipeline) and the admin re-evaluate route both call
+ * it, so a page re-scored from the panel lands on the number the pipeline
+ * stamped. Moved here from a repairPipeline closure on 2026-09-24 after the
+ * re-evaluate route kept its own severity-only sum.
+ * Returns { penalty (uncapped), issues } — issues carry type/subType so the
+ * type ceilings are reproducible downstream.
+ */
+function entityIssuesForPage(pageNumber, report) {
+  const out = { penalty: 0, issues: [] };
+  if (!report?.characters) return out;
+  for (const [charName, charData] of Object.entries(report.characters)) {
+    const charIssues = charData.issues || [];
+    for (const issue of charIssues) {
+      if (issue.pages?.includes(pageNumber) || issue.pagesToFix?.includes(pageNumber) || issue.pageNumber === pageNumber) {
+        // Charge through deductionPoints so the TYPE ceilings actually apply
+        // here. This path used to bill severity alone, so every
+        // MAX_SEVERITY_TYPES entry — accessory, unverified_absence,
+        // face_drift, hair_nuance — was silently ignored for entity
+        // findings: the bounding existed in code but not on the path that
+        // does the entity billing. Measured cost on one production book:
+        // 75 points across four pages and a cover for hair differing by a
+        // shade, which the owner reads as a nuance.
+        // { entity: true }: this IS the entity report, so its source-scoped
+        // zero (scoring.js ENTITY_ONLY_ZERO_POINT_TYPES) applies.
+        out.penalty += deductionPoints(issue, { entity: true });
+        out.issues.push({
+          name: charName,
+          // Carried so the ceiling is reproducible downstream and the dev
+          // panel can show WHY a MAJOR-looking finding cost 2 points.
+          type: issue.type || null,
+          subType: issue.subType || null,
+          severity: issue.severity,
+          description: findingText(issue),
+          source: 'character',
+        });
+      }
+    }
+  }
+  // Also include object-level issues so the panel surfaces missing/wrong props.
+  for (const [objName, objData] of Object.entries(report.objects || {})) {
+    const objIssues = objData.issues || [];
+    for (const issue of objIssues) {
+      if (issue.pages?.includes(pageNumber) || issue.pagesToFix?.includes(pageNumber) || issue.pageNumber === pageNumber) {
+        out.penalty += deductionPoints(issue, { entity: true });
+        out.issues.push({
+          name: objName,
+          type: issue.type || null,
+          subType: issue.subType || null,
+          severity: issue.severity,
+          description: findingText(issue),
+          source: 'object',
+        });
+      }
+    }
+  }
+  return out;
+}
+
 module.exports = {
   // New deductions-first model (canonical)
   SEVERITY_POINTS,
@@ -1156,6 +1217,7 @@ module.exports = {
   sameConcept,
   sumDeductionPoints,
   deductionPoints,
+  entityIssuesForPage,
   ENTITY_ONLY_ZERO_POINT_TYPES,
   isEntitySourced,
   deductionClassKey,

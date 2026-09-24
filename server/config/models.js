@@ -1168,13 +1168,18 @@ function resolveGrokImageModel(modelKey) {
  * every plate call site instead. Backend is DERIVED from IMAGE_MODELS so the
  * tier stays a single registry row, never a second hardcoded string.
  *
- * @returns {{imageModelOverride: string, imageBackendOverride: string|null}}
+ * It also marks the call AS a plate render (`landmarkScene: 'plate'`): the
+ * plate is the one render that may take the raw landmark photo as its scene,
+ * because the plate IS its painted, people-free version (server/lib/
+ * landmarkScene.js — every other render with a photo needs a plate or fails).
+ *
+ * @returns {{imageModelOverride: string, imageBackendOverride: string|null, landmarkScene: 'plate'}}
  */
 function emptyScenePlateRouting() {
   const key = MODEL_DEFAULTS.emptyScenePlateModel;
   const cfg = IMAGE_MODELS[key];
   if (!cfg) throw new Error(`[MODELS] emptyScenePlateModel "${key}" is not an IMAGE_MODELS key.`);
-  return { imageModelOverride: key, imageBackendOverride: cfg.backend || null };
+  return { imageModelOverride: key, imageBackendOverride: cfg.backend || null, landmarkScene: 'plate' };
 }
 
 // Repair workflow thresholds — single source of truth for server-side pipeline.

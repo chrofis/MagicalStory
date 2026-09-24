@@ -1899,6 +1899,18 @@
       "fixedAt": "2026-09-23",
       "fixedIn": "30f2c6913",
       "fix": "visualBible.vehicleDescription derives it (authored description stands) in both parse paths. Stored rows keep the gap (parse-time fix; recorded in decisions.md). Pinned by tests/unit/cover-objects-any-element.test.ts."
+    },
+    {
+      "id": "reevaluate-route-own-entity-sum",
+      "title": "The admin re-evaluate route computed its own entity penalty (severity-only sum) and showed/stored a score that disagreed with the canonical stamp",
+      "reportedAt": "2026-09-24",
+      "source": "Owner-approved bug report 2026-09-24. server/routes/regeneration.js re-evaluate summed SEVERITY_POINTS per entity/image-check issue, ignoring ZERO_POINT / MAX_SEVERITY / ENTITY_ONLY_ZERO_POINT_TYPES (a crop artefact that costs 0 was charged 15); the result went into version.qualityScore, the stamp input, the scene fallback and the response pages[n].score/entityPenalty. Staging job_1790100385959_1nitlympp back cover v0 is the stored example (crop finding, stamped 70, canonical 85).",
+      "rootCause": "A second, route-local entity scale beside scoring.js deductionPoints; the route also fed collectAllIssuesForPage's list (retry-history + entity findings) to the stamp as evaluator issues and returned no finalScore, so findBadPages subtracted the entity charge twice. The client collect-feedback step re-derived the score the same way.",
+      "impact": "The repair panel showed a number different from the stored score; redo decisions ran on it.",
+      "status": "fixed",
+      "fixedAt": "2026-09-24",
+      "fixedIn": "0765b1305",
+      "fix": "scoring.entityIssuesForPage is the one entity reader (pipeline + route); the route stamps the evaluator result unmodified and returns finalScore/evalScore/entityPenalty/entity deductions from the stamped version; client reads the stored finalScore. Pinned by tests/unit/reevaluate-canonical-score.test.ts."
     }
   ]
 }

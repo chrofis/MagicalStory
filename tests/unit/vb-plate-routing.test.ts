@@ -74,7 +74,6 @@ describe('the predicate', () => {
 
   it('falls back to the type rule when the class is null — every stored bible', () => {
     expect(isPlateBorneElement({ type: 'vehicle', scaleClass: null })).toBe(true);
-    expect(isPlateBorneElement({ type: 'location', scaleClass: null })).toBe(true);
     expect(isPlateBorneElement({ type: 'artifact', scaleClass: null })).toBe(false);
     // and the class overrides the collection: a building-scale ARTIFACT routes
     expect(isPlateBorneElement({ type: 'artifact', scaleClass: 'building' })).toBe(true);
@@ -103,8 +102,8 @@ describe('the plate gains the large elements', () => {
 
   it('adds nothing new for a stored bible with no classes', () => {
     const refs = getEmptySceneElementReferences(LEGACY, 1, 9, null, ['ART001', 'VEH001']);
-    // the location rides as it always did; nothing new is added
-    expect(refs.map((r: any) => r.id)).toEqual(['VEH001', 'LOC001']);
+    // nothing new is added — and no location cell rides the plate (2026-09-24)
+    expect(refs.map((r: any) => r.id)).toEqual(['VEH001']);
   });
 });
 
@@ -173,8 +172,6 @@ describe('the page loses them — but only when a plate is actually sent', () =>
     // no brief supplied (covers, trial plates) → unchanged behaviour
     expect(isPlateBorneElement(ship)).toBe(true);
     expect(isPlateBorneElement(ship, null)).toBe(true);
-    // a location is not AD-gated on either side
-    expect(isPlateBorneElement({ id: 'LOC001', name: 'the quay', type: 'location' }, ['ART002'])).toBe(true);
   });
 
   it('a stored bible keeps exactly its pre-2026-09-15 behaviour', async () => {

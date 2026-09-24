@@ -122,7 +122,10 @@ describe('the pipeline honours it', () => {
   it('picks a plate-sharing page as the vantage representative', () => {
     // Taking pageNumbers[0] blindly could paint the base from a high-angle page
     // and hand that horizon to the whole vantage.
-    expect(src).toContain('group.pageNumbers.find(pn => plateClass(shotOfPage(pn)) === PLATE_BASE_CLASS)');
+    // Among the plate-sharing pages it prefers one in the vantage's common
+    // declared light (sceneLight.js, 2026-09-24), so the fewest pages need a relit plate.
+    expect(src).toContain('const basePages = group.pageNumbers.filter(pn => plateClass(shotOfPage(pn)) === PLATE_BASE_CLASS);');
+    expect(src).toContain('basePages.find(pn => lightKey(lightOfPage(pn)) === commonLightKey)');
   });
 
   it('derives from the base plate image, not from a fresh generation', () => {

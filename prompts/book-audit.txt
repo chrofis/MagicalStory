@@ -1,10 +1,12 @@
-You are reading a finished picture book the way its audience receives it: an adult reads a page aloud while the child looks at that page's picture. Below you get each page's text followed by that page's picture, in reading order.
+You are reading a finished picture book the way its audience receives it: an adult reads a page aloud while the child looks at that page's picture. Below you get, in reading order, each page's text, then the brief its picture was drawn from — the moment it shows and the characters it was drawn with — then the picture.
 
 This batch covers page(s) {PAGE_LIST}.
 
 The words and the picture tell the story together. Some pages carry the story mostly in the picture and use few words; others carry it mostly in the words. That balance is never a fault. Never report a page for having little text, sparse action, or a quiet moment.
 
 {TEXT_NOT_A_CHECKLIST}
+
+The brief decides who is in the picture. A picture shows one moment, and a character the words name but the brief did not draw is absent by design — never an image fault. When the words put that character inside the very moment the picture shows, so a listener looks for them and cannot find them, it is FAULT[TEXT]; otherwise it is no fault.
 
 For every page, answer six questions:
 1. TOGETHER: taken together, do this page's words and picture tell one moment of the story a listener can follow? A picture may carry what the words do not say, and words may carry what the picture does not show.
@@ -16,4 +18,4 @@ For every page, answer six questions:
 
 Answer these questions for every page, but do not write the answers down. Output only the faults they found.
 
-Route every fault by its fix and weigh it. Write "FAULT[IMG][<WEIGHT>]: p<N> — <one sentence>" when a different image would fix it, and "FAULT[TEXT][<WEIGHT>]: p<N> — <one sentence>" when different prose would fix it. <WEIGHT> is one of: MINOR — a small detail is off and a listener would not notice; MAJOR — a described action, object or feeling is contradicted or wrongly shown, and a listener notices. Words describing what the picture simply does not show are not a fault; CRITICAL — the picture makes the words impossible, and a listener is confused; CATASTROPHIC — the page tells a different story: wrong characters, wrong place, or the opposite event. One line per fault, starting at the left margin. State each fault once — a finding you doubt is omitted. After the list write one line: "FAULTS: <count>".
+Route every fault by its fix and weigh it. Write "FAULT[IMG][<WEIGHT>][<TYPE>]: p<N> — <one sentence>" when a different image would fix it, and "FAULT[TEXT][<WEIGHT>]: p<N> — <one sentence>" when different prose would fix it. <WEIGHT> is one of: MINOR — a small detail is off and a listener would not notice; MAJOR — a described action, object or feeling is contradicted or wrongly shown, and a listener notices. Words describing what the picture simply does not show are not a fault; CRITICAL — the picture makes the words impossible, and a listener is confused; CATASTROPHIC — the page tells a different story: wrong characters, wrong place, or the opposite event. <TYPE> names what is wrong in the picture, exactly one value from this list: {FINDING_TYPES}. One line per fault, starting at the left margin. State each fault once — a finding you doubt is omitted. After the list write one line: "FAULTS: <count>".

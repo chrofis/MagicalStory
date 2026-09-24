@@ -1408,6 +1408,8 @@ export interface PageFeedback {
     character: string;
     issue: string;
     severity: string;
+    type?: string;
+    subType?: string;
     source?: string;
   }>;
   // Object consistency issues (from entity.objects)
@@ -1415,6 +1417,8 @@ export interface PageFeedback {
     object: string;
     issue: string;
     severity: string;
+    type?: string;
+    subType?: string;
     source?: string;
   }>;
   // Semantic/legacy image check issues (character_appearance, position_swap, etc.)
@@ -1499,10 +1503,14 @@ export interface RepairWorkflowState {
   };
   reEvaluationResults: {
     pages: Record<number, {
-      score?: number;                // Combined final score (quality - semantic - entity penalties)
-      qualityScore: number;          // Visual quality score only
+      score?: number | null;         // Legacy alias of finalScore
+      finalScore?: number | null;    // The stamped version's canonical score
+      evalScore?: number | null;     // The stamped version's pre-entity score
+      qualityScore: number;          // Visual evaluator's own number
       semanticScore?: number | null; // Semantic fidelity score only
-      entityPenalty?: number;        // Penalty from entity/image-check issues
+      entityPenalty?: number;        // The stamped version's entity charge
+      entityIssues?: Array<{ name?: string | null; severity: string; description?: string; type?: string | null; subType?: string }>;
+      scoreBreakdown?: { visual?: { score?: number | null }; semantic?: { score?: number | null } | null; entity?: { penalty?: number | null } } | null;
           verdict?: string;
       issuesSummary?: string;
       reasoning?: string;

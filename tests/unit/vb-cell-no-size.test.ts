@@ -95,12 +95,6 @@ describe('every page-side reader of a creature still states its scale', () => {
     expect(block).toContain(`Size: ${LEGACY_SIZE}`);
   });
 
-  it('the cover KEY STORY ELEMENTS', () => {
-    const block = VB.buildFullVisualBiblePrompt(vb(), { skipMainCharacters: true, allowedElementIds: ['ANI001', 'ANI003'] });
-    expect(block).toContain(`Size: ${KNEE}`);
-    expect(block).toContain(`Size: ${LEGACY_SIZE}`);
-  });
-
   it('the plate creature block (resolveSceneCreatures)', () => {
     const creatures = VB.resolveSceneCreatures(vb(), ['ANI001', 'ANI003']);
     expect(creatures.find((c: any) => c.id === 'ANI001').description).toContain(`Size: ${KNEE}`);

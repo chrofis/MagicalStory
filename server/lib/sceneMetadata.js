@@ -209,6 +209,8 @@ const { parseWornItems } = require('./wornItems');
  * anything else → 'cast_only'. `crowdExpected` continues to be published
  * alongside, derived, for every consumer that only asks the old question.
  */
+const { normaliseTimeOfDay, normaliseWeather } = require('./sceneLight');
+
 const POPULATION_LEVELS = ['cast_only', 'ambient', 'crowd'];
 
 function normalisePopulation(raw, legacyCrowdExpected) {
@@ -1023,8 +1025,11 @@ function extractSceneMetadata(sceneDescription) {
         population: normalisePopulation(metadata.population, metadata.crowdExpected),
         crowdExpected: normalisePopulation(metadata.population, metadata.crowdExpected) === 'crowd',
         setting: metadata.setting || null,
-        // time/weather passthroughs removed 2026-08-11: written for months,
-        // read by nothing (metadata-migration audit).
+        // The page's declared light (sceneLight.js, owner 2026-09-24): two
+        // closed enums, normalised here so every reader sees a valid value or
+        // null. Null on a brief written before the fields existed.
+        timeOfDay: normaliseTimeOfDay(metadata.timeOfDay),
+        weather: normaliseWeather(metadata.weather),
         background: metadata.background || null,
         // The Art Director writes `sceneIntent` on every page, and this
         // allowlist dropped it — so the two branches of this function
@@ -1069,6 +1074,8 @@ function extractSceneMetadata(sceneDescription) {
       // reference photo by kind (landmarkPhotos.pickVariantForView).
       landmarkView: metadata.landmarkView || null,
       sceneIntent: metadata.sceneIntent || null,
+      timeOfDay: normaliseTimeOfDay(metadata.timeOfDay),
+      weather: normaliseWeather(metadata.weather),
       background: metadata.background || null,
       isJsonFormat: true,
       isProseFormat: true
@@ -1210,6 +1217,10 @@ function extractSceneMetadata(sceneDescription) {
       textZoneDescription: parsedData.textZoneDescription || null,
       era: parsedData.era || null,
       sceneIntent: parsedData.sceneIntent || null,
+      // Declared light (sceneLight.js) — the trial writer emits it on the scene
+      // object; null on a hint that predates the fields.
+      timeOfDay: normaliseTimeOfDay(parsedData.timeOfDay),
+      weather: normaliseWeather(parsedData.weather),
       isJsonFormat: true
     };
   }
@@ -1296,6 +1307,8 @@ function extractSceneMetadata(sceneDescription) {
         textZoneDescription: null,
         aboard: null,
         era: null,
+        timeOfDay: null,
+        weather: null,
         isJsonFormat: true,
         isProseFormat: true,
         isRecovered: true

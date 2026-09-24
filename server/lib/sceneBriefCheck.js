@@ -355,6 +355,24 @@ function checkPopulationContradiction(page, metadata, castNames = []) {
 }
 
 /**
+ * N — `timeOfDay` / `weather` missing, or not one of the declared values
+ * (the parser normalises an unknown word to null). Reported to the scene
+ * review, which owns the fields like every other metadata field it rewrites.
+ */
+function checkLightDeclared(page, metadata) {
+  const { declaredLight, SCENE_LIGHT_FIELD_RULE } = require('./sceneLight');
+  const light = declaredLight(metadata);
+  const missing = ['timeOfDay', 'weather'].filter(f => !light[f]);
+  if (missing.length === 0) return null;
+  return {
+    pageNumber: page.pageNumber,
+    type: 'light_undeclared',
+    fields: missing,
+    detail: `The metadata declares no valid ${missing.map(f => `\`${f}\``).join(' or ')}. ${SCENE_LIGHT_FIELD_RULE} Set ${missing.length > 1 ? 'them' : 'it'} from the light the prose describes and the book's time.`,
+  };
+}
+
+/**
  * I — the page's own instant disagrees with the state it resolves to.
  *
  * Reuses `resolveObjectState`, the ONE place a page's state is decided, in
@@ -828,6 +846,13 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
   const populated = checkPopulationContradiction(page, metadata, castNames);
   if (populated) findings.push(populated);
 
+  // N — the page declares no light (sceneLight.js, owner 2026-09-24). Its
+  // `timeOfDay` and `weather` choose the plate it is painted on and write the
+  // page prompt's LIGHT line; a page without them inherits whatever light its
+  // vantage's base plate was painted in. Structured fields only.
+  const lightMissing = checkLightDeclared(page, metadata);
+  if (lightMissing) findings.push(lightMissing);
+
   // F — R4, the text half only. The depth-mismatch half of the old check 24b
   // is deliberately not restored (owner ruling, rule-survival audit 2026-09-03).
   if (opts && opts.textZoneRules) {
@@ -1084,6 +1109,9 @@ const REVIEWABLE = new Set(['cast_unlisted', 'cast_id_unresolved', 'interaction_
   // them the page cites a dotted LOC id the photo picker reads first, so the
   // field could not have changed the photo at all. docs/decisions.md.
   'shot_off_plate',
+  // The review owns `timeOfDay` / `weather` (check 3a); a missing value is one
+  // field on a page it already rewrites (sceneLight.js, 2026-09-24).
+  'light_undeclared',
   'textzone_character_collision', 'textzone_fullwidth_floor', 'textzone_top_floor', 'textzone_bottom_floor', 'textzone_half_streak']);
 
 // Reserved `action` labels for characters who are present but not acting. They
@@ -1122,4 +1150,5 @@ module.exports = {
   checkTextZoneDistribution, checkTextZoneCollision, parseTextPosition,
   checkPopulationContradiction,
   checkShotOffPlate,
+  checkLightDeclared,
 };

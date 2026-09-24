@@ -14,12 +14,9 @@
  * not an artifact"). A real landmark ships as a photograph, and an invented
  * location is what the empty-scene plate is built from — the backdrop the
  * characters are composited into, not a prop competing for a slot. Counting it
- * spent it twice. The selection still hands the page its location cell, LAST
- * and at most one. With the budget at FOUR (2026-09-11) a full page WANTS
- * VB_ELEMENT_BUDGET + 1 = 5 cells and Grok's VB_SLOT_MAX_ELEMENTS is 4, so the
- * location — last in priority — is the cell that gives way. That is deliberate:
- * five cells would put every crowded page on the 200px identity floor, and the
- * page already receives the location as its background plate.
+ * spent it twice. Since 2026-09-24 a location has no cell at all: an invented
+ * location lives in the bible as TEXT and its plate is built from that text, so
+ * the budget (4) and Grok's VB_SLOT_MAX_ELEMENTS (4) now meet exactly.
  *
  * Two sources put an element on a page, and both are counted, because both feed
  * the selection: the brief's own `objects[]` (an id the Art Director asked for)
@@ -83,11 +80,10 @@ const { idsCarriedByReferences } = require('./wornItems');
  *
  * The FIFTH cell is what would cost: 204px, four pixels above
  * `VB_CELL_FLOOR_PX`, and below ~200px a secondary character's face is a smear
- * the model replaces with a prior. So Grok's `VB_SLOT_MAX_ELEMENTS` stays at 4:
- * a page using all four elements drops its LOCATION cell (last in priority)
- * rather than shrinking every cell on the most crowded pages. The location is
- * the one cell that is genuinely redundant — the page already receives that
- * plate as its background.
+ * the model replaces with a prior. So Grok's `VB_SLOT_MAX_ELEMENTS` stays at 4,
+ * equal to the budget. (Until 2026-09-24 a page also carried its invented
+ * location's cell as a fifth, and that was the cell that gave way; locations
+ * no longer have cells.)
  */
 const VB_ELEMENT_BUDGET = 4;
 

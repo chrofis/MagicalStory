@@ -21,6 +21,373 @@ superseded and link forward.
 
 ---
 
+## 2026-09-24 — One place is one place: the arc keeps inside and outside apart, and the Art Director never folds two named places or an indoor page into one outdoor location
+
+**Context:** Prod `job_1790107559778_fcmlfa8kn`. The committed arc (sentence 4) had a child "carry the
+whole key drawer outside to try every key", trip on the step and tip the keys into the leaves — at a
+reading-room door the next sentence stages from the floor inside, next to a windowsill. The three
+panelists (grok-4.6, deepseek-v4-pro, gpt-5.6-luna-pro) all passed it: SENSE and CLAIM ask whether a
+turn holds, and none asked on which side of a wall a place lies. The planner staged it (p4 "keys
+half-buried in wet leaves on the step outside the reading-room door"). The Art Director then folded
+the building's front door (p2, rain, a lantern cart at the doorstep) and the reading-room door (p4-p6,
+p5 a child lying on the floor) into ONE outdoor location, `LOC002 "tower exterior and door step"`,
+setting `outdoor, threshold`, with no vantages. Nothing in `scene-expansion-all.txt` said what counts as
+one location: C1 says to reuse a location's id, the vantage paragraph says when to split one, and
+nothing says when two places are two. The scene review cannot split a location (its bible lane only
+corrects `states[]`), so the fault shipped.
+
+**Decision (owner-approved build, 2026-09-24):**
+1. **Arc: `ARC_PLACE_RULE`** (promptBuilders.js) — every staged place is inside or outside, a move
+   between them goes through a way the place has, an inside door is reached from inside, and a thing
+   dropped lands where it happens. ONE string, three consumers: the creator's and re-teller's
+   `{TELLING_RULES}` (generator), the panel's new PLACE lens in arc-panel.txt, which first lists each
+   staged place as inside or outside (critic), and check 11 of the Lab-only story-arc-review.txt.
+   Registered set `arc-generator-vs-critic` — the same pattern as ENTRANCE / GIVEN / SENSE.
+2. **Art Director: `PLACE_SEPARATE_RULE` + `PLACE_INSIDE_OUTSIDE_RULE`** — places the plan lines
+   name separately (two doors, two rooms) are separate locations, or vantages of one location when
+   they are parts of one building; a page whose plan line puts its figures inside never shares a plate
+   with an outdoor page, and a building seen from both sides is an exterior vantage and an interior one.
+   Both reach scene-expansion-all.txt (the only location author), next to the vantage paragraph. The
+   per-page fallback scene-expansion.txt cites a location the bible already holds, so it gets only the
+   inside/outside half.
+3. **No critic side for the Art Director rule.** scene-review.txt has no check category for place
+   identity (`[continuity]` covers a location changing shape, not two places sharing one), and the
+   reviewer cannot split a location. None was added: a finding the reviewer cannot fix is noise.
+4. **Not given:** the planner (story-beats.txt) — it divides a finished story, and the arc rule
+   upstream is where the fault is authored; the iterate templates — they rewrite one page against its
+   already-cited vantage; the trial writer (story-trial.txt) — it authors locations with no vantages,
+   and the rule's vantage half does not fit it. Each is a candidate if the fault recurs there.
+
+**Rationale:** a place's side of the wall is a fact the arc owns and the Art Director must keep; once
+two places share one plate, every page of them is drawn on the wrong backdrop and no later stage can
+separate them.
+
+**Validation (rung 2, staging Test Lab, the prod story copied to staging):**
+- `arc_panel_replay` #1444 (#1439 was reaped mid-run by another session's deploy) on the stored
+  committed arc, the three production panelists: **3 of 3 now flag sentence 4** (grok-4.6 "Sophie
+  works the door from outdoor leaves while Lukas later lies on an interior floor at the same door";
+  deepseek-v4-pro "PLACE — MAJOR MISSED ISSUE … an inside door … spill lands on outside ground";
+  gpt-5.6-luna-pro M1 "whether the reading-room door opens from the tower interior or the yard").
+  Production's panel on the same arc: 0 of 3. $0.11.
+- `beats_scenes` #1451 (stored plan lines p1-p6, no scene review, gemini-3.1-pro as in production):
+  the front door (p2) is now its own `LOC003 "Tower Main Entrance"`, apart from the reading-room door
+  `LOC002` (p4-p6, three vantages). Production merged them into one LOC002. **Partial on the inside
+  half:** LOC002 stays `outdoor` and p5 lies "on the cold stone" in front of the door — the stored p4
+  plan line itself says "on the step outside the reading-room door … wet leaves", and the plan line is
+  the Art Director's authority. The contradiction is authored in the arc, which the PLACE lens now
+  catches before the planner sees it. $0.26.
+
+**Touched:** `server/lib/promptBuilders.js` (`ARC_PLACE_RULE`, `PLACE_SEPARATE_RULE`,
+`PLACE_INSIDE_OUTSIDE_RULE`, telling rules, panel / arc-review / both Art Director builders),
+`prompts/arc-panel.txt`, `prompts/story-arc-review.txt`, `prompts/scene-expansion-all.txt`,
+`prompts/scene-expansion.txt`, `tests/unit/place-inside-outside-rules.test.ts`.
+
+**Status:** ✅ active (staging).
+
+---
+
+## 2026-09-24 — Invented locations are TEXT only: no location reference cell is rendered or attached anywhere (amends 2026-08-29 "one reference family per plate")
+
+**Context.** The owner's intent has always been that an invented (non-landmark) location lives in the
+Visual Bible as prose and its background plate is built from that prose. The code did otherwise:
+`getElementsNeedingReferenceImages` rendered a cell for every non-landmark location on ≥2 pages
+("imaginary locations need reference images"), drew it with the isolated-object prop template, and
+`getEmptySceneElementReferences` → `buildEmptySceneVbGrid` attached it as the plate's only image, with the
+REFERENCE line "The place or vessel in this scene is the one shown in the attached reference image". The
+same cell also rode the page grid (`getElementReferenceImagesForPage`, LAST, on plateless pages) and the
+cover grid (`getElementReferenceImagesByIds`). A read-only survey (2026-09-24) found **6-11 of 65 recent
+location cells were dioramas or isolated objects**, and the plates copied the cell almost pixel for pixel —
+camera, plinth and pillar bars included: **5 of 6 bad cells gave bad plates**. Prod
+`job_1790107559778_fcmlfa8kn`: LOC001 kitchen = a miniature on a plinth (plates for p1/p3), LOC002 = a
+wall-less door (p2, p4-6). `docs/image-routing.md` implied the text-only behaviour already held.
+
+**Decision (owner, 2026-09-24).**
+1. No reference cell is ever generated for a location. The locations loop in
+   `getElementsNeedingReferenceImages` is deleted, not gated.
+2. No location cell is ever attached: the location loops in `getEmptySceneElementReferences`,
+   `getElementReferenceImagesForPage` and `getElementReferenceImagesByIds` are deleted, and with them the
+   now-dead `type === 'location'` branches (`isPlateBorneElement`, the `buildPageCompositeRefs`
+   "other refs → drop locations" branch and its `hasOtherRefs` option, the cover-grid and Grok
+   character-row filters, the `'location'` pool label). Plates, covers, iterate, repair, plateless pages
+   and every Test Lab stage go through these selectors, so all of them build an invented location from
+   the text. The Lab's `vb_element_cell` stage refuses a LOC id.
+3. The plate REFERENCE line is split by family: a landmark photo is "the place in this scene", a VB grid
+   is "the vessel or structure in this scene". Neither can now refer to a location cell.
+4. Unchanged: real landmarks keep their photo path; vehicles and building-scale artifacts keep their cells
+   and still ride the plate; the one-reference-family rule (landmark photo XOR element grid) still holds
+   for those.
+5. **Old stories** that already carry a location cell (`referenceImageUrl` on a `visualBible.locations`
+   entry): the stored cell stays in the data (diagnostics are kept) but is ignored by every selector, so
+   every re-render, iterate, repair and cover regeneration builds that location from its text. No
+   migration is needed or wanted.
+
+**Rationale.** A location is the whole setting; a cell is a small isolated render with its own camera and
+ground. When a plate is an edit anchored on such a cell, the model reproduces the cell's framing instead of
+building a room around the cast. The text already carries what the place looks like (the vantage
+LOCATION/VANTAGE lines and the Art Director's FRAMING block), and the vantage plate is what keeps a
+location consistent across the pages that share it. This amends 2026-08-29 decision 2 only in what the
+"element" family may contain; SETTLED.md's "LOCATIONS ARE NOT ELEMENTS" line is refreshed factually (the
+page no longer carries a location cell that "gives way").
+
+**Plateless pages.** A page that is sent no plate now carries no image of an invented location either; its
+setting comes from the Art Director's scene prose. The page prompt's REQUIRED OBJECTS block still skips
+location entries (`promptBuilders.js`), as before.
+
+**Touched:** `server/lib/visualBible.js`, `server/lib/referenceSheets.js`, `server/lib/coverIterate.js`,
+`server/lib/grok.js`, `server/lib/images.js`, `server/lib/testlab.js`, `server/lib/vbElementBudget.js`
+(comments), `server/services/prompts.js`, `storyJobPipeline.js` (comments/logs),
+`tests/unit/location-text-only.test.ts` (new), `tests/unit/vb-plate-routing.test.ts`,
+`tests/unit/recurring-creature-slot.test.ts`, `tests/unit/vb-element-cell-prompt.test.ts`,
+`tests/manual/test-pt8-secondary-references.js`, `docs/image-routing.md`, `docs/SETTLED.md`.
+**Status:** ✅ active
+
+---
+
+## 2026-09-24 — A page declares its time of day and weather; a plate in another light is re-lit from its vantage's base
+
+**Supersedes** the time/weather half of 2026-08-11 "Scene-metadata migration orphans" ("prose covers
+lighting/weather", dead `time`/`weather` passthroughs deleted), the "Rejected for now: a declared
+time-of-day" paragraph of 2026-08-15 "The garment fix has no lighting factor", the keyword extractor of
+2026-08-26 "Visual flow: time-of-day is judged against the page's DECLARED time", and item 3 "One plate,
+one light" of 2026-09-23 "The all-pages Art Director and the scene review see no page text". Owner
+sign-off 2026-09-24, framed as a reversal of the first two.
+
+**Context.** The light lived only in free prose, and nothing structured carried it:
+- Pages sharing a vantage plate inherited the representative page's light and weather
+  (`storyJobPipeline.js` `repPageData`), and `image-generation.txt` told the illustrator to "copy its
+  setting, geography and light direction". Prod `job_1790107559778_fcmlfa8kn`: the p2/p4/p5/p6 plates
+  are byte-identical, with p2's rain.
+- `sceneIntent` named no light on 135 of 294 staging pages.
+- `sceneGeometry.js` skipped any sentence over 240 characters; p10's "at night" sentence (247) never
+  reached its plate.
+- Pixel sample: 7 of 15 staging shared-plate pages whose light differed from the representative's rendered
+  the wrong light — night usually won, evening and rain lost.
+- The visual-flow judge read the declared hour with a keyword scan of the prose.
+- The 2026-09-23 AD rule "split a vantage when its pages differ in time or weather" was a second,
+  prose-only mechanism for the same problem, and could not reach a plate already shared.
+
+**Decision.**
+1. **Two closed enums, one module** (`server/lib/sceneLight.js`): `timeOfDay` ∈ dawn | morning | midday |
+   afternoon | evening | dusk | night; `weather` ∈ clear | overcast | rain | snow | fog | storm | none
+   (`none` = an interior, where weather is not visible). One rule constant `SCENE_LIGHT_FIELD_RULE` is
+   filled into both Art Director templates, both iterate templates, the trial writer and scene-review
+   check 3a `[light_fields]`. The parser (`sceneMetadata.js`) normalises both fields on every branch; an
+   unknown word is null.
+2. **The fields survive every rewrite.** The scene review and its worn-state round
+   (`beatsPipeline.keepDeclaredLight`) and the iterate rewrite (`images.js`) carry the parent's fields
+   forward when a rewrite states none (`carryForwardLightInBrief`); a rewrite that states a value wins.
+   `sceneBriefCheck` reports `light_undeclared` (REVIEWABLE; not an iterate type, since the carry makes it
+   unanswerable there).
+3. **Plates: re-light, don't regenerate.** The vantage group stays one place. Its base plate is painted
+   in the light most of its pages declare (representative = a plate-sharing page in that light), and a
+   page declaring another light gets a plate EDITED from the base by the existing derive machinery — same
+   edit model, art style, plate QC and one fed-back retry — keyed by (shot class, light). An angled page
+   in another light takes ONE edit that moves the camera and re-lights (`buildPlateDeriveInstruction`
+   `relight`). Chosen over a fresh plate because the derive keeps the place's buildings, trees and palette
+   between adjacent pages of one location, which is what a shared plate exists for; a fresh generation
+   breaks it (the 2026-09-21 angle-derive rationale). The plate prompt and the per-page plate path carry
+   the light as a fixed `**LIGHT:**` line from the fields; the plate QC judges it (`LIGHT_CHECK`). The AD
+   no longer splits a vantage for light, and its plate prose names no time of day or weather — **one
+   mechanism**.
+4. **Page prompt.** `buildImagePrompt` writes the fixed `**LIGHT:**` line from the fields into the
+   protected tail (`PROMPT_NEVER_CUT` marker, so no shrink cuts it). `image-generation.txt` now copies
+   the plate's "setting and geography"; its time of day and weather give way to the LIGHT line.
+5. **Critics read the fields, not the prose.** The semantic judge gets `{DECLARED_LIGHT}` and skips the
+   light check when it is empty; the visual-flow judge compares `renderedTime`/`renderedWeather` (same
+   enums) to the brief's fields, with neighbouring hours not a contradiction (`timeContradicts`) — still
+   warn-only. `extractDeclaredLight` is deleted. Registry set `scene-light-generator-vs-critic`.
+6. **240-char filter:** a long sentence is never forwarded whole, but its clauses are salvaged; a cut
+   clause that opens on a verb, an adverb, a body part or a colour lost its figure subject and is dropped
+   (`ELIDED_SUBJECT_RE`) — measured over 54 stored staging pages: without that guard 12 of the 17
+   pages whose facts changed gained a figure-action fragment; with it, 9 pages gain facts, 4 of them a light fact (p10 "in the fading
+   afternoon light").
+7. **Stored stories** (every brief written before today) declare no light: no LIGHT line, their vantage
+   plate is shared exactly as before, no judge can call their light wrong. Not a fallback — the
+   declaration is absent and nothing is inferred from prose. A page repaired through the iterate rewrite
+   gains the fields, since that template now asks for them. Covers carry no fields: a cover hint's `Mood`
+   line sets its light, and a cover is not in the book's time flow. Trial plates are not split by light: they render from
+   `backgrounds[]` during outline streaming, before any scene hint exists, and the trial's latency is its
+   product requirement; trial page prompts do carry the LIGHT line from the hint's fields, which wins over
+   the plate.
+
+**Evidence (rung 2, Test Lab on staging, ~$0.28):** relit plate (`edit_image`, the production derive
+instruction) then the page on it with the new template — exps 1442/1443 (`job_1789506283204_3kxqshifx`
+p13, dusk: was bright daylight with white clouds, now a dusk sky with the lamp lit, same plaza), 1445/1446
+(`job_1789853503332_riqncqg1i` p17, night: starry dark sky, lit windows, same tree), 1447/1448
+(`job_1789343124794_z2c779f7i` p10, evening: low sun through the beeches, long shadows) and 1449/1450
+(riqncqg1i p12, dusk). Every relit plate kept its place's geometry. Not exercised: the combined
+angle-and-relight edit, and an Art Director run emitting the fields (stored briefs were given them by
+hand).
+
+**Touched:** `server/lib/sceneLight.js` (new), `server/lib/sceneMetadata.js`, `server/lib/promptBuilders.js`,
+`server/lib/beatsPipeline.js`, `server/lib/images.js`, `server/lib/sceneBriefCheck.js`,
+`server/lib/shotVocabulary.js`, `server/lib/sceneGeometry.js`, `server/lib/evalPipeline.js`,
+`server/lib/sceneValidator.js`, `server/lib/styleConsistency.js`, `server/lib/testlab.js`,
+`server/services/prompts.js`, `storyJobPipeline.js`, `prompts/scene-expansion-all.txt`,
+`prompts/scene-expansion.txt`, `prompts/scene-iteration.txt`, `prompts/scene-iteration-free.txt`,
+`prompts/story-trial.txt`, `prompts/scene-review.txt`, `prompts/image-generation.txt`,
+`prompts/empty-scene.txt`, `prompts/empty-scene-qc.txt`, `prompts/image-semantic.txt`,
+`scripts/admin/sibling-registry.json`, `tests/unit/scene-light.test.ts`.
+
+**Status:** ✅ active (owner sign-off 2026-09-24).
+
+## 2026-09-24 — A VB description's first noun is its label's noun; the cell gate keeps judging the `type` (naming the object in the gate question was measured WORSE)
+
+**Context:** Prod `job_1790107559778_fcmlfa8kn` ART002 "heavy brass nutcracker" (type `hand tool`)
+rendered as pliers / a bolt cutter, and the gate passed it: "The image shows a brass bolt cutter that
+matches the description". The description carried no identity noun ("a heavy hand tool made of solid
+brass … two thick lever handles connected by a sturdy hinge"): the authoring rule "Name the thing with
+the word that names it" did not stop the model naming it by its `type` family. The owner-approved fix
+had two halves: (a) the gate checks the cell against the element's label, (b) the description carries
+the kind noun.
+
+**Decision:**
+1. SHIPPED — both VB authoring sites (`scene-expansion-all.txt`, `story-trial.txt`): a description's
+   first noun is the noun its `label` ends in, never the family in `type`.
+2. NOT SHIPPED — the gate change. Measured on the stored cells of the three stories (25 cells, the
+   gate model `gemini-2.5-flash-lite`, each story's own art style, old question vs a question naming
+   the object as "the brass nutcracker, a hand tool … another object of the same family … fails"):
+   old gate 7 NO, new gate 1 NO. Naming the object PRIMES the judge: both known-bad scale cells, which
+   the old gate correctly failed ("a ceramic dish, not a reptile scale"; "a plate, not a dragon
+   scale"), PASSED under the new question ("accurately depicts a teal-colored, oval-shaped scale"),
+   and ART002 still passed ("accurately depicts a brass nutcracker"). A variant that asked the judge to
+   name what it sees first, in the same call, also passed the dish ("seen: teal scale") and ART002, and
+   falsely failed a correct possessive-named ball. The old question stays.
+3. What does separate the cells: asked COLD, with no name and no description, flash-lite names the
+   cells "blue shell", "orange plate" and "nut cracker"; `gemini-2.5-flash` names ART002 "gold pliers".
+   A blind naming call (separate, name-free) and/or a stronger gate model is the open option — an
+   owner decision, in BACKLOG.
+4. The cell RENDER prompt is unchanged (its deliberate omission is of the labelled heading form; the
+   2026-09-11 kind sentence already carries the label as prose).
+
+**Touched:** `prompts/scene-expansion-all.txt`, `prompts/story-trial.txt`,
+`tests/unit/vb-authoring-contract.test.ts`. **Status:** ✅ active (authoring); gate unchanged.
+
+## 2026-09-24 — Consolidator votes are clamped to what each source actually said (keeps 09-11 CRITICAL-wins)
+
+**Context:** The severity of a consolidated finding is computed in code from the model's transcribed
+`severities` (2026-08-09 median in code; 2026-09-11 owner reversal: a CRITICAL vote wins). The
+transcription is not reliable: prod `job_1790107559778_fcmlfa8kn` p6 v3 carried a reader MAJOR that
+the consolidator transcribed as `{"reader":"CATASTROPHIC"}`, and one vote's median is that vote — a
+CATASTROPHIC `character_identity`. Across stored `consolidator_calls` (60 days) entries scored above
+every severity their sources showed: prod 9 of 2,204, staging 27 of 8,948.
+
+**Decision:** Before the median, each transcribed vote is clamped to the HIGHEST severity that source
+showed in this page's consolidator input (`sourceSeverityCeilings`, reading the same sections with the
+same defaults `buildFeedbackInput` renders — one `shownSeverity` helper for both). A vote for a source
+that flagged nothing on the page is dropped. When no vote survives, the model's pick is held to the
+page's highest input severity. A source whose findings carry no readable severity (entity `?`) is not
+clamped. The CRITICAL-wins rule is untouched and now fires only on a CRITICAL a source really gave.
+Code reads severities and source NAMES only — never a finding's text, never its type (SETTLED:
+classification is the prompt's; code may only change a severity). The raw transcribed votes stay
+stored in `severities` for audit.
+
+**Measured (free replay over stored `consolidator_calls`, current code vs clamp):** prod: 9 → 0
+entries above their sources, 9 → 0 votes above their source; 11 entries change, all lowered
+(CRITICAL→MAJOR 4, CRITICAL→MODERATE 4, CATASTROPHIC→MAJOR 2 incl. p6 v3, MAJOR→MODERATE 1).
+Staging: 27 → 0 and 31 → 0; 33 entries change, all lowered. Zero raised. Known cost: when the model
+MIS-ATTRIBUTES a real vote (writes `compliance: CRITICAL` for a CRITICAL the semantic judge gave), the
+clamp lowers it — seen on prod `job_1787436913379` p10 (3 entries). The clamp trusts what the
+evaluators said, not what the transcription claims they said.
+
+**Touched:** `server/lib/feedbackConsolidator.js`, `tests/unit/consolidator-vote-clamp.test.ts`.
+**Status:** ✅ active
+
+## 2026-09-24 — The book audit gets each page's brief (moment + cast) and types its IMG findings
+
+**Context:** `bookAudit.js` gave the reader only page text and picture. It charged a character the
+words name but the Art Director never staged: prod `job_1790107559778_fcmlfa8kn` p7 (brief cast: none)
+"Manuel absent", p9 (cast: Lukas) "Sophie and Manuel not visible"; over 17 stories, 40 IMG faults
+named a character outside that page's cast. The Lukas diagnosis first blamed text refinement running
+after images; the pre-refine text already named them, so the cause was the reader lacking the cast.
+Separately its IMG lines reached the consolidator with no type, so the consolidator invented one.
+
+**Decision:** Between each page's text and picture the reader gets a BRIEF line: the moment drawn
+(`sceneMetadata.sceneIntent`) and who it was drawn with — the evaluator's ONE roster
+(`resolveExpectedCastNames`, the arguments images.js passes), "nobody … by design" for a declared
+empty cast, omitted when the page records no cast (covers). The prompt: a character the words name
+but the brief did not draw is no fault, or `FAULT[TEXT]` when the words put them in the very moment
+shown. IMG lines carry a type: `FAULT[IMG][<WEIGHT>][<TYPE>]`, `<TYPE>` from `{FINDING_TYPES}` =
+`evalBuckets.CONSOLIDATED_TYPES`, which a test pins to the consolidator template's closed list;
+`parseRoutes` → `attributeReaderFindings` → the consolidator renders it `(type)` like any evaluator
+line. The audit stays the single text-vs-image cross-check (SETTLED, 2026-09-13): the per-page judges
+still judge image-vs-brief only.
+
+**Touched:** `server/lib/bookAudit.js`, `server/lib/repairLogic.js`, `server/lib/repairPipeline.js`
+(passes `characters`), `server/lib/feedbackConsolidator.js`, `server/lib/evalBuckets.js`,
+`prompts/book-audit.txt`, `prompts/feedback-consolidator.txt`, tests.
+**Status:** ✅ active
+
+## 2026-09-24 — Image prompts say each thing once; the shrinker's cut order is one named list the docs render
+
+**Context.** Staging `job_1790100385959_1nitlympp`: every four-character image prompt (pages and
+covers) sat at or over ~10,010 characters, the line above which the shrinker (Grok cap 7,900) spends
+REQUIRED CAST; the front cover crossed it (10,129 built, REQUIRED CAST cut). Most of the overshoot was
+the same thing said twice. The ranked cut of 769c655ff existed only as a builder function with a
+docblock, and prompt-inventory.md kept a hand-written copy of the rank. Owner, 2026-09-24:
+"remove the pure repetition" (seven listed items) and "make clear what gets removed in which order" —
+one explicit ordered list in code, code and docs reading the same list, the log naming each cut block.
+
+**Decision — repetition (shared builders, so pages and covers stay identical per 2026-08-26).**
+1. ONE ground/feet rule: the cover-composition.txt ground bullet (all three covers) is deleted; the
+   shared Composition ground bullet (`COMPOSITION_GROUND_BULLET`) gains the one clause a page also
+   needs, "then no ground is invented under" a figure that swims, floats or flies. "Feet level with
+   each other" is not carried over: it contradicts a cover figure placed in the background.
+2. No `**CHARACTER REFERENCE PHOTOS:** [Name], …` line (`buildCharacterReferenceList`); REQUIRED CAST
+   reads "Every named character" instead of "named in the reference list" (pages never had the list).
+3. `buildCharacterPhysicalDescription` states the age once (no "(Looks: X)"), no height in cm
+   (HEIGHT ORDER carries relative size; nothing compares cm), and drops the midpoint build "average"
+   (same logic as the midpoint faces); slim / athletic / stocky stay. This line also feeds the entity
+   judge, consolidator and detector rich line, so generator and critic move together.
+4. `buildCoverSceneFromHint` no longer restates the age per figure and states the gaze once
+   ("Each of them looks at the viewer." / "<Name> looks at the viewer."); the empty-plate strip drops
+   the group sentence. Gaze stays code-owned at the viewer (SETTLED).
+5. The cover "Each character has 2 hands / at most 2 items" bullet is deleted (HANDS anchor carries it).
+6. The front "ALL MAIN CHARACTERS are prominently featured…" bullet is shortened to "The characters
+   form one balanced, uncluttered group, each clearly recognizable." (REQUIRED CAST carries the cast).
+7. Covers do not build the Composition facing bullet or COUNTS: both are now code constants
+   (`buildCompositionBlock({cover})`, `COUNTS_RULE`, placeholders `{COMPOSITION}` / `{COUNTS}` in
+   image-generation.txt). Same "inapplicable text is not built" precedent as the 2026-09-23 cover SHOT.
+Untouched: face text (d5dd79baf), the baked title block (SETTLED), the NO MARKS / HANDS anchors.
+
+**Decision — cut order.** `PROMPT_CUT_ORDER` (server/lib/images.js) is the one ordered list: each step
+has label, what, why and approximate size, and builds the exact-text remover the shrinker runs.
+`PROMPT_NEVER_CUT` lists what no step may remove (NO MARKS, HANDS, REQUIRED TEXT — checked by
+construction — plus SHOT, EXACT POSES and the `marker` entries REQUIRED OBJECTS, KEY STORY ELEMENTS, SEASON, COMPOSITION GUIDELINES, ART STYLE, which open the protected tail: b794b9731's MUST_KEEP_MARKERS is now derived from this list, not a second copy). The rank
+itself is unchanged from 769c655ff. The docs' section is generated from these constants by
+`scripts/admin/sync-prompt-cut-order-docs.js`; `tests/unit/prompt-cut-order-docs.test.ts` fails when
+a doc is stale, and the hand-written copy in prompt-inventory.md is replaced by a pointer. The log line
+and the generation-log event now read `cut in order: #1 COUNTS (-233) > #2 Composition: size (-305) …`
+(`droppedSteps` carries step, label, chars).
+
+**Evidence (rung 1, free).** The stored story rebuilt through the real builders (covers as
+storyJobPipeline builds them; pages 12 and 1 via `buildImagePrompt` from the stored brief, cast and
+reference photos) and the real shrinker at 7,900:
+
+| prompt | built before → after | sent before → after | cut after |
+|---|---|---|---|
+| front cover | 10,129 → 8,641 | 7,494 → 7,688 | size, DEPTH AND SIZE (REQUIRED CAST and ground now kept) |
+| initial page | 9,329 → 7,975 | 7,777 → 7,671 | size (DEPTH AND SIZE now kept) |
+| back cover | 9,280 → 7,907 | 7,728 → 7,603 | size (DEPTH AND SIZE now kept) |
+| page 12 (4 children) | 10,022 → 10,043 | 7,567 → 7,545 | COUNTS … ground (unchanged; REQUIRED CAST kept) |
+| page 1 (2 children) | 8,944 → 8,965 | 7,391 → 7,412 | unchanged |
+
+Every judge-checked rule (REQUIRED CAST, NO MARKS, HANDS, DEPTH AND SIZE, size, COUNTS, ground, HEIGHT
+ORDER, title, top third, viewer gaze) was grepped in each sent prompt: none went from sent to cut; on
+pages the only text change is the ground clause and the REQUIRED CAST wording. Page prompts carry no
+character lines or name list, so Task A saves nothing on pages; a four-child page still loses
+DEPTH AND SIZE and Composition to the cap.
+
+**Touched:** `prompts/image-generation.txt`, `prompts/cover-composition.txt`,
+`server/lib/promptBuilders.js`, `server/lib/coverIterate.js`, `server/lib/images.js`,
+`scripts/admin/sync-prompt-cut-order-docs.js`, `docs/image-generation-methods.html`,
+`docs/prompt-inventory.md`, `tests/unit/prompt-says-each-thing-once.test.ts`,
+`tests/unit/prompt-cut-order-docs.test.ts` (+ three tests moved to the constants).
+
+**Status:** ✅ active
+
+---
+
 ## 2026-09-24 — Cells get no size: a Visual Bible description states no scale; page-side readers add it via `withScaleNote`
 
 **Context:** Owner, 2026-09-23: *"Cells get no size."* A reference cell paints one element alone, so it
@@ -86,7 +453,7 @@ ELEMENTS and plate creature lines: still carry the phrase.
 
 **Status:** ✅ active
 
-## 2026-09-24 — Plate or fail: no render is ever built on a raw landmark photo (covers, trial pages, Gemini); cover edits send no photo; composite covers unchanged
+## 2026-09-24 — Plate or fail: no render is ever built on a raw landmark photo (covers, every story page, Gemini); cast-0 pages and composite covers are the named exemptions; cover edits send no photo
 
 **Context:** The 2026-09-23 trial-cover fix (entry below) left three paths where a missing plate still let
 `packReferences` promote the raw landmark photograph into the scene slot: full-account covers (streaming
@@ -125,6 +492,57 @@ prod trials and older staging trials that predate the persisted plate prompt.
 `tests/unit/plate-or-fail-covers-and-trial-pages.test.ts`, `tests/unit/trial-cover-plate-not-raw-photo.test.ts`,
 `docs/image-routing.md`, `docs/image-generation-methods.html`.
 **Status:** ✅ active on staging.
+
+**Extended the same day to every story page (owner, 2026-09-24).**
+- **One check, three named roles.** `server/lib/landmarkScene.js` owns the rule. `assertLandmarkScene` runs
+  in `generateImageOnly` (before the cache) and in the shared dispatch, so it covers Grok, Gemini and Runware.
+  A landmark photo with no plate throws `PlateRequiredError` unless the call declares a role:
+  - `'plate'`: the plate render itself. `emptyScenePlateRouting()` now returns it, which marks every plate
+    call site.
+  - `'castless'`: THE CAST-0 EXEMPTION, `landmarkPhotoIsPageScene`, the same cast count the router uses. The
+    2026-09-02 ruling stands, so a page with no named cast renders on its photo.
+  - `'composite'`: iterateCover's composite route, left as it was.
+- **packReferences no longer promotes the photo on its own.** The branch that made `landmarkPhotos[0]` the
+  scene anchor whenever no plate was given is deleted. The photo goes in the scene slot only under a declared
+  role, and a photo with no plate and no role throws there too. Gemini attaches the photo only under a role.
+- **Every mode plates a landmark page.** Phase 5a-pre plates `pageNeedsPlate` pages even with
+  `singlePassScene` or `generateEmptyScenes=false`; pages without a landmark keep the single-pass behaviour.
+  The per-page plate body is now `renderPagePlate(pageData)`, one mechanism for 5a-pre and the page retry.
+- **First render and retry.** A landmark page with no plate throws at the Phase 5a render and lands in the
+  existing page catch. The one retry then renders the missing plate with `renderPagePlate`, records it on the
+  page (`emptySceneImage`), and renders. If the plate cannot be made, the page fails
+  (`page_image_retry_failed`).
+- **Trial pages** follow the same rule, with the cast-0 exemption.
+- **Iterate and repair.** Plates are reused or rendered, never the raw photo:
+  - `iteratePageCore` resolves its plate in `resolveIteratePlate`. A landmark page ignores
+    `singlePassScene`, reuses the passed-in or stored plate (converted to a data URI), renders one with
+    `renderStoryPagePlate` when none is stored, and throws when that fails.
+  - The page regenerate, test-models and style-lab routes go through `ensureStoryPagePlate`, which does the
+    same.
+  - The calm-zone re-render (pipeline, repair pipeline, Lab mirror) and the repair pipeline's regenerate
+    branch go through `resolveRepairScene`, which uses the page's stored plate and fails without one.
+  - Iterative placement passes the plate. Its pass 2 (an edit of pass 1) sends no photo.
+- **Found while replaying.** The iterate route's `emptySceneCallbacks.load` returns raw base64 for R2-backed
+  rows, and packReferences only takes a `data:image` plate. So a UI iterate of a landmark page dropped its
+  stored plate and, with no plate, rendered on the raw photo. Staging `job_1790100385959_1nitlympp` p5's row
+  has `image_url` only. Landmark pages now convert the plate.
+- **Registry:** new set `page-plate-or-fail-callers`, anchored on `landmarkScene`.
+- **Validation (free; every provider call intercepted and refused):** staging `job_1790100385959_1nitlympp`.
+  - p5 (cast 1, stored plate): the plate is slot 0 and the photo is not packed.
+  - The same page with no plate: `PlateRequiredError` before any provider call.
+  - Stored plate removed and plate render refused: `ensureStoryPagePlate` throws.
+  - Iterate with the route's real DB loader under `singlePassScene`: reuses the stored plate, 0 plate calls.
+  - p3 (cast 0, no plate): role `castless`, slot 0 is the landmark photo.
+- **Not changed:** secondary landmarks (2nd+) still ride the VB grid as small photo cells; that is the grid,
+  not the scene slot. The Phase 5a-pre and iterate plate renderers are still two implementations, as they
+  were before this change.
+
+**Touched (extension):** `server/lib/landmarkScene.js` (new), `server/lib/grok.js`, `server/lib/images.js`,
+`server/config/models.js`, `storyJobPipeline.js`, `server/lib/repairPipeline.js`,
+`server/routes/regeneration.js`, `server/lib/testlab.js`, `server/lib/coverIterate.js`,
+`scripts/admin/sibling-registry.json`, `tests/unit/plate-or-fail-story-pages.test.ts`,
+`tests/unit/plate-or-fail-covers-and-trial-pages.test.ts`, `docs/image-routing.md`,
+`docs/image-generation-methods.html`.
 
 ## 2026-09-24 — A dotted id is a vantage, never a landmark photo; `landmarkView` picks the kind and the judged score ranks within it
 
@@ -170,6 +588,66 @@ keep slot 1, which they now get by rule rather than by substitution.
 `tests/unit/landmark-vantage-id-not-photo.test.ts`, `tests/unit/landmark-plate-resolve.test.ts`,
 `tests/unit/landmark-photo-kind-to-prompt.test.ts`, `tasks/bugs.json`, `tasks/BACKLOG.md`.
 Supersedes the 2026-08-11 "variant 0" convention. **Status:** ✅ active.
+
+---
+
+## 2026-09-24 — The page's shot picks the landmark photo's framing: ultra-wide and aerial pages get a far photo when the index has one, every other page the normal photo
+
+**Context.** Owner, 2026-09-24: *"We should take the correct landmark photo. For ultra wide a different
+one than for a normal image. If we have landmark variants that match. If not we use the same one."*
+After the entry above, staging `job_1790100385959_1nitlympp` would serve one photo (Lindenhof slot 1,
+the terrace square, judged `medium` 80) on all 17 Lindenhof pages — the ultra-wide p2 and the aerial
+p12 included — while the index holds two photos the judge framed `wide` (slot 2, 45; slot 3, 72).
+Every judged photo already carries a `framing` (`landmark_photo_scores.framing`, docs/
+landmark-judging-instructions.md): populated on 16,249 of 16,253 rows on both staging and prod
+(medium 9.6k, wide 2.9k, closeup 1.4k, interior 1.4k, view-from 404, aerial 391). 2,144 of 6,464
+judged landmarks have a usable `wide`/`aerial` photo.
+
+**Decision.**
+1. `variantsFromIndexRow` carries each slot's judged `framing` (`PHOTO_SCORES_SQL` now also selects
+   `photo_framings`).
+2. `pickVariantForView(location, view, shot)`: among the photos of the view's accepted kinds, one whose
+   framing fits the shot wins (framing preference, then `photoScore`, then slot); the ≥40 cutoff still
+   applies. `SHOT_PHOTO_FRAMINGS`: `ultra-wide` → `wide`, then `aerial`; `aerial` → `aerial`, then
+   `wide`. Every other shot — `medium`, `wide`, `close-up`, the camera positions, and no shot — prefers
+   `medium`. No fitting photo → the normal choice (first accepted kind, best score), i.e. the photo a
+   medium page gets: the owner's rule, a selection preference, not a degraded path.
+   - The judge's `wide` is "the place sits small inside a landscape or townscape" — the page's
+     ultra-wide, not its `wide` ("shows the full setting").
+   - A close-up is close to a FIGURE, not to the place (the reason `shot` never derives `landmarkView`,
+     the `landmark_view_missing` entry above), so it keeps the normal photo. `high-angle` names where
+     the camera stands, not how far — on this run's high-angle vantage it looks down at the ground by
+     the wall — so it keeps the normal photo too.
+   - `landmarkView` still decides the kind: an interior page never gets an exterior wide photo.
+3. The shot is the page's own (`shot` / `fullData.shot`; a cover's `setting.camera`), else the cited
+   vantage's `shot`, else the shot of the vantage whose `pages[]` names the page — the precedence the
+   vantage plate's SHOT line already uses. One function (`storyHelpers.landmarkPhotoShot`) inside
+   `getLandmarkPhotosForScene`, so pages, iterate, regeneration, covers and the vantage plate (which
+   takes its representative page's photos) all follow it. The trial plate has no brief and no camera
+   and keeps the normal photo. Shot words resolve through `shotVocabulary.resolveShotId`.
+4. An UNCLASSIFIED photo (`photo_type` NULL — ~8,700 of the ~16,250 judged photos) takes its kind from its
+   framing (`KIND_FROM_FRAMING`: medium → exterior, closeup → close, wide/aerial → distant, interior,
+   view-from) instead of the slot guess (1-3 exterior, 4-6 interior). The guess was wrong for 553
+   usable photos judged `interior` in slots 1-3 and 554 in slots 4-6 judged other than `interior`
+   (both DBs). A
+   classified `photo_type` keeps its own value; the slot guess stays only for a photo never judged.
+
+**Stored stories.** A stored Visual Bible's `photoVariants` carry no `framing` (and before today no
+`photoScore`), so a regenerated page of an older story picks as before — no match, normal choice.
+
+**Validation (free replay).** The stored briefs of `job_1790100385959_1nitlympp` through the real
+`getLandmarkPhotosForScene`, variants re-read from staging by `loadLandmarkPhotoDescriptions`: p2
+(ultra-wide) and p12 (aerial) change from slot 1 to slot 3; the other 15 Lindenhof pages, p1 and the
+three covers are unchanged. **Slot 3 is the wrong subject**: a Limmat quay with the Zunfthaus zur Meisen
+and the Münsterbrücke — the Lindenhof is not in the frame — judged `wide` 72 ("hill and old houses
+seen across the river"). The judging brief scores "a picture of somewhere else entirely" 0, so this is
+a judging error the data cannot catch; with slot 3 re-judged to 0 the same two pages get slot 2 (the
+Lindenhof terrace wall and trees seen over the rooftops from the ETH, `wide` 45). Correction proposed
+to the owner, not applied (a DB write).
+
+**Touched files.** `server/lib/landmarkPhotos.js`, `server/lib/storyHelpers.js`,
+`server/lib/shotVocabulary.js`, `tests/unit/landmark-photo-shot-framing.test.ts`,
+`docs/landmark-database.md`, `docs/landmarks.html`. **Status:** ✅ active.
 
 ---
 
@@ -578,7 +1056,7 @@ aerial plate; p14/16/17 on the high-angle one; p18 medium on the ultra-wide one)
    carried over from the parent in code). The AD's vantage rule is `shotVocabulary.VANTAGE_SHOT_RULE`, built
    from `PLATE_DERIVED_SHOTS`, the set the check and the plate derive read: an angled vantage holds only
    pages of its own shot, because nothing derives an eye-level plate from an angled one.
-3. **One plate, one light.** A vantage is split when its pages differ in time of day or weather.
+3. **One plate, one light.** A vantage is split when its pages differ in time of day or weather. *(🗄 Superseded 2026-09-24: pages declare `timeOfDay` / `weather` and a plate in another light is re-lit from the vantage's base — "A page declares its time of day and weather".)*
 4. **Check 4** stages a same-goal group where the plan line puts it; **9f** matches the AD (dotted state
    id on every page).
 5. **The raw AD reply is stored**, one row per attempt, in `sceneExpansionReport.replies[]`. Only parsed
@@ -18481,7 +18959,7 @@ anachronism guard on any beats page), `setting{}` (camera fallback dead), `actio
 (superseded by interactions[]), `framingPattern`/`pose`/`flip` (OTS niche / killed composite).
 
 **Decision:** restore `shot` + `era` (templates emit them again; parser passthroughs live).
-`setting{}` stays dead ON PURPOSE — `shot` covers the camera, prose covers lighting/weather;
+`setting{}` stays dead ON PURPOSE — `shot` covers the camera, prose covers lighting/weather *(the lighting/weather half is 🗄 superseded 2026-09-24: a page declares `timeOfDay` / `weather` — see "A page declares its time of day and weather")*;
 do not re-emit it. `action`/`holding` stay superseded by interactions[] (comment fixed);
 dead `time`/`weather` passthroughs deleted. `framingPattern`/`pose`/`flip` not restored.
 
@@ -20690,7 +21168,7 @@ field vanishing. `medianSkinL` is deleted.
 disease in a new place - a night scene and a dark watercolour both read "dark", so median page L
 cannot separate illumination from medium either.
 
-**Rejected for now: a declared time-of-day.** That is the only signal that could work, and no such
+*(🗄 Superseded 2026-09-24: the field now exists — "A page declares its time of day and weather". The garment lighting factor stays removed; nothing reads the new fields for it.)* **Rejected for now: a declared time-of-day.** That is the only signal that could work, and no such
 field exists: `sceneMetadata` carries 25 keys and not one about lighting or time of day, and the
 scene-expansion prompt asks for lighting only as free prose (on the page checked, the prose contains
 no lighting words at all). Adding `timeOfDay` to the schema is a prompt-and-schema decision and needs
@@ -28984,7 +29462,7 @@ rather than to an error.
 "page 3 is morning and page 13 is evening" is a story, not a defect. Nothing
 infers an hour from the plot, from neighbouring pages, or from an assumed single
 day. The declaration comes from a deliberately **dumb and transparent**
-extractor (`extractDeclaredLight`): a keyword hit in the page's own brief picks
+extractor (`extractDeclaredLight`, 🗄 deleted 2026-09-24 — the declaration is now the brief's `timeOfDay` / `weather` fields): a keyword hit in the page's own brief picks
 a bucket, and the sentence carrying it is handed to the judge verbatim. Bare
 `light` and bare `dark` are banned as keywords — every brief opens with hair and
 clothing ("light blonde", "dark red") and keying on them classifies a
@@ -30235,6 +30713,10 @@ ships, a ship inside a cave, and wheels on dry land.
    `referenceKind` and emits one REFERENCE line — identical wording for both
    families: the place or vessel in the scene is the one in the reference,
    render the part the camera sees, consistent in colour and construction.
+   *(Amended 2026-09-24: the element family no longer contains location
+   cells — invented locations are text only, and the REFERENCE line now names
+   a landmark as "the place" and an element grid as "the vessel or structure".
+   See "Invented locations are TEXT only".)*
 3. **VEHICLES asks for the visible part.** "Render it exactly to its
    description" becomes "match its colour, construction and named parts",
    plus a camera-aboard clause: when the camera stands on board, show the
@@ -58451,6 +58933,205 @@ page rewritable. Applies to every finding category, not only STYLE. No audit-sid
 rewrite risk.
 **Touched:** prompts/text-refine.txt, tests/unit/text-style-rulebook.test.ts.
 
+## 2026-09-23 — KEY STORY ELEMENTS, SEASON and COMPOSITION GUIDELINES are must-keep in the prompt shrink
+
+**Context.** The shrink (`images.shrinkPromptForModel` → `sectionAwareCut`) protects a TAIL verbatim and
+pays for an over-cap prompt out of the head: first by the ranked, exact-text drop units (2026-09-21 /
+769c655ff), then — last resort — by trimming the head's END at a sentence boundary. The tail began at
+`**REQUIRED OBJECTS`, or at `**ART STYLE` when a prompt has none. Full-path covers have no REQUIRED OBJECTS
+block, and `image-generation.txt` places `{VISUAL_BIBLE}` (KEY STORY ELEMENTS), `{SEASON_NOTE}` and
+`{COVER_COMPOSITION}` directly before ART STYLE — i.e. at the very end of the trimmable head, the first text
+the last-resort trim removes. Staging `job_1789853503332_riqncqg1i`'s back cover shipped with all three gone
+(stored sent prompt 7,880 chars; its animal survived only as "holds the Zippi"). The comment above the drop
+list already said the season was "not droppable at all"; the trim did not honour it.
+
+**Decision (owner-approved).**
+1. `MUST_KEEP_MARKERS` = REQUIRED OBJECTS, KEY STORY ELEMENTS, SEASON, COMPOSITION GUIDELINES, ART STYLE; the
+   protected tail starts at the EARLIEST one present (`protectedTailStart`), on every prompt. Pages with a
+   REQUIRED OBJECTS block are byte-identical (it already came first); the change reaches full-path covers
+   (streaming, iterate, regeneration) and pages without REQUIRED OBJECTS, whose season is now protected.
+2. Lower-value text still goes first and in the same order — the ranked drop units, then the sentence-boundary
+   trim of the scene prose — and never reaches into the tail, by construction.
+3. **Fail loudly.** When the must-keep tail alone leaves under 500 chars for the scene, the shrink THROWS
+   instead of the old blunt `truncatePromptForModel` slice (which cut from the end — ART STYLE first). The
+   render fails; nothing ships with its must-keep sections cut. Non-image prompts with no section marker (Grok
+   edit body, composite blend) keep the plain truncation.
+4. `sceneHeadOf` (the `compressedScene` the batch eval judges against) uses the same boundary, so it is the
+   scene block alone, never the must-keep sections.
+5. The "a drop removes its own block" guard is untouched: the drop units still remove only their exact text,
+   and none of them contains a must-keep marker.
+
+**Validation.** Rung 1: the back cover of staging `job_1789853503332_riqncqg1i` rebuilt with the real builders
+(9,326 chars against grok-imagine-image-2.0's 7,900 cap) → 7,774 chars, drops only (COUNTS, two Composition
+bullets, DEPTH AND SIZE), KEY STORY ELEMENTS / SEASON / COMPOSITION GUIDELINES / ART STYLE / the cast / the
+animal all present. Prod trial `job_1790169018278_n57xpnufo` front cover rebuilt (9,149) → 7,595 at the cap and
+5,499 at a forced 6,000 cap, all must-keep sections present. Unit: `tests/unit/cover-shrink-must-keep.test.ts`
+(prose trimmed, must-keep whole; tail too large → throws; REQUIRED OBJECTS prompts unchanged).
+
+**Touched:** `server/lib/images.js`, `tests/unit/cover-shrink-must-keep.test.ts`.
+**Status:** ✅ active on staging.
+
+## 2026-09-24 — The admin re-evaluate route scores through the pipeline's scorer; it keeps no sum of its own
+
+**Context.** `POST /:id/repair-workflow/re-evaluate` (server/routes/regeneration.js) summed
+`SEVERITY_POINTS` over every 'entity check' / 'image checks' issue and wrote `evaluation.score − that`
+into the version's `qualityScore`, into the stamp's input, into the scene fallback and into the
+response the repair panel shows. The sum ignored the per-type rules (`ZERO_POINT_TYPES`,
+`MAX_SEVERITY_TYPES`, `ENTITY_ONLY_ZERO_POINT_TYPES`): a crop artefact that costs 0 was charged 15. It also
+passed `collectAllIssuesForPage`'s list (retry-history issues from earlier images, and the entity
+findings a second time) to the stamp as if the evaluator had reported them, and its response carried no
+`finalScore`, so `findBadPages` (`computeFinalScore` → `score − entityPenalty`) subtracted the
+entity charge twice. The repair panel's collect-feedback step did the same on the client
+(`qualityScore − Σ`, entity issues stripped of their type, image checks priced though the scorer never
+charges them) and priced each listed issue on a 30/20/10 table nothing else uses.
+
+**Decision (owner-approved bug fix, 2026-09-24).** One scorer, one entity reader:
+- `scoring.js entityIssuesForPage(pageNumber, entityReport)` — moved verbatim from a repairPipeline
+  closure — is the only reader of an entity report for scoring. The pipeline and the route both call it.
+- The route stamps the active version with the evaluator's result unmodified plus that entity bucket
+  (the same inputs as repairPipeline's `stampAtCreation`), and everything it writes or returns —
+  `finalScore`, `evalScore`, `entityPenalty`, the entity deductions, `scoreBreakdown` — is read back
+  from the stamped version. `version.qualityScore` / `scene.qualityScore` mirror `evalScore`.
+- No fallback: a page with no active version to stamp returns an error for that page; nothing is
+  written on the evaluator's scale.
+- The client shows the stored `finalScore` (evaluation-data now returns it) and decides redo on it;
+  entity findings keep type/subType so their displayed price follows the per-type rules; image-check
+  findings are listed, not priced.
+
+**Evidence.** Replay over staging job_1790100385959_1nitlympp's stored back cover (v0 stamped 70 with a
+MAJOR entity-only `figure_completeness` crop finding): the new route path stamps 85, entity −0, equal to
+the canonical scorer. Pinned by `tests/unit/reevaluate-canonical-score.test.ts`.
+
+**Touched:** `server/routes/regeneration.js`, `server/lib/scoring.js`, `server/lib/repairPipeline.js`,
+`server/routes/stories.js`, `client/src/hooks/useRepairWorkflow.ts`,
+`client/src/components/generation/RepairWorkflowPanel.tsx`, `client/src/types/story.ts`,
+`client/src/services/storyService.ts`, `tests/unit/reevaluate-canonical-score.test.ts`.
+**Status:** ✅ active.
+
+## 2026-09-24 — Landmark photo slots are contiguous from slot 1; the indexer packs them, gaps are compacted
+
+**Context.** 68 prod landmarks had an empty photo slot followed by a filled one; 17 had slot 1 empty,
+which makes them invisible: every serving query filters on `photo_url IS NOT NULL` (slot 1), so
+Stadtturm (Baden, story_score 85), Wildnispark Zürich (72), Johanneskirche Bern (62) and the Zollmuseum
+(60) were never offered despite judged, usable photos. Two producers, read off the stored layouts:
+- **51 landmarks — the indexer's layout** (`indexLandmarksForCity`): exteriors to slots 1-3, interiors to
+  4-6, so any landmark with fewer than three exteriors got a hole (`XX.XX.`, `X..X..`, `...X..` — no
+  exterior at all means slot 1 empty). Still live: rows created 2026-09-06..09-23 had the same gaps.
+  A non-free URL dropped by `saveLandmarkToIndex`'s licence check left its slot empty the same way.
+- **17 landmarks — slots cleared in place** (`.X....`, `X.X...`, `.XXX..`): the 2026-09-01 non-free-image
+  cleanup (commit b38bad6b7, "url, description and credit cleared together") was ad-hoc SQL that NULLed
+  the columns without shifting the later slots or dropping the slot's score rows — the six corporate
+  logos it names (a bank, a tennis open, an airfield…) are exactly the landmarks whose orphaned slot-1
+  scores were removed earlier today.
+
+**Decision (owner, 2026-09-24).** Slots are contiguous from 1; position means nothing, `photo_type`
+carries interior/exterior. `saveLandmarkToIndex` packs its six slots (`packLandmarkPhotoSlots`, each
+photo with its own credit, description and kind), and the indexer now sets `photoType` on each photo.
+A photo is removed only by a compaction, never by NULLing columns. `merge-landmark-descriptions.js`'s
+compaction write is extracted as `writeCompaction` and reused by the new `compact-landmark-slots.js`
+(planCompaction with no discards): dry-run, JSON backup, one transaction per landmark, refuses to lose a
+photo or a score, checks the derived story score did not move (renumbering cannot change
+MAX(draw)/MAX(photo)). Run on prod: 68 compacted, 0 rolled back, 197 score rows re-keyed; mirrored to
+staging (79 stale slot-keyed score rows replaced). A DB CHECK constraint would also stop ad-hoc SQL
+from leaving a gap; not added — a schema change for the owner to decide.
+
+**Touched:** `server/lib/landmarkPhotos.js`, `scripts/admin/merge-landmark-descriptions.js`,
+`scripts/admin/compact-landmark-slots.js`, `tests/unit/landmark-photo-slots-contiguous.test.ts`,
+`docs/landmark-database.md`.
+**Status:** ✅ active.
+
+## 2026-09-23 — A cover is briefed the way a page is: Art Director prose for the look, REQUIRED OBJECTS for presence; KEY STORY ELEMENTS deleted
+
+**Context.** Covers and pages carried a Visual Bible element two different ways. A page: the Art Director's
+prose writes each element's look (`scene-expansion-all.txt` rule 10), the REQUIRED OBJECTS checklist says it is
+there (name, scale, state, reference pointer — name-only by the 2026-09-02 ruling), the reference cell shows it.
+A full-path cover: the scene text was code-built from a structured hint with NO look anywhere, so a separate
+cover-only block — KEY STORY ELEMENTS, `visualBible.buildFullVisualBiblePrompt`, passed in through
+`visualBibleOverride` — pasted up to three full Visual Bible descriptions into `{VISUAL_BIBLE}`; full-path covers
+had no REQUIRED OBJECTS at all, so the bbox labels, the entity keys and the D-16b held-object judge had nothing
+to read (`notEvaluated: no_required_objects`). The trial cover had both blocks. Owner (2026-09-23): covers and
+pages work the SAME way, one block; the look comes the page way (Option 1: the Art Director writes cover prose).
+
+**Decision.**
+1. **Art Director cover prose.** Each cover in `---COVER SCENE HINTS---` gains a `Scene:` line — English, one to
+   three sentences written like a page brief: it names each entry `Objects:` lists after the LOC and interleaves
+   its identifying detail (rule 10). Positions, gaze, cast and clothing stay code-owned and structured (the
+   Characters lines; gaze SETTLED). Parsed by `outlineParser/unified.js` into `hint.scene`;
+   `buildCoverSceneFromHint` places it right after the scene starter. This SUPERSEDES the structured-only cover
+   hint design of 2026-05-10 for the element look only.
+2. **REQUIRED OBJECTS on every cover, from the page builder.** A full-path cover brief is now the page brief's
+   shape — prose + `---METADATA---` — via `coverIterate.coverBriefWithObjects(prose, ids, excludeIds)`: `objects`
+   = the hint ids ∪ the cover NAME invariant's injected ids, minus the worn-wins ids of
+   `applyCoverWornHeldDedupe`; `characters: []` on purpose (a metadata cast would make the page builder emit
+   per-figure pose/gaze defaults, and a cover's cast and gaze are code-owned). Streaming covers build it at
+   generation; `iterateCover` (repair, dev iterate and every user regenerate route) re-briefs a stored prose
+   description from the hint the same way. A trial cover's brief stays the writer's fenced JSON — the same shape
+   a trial page uses — and `withTrialCoverObjects` adds the invariant's injected ids to its `objects[]`.
+3. **KEY STORY ELEMENTS deleted:** `buildFullVisualBiblePrompt`, the `visualBibleOverride` option and its three
+   call sites, `COVER_KEY_ELEMENT_CAP`, the shrink's must-keep entry (the must-keep list is now REQUIRED OBJECTS,
+   SEASON, COMPOSITION GUIDELINES, ART STYLE), the manual harness `tests/manual/test-cover-prompt-builder.js`, the
+   tests that pinned it, and the generated doc lines. The "Also in the scene" sentence of the earlier entry is
+   deleted with it — presence is REQUIRED OBJECTS' job.
+4. **The cover element cap is the page element budget.** `{COVER_ELEMENT_CAP}` (both writers) is filled from
+   `VB_ELEMENT_BUDGET` (4, SETTLED "four Visual Bible elements per page") — a cover is drawn the way a page is.
+5. **The plate** is built from the brief's prose only (`splitBrief`), with the `Scene` prose removed by its exact
+   text: the cover's elements come in with the cast, never onto the empty plate.
+6. **Judges / downstream.** Nothing new is wired and nothing needed to be: D-16b (`buildEvalRequiredObjects`) and
+   the bbox labels (`parseVisualBibleObjects`) read REQUIRED OBJECTS from the SENT prompt, exactly as for a page,
+   so they now run on full-path covers. The semantic judge's cover brief (`outlineExtract` = the stored
+   description) carries the Art Director's `Scene` prose, i.e. the same look text the generator got. The
+   regeneration header search (`regeneration.js`, test-models page composite) already matches
+   `**REQUIRED OBJECTS`. No judge prompt carries a KEY STORY ELEMENTS rule.
+
+**Accepted constraint (owner).** A story written before the `Scene` field has none: on iterate or regeneration
+its cover elements get their REQUIRED OBJECTS line and their reference cell, and NO look text — nothing
+substitutes a look from the Visual Bible.
+
+**Validation.** Rung 1 (free): the real builders over three stored staging full covers (back cover with ANI001,
+initial page with VEH001, front cover with ANI001 + ART001) on the streaming sequence, the real `iterateCover`
+(image call intercepted) on the new brief AND on the stored old description, and the prod trial front cover
+(`job_1790169018278_n57xpnufo`) on the trial sequence and the real `iterateCover` over its JSON brief: every
+built prompt has REQUIRED OBJECTS (e.g. "**Zippi** (animal) — about as long as an adult's forearm", "**tram**
+(vehicle)", the crown with its final-state delta), no KEY STORY ELEMENTS, no leaked METADATA block, and the D-16b
+checklist and the bbox labels are non-empty (source: prompt). Rung 2: see the Lab entry appended below.
+
+**Touched:** `prompts/scene-expansion-all.txt`, `server/lib/outlineParser/unified.js`, `server/lib/coverIterate.js`,
+`server/lib/promptBuilders.js`, `server/lib/visualBible.js`, `server/lib/images.js`, `storyJobPipeline.js`,
+`server.js`, `server/routes/regeneration.js`, `docs/prompt-inventory.md`, `docs/image-generation-methods.html`,
+`tests/unit/cover-objects-any-element.test.ts`, `tests/unit/cover-shrink-must-keep.test.ts`,
+`tests/unit/cover-key-elements-secondary.test.ts`, `tests/unit/vb-cell-no-size.test.ts`,
+`tests/unit/prompt-says-each-thing-once.test.ts`, `tests/manual/test-cover-prompt-builder.js` (deleted).
+**Status:** ✅ active on staging.
+
+## 2026-09-24 — The database refuses a landmark photo-slot gap (migration 042)
+
+**Context.** Contiguous slots were fixed in code and data earlier today, but one of the two gap producers
+was one-off SQL, which no code fix reaches.
+
+**Decision (owner).** Migration 042 adds CHECK `landmark_photo_slots_contiguous` on `landmark_index`:
+for N = 1..5, `photo_url_N IS NOT NULL OR photo_url_{N+1} IS NULL` — "empty" is `photo_url[_N] IS NULL`,
+the column serving (`HAS_PHOTO_SQL`) and `hasSlotGap()` use. 0 violations on prod (7,401 rows) and
+staging (7,447) before it was written; applied inside a rolled-back transaction on staging it accepted
+the data, rejected a slot-1 NULL on a two-photo row and accepted clearing all six. Writers checked:
+`saveLandmarkToIndex` packs (packed input COALESCEd onto a packed row stays packed); both compaction
+scripts and the 2026-09-04 repair rewrite all six slots in one UPDATE; `storeLandmarkPhoto` and the
+classifiers touch only R2/type columns; the sync upserts every photo column of a (contiguous) prod row
+in one statement — a row-level CHECK sees only the row a statement leaves, so upsert order cannot trip
+it; single-slot writers (`add-iconic-landmarks`, `broad-city-overviews`, `reindex-missing-cities`)
+write slot 1 only. `fetch-landmark-photos-free.js` wrote slots 1..4 unconditionally on any row whose
+slot 1 was empty; it now fills the first empty slots after the existing photos (`planFreePhotoFill`),
+skips URLs the row already has, refuses a row with a gap, and guards the UPDATE on the target slots
+still being empty. Pinned by `tests/unit/landmark-photo-slot-constraint.test.ts` (the CHECK equals
+`hasSlotGap` over all 64 slot patterns).
+
+**Rollout.** Migrations run at boot (`server/services/migrate.js`), so 042 applies to staging on this
+push's deploy and to prod on the next approved master deploy. A prod gap created before then would make
+the prod boot fail loudly — re-check with `compact-landmark-slots.js --dry-run` just before that deploy.
+
+**Touched:** `migrations/042_landmark_photo_slots_contiguous.sql`,
+`scripts/admin/fetch-landmark-photos-free.js`, `scripts/admin/sync-landmark-index-to-staging.js`
+(exports COLUMNS), `tests/unit/landmark-photo-slot-constraint.test.ts`, `docs/landmark-database.md`.
+**Status:** ✅ staging; prod on the next master deploy.
 ## 2026-09-24 — Changes that need a story run are a registry; a stored run is judged against it
 
 **Context:** Owner: "we do 20 changes that need a new story. When we rerun it we should ensure if all 20 are

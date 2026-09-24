@@ -37,7 +37,7 @@ const typesOn = (pageNumber: number, meta: any) =>
 // review rewrote every page to set it.
 describe('landmark_view_missing is gone', () => {
   it('a real-landmark page with no landmarkView raises nothing', () => {
-    expect(typesOn(3, { shot: 'medium', objects: ['LOC002.2'] })).toEqual([]);
+    expect(typesOn(3, { shot: 'medium', objects: ['LOC002.2'], timeOfDay: 'morning', weather: 'clear' })).toEqual([]);
   });
   it('is not a type the scene review can be sent', () => {
     expect(REVIEWABLE.has('landmark_view_missing')).toBe(false);

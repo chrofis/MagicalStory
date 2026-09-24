@@ -18,6 +18,7 @@ const { upsertStory, saveStoryImage, rehydrateStoryImages } = require('./server/
 const { PROMPT_TEMPLATES, fillTemplate, buildEmptyScenePrompt } = require('./server/services/prompts');
 const { generateViewPdf } = require('./server/lib/pdf');
 const { generateImageOnly } = require('./server/lib/images');
+const { landmarkPhotoIsPageScene, pageNeedsPlate, pageLandmarkScene, resolveRepairScene } = require('./server/lib/landmarkScene');
 const { generateReferenceSheet, buildVisualBibleGrid, buildEmptySceneVbGrid } = require('./server/lib/referenceSheets');
 const { runUnifiedRepairPipeline } = require('./server/lib/repairPipeline');
 const {
@@ -51,7 +52,6 @@ const {
 const {
   filterMainCharactersFromVisualBible,
   initializeVisualBibleMainCharacters,
-  buildFullVisualBiblePrompt,
   linkPreDiscoveredLandmarks,
   injectHistoricalLocations,
   getElementReferenceImagesForPage,
@@ -1196,19 +1196,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // promoted the raw landmark PHOTOGRAPH into the slot instead — so the
           // page was an edit of a real photo while its styled plate landed
           // moments later, unused and paid for.
-          // A page whose plate failed is NOT rendered without it: with no plate
-          // packReferences promotes the raw landmark photo into the scene slot.
-          // The page fails here like any other trial page failure (the catch
-          // below returns null and the page goes through the normal page render).
+          // Whether a missing plate fails the page is decided below, once the
+          // page's cast and landmark photos are known (plate or fail).
           const platePromise = trialEmptyScenePromises.get(page.pageNumber);
-          if (platePromise) {
-            await platePromise;
-            if (!sceneBackgrounds[page.pageNumber]?.imageData) {
-              log.error(`❌ [TRIAL-PAGE] Page ${page.pageNumber}: plate failed — page not rendered on the raw photo`);
-              throw new Error(`page ${page.pageNumber} plate failed`);
-            }
-            log.info(`🎬 [TRIAL-PAGE] Page ${page.pageNumber}: plate ready`);
-          }
+          if (platePromise) await platePromise;
 
           // Build per-character clothing for this page.
           // Honour Claude's per-page clothing choices — including narrative
@@ -1296,10 +1287,26 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const trialLandmarkMisses = [];
           let pageLandmarkPhotos = await getLandmarkPhotosForScene(streamingVisualBible, sceneMetadata, { pageNumber: page.pageNumber, misses: trialLandmarkMisses });
           pageLandmarkPhotos = await ensureLandmarkPhotoBytes(pageLandmarkPhotos, { misses: trialLandmarkMisses });
-          if (pageLandmarkPhotos.length > 0 && !sceneBackgrounds[page.pageNumber]?.imageData) {
-            log.error(`❌ [TRIAL-PAGE] Page ${page.pageNumber}: landmark "${pageLandmarkPhotos[0].name}" but no plate — page not rendered on the raw photo`);
-            throw new Error(`page ${page.pageNumber} has a landmark photo and no plate`);
+          // PLATE OR FAIL (server/lib/landmarkScene.js). A page whose plate
+          // failed, or that carries a landmark photo with no plate, is not
+          // rendered here: with no plate the raw photo would be the scene. It
+          // fails like any other trial page (the catch below returns null and
+          // the page goes through the normal page render, which plates it).
+          // THE CAST-0 EXEMPTION: a page with no named cast renders on its
+          // landmark photo (owner ruling 2026-09-02).
+          const trialPageRef = { sceneMetadata, sceneCharacters };
+          const trialPlate = sceneBackgrounds[page.pageNumber]?.imageData || null;
+          if (!trialPlate && !landmarkPhotoIsPageScene(trialPageRef)) {
+            if (platePromise) {
+              log.error(`❌ [TRIAL-PAGE] Page ${page.pageNumber}: plate failed — page not rendered on the raw photo`);
+              throw new Error(`page ${page.pageNumber} plate failed`);
+            }
+            if (pageLandmarkPhotos.length > 0) {
+              log.error(`❌ [TRIAL-PAGE] Page ${page.pageNumber}: landmark "${pageLandmarkPhotos[0].name}" but no plate — page not rendered on the raw photo`);
+              throw new Error(`page ${page.pageNumber} has a landmark photo and no plate`);
+            }
           }
+          if (trialPlate) log.info(`🎬 [TRIAL-PAGE] Page ${page.pageNumber}: plate ready`);
           if (trialLandmarkMisses.length > 0) {
             log.warn(`⚠️ [LANDMARK] Trial page ${page.pageNumber} renders WITHOUT its landmark reference photo (${trialLandmarkMisses.map(m => `${m.name}: ${m.reason}`).join('; ')}) — downgraded to prose description`);
           }
@@ -1357,6 +1364,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             imageBackendOverride: pageImageBackend,
             pageNumber: page.pageNumber,
             landmarkPhotos: pageLandmarkPhotos,
+            landmarkScene: pageLandmarkScene(trialPageRef),
             visualBibleGrid: trialVbGrid,
             // Use the pre-rendered empty-scene plate as the background anchor.
             // The empty-scene block at line 3918 generates these in parallel
@@ -1728,16 +1736,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }
 
         // Cover prompt setup — routed model/backend determined after scene expansion.
-        // KEY STORY ELEMENTS filtered to the hint's objects ∪ holds, and the
+        // REQUIRED OBJECTS lists the hint's objects ∪ holds, and the
         // worn-vs-held contradiction resolved before the CLOTHING block is
         // built (same helpers the iterate path uses — single source of truth).
         const { collectCoverHintElementIds, applyCoverWornHeldDedupe } = require('./server/lib/coverIterate');
         const hintElementIds = collectCoverHintElementIds(hint);
         const { photos: clothingDedupedPhotos, excludeElementIds } =
           applyCoverWornHeldDedupe(coverPhotos, hint, streamingVisualBible);
-        // visualBibleText is built AFTER the scene description below — the
-        // KEY STORY ELEMENTS gate has to see which entities the assembled
-        // description actually names (cover NAME invariant).
+        // The brief's objects are fixed AFTER the scene description below —
+        // REQUIRED OBJECTS has to list every entity the assembled description
+        // actually names (cover NAME invariant).
         // Same block as every other cover path and as pages: garment bound to
         // its wearer, plus the legend saying which framed card is whom.
         let characterRefList = buildCharacterReferenceList(clothingDedupedPhotos, inputData.characters, { includeClothing: true })
@@ -1769,7 +1777,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // COVER NAME INVARIANT — buildCoverSceneFromHint pastes the outline's
         // per-character `position` free text verbatim, so any entity NAME the
         // writer put there arrives here. Either it is fully sent (definition
-        // in KEY STORY ELEMENTS + reference image in the VB grid, which
+        // in REQUIRED OBJECTS + reference image in the VB grid, which
         // buildCoverReferences re-derives with the same matcher) or its name
         // is stripped. job_1788903616404_iqvhj4l8m front cover: the dog "Nia"
         // reached the model undefined and was painted as a phantom child.
@@ -1779,15 +1787,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           elementIds: hintElementIds,
           label: `${coverType} FIRST-GEN`,
         });
-        sceneDescription = coverNameFix.sceneDescription;
-        const visualBibleText = streamingVisualBible
-          ? buildFullVisualBiblePrompt(streamingVisualBible, {
-              skipMainCharacters: true,
-              allowedElementIds: coverNameFix.elementIds,
-              excludeElementIds,
-            })
-          : '';
-        const coverExpandedMetadata = null; // No metadata block — structured hint IS the metadata.
+        // The page brief's shape: prose + a METADATA block whose objects are
+        // the cover's elements, so the page builder emits REQUIRED OBJECTS for
+        // the cover exactly as for a page (coverBriefWithObjects).
+        const { coverBriefWithObjects } = require('./server/lib/coverIterate');
+        sceneDescription = coverBriefWithObjects(coverNameFix.sceneDescription,
+          coverNameFix.elementIds || hintElementIds || [], excludeElementIds);
+        const coverExpandedMetadata = null; // The hint IS the metadata; the brief carries its objects.
 
         const coverLabel = coverType === 'frontCover' ? 'FRONT COVER' : coverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
 
@@ -1866,7 +1872,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             options: {
               customStyleDescription: styleDescription,
               characterReferenceListOverride: characterRefList,
-              visualBibleOverride: visualBibleText,
               // Empty unless baked mode is on; buildCoverPrompt appends the TITLE block.
               bakeTitle: coverTitleModeInfo.bakeTitle,
             },
@@ -2416,9 +2421,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   (inputData.characters || []).filter(c => coverPhotos.some(ph => ph.name === c.name)),
                   coverPhotos
                 );
-            // KEY STORY ELEMENTS filtered to the cover hint's declared ids
-            // (same fix as the full-account cover paths — without it every VB
-            // artifact got dumped into the prompt and strays got painted).
+            // The cover's declared element ids (its JSON objects[]), the input
+            // to the cover NAME invariant below.
             const trialCoverIds = (coverScene.objects || [])
               .map(obj => typeof obj === 'string' ? obj.match(/((?:ART|ANI|VEH|CHR|LOC)\d+)/i)?.[1]?.toUpperCase() : (obj?.id ? String(obj.id).toUpperCase() : null))
               .filter(Boolean);
@@ -2433,14 +2437,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               label: 'TRIAL FRONT COVER',
               stripMode: 'token', // the trial cover description is a JSON blob
             });
-            sceneDescription = trialNameFix.sceneDescription;
+            // An entity the invariant injected (named in the prose, fully
+            // sendable) joins the JSON objects[], so REQUIRED OBJECTS lists it
+            // exactly as a trial page's brief would.
+            sceneDescription = require('./server/lib/coverIterate').withTrialCoverObjects(
+              trialNameFix.sceneDescription, (trialNameFix.injected || []).map(h => h.id));
             // Title-named creature/character missing from objects: WARN ONLY.
             require('./server/lib/coverIterate').warnTitleNamedEntitiesMissingFromCover({
               title: coverTitle, objects: coverScene.objects, visualBible: streamingVisualBible, label: 'TRIAL FRONT COVER',
-            });
-            const visualBibleText = buildFullVisualBiblePrompt(streamingVisualBible, {
-              skipMainCharacters: true,
-              allowedElementIds: trialNameFix.elementIds,
             });
 
             // Textless when covers are typeset app-side — same rule the
@@ -2469,7 +2473,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               options: {
                 customStyleDescription: styleDescription,
                 characterReferenceListOverride: characterRefList,
-                visualBibleOverride: visualBibleText,
                 // Empty unless baked mode is on; buildCoverPrompt appends the TITLE block.
                 bakeTitle: trialCoverTitleMode.bakeTitle,
               },
@@ -4688,11 +4691,31 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const { plateClass, PLATE_BASE_CLASS, buildPlateDeriveInstruction } = require('./server/lib/shotVocabulary');
             const shotOfPage = (pn) => (pageDataArray.find(pd => pd.pageNumber === pn)
               ?.sceneMetadata?.fullData?.shot || '').trim();
-            // Pull a representative page so we can inherit aspect / model / landmark refs.
-            const repPageNum = group.pageNumbers.find(pn => plateClass(shotOfPage(pn)) === PLATE_BASE_CLASS)
+            // ONE PLATE, ONE LIGHT (owner, 2026-09-24). A page's time of day and
+            // weather are its brief's `timeOfDay` / `weather` (sceneLight.js),
+            // never the plate's. The base plate is painted in the light most of
+            // the vantage's pages declare, and a page declaring another light
+            // gets a plate RE-LIT from the base below — same place, same camera.
+            // Before this every page inherited the representative's light:
+            // prod job_1790107559778_fcmlfa8kn p2/p4/p5/p6 all got p2's rain.
+            const { declaredLight, lightKey, describeLight, relightClause, buildPlateRelightInstruction } = require('./server/lib/sceneLight');
+            const lightOfPage = (pn) => declaredLight(pageDataArray.find(pd => pd.pageNumber === pn)?.sceneMetadata);
+            const lightVotes = new Map();
+            for (const pn of group.pageNumbers) {
+              const k = lightKey(lightOfPage(pn));
+              if (k) lightVotes.set(k, (lightVotes.get(k) || 0) + 1);
+            }
+            const commonLightKey = [...lightVotes.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+            // Pull a representative page so we can inherit aspect / model / landmark refs:
+            // a plate-sharing page, in the common light when one is declared.
+            const basePages = group.pageNumbers.filter(pn => plateClass(shotOfPage(pn)) === PLATE_BASE_CLASS);
+            const repPageNum = basePages.find(pn => lightKey(lightOfPage(pn)) === commonLightKey)
+              ?? basePages[0]
               ?? group.pageNumbers[0];
             const repPageData = pageDataArray.find(pd => pd.pageNumber === repPageNum);
             if (!repPageData) return;
+            const baseLight = lightOfPage(repPageNum);
+            const baseLightKey = lightKey(baseLight);
             const artStyleDesc = resolveArtStyle(inputData.artStyle || 'pixar', repPageData.pageImageBackend) || '';
             const layoutAspect = inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect;
             // Vantage canvas is GENERIC — no character-space hints (the canvas
@@ -4795,6 +4818,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 // against, reduced to the geometry facts (no cast, no action).
                 mainScenePrompt: repPageData.scene?.sceneDescription || null,
                 castNames: (repPageData.sceneMetadata?.fullData?.characters || []).map(c => c?.name).filter(Boolean),
+                light: baseLight,
               });
               const result = await generateImageOnly(emptyPrompt, [], {
                 aspectRatio: layoutAspect,
@@ -4834,7 +4858,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // ONE set of QC options for the plate, its retry and every plate
               // derived from it — the retry was judged on pixels only and the
               // derived plates not at all (2026-09-23, dragon run 6).
-              let plateQcOpts = { artStyle: artStyleDesc, shot: plateClass(vantageShot), pageNumber: repPageNum, landmarkPhoto: landmarkPhotos[0] || null };
+              let plateQcOpts = { artStyle: artStyleDesc, shot: plateClass(vantageShot), pageNumber: repPageNum, landmarkPhoto: landmarkPhotos[0] || null, light: baseLight };
               const { validateEmptyScene } = require('./server/lib/images');
               try {
                 const seenPlacement = new Set();
@@ -4885,6 +4909,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     sceneObjects: repSceneObjects,
                     mainScenePrompt: repPageData.scene?.sceneDescription || null,
                     castNames: (repPageData.sceneMetadata?.fullData?.characters || []).map(c => c?.name).filter(Boolean),
+                    light: baseLight,
                   });
                   const retryResult = await generateImageOnly(retryPrompt, [], {
                     aspectRatio: layoutAspect,
@@ -4937,13 +4962,31 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // one location, which is what a shared plate exists to prevent.
               // On failure the page keeps the base plate (owner's call): the
               // wrong camera on the right place beats no plate at all.
+              //
+              // A PAGE IN ANOTHER LIGHT TAKES A PLATE RE-LIT FROM THIS ONE
+              // (owner, 2026-09-24), by the same edit + QC + one fed-back retry:
+              // a relit derive keeps the place's buildings, trees and palette,
+              // which a fresh generation would not. An angled page in another
+              // light takes ONE edit that moves the camera and re-lights. A page
+              // that declares no light (a brief written before the fields) keeps
+              // the base plate's light.
               const derivedPlates = new Map();
               const baseShotForDerive = plateClass(vantageShot) === PLATE_BASE_CLASS ? vantageShot : '';
-              for (const pn of group.pageNumbers) {
+              const plateKeyOf = (pn) => {
                 const cls = plateClass(shotOfPage(pn));
-                if (cls === PLATE_BASE_CLASS || derivedPlates.has(cls)) continue;
-                const deriveInstruction = buildPlateDeriveInstruction(baseShotForDerive, cls);
+                const light = lightOfPage(pn);
+                const k = lightKey(light);
+                const relit = !!k && k !== baseLightKey;
+                return { cls, light, relit, key: `${cls}|${relit ? k : ''}` };
+              };
+              for (const pn of group.pageNumbers) {
+                const { cls, light: pageLight, relit, key } = plateKeyOf(pn);
+                if ((cls === PLATE_BASE_CLASS && !relit) || derivedPlates.has(key)) continue;
+                const deriveInstruction = cls === PLATE_BASE_CLASS
+                  ? buildPlateRelightInstruction(pageLight)
+                  : buildPlateDeriveInstruction(baseShotForDerive, cls, { relight: relit ? relightClause(pageLight) : '' });
                 if (!deriveInstruction) continue;
+                const deriveLabel = `${cls}${relit ? ` (${describeLight(pageLight)})` : ''}`;
                 try {
                   const { editImageWithPrompt } = require('./server/lib/images');
                   // The book's art style goes to the edit (it went as null, and
@@ -4964,7 +5007,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     storyEra: plateQcOpts.storyEra || null,
                     artStyle: artStyleDesc,
                     shot: cls,
-                    pageNumber: group.pageNumbers.find(pn => plateClass(shotOfPage(pn)) === cls) ?? repPageNum,
+                    // Judged on the light the derive was told to paint.
+                    light: relit ? pageLight : baseLight,
+                    pageNumber: pn,
                     // The derive keeps the base plate's landmark, which was
                     // painted from this photo — judged against it, not the words.
                     landmarkPhoto: plateQcOpts.landmarkPhoto || null,
@@ -4975,7 +5020,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   if (derivedImage) {
                     const dqc = await validateEmptyScene(derivedImage, null, `vantage-${vantageId}-${cls}`, derivedQcOpts);
                     if (!dqc.pass) {
-                      genLog.warn('vantage_plate_qc_failed', `Derived ${cls} plate for ${vantageId} failed QC: ${dqc.issues.join(', ')} — re-deriving with feedback`);
+                      genLog.warn('vantage_plate_qc_failed', `Derived ${deriveLabel} plate for ${vantageId} failed QC: ${dqc.issues.join(', ')} — re-deriving with feedback`);
                       const retryInstruction = dqc.visionFeedback
                         ? `${deriveInstruction} The previous attempt had this problem: ${dqc.visionFeedback}. Fix this in the new version.`
                         : deriveInstruction;
@@ -4987,20 +5032,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                       if (rqc && (rqc.pass || rqc.issues.length < dqc.issues.length)) {
                         derivedImage = retryImage;
                         derivedPrompt = retryInstruction;
-                        genLog.info('vantage_plate_qc_retry', `Derived ${cls} plate for ${vantageId}: re-derive ${rqc.pass ? 'passed QC' : `has ${rqc.issues.length} issue(s), fewer than ${dqc.issues.length} — kept`}`);
+                        genLog.info('vantage_plate_qc_retry', `Derived ${deriveLabel} plate for ${vantageId}: re-derive ${rqc.pass ? 'passed QC' : `has ${rqc.issues.length} issue(s), fewer than ${dqc.issues.length} — kept`}`);
                       } else {
-                        genLog.warn('vantage_plate_qc_retry', `Derived ${cls} plate for ${vantageId}: re-derive did not improve${rqc ? ` (${rqc.issues.join(', ')})` : ' (no image)'} — keeping the first derive`);
+                        genLog.warn('vantage_plate_qc_retry', `Derived ${deriveLabel} plate for ${vantageId}: re-derive did not improve${rqc ? ` (${rqc.issues.join(', ')})` : ' (no image)'} — keeping the first derive`);
                       }
                     }
                   }
                   if (derivedImage) {
-                    derivedPlates.set(cls, { imageData: derivedImage, prompt: derivedPrompt, qcRecord: derivedQcRecord });
-                    log.info(`🏛️ [VANTAGE] ${vantageId}: derived a ${cls} plate from the ${baseShotForDerive || 'base'} one`);
+                    derivedPlates.set(key, { imageData: derivedImage, prompt: derivedPrompt, qcRecord: derivedQcRecord, label: deriveLabel, light: relit ? pageLight : baseLight });
+                    log.info(`🏛️ [VANTAGE] ${vantageId}: derived a ${deriveLabel} plate from the ${baseShotForDerive || 'base'}${baseLightKey ? ` ${describeLight(baseLight)}` : ''} one`);
                   } else {
-                    log.error(`❌ [VANTAGE] ${vantageId}: ${cls} plate derive returned no image — those pages keep the base plate, drawn for a camera that cannot hold them`);
+                    log.error(`❌ [VANTAGE] ${vantageId}: ${deriveLabel} plate derive returned no image — those pages keep the base plate, drawn for a camera or a light that is not theirs`);
                   }
                 } catch (deriveErr) {
-                  log.error(`❌ [VANTAGE] ${vantageId}: ${cls} plate derive failed (${deriveErr.message}) — those pages keep the base plate`);
+                  log.error(`❌ [VANTAGE] ${vantageId}: ${deriveLabel} plate derive failed (${deriveErr.message}) — those pages keep the base plate`);
                 }
                 imageGenHeartbeat();
               }
@@ -5009,11 +5054,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // or the derived one where the page's own camera earned it.
               for (const pn of group.pageNumbers) {
                 if (sceneBackgrounds[pn]) continue; // pre-populated (e.g. trial mode)
-                const derivedForPage = derivedPlates.get(plateClass(shotOfPage(pn))) || null;
+                const derivedForPage = derivedPlates.get(plateKeyOf(pn).key) || null;
                 sceneBackgrounds[pn] = {
                   imageData: derivedForPage ? derivedForPage.imageData : plateImage,
                   prompt: derivedForPage ? derivedForPage.prompt : platePrompt,
-                  plateDerivedFor: derivedForPage ? plateClass(shotOfPage(pn)) : null,
+                  // The derive's identity — its camera class, plus the light
+                  // when it was re-lit ("eye-level (night, rain)"). Also the
+                  // plate-population key, so each distinct image is read once.
+                  plateDerivedFor: derivedForPage ? derivedForPage.label : null,
+                  // The time of day and weather this plate was painted in.
+                  plateLight: describeLight(derivedForPage ? derivedForPage.light : baseLight) || null,
                   // Refs packed into the call that produced THIS page's plate.
                   // The base plate: the refs of its own call (the retry's, when
                   // the retry won). A derived plate: the base plate itself — the
@@ -5030,7 +5080,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   ...((derivedForPage ? derivedForPage.qcRecord : plateQcRecord) || {}),
                 };
               }
-              log.info(`🏛️ [VANTAGE] ${vantageId} ${v.locationName} – ${v.name}: 1 canvas → pages [${group.pageNumbers.join(',')}]`);
+              log.info(`🏛️ [VANTAGE] ${vantageId} ${v.locationName} – ${v.name}: 1 canvas${derivedPlates.size ? ` + ${derivedPlates.size} derived` : ''} → pages [${group.pageNumbers.join(',')}]`);
             } catch (err) {
               log.warn(`⚠️ [VANTAGE] ${vantageId} failed: ${err.message}`);
             }
@@ -5041,29 +5091,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }
       }
 
-      // Phase 5a-pre: Generate empty scene backgrounds (no characters) for style anchoring
-      // Note: sceneBackgrounds may already have entries from trial mode early generation
-      // OR from Phase 5a-pre-vantage above (vantage canvas covers most pages).
-      if (modelOverrides.generateEmptyScenes !== false && !runSinglePassScene) {
-        log.info(`🎨 [UNIFIED] Phase 5a-pre: Generating ${pageDataArray.length} empty scene backgrounds...`);
-        const bgStartTime = Date.now();
-        const bgLimit = pLimit(50);
-
-        const emptyScenes = await Promise.all(
-          pageDataArray.map(pageData => bgLimit(async () => {
-            await checkCancellation();
-            // Skip if already generated (e.g., trial mode early generation from
-            // visual bible, or a shared vantage canvas fanned out above).
-            if (sceneBackgrounds[pageData.pageNumber]) return null;
-            // Cast-0 page: no plate. The plate anchors character placement, and
-            // with no characters the page render IS the scene (owner ruling,
-            // 2026-09-02). Skipping it also lets the page keep its location /
-            // vehicle VB grid cells (Phase 5a-pre-grid), which the plate would
-            // otherwise displace.
-            if (platelessByRoute(pageData.pageNumber)) {
-              log.info(`🎨 [EMPTY SCENE] Page ${pageData.pageNumber}: cast=0 → no plate generated (the render is the scene)`);
-              return null;
-            }
+      // ONE page's own empty-scene plate (render + QC + one fed-back retry).
+      // Phase 5a-pre renders every uncovered page with it, and the page-image
+      // retry below reuses it for a landmark page whose plate is missing —
+      // one plate mechanism for both. Returns null on failure (logged).
+      const renderPagePlate = async (pageData) => {
             const sceneMetadata = pageData.sceneMetadata;
             const settingDesc = sceneMetadata?.setting?.description || sceneMetadata?.imageSummary || '';
             // The page's plate: the outline hint's, then the cited vantage's
@@ -5085,7 +5117,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const artStyleDesc = resolveArtStyle(inputData.artStyle || 'pixar', pageData.pageImageBackend) || '';
             const camera = sceneMetadata?.setting?.camera || 'wide shot';
             const lighting = sceneMetadata?.setting?.lighting || '';
-            const weather = sceneMetadata?.setting?.weather || '';
+            // The page's declared time of day and weather (sceneLight.js) — the
+            // plate's LIGHT line. Replaces the `setting.weather` prose field.
+            const pageLight = require('./server/lib/sceneLight').declaredLight(sceneMetadata);
 
             // Use rich emptyScenePrompt from scene expansion if available, fallback to metadata fields.
             // Prepend a **SHOT:** line — the template ends with "Use the exact camera angle and
@@ -5095,7 +5129,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const shotForCamera = (sceneMetadata?.fullData?.shot || camera || '').trim();
             const shotPrefix = shotForCamera ? `**SHOT:** ${shotForCamera}\n\n` : '';
             const emptySceneDesc = shotPrefix + (expandedEmptyPrompt
-              || `**SETTING:** ${settingDesc}\n**CAMERA:** ${camera}${lighting ? `\n**LIGHTING:** ${lighting}` : ''}${weather ? `\n**WEATHER:** ${weather}` : ''}`);
+              || `**SETTING:** ${settingDesc}\n**CAMERA:** ${camera}${lighting ? `\n**LIGHTING:** ${lighting}` : ''}`);
 
             // Classify each character by depth AND lateral side so the empty scene leaves
             // room in the right band. "Leave space for 2 figures in the far background" is
@@ -5233,6 +5267,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // against, reduced to the geometry facts (no cast, no action).
               mainScenePrompt: pageData.scene?.sceneDescription || null,
               castNames: (sceneMetadata?.fullData?.characters || []).map(c => c?.name).filter(Boolean),
+              light: pageLight,
             });
 
             try {
@@ -5292,6 +5327,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   shot: shotForCamera || null,
                   pageNumber: pageData.pageNumber,
                   landmarkPhoto: pageData.landmarkPhotos?.[0] || null,
+                  light: pageLight,
                 };
                 const qc = await validateEmptyScene(result.imageData, textPos, `P${pageData.pageNumber}`, pageQcOpts);
                 if (!qc.pass) {
@@ -5322,6 +5358,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     sceneObjects: pageSceneObjects,
                     mainScenePrompt: pageData.scene?.sceneDescription || null,
                     castNames: (sceneMetadata?.fullData?.characters || []).map(c => c?.name).filter(Boolean),
+                    light: pageLight,
                   });
                   const retryResult = await generateImageOnly(retryPrompt, [], {
                     aspectRatio: layoutAspect,
@@ -5358,9 +5395,61 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // (job_1787959478282: p1 and p3 were the only two pages without a
               // plate, and nothing in the story said why).
               log.warn(`⚠️ [EMPTY SCENE] Page ${pageData.pageNumber} failed: ${err.message}`);
-              genLog.warn('empty_scene_failed', `Page ${pageData.pageNumber} empty-scene generation failed: ${err.message} — page will render without a background plate`);
+              genLog.warn('empty_scene_failed', `Page ${pageData.pageNumber} empty-scene generation failed: ${err.message}`);
               return null;
             }
+      };
+      // Store a rendered plate in the page's slot (same shape for every caller).
+      const storePagePlate = (bg) => {
+        if (!bg?.imageData) return false;
+        sceneBackgrounds[bg.pageNumber] = {
+          imageData: bg.imageData,
+          prompt: bg.prompt,
+          // Refs packed into the plate call — same field name every other
+          // image call stores its packed refs under.
+          grokRefImages: bg.grokRefImages || null,
+          textAreaMask: bg.textAreaMask || null,
+          emptySceneVbGrid: bg.emptySceneVbGrid || null,
+          // Store QC data for dev mode comparison (v1 failed, v2 retry)
+          ...(bg.v1ImageData ? {
+            v1ImageData: bg.v1ImageData,
+            v1Issues: bg.v1Issues,
+            visionFeedback: bg.visionFeedback || null,
+            retryPrompt: bg.retryPrompt || null,
+          } : {}),
+        };
+        return true;
+      };
+
+      // Phase 5a-pre: Generate empty scene backgrounds (no characters) for style anchoring
+      // Note: sceneBackgrounds may already have entries from trial mode early generation
+      // OR from Phase 5a-pre-vantage above (vantage canvas covers most pages).
+      // PLATE OR FAIL: a landmark page is plated in EVERY mode — single-pass and
+      // generateEmptyScenes=false only switch plates off for the other pages
+      // (owner, 2026-09-24). Cast-0 pages never get one (the exemption).
+      const platesOn = modelOverrides.generateEmptyScenes !== false && !runSinglePassScene;
+      const platePageData = pageDataArray.filter(pd => platesOn || pageNeedsPlate(pd, pd.landmarkPhotos));
+      if (platePageData.length > 0) {
+        log.info(`🎨 [UNIFIED] Phase 5a-pre: Generating ${platePageData.length} empty scene backgrounds${platesOn ? '' : ' (landmark pages only — plates are off for the rest)'}...`);
+        const bgStartTime = Date.now();
+        const bgLimit = pLimit(50);
+
+        const emptyScenes = await Promise.all(
+          platePageData.map(pageData => bgLimit(async () => {
+            await checkCancellation();
+            // Skip if already generated (e.g., trial mode early generation from
+            // visual bible, or a shared vantage canvas fanned out above).
+            if (sceneBackgrounds[pageData.pageNumber]) return null;
+            // Cast-0 page: no plate. The plate anchors character placement, and
+            // with no characters the page render IS the scene (owner ruling,
+            // 2026-09-02). Skipping it also lets the page keep its location /
+            // vehicle VB grid cells (Phase 5a-pre-grid), which the plate would
+            // otherwise displace.
+            if (platelessByRoute(pageData.pageNumber)) {
+              log.info(`🎨 [EMPTY SCENE] Page ${pageData.pageNumber}: cast=0 → no plate generated (the render is the scene)`);
+              return null;
+            }
+            return renderPagePlate(pageData);
           }))
         );
 
@@ -5368,7 +5457,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Cast-0 pages are excluded — they have no plate BY DESIGN (see the
         // skip above), and warning about a deliberate omission sends the next
         // reader hunting a bug that doesn't exist.
-        const platelessPages = pageDataArray
+        const platelessPages = platePageData
           .map(pd => pd.pageNumber)
           .filter(pn => !platelessByRoute(pn))
           .filter(pn => !sceneBackgrounds[pn] && !emptyScenes.some(bg => bg?.pageNumber === pn && bg?.imageData));
@@ -5377,26 +5466,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           genLog.warn('empty_scene_missing', `No background plate for page(s) ${platelessPages.join(', ')} — those pages render without one`);
         }
 
-        for (const bg of emptyScenes) {
-          if (bg?.imageData) {
-            sceneBackgrounds[bg.pageNumber] = {
-              imageData: bg.imageData,
-              prompt: bg.prompt,
-              // Refs packed into the plate call — same field name every other
-              // image call stores its packed refs under.
-              grokRefImages: bg.grokRefImages || null,
-              textAreaMask: bg.textAreaMask || null,
-              emptySceneVbGrid: bg.emptySceneVbGrid || null,
-              // Store QC data for dev mode comparison (v1 failed, v2 retry)
-              ...(bg.v1ImageData ? {
-                v1ImageData: bg.v1ImageData,
-                v1Issues: bg.v1Issues,
-                visionFeedback: bg.visionFeedback || null,
-                retryPrompt: bg.retryPrompt || null,
-              } : {}),
-            };
-          }
-        }
+        for (const bg of emptyScenes) storePagePlate(bg);
         const bgElapsed = ((Date.now() - bgStartTime) / 1000).toFixed(1);
         log.info(`🎨 [UNIFIED] Phase 5a-pre: ${Object.keys(sceneBackgrounds).length}/${pageDataArray.length} empty scenes in ${bgElapsed}s`);
       }
@@ -5495,9 +5565,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // it matters on the plateless cast-0 pages this phase now feeds.
           const aboardId = pageData.sceneMetadata?.aboard || null;
           // LARGE ELEMENTS BELONG TO THE PLATE (owner, 2026-09-15). Same
-          // question as buildPageCompositeRefs asks: vehicles and locations by
-          // TYPE (the pre-2026-09-15 rule and the `scaleClass === null`
-          // fallback for stored bibles), plus anything the bible classed at
+          // question as buildPageCompositeRefs asks: vehicles by TYPE (the
+          // pre-2026-09-15 rule and the `scaleClass === null` fallback for
+          // stored bibles), plus anything the bible classed at
           // vehicle, building or landscape scale — a building-scale ARTIFACT
           // belongs to the plate for the same reason a ship does.
           //
@@ -5535,10 +5605,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           if (typeof pageData.makeImagePrompt === 'function') {
             pageData.prompt = pageData.makeImagePrompt(kept.map(e => e.id).filter(Boolean));
           }
-          log.info(`🔲 [VB-GRID] Page ${pageData.pageNumber}: ${kept.length}/${refs.length} cell(s) — ${hasPlate ? `plate sent, dropped location/vehicle` : `no plate sent, location/vehicle kept`}${aboardId ? ` (aboard ${aboardId} withheld)` : ''}`);
+          log.info(`🔲 [VB-GRID] Page ${pageData.pageNumber}: ${kept.length}/${refs.length} cell(s) — ${hasPlate ? `plate sent, dropped plate-borne vehicle/structure` : `no plate sent, vehicle/structure kept`}${aboardId ? ` (aboard ${aboardId} withheld)` : ''}`);
         }
         if (filteredPages > 0) {
-          log.info(`🔲 [UNIFIED] Phase 5a-pre-grid: dropped ${droppedCells} cell(s) across ${filteredPages} page(s) (plate-covered location/vehicle + aboard elements)`);
+          log.info(`🔲 [UNIFIED] Phase 5a-pre-grid: dropped ${droppedCells} cell(s) across ${filteredPages} page(s) (plate-covered vehicle/structure + aboard elements)`);
         }
       }
 
@@ -5642,10 +5712,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               sceneBackground: sceneBackgrounds[pageData.pageNumber]?.imageData || null,
               sceneMetadata: pageData.sceneMetadata,
             });
+            // PLATE OR FAIL (server/lib/landmarkScene.js): a landmark page with no
+            // plate is not rendered on the raw photo. It fails here into the
+            // catch below; the one page retry renders its plate first.
+            if (pageNeedsPlate(pageData, refApplied.landmarkPhotos) && !refApplied.sceneBackground) {
+              log.error(`❌ [UNIFIED] Page ${pageData.pageNumber}: landmark "${refApplied.landmarkPhotos[0]?.name || 'unknown'}" has no plate — not rendered on the raw photo`);
+              throw new Error(`page ${pageData.pageNumber} has a landmark photo and no plate`);
+            }
             const genResult = await generateImageOnly(
               pageData.prompt,
               refApplied.characterPhotos,
               {
+                // THE CAST-0 EXEMPTION: a page with no named cast renders on its
+                // landmark photo (owner ruling 2026-09-02).
+                landmarkScene: pageLandmarkScene(pageData),
                 aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
                 imageModelOverride: pageData.pageImageModel,
                 imageBackendOverride: pageData.pageImageBackend,
@@ -6027,6 +6107,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const pageData = pageDataByNumber.get(raw.pageNumber);
         if (!pageData) continue;
         try {
+          // PLATE OR FAIL: the retry reuses the page's plate, or renders one
+          // with the same mechanism Phase 5a-pre uses — never the raw photo.
+          // No plate after that → the throw lands in the catch below and the
+          // page ships marked missing (page_image_retry_failed).
+          if (pageNeedsPlate(pageData, pageData.landmarkPhotos) && !sceneBackgrounds[pageData.pageNumber]?.imageData) {
+            log.info(`🎬 [UNIFIED] Page ${raw.pageNumber}: retry renders the missing plate first`);
+            const renderedPlate = await renderPagePlate(pageData);
+            if (!storePagePlate(renderedPlate)) {
+              log.error(`❌ [UNIFIED] Page ${raw.pageNumber}: plate could not be rendered — page not rendered on the raw photo`);
+              throw new Error(`page ${raw.pageNumber} has a landmark photo and its plate could not be rendered`);
+            }
+            raw.emptySceneImage = sceneBackgrounds[pageData.pageNumber].imageData;
+            raw.emptyScenePrompt = sceneBackgrounds[pageData.pageNumber].prompt || null;
+            raw.emptySceneGrokRefImages = sceneBackgrounds[pageData.pageNumber].grokRefImages || null;
+          }
           const retryResult = await generateImageOnly(
             pageData.prompt,
             pageData.characterPhotos,
@@ -6035,6 +6130,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               imageModelOverride: pageData.pageImageModel,
               imageBackendOverride: pageData.pageImageBackend,
               landmarkPhotos: pageData.landmarkPhotos,
+              landmarkScene: pageLandmarkScene(pageData),
               visualBibleGrid: pageData.visualBibleGrid,
               pageNumber: pageData.pageNumber,
               sceneBackground: sceneBackgrounds[pageData.pageNumber]?.imageData || null,
@@ -6246,17 +6342,26 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
             // Caller-supplied retry image generator. Wraps generateImageOnly so
             // ensureCalmZone doesn't import images.js (would be circular).
-            const generateImage = (repairPrompt, opts) => generateImageOnly(repairPrompt, img.characterPhotos || [], {
+            // PLATE OR FAIL: a landmark page's repair re-render carries its stored plate, never the raw photo (server/lib/landmarkScene.js).
+            const generateImage = async (repairPrompt, opts) => {
+              const repairScene = await resolveRepairScene({
+                page: img, landmarkPhotos: img.landmarkPhotos, plate: img.emptySceneImage || null,
+                storyId: jobId, pageNumber: img.pageNumber, label: 'CALM-ZONE',
+              });
+              return generateImageOnly(repairPrompt, img.characterPhotos || [], {
               imageModelOverride: img.sceneMetadata?.pageImageModel || null,
               imageBackendOverride: img.sceneMetadata?.pageImageBackend || null,
               landmarkPhotos: img.landmarkPhotos || [],
+              landmarkScene: repairScene.landmarkScene,
+              sceneBackground: repairScene.sceneBackground,
               visualBibleGrid: img.visualBibleGrid || null,
               previousImage: opts.previousImage,
               textAreaMask: opts.textAreaMask,
               pageNumber: img.pageNumber,
               skipCache: true,
               aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
-            });
+              });
+            };
 
             const onUsage = (result) => {
               if (!result.usage) return;

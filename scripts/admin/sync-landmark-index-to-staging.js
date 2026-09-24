@@ -198,7 +198,7 @@ async function main() {
   await prod.end(); await stg.end();
 }
 
-module.exports = { scoreRowsToDelete, scoreKey };
+module.exports = { scoreRowsToDelete, scoreKey, COLUMNS };
 
 if (require.main === module) {
   main().catch(e => { console.error('ERR:', e.message); process.exit(1); });

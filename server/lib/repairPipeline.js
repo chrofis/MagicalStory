@@ -37,6 +37,7 @@ const getStoryHelpers = () => require('./storyHelpers');
 // Leaf module (parsers only) — safe to require eagerly, no cycle back here.
 const { resolveEvalSceneHint } = require('./sceneMetadata');
 const images = () => require('./images');
+const { resolveRepairScene } = require('./landmarkScene');
 
 function selectBestVersion(versions) {
   if (!versions || versions.length === 0) return null;
@@ -729,62 +730,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // MIN_SEVERITY_TYPES on top of SEVERITY_POINTS — the same arithmetic the
   // consolidated score uses, so an entity finding cannot cost more here than
   // its type is allowed to cost there.
-  const { SEVERITY_POINTS: ENTITY_PENALTIES, deductionPoints } = require('./scoring');
-  // Returns { penalty, issues } so callers can persist BOTH the number AND the
-  // source issues on each version. Without the issues, the dev panel shows a
-  // mysterious "−N" deduction that the user can't drill into.
-  const getEntityPenaltyAndIssues = (pageNumber, report) => {
-    const out = { penalty: 0, issues: [] };
-    if (!report?.characters) return out;
-    for (const [charName, charData] of Object.entries(report.characters)) {
-      const charIssues = charData.issues || [];
-      for (const issue of charIssues) {
-        if (issue.pages?.includes(pageNumber) || issue.pagesToFix?.includes(pageNumber) || issue.pageNumber === pageNumber) {
-          // Charge through deductionPoints so the TYPE ceilings actually apply
-          // here. This path used to bill severity alone, so every
-          // MAX_SEVERITY_TYPES entry — accessory, unverified_absence,
-          // face_drift, hair_nuance — was silently ignored for entity
-          // findings: the bounding existed in code but not on the path that
-          // does the entity billing. Measured cost on one production book:
-          // 75 points across four pages and a cover for hair differing by a
-          // shade, which the owner reads as a nuance.
-          // { entity: true }: this IS the entity report, so its source-scoped
-          // zero (scoring.js ENTITY_ONLY_ZERO_POINT_TYPES) applies.
-          out.penalty += deductionPoints(issue, { entity: true });
-          out.issues.push({
-            name: charName,
-            // Carried so the ceiling is reproducible downstream and the dev
-            // panel can show WHY a MAJOR-looking finding cost 2 points.
-            type: issue.type || null,
-            subType: issue.subType || null,
-            severity: issue.severity,
-            description: require('./scoring').findingText(issue),
-            source: 'character',
-          });
-        }
-      }
-    }
-    // Also include object-level issues so the panel surfaces missing/wrong props.
-    for (const [objName, objData] of Object.entries(report.objects || {})) {
-      const objIssues = objData.issues || [];
-      for (const issue of objIssues) {
-        if (issue.pages?.includes(pageNumber) || issue.pagesToFix?.includes(pageNumber) || issue.pageNumber === pageNumber) {
-          out.penalty += deductionPoints(issue, { entity: true });
-          out.issues.push({
-            name: objName,
-            type: issue.type || null,
-            subType: issue.subType || null,
-            severity: issue.severity,
-            description: require('./scoring').findingText(issue),
-            source: 'object',
-          });
-        }
-      }
-    }
-    return out;
-  };
-  // Backward-compat shim — existing callers that only need the number.
-  const getEntityPenalty = (pageNumber, report) => getEntityPenaltyAndIssues(pageNumber, report).penalty;
+  // The entity report's per-page findings, billed through deductionPoints —
+  // the ONE implementation (scoring.js entityIssuesForPage), shared with the
+  // admin re-evaluate route so both land on the same score.
+  const { entityIssuesForPage: getEntityPenaltyAndIssues } = require('./scoring');
 
   // ---------------------------------------------------------------------
   // Eval consolidation (owner decision Jul 2026: "3-4 different evals, then
@@ -1179,10 +1128,17 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const regenPrompt = feedbackSuffix
         ? `${img.prompt}\n\n${feedbackSuffix}`
         : img.prompt;
+      // PLATE OR FAIL: a landmark page's repair re-render carries its stored plate, never the raw photo (server/lib/landmarkScene.js).
+      const regenScene = await resolveRepairScene({
+        page: img, landmarkPhotos: img.landmarkPhotos, plate: img.emptySceneImage || null,
+        storyId: storyData?.id || null, pageNumber: img.pageNumber, label: 'REGENERATE',
+      });
       result = await images().generateImageOnly(regenPrompt, img.characterPhotos, {
         imageModelOverride: modelOverrides.imageModel,
         imageBackendOverride: modelOverrides.imageBackend,
         landmarkPhotos: img.landmarkPhotos,
+        landmarkScene: regenScene.landmarkScene,
+        sceneBackground: regenScene.sceneBackground,
         visualBibleGrid: img.visualBibleGrid,
         pageNumber: img.pageNumber,
         skipCache: true
@@ -2120,8 +2076,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           // carry a declared size. Passing only the projection starved it: zero
           // candidates, zero skips, no notEvaluated row, total silence in the
           // live path. bookAudit now log.errors on a starved call.
+          // `characters` too (2026-09-24): the reader's per-page cast is
+          // resolved through the evaluator's roster, which indexes them.
           ? await auditStoryBook(
-              { id: consolidatorStoryId, visualBible: storyData?.visualBible || visualBible || null, sceneImages: auditPages },
+              { id: consolidatorStoryId, visualBible: storyData?.visualBible || visualBible || null, characters: storyData?.characters || [], sceneImages: auditPages },
               { usageTracker })
           : null;
         if (audit) {
@@ -3264,17 +3222,26 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         || (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.imageAspect
         || null;
 
-      const generateImage = (repairPrompt, opts) => images().generateImageOnly(repairPrompt, img.characterPhotos || [], {
-        imageModelOverride: img.sceneMetadata?.pageImageModel || null,
-        imageBackendOverride: img.sceneMetadata?.pageImageBackend || null,
-        landmarkPhotos: img.landmarkPhotos || [],
-        visualBibleGrid: img.visualBibleGrid || null,
-        previousImage: opts.previousImage,
-        textAreaMask: opts.textAreaMask,
-        pageNumber,
-        skipCache: true,
-        aspectRatio,
-      });
+      // PLATE OR FAIL: a landmark page's repair re-render carries its stored plate, never the raw photo (server/lib/landmarkScene.js).
+      const generateImage = async (repairPrompt, opts) => {
+        const repairScene = await resolveRepairScene({
+          page: img, landmarkPhotos: img.landmarkPhotos, plate: img.emptySceneImage || null,
+          storyId: storyData?.id || null, pageNumber, label: 'POST-REPAIR-TEXT',
+        });
+        return images().generateImageOnly(repairPrompt, img.characterPhotos || [], {
+          imageModelOverride: img.sceneMetadata?.pageImageModel || null,
+          imageBackendOverride: img.sceneMetadata?.pageImageBackend || null,
+          landmarkPhotos: img.landmarkPhotos || [],
+          landmarkScene: repairScene.landmarkScene,
+          sceneBackground: repairScene.sceneBackground,
+          visualBibleGrid: img.visualBibleGrid || null,
+          previousImage: opts.previousImage,
+          textAreaMask: opts.textAreaMask,
+          pageNumber,
+          skipCache: true,
+          aspectRatio,
+        });
+      };
 
       const onUsage = (result) => {
         if (!result.usage || !usageTracker) return;

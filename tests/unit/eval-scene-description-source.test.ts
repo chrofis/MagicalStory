@@ -72,9 +72,11 @@ describe('wiring: the compressed scene block is produced, carried and consumed',
     // branch that used to stamp `newHead` was deleted 2026-09-21).
     expect(images).toContain('if (meta) meta.compressedScene = sceneHeadOf(out) || undefined;');
     expect(images).toContain('if (meta) meta.compressedScene = sceneHeadOf(cut.text) || undefined;');
-    // The head is taken from strictly before the REQUIRED OBJECTS / ART STYLE
-    // tail split — that split is WHY the block can never carry a style section.
-    expect(images).toContain("const o = prompt.indexOf('**REQUIRED OBJECTS');");
+    // The head is taken from strictly before the protected must-keep tail
+    // (REQUIRED OBJECTS / KEY STORY ELEMENTS / SEASON / COMPOSITION GUIDELINES /
+    // ART STYLE, whichever comes first) — that split is WHY the block can never
+    // carry a style section.
+    expect(images).toContain('const tailStart = protectedTailStart(prompt);');
     expect(images).toContain('return tailStart > 0 ? prompt.slice(0, tailStart).trim()');
     // Not a second copy of the whole prompt (storage cost + IRON RULE hygiene).
     expect(images).not.toContain('meta.compressedScene = assembled');

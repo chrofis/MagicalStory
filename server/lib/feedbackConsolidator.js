@@ -20,6 +20,25 @@ const { log } = require('../utils/logger');
 const { FINDING_SOURCES, sourcesOf, mergeSources } = require('./findingSources');
 
 /**
+ * The severity each section of the consolidator input SHOWS for a finding —
+ * the finding's own, or the section's default when it carries none. One
+ * function for the renderer and for the vote clamp below, so the ceiling a
+ * vote is clamped to is exactly the value the model was shown.
+ */
+const SECTION_DEFAULT_SEVERITY = Object.freeze({
+  [FINDING_SOURCES.QUALITY]: 'MODERATE',
+  [FINDING_SOURCES.SEMANTIC]: 'MAJOR',
+  [FINDING_SOURCES.COMPLIANCE]: 'MODERATE',
+  // Pre-severity book-audit fault lines are MAJOR.
+  [FINDING_SOURCES.READER]: 'MAJOR',
+  [FINDING_SOURCES.ENTITY]: '?',
+  [FINDING_SOURCES.FINAL_CHECKS]: '?',
+});
+function shownSeverity(source, finding) {
+  return String(finding?.severity || SECTION_DEFAULT_SEVERITY[source] || '?').toUpperCase();
+}
+
+/**
  * Build the Haiku input text from all feedback sources.
  */
 function buildFeedbackInput({
@@ -123,7 +142,7 @@ function buildFeedbackInput({
     parts.push('(none)');
   } else {
     for (const iss of fixableIssues) {
-      const sev = iss.severity || 'MODERATE';
+      const sev = shownSeverity(FINDING_SOURCES.QUALITY, iss);
       const type = iss.type || 'general';
       const desc = iss.description || iss.issue || '(no description)';
       const fix = iss.fix ? ` — suggested: ${iss.fix}` : '';
@@ -137,7 +156,7 @@ function buildFeedbackInput({
     parts.push('(none)');
   } else {
     for (const iss of semanticIssues) {
-      const sev = iss.severity || 'MAJOR';
+      const sev = shownSeverity(FINDING_SOURCES.SEMANTIC, iss);
       const type = iss.type || 'general';
       const item = iss.item ? ` [${iss.item}]` : '';
       const problem = require('./scoring').findingText(iss) || '(no description)';
@@ -157,7 +176,7 @@ function buildFeedbackInput({
     parts.push('(none)');
   } else {
     for (const iss of complianceIssues) {
-      const sev = iss.severity || 'MODERATE';
+      const sev = shownSeverity(FINDING_SOURCES.COMPLIANCE, iss);
       const type = iss.type || 'general';
       const desc = iss.description || iss.issue || '(no description)';
       const fix = iss.fix ? ` — suggested: ${iss.fix}` : '';
@@ -171,7 +190,7 @@ function buildFeedbackInput({
     parts.push('(none)');
   } else {
     for (const iss of entityIssues) {
-      parts.push(`- [${iss.severity || '?'}] ${iss.characterName}: ${iss.description}`);
+      parts.push(`- [${shownSeverity(FINDING_SOURCES.ENTITY, iss)}] ${iss.characterName}: ${iss.description}`);
     }
   }
   parts.push('');
@@ -183,9 +202,12 @@ function buildFeedbackInput({
     for (const f of readerFindings) {
       // Severity is already the shared vocabulary (MINOR/MAJOR/CRITICAL/
       // CATASTROPHIC); MAJOR is the default for pre-severity fault lines.
-      const sev = String(f?.severity || 'MAJOR').toUpperCase();
+      const sev = shownSeverity(FINDING_SOURCES.READER, f);
       const line = String(f?.line || f?.detail || '').trim();
-      if (line) parts.push(`- [${sev}] ${line}`);
+      // The reader's own type (bookAudit, closed list) — rendered the way every
+      // evaluator section renders its type, so it is carried over, not invented.
+      const type = typeof f?.type === 'string' && f.type.trim() ? ` (${f.type.trim()})` : '';
+      if (line) parts.push(`- [${sev}]${type} ${line}`);
     }
     parts.push('');
   }
@@ -193,7 +215,7 @@ function buildFeedbackInput({
   if (finalCheckIssues.length > 0) {
     parts.push('## Final checks issues');
     for (const iss of finalCheckIssues) {
-      parts.push(`- [${iss.severity || '?'}] ${iss.description || iss.issue}`);
+      parts.push(`- [${shownSeverity(FINDING_SOURCES.FINAL_CHECKS, iss)}] ${iss.description || iss.issue}`);
     }
     parts.push('');
   }
@@ -310,6 +332,75 @@ function medianSeverity(severities) {
   // Any witness at CRITICAL or above → the highest vote, never the middle.
   if (votes.some(v => ESCALATING_VOTE.has(v))) return votes[votes.length - 1];
   return votes[Math.floor((votes.length - 1) / 2)];
+}
+
+/**
+ * THE VOTES ARE CLAMPED TO WHAT EACH SOURCE SAID (2026-09-24).
+ *
+ * `severities` is the model's TRANSCRIPTION of each evaluator's vote, and the
+ * median above trusts it. The transcription is not reliable: prod
+ * job_1790107559778_fcmlfa8kn p6 v3 carried a reader MAJOR that came back as a
+ * CATASTROPHIC vote, and the median of one vote is that vote. Over the stored
+ * consolidator_calls: prod 9 entries escalated above every severity their
+ * sources gave, 10 votes higher than anything that source said on the page;
+ * staging 39 and 78.
+ *
+ * So each vote is clamped to the HIGHEST severity that source actually showed
+ * in this page's input (`sourceSeverityCeilings`, read off the same sections
+ * buildFeedbackInput renders), then the median runs as before — including the
+ * CRITICAL-wins rule, which now fires only on a CRITICAL a source really gave.
+ * A vote for a source that flagged nothing on this page is not a vote and is
+ * dropped. When no vote survives, the model's pick is held to the page's
+ * highest input severity. Code reads severities and source names only — never
+ * a finding's text, and never its type.
+ */
+function sourceSeverityCeilings({
+  fixableIssues = [], semanticIssues = [], complianceIssues = [],
+  entityIssues = [], readerFindings = [], finalCheckIssues = [],
+} = {}) {
+  const sections = {
+    [FINDING_SOURCES.QUALITY]: fixableIssues,
+    [FINDING_SOURCES.SEMANTIC]: semanticIssues,
+    [FINDING_SOURCES.COMPLIANCE]: complianceIssues,
+    [FINDING_SOURCES.ENTITY]: entityIssues,
+    [FINDING_SOURCES.READER]: readerFindings,
+    [FINDING_SOURCES.FINAL_CHECKS]: finalCheckIssues,
+  };
+  // source → highest shown severity; null when the source showed a finding
+  // with no readable severity (its ceiling is unknown, so it is not clamped).
+  // A source absent from the map showed nothing on this page.
+  const ceilings = {};
+  for (const [source, list] of Object.entries(sections)) {
+    const items = (Array.isArray(list) ? list : []).filter(Boolean);
+    if (items.length === 0) continue;
+    const ranks = items.map(f => SEVERITY_RANK.indexOf(shownSeverity(source, f)));
+    ceilings[source] = ranks.some(r => r < 0) ? null : SEVERITY_RANK[Math.max(...ranks)];
+  }
+  return ceilings;
+}
+
+function clampVotesToSources(severities, ceilings) {
+  if (!severities || typeof severities !== 'object' || !ceilings) return severities || null;
+  const out = {};
+  for (const [source, vote] of Object.entries(severities)) {
+    if (!Object.prototype.hasOwnProperty.call(ceilings, source)) continue;   // flagged nothing here
+    const cap = ceilings[source];
+    const v = String(vote || '').toUpperCase();
+    out[source] = cap && SEVERITY_RANK.indexOf(v) > SEVERITY_RANK.indexOf(cap) ? cap : v;
+  }
+  return out;
+}
+
+/** The severity a deduped entry is scored at: median of the clamped votes. */
+function resolveEntrySeverity(chosen, severities, ceilings) {
+  const pick = String(chosen || 'MODERATE').toUpperCase();
+  if (!ceilings) return medianSeverity(severities) || pick;
+  const fromVotes = medianSeverity(clampVotesToSources(severities, ceilings));
+  if (fromVotes) return fromVotes;
+  const known = Object.values(ceilings).filter(Boolean).map(c => SEVERITY_RANK.indexOf(c));
+  if (known.length === 0 || SEVERITY_RANK.indexOf(pick) < 0) return pick;
+  const pageMax = SEVERITY_RANK[Math.max(...known)];
+  return SEVERITY_RANK.indexOf(pick) > SEVERITY_RANK.indexOf(pageMax) ? pageMax : pick;
 }
 
 /**
@@ -505,6 +596,13 @@ async function consolidateFeedback({
       if (desc) characterDescriptions[c.name] = desc;
     }
 
+    // What each source actually said on this page — the ceiling for the
+    // votes the model transcribes (resolveEntrySeverity).
+    const voteCeilings = sourceSeverityCeilings({
+      fixableIssues, semanticIssues, complianceIssues, entityIssues,
+      readerFindings: Array.isArray(readerFindings) ? readerFindings : [],
+    });
+
     const userInput = buildFeedbackInput({
       sceneDescription,
       fixableIssues,
@@ -624,10 +722,7 @@ async function consolidateFeedback({
         .filter(i => i && typeof i === 'object' && (i.description || i.problem || i.issue))
         .map(i => ({
           description: require('./scoring').findingText(i),
-          severity: (() => {
-            const chosen = String(i.severity || 'MODERATE').toUpperCase();
-            return medianSeverity(i.severities) || chosen;
-          })(),
+          severity: resolveEntrySeverity(i.severity, i.severities, voteCeilings),
           // What the model picked, kept for audit against the computed value.
           severityChosen: String(i.severity || 'MODERATE').toUpperCase(),
           // The consolidated list IS the scoring source, so dropping `type` here
@@ -950,6 +1045,9 @@ module.exports = {
   dropCropArtifactFixes, // exported for testing
   consolidateFeedback,
   medianSeverity, // exported for testing
+  sourceSeverityCeilings, // exported for testing
+  clampVotesToSources, // exported for testing
+  resolveEntrySeverity, // exported for testing
   consolidateEvaluation,
   buildFeedbackInput, // exported for testing
   flattenEntityIssues, // exported for testing

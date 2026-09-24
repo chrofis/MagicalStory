@@ -140,8 +140,8 @@ function finalObjectState(entry) {
 /**
  * A vehicle's one-line description. The Art Director and the writers author a
  * vehicle as `colorAndDetails` + `signatureElement` with no `description`
- * field, and every consumer (KEY STORY ELEMENTS, REQUIRED OBJECTS, the
- * reference sheet) reads `description` — so both parse paths derive it here.
+ * field, and every consumer (REQUIRED OBJECTS, the reference sheet, the
+ * scene review) reads `description` — so both parse paths derive it here.
  * An authored `description` stands. Without this the live parse left it
  * undefined and staging covers shipped "**Vehicle**: undefined"
  * (job_1789343124794_z2c779f7i initial page).
@@ -154,13 +154,6 @@ function vehicleDescription(veh) {
   if (!details && !signature) return null;
   return [details, signature ? `Signature: ${signature}` : ''].filter(Boolean).join('. ');
 }
-
-/**
- * How many Visual Bible elements a cover's KEY STORY ELEMENTS block defines,
- * and so how many elements after the LOC a cover's objects may list: the
- * writer templates are filled from this same number ({COVER_ELEMENT_CAP}).
- */
-const COVER_KEY_ELEMENT_CAP = 3;
 
 /** True for the negative page numbers the three covers carry (coverKeys.COVER_PAGE_NUMBERS). */
 function isCoverPageNumber(pageNumber) {
@@ -2004,132 +1997,6 @@ These elements are NOT required - only include them if they naturally fit the im
   return prompt;
 }
 
-/**
- * Build Visual Bible prompt for covers (key story elements, optionally main characters)
- * @param {object} visualBible - Visual bible data
- * @param {object} options - Options
- * @param {boolean} options.skipMainCharacters - Skip main characters section (use when CHARACTER_REFERENCE_LIST already includes them)
- * @param {Array<string>|null} options.allowedElementIds - When provided (cover
- *   hint objects ∪ held ids), KEY STORY ELEMENTS is FILTERED to these VB ids.
- *   Without the filter the builder dumped every VB artifact into the cover
- *   prompt, and stray objects the hint never asked for got hallucinated into
- *   the render. null/undefined = no filter (legacy stories without a hint).
- * @param {Array<string>|null} options.excludeElementIds - VB ids to always
- *   drop (e.g. artifacts that are part of a character's WORN outfit — those
- *   are emitted once in the CLOTHING block, not again as an artifact).
- */
-function buildFullVisualBiblePrompt(visualBible, options = {}) {
-  if (!visualBible) return '';
-
-  const normIds = (arr) => Array.isArray(arr)
-    ? new Set(arr.map(id => String(id || '').toUpperCase()).filter(Boolean))
-    : null;
-  const allowedIds = normIds(options.allowedElementIds);
-  const excludeIds = normIds(options.excludeElementIds) || new Set();
-  const elementAllowed = (entry) => {
-    const id = String(entry?.id || '').toUpperCase();
-    if (id && excludeIds.has(id)) return false;
-    if (!allowedIds) return true;           // no hint → legacy unfiltered
-    return id ? allowedIds.has(id) : false; // hint present → only named elements
-  };
-
-  let prompt = '';
-
-  // Add ALL main characters with their style DNA (unless skipped - e.g., for covers with CHARACTER_REFERENCE_LIST)
-  if (!options.skipMainCharacters && visualBible.mainCharacters && visualBible.mainCharacters.length > 0) {
-    prompt += '\n\n**MAIN CHARACTERS - Must match reference photos exactly:**\n';
-    for (const char of visualBible.mainCharacters) {
-      prompt += `**${char.name}:**\n`;
-      const p = char.physical || {};
-      // Image-pipeline consumer: surface VISUAL age category (apparentAge or
-      // numeric→category), not the numeric age. A 45 and 50 look the same
-      // to the model. Numeric age is used elsewhere (reading level, text gen).
-      const numericAge = parseInt(char.age);
-      const visualAge = p.apparentAge
-        || (Number.isFinite(numericAge)
-          ? (numericAge < 5 ? 'toddler'
-            : numericAge < 12 ? 'school-age'
-            : numericAge < 18 ? 'teenager'
-            : numericAge < 65 ? 'adult'
-            : 'elderly')
-          : null);
-      if (visualAge) prompt += `- Looks: ${visualAge}\n`;
-      const topGender = char.gender && char.gender !== 'Unknown' ? char.gender : null;
-      if (topGender) prompt += `- Gender: ${topGender}\n`;
-
-      const meaningful = (v) => v && v !== 'Unknown' && v !== 'Not analyzed' && v !== 'none' && v !== 'nein';
-      if (meaningful(p.height)) prompt += `- Height: ${p.height} cm\n`;
-      if (meaningful(p.build)) prompt += `- Build: ${p.build}\n`;
-      if (meaningful(p.skinTone)) prompt += `- Skin tone: ${p.skinTone}\n`;
-      if (meaningful(p.eyeColor)) prompt += `- Eyes: ${p.eyeColor}\n`;
-      // Hair: derived from detailedHairAnalysis + hairColor (single source of truth).
-      const hairCombined = buildHairDescription(p) || (meaningful(p.hair) ? p.hair : null);
-      if (meaningful(hairCombined)) prompt += `- Hair: ${hairCombined}\n`;
-      if (meaningful(p.facialHair)) {
-        prompt += p.facialHair.toLowerCase() === 'clean-shaven'
-          ? '- Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face\n'
-          : `- Facial hair: ${p.facialHair}\n`;
-      }
-      if (meaningful(p.face)) prompt += `- Face: ${p.face}\n`;
-      if (meaningful(p.glasses)) prompt += `- Glasses: ${p.glasses}\n`;
-      if (meaningful(p.other)) prompt += `- Distinctive marks: ${p.other}\n`;
-    }
-  }
-
-  // Add only 2-3 key story elements. Secondary characters and vehicles are
-  // included ONLY when the caller filters by id (a cover hint's objects) —
-  // a hint-less legacy cover keeps the animals + artifacts it always had
-  // instead of dumping every CHR in the bible. Secondary characters go first:
-  // a creature the cast rides or stands beside is the one element the model
-  // cannot invent from context. job_1789078732136_622wecmhj front cover:
-  // the hint named CHR001 (a dragon, only state-cell renders) and every
-  // position said "on <name>'s back", but this block only read animals and
-  // artifacts, so the name reached the model with no species and the four
-  // riders were painted on the dog — the only creature defined.
-  const KEY_ELEMENT_CAP = COVER_KEY_ELEMENT_CAP;
-  const keyElements = [];
-  const pools = [
-    ['secondaryCharacters', 'character', !!allowedIds],
-    ['animals', 'animal', true],
-    ['artifacts', 'artifact', true],
-    ['vehicles', 'vehicle', !!allowedIds],
-  ];
-  for (const [pool, type, enabled] of pools) {
-    if (!enabled) continue;
-    for (const entry of visualBible[pool] || []) {
-      if (keyElements.length < KEY_ELEMENT_CAP && elementAllowed(entry)) {
-        keyElements.push({ ...entry, type });
-      }
-    }
-  }
-
-  if (keyElements.length > 0) {
-    prompt += '\n**KEY STORY ELEMENTS:**\n';
-    for (const entry of keyElements) {
-      // A creature's scale rides its line (cells get no size, 2026-09-23 — the
-      // description states none).
-      const baseDescription = entry.extractedDescription || entry.description;
-      const description = entry.type === 'animal' ? withScaleNote(baseDescription, entry) : baseDescription;
-      // Image-facing text is English-only. A VB entity NAME follows the story
-      // language (a German artifact name would leak into the English prompt
-      // and can even get painted as lettering), so artifacts/vehicles lead
-      // with a generic English label + their description. Animals keep their
-      // proper name (a pet's name is an identity anchor, like a character's),
-      // and so does a secondary character: the cover description places the
-      // cast relative to that name, and the description itself opens with
-      // what the creature is ("a dragon, …"), which is the species the model
-      // needs.
-      const named = (entry.type === 'animal' || entry.type === 'character') && entry.name;
-      const lead = named
-        ? `**${entry.name}** (${entry.type})`
-        : `**${entry.type.charAt(0).toUpperCase()}${entry.type.slice(1)}**`;
-      prompt += `${lead}: ${description}\n`;
-    }
-  }
-
-  return prompt;
-}
-
 // ============================================================================
 // IMAGE ANALYSIS FUNCTIONS
 // ============================================================================
@@ -3081,7 +2948,8 @@ function injectHistoricalLocations(visualBible, historicalLocations) {
  * Returns elements that:
  * 1. Meet the per-type appearance gate (secondary characters: 1+ page; others: minAppearances)
  * 2. Don't already have reference images
- * 3. Are secondary characters or important artifacts (not locations which have landmark photos)
+ * 3. Are secondary characters, animals, artifacts or vehicles. Locations never get a
+ *    cell: an invented one is built from its text, a real one from its photo (2026-09-24).
  *
  * Owner rule (2026-07-26): EVERY secondary character must be in the visual bible
  * with its own reference image even when it appears in a SINGLE scene — the old
@@ -3136,25 +3004,11 @@ function getElementsNeedingReferenceImages(visualBible, minAppearances = 2, char
   checkEntries(visualBible.animals, 'animal');
   checkEntries(visualBible.vehicles, 'vehicle');
 
-  // Include non-landmark locations (imaginary locations need reference images; real landmarks have photos)
-  if (visualBible.locations) {
-    for (const loc of visualBible.locations) {
-      // Skip real landmarks (they have landmark photos)
-      if (loc.isRealLandmark) continue;
-      // Skip if already has reference image
-      if (loc.referenceImageGenerated) continue;
-      if (loc.referenceImageData) continue;
-      // Skip if fewer than minAppearances
-      if (!loc.appearsInPages || loc.appearsInPages.length < minAppearances) continue;
-
-      needsReference.push({
-        ...loc,
-        kind: typeof loc.type === 'string' && loc.type.trim() ? loc.type.trim() : null,
-        type: 'location',
-        pageCount: loc.appearsInPages.length
-      });
-    }
-  }
+  // LOCATIONS GET NO CELL (owner, 2026-09-24). An invented location lives in
+  // the bible as TEXT and its plate is built from that text; a real landmark
+  // travels as its photo. The location cell was drawn with the isolated-object
+  // template, and the plate copied it pixel for pixel — plinth, cut-away walls
+  // and all (docs/decisions.md 2026-09-24). visualBible.locations is not walked.
 
   // Sort by page count (most appearances first)
   needsReference.sort((a, b) => b.pageCount - a.pageCount);
@@ -3338,9 +3192,6 @@ function isLargeScaleClass(value) {
  */
 function isPlateBorneElement(ref, sceneObjects = null) {
   if (!ref) return false;
-  // A location rides the plate on its `appearsInPages` membership alone — the
-  // locations loop below is not AD-gated, so neither is the drop.
-  if (ref.type === 'location') return true;
   // A FIGURE IS NEVER PLATE-BORNE, at any scale. The plate prompt says verbatim
   // "never draw a figure named anywhere in this prompt" (prompts/empty-scene.txt)
   // and its STRUCTURES block calls what it lists a "vessel, vehicle or built
@@ -3408,24 +3259,9 @@ function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9, ab
     });
   }
 
-  // Non-landmark locations (real landmarks use real photos via getLandmarkPhotosForScene)
-  for (const entry of visualBible.locations || []) {
-    if (skip(entry)) continue;
-    if (entry.isRealLandmark) continue;
-    if (!hasRef(entry)) continue;
-    if (!entry.appearsInPages || !entry.appearsInPages.includes(pageNumber)) continue;
-    const { cell } = elementRefCell(entry);
-    refs.push({
-      id: entry.id,
-      name: entry.name,
-      type: 'location',
-      scaleClass: entry.scaleClass || null,
-      description: entry.extractedDescription || entry.description,
-      referenceImageData: cell.referenceImageData,
-      referenceImageUrl: cell.referenceImageUrl,
-      priority: 2,
-    });
-  }
+  // No location cell rides the plate (2026-09-24): an invented location
+  // reaches the plate as its bible TEXT, a real one as its landmark photo. A
+  // stored story that still carries a location cell ignores it here.
 
   // LARGE ELEMENTS FROM ANY COLLECTION (2026-09-15). A building-scale artifact
   // — a monument, a mill, a bridge, a pole-with-banner — is part of the
@@ -3680,32 +3516,14 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
     }
   };
 
-  // Priority order: characters > animals > artifacts > vehicles > locations
+  // Priority order: characters > animals > artifacts > vehicles
   checkEntries(visualBible.secondaryCharacters, 'character', 1);
   checkEntries(visualBible.animals, 'animal', 2);
   checkEntries(visualBible.artifacts, 'artifact', 3);
   checkEntries(visualBible.vehicles, 'vehicle', 4);
 
-  // Add non-landmark locations (landmarks use real photos via getLandmarkPhotosForScene instead)
-  for (const entry of visualBible.locations || []) {
-    // Skip landmarks - they use real photos, not generated reference images
-    if (entry.isRealLandmark) continue;
-    // Must have generated reference image (inline OR R2 URL) and appear on this page
-    if (!hasRef(entry)) continue;
-    if (!entry.appearsInPages || !entry.appearsInPages.includes(pageNumber)) continue;
-
-    const { cell: locCell } = elementRefCell(entry);
-    relevantRefs.push({
-      id: entry.id,
-      name: entry.name,
-      type: 'location',
-      scaleClass: entry.scaleClass || null,
-      description: entry.extractedDescription || entry.description,
-      referenceImageData: locCell.referenceImageData,
-      referenceImageUrl: locCell.referenceImageUrl,
-      priority: 5 // Lower priority than objects/characters
-    });
-  }
+  // No location cells (2026-09-24): an invented location is text, a real one
+  // a landmark photo. Stored location cells are ignored.
 
   // WORN-ITEM DEDUPE (owner ruling 2026-09-06). An element that is also part of
   // a character's outfit (`wornAs`) and whose owner is on this page is ALREADY
@@ -3758,19 +3576,11 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
     log.info(`[VB-REFS] Page ${pageNumber}: worn-item dedupe KEPT ${wornKeptOff.join(', ')} — the plate is its only reference`);
   }
 
-  // Sort by priority and limit. LOCATIONS ARE NOT ELEMENTS (owner ruling,
-  // 2026-09-08: "Do not count it as it is the empty scene not an artifact") —
-  // an invented location is the plate the cast is composited into, so it is
-  // not one of the `maxRefs` elements; it rides along LAST, at most one, so
-  // the page holds at most maxRefs + 1 cells (3 + 1 = 4 = VB_SLOT_MAX_ELEMENTS
-  // on the page path). Real landmarks never reached this list at all.
+  // Sort by priority and limit to the element budget. LOCATIONS ARE NOT
+  // ELEMENTS (owner ruling, 2026-09-08) and, since 2026-09-24, carry no cell at
+  // all — every ref here is one of the `maxRefs` elements.
   relevantRefs.sort((a, b) => a.priority - b.priority);
-  const elements = relevantRefs.filter(r => r.type !== 'location');
-  const locations = relevantRefs.filter(r => r.type === 'location');
-  if (locations.length > 1) {
-    log.warn(`[VB-REFS] Page ${pageNumber}: ${locations.length} invented locations claim this page (${locations.map(l => l.id).join(', ')}) — only ${locations[0].id} rides as the location cell`);
-  }
-  const kept = [...elements.slice(0, maxRefs), ...locations.slice(0, 1)];
+  const kept = relevantRefs.slice(0, maxRefs);
   const pinned = kept.filter(r => r.recurring).map(r => `${r.name} (${r.id})`);
   if (pinned.length > 0) {
     log.info(`🔲 [VB-REFS] Page ${pageNumber}: recurring creature pinned to the element refs — ${pinned.join(', ')}`);
@@ -3796,7 +3606,7 @@ function getElementReferenceImagesByIds(visualBible, elementIds, pageNumber) {
   const results = [];
   const idSet = new Set(elementIds.map(id => id.toUpperCase()));
 
-  const priorities = { character: 1, animal: 2, artifact: 3, vehicle: 4, location: 5 };
+  const priorities = { character: 1, animal: 2, artifact: 3, vehicle: 4 };
   const searchArrays = [
     [visualBible.secondaryCharacters, 'character'],
     [visualBible.animals, 'animal'],
@@ -3821,22 +3631,6 @@ function getElementReferenceImagesByIds(visualBible, elementIds, pageNumber) {
         priority: priorities[type]
       });
     }
-  }
-
-  // Non-landmark locations
-  for (const entry of visualBible.locations || []) {
-    if (entry.isRealLandmark) continue;
-    if (!hasRef(entry)) continue;
-    if (!entry.id || !idSet.has(entry.id.toUpperCase())) continue;
-    results.push({
-      id: entry.id,
-      name: entry.name,
-      type: 'location',
-      description: entry.extractedDescription || entry.description,
-      referenceImageData: entry.referenceImageData,
-      referenceImageUrl: entry.referenceImageUrl,
-      priority: priorities.location
-    });
   }
 
   return results;
@@ -3997,7 +3791,6 @@ module.exports = {
 
   // Prompt building
   buildVisualBiblePrompt,
-  buildFullVisualBiblePrompt,
   englishEntityRef,
   labelOf: vbLabel.labelOf,
   stateLabelOf: vbLabel.stateLabelOf,
@@ -4039,7 +3832,6 @@ module.exports = {
   finalObjectState,
   isCoverPageNumber,
   vehicleDescription,
-  COVER_KEY_ELEMENT_CAP,
   pageHoldsObject,
   entryNamedByRow,
   citedEntries,

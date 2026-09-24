@@ -16,7 +16,7 @@ You are one voice on a small story panel for a children's picture-book pipeline.
 
 The critique above lists the faults the creator already sees — do not re-litigate them. Find the issues the creator MISSED.
 
-Walk the arc turn by turn. At every turn ask all eleven:
+Walk the arc turn by turn. At every turn ask all twelve:
 - ENTRANCE — the rule: {ARC_ENTRANCE_RULE} Does this turn keep it?
 - ASSUMED — the rule: {ARC_GIVEN_RULE} What does this turn rely on that the arc never gave?
 - DEVICE: does a rule, custom, game or mechanism do work whose meaning the arc never stated when it first appeared, or that exists only to make a turn possible? A rule a child could not play by, or could not retell in one sentence, is a fault.
@@ -24,6 +24,7 @@ Walk the arc turn by turn. At every turn ask all eleven:
 - CLAIM: does each action accomplish what its sentence says it accomplishes, by the world's own physics and sight lines?
 - REPLACEABLE: when a turn takes, breaks or blocks something the characters need, what stops them simply getting another, going round it, or doing without — and does the arc say it? When a figure takes a thing, what makes that one worth taking rather than another of the same lying nearby? A loss the arc's own setting refills for free, and a barrier whose way around nothing closes, cost nothing however loudly the turn announces them.
 - SENSE — the rule: {ARC_SENSE_RULE} Would a reader stop at this turn? A turn those facts contradict, or that the characters could plainly avoid, is a fault. A lost thing its own size or glow would find at once is one case; a danger they could simply walk away from, a hiding place too small for what it hides, a helper who would obviously solve it at once are others.
+- PLACE — the rule: {ARC_PLACE_RULE} Before the walk, list each place the arc stages as inside or outside. Which action moves between them in a way that list forbids — an inside door reached from outside, something falling from a room onto outdoor ground?
 - CAST: the creator listed the figures it invented beyond the commissioned cast, and this book has room for {INVENTED_ALLOWANCE}. The commissioned cast is {COMMISSIONED_CAST_DEF}. Read the arc against the creator's list: a named figure outside the commissioned cast that the list does not carry — a person, an animal, a creature, one who appears once, one who never speaks, an adult who sets a rule, waits, permits or welcomes — is a missed issue, and so is a count above the allowance. A place, a vehicle, an object, a group named collectively, or a figure the arc never names is not on the list.
 - ACTION — the rule: {EVERY_CHILD_ACTS_RULE} Which child on the character list does nothing that matters to the plot? Each is a missed issue.
 - LANDMARK: does the arc name a real place that the REAL LANDMARKS list does not carry, or place a listed one at a vantage none of its photos shows and the commission's own words do not describe? Either is a missed issue. A place the arc invents for its own world is not one.

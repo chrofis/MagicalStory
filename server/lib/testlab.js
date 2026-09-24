@@ -510,7 +510,7 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
   const textAreaMask = textInImage && ctx.textPosition ? getTextAreaMask(ctx.textPosition, ctx.languageLevel) : null;
 
   // Visual Bible grid + landmark refs — production's shared helper (a plate
-  // background drops vehicles/locations/landmarks; otherwise locations only).
+  // background drops plate-borne elements and landmarks).
   let visualBibleGrid = null;
   let genLandmarkPhotos = ctx.landmarkPhotos;
   if (ctx.visualBible) {
@@ -678,6 +678,9 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
     // gemini-2.5-flash-image) — style-adherence routing tests. Null = prod default.
     imageModelOverride: params.imageModel || null,
     landmarkPhotos: genLandmarkPhotos,
+    // Plate or fail, as in production: only a cast-0 page may render on its
+    // landmark photo; any other landmark page needs the plate (emptyScene).
+    landmarkScene: require('./landmarkScene').pageLandmarkScene({ sceneMetadata: ctx.scene?.sceneMetadata || null }),
     visualBibleGrid,
     artStyle,
     sceneBackground: emptyScene,
@@ -810,6 +813,9 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
     // AD objects[] gates which vehicles enter the plate prompt + grid — same
     // gate production runs (AD is the authority on vehicle presence).
     sceneObjects: meta.objects || null,
+    // The page's declared time of day and weather — the plate's LIGHT line, as
+    // at every production plate call site (sceneLight.js).
+    light: require('./sceneLight').declaredLight(meta),
     // The geometry facts the plate is GRADED on (validateEmptyScene reads the
     // same scene prose). Production passes these at every page/vantage plate
     // call site; without them the Lab renders a plate blind to the geometry and
@@ -848,6 +854,7 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
       artStyle: plateStyle,
       shot: (meta.fullData?.shot || meta.shot || '').trim() || null,
       landmarkPhoto: ctx.landmarkPhotos?.[0] || null,
+      light: require('./sceneLight').declaredLight(meta),
     });
     qc = { pass: qcRes.pass, issues: qcRes.issues || [], visionFeedback: qcRes.visionFeedback || null };
   } catch (err) {
@@ -4731,14 +4738,24 @@ async function runTextZoneStage(ctx, { experimentId, params = {} }) {
   const textAreaMask = getTextAreaMask(textPosition, ctx.languageLevel);
 
   // Same wrapper the pipeline builds (ensureCalmZone never imports images.js).
-  const generateImage = (repairPrompt, opts) => generateImageOnly(repairPrompt, ctx.referencePhotos, {
-    landmarkPhotos: ctx.landmarkPhotos,
-    previousImage: opts.previousImage,
-    textAreaMask: opts.textAreaMask,
-    pageNumber: ctx.pageNumber,
-    skipCache: true,
-    aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
-  });
+  // PLATE OR FAIL: a landmark page's repair re-render carries its stored plate, never the raw photo (server/lib/landmarkScene.js).
+  const generateImage = async (repairPrompt, opts) => {
+    const { resolveRepairScene } = require('./landmarkScene');
+    const repairScene = await resolveRepairScene({
+      page: { sceneMetadata: ctx.scene?.sceneMetadata || null }, landmarkPhotos: ctx.landmarkPhotos,
+      storyId: ctx.storyId, pageNumber: ctx.pageNumber, label: 'LAB TEXT-ZONE',
+    });
+    return generateImageOnly(repairPrompt, ctx.referencePhotos, {
+      landmarkPhotos: ctx.landmarkPhotos,
+      landmarkScene: repairScene.landmarkScene,
+      sceneBackground: repairScene.sceneBackground,
+      previousImage: opts.previousImage,
+      textAreaMask: opts.textAreaMask,
+      pageNumber: ctx.pageNumber,
+      skipCache: true,
+      aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
+    });
+  };
 
   const t0 = Date.now();
   const result = await ensureCalmZone({
@@ -8932,7 +8949,12 @@ async function runVbElementCellStage(target, { experimentId, promptOverride = nu
   if (!vb) throw new Error('Story has no visualBible');
   const elementId = String(params.elementId || '').trim().toUpperCase();
   if (!elementId) throw new Error('params.elementId is required (e.g. ART001)');
-  const POOLS = { secondaryCharacters: 'character', artifacts: 'artifact', animals: 'animal', vehicles: 'vehicle', locations: 'location' };
+  // Locations have no reference cell in production (owner, 2026-09-24): an
+  // invented location is built from its bible text, a real one from its photo.
+  if ((vb.locations || []).some(e => String(e.id || '').toUpperCase() === elementId)) {
+    throw new Error(`${elementId} is a location — locations have no reference cell (the plate is built from the bible text)`);
+  }
+  const POOLS = { secondaryCharacters: 'character', artifacts: 'artifact', animals: 'animal', vehicles: 'vehicle' };
   let entry = null;
   let type = null;
   for (const [pool, t] of Object.entries(POOLS)) {

@@ -29,6 +29,8 @@ import path from 'path';
 
 // @ts-expect-error - JS module without types
 import { shrinkPromptForModel } from '../../server/lib/images.js';
+// @ts-expect-error - JS module without types
+import { COUNTS_RULE, buildCompositionBlock } from '../../server/lib/promptBuilders.js';
 
 const TEMPLATE = fs.readFileSync(
   path.join(process.cwd(), 'prompts', 'image-generation.txt'),
@@ -81,9 +83,9 @@ const TAIL = [
   '',
   templateParagraph('**DEPTH AND SIZE:**'),
   '',
-  templateParagraph('**COUNTS:**'),
+  COUNTS_RULE,
   '',
-  templateParagraph('**Composition:**'),
+  buildCompositionBlock(),
 ].join('\n\n');
 
 const PROMPT = [
@@ -167,9 +169,9 @@ describe('shrinkPromptForModel — a drop is confined to the block it names', ()
 
     // The units are whole paragraphs and, for Composition, single bullets
     // (2026-09-23): a unit is spent when its exact text is gone.
-    const composition = templateParagraph('**Composition:**').split('\n');
+    const composition = buildCompositionBlock().split('\n');
     const units = [
-      templateParagraph('**COUNTS:**'),
+      COUNTS_RULE,
       templateParagraph('**DEPTH AND SIZE:**'),
       templateParagraph('**REQUIRED CAST:**'),
       ...composition.slice(1),

@@ -55,7 +55,7 @@ const sign = {
   text: 'Windchopf',
   pageCount: 2,
 };
-const location = { id: 'LOC003', name: 'hillside cave entrance', label: 'hillside cave entrance', type: 'location', description: 'outdoor, a dark cave mouth under a mossy rock lip', pageCount: 2 };
+const cart = { id: 'VEH003', name: 'red handcart', label: 'red handcart', type: 'vehicle', description: 'a two-wheeled wooden handcart painted red', pageCount: 2 };
 const character = { id: 'CHR001', name: 'Fenn', type: 'character', build: 'a dragon, broad-chested', description: 'a dragon, broad-chested and sturdy', pageCount: 4 };
 
 describe('elementKindSentence — the noun as prose', () => {
@@ -72,7 +72,7 @@ describe('elementKindSentence — the noun as prose', () => {
     expect(elementKindSentence({ ...sign, text: null, type: 'oak plank sign' })).toBe('This is the trail sign, an oak plank sign: ');
   });
   it('ignores the pool label the sheet code stamps as type', () => {
-    expect(elementKindSentence(location)).toBe('This is the hillside cave entrance: ');
+    expect(elementKindSentence(cart)).toBe('This is the red handcart: ');
   });
   it('reads the bible type from `kind` when the pool sits on `type` (the production shape)', () => {
     // getElementsNeedingReferenceImages stamps the pool onto `type`; without
@@ -136,7 +136,7 @@ describe('buildReferenceSheetPrompt / batches with the new cells', () => {
     expect(p).not.toMatch(/^Row 1:/m);
   });
   it('an entry with text is quarantined into a solo batch', () => {
-    const batches = buildReferenceSheetBatches([scale, sign, location], { artifacts: [], vehicles: [], clothing: [] }, 4);
+    const batches = buildReferenceSheetBatches([scale, sign, cart], { artifacts: [], vehicles: [], clothing: [] }, 4);
     const solo = batches.find(b => b.length === 1 && b[0].id === 'ART005');
     expect(solo).toBeTruthy();
     expect(batches.some(b => b.length > 1 && b.some(e => e.id === 'ART005'))).toBe(false);

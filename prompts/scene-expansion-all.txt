@@ -159,7 +159,7 @@ Every entry needs specific colours, one signature element, and a description tha
 Two or more beings of one kind — two cats, two horses, a grown creature and its young — are written against each other: each entry names the dimensions they share and the dimensions that tell them apart. Unrelated ones differ in at least two a child reads at a glance: colour, markings, coat or scale texture, build, ear or horn or tail shape. Ones the story makes kin share the family look — palette, markings, eye colour, head and snout shape — and part only on age and size.
 
 The `description` is copied verbatim into image prompts, so write it as image-prompt text:
-- **It must read as that thing at a glance.** Name the thing with the word that names it, and name the one feature that separates it from the everyday object its bare geometry would otherwise describe — what it attaches to, what it is part of, what it does. Naming that thing identifies the object and never puts it in the picture. Geometry serves recognition; it is never the whole description.
+- **It must read as that thing at a glance.** Its first noun is the noun its `label` ends in — the word that names the thing, never the family in `type` ("a brass lantern with…", never "a brass light source with…"). Then name the one feature that separates it from the everyday object its bare geometry would otherwise describe — what it attaches to, what it is part of, what it does. Naming that thing identifies the object and never puts it in the picture. Geometry serves recognition; it is never the whole description.
 - Describe the SHAPE for objects the model confuses — name the parts and how they connect (`perpendicular`, `parallel`, `spans across`, `forms a T from above`, `mounted at right angles to`). No analogies, no negations; both mislead the model.
 - Name every functional part the model tends to drop, with its position and state (a taut string, evenly spaced rungs, a tensioned sail).
 - A two-sided prop (rule above) lists the side away from the viewer first (the back of the sheet, the closed cover, the outer face of the roll), then `"face to camera"`, each with its own `pages`. Its `description` gives material, edge wear and dominant colour and says nothing about what is drawn or written on the face; words the reader must be able to read go in `text`.
@@ -168,14 +168,16 @@ Ids: CHR001… secondary characters, ANI001… animals, ART001… artifacts, LOC
 
 Only a place listed in the REAL LANDMARKS section above gets `isRealLandmark: true` and `landmarkQuery` set to its exact name as listed. Every other location — a town, a street, a square, a building, any place that exists in reality but is not on that list — stays `isRealLandmark: false` with `landmarkQuery: null`. No REAL LANDMARKS section means no landmarks are available: every location is `false` and `null`.
 
-A location shown from one viewpoint needs no `vantages[]`. Give it `vantages[]` and split it when the same place appears from a fundamentally different camera position — exterior/interior, on a structure/beside it, wide vista/close on one element, approach/arrival. Split it too when its pages differ in time of day or weather: the plate carries the light. Never split for a different cast. An object with `states[]` is cited by a page as `ART###.N`, the state whose `pages` include that page; otherwise the bare `ART###`. Vantage ids are `LOC###.N` from 1; each carries `name` (3-8 words), `shot` (one of {SHOT_ENUM}; {VANTAGE_SHOT}), a 2-3 sentence background-only `description` of what the place looks like from here, an `emptyScenePrompt` (the plate, rules below), and `pages`. Every page in the location's `pages` appears in exactly one vantage.
+{PLACE_SEPARATE} {PLACE_INSIDE_OUTSIDE}
+
+A location shown from one viewpoint needs no `vantages[]`. Give it `vantages[]` and split it when the same place appears from a fundamentally different camera position — exterior/interior, on a structure/beside it, wide vista/close on one element, approach/arrival. Never split for a different cast, time of day or weather: each page declares its light in `timeOfDay` and `weather`, and the plate is painted, or re-lit, in that page's light. An object with `states[]` is cited by a page as `ART###.N`, the state whose `pages` include that page; otherwise the bare `ART###`. Vantage ids are `LOC###.N` from 1; each carries `name` (3-8 words), `shot` (one of {SHOT_ENUM}; {VANTAGE_SHOT}), a 2-3 sentence background-only `description` of what the place looks like from here, an `emptyScenePrompt` (the plate, rules below), and `pages`. Every page in the location's `pages` appears in exactly one vantage.
 
 One backdrop plate is painted per vantage, and every page of that vantage is drawn on it. A location with no `vantages[]` carries its single plate in its own `emptyScenePrompt`. A page whose backdrop the shared plate cannot hold — a different camera position, a different part of the place, a framing the plate has no room for — takes a vantage of its own, with its own plate. Decide that split here, from the plan lines: a plate is written once for the pages that share it, never once per page.
 
 **`emptyScenePrompt`** — one plate per vantage
 - 2-3 sentences describing only the background. Every page of the vantage is drawn on this one plate; you write it once, here, and never again on a page.
 - The framing the vantage's `shot` names: a close vantage gets a close stage (the wall, the doorway, the table corner), a wide vantage the wide setting. Never an establishing wide shot for a close vantage.
-- The plate carries this vantage's geometry: the same direction and the same gradient for any path, river, road, corridor, shoreline or horizon — a route the pages climb rises away from the camera, one they descend falls away; the vanishing point or opening named as a frame position (upper-right, lower-centre); the dominant diagonals; a lighting direction that matches the story's time and weather at this place. When the camera is aboard a vessel or inside a structure (rule 11d), it is that view's geometry — the rail's line, the deck's recession, the direction the light enters.
+- The plate carries this vantage's geometry: the same direction and the same gradient for any path, river, road, corridor, shoreline or horizon — a route the pages climb rises away from the camera, one they descend falls away; the vanishing point or opening named as a frame position (upper-right, lower-centre); the dominant diagonals; the direction the light comes from. The plate names no time of day and no weather — the pages declare those. When the camera is aboard a vessel or inside a structure (rule 11d), it is that view's geometry — the rail's line, the deck's recession, the direction the light enters.
 - The plate describes only what the camera sees from this vantage — never the exterior of the vehicle or structure the camera stands on.
 - Foreground, midground and background bands show the place's own ground, floor, deck or water continuing unbroken — figures are composited into them on every page that uses this plate, so those bands are written as the scene's own surface and never as a reference to the figures themselves. Everywhere else the room or landscape keeps its furnishing; never clear the whole frame.
 - The geography gives a standing character footing at every depth the pages on this vantage place one — a bank, path, floor, deck or walkway, never open water or air under a standing figure. A plan line that puts a figure where nothing standable exists moves the figure or takes another vantage. A character inside a shaft, pit or hollow stands on its floor: that floor is the standable surface, shown from within (rule 11e).
@@ -208,6 +210,7 @@ Each cover is a structured spec, not prose. The fields are the spec.
 - `priority` is `essential | normal | low`.
 - `Mood` is one phrase of 2-5 words.
 - After the LOC, a cover's `Objects:` list any `ART###`, `ANI###` or `VEH###` from the Visual Bible that the cover calls for — at most {COVER_ELEMENT_CAP}, on any of the three covers. Each one listed appears in that cover's scene.
+- `Scene` is the cover's prose, in English, one to three sentences written like a page brief: name each entry `Objects:` lists after the LOC and interleave its identifying detail (rule 10). It does not place, pose or dress the characters of the Characters lines and says nothing about gaze — those lines and the code own them. With no element after the LOC, `Scene` describes the backdrop in one sentence.
 - When the story centres on a creature or animal — the title names it, or the plot turns on it — the Title Page lists that `ANI###` in `Objects:` right after the LOC.
 - No perspective or depth on covers — every figure faces the viewer and is fully visible. If the cast does not fit, drop the least essential character instead of hiding them.
 
@@ -319,18 +322,21 @@ Then, exactly:
 **Title Page**
 Mood: [one phrase]
 Objects: [LOC###, then the ART### / ANI### / VEH### this cover shows]
+Scene: [English prose naming each element above with its identifying detail]
 Characters:
 - [Name] ([position]): [clothing], holds: [ART### or nothing], priority: [essential|normal|low]
 
 **Initial Page**
 Mood: [one phrase]
 Objects: [LOC###, then the ART### / ANI### / VEH### this cover shows]
+Scene: [English prose naming each element above with its identifying detail]
 Characters:
 - [Name] ([position]): [clothing], holds: [ART### or nothing], priority: [essential|normal|low]
 
 **Back Cover**
 Mood: [one phrase]
 Objects: [LOC###, then the ART### / ANI### / VEH### this cover shows]
+Scene: [English prose naming each element above with its identifying detail]
 Characters:
 - [Name] ([position]): [clothing], holds: [ART### or nothing], priority: [essential|normal|low]
 
@@ -382,6 +388,8 @@ Then a single-line JSON object:
   "aboard": "VEH001",
   "landmarkView": "exterior",
   "era": "present day",
+  "timeOfDay": "midday",
+  "weather": "none",
   "objects": ["LOC001", "ART002"],
 <!-- TEXT_OVERLAY_BEGIN -->
   "textPosition": "top-left|top-right|bottom-left|bottom-right|top-full|bottom-full",
@@ -402,6 +410,8 @@ Then a single-line JSON object:
 ### Field rules
 
 **`sceneIntent`** (required): {SCENE_INTENT_FIELD}
+
+**`timeOfDay` / `weather`** (required): {SCENE_LIGHT_FIELD}
 
 **`characters[]`**
 - One entry per main or primary character in the scene. Secondary characters never appear here.
