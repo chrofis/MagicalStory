@@ -79,6 +79,8 @@
 
 <p><strong>Per-variant selection:</strong> the page's <code>landmarkView</code> (<code>exterior | distant | close | interior | view-from | none</code>) picks the photo by the slot's indexed kind, and within that kind the judged <code>photo_score</code> ranks (<code>landmarkPhotos.js → pickVariantForView</code>, called by <code>storyHelpers.js → getLandmarkPhotosForScene</code>). A dotted id such as <code>LOC002.3</code> is a Visual Bible <em>vantage</em> (a plate camera position) and never selects a photo; the old <code>[LOC###.N]</code>-is-a-photo-slot convention was deleted 2026-09-24 (<code>docs/decisions.md</code>).</p>
 
+<p><strong>The page's shot picks the framing</strong> (owner, 2026-09-24): within the view's kinds, an <code>ultra-wide</code> page gets a photo the judge framed <code>wide</code> (then <code>aerial</code>), an <code>aerial</code> page an <code>aerial</code> (then <code>wide</code>) one, when the landmark has one scoring ≥ 40. Every other page — and a far page whose landmark has no such photo — gets the same normal photo (<code>medium</code> first). The shot is the page's own, else its vantage's; covers read <code>setting.camera</code>. Same function for pages, iterate, regeneration, covers and the vantage plate (which takes its representative page's photo).</p>
+
 <p><strong>How Claude learns about variants:</strong></p>
 <ul>
   <li><strong>Full mode</strong> (the beats chain): scene expansion runs after <code>loadLandmarkPhotoDescriptions</code> has put the per-slot descriptions on the visual bible, and writes <code>landmarkView</code> on each page citing a real landmark.</li>

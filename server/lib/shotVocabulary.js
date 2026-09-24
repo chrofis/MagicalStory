@@ -212,6 +212,16 @@ const SHOT_DEFINITIONS = `**SHOT:** The scene description declares the shot. ${S
 const SHOT_RULE_LEAD = '**SHOT:** The scene description declares the shot.';
 
 /**
+ * The shot id a free-text shot word names (recognition order, so `ultra-wide`
+ * is never read as `wide`), or null when it names none.
+ */
+function resolveShotId(text) {
+  if (!text) return null;
+  for (const [id, pattern] of SHOT_PATTERNS) if (pattern.test(String(text))) return id;
+  return null;
+}
+
+/**
  * THE SHOT BLOCK FOR ONE PAGE — its declared shot's definition, nothing else.
  *
  * The full table is 1,223 characters for eight shots, and a page draws ONE.
@@ -232,12 +242,7 @@ const SHOT_RULE_LEAD = '**SHOT:** The scene description declares the shot.';
  * @returns {{ text: string, shot: string|null }}
  */
 function buildShotDefinitions(shotHint, sceneText = null) {
-  const resolve = (s) => {
-    if (!s) return null;
-    for (const [id, pattern] of SHOT_PATTERNS) if (pattern.test(String(s))) return id;
-    return null;
-  };
-  const id = resolve(shotHint) || resolve(sceneText);
+  const id = resolveShotId(shotHint) || resolveShotId(sceneText);
   if (!id) return { text: '', shot: null };
   const shot = SHOTS.find(s => s.id === id);
   return { text: `${SHOT_RULE_LEAD} ${shot.definition}`, shot: id };
@@ -645,6 +650,7 @@ module.exports = {
   SHOT_DEFINITIONS,
   SHOT_RULE_LEAD,
   buildShotDefinitions,
+  resolveShotId,
   MAX_MEDIUM_WIDE_SHARE,
   MID_DISTANCE_SHOTS,
   PEOPLELESS_SHARED_SHOT,

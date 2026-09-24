@@ -151,6 +151,16 @@ the interior shot. Serving takes **every field from the same slot**: no
 cross-slot fallback, because pairing slot 3's photo with slot 1's credit names
 the wrong photographer, and attribution is a CC licence condition.
 
+**Per page, the camera picks the framing** (owner, 2026-09-24; `docs/decisions.md`).
+`variantsFromIndexRow` carries each slot's `framing` beside its `photo_score`
+(`PHOTO_SCORES_SQL` selects both), and `pickVariantForView(loc, landmarkView, shot)`
+serves an `ultra-wide` page a `wide` (then `aerial`) photo and an `aerial` page an
+`aerial` (then `wide`) photo when the landmark has one scoring ≥ 40; every other
+shot — and any page whose far framing has no photo — gets the normal choice
+(`medium` first, then best score within the view's kind). The shot is the page's
+own, else its vantage's. A slot with no `photo_type` takes its kind from its
+framing (`KIND_FROM_FRAMING`), not from the slot number.
+
 Judging is done by **Claude agents reading the image files directly — $0**, not
 by a vision API. See `docs/landmark-judging-instructions.md`,
 `prep-landmark-judging.js`, `merge-landmark-judgments.js`.

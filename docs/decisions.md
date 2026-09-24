@@ -173,6 +173,66 @@ Supersedes the 2026-08-11 "variant 0" convention. **Status:** ✅ active.
 
 ---
 
+## 2026-09-24 — The page's shot picks the landmark photo's framing: ultra-wide and aerial pages get a far photo when the index has one, every other page the normal photo
+
+**Context.** Owner, 2026-09-24: *"We should take the correct landmark photo. For ultra wide a different
+one than for a normal image. If we have landmark variants that match. If not we use the same one."*
+After the entry above, staging `job_1790100385959_1nitlympp` would serve one photo (Lindenhof slot 1,
+the terrace square, judged `medium` 80) on all 17 Lindenhof pages — the ultra-wide p2 and the aerial
+p12 included — while the index holds two photos the judge framed `wide` (slot 2, 45; slot 3, 72).
+Every judged photo already carries a `framing` (`landmark_photo_scores.framing`, docs/
+landmark-judging-instructions.md): populated on 16,249 of 16,253 rows on both staging and prod
+(medium 9.6k, wide 2.9k, closeup 1.4k, interior 1.4k, view-from 404, aerial 391). 2,144 of 6,464
+judged landmarks have a usable `wide`/`aerial` photo.
+
+**Decision.**
+1. `variantsFromIndexRow` carries each slot's judged `framing` (`PHOTO_SCORES_SQL` now also selects
+   `photo_framings`).
+2. `pickVariantForView(location, view, shot)`: among the photos of the view's accepted kinds, one whose
+   framing fits the shot wins (framing preference, then `photoScore`, then slot); the ≥40 cutoff still
+   applies. `SHOT_PHOTO_FRAMINGS`: `ultra-wide` → `wide`, then `aerial`; `aerial` → `aerial`, then
+   `wide`. Every other shot — `medium`, `wide`, `close-up`, the camera positions, and no shot — prefers
+   `medium`. No fitting photo → the normal choice (first accepted kind, best score), i.e. the photo a
+   medium page gets: the owner's rule, a selection preference, not a degraded path.
+   - The judge's `wide` is "the place sits small inside a landscape or townscape" — the page's
+     ultra-wide, not its `wide` ("shows the full setting").
+   - A close-up is close to a FIGURE, not to the place (the reason `shot` never derives `landmarkView`,
+     the `landmark_view_missing` entry above), so it keeps the normal photo. `high-angle` names where
+     the camera stands, not how far — on this run's high-angle vantage it looks down at the ground by
+     the wall — so it keeps the normal photo too.
+   - `landmarkView` still decides the kind: an interior page never gets an exterior wide photo.
+3. The shot is the page's own (`shot` / `fullData.shot`; a cover's `setting.camera`), else the cited
+   vantage's `shot`, else the shot of the vantage whose `pages[]` names the page — the precedence the
+   vantage plate's SHOT line already uses. One function (`storyHelpers.landmarkPhotoShot`) inside
+   `getLandmarkPhotosForScene`, so pages, iterate, regeneration, covers and the vantage plate (which
+   takes its representative page's photos) all follow it. The trial plate has no brief and no camera
+   and keeps the normal photo. Shot words resolve through `shotVocabulary.resolveShotId`.
+4. An UNCLASSIFIED photo (`photo_type` NULL — ~8,700 of the ~16,250 judged photos) takes its kind from its
+   framing (`KIND_FROM_FRAMING`: medium → exterior, closeup → close, wide/aerial → distant, interior,
+   view-from) instead of the slot guess (1-3 exterior, 4-6 interior). The guess was wrong for 553
+   usable photos judged `interior` in slots 1-3 and 554 in slots 4-6 judged other than `interior`
+   (both DBs). A
+   classified `photo_type` keeps its own value; the slot guess stays only for a photo never judged.
+
+**Stored stories.** A stored Visual Bible's `photoVariants` carry no `framing` (and before today no
+`photoScore`), so a regenerated page of an older story picks as before — no match, normal choice.
+
+**Validation (free replay).** The stored briefs of `job_1790100385959_1nitlympp` through the real
+`getLandmarkPhotosForScene`, variants re-read from staging by `loadLandmarkPhotoDescriptions`: p2
+(ultra-wide) and p12 (aerial) change from slot 1 to slot 3; the other 15 Lindenhof pages, p1 and the
+three covers are unchanged. **Slot 3 is the wrong subject**: a Limmat quay with the Zunfthaus zur Meisen
+and the Münsterbrücke — the Lindenhof is not in the frame — judged `wide` 72 ("hill and old houses
+seen across the river"). The judging brief scores "a picture of somewhere else entirely" 0, so this is
+a judging error the data cannot catch; with slot 3 re-judged to 0 the same two pages get slot 2 (the
+Lindenhof terrace wall and trees seen over the rooftops from the ETH, `wide` 45). Correction proposed
+to the owner, not applied (a DB write).
+
+**Touched files.** `server/lib/landmarkPhotos.js`, `server/lib/storyHelpers.js`,
+`server/lib/shotVocabulary.js`, `tests/unit/landmark-photo-shot-framing.test.ts`,
+`docs/landmark-database.md`, `docs/landmarks.html`. **Status:** ✅ active.
+
+---
+
 ## 2026-09-24 — One shorter face, everywhere: pages and covers still describe a character identically, now shorter
 
 **Context.** Four-child covers of staging `job_1790100385959_1nitlympp` are still 1.3-2.3k characters

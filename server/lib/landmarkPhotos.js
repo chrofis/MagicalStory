@@ -13,6 +13,7 @@ const { callTextModel } = require('./textModels');
 const { TEXT_MODELS } = require('../config/models');
 const r2 = require('./r2');
 const { servedPhotoUrl } = require('./landmarkPhotoStore');
+const { SHOT_TYPES, resolveShotId } = require('./shotVocabulary');
 
 // Simple in-memory cache (24-hour TTL)
 const photoCache = new Map();
@@ -2790,11 +2791,14 @@ const MIN_USABLE_PHOTO = 40;
 
 const JUDGED_USABLE_SQL = `(story_score IS NULL OR story_score >= ${MIN_USABLE_PHOTO})`;
 
-// Each slot's judged photo_score as {slot: score}, selected beside the slot
-// columns so variantsFromIndexRow can hand every variant its own score and
-// pickVariantForView can rank photos of one kind. NULL when never judged.
+// Each slot's judged photo_score and framing as {slot: value}, selected beside
+// the slot columns so variantsFromIndexRow can hand every variant its own
+// judgement: pickVariantForView ranks by the score and matches the page's shot
+// against the framing. NULL when never judged.
 const PHOTO_SCORES_SQL = `(SELECT jsonb_object_agg(s.slot, s.photo_score)
-          FROM landmark_photo_scores s WHERE s.landmark_id = landmark_index.id) AS photo_scores`;
+          FROM landmark_photo_scores s WHERE s.landmark_id = landmark_index.id) AS photo_scores,
+        (SELECT jsonb_object_agg(s.slot, s.framing)
+          FROM landmark_photo_scores s WHERE s.landmark_id = landmark_index.id AND s.framing IS NOT NULL) AS photo_framings`;
 
 // Fame is a GLOBAL measure, so inside one town it ranks the wrong way round: a
 // synagogue 7km away in another village (5 language editions) beat the town's
@@ -3746,16 +3750,26 @@ function normalizePhotoKind(raw) {
  * job_1790100385959_1nitlympp served a riverside promenade on six Lindenhof
  * pages because vantage 3 was read as slot 3; docs/decisions.md 2026-09-24).
  *
- * Within the first accepted kind that has a photo, the judged `photoScore`
- * ranks (slot order breaks ties and orders unjudged photos); a photo judged
- * below MIN_USABLE_PHOTO is not a candidate, the same cutoff serving applies.
+ * THE PAGE'S CAMERA PICKS THE FRAMING (owner, 2026-09-24: "For ultra wide a
+ * different one than for a normal image. If we have landmark variants that
+ * match. If not we use the same one."). Among the photos of the view's accepted
+ * kinds, one whose judged `framing` fits the page's shot wins
+ * (SHOT_PHOTO_FRAMINGS; framing preference, then photoScore, then slot). When
+ * none fits, the page gets the normal choice below — the same photo a medium
+ * page gets.
+ *
+ * The normal choice: within the first accepted kind that has a photo, the
+ * judged `photoScore` ranks (slot order breaks ties and orders unjudged
+ * photos). A photo judged below MIN_USABLE_PHOTO is never a candidate, the same
+ * cutoff serving applies.
  *
  * @param {Object} location - VB location with photoVariants[] carrying `kind`
- *   and, when judged, `photoScore`
+ *   and, when judged, `photoScore` and `framing`
  * @param {string|null} view - scene's landmark view
+ * @param {string|null} [shot] - the page's camera shot (shotVocabulary word)
  * @returns {number|null} variantNumber to attach, or null for "no photo"
  */
-function pickVariantForView(location, view) {
+function pickVariantForView(location, view, shot = null) {
   const variants = (location?.photoVariants || []).filter(v => v?.url && v.kind !== 'bad'
     && !(Number.isFinite(v.photoScore) && v.photoScore < MIN_USABLE_PHOTO));
   if (variants.length === 0) return null;
@@ -3768,8 +3782,18 @@ function pickVariantForView(location, view) {
     interior: ['interior'],
     'view-from': ['view-from'],
   };
+  const kinds = ACCEPTS[v] || ACCEPTS.exterior;
   const score = x => (Number.isFinite(x.photoScore) ? x.photoScore : -1);
-  for (const kind of (ACCEPTS[v] || ACCEPTS.exterior)) {
+
+  const wanted = photoFramingsForShot(shot);
+  const fitting = variants.filter(x => kinds.includes(x.kind) && wanted.includes(x.framing));
+  if (fitting.length > 0) {
+    fitting.sort((a, b) => wanted.indexOf(a.framing) - wanted.indexOf(b.framing)
+      || score(b) - score(a) || a.variantNumber - b.variantNumber);
+    return fitting[0].variantNumber;
+  }
+
+  for (const kind of kinds) {
     const ofKind = variants.filter(x => x.kind === kind);
     if (ofKind.length === 0) continue;
     ofKind.sort((a, b) => score(b) - score(a) || a.variantNumber - b.variantNumber);
@@ -3777,6 +3801,50 @@ function pickVariantForView(location, view) {
   }
   return null;
 }
+
+/**
+ * Which judged photo framings (landmark_photo_scores.framing — docs/
+ * landmark-judging-instructions.md) fit a page's camera shot, best first.
+ *
+ * Only the two shots whose camera is far from the PLACE have their own photo.
+ * The judge's `wide` is "the place sits small inside a landscape or a
+ * townscape" — the page's ULTRA-WIDE, not its `wide` (which "shows the full
+ * setting" and is drawn from a medium photo like every eye-level page).
+ * `aerial` and `ultra-wide` each take the other far framing second.
+ * A close-up is close to a FIGURE, not to the place: a child waist-up in front
+ * of a tower is not a `closeup` detail of the tower (the same reason `shot`
+ * never derives `landmarkView`, decisions.md 2026-09-24), so it keeps the
+ * normal photo. A camera POSITION (high-angle, low-angle, over-the-shoulder)
+ * states no distance and gets the normal photo too, as does a page with no shot.
+ */
+const SHOT_PHOTO_FRAMINGS = {
+  'ultra-wide': ['wide', 'aerial'],
+  aerial: ['aerial', 'wide'],
+};
+const NORMAL_PHOTO_FRAMINGS = ['medium'];
+if (Object.keys(SHOT_PHOTO_FRAMINGS).some(id => !SHOT_TYPES.includes(id))) {
+  throw new Error('landmarkPhotos: SHOT_PHOTO_FRAMINGS names a shot shotVocabulary does not define');
+}
+
+function photoFramingsForShot(shot) {
+  return SHOT_PHOTO_FRAMINGS[resolveShotId(shot)] || NORMAL_PHOTO_FRAMINGS;
+}
+
+/**
+ * The index's kind for a photo whose `photo_type` was never classified, read
+ * from the judge's framing of the same photo. Used only where photo_type is
+ * NULL (~8,700 of ~16,250 judged photos, 2026-09-24): the slot convention
+ * (1-3 exterior, 4-6 interior) it replaces was wrong for ~1,100 usable ones —
+ * 553 interiors in slots 1-3, 554 non-interiors in slots 4-6.
+ */
+const KIND_FROM_FRAMING = {
+  medium: 'exterior',
+  closeup: 'close',
+  wide: 'distant',
+  aerial: 'distant',
+  interior: 'interior',
+  'view-from': 'view-from',
+};
 
 /**
  * Build the photoVariants array for one landmark_index row (slots 1-6).
@@ -3801,17 +3869,20 @@ function variantsFromIndexRow(row) {
     if (cfg.url) {
       // kind = the indexer's own classification of this photo
       // (exterior | distant | close | interior | view-from; 'bad' = reject).
-      // Slot position is only a fallback for rows indexed before the
-      // classification existed — the slot convention (1-3 exterior,
-      // 4-6 interior) is a guess, the column is data.
-      const kind = normalizePhotoKind(cfg.kind) || (cfg.num >= 4 ? 'interior' : 'exterior');
+      // Unclassified: the judge's framing of the same photo says it
+      // (KIND_FROM_FRAMING). Slot position only for a photo never judged
+      // either — the slot convention (1-3 exterior, 4-6 interior) is a guess.
+      const framing = row.photo_framings?.[String(cfg.num)] || null;
+      const kind = normalizePhotoKind(cfg.kind) || KIND_FROM_FRAMING[framing]
+        || (cfg.num >= 4 ? 'interior' : 'exterior');
       if (kind === 'bad') continue;
       const judged = row.photo_scores?.[String(cfg.num)];
       variants.push({
         variantNumber: cfg.num,
         kind,
-        // Judged photo_score (landmark_photo_scores); null = never judged.
+        // Judged photo_score and framing (landmark_photo_scores); null = never judged.
         photoScore: Number.isFinite(judged) ? judged : null,
+        framing,
         vantage: kind === 'interior' ? 'interior' : 'exterior',
         url: cfg.url,
         sourceUrl: cfg.sourceUrl,
@@ -4302,6 +4373,7 @@ module.exports = {
   // Lazy photo variant loading
   loadLandmarkPhotoDescriptions,
   pickVariantForView,
+  photoFramingsForShot,
   variantsFromIndexRow,
   loadLandmarkPhotoVariant,
 

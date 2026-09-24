@@ -88,18 +88,22 @@ async function getLandmarkPhotosForScene(visualBible, sceneMetadata, opts = {}) 
 
   // Extract LOC IDs and names from objects like "Burgruine Stein [LOC002]" or "Kennedy Space Center [LOC001.2]".
   // A dotted `.N` is a Visual Bible VANTAGE id (the plate's camera position),
-  // never a photo slot: it is dropped here, and the page's `landmarkView`
-  // alone picks the photo (pickVariantForView; docs/decisions.md 2026-09-24).
+  // never a photo slot: the page's `landmarkView` picks the photo's kind and
+  // the page's shot its framing (pickVariantForView; docs/decisions.md
+  // 2026-09-24). The vantage is kept only for its `shot`, the camera of a page
+  // that declares none.
   const locIds = [];
   const locNames = [];
+  const vantageIds = [];
 
   // Helper to extract LOC ID and name from a string like "Ruine Stein [LOC001]" or "Ruine Stein [LOC001.2]"
   const extractLocFromString = (str) => {
     if (!str || typeof str !== 'string') return;
     // Match [LOC###] or [LOC###.N] pattern
-    const bracketMatch = str.match(/\[LOC(\d+)(?:\.\d+)?\]/i);
+    const bracketMatch = str.match(/\[LOC(\d+)(?:\.(\d+))?\]/i);
     if (bracketMatch) {
       locIds.push(`LOC${bracketMatch[1].padStart(3, '0')}`);
+      if (bracketMatch[2]) vantageIds.push(`LOC${bracketMatch[1].padStart(3, '0')}.${bracketMatch[2]}`);
       // Also extract the name before the bracket
       const namePart = str.replace(/\s*\[LOC\d+(?:\.\d+)?\]\s*/gi, '').trim();
       if (namePart) locNames.push(namePart.toLowerCase());
@@ -107,6 +111,7 @@ async function getLandmarkPhotosForScene(visualBible, sceneMetadata, opts = {}) 
     // Also match plain "LOC002" or "LOC002.3" format
     else if (str.match(/^LOC\d+(\.\d+)?$/i)) {
       locIds.push(str.split('.')[0].toUpperCase());
+      if (str.includes('.')) vantageIds.push(str.trim().toUpperCase());
     }
     // Fallback: treat as location name (for historical locations)
     else if (str.trim()) {
@@ -172,12 +177,33 @@ async function getLandmarkPhotosForScene(visualBible, sceneMetadata, opts = {}) 
   for (const loc of matchingLocations) {
     const photo = await resolveLandmarkPhotoForLocation(visualBible, loc, {
       sceneView,
+      shot: landmarkPhotoShot(sceneMetadata, loc, vantageIds, gatePage),
       misses: opts.misses,
     });
     if (photo) results.push(photo);
   }
 
   return results;
+}
+
+/**
+ * The camera shot a landmark photo is matched to: the page's own shot, else the
+ * shot of the vantage the page is drawn from (the dotted id it cites, else the
+ * vantage whose `pages[]` names the page). Same precedence the vantage plate
+ * uses for its SHOT line — the page's shot wins over the vantage's.
+ * Covers carry theirs in `setting.camera`.
+ *
+ * @returns {string|null} a shot word, or null when neither states one
+ */
+function landmarkPhotoShot(sceneMetadata, loc, vantageIds = [], pageNumber = null) {
+  const own = sceneMetadata?.shot || sceneMetadata?.fullData?.shot || sceneMetadata?.setting?.camera
+    || sceneMetadata?.fullData?.setting?.camera || null;
+  if (typeof own === 'string' && own.trim()) return own.trim();
+  const vantages = Array.isArray(loc?.vantages) ? loc.vantages : [];
+  const cited = vantages.find(v => vantageIds.includes(String(v?.id || '').toUpperCase()));
+  const onPage = pageNumber != null ? vantages.find(v => Array.isArray(v?.pages) && v.pages.includes(pageNumber)) : null;
+  const shot = (cited || onPage)?.shot;
+  return typeof shot === 'string' && shot.trim() ? shot.trim() : null;
 }
 
 /**
@@ -213,6 +239,7 @@ async function getLandmarkPhotosForScene(visualBible, sceneMetadata, opts = {}) 
  * @param {Object} loc - one VB location (isRealLandmark)
  * @param {Object} [opts]
  * @param {string|null} [opts.sceneView] - declared landmark view; null picks an exterior
+ * @param {string|null} [opts.shot] - the page's camera shot; picks the photo's framing
  * @param {Array} [opts.misses] - see getLandmarkPhotosForScene; failure-to-serve
  *   entries {id, name, reason} are pushed here (never by-design nulls)
  * @returns {Promise<Object|null>} landmark photo entry, or null to attach nothing
@@ -288,10 +315,10 @@ async function resolveLandmarkPhotoForLocation(visualBible, loc, opts = {}) {
  */
 function decideLandmarkPhotoSource(loc, opts = {}) {
   if (!loc) return null;
-  const { sceneView = null } = opts;
+  const { sceneView = null, shot = null } = opts;
 
   if (loc.photoVariants && loc.photoVariants.length > 0) {
-    const variantNumber = pickVariantForView(loc, sceneView);
+    const variantNumber = pickVariantForView(loc, sceneView, shot);
     if (variantNumber == null) {
       log.info(`📍 [LANDMARK-SCENE] ${loc.name}: no photo attached (view=${sceneView || 'unset'}) — prose carries the setting`);
       return null;
@@ -378,10 +405,10 @@ function trialPlateLandmarkPromisesByPage(visualBible, opts = {}) {
     if (!loc.isRealLandmark || !loc.pages?.length) continue;
     const p = (async () => {
       if (opts.descriptionsPromise) await opts.descriptionsPromise;
-      // No scene view exists here (the plate is built from the VB background,
-      // before any brief), so the resolver picks an exterior — which is what a
-      // background plate wants.
-      const photo = await resolveLandmarkPhotoForLocation(visualBible, loc, { sceneView: null });
+      // No scene view and no shot exist here (the plate is built from the VB
+      // background, before any brief, and its prompt names no camera), so the
+      // resolver picks the normal exterior — what a background plate wants.
+      const photo = await resolveLandmarkPhotoForLocation(visualBible, loc, { sceneView: null, shot: null });
       if (!photo) return null;
       // block ⇔ bytes: a legacy entry can resolve to a URL with no inline data,
       // and the fidelity block must never ship without the photo it describes.
