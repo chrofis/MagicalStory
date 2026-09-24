@@ -5905,7 +5905,10 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           // A crop artefact is a defect of the entity grid's cutout, never of the
           // page, so it decides nothing here (same predicate as the automatic gate).
           const { isCropArtifact } = require('../lib/repairLogic');
-          const charIssueTypes = charIssues.filter(i => !isCropArtifact(i, { entity: true })).map(i => i.subType || i.type).filter(Boolean);
+          // Only types on the entity judge's closed list route (owner,
+          // 2026-09-24); an off-list type was logged at parse and decides nothing.
+          const { isEntityCheckType } = require('../lib/evalBuckets');
+          const charIssueTypes = charIssues.filter(i => !isCropArtifact(i, { entity: true })).map(i => i.subType || i.type).filter(t => t && isEntityCheckType(t));
           if (!forceTarget && !repairTargetForTypes(charIssueTypes)) {
             log.error(`🚫 [CHAR REPAIR] ${characterName} p${pageNumber}: Auto target but no finding type decides face vs full figure (types: ${JSON.stringify(charIssueTypes)}) — refusing`);
             return {

@@ -977,9 +977,13 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
       // type the evaluator vocabulary does not know decides nothing, and the
       // judge's sentence is never read in its place — that finding cannot be
       // routed, so it is declined here, loudly, and the next one is tried.
+      // An entity finding routes only when its type is on the entity judge's
+      // closed list (evalBuckets.ENTITY_CHECK_TYPES, owner 2026-09-24) — an
+      // off-list type was logged as a parse error and is never repaired.
       const { repairTargetForTypes } = require('./faceRepair');
-      if (!repairTargetForTypes([issue.subType || issue.type])) {
-        log.error(`🚫 [REPAIR-DECIDE] page ${pageNumber}: entity ${sev} on ${charName} has type "${issue.subType || issue.type || ''}", which decides neither a face nor a full-figure repair — no char-fix for it`);
+      const { isEntityCheckType } = require('./evalBuckets');
+      if (!isEntityCheckType(issue.subType || issue.type) || !repairTargetForTypes([issue.subType || issue.type])) {
+        log.error(`🚫 [REPAIR-DECIDE] page ${pageNumber}: entity ${sev} on ${charName} has type "${issue.subType || issue.type || ''}", which is off the entity closed list or decides neither a face nor a full-figure repair — no char-fix for it`);
         continue;
       }
       if (!worst) worst = { severity: sev, charName, issue };

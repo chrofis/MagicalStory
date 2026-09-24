@@ -148,6 +148,8 @@ A garment of the wrong kind, cut or category still belongs in `fixable_issues` a
 
 ## Type Tie-Break
 
+`type` is exactly one of these values, and nothing else: {ENTITY_ISSUE_TYPES}. A defect none of them names is not reported.
+
 If a defect could match multiple `type` values, pick the most specific:
 - Face rendered without features, smeared or melted inside the picture → `face_destroyed`
 - Wrong species or completely different person → `face_mismatch`

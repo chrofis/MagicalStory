@@ -420,8 +420,25 @@ const CONSOLIDATED_TYPES = Object.freeze([
   'viewer_address', 'physics', 'unverified_absence', 'composite_seam',
 ]);
 
+// The entity grid judge's CLOSED type vocabulary (owner, 2026-09-24: "Closed
+// list in the prompt"). prompts/entity-consistency-check.txt is filled from
+// this list ({ENTITY_ISSUE_TYPES}) and entityConsistency.js logs any other
+// value as a parse error; repair routing takes an entity finding only when its
+// type is on it. Every value already has its TYPE_TO_BUCKET row — adding one
+// here is a new scored type and needs its bucket row too.
+const ENTITY_CHECK_TYPES = Object.freeze([
+  'face_destroyed', 'face_mismatch', 'face_drift', 'age_shift', 'hair_nuance', 'hair_change',
+  'skin_tone', 'clothing_inconsistent', 'color_change', 'shape_change', 'garment_colour',
+  'cutout_artifact',
+]);
+
+/** Is this an entity-judge type from its closed list? Case-insensitive, never aliased. */
+function isEntityCheckType(type) {
+  return ENTITY_CHECK_TYPES.includes(String(type || '').toLowerCase().trim());
+}
+
 module.exports = {
-  CONSOLIDATED_TYPES,
+  CONSOLIDATED_TYPES, ENTITY_CHECK_TYPES, isEntityCheckType,
   BUCKETS, TYPE_TO_BUCKET, SEVERITY_RANK, RANK_TO_SEVERITY,
   sevRank, bucketForType, normalizeType, mapIssuesToBuckets, mergeJudges, bucketsToIssues, medianRank,
 };

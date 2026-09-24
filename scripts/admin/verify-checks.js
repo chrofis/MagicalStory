@@ -763,4 +763,25 @@ checks.redoCount = (ctx) => {
   return { covered: true, pass: null, detail: `redo_trigger ${m.redo_trigger ?? 0}, consistency_regen ${m.consistency_regen ?? 0}, char_repair_run ${m.char_repair_run ?? 0} over ${pages(ctx).length} pages`, human: 'compare with the pre-fix baseline in tasks/redo-clothing-analysis-2026-07-20.md' };
 };
 
+/**
+ * Entity closed type list (owner, 2026-09-24): every stored entity finding's
+ * type is on evalBuckets.ENTITY_CHECK_TYPES. Baseline over the 40 days before
+ * the change: 6.5% of typed entity findings off-list on staging (36 of 557),
+ * 7.5% on production (5 of 67).
+ */
+checks.entityClosedTypes = (ctx) => {
+  const { isEntityCheckType } = require(path.join(LIB, 'evalBuckets.js'));
+  const chars = ctx.data?.finalChecksReport?.entity?.characters;
+  if (!chars || typeof chars !== 'object') return notCovered('no entity report');
+  const all = [];
+  for (const [name, c] of Object.entries(chars)) {
+    const lists = [c?.issues, ...Object.values(c?.byClothing || {}).map(b => b?.issues)];
+    for (const l of lists) for (const i of (Array.isArray(l) ? l : [])) all.push({ name, type: i?.type });
+  }
+  if (!all.length) return notCovered('the entity check reported no finding to type');
+  const off = all.filter(x => !isEntityCheckType(x.type));
+  if (off.length) return { covered: true, pass: false, detail: `${off.length}/${all.length} entity finding(s) off the closed list: ${off.slice(0, 8).map(x => `${x.name}:${x.type}`).join(', ')}` };
+  return { covered: true, pass: true, detail: `all ${all.length} entity finding(s) carry a listed type` };
+};
+
 module.exports = { checks, SHAPES, evalRunShape, helpers: { pages, brief, versions, shotOf, activeImageUrl, plateUrl, pageFindings, splitSentences, sizeHits } };

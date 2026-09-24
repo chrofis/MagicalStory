@@ -25,6 +25,7 @@ const { COVER_PAGE_NUMBERS } = require('./coverKeys');
 const r2 = require('./r2');
 const geminiPad = require('./geminiPad');
 const { canonicalName } = require('./castResolver');
+const { ENTITY_CHECK_TYPES, isEntityCheckType } = require('./evalBuckets');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -2767,6 +2768,11 @@ async function createEntityHeadGrid(crops, entityName, referencePhoto = null) {
  * @param {Object} entityInfo - Entity information
  * @returns {Promise<Object>} Evaluation result
  */
+/** The closed entity type list as the prompt shows it — from the one constant. */
+function entityIssueTypesForPrompt() {
+  return ENTITY_CHECK_TYPES.map(t => '`' + t + '`').join(', ');
+}
+
 async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headGridBuffer = null) {
   const { entityType, entityName, referencePhoto, cellCount, clothingCategory, expectedClothing,
           removedGarments = [], primaryIsHeadGrid = false, focus = null } = entityInfo;
@@ -2893,6 +2899,8 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headG
     CELL_INFO: JSON.stringify(cellInfo, null, 2),
     CELL_COUNT: cellCount.toString(),
     GARMENT_ENUM: garmentEnumForPrompt(),
+    // The closed type list, from the one constant the parse check reads.
+    ENTITY_ISSUE_TYPES: entityIssueTypesForPrompt(),
   });
 
   const model = genAI.getGenerativeModel({
@@ -2939,6 +2947,16 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headG
       // "Cannot access before initialization", was caught, and was recorded as
       // a FAILED evaluation - consistent:false with zero issues.
       const isGarmentColour = (i) => /^garment_colou?r$/i.test(String(i && i.type || ""));
+      // CLOSED TYPE LIST (owner, 2026-09-24). The prompt names the only values
+      // `type` may take (evalBuckets.ENTITY_CHECK_TYPES). Anything else is a
+      // parse error: logged here, kept on the report as the judge wrote it (its
+      // scoring is unchanged), and never routed to a repair — the repair gates
+      // take an entity finding only when its type is on the list. No aliases.
+      for (const raw of (Array.isArray(parsed.fixable_issues) ? parsed.fixable_issues : (parsed.issues || []))) {
+        if (!isEntityCheckType(raw?.type)) {
+          log.error(`❌ [ENTITY-CHECK] ${entityName}: finding type "${raw?.type ?? ''}" is not on the closed list — kept as reported, never routed to a repair`);
+        }
+      }
       const issues = (Array.isArray(parsed.fixable_issues)
         ? parsed.fixable_issues.filter(i => !isGarmentColour(i))
         : (parsed.issues || [])).map(issue => ({
@@ -3689,6 +3707,7 @@ module.exports = {
   createEntityGrid,
   createEntityHeadGrid,
   evaluateEntityConsistency,
+  entityIssueTypesForPrompt,
   getStyledAvatarForClothing,
   saveEntityGrid,
   saveEntityGrids,

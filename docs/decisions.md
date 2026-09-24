@@ -21,6 +21,39 @@ superseded and link forward.
 
 ---
 
+## 2026-09-24 — The entity grid judge's `type` is a closed list, injected from one constant; an off-list type is a logged parse error and is never repaired
+
+**Context:** The entity grid judge (`prompts/entity-consistency-check.txt`) lists its types only as a
+tie-break guide, and the model sometimes invents others. Over the 40 days before this change: 36 of 557
+typed entity findings off-list on staging (6.5%, 18 stories, 3 of them CRITICAL), 5 of 67 on production
+(7.5%) — `facial_features` ×10, `facial_hair_change` ×5, `body_build` ×5 (+ `_change` ×2, `_drift` ×1),
+`facial_hair` ×3, `facial_feature(s)_change` ×7, `eye_colour(_change)` ×2, `facial_feature_missing` ×2,
+`visual_quality` ×2, `cross_character_leakage` ×1, `character_mismatch` ×1. Since the same-day
+type-only repair routing (entry below), such a finding routed nowhere — or, worse, by accident:
+`facial_hair_change` normalises to the `hair` bucket.
+
+**Decision (owner, 2026-09-24: "Closed list in the prompt"):** `evalBuckets.ENTITY_CHECK_TYPES` (the
+twelve types the prompt already named) is the ONE list. The prompt says "`type` is exactly one of these
+values, and nothing else: {ENTITY_ISSUE_TYPES}. A defect none of them names is not reported", filled from
+the constant by `entityIssueTypesForPrompt()`. On parse, an off-list type is logged at error level and the
+finding is kept as the judge wrote it (its scoring is unchanged — no aliases, no bucket changes). Repair
+routing takes an entity finding only when its type is on the list: `decideRepairMethod` gate 2 and the
+manual character-repair route (`isEntityCheckType`). No other judge emits this `type` field (sibling
+registry checked; `sheet-row-identity-eval.txt` has no type).
+
+**Open:** the prompt still asks the judge to assess body build (severity guide, head/body grid lines) but
+no listed type names it — the largest off-list family above. Under the closed list such a finding is now
+either filed under another type or not reported. Adding a `body_build` type is a new scored type (bucket
+row + scoring) and an owner call.
+
+**Evidence:** replay of stored reports as above (rung 1). Verify entry `entity-closed-type-list` measures
+the off-list share on the next run (baseline 6.5% / 7.5%).
+
+**Touched:** `server/lib/evalBuckets.js`, `prompts/entity-consistency-check.txt`,
+`server/lib/entityConsistency.js`, `server/lib/repairLogic.js`, `server/routes/regeneration.js`,
+`scripts/admin/verify-checks.js`, `tasks/verify.json`, `tests/unit/entity-closed-type-list.test.ts`
+**Status:** ✅ active
+
 ## 2026-09-24 — Char-fix face vs full figure is decided by the finding's TYPE only; the judge's sentence is no longer read
 
 **Context:** `resolveRepairAxes` (`server/lib/faceRepair.js`) picked a face patch or a whole-figure
