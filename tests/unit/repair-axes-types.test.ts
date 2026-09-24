@@ -61,7 +61,7 @@ describe('resolveRepairAxes — defect-type mapping', () => {
   });
 
   it('no deciding type and no forceTarget → throws, never guesses', () => {
-    for (const issueTypes of [null, [], [''], ['consistency'], ['eye_colour'], ['body_build']]) {
+    for (const issueTypes of [null, [], [''], ['consistency'], ['eye_colour'], ['body_build_change']]) {
       expect(repairTargetForTypes(issueTypes)).toBe(null);
       expect(() => resolveRepairAxes({ hasFaceBbox: true, issueTypes })).toThrow(/no finding type decides/);
     }

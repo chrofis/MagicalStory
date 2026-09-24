@@ -660,6 +660,7 @@ const CHAR_FIX_DEFECT_PHRASES = Object.freeze({
   clothing: PHRASE_CLOTHING,
   clothing_inconsistent: PHRASE_CLOTHING,
   garment: PHRASE_CLOTHING,
+  body_build: 'the build differs from the reference — match the body proportions of the reference image',
   // Code-authored, not a judge finding: the scene composite's placeholder fill.
   placeholder_figure: 'the marked figure is a flat placeholder silhouette — paint the character there instead',
 });

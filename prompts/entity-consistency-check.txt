@@ -136,6 +136,7 @@ A garment of the wrong kind, cut or category still belongs in `fixable_issues` a
 
 - **CRITICAL**: a viewer would read this as a different person (age, face, build), or the face is not rendered at all (`face_destroyed`).
 - **MAJOR**: a clearly visible difference — a garment, a colour, the hair.
+- `body_build` is MAJOR; CRITICAL when the build alone makes the figure read as a different person.
 - **MINOR**: only findable comparing side by side — fastenings, buttons, panels, trim, freckle density, small hue shifts. `face_drift` and `hair_nuance` are always MINOR.
 
 ## Score Scale (1-10)
@@ -158,6 +159,7 @@ If a defect could match multiple `type` values, pick the most specific:
 - Same identity, hair differing only in shade within one colour family (dark blonde against light brown, mid against dark brown) or in texture between wavy and curly → `hair_nuance`
 - Same identity but the hair colour family or the style category differs → `hair_change`
 - Same identity but skin pigmentation differs → `skin_tone`
+- Same identity, but the figure is stockier, slimmer, taller or shorter in proportion than the reference → `body_build`
 - Outfit category mismatch, or a garment missing a part the expected description names → `clothing_inconsistent`
 - Object color drift → `color_change`
 - Object proportions drift → `shape_change`

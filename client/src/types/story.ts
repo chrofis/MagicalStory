@@ -550,6 +550,7 @@ export interface FinalChecksTextCheck {
 export type EntityIssueSubType =
   | 'face_mismatch' | 'face_drift' | 'face_destroyed' | 'hair_change' | 'hair_nuance' | 'skin_tone' | 'age_shift'
   | 'cutout_artifact'
+  | 'body_build'
   | 'clothing_inconsistent' | 'garment_colour' | 'color_change' | 'shape_change';
 
 export interface EntityConsistencyIssue {

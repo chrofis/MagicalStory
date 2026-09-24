@@ -182,6 +182,13 @@ const TYPE_TO_BUCKET = {
   hair_nuance: 'character_identity',
   face_drift: 'character_identity',
   anatomy: 'anatomy', proportion: 'anatomy',
+  // body_build (owner, 2026-09-24: "Add a body_build type"): a figure's build —
+  // stockier, slimmer, taller or shorter in proportion — drawn inconsistent with
+  // its reference. A whole-figure defect, so the anatomy bucket: repair routing
+  // sends it to a full-figure redraw (never a face patch), and scoring bills it
+  // in the per-character 'build' class the owner defined on 2026-08-19 ("we can
+  // make a figure bigger or smaller"). Emitted by the entity grid judge.
+  body_build: 'anatomy',
   incomplete_figure: 'figure_completeness', figure_completeness: 'figure_completeness',
   // Facing vocabulary → action_interaction (merge 2026-08-09). Kept as ALIASES,
   // never deleted: every stored finding typed `camera_facing` still routes.
@@ -413,7 +420,7 @@ const CONSOLIDATED_TYPES = Object.freeze([
   'image_coherence', 'character_identity', 'duplicate_character', 'duplicate_identity',
   'missing_character', 'extra_character', 'clothing', 'clothing_detail', 'clothing_sex',
   'accessory', 'accessory_missing', 'hair', 'hair_nuance', 'face_drift', 'face_destroyed',
-  'cutout_artifact', 'nudity', 'anatomy', 'figure_completeness', 'action_interaction',
+  'cutout_artifact', 'nudity', 'anatomy', 'body_build', 'figure_completeness', 'action_interaction',
   'object_presence', 'missing_element', 'object_count', 'duplicate_object', 'scale',
   'structure_scale', 'setting', 'style_consistency', 'rendered_text', 'required_text',
   'character_marking', 'anachronism', 'garment_colour', 'naturalness', 'emotion',
@@ -428,7 +435,7 @@ const CONSOLIDATED_TYPES = Object.freeze([
 // here is a new scored type and needs its bucket row too.
 const ENTITY_CHECK_TYPES = Object.freeze([
   'face_destroyed', 'face_mismatch', 'face_drift', 'age_shift', 'hair_nuance', 'hair_change',
-  'skin_tone', 'clothing_inconsistent', 'color_change', 'shape_change', 'garment_colour',
+  'skin_tone', 'body_build', 'clothing_inconsistent', 'color_change', 'shape_change', 'garment_colour',
   'cutout_artifact',
 ]);
 

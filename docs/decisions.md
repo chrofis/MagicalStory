@@ -21,6 +21,40 @@ superseded and link forward.
 
 ---
 
+## 2026-09-24 — `body_build` is a scored entity type: whole-figure repair, billed in the per-character build class
+
+**Context:** The entity grid judge is told to assess body build (severity guide, the wardrobe pass's
+"clothing, garment colour and body build"), but its closed type list (entry below) had no type for it —
+the second-largest off-list family in the 40-day baseline (`body_build` ×5, `body_build_change` ×2,
+`body_build_drift` ×1).
+
+**Decision (owner, 2026-09-24: "Add a body_build type"):** `body_build` = a figure drawn stockier,
+slimmer, taller or shorter in proportion than its reference, same identity. Registered at every site:
+- `evalBuckets.ENTITY_CHECK_TYPES` (so the prompt's closed list carries it) and `TYPE_TO_BUCKET`
+  → `anatomy`. Not its own bucket: `anatomy` already means a whole-figure defect, so
+  `repairTargetForTypes` sends it to a full-figure redraw (never a face patch, alone or beside a face
+  type), and scoring bills it in the per-character `build` class the owner defined on 2026-08-19 ("we
+  can make a figure bigger or smaller"), next to anatomy and figure completeness.
+- Scoring: no ceiling or floor — it costs its severity (MINOR/MAJOR/CRITICAL), on the consolidated and
+  the raw `{type:'consistency', subType}` shapes alike.
+- `prompts/entity-consistency-check.txt`: a tie-break line and a severity line ("MAJOR; CRITICAL when
+  the build alone makes the figure read as a different person").
+- `CONSOLIDATED_TYPES` + `prompts/feedback-consolidator.txt` closed list, with a keep-own-type line
+  (relabelled `anatomy` it would be inpainted); `NOT_INPAINTABLE_TYPES` (repairLogic);
+  `CHAR_FIX_DEFECT_PHRASES` (faceRepair); client `EntityIssueSubType`.
+No stored data is aliased: `body_build_change` / `body_build_drift` stay off-list.
+
+**Evidence (rung 1):** of the 8 stored `body_build*` findings (40 days, staging + prod), the 5 exact
+`body_build` now read as listed → bucket `anatomy` → full-figure route → billing `build|<name>`
+(was `other|<name>`; points unchanged, same severity). The 3 variants stay off-list and unrouted. One of
+the five (staging job_1789083667794 p18, CRITICAL) describes "a purple blob with no discernible human
+body" — the judge filed a non-render as build; on a rerun that would now take a full-figure char-fix.
+
+**Touched:** `server/lib/evalBuckets.js`, `server/lib/faceRepair.js`, `server/lib/repairLogic.js`,
+`prompts/entity-consistency-check.txt`, `prompts/feedback-consolidator.txt`, `client/src/types/story.ts`,
+`tests/unit/entity-closed-type-list.test.ts`, `tests/unit/repair-axes-types.test.ts`
+**Status:** ✅ active
+
 ## 2026-09-24 — The entity grid judge's `type` is a closed list, injected from one constant; an off-list type is a logged parse error and is never repaired
 
 **Context:** The entity grid judge (`prompts/entity-consistency-check.txt`) lists its types only as a

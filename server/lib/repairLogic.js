@@ -1363,6 +1363,9 @@ const NOT_INPAINTABLE_TYPES = new Set([
   'face_destroyed',
   // hair
   'hair', 'hair_change', 'hair_nuance',
+  // body_build: a figure's build is redrawn whole from the reference, never
+  // painted over in place.
+  'body_build',
   // clothing (garment_colour has its own mechanical recolour path)
   'clothing', 'clothing_inconsistent', 'clothing_detail', 'garment_colour', 'garment_color',
   // body form
