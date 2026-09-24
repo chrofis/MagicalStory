@@ -8745,7 +8745,16 @@ const ONE_INSTANT_RULE = "The prose never asks the picture to show how many time
 
 const GAZE_TARGET_RULE = "Name at most one gaze target, and compose the frame so that target is the dominant element — large, central, or nearest the camera. Every other figure looks at that same target or at the page's action. Two named characters facing each other are the one exception — a standoff, an exchange, a conversation — and there each looks at the other; that pair is a single relationship, not two targets, and nobody else in the frame looks anywhere but at them or at the action. A gaze aimed at anything smaller or further off than the frame's dominant element lands on the dominant element instead. Never write a gaze to the viewer.";
 
-const LOOKS_AT_FIELD_RULE = "Every foreground or midground character carries `looksAt`: another character's name, a Visual Bible id, or `away`. There is no value for the viewer: a figure never meets the reader's eye. It is the eyes only; hands live in `interactions[]`, and a character holding a thing does not look at it unless the plan line says so. When the plan line stages two named characters facing each other, in a standoff, an exchange or a conversation, each one's `looksAt` is the other — unless the plan line gives one of them a different gaze (\"looks up at it\", \"stares at the chest\"), in which case that one looks where the plan says and the other looks at them. On different levels the lower one looks up, the upper one looks down. The prose clause says the same thing the field says. A secondary character (a CHR id in `objects[]`) has no `characters[]` row: its gaze is a `watching` interaction whose `object` is what it looks at, and its prose clause says the same.";
+/**
+ * THE COVER GAZE EXCEPTION (covers-as-pages, 2026-09-24; SETTLED "cover gaze is
+ * code-owned: always at the viewer"). A full-story cover is a page whose beat
+ * sends every figure to the viewer; every brief author (via LOOKS_AT_FIELD_RULE)
+ * and the scene review's gaze check read this ONE sentence, so neither the
+ * author nor the critic "fixes" a cover portrait back into a page gaze.
+ */
+const COVER_GAZE_EXCEPTION = "A book cover page (page -1, -2 or -3) is the one exception: its plan line poses the cast for the reader, every figure's `looksAt` is `viewer`, and that plan line overrides every rule against facing or looking at the viewer.";
+
+const LOOKS_AT_FIELD_RULE = "Every foreground or midground character carries `looksAt`: another character's name, a Visual Bible id, or `away`. There is no value for the viewer: a figure never meets the reader's eye. " + COVER_GAZE_EXCEPTION + " It is the eyes only; hands live in `interactions[]`, and a character holding a thing does not look at it unless the plan line says so. When the plan line stages two named characters facing each other, in a standoff, an exchange or a conversation, each one's `looksAt` is the other — unless the plan line gives one of them a different gaze (\"looks up at it\", \"stares at the chest\"), in which case that one looks where the plan says and the other looks at them. On different levels the lower one looks up, the upper one looks down. The prose clause says the same thing the field says. A secondary character (a CHR id in `objects[]`) has no `characters[]` row: its gaze is a `watching` interaction whose `object` is what it looks at, and its prose clause says the same.";
 
 /**
  * ONE contract for the `expression` field, at every site that writes a brief.
@@ -10432,6 +10441,7 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
     // 7b / 10: the plan's close-up wins — the constant the Art Director gets
     // as 11c and `shot_widened` states (shotVocabulary.CLOSEUP_KEPT_RULE).
     CLOSEUP_KEPT: CLOSEUP_KEPT_RULE,
+    COVER_GAZE_EXCEPTION,
     // Check 3a, from the one rule every brief author is given (sceneLight.js).
     SCENE_LIGHT_FIELD: SCENE_LIGHT_FIELD_RULE,
   });
@@ -11406,6 +11416,7 @@ module.exports = {
   NO_LENS_RULE,
   GAZE_TARGET_RULE,
   LOOKS_AT_FIELD_RULE,
+  COVER_GAZE_EXCEPTION,
   EXPRESSION_FIELD_RULE,
   GARMENT_REMOVED_RULE,
   WORN_ITEMS_ROW_RULE,

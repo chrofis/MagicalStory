@@ -185,6 +185,21 @@ describe('a briefed cover is judged against the cast its brief declares, like a 
   });
 });
 
+describe('the cover gaze exception reaches the author and the critic from one constant', () => {
+  beforeAll(async () => { await require_('../../server/services/prompts').loadPromptTemplates(); });
+  it('the all-pages Art Director and the scene review both carry it', () => {
+    const PB = require_('../../server/lib/promptBuilders');
+    const inputData = { language: 'en', pages: 1, characters: [{ id: 1, name: 'Child1' }], mainCharacters: [1] };
+    const beats = [{ pageNumber: 1, planLine: 'wide — Child1 — x — y' }];
+    const ad = String(PB.buildSceneExpansionAllPrompt(inputData, beats, {}));
+    const review = String(PB.buildSceneReviewPrompt(inputData, [{ pageNumber: 1, brief: 'x\n---METADATA---\n{}' }], { beats }));
+    expect(PB.LOOKS_AT_FIELD_RULE).toContain(PB.COVER_GAZE_EXCEPTION);
+    expect(ad).toContain(PB.COVER_GAZE_EXCEPTION);
+    expect(review).toContain(PB.COVER_GAZE_EXCEPTION);
+    expect(review).not.toContain('{COVER_GAZE_EXCEPTION}');
+  });
+});
+
 describe('a portrait gaze is not contradicted by the pose fill line', () => {
   beforeAll(async () => { await require_('../../server/services/prompts').loadPromptTemplates(); });
   it('a figure sent to the viewer gets no "not at the viewer" line; one without a gaze keeps it', () => {
