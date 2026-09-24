@@ -1,7 +1,8 @@
 # Arc creation, logic first — plan (2026-09-24)
 
-Owner decision 2026-09-24. PLANNING ONLY: nothing in this file has been built. No code, prompt
-or registry change ships with this document.
+Owner decision 2026-09-24. D1-D7 answered by the owner on 2026-09-24 (D1=A, D2 follows A, D3
+band-scaled via `arcChainRange`, D4 log only, D5=a, D6 voice line to STYLE_RULEBOOK, D7 move).
+BUILT on `staging` 2026-09-24 (not pushed); see the implementation outline and the review at the end.
 
 Target shape:
 1. ONE arc (ARC 1 / ARC 2 and the "Stronger:" commitment line go away).
@@ -410,12 +411,35 @@ decision").
 
 ## Implementation outline (after D1-D7 are answered; not started)
 
-- [ ] Parser + builder: `parseArcCreate` (one arc), `parseStoryLogic`, `parseArcRetell` (+logic), `arcChainRange`, new `arcCritiqueSpec`, trimmed `buildTellingRulesSection`, `ARC_LOGIC_CHECK` constant; delete `buildArcBudgetSection` from the arc builders (keep `arcInventedAllowance`, `EVENT_BUDGETS`).
-- [ ] Templates: arc-create, arc-retell, arc-panel, arc-hints (one commit, gate 9 sets `arc-generator-vs-critic`, `character-source-claim`, `commissioned-cast-arc-vs-plan-counters`).
-- [ ] beatsPipeline: create parse, report fields, d1/d2 warnings, d3 per D1.
-- [ ] planCounters + plan-check Q12 (d4), `beats-planner-vs-plan-check` sync.
-- [ ] storyScorecard judge context; Lab `challengesFromStory` / `baselineFromStory` + client label.
-- [ ] Client dev panel + `ArcReviewReport` type (reads both shapes).
-- [ ] Rewrite the 30 unit tests (behaviour, not wording); full suite green.
-- [ ] Rung 0 (free) → staging deploy → Lab (f) under the $8 cap → owner reads side by side.
-- [ ] decisions.md superseding entries R1-R8; prompt-inventory; registry reason texts; memory `project_invented_cast_enumeration`.
+- [x] Parser + builder: `parseArcCreate` (one arc), `parseStoryLogic`, `parseArcRetell` (+logic), `arcChainRange`, new `arcCritiqueSpec`, trimmed `buildTellingRulesSection`, `ARC_LOGIC_CHECK` constant; delete `buildArcBudgetSection` from the arc builders (keep `arcInventedAllowance`, `EVENT_BUDGETS`).
+- [x] Templates: arc-create, arc-retell, arc-panel, arc-hints (one commit, gate 9 sets `arc-generator-vs-critic`, `character-source-claim`, `commissioned-cast-arc-vs-plan-counters`).
+- [x] beatsPipeline: create parse, report fields, d1/d2 warnings, d3 per D1.
+- [x] planCounters + plan-check Q12 (d4), `beats-planner-vs-plan-check` sync.
+- [x] storyScorecard judge context; Lab `challengesFromStory` / `baselineFromStory` + client label.
+- [x] Client dev panel + `ArcReviewReport` type (reads both shapes).
+- [x] Rewrite the 30 unit tests (behaviour, not wording); full suite green.
+- [x] Rung 0 (free): new create/retell/panel/hints prompts built from the stored inputs of job_1790277448294_5herh01j7, no unfilled placeholder; parser run on hand-written replies.
+- [ ] Staging deploy → Lab (f) under the $8 cap → owner reads side by side (`tasks/verify.json` `arc-logic-first`).
+- [x] decisions.md superseding entries R1-R8; prompt-inventory; registry reason texts; memory `project_invented_cast_enumeration`.
+
+---
+
+## Review (2026-09-24, implementation)
+
+Built as planned, with these calls the plan left open:
+- **Chain length** = the band event range + 1 (the last "why it works now" link). Journey at 18
+  pages gives 5-6, the owner's anchor; a flat-budget toddler band gives 2 (the plan's "3-4 for a
+  toddler book" example does not follow from `EVENT_BUDGETS` and was not used).
+- **Parse strictness:** `parseStoryLogic` throws on no heading, no tagged figure line, no
+  "Central figure:" line, or no chain link. A numbered chain link is still counted (the block never
+  enters `finalArc`, so it cannot reach `arcActSpans`).
+- **Central figure names:** the arc gives one or two names ("the egg / Kachel"); presence per third is
+  read from the plan check's roster people/things/covers, a name matching whole or as whole words
+  inside an entry, never the reverse.
+- **"therefore or but"** moved from the rules into the ARC line of the template and the chain spec.
+- **Old stored stories** (two-arc `committed`, `committedArc`, `discarded`) are read by the dev panel
+  and by the Lab (`storedCommittedArc`) as a named read-compat constraint; the pipeline writes only
+  the new shape.
+- **Sizes (rung 0, dragon run 7 inputs):** create 35,864 → 31,317 chars like for like (23,022 + the
+  8,295-char landmark block the story row does not store), retell fixed text 29,178 → 24,995,
+  panel fixed text 9,010 → 8,553, hints +1.8k (the logic block).

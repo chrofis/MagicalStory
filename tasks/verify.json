@@ -1480,7 +1480,11 @@
     {
       "id": "arc-logic-first",
       "title": "The arc is written logic first: one arc, a STORY LOGIC block, a critique that checks logic and counts nothing",
-      "commits": [],
+      "commits": [
+        "cf672a0f8",
+        "933b1fef7",
+        "e312ef7b0"
+      ],
       "addedAt": "2026-09-24",
       "claim": "On a full story the arc machine writes one arc whose STORY LOGIC block (want and stakes, opposition, tagged figure facts, central figure, because/but chain) parses on the first create, the final arc carries no fact its logic block contradicts, and arcReviewReport.counts shows the chain and sentence counts in range (baseline: job_1790277448294_5herh01j7, whose Opus-max arc had logic holes the counting critique missed).",
       "runShape": [

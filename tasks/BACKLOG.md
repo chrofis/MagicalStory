@@ -50,8 +50,8 @@ Last full sweep: **2026-09-06**.
       → `tasks/analyzer-workers-2026-08-23.md`
 
 - [ ] Arc creation "logic first" (owner 2026-09-24): one arc, a STORY LOGIC block before the
-      sentences, a logic-first critique with no model counting, the rulebook cut to logic. The plan
-      is written; owner decisions D1-D7 are open; nothing is built. Lab validation is capped at $8
+      sentences, a logic-first critique with no model counting, the rulebook cut to logic. D1-D7
+      answered; BUILT on staging (not pushed). Open: staging deploy + Lab validation (capped at $8)
       → `tasks/arc-logic-first-2026-09-24.md`
 
 ## Image quality — unresolved render defects

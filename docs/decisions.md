@@ -31613,6 +31613,8 @@ call run yet.
 
 ## 2026-08-30 — The arc stage is the ARC MACHINE (create → panel → re-tell), not a review chain
 
+**Superseded in part 2026-09-24:** the creator writes ONE arc, logic first; no second arc, no "Stronger:" line. The panel + re-tell machine stays. See "The arc is written logic first" (2026-09-24).
+
 **Context.** The arc stage ran write → blind audit + child critic → review →
 re-audit → targeted re-review. Forensics on recent runs showed the PATCH step of
 that chain destroying stories rather than improving them: a fix deleted the
@@ -35516,9 +35518,13 @@ Owner rulings on the dragon salvage (`job_1788551692337_bc479p945`); per-item de
 **Context:** the run's landmark pages rendered with zero reference photos, silently — staging's index rows had no `photo_r2_url` at run time (backfill landed hours later), the live Commons fetches at page-gen failed, and the null return was swallowed; pages carried "preserve this exact building" with no photo attached. Separately, an unlinked Swiss landmarkQuery could fall into the free-form Wikipedia lazy path. **Decision:** (a) Swiss user → landmarks resolve strictly from `landmark_index` (strong-name match, servable+judged, class>0); no hit → WARN + serve nothing — Wikipedia free-form is barred for Switzerland; non-Swiss keeps the fetch routine with a bounded 75s pre-page await. (b) Fidelity block ⇔ photo bytes invariant: any miss downgrades that page to prose with a loud log (`landmarkPhotoMisses` on pageData). Premise correction: index row 210 "Lindenhof (Zürcher Hügelzug)" IS the Zurich square (Q39374) — label cosmetic, not wrong entity. **Touched:** server/lib/landmarkPhotos.js, storyHelpers.js, storyJobPipeline.js (43c907d2e).
 
 ### Arc budgets are computed, not asked for; coverage nests deeds inside events
+**Superseded 2026-09-24:** the arc gets no budgets section; the event range sizes the chain (`arcChainRange`) and code counts it. See "Code counts what the arc critique used to certify" (2026-09-24).
+
 **Context:** the 18-page 1st-grade run packed ~15 events and invented a named parent (allowance should be 0); the critique had no dimension for load or cast inflation — it opened a new event per character deed. **Decision:** `buildArcBudgetSection` computes an event budget (pages/3 at 1st-grade + one obstacle chain, /2 standard, /1.5 advanced, floor 3) and an invented-named-figure allowance (`clamp(round(pages/8)−floor(cast/2),0,3)`; anchors 1 char/20p→3, 5 chars/10p→0) and injects the numbers into arc-create AND arc-retell; the critique counts events vs the budget (exceeding = MAJOR, cut whole events never compress) and flags unjustified figures past the allowance (MAJOR, unless a one-line cannot-work-without justification). New shared rule: coverage is served by giving several characters deeds inside the same event — never a new event per character. **Touched:** server/lib/promptBuilders.js, prompts/arc-create.txt, arc-retell.txt (cb7407ab6, 69dbb1ec4). **Status:** 🗄 superseded 2026-09-07 by "Plot complexity is keyed on the age band, not on page count" (the event and invented-figure arithmetic only; the critique dimensions and the coverage-nests-deeds rule stand).
 
 ### Arc critique gains agency, fidelity, theme and plant/payoff dimensions
+**Superseded in part 2026-09-24:** the "central figure acts in every third" check moved to code (`CENTRAL_FIGURE_ABSENT_THIRD`) and plan-check Q12; fidelity, theme and plant/payoff stay.
+
 **Context:** same run — the title dragon acted twice after hatching (cargo), the commissioned quest was silently inverted, the theme was thin, planted threads dropped. **Decision:** shared rule + critique questions (five→ten): central figure acts in every third (passive stretch = MAJOR); commission's central quest and named elements honored or the deviation named and fixed/justified in one line; the commissioned theme genuinely delivered throughout, not nominal; every plant pays off and every payoff traces to a plant (both directions, arc level; page level via plan-check Q7). Archetype list and its "last three are MAJOR" pointer untouched; shared blocks verified byte-identical. **Touched:** prompts/arc-create.txt, arc-retell.txt (cb7407ab6).
 
 ### Peopleless pages are for story-important subjects (plan-check Q6); plant/payoff at page level (Q7)
@@ -39239,6 +39245,8 @@ sheet correctly.
 
 ## 2026-09-07 — The arc budgets ACTIONS, not just events; the over-length word fault stops asking for lost meaning
 
+**Superseded in part 2026-09-24:** the per-page action shape left the arc (the arc has no pages); the page plan and the word counter carry it. See "Code counts what the arc critique used to certify" (2026-09-24).
+
 **Context:** `job_1788727233899_1dpnym94p` (18 pages, `1st-grade`) shipped
 incoherent text. The stage reports show the arc was *inside* its budget and the
 damage happened anyway:
@@ -40368,6 +40376,8 @@ at the end, AD context with none. Beats now runs `linkPreDiscoveredLandmarks` an
 carry variants at that point so the next run proves it. The PHOTOS line for the writer stands.
 
 ## The arc ENUMERATES the figures it invented; code re-counts the list and may force one more round (2026-09-09)
+**Amended 2026-09-24:** the list is the `(new)`-tagged FACTS lines of the STORY LOGIC; the re-count and the forced round stay. See "The invented figures are the (new) tags of the STORY LOGIC" (2026-09-24).
+
 **Context:**   `job_1788903616404_iqvhj4l8m` was commissioned for four children with photos
 (allowance 2, journey band, cast 4). The arc invented four named figures — a dragon, a mountain
 creature, a **mother** with a wholly fabricated face on pages 2 and 18, and a dog — and its own
@@ -59003,6 +59013,8 @@ cannot drift apart.
 
 ## 2026-09-23 — Sizes and looks leave the arc and the plan: one SIZE_LOOK_RULE for arc, plan and prose; the Visual Bible author decides sizes
 
+**Superseded in part 2026-09-24 (D7):** SIZE_LOOK_RULE left the arc; the arc keeps only "a size the plot turns on is a fact" in its FACTS spec. See "The arc keeps only the rules of the logic" (2026-09-24).
+
 **Context.** Owner, reading dragon run 6 (staging `job_1790100385959_1nitlympp`): "why are sizes in the arc
 … sizes are needed only for the images, the art director must create them". The arc prompts never asked
 for sizes, but the arc model wrote them anyway ("a young dragon the size of a handcart", "a scale as big
@@ -60042,3 +60054,143 @@ the stored p16/p17 pairs carries it once. Model behaviour is unproven until a st
 **Touched:** `server/lib/promptBuilders.js`, `prompts/text-refine.txt`, `prompts/story-text-diff.txt`,
 `tests/unit/text-style-rulebook.test.ts`, `tasks/verify.json`.
 **Status:** ✅ committed, not pushed.
+
+## 2026-09-24 — The arc is written logic first: ONE arc, a STORY LOGIC block, a critique that checks logic and counts nothing
+
+**Context:** Dragon run 7 (staging `job_1790277448294_5herh01j7`). The arc creator ran at effort `max`
+and still shipped an arc with logic holes: figures acting against what the story had made them want
+or able to do, a "why don't they just…" left open, a turn whose reason was never stated. Its own
+critique spent its budget on counts it certified itself (events against a budget, invented figures
+against an allowance, the central figure per third, each child's action) and missed them; the panel
+caught some after the fact. Plan: `tasks/arc-logic-first-2026-09-24.md` (tables a-g).
+
+**Decision (owner, 2026-09-24, D1-D7):**
+- The creator writes ONE arc (no ARC 2, no "Stronger:" line), in this order: a STORY LOGIC block
+  (Want and stakes; Opposition; Facts — one dash line per named figure the plot runs on, tagged
+  `(commissioned)` or `(new)`, with what it can and cannot do, then the world's rules and any size the
+  plot turns on; Central figure; Chain — because/but dash links, the last one saying why the solution
+  works now and did not before), then `ARC:` and the numbered sentences told from the block, then the
+  critique. `arcLogicSpec()` is the one spec, filled as `{ARC_LOGIC_SPEC}` into arc-create and
+  arc-retell. The re-telling updates the logic FIRST, then the sentences.
+- The critique opens with "Logic:" (dash lines per sentence that breaks the logic) using
+  `ARC_LOGIC_CHECK`, the same constant the panel's new first lens LOGIC reads. It counts nothing:
+  the "Checks:" block and the figure lists are gone. Commission honored, five reader questions and
+  3-6 tagged faults (logic first) stay; the fault tags remain the `critiqueMaxSeverity` contract.
+- The panel loses its CAST and ACTION lenses (both were counts). The hint pass reads the logic block
+  (`{STORY_LOGIC}`); a CHANGE that must contradict it names the fact it changes.
+- A reply without a complete STORY LOGIC block is a parse error (`parseStoryLogic` throws): the one
+  re-create / one re-tell applies, then the arc machine fails loudly. No degraded reading.
+- The logic block is stored in `arcReviewReport` only (`logic`, `createLogic`, `centralFigure`,
+  `counts`, and each round's `logic`); `finalArc` keeps its shape for every downstream reader (D5-a).
+- The arc receives the premise view of the age band (`bandView: 'premise'`); the low point the band's
+  craft lines carried is stated in the chain spec (repetition shape for the simple bands).
+- The Lab judge context (`storyScorecard.buildBriefContext({arc:true})`) drops the budgets and uses the
+  same premise view, so `fit` is judged against what the arc was given.
+
+**Evidence:** job_1790277448294_5herh01j7 (the Opus-max arc with logic holes the counting critique
+missed). Rung 0 on its stored inputs (free): the rebuilt create prompt is 23,022 chars without the
+landmark block the story row does not store (31,317 with it) against 35,864 sent; every placeholder is
+filled; the stored challenge draw is carried verbatim. No paid validation yet (`tasks/verify.json`
+`arc-logic-first`; Lab plan in the plan file, (f)).
+
+**Supersedes:** 2026-08-30 "The arc stage is the ARC MACHINE" in its two-arcs-plus-commitment part
+(R1; the panel + re-tell machine stays); the 2026-09-19 critique-spec design recorded at
+`arcCritiqueSpec` ("the counts now report in their own block", R8).
+
+**Rationale:** a critique checks what it is pointed at. Pointed at counts, it counted; pointed at a
+written logic, it can read each sentence against it. The one-arc risk (no second candidate) is
+answered by the panel and re-tell, which stay; the Lab run in the plan measures it.
+
+**Touched:** `server/lib/promptBuilders.js`, `prompts/arc-create.txt`, `prompts/arc-retell.txt`,
+`prompts/arc-panel.txt`, `prompts/arc-hints.txt`, `server/lib/beatsPipeline.js`,
+`server/lib/storyScorecard.js`, `server/lib/testlab.js`, client dev panel and `ArcReviewReport` type.
+**Status:** ✅ committed on `staging`, not pushed.
+
+## 2026-09-24 — Code counts what the arc critique used to certify: sentences, chain links, new figures, the central figure per third
+
+**Context:** see the entry above. The budgets section and the "Checks:" block asked the model for
+totals it then certified; two models were measured self-certifying overruns (2026-09-09).
+
+**Decision (owner, 2026-09-24, D3/D4 and d1-d4 of the plan):**
+- d1 the arc's numbered sentences against `arcLengthRange` and d2 the chain links against
+  `arcChainRange` are counted by `arcShapeCounts` after the create and each re-tell, logged as
+  `arc_length_out_of_range` / `arc_chain_out_of_range` and stored in `arcReviewReport.counts`. Log
+  only, no extra round (D4).
+- The chain IS the event budget (D3): `arcChainRange` = the band's `EVENT_BUDGETS` range plus one
+  (the last "why it works now" link). The journey band at 18 pages gives 5-6, the owner's anchor. The
+  number the prompt states and the number code checks come from the one function. The model counts
+  nothing.
+- d3 the `(new)` tags are counted against `arcInventedAllowance`; the one forced re-tell round on an
+  overcount stays (`arcForceRoundOnInventedOvercount`). The `(new)` names are the declared list the
+  plan counters cross-check; the `(commissioned)` names outside the character list replace the
+  "Premise figures:" list in `commissionedCast` (D1-A, D2).
+- d4 the central figure the logic names is counted in each third of the page plan
+  (`CENTRAL_FIGURE_ABSENT_THIRD`, must-fix, direction 'more'), on the plan check's roster
+  (people/things/covers; a name matches whole or as whole words inside an entry). The planner and
+  plan-check Q12 read the same sentence (`castCoverage.centralFigureActionRule`), and Q12 asks an
+  ACTION line for the central figure, so "acts, never carried" is judged on pages.
+- The per-page action shape and "one telling carries one new fact" leave the arc. The action shape
+  lives in `story-beats.txt` ("One action per page"), plan-check Q9 and the word counter; the
+  surplus-facts check has no downstream carrier (risk R6: watch it on the next dragon run; if it
+  recurs it becomes a plan-check question).
+
+**Supersedes:** 2026-09-05 "Arc budgets are computed, not asked for" (R2); 2026-09-07 "The arc
+budgets ACTIONS, not just events" in its arc half (R3 — live risk: an arc sentence dense with actions
+can still overload a page's text; watch the word-budget findings); 2026-09-05 "Arc critique gains
+agency, fidelity, theme and plant/payoff dimensions" in its "central figure acts in every third" check
+(R5; fidelity, theme and plant/payoff stay); the surplus-facts check in the arc budgets (R6).
+
+**Rationale:** every count now reads a list the model wrote as content (sentences, links, tagged
+figures, roster). None scans prose for meaning.
+
+**Touched:** `server/lib/promptBuilders.js`, `server/lib/beatsPipeline.js`, `server/lib/planCounters.js`,
+`server/lib/castCoverage.js`, `prompts/plan-check.txt`, `server/lib/beatsReplayInputs.js`,
+`server/lib/testlab.js`, `scripts/admin/sibling-registry.json` (`central-figure-rule-vs-counter`).
+**Status:** ✅ committed on `staging`, not pushed.
+
+## 2026-09-24 — The invented figures are the (new) tags of the STORY LOGIC
+
+**Context:** The 2026-09-09 entry had the critique ENUMERATE its invented figures ("Invented
+figures:" / "Allowed: N. Written: M.") and the 2026-09-23 audit added a "Premise figures:" list for
+commissioned figures outside the character list.
+
+**Decision (owner, 2026-09-24, D1-A, D2):** the enumeration moves into the FACTS section of the STORY
+LOGIC: each named figure the plot runs on is one line, tagged `(commissioned)` (defined by
+`COMMISSIONED_CAST_DEF`) or `(new)`, with its abilities and limits. The unnamed one-page exemption
+(`UNNAMED_FIGURE_EXEMPT`) and "taking its name away does not take it off" are in the same spec. Code
+re-counts the tags and may force one more round, as before. The model writes no count and no
+Allowed/Written line.
+
+**Supersedes:** 2026-09-09 "The arc ENUMERATES the figures it invented" (R4) — amended: the list and
+its source move, the re-count and the forced round stay.
+
+**Touched:** `server/lib/promptBuilders.js` (`arcLogicSpec`, `parseStoryLogic`; `PREMISE_FIGURES_SPEC`,
+`INVENTED_FIGURES_SPEC`, `parseInventedFigures`, `parsePremiseFigures`, `parseFigureList` deleted),
+`server/lib/beatsPipeline.js`, `server/lib/castCoverage.js` (comment),
+`scripts/admin/sibling-registry.json` (`commissioned-cast-arc-vs-plan-counters`).
+**Status:** ✅ committed on `staging`, not pushed.
+
+## 2026-09-24 — The arc keeps only the rules of the logic; sizes and voice are the prose's
+
+**Context:** The arc's RULES OF THE TELLING had grown to 32 lines; many shape the telling of pages,
+which the arc (a factual register without pages) cannot carry.
+
+**Decision (owner, 2026-09-24, table (b), D6, D7):** `buildTellingRulesSection` is trimmed to the
+rules that shape the logic, under the heading "RULES OF THE LOGIC". Cut rules and where each lives:
+feelings at each turn and the stake said aloud (`story-text-from-beats.txt`); coverage by deeds and
+entrances in ones and twos (`story-beats.txt`, plan-check Q2); the remembered last page
+(`STYLE_RULEBOOK`, `ENDING_EVENT_DEF`); the travelling animal's name and the vessel names (dropped,
+cosmetic); the written backstory (merged into "reasons are grounded"); the rival's "at least once
+more" (a count); "therefore or but" and the cost/low-point shape (moved into the chain spec).
+- D7: `SIZE_LOOK_RULE` leaves the arc. The FACTS spec keeps only its positive half ("a size or a look
+  only where the plot turns on it, stated as that fact"); the comparison ban stays with the plan
+  (`story-beats.txt`) and every prose pass (`STYLE_RULEBOOK`).
+- D6: the distinctive-voice rule leaves the arc and `STYLE_RULEBOOK` gains one line ("Each named
+  character who speaks has a voice of their own …"), so every prose pass that fills the rulebook gets
+  it; nothing downstream carried it before.
+
+**Supersedes:** 2026-09-23 "Sizes and looks leave the arc and the plan: one SIZE_LOOK_RULE for arc,
+plan and prose" in its arc reach (R7); the plan and prose halves stay.
+
+**Touched:** `server/lib/promptBuilders.js`, `tests/unit/size-look-rule.test.ts`.
+**Status:** ✅ committed on `staging`, not pushed.
