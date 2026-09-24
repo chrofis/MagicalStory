@@ -59965,3 +59965,23 @@ self-check block stripped), not a draft/review transcript.
 
 **Touched:** `server/routes/storyIdeas.js`, `tests/unit/idea-stream-final-only.test.ts`.
 **Status:** ✅ active on staging.
+
+## 2026-09-24 — The plate fallback stays, the Grok error is logged
+
+**Context:** Staging job_1790277448294_5herh01j7 lost its front cover and initial page. Grok failed on
+the cover plates (`renderPagePlate` → `generateImageOnly` with `emptyScenePlateRouting()`), the
+dispatcher fell back to Gemini, Gemini refused with IMAGE_OTHER — and only Gemini's refusal reached
+the story. The Grok error was a console line in Railway, so the real cause was invisible.
+
+**Decision (owner, 2026-09-24):** the Grok→Gemini fallback in image generation stays. Every fallback
+site in `server/lib/images.js` (dispatcher primary Grok, model-routed Grok, primary Runware, and
+`editImageWithPrompt`'s Grok edit) records a `warn` generationLog event `image_provider_fallback`
+carrying the provider, model, route, page and the error text (`recordProviderFallback`). When the
+Gemini fallback then fails, the thrown error names the upstream failure(s) first and Gemini's after
+(`withUpstreamErrors`), so a cover/plate failure stored from `err.message` carries both.
+
+**Rationale:** the fallback is wanted; a hidden cause is not. The Gemini text is kept verbatim in the
+combined message, so callers that classify refusals by message substring are unaffected.
+
+**Touched:** `server/lib/images.js`, `tests/unit/grok-fallback-logged.test.ts`.
+**Status:** ✅ active on staging.

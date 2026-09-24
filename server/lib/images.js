@@ -1210,6 +1210,44 @@ function recordPromptShrink({ logLabel, modelName, branch, before, after, cap, d
   else genLog.info('prompt_shrink', msg, null, details);
 }
 
+/**
+ * A PROVIDER FALLBACK IS A GENERATION EVENT, NOT A LOG LINE.
+ *
+ * The Grok→Gemini fallback stays (owner, 2026-09-24), but the Grok error must
+ * reach the story's generationLog: staging job_1790277448294_5herh01j7 lost its
+ * front cover and initial page when Grok failed on the plates and Gemini then
+ * refused with IMAGE_OTHER — and only Gemini's refusal was stored, so the real
+ * cause was invisible. Returns the entry the caller carries forward so a later
+ * Gemini failure can report both errors (withUpstreamErrors).
+ */
+function recordProviderFallback({ logLabel, provider, route, model, pageLabel, error }) {
+  const entry = { provider, route, model: model || null, message: error?.message || String(error) };
+  const genLog = getCurrentLogger();
+  if (genLog) {
+    const page = pageLabel ? ` page ${pageLabel}` : '';
+    genLog.warn('image_provider_fallback',
+      `${logLabel}${page}: ${provider} (${entry.model || 'unknown model'}) failed, falling back to Gemini: ${entry.message}`,
+      null, { label: logLabel, page: pageLabel || null, ...entry });
+  }
+  return entry;
+}
+
+/**
+ * The error a Gemini fallback throws, prefixed with the upstream provider
+ * failure(s) that sent the call there — first error first. Keeps the Gemini
+ * message verbatim (callers classify refusals by its text) and its `status`.
+ */
+function withUpstreamErrors(err, upstreamErrors) {
+  if (!upstreamErrors?.length) return err;
+  const prefix = upstreamErrors
+    .map(u => `${u.provider} (${u.model || 'unknown model'}) failed: ${u.message}`)
+    .join('; ');
+  const combined = new Error(`${prefix}; then Gemini fallback failed: ${err?.message || String(err)}`, { cause: err });
+  if (err?.status) combined.status = err.status;
+  combined.upstreamErrors = upstreamErrors;
+  return combined;
+}
+
 
 /**
  * Collect the data:image reference URLs from a characterPhotos array (each
@@ -1295,6 +1333,11 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
   // reaches a provider (server/lib/landmarkScene.js).
   assertLandmarkScene({ landmarkPhotos, sceneBackground, landmarkScene, label: logLabel || 'IMAGE' });
 
+  // Upstream provider failures that sent this call to Gemini, in order. Each is
+  // recorded in the generationLog as it happens and rides on the Gemini
+  // sentinel, so a failing fallback reports both errors (withUpstreamErrors).
+  const upstreamErrors = [];
+
   // Whether slot-0 scene plates get magenta-extension padding (gen-only only).
   const slot0IsScenePlate = usePadExtension && !!(sceneBackground || (Array.isArray(landmarkPhotos) && landmarkPhotos.length) || previousImage);
 
@@ -1333,6 +1376,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
       log.error(verbose
         ? `❌ [RUNWARE] Generation failed, falling back to Gemini: ${runwareError.message}`
         : `❌ [${logLabel}] Runware failed, falling back to Gemini: ${runwareError.message}`);
+      upstreamErrors.push(recordProviderFallback({ logLabel, provider: 'runware', route: 'primary', model: RUNWARE_MODELS.FLUX_SCHNELL, pageLabel, error: runwareError }));
       // Fall through to Gemini
     }
   }
@@ -1377,6 +1421,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
       log.error(verbose
         ? `❌ [GROK] Generation failed, falling back to Gemini: ${grokError.message}`
         : `❌ [${logLabel}] Grok failed, falling back to Gemini: ${grokError.message}`);
+      upstreamErrors.push(recordProviderFallback({ logLabel, provider: 'grok', route: 'primary', model: grokModel, pageLabel, error: grokError }));
       // Fall through to Gemini
     }
   }
@@ -1619,6 +1664,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
       return { provider: 'grok-routed', imageData: result.imageData, modelId: result.modelId, usage: result.usage, packedRefs: refImages, promptSent: effectivePrompt };
     } catch (grokError) {
       log.error(`❌ [${logLabel}] Grok generation failed (model-routed), falling back to Gemini: ${grokError.message}`);
+      upstreamErrors.push(recordProviderFallback({ logLabel, provider: 'grok', route: 'model-routed', model: modelId, pageLabel, error: grokError }));
       // Fall through to Gemini below
     }
   }
@@ -1634,7 +1680,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
 
   // Gemini fallback sentinel — parts built, model resolved + swapped, prompt
   // truncated. The wrapper runs its own terminal Gemini fetch (they differ).
-  return { provider: 'gemini', parts, modelId, effectivePrompt };
+  return { provider: 'gemini', parts, modelId, effectivePrompt, upstreamErrors };
 }
 
 /**
@@ -1866,196 +1912,203 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   // one withRetry fetch, recordImageApiUsage, rich refusal-error extraction, and
   // the avatar-skip early return — deliberately NOT shared with generateImageOnly's
   // sanitization-retry-loop Gemini generator (they are different generators).
-  const { parts, modelId, effectivePrompt } = raw;
-  const apiKey = process.env.GEMINI_API_KEY;
-
-  const systemInstruction = getImageSystemInstruction();
-  const geminiAspect = outputAspect;
-  const requestBody = {
-    ...(systemInstruction && { systemInstruction }),
-    contents: [{
-      parts: parts
-    }],
-    generationConfig: {
-      responseModalities: ["TEXT", "IMAGE"],
-      ...geminiSampling(modelId),
-      ...(modelSupportsThinking(modelId) && { thinkingConfig: { includeThoughts: true } }),
-      imageConfig: {
-        aspectRatio: geminiAspect
-      }
-    }
-  };
-
-  log.debug(`🖼️  [IMAGE GEN] Calling Gemini API with prompt (${prompt.length} chars), scene: ${prompt.substring(0, 80).replace(/\n/g, ' ')}...`);
-  log.debug(`🖼️  [IMAGE GEN] Model: ${modelId}, Aspect Ratio: ${geminiAspect}, Sampling: ${JSON.stringify(geminiSampling(modelId))}, systemInstruction: ${!!systemInstruction}`);
-
-  const data = await withRetry(async () => {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
-      }
-    );
-
-    log.debug('🖼️  [IMAGE GEN] Response status:', response.status, response.statusText);
-
-    if (!response.ok) {
-      const error = await response.text();
-      log.error('❌ [IMAGE GEN] Gemini API error response:', error);
-      const err = new Error(`Gemini API error (${response.status}): ${error}`);
-      err.status = response.status;
-      throw err;
-    }
-
-    return response.json();
-  }, { maxRetries: 2, baseDelay: 2000 });
-
-  // Extract token usage from response (including thinking tokens for Gemini 2.5)
-  const imageUsage = {
-    input_tokens: data.usageMetadata?.promptTokenCount || 0,
-    output_tokens: data.usageMetadata?.candidatesTokenCount || 0,
-    thinking_tokens: data.usageMetadata?.thoughtsTokenCount || 0
-  };
-  if (imageUsage.input_tokens > 0 || imageUsage.output_tokens > 0) {
-    const thinkingInfo = imageUsage.thinking_tokens > 0 ? `, thinking: ${imageUsage.thinking_tokens.toLocaleString()}` : '';
-    log.debug(`📊 [IMAGE GEN] Token usage - input: ${imageUsage.input_tokens.toLocaleString()}, output: ${imageUsage.output_tokens.toLocaleString()}${thinkingInfo}`);
-  }
-  // Structured cost log so analyze-story-log.js can attribute Nano Banana spend.
-  recordImageApiUsage(modelId, evaluationType, imageUsage);
-
-  if (!data.candidates || data.candidates.length === 0) {
-    log.error('❌ [IMAGE GEN] No candidates in response');
-    throw new Error('No image generated - no candidates in response');
-  }
-
-  // Extract image data
-  const candidate = data.candidates[0];
-
-  // Extract thinking text from response (Gemini 3 Pro / 2.5 Flash thinking mode)
-  const thinkingText = extractThinkingFromParts(candidate.content?.parts, 'IMAGE GEN');
-
-  if (candidate.content && candidate.content.parts) {
-    for (const part of candidate.content.parts) {
-      // Check both camelCase (inlineData) and snake_case (inline_data) - Gemini API may vary
-      const inlineData = part.inlineData || part.inline_data;
-      if (inlineData && inlineData.data) {
-        const imageDataSize = inlineData.data.length;
-        const imageSizeKB = (imageDataSize / 1024).toFixed(2);
-        console.log(`✅ [IMAGE GEN] Successfully extracted image data (${imageSizeKB} KB base64)`);
-        const pngImageData = `data:image/png;base64,${inlineData.data}`;
-
-        // Compress PNG to JPEG
-        log.debug('🗜️  [COMPRESSION] Compressing image to JPEG...');
-        const compressedImageData = await compressImageToJPEG(pngImageData);
-
-        // Call onImageReady callback immediately (before quality eval) for progressive display
-        if (onImageReady) {
-          try {
-            await onImageReady(compressedImageData, modelId);
-            log.debug('📤 [IMAGE GEN] Image sent for immediate display (quality eval pending)');
-          } catch (callbackError) {
-            log.error('⚠️ [IMAGE GEN] onImageReady callback error:', callbackError.message);
-          }
+  // A failing Gemini fallback reports the upstream provider error(s) that
+  // sent the call here first (withUpstreamErrors) — the stored error must name
+  // the real cause, not only the fallback's refusal.
+  try {
+    const { parts, modelId, effectivePrompt } = raw;
+    const apiKey = process.env.GEMINI_API_KEY;
+  
+    const systemInstruction = getImageSystemInstruction();
+    const geminiAspect = outputAspect;
+    const requestBody = {
+      ...(systemInstruction && { systemInstruction }),
+      contents: [{
+        parts: parts
+      }],
+      generationConfig: {
+        responseModalities: ["TEXT", "IMAGE"],
+        ...geminiSampling(modelId),
+        ...(modelSupportsThinking(modelId) && { thinkingConfig: { includeThoughts: true } }),
+        imageConfig: {
+          aspectRatio: geminiAspect
         }
-
-        // Skip quality evaluation for avatar conversions (just style transfer, no scene composition)
-        if (evaluationType === 'avatar') {
-          log.debug(`⏭️ [QUALITY] Skipping quality evaluation for avatar conversion`);
+      }
+    };
+  
+    log.debug(`🖼️  [IMAGE GEN] Calling Gemini API with prompt (${prompt.length} chars), scene: ${prompt.substring(0, 80).replace(/\n/g, ' ')}...`);
+    log.debug(`🖼️  [IMAGE GEN] Model: ${modelId}, Aspect Ratio: ${geminiAspect}, Sampling: ${JSON.stringify(geminiSampling(modelId))}, systemInstruction: ${!!systemInstruction}`);
+  
+    const data = await withRetry(async () => {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
+        }
+      );
+  
+      log.debug('🖼️  [IMAGE GEN] Response status:', response.status, response.statusText);
+  
+      if (!response.ok) {
+        const error = await response.text();
+        log.error('❌ [IMAGE GEN] Gemini API error response:', error);
+        const err = new Error(`Gemini API error (${response.status}): ${error}`);
+        err.status = response.status;
+        throw err;
+      }
+  
+      return response.json();
+    }, { maxRetries: 2, baseDelay: 2000 });
+  
+    // Extract token usage from response (including thinking tokens for Gemini 2.5)
+    const imageUsage = {
+      input_tokens: data.usageMetadata?.promptTokenCount || 0,
+      output_tokens: data.usageMetadata?.candidatesTokenCount || 0,
+      thinking_tokens: data.usageMetadata?.thoughtsTokenCount || 0
+    };
+    if (imageUsage.input_tokens > 0 || imageUsage.output_tokens > 0) {
+      const thinkingInfo = imageUsage.thinking_tokens > 0 ? `, thinking: ${imageUsage.thinking_tokens.toLocaleString()}` : '';
+      log.debug(`📊 [IMAGE GEN] Token usage - input: ${imageUsage.input_tokens.toLocaleString()}, output: ${imageUsage.output_tokens.toLocaleString()}${thinkingInfo}`);
+    }
+    // Structured cost log so analyze-story-log.js can attribute Nano Banana spend.
+    recordImageApiUsage(modelId, evaluationType, imageUsage);
+  
+    if (!data.candidates || data.candidates.length === 0) {
+      log.error('❌ [IMAGE GEN] No candidates in response');
+      throw new Error('No image generated - no candidates in response');
+    }
+  
+    // Extract image data
+    const candidate = data.candidates[0];
+  
+    // Extract thinking text from response (Gemini 3 Pro / 2.5 Flash thinking mode)
+    const thinkingText = extractThinkingFromParts(candidate.content?.parts, 'IMAGE GEN');
+  
+    if (candidate.content && candidate.content.parts) {
+      for (const part of candidate.content.parts) {
+        // Check both camelCase (inlineData) and snake_case (inline_data) - Gemini API may vary
+        const inlineData = part.inlineData || part.inline_data;
+        if (inlineData && inlineData.data) {
+          const imageDataSize = inlineData.data.length;
+          const imageSizeKB = (imageDataSize / 1024).toFixed(2);
+          console.log(`✅ [IMAGE GEN] Successfully extracted image data (${imageSizeKB} KB base64)`);
+          const pngImageData = `data:image/png;base64,${inlineData.data}`;
+  
+          // Compress PNG to JPEG
+          log.debug('🗜️  [COMPRESSION] Compressing image to JPEG...');
+          const compressedImageData = await compressImageToJPEG(pngImageData);
+  
+          // Call onImageReady callback immediately (before quality eval) for progressive display
+          if (onImageReady) {
+            try {
+              await onImageReady(compressedImageData, modelId);
+              log.debug('📤 [IMAGE GEN] Image sent for immediate display (quality eval pending)');
+            } catch (callbackError) {
+              log.error('⚠️ [IMAGE GEN] onImageReady callback error:', callbackError.message);
+            }
+          }
+  
+          // Skip quality evaluation for avatar conversions (just style transfer, no scene composition)
+          if (evaluationType === 'avatar') {
+            log.debug(`⏭️ [QUALITY] Skipping quality evaluation for avatar conversion`);
+            const result = {
+              imageData: compressedImageData,
+              score: null,
+              reasoning: null,
+              modelId,
+              thinkingText,
+              imageUsage: imageUsage
+            };
+            imageCache.set(cacheKey, result);
+            return result;
+          }
+  
+          // Evaluate image quality with prompt and reference images
+          log.debug(`📊 [EVAL] Evaluating image quality (${evaluationType})...${qualityModelOverride ? ` [model: ${qualityModelOverride}]` : ''}`);
+          // Same rule as the runEval above: judge against what Gemini received.
+          // parts[0].text is the post-shrink text (it is also what this branch
+          // stamps as the result's `prompt`, a few lines down).
+          const qualityResult = await evaluateImageQuality(compressedImageData, resolveEvalImagePrompt({ promptSent: parts[0]?.text, originalPrompt: prompt }), characterPhotos, evaluationType, qualityModelOverride, pageContext, storyText, sceneHint, sceneCharacters);
+  
+          // Extract score, reasoning, and text error info from quality result
+          const score = qualityResult ? qualityResult.score : null;
+          const reasoning = qualityResult ? qualityResult.reasoning : null;
+          const textIssue = qualityResult ? qualityResult.textIssue : null;
+          const textErrorOnly = qualityResult ? qualityResult.textErrorOnly : false;
+          const expectedText = qualityResult ? qualityResult.expectedText : null;
+          const actualText = qualityResult ? qualityResult.actualText : null;
+          const qualityUsage = qualityResult ? qualityResult.usage : null;
+          const qualityModelId = qualityResult ? qualityResult.modelId : null;
+          const fixTargets = qualityResult ? qualityResult.fixTargets : [];
+          const fixableIssues = qualityResult ? qualityResult.fixableIssues : [];
+          const figures = qualityResult ? qualityResult.figures : [];
+          const matches = qualityResult ? qualityResult.matches : [];
+          const objectMatches = qualityResult ? qualityResult.object_matches : [];
+  
+          // Store in cache (include text error info for covers)
           const result = {
             imageData: compressedImageData,
-            score: null,
-            reasoning: null,
-            modelId,
-            thinkingText,
-            imageUsage: imageUsage
+            score,
+            reasoning,
+            textIssue,
+            textErrorOnly,
+            expectedText,
+            actualText,
+            fixTargets, // Bounding boxes for auto-repair (from evaluation)
+            fixableIssues, // New format without bboxes (for two-stage detection)
+            figures, // Figure detection results from evaluation
+            matches, // Character-to-figure matches from evaluation
+            objectMatches, // Object/animal/landmark matches from evaluation
+            semanticResult: qualityResult?.semanticResult || null,
+            semanticScore: qualityResult?.semanticScore ?? null,
+            ...carryEvalEvidence(qualityResult),
+            issuesSummary: qualityResult?.issuesSummary || null,
+            verdict: qualityResult?.verdict || null,
+            modelId,  // Include which model was used for image generation
+            qualityModelId,  // Include which model was used for quality evaluation
+            thinkingText, // Gemini thinking/reasoning text (if available)
+            imageUsage: imageUsage,  // Token usage for image generation
+            qualityUsage: qualityUsage,  // Token usage for quality evaluation
+            // Reconstruction record: prompt + reference images actually sent in
+            // this call. parts[0] holds the exact sent text (post-truncation when
+            // a model cap applied); grokRefImages is the historical field name for
+            // "refs sent to the image model".
+            prompt: parts[0]?.text || prompt,
+            grokRefImages: parts
+              .filter(p => p.inline_data)
+              .map(p => `data:${p.inline_data.mime_type};base64,${p.inline_data.data}`)
           };
           imageCache.set(cacheKey, result);
+          log.verbose('💾 [IMAGE CACHE] Stored in cache. Total cached:', imageCache.size, 'images');
+  
           return result;
         }
-
-        // Evaluate image quality with prompt and reference images
-        log.debug(`📊 [EVAL] Evaluating image quality (${evaluationType})...${qualityModelOverride ? ` [model: ${qualityModelOverride}]` : ''}`);
-        // Same rule as the runEval above: judge against what Gemini received.
-        // parts[0].text is the post-shrink text (it is also what this branch
-        // stamps as the result's `prompt`, a few lines down).
-        const qualityResult = await evaluateImageQuality(compressedImageData, resolveEvalImagePrompt({ promptSent: parts[0]?.text, originalPrompt: prompt }), characterPhotos, evaluationType, qualityModelOverride, pageContext, storyText, sceneHint, sceneCharacters);
-
-        // Extract score, reasoning, and text error info from quality result
-        const score = qualityResult ? qualityResult.score : null;
-        const reasoning = qualityResult ? qualityResult.reasoning : null;
-        const textIssue = qualityResult ? qualityResult.textIssue : null;
-        const textErrorOnly = qualityResult ? qualityResult.textErrorOnly : false;
-        const expectedText = qualityResult ? qualityResult.expectedText : null;
-        const actualText = qualityResult ? qualityResult.actualText : null;
-        const qualityUsage = qualityResult ? qualityResult.usage : null;
-        const qualityModelId = qualityResult ? qualityResult.modelId : null;
-        const fixTargets = qualityResult ? qualityResult.fixTargets : [];
-        const fixableIssues = qualityResult ? qualityResult.fixableIssues : [];
-        const figures = qualityResult ? qualityResult.figures : [];
-        const matches = qualityResult ? qualityResult.matches : [];
-        const objectMatches = qualityResult ? qualityResult.object_matches : [];
-
-        // Store in cache (include text error info for covers)
-        const result = {
-          imageData: compressedImageData,
-          score,
-          reasoning,
-          textIssue,
-          textErrorOnly,
-          expectedText,
-          actualText,
-          fixTargets, // Bounding boxes for auto-repair (from evaluation)
-          fixableIssues, // New format without bboxes (for two-stage detection)
-          figures, // Figure detection results from evaluation
-          matches, // Character-to-figure matches from evaluation
-          objectMatches, // Object/animal/landmark matches from evaluation
-          semanticResult: qualityResult?.semanticResult || null,
-          semanticScore: qualityResult?.semanticScore ?? null,
-          ...carryEvalEvidence(qualityResult),
-          issuesSummary: qualityResult?.issuesSummary || null,
-          verdict: qualityResult?.verdict || null,
-          modelId,  // Include which model was used for image generation
-          qualityModelId,  // Include which model was used for quality evaluation
-          thinkingText, // Gemini thinking/reasoning text (if available)
-          imageUsage: imageUsage,  // Token usage for image generation
-          qualityUsage: qualityUsage,  // Token usage for quality evaluation
-          // Reconstruction record: prompt + reference images actually sent in
-          // this call. parts[0] holds the exact sent text (post-truncation when
-          // a model cap applied); grokRefImages is the historical field name for
-          // "refs sent to the image model".
-          prompt: parts[0]?.text || prompt,
-          grokRefImages: parts
-            .filter(p => p.inline_data)
-            .map(p => `data:${p.inline_data.mime_type};base64,${p.inline_data.data}`)
-        };
-        imageCache.set(cacheKey, result);
-        log.verbose('💾 [IMAGE CACHE] Stored in cache. Total cached:', imageCache.size, 'images');
-
-        return result;
       }
+    } else {
+      const reason = candidate.finishReason || 'unknown';
+      const message = candidate.finishMessage || 'no message';
+      log.error(`❌ [IMAGE GEN] Image blocked: reason=${reason}, message=${message}`);
+      log.error(`❌ [IMAGE GEN] Failed prompt (first 1000 chars): "${prompt.substring(0, 1000)}..."`);
+      throw new Error(`Image blocked by API: reason=${reason}, message=${message}`);
     }
-  } else {
-    const reason = candidate.finishReason || 'unknown';
-    const message = candidate.finishMessage || 'no message';
-    log.error(`❌ [IMAGE GEN] Image blocked: reason=${reason}, message=${message}`);
+  
+    // No image found - log what Gemini actually returned (likely a refusal message)
+    const textParts = candidate.content?.parts?.filter(p => p.text) || [];
+    if (textParts.length > 0) {
+      const refusalMessage = textParts.map(p => p.text).join(' ').substring(0, 500);
+      log.error(`❌ [IMAGE GEN] No image data - Gemini returned text instead: "${refusalMessage}"`);
+      log.error(`❌ [IMAGE GEN] Failed prompt (first 1000 chars): "${prompt.substring(0, 1000)}..."`);
+      throw new Error(`Image generation refused: ${refusalMessage.substring(0, 200)}`);
+    }
+  
+    log.error('❌ [IMAGE GEN] No image data found in any part');
     log.error(`❌ [IMAGE GEN] Failed prompt (first 1000 chars): "${prompt.substring(0, 1000)}..."`);
-    throw new Error(`Image blocked by API: reason=${reason}, message=${message}`);
+    throw new Error('No image data in response - check logs for API response structure');
+  } catch (err) {
+    throw withUpstreamErrors(err, raw.upstreamErrors);
   }
-
-  // No image found - log what Gemini actually returned (likely a refusal message)
-  const textParts = candidate.content?.parts?.filter(p => p.text) || [];
-  if (textParts.length > 0) {
-    const refusalMessage = textParts.map(p => p.text).join(' ').substring(0, 500);
-    log.error(`❌ [IMAGE GEN] No image data - Gemini returned text instead: "${refusalMessage}"`);
-    log.error(`❌ [IMAGE GEN] Failed prompt (first 1000 chars): "${prompt.substring(0, 1000)}..."`);
-    throw new Error(`Image generation refused: ${refusalMessage.substring(0, 200)}`);
-  }
-
-  log.error('❌ [IMAGE GEN] No image data found in any part');
-  log.error(`❌ [IMAGE GEN] Failed prompt (first 1000 chars): "${prompt.substring(0, 1000)}..."`);
-  throw new Error('No image data in response - check logs for API response structure');
 }
 
 /**
@@ -2261,214 +2314,221 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
   // Gemini generator — deliberately NOT shared with callGeminiAPIForImage's
   // single-shot generator (that one records usage + extracts refusal text; this
   // one runs a sanitization retry loop instead).
-  const { parts, modelId, effectivePrompt } = raw;
-  const apiKey = process.env.GEMINI_API_KEY;
-
-  const systemInstruction = getImageSystemInstruction();
-  const requestBody = {
-    ...(systemInstruction && { systemInstruction }),
-    contents: [{
-      parts: parts
-    }],
-    generationConfig: {
-      responseModalities: ["TEXT", "IMAGE"],
-      ...geminiSampling(modelId),
-      ...(modelSupportsThinking(modelId) && { thinkingConfig: { includeThoughts: true } }),
-      imageConfig: {
-        aspectRatio
+  // A failing Gemini fallback reports the upstream provider error(s) that
+  // sent the call here first (withUpstreamErrors) — the stored error must name
+  // the real cause, not only the fallback's refusal.
+  try {
+    const { parts, modelId, effectivePrompt } = raw;
+    const apiKey = process.env.GEMINI_API_KEY;
+  
+    const systemInstruction = getImageSystemInstruction();
+    const requestBody = {
+      ...(systemInstruction && { systemInstruction }),
+      contents: [{
+        parts: parts
+      }],
+      generationConfig: {
+        responseModalities: ["TEXT", "IMAGE"],
+        ...geminiSampling(modelId),
+        ...(modelSupportsThinking(modelId) && { thinkingConfig: { includeThoughts: true } }),
+        imageConfig: {
+          aspectRatio
+        }
       }
-    }
-  };
-
-  log.debug(`🖼️  [IMAGE GEN-ONLY] Calling Gemini API with prompt (${prompt.length} chars), model: ${modelId}, sampling: ${JSON.stringify(geminiSampling(modelId))}, aspect: ${aspectRatio}, systemInstruction: ${!!systemInstruction}`);
-
-  // Safety-block ladder: level 0 is the prompt as built, level 1 asks a text
-  // model to REWRITE the scene — defuse the safety trigger while keeping the
-  // story moment (same rewriteBlockedScene used by the main generation path).
-  // If the rewritten scene is STILL blocked, this function throws — a wrong
-  // image is worse than no image, and so is a mutilated prompt. Every earlier
-  // rung (the generic one-liner prompts, then the 78-word local strip) is gone;
-  // the PROMPT SANITIZATION note near the top of this file records what each
-  // one cost and the measurements that retired it.
-  // Every rung rebuilds from what level 0 actually SENT — `parts[0].text`, the
-  // post-shrink string — not from the raw `prompt` argument. The two diverge on
-  // the Grok→Gemini fallback: shrinkPromptForModel ran against the GROK model's
-  // 7,900-char cap (models.js) before the swap to gemini-2.5-flash-image, while
-  // `prompt` can be 22k (measured max in stories.data). Rebuilding a "retry"
-  // from `prompt` silently re-expanded it by thousands of characters, so what
-  // got retried was not the request that had just been refused. Same
-  // sent-equals-stored equality that stored-prompt-is-sent-prompt.test.ts pins
-  // for the level-0 path.
-  const sentPrompt = parts[0]?.text || effectivePrompt;
-
-  const rewriteSceneInPrompt = async () => {
-    const { callTextModel } = require('./textModels');
-    const sceneMatch = sentPrompt.match(/\*\*THIS IMAGE DEPICTS:\*\*\s*([\s\S]*?)(?=\n\n\*\*|$)/i)
-      || sentPrompt.match(/\*\*SCENE:\*\*\s*([\s\S]*?)(?=\n\n\*\*|$)/i)
-      || sentPrompt.match(/Scene Description:\s*([\s\S]*?)(?=\n\n\*\*|$)/i);
-    const originalScene = sceneMatch?.[1]?.trim();
-    const rewriteResult = await rewriteBlockedScene(originalScene || sentPrompt, callTextModel);
-    // Replace the scene block in place so style / reference / no-text rules
-    // survive; when no scene block was found (custom prompts like
-    // scale-repair or empty-scene), use the rewrite as the whole prompt.
-    // The replacement is a FUNCTION: a `$&`, `$'` or `$1` sequence in
-    // MODEL-authored text is a substitution pattern to String.replace, which
-    // would splice a copy of the matched scene back into the prompt. A replacer
-    // function is taken literally.
-    return originalScene ? sentPrompt.replace(originalScene, () => rewriteResult.text) : rewriteResult.text;
-  };
-  const sanitizationLevels = [
-    null,                   // Level 0: the prompt as sent
-    rewriteSceneInPrompt,   // Level 1: text-model scene rewrite (keeps the story moment)
-  ];
-
-  for (let sanitizationLevel = 0; sanitizationLevel < sanitizationLevels.length; sanitizationLevel++) {
-    // Apply sanitization if needed
-    let currentPrompt = sentPrompt;
-    if (sanitizationLevel > 0) {
+    };
+  
+    log.debug(`🖼️  [IMAGE GEN-ONLY] Calling Gemini API with prompt (${prompt.length} chars), model: ${modelId}, sampling: ${JSON.stringify(geminiSampling(modelId))}, aspect: ${aspectRatio}, systemInstruction: ${!!systemInstruction}`);
+  
+    // Safety-block ladder: level 0 is the prompt as built, level 1 asks a text
+    // model to REWRITE the scene — defuse the safety trigger while keeping the
+    // story moment (same rewriteBlockedScene used by the main generation path).
+    // If the rewritten scene is STILL blocked, this function throws — a wrong
+    // image is worse than no image, and so is a mutilated prompt. Every earlier
+    // rung (the generic one-liner prompts, then the 78-word local strip) is gone;
+    // the PROMPT SANITIZATION note near the top of this file records what each
+    // one cost and the measurements that retired it.
+    // Every rung rebuilds from what level 0 actually SENT — `parts[0].text`, the
+    // post-shrink string — not from the raw `prompt` argument. The two diverge on
+    // the Grok→Gemini fallback: shrinkPromptForModel ran against the GROK model's
+    // 7,900-char cap (models.js) before the swap to gemini-2.5-flash-image, while
+    // `prompt` can be 22k (measured max in stories.data). Rebuilding a "retry"
+    // from `prompt` silently re-expanded it by thousands of characters, so what
+    // got retried was not the request that had just been refused. Same
+    // sent-equals-stored equality that stored-prompt-is-sent-prompt.test.ts pins
+    // for the level-0 path.
+    const sentPrompt = parts[0]?.text || effectivePrompt;
+  
+    const rewriteSceneInPrompt = async () => {
+      const { callTextModel } = require('./textModels');
+      const sceneMatch = sentPrompt.match(/\*\*THIS IMAGE DEPICTS:\*\*\s*([\s\S]*?)(?=\n\n\*\*|$)/i)
+        || sentPrompt.match(/\*\*SCENE:\*\*\s*([\s\S]*?)(?=\n\n\*\*|$)/i)
+        || sentPrompt.match(/Scene Description:\s*([\s\S]*?)(?=\n\n\*\*|$)/i);
+      const originalScene = sceneMatch?.[1]?.trim();
+      const rewriteResult = await rewriteBlockedScene(originalScene || sentPrompt, callTextModel);
+      // Replace the scene block in place so style / reference / no-text rules
+      // survive; when no scene block was found (custom prompts like
+      // scale-repair or empty-scene), use the rewrite as the whole prompt.
+      // The replacement is a FUNCTION: a `$&`, `$'` or `$1` sequence in
+      // MODEL-authored text is a substitution pattern to String.replace, which
+      // would splice a copy of the matched scene back into the prompt. A replacer
+      // function is taken literally.
+      return originalScene ? sentPrompt.replace(originalScene, () => rewriteResult.text) : rewriteResult.text;
+    };
+    const sanitizationLevels = [
+      null,                   // Level 0: the prompt as sent
+      rewriteSceneInPrompt,   // Level 1: text-model scene rewrite (keeps the story moment)
+    ];
+  
+    for (let sanitizationLevel = 0; sanitizationLevel < sanitizationLevels.length; sanitizationLevel++) {
+      // Apply sanitization if needed
+      let currentPrompt = sentPrompt;
+      if (sanitizationLevel > 0) {
+        try {
+          currentPrompt = await sanitizationLevels[sanitizationLevel]();
+        } catch (rewriteErr) {
+          log.warn(`⚠️ [IMAGE GEN-ONLY] Level ${sanitizationLevel} prompt rewrite failed: ${rewriteErr.message}`);
+          throw new Error(`Image blocked and scene rewrite failed: ${rewriteErr.message}`);
+        }
+        parts[0] = { text: currentPrompt };
+        log.info(`🔄 [IMAGE GEN-ONLY] Retry with sanitization level ${sanitizationLevel} (scene rewrite), prompt: ${currentPrompt.substring(0, 100)}...`);
+      }
+  
       try {
-        currentPrompt = await sanitizationLevels[sanitizationLevel]();
-      } catch (rewriteErr) {
-        log.warn(`⚠️ [IMAGE GEN-ONLY] Level ${sanitizationLevel} prompt rewrite failed: ${rewriteErr.message}`);
-        throw new Error(`Image blocked and scene rewrite failed: ${rewriteErr.message}`);
-      }
-      parts[0] = { text: currentPrompt };
-      log.info(`🔄 [IMAGE GEN-ONLY] Retry with sanitization level ${sanitizationLevel} (scene rewrite), prompt: ${currentPrompt.substring(0, 100)}...`);
-    }
-
-    try {
-      const data = await withRetry(async () => {
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
+        const data = await withRetry(async () => {
+          const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(requestBody)
+            }
+          );
+  
+          if (!response.ok) {
+            const error = await response.text();
+            log.error('❌ [IMAGE GEN-ONLY] Gemini API error response:', error);
+            const err = new Error(`Gemini API error (${response.status}): ${error}`);
+            err.status = response.status;
+            throw err;
           }
-        );
-
-        if (!response.ok) {
-          const error = await response.text();
-          log.error('❌ [IMAGE GEN-ONLY] Gemini API error response:', error);
-          const err = new Error(`Gemini API error (${response.status}): ${error}`);
-          err.status = response.status;
-          throw err;
+  
+          return response.json();
+        }, { maxRetries: 2, baseDelay: 2000 });
+  
+        // Extract token usage
+        const usage = {
+          input_tokens: data.usageMetadata?.promptTokenCount || 0,
+          output_tokens: data.usageMetadata?.candidatesTokenCount || 0,
+          thinking_tokens: data.usageMetadata?.thoughtsTokenCount || 0
+        };
+  
+        if (!data.candidates || data.candidates.length === 0) {
+          // No candidates = likely safety block
+          log.warn(`⚠️ [IMAGE GEN-ONLY] No candidates (safety block?) at level ${sanitizationLevel}`);
+          if (sanitizationLevel < sanitizationLevels.length - 1) continue;
+          throw new Error('No image generated - no candidates in response');
         }
-
-        return response.json();
-      }, { maxRetries: 2, baseDelay: 2000 });
-
-      // Extract token usage
-      const usage = {
-        input_tokens: data.usageMetadata?.promptTokenCount || 0,
-        output_tokens: data.usageMetadata?.candidatesTokenCount || 0,
-        thinking_tokens: data.usageMetadata?.thoughtsTokenCount || 0
-      };
-
-      if (!data.candidates || data.candidates.length === 0) {
-        // No candidates = likely safety block
-        log.warn(`⚠️ [IMAGE GEN-ONLY] No candidates (safety block?) at level ${sanitizationLevel}`);
-        if (sanitizationLevel < sanitizationLevels.length - 1) continue;
-        throw new Error('No image generated - no candidates in response');
-      }
-
-      const candidate = data.candidates[0];
-      const thinkingText = extractThinkingFromParts(candidate.content?.parts, 'IMAGE GEN-ONLY');
-
-      // Candidate-level refusal. ALLOW-LIST since 2026-09-18 (imageReplyGuard):
-      // only a finish reason that MEANS the model finished lets the response
-      // through. The old test named SAFETY and PROHIBITED_CONTENT alone, so
-      // every other refusal — RECITATION, BLOCKLIST, SPII, LANGUAGE, OTHER and
-      // the whole IMAGE_* family, IMAGE_OTHER included — fell past it into the
-      // parts loop and was caught only by the "no image data" fall-through
-      // below, under a vaguer log line. MAX_TOKENS is deliberately NOT a block
-      // here: it keeps falling through exactly as before.
-      const block = assessImageResponse(data);
-      if (block.blocked) {
-        log.warn(`⚠️ [IMAGE GEN-ONLY] Content ${describeImageBlock(block)} at level ${sanitizationLevel}`);
-        if (sanitizationLevel < sanitizationLevels.length - 1) continue;
-        throw new Error(`Image blocked by API: reason=${block.reason}`);
-      }
-
-      if (candidate.content && candidate.content.parts) {
-        for (const part of candidate.content.parts) {
-          const inlineData = part.inlineData || part.inline_data;
-          if (inlineData && inlineData.data) {
-            const pngImageData = `data:image/png;base64,${inlineData.data}`;
-            const compressedImageData = await compressImageToJPEG(pngImageData);
-
-            if (onImageReady) {
-              try {
-                await onImageReady(compressedImageData, modelId);
-              } catch (callbackError) {
-                log.error('⚠️ [IMAGE GEN-ONLY] onImageReady callback error:', callbackError.message);
+  
+        const candidate = data.candidates[0];
+        const thinkingText = extractThinkingFromParts(candidate.content?.parts, 'IMAGE GEN-ONLY');
+  
+        // Candidate-level refusal. ALLOW-LIST since 2026-09-18 (imageReplyGuard):
+        // only a finish reason that MEANS the model finished lets the response
+        // through. The old test named SAFETY and PROHIBITED_CONTENT alone, so
+        // every other refusal — RECITATION, BLOCKLIST, SPII, LANGUAGE, OTHER and
+        // the whole IMAGE_* family, IMAGE_OTHER included — fell past it into the
+        // parts loop and was caught only by the "no image data" fall-through
+        // below, under a vaguer log line. MAX_TOKENS is deliberately NOT a block
+        // here: it keeps falling through exactly as before.
+        const block = assessImageResponse(data);
+        if (block.blocked) {
+          log.warn(`⚠️ [IMAGE GEN-ONLY] Content ${describeImageBlock(block)} at level ${sanitizationLevel}`);
+          if (sanitizationLevel < sanitizationLevels.length - 1) continue;
+          throw new Error(`Image blocked by API: reason=${block.reason}`);
+        }
+  
+        if (candidate.content && candidate.content.parts) {
+          for (const part of candidate.content.parts) {
+            const inlineData = part.inlineData || part.inline_data;
+            if (inlineData && inlineData.data) {
+              const pngImageData = `data:image/png;base64,${inlineData.data}`;
+              const compressedImageData = await compressImageToJPEG(pngImageData);
+  
+              if (onImageReady) {
+                try {
+                  await onImageReady(compressedImageData, modelId);
+                } catch (callbackError) {
+                  log.error('⚠️ [IMAGE GEN-ONLY] onImageReady callback error:', callbackError.message);
+                }
               }
+  
+              const result = {
+                imageData: compressedImageData,
+                // parts[0] holds the exact sent text — after a safety block the
+                // sanitized/rewritten prompt, not the original.
+                prompt: parts[0]?.text || effectivePrompt,
+                modelId,
+                thinkingText,
+                usage,
+                // Which rung produced this image: 0 = the prompt as built,
+                // 1 = after the scene rewrite. (Level 1 meant the local word
+                // strip until 2026-09-18; nothing reads this field — verified
+                // repo-wide, and `$.**.sanitizationLevel` returns zero rows in
+                // both environments' stories.data — so the renumber is safe.)
+                sanitizationLevel,
+                // Reconstruction record — refs were in parts but never stamped.
+                // NOTE ON THE COUNT (documented 2026-08-29): on this GEMINI
+                // FALLBACK path the field holds the UNPACKED part list — one
+                // image per character plus the scene plate plus the VB grid — so
+                // it routinely holds 4-7 entries. That is NOT a breach of Grok's
+                // 3-slot cap: the Grok branches above store `packedRefs`, which
+                // packReferences hard-limits to 3 (`slots.length >= 3`). A stored
+                // page with >3 refs is by definition a Gemini render, and
+                // `modelId` says so. Verified across job_1787959478282: every
+                // page with 4/5/7 refs is gemini-2.5-flash-image, every
+                // grok-imagine-image page has ≤3.
+                grokRefImages: parts
+                  .filter(p => p.inline_data)
+                  .map(p => `data:${p.inline_data.mime_type};base64,${p.inline_data.data}`),
+                ...sceneStamp()
+              };
+  
+              if (!skipCache) imageCache.set(genOnlyCacheKey, result);
+              if (sanitizationLevel > 0) {
+                log.info(`✅ [IMAGE GEN-ONLY] Image generated with sanitization level ${sanitizationLevel}`);
+              } else {
+                log.info(`✅ [IMAGE GEN-ONLY] Image generated successfully`);
+              }
+              return result;
             }
-
-            const result = {
-              imageData: compressedImageData,
-              // parts[0] holds the exact sent text — after a safety block the
-              // sanitized/rewritten prompt, not the original.
-              prompt: parts[0]?.text || effectivePrompt,
-              modelId,
-              thinkingText,
-              usage,
-              // Which rung produced this image: 0 = the prompt as built,
-              // 1 = after the scene rewrite. (Level 1 meant the local word
-              // strip until 2026-09-18; nothing reads this field — verified
-              // repo-wide, and `$.**.sanitizationLevel` returns zero rows in
-              // both environments' stories.data — so the renumber is safe.)
-              sanitizationLevel,
-              // Reconstruction record — refs were in parts but never stamped.
-              // NOTE ON THE COUNT (documented 2026-08-29): on this GEMINI
-              // FALLBACK path the field holds the UNPACKED part list — one
-              // image per character plus the scene plate plus the VB grid — so
-              // it routinely holds 4-7 entries. That is NOT a breach of Grok's
-              // 3-slot cap: the Grok branches above store `packedRefs`, which
-              // packReferences hard-limits to 3 (`slots.length >= 3`). A stored
-              // page with >3 refs is by definition a Gemini render, and
-              // `modelId` says so. Verified across job_1787959478282: every
-              // page with 4/5/7 refs is gemini-2.5-flash-image, every
-              // grok-imagine-image page has ≤3.
-              grokRefImages: parts
-                .filter(p => p.inline_data)
-                .map(p => `data:${p.inline_data.mime_type};base64,${p.inline_data.data}`),
-              ...sceneStamp()
-            };
-
-            if (!skipCache) imageCache.set(genOnlyCacheKey, result);
-            if (sanitizationLevel > 0) {
-              log.info(`✅ [IMAGE GEN-ONLY] Image generated with sanitization level ${sanitizationLevel}`);
-            } else {
-              log.info(`✅ [IMAGE GEN-ONLY] Image generated successfully`);
-            }
-            return result;
           }
         }
+  
+        // No image data in response but also not explicitly blocked
+        const reason = candidate.finishReason || 'unknown';
+        log.warn(`⚠️ [IMAGE GEN-ONLY] No image data, reason=${reason} at level ${sanitizationLevel}`);
+        if (sanitizationLevel < sanitizationLevels.length - 1) continue;
+        throw new Error(`Image blocked by API: reason=${reason}`);
+  
+      } catch (error) {
+        const errorMsg = error.message?.toLowerCase() || '';
+        const isSafetyBlock = errorMsg.includes('blocked') || errorMsg.includes('safety') ||
+                              errorMsg.includes('prohibited') || errorMsg.includes('filtered') ||
+                              errorMsg.includes('no candidates') || errorMsg.includes('no image generated');
+  
+        if (isSafetyBlock && sanitizationLevel < sanitizationLevels.length - 1) {
+          log.warn(`⚠️ [IMAGE GEN-ONLY] Safety block at level ${sanitizationLevel}, trying level ${sanitizationLevel + 1}...`);
+          continue;
+        }
+        throw error;
       }
-
-      // No image data in response but also not explicitly blocked
-      const reason = candidate.finishReason || 'unknown';
-      log.warn(`⚠️ [IMAGE GEN-ONLY] No image data, reason=${reason} at level ${sanitizationLevel}`);
-      if (sanitizationLevel < sanitizationLevels.length - 1) continue;
-      throw new Error(`Image blocked by API: reason=${reason}`);
-
-    } catch (error) {
-      const errorMsg = error.message?.toLowerCase() || '';
-      const isSafetyBlock = errorMsg.includes('blocked') || errorMsg.includes('safety') ||
-                            errorMsg.includes('prohibited') || errorMsg.includes('filtered') ||
-                            errorMsg.includes('no candidates') || errorMsg.includes('no image generated');
-
-      if (isSafetyBlock && sanitizationLevel < sanitizationLevels.length - 1) {
-        log.warn(`⚠️ [IMAGE GEN-ONLY] Safety block at level ${sanitizationLevel}, trying level ${sanitizationLevel + 1}...`);
-        continue;
-      }
-      throw error;
     }
+  
+    // Should not reach here, but just in case
+    throw new Error('Image generation failed after all sanitization levels');
+  } catch (err) {
+    throw withUpstreamErrors(err, raw.upstreamErrors);
   }
-
-  // Should not reach here, but just in case
-  throw new Error('Image generation failed after all sanitization levels');
 }
 
 /**
@@ -5660,6 +5720,9 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
   });
   log.debug(`✏️  [IMAGE EDIT] Full prompt: "${editPrompt}"`);
 
+  // The Grok failure that sent this edit to Gemini (recorded in the
+  // generationLog, and prefixed onto a failing Gemini fallback's error).
+  let grokFailure = null;
   if (backend === 'grok') {
     // Grok edit path — uses /images/edits endpoint with reference images
     // Include the current image + any additional character/VB references
@@ -5713,12 +5776,15 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
             };
           } catch (retryErr) {
             log.warn(`⚠️ [IMAGE EDIT] Sanitized retry also blocked, falling back to Gemini`);
+            grokFailure = recordProviderFallback({ logLabel: 'IMAGE EDIT', provider: 'grok', route: 'edit-sanitized-retry', model: modelConfig.modelId, pageLabel: '', error: retryErr });
           }
         }
         // Fall through to Gemini path below
         log.info(`🔄 [IMAGE EDIT] Falling back to Gemini for content-moderated edit`);
+        if (!grokFailure) grokFailure = recordProviderFallback({ logLabel: 'IMAGE EDIT', provider: 'grok', route: 'edit', model: modelConfig.modelId, pageLabel: '', error: grokErr });
       } else {
         log.error(`❌ [IMAGE EDIT] Grok edit failed, falling back to Gemini: ${grokErr.message}`);
+        grokFailure = recordProviderFallback({ logLabel: 'IMAGE EDIT', provider: 'grok', route: 'edit', model: modelConfig.modelId, pageLabel: '', error: grokErr });
         // Fall through to Gemini path below
       }
     }
@@ -5813,7 +5879,7 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
     return { imageData: null, usage: { inputTokens, outputTokens, model: modelId } };
   } catch (error) {
     log.error('❌ [IMAGE EDIT] Error editing image:', error);
-    throw error;
+    throw withUpstreamErrors(error, grokFailure ? [grokFailure] : []);
   }
 }
 
