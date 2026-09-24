@@ -46,8 +46,12 @@ dragon. about as long as an adult's forearm. …" — all three reached their ce
    `sceneComposite.buildPlateCreatureBlock`), both Art Director recurring-elements blocks
    (`buildRecurringElementsText` and the per-page scene-description prompt), the brief rewriter's staged
    figures (`iterateBeat.figurePool`), and the two detector/eval rosters (`buildSecondaryCharacterDescriptions`,
-   the entity-consistency expected-character list in `entityConsistency.js`). Animals only: those are the
-   entries whose description carried it.
+   the entity-consistency expected-character list in `entityConsistency.js`), and the iterate
+   composition-analysis context (`sceneValidator.formatLandmarkContext`). Animals only: those are the
+   entries whose description carried it on the live parse. Artifact readers (plate STRUCTURES, the AD
+   blocks, the cover) are unchanged: the live parser takes an artifact's `description` verbatim, so the
+   `Size:` suffix `buildArtifactDescription` added never reached a production story (verified on run 6's
+   stored artifacts) — there was nothing to lose.
    Deliberately NOT given the scale: the GroundingDINO object-grounding hint (`buildObjectGroundingHints`) — a
    phrase naming "an adult" in a grounding query points the detector at the adult — and the token/keyword
    matchers (`iterateBeat.partitionAnchoredObjects`, entity keyword index), where "adult"/"stands" were spurious
@@ -77,7 +81,7 @@ image prompt: byte-identical scale lines (REQUIRED OBJECTS carried them before a
 ELEMENTS and plate creature lines: still carry the phrase.
 
 **Touched:** `server/lib/visualBible.js`, `server/lib/outlineParser/unified.js`, `server/lib/promptBuilders.js`,
-`server/lib/iterateBeat.js`, `server/lib/entityConsistency.js`,
+`server/lib/iterateBeat.js`, `server/lib/entityConsistency.js`, `server/lib/sceneValidator.js`,
 `tests/unit/vb-cell-no-size.test.ts` (new), `tests/unit/artifact-size.test.ts`, `tests/unit/vb-scale-class.test.ts`.
 
 **Status:** ✅ active

@@ -363,7 +363,10 @@ function formatLandmarkContext(visualBible) {
 
   if (visualBible.animals) {
     for (const [id, animal] of Object.entries(visualBible.animals)) {
-      items.push(`- ${animal.name || id}: ${animal.description || 'animal'}`);
+      // A creature's description states no size (cells get no size,
+      // 2026-09-23); the scale it used to carry is added back here.
+      const { withScaleNote } = require('./visualBible');
+      items.push(`- ${animal.name || id}: ${withScaleNote(animal.description, animal) || 'animal'}`);
     }
   }
 

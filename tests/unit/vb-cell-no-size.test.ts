@@ -126,6 +126,13 @@ describe('every page-side reader of a creature still states its scale', () => {
     expect(pool.find((f: any) => f.id === 'ANI003').description).toContain(`Size: ${LEGACY_SIZE}`);
   });
 
+  it('the iterate composition-analysis context (sceneValidator.formatLandmarkContext)', () => {
+    const { formatLandmarkContext } = cjs('../../server/lib/sceneValidator.js');
+    const text = formatLandmarkContext(vb());
+    expect(text).toContain(`Size: ${KNEE}`);
+    expect(text).toContain(`Size: ${LEGACY_SIZE}`);
+  });
+
   it('withScaleNote adds nothing when an element states no scale', () => {
     expect(VB.withScaleNote('a goat', { scaleClass: null })).toBe('a goat');
     expect(VB.withScaleNote('a goat.', { scaleClass: 'knee-high' })).toBe(`a goat. Size: ${KNEE}`);
