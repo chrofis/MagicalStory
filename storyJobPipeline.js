@@ -4498,6 +4498,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // Elements whose reference render rides with this call: grid cells,
             // or (for a plate-filtered vehicle in 5a-pre-grid) the plate itself.
             vbRefElementIds,
+            // A cover's copy space is its beat's (coverRender.js).
+            ...(coverOpts ? { textPositionOverride: coverOpts.textPosition } : {}),
           }
         ), coverOpts?.bakeTitle || '');
         const imagePrompt = makeImagePrompt(elementReferences.map(r => r.id).filter(Boolean));
@@ -5187,7 +5189,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // Build text area instruction from scene metadata (keeps text area calm in empty scene too)
             // Enforce spread rule: odd pages = left side, even = right side
             const { enforceSpreadTextPosition, buildTextZoneInstruction, buildEraGuard } = require('./server/lib/storyHelpers');
-            const sonnetTextPos = sceneMetadata?.textPosition || null;
+            // A cover's copy space is its beat's (coverRender.js), like its render prompt's.
+            const sonnetTextPos = pageData.coverOpts?.textPosition || sceneMetadata?.textPosition || null;
             const textPos = enforceSpreadTextPosition(sonnetTextPos, pageData.pageNumber);
             // If spread rule flipped Sonnet's left/right, Sonnet's textZoneDescription
             // was written for the wrong side — discard it and let the code-generated

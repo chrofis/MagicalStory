@@ -172,9 +172,12 @@ function checkCoverBrief(page, metadata) {
       detail: `This is a book cover: every figure looks at the viewer. ${off.join(', ')} — set \`looksAt: "viewer"\` and turn the figure toward the viewer in the prose.`,
     });
   }
+  // A brief with no `textPosition` (a story whose text-zone rules are off
+  // carries none) is not a fault: the render takes the beat's position. Only a
+  // brief that DECLARES another zone contradicts its beat.
   const want = COVER_TEXT_POSITION[coverKeyOfPage(page.pageNumber)];
   const got = String((metadata && metadata.textPosition) || '').trim();
-  if (want && got !== want) {
+  if (want && got && got !== want) {
     out.push({
       pageNumber: page.pageNumber,
       type: 'cover_text_zone_mismatch',

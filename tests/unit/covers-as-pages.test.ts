@@ -84,8 +84,9 @@ describe('the mechanical cover checks on a brief', () => {
     const types = SBC.checkCoverBrief({ pageNumber: -1 }, meta('Child2', 'bottom-full')).map((f: any) => f.type);
     expect(types).toEqual(['cover_gaze_not_viewer', 'cover_text_zone_mismatch']);
   });
-  it('a brief that follows its beat is clean', () => {
+  it('a brief that follows its beat is clean; one with no textPosition is not a fault (the render takes the beat\'s)', () => {
     expect(SBC.checkCoverBrief({ pageNumber: -1 }, meta('viewer', 'top-full'))).toEqual([]);
+    expect(SBC.checkCoverBrief({ pageNumber: -2 }, meta('viewer', ''))).toEqual([]);
     expect(SBC.checkCoverBrief({ pageNumber: -3 }, meta('camera', 'bottom-full'))).toEqual([]);
   });
   it('a story page is never held to a cover rule', () => {
@@ -106,6 +107,7 @@ describe('cover render options', () => {
       const o = coverRenderOptions(n, { title: 'The Little Lantern', dedication: 'For you' });
       expect(o.aspectRatio).toBe(MODEL_DEFAULTS.coverAspect);
       expect(o.textInImage).toBe(true);
+      expect(o.textPosition).toBe(CB.COVER_TEXT_POSITION[o.coverKey]);
       expect(o.usageLabel).toBe('cover_images');
       expect(o.coverKey).toBe(CB.coverKeyOfPage(n));
     }

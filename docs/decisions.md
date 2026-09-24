@@ -59611,7 +59611,7 @@ owner's eight answers: `tasks/covers-as-pages-2026-09-24.md` §9.
    cover-only options (`coverRender.coverRenderOptions`): the cover aspect, text always in the image, the
    baked-title model and REQUIRED TEXT tail (`withBakedTitle`, one implementation with the trial builder), the text
    contract for the judges, the `cover_images` usage bucket and the `partial_cover` checkpoint.
-   `{COVER_COMPOSITION}` stays empty for them — the layout lives in the beat. Covers are kept out of the vantage
+   `{COVER_COMPOSITION}` stays empty for them — the layout lives in the beat. The copy space the render reserves is the beat's `COVER_TEXT_POSITION` (`coverRenderOptions.textPosition`, prompt and plate), not the brief's field: Lab 1458 showed the field absent on a story whose text-zone rules are off (the template gates it out) while the prose staged the band; `cover_text_zone_mismatch` fires only on a brief that declares a different zone. Covers are kept out of the vantage
    plate groups. Storage is unchanged: `coverImages.{frontCover,initialPage,backCover}` + the cover keys in
    `story_images`; the record adds the brief fields (`sceneDescription`, `sceneMetadata`, `outlineExtract`,
    `perCharClothing`, plate) and `briefedAsPage: true`, and the shipped version's brief travels back after repair.
