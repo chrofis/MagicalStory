@@ -958,7 +958,9 @@
     {
       "id": "entity-closed-type-list",
       "title": "The entity grid judge returns only types from its closed list",
-      "commits": [],
+      "commits": [
+        "59bb2ecf3"
+      ],
       "addedAt": "2026-09-24",
       "claim": "Every entity finding stored in finalChecksReport.entity carries a type from evalBuckets.ENTITY_CHECK_TYPES (baseline before the change: 6.5% off-list on staging, 7.5% on production); an off-list one is logged as a parse error and never routed to a repair.",
       "runShape": [
