@@ -1921,7 +1921,7 @@
       "impact": "Entity findings the score counted were missing from the panel list and from the re-evaluate route's issue list, so the admin could not see or repair them.",
       "status": "fixed",
       "fixedAt": "2026-09-24",
-      "fixedIn": "FIXCOMMIT",
+      "fixedIn": "c64661d60",
       "fix": "scoring.entityFindingsForPage is the one page reader of an entity report (root issues, characters + objects); entityIssuesForPage bills it, collectAllIssuesForPage lists it, and the evaluation-data route returns each page's entityIssuesForPage list, which the client shows instead of reading the report itself. Pinned by tests/unit/entity-findings-one-reader.test.ts; replayed over the stored back cover (list now has Julian's crop artefact, canonical score 85 unchanged)."
     }
   ]
