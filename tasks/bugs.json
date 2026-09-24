@@ -1863,6 +1863,30 @@
       "fixedAt": "2026-09-24",
       "fixedIn": "d5dd79baf",
       "fix": "Owner 'log only': scoring.js ENTITY_ONLY_ZERO_POINT_TYPES charges an entity-only figure_completeness 0; repairLogic.isCropArtifact closes its char-fix and critical routes; feedbackConsolidator.dropCropArtifactFixes drops its plan fix. Pinned by tests/unit/entity-crop-figure-completeness.test.ts. docs/decisions.md 2026-09-24."
+    },
+    {
+      "id": "reader-findings-charged-to-next-version",
+      "title": "The book audit's reader findings were charged to the next round's newly repaired version instead of the version the audit read",
+      "reportedAt": "2026-09-23",
+      "source": "Production job_1790107559778_fcmlfa8kn: p5 v3 (iterate-round-3, scored 23:19:33 CH) carried object_presence CATASTROPHIC src=reader 'Book is held by Lukas' read off v0's pixels by the round-2 audit (23:15:33 CH); without it v3 scores 68 vs v0's 58. p8 v2 was billed 'root is not visible' from the audit of v1 although the inpaint added the root (-14, 3 on its own evidence).",
+      "rootCause": "repairPipeline kept a page-keyed readerFindingsByPage map filled by each audit and passed it to every consolidatePageEval call of the next round, i.e. to versions painted after the audit.",
+      "impact": "Reader findings penalised every new version and never the one they described; good repairs lost the pick to the faulted original.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "c3bac9a52",
+      "fix": "repairLogic.attributeReaderFindings binds each IMG fault to the version object the audit read; runBookAuditRound re-consolidates and re-scores that version only (final audit included, owner-approved 2026-09-24); the map is deleted. Pinned by tests/unit/repair-reader-attribution-and-cast0.test.ts."
+    },
+    {
+      "id": "cast0-page-loops-on-failed-char-fix",
+      "title": "A page written with no cast routed invented figures to char-fix as roster characters, and a failed char-fix was repeated every round",
+      "reportedAt": "2026-09-23",
+      "source": "Production job_1790107559778_fcmlfa8kn p7: sceneCharacters [], two generic children drawn, entity check mapped one to Sophie with CRITICAL age_shift; decideRepairMethod gate 2 chose char-fix in rounds 1-3 and every attempt returned 'char-fix produced no usable image' (finalChecksReport.repairRounds); the page shipped with both children.",
+      "rootCause": "decideRepairMethod never saw the page's declared cast; a failed char-fix produces no version so the same version stayed best with no record that char-fix had failed on it; and the 2026-09-13 presence rule barred extra_character from its only removal route and told the model to redraw the figure as an EXPECTED CAST entry even for a roster of 0.",
+      "impact": "All repair rounds on such a page wasted; the uncommissioned figures shipped.",
+      "status": "fixed",
+      "fixedAt": "2026-09-24",
+      "fixedIn": "c3bac9a52, ef7ed5f2e",
+      "fix": "Owner reversal 2026-09-24: three-case presence model in derivePresenceFinding (missing → add, extra → remove via inpaint, mixed → figure-targeted char-fix redrawing the unmatched figure as the missing name); a char-fix is never aimed at a name outside the version's declared cast; failures are recorded on the version attempted and a failed char-fix flips to iterate. Pinned by tests/unit/repair-reader-attribution-and-cast0.test.ts and tests/unit/extra-character-type.test.ts."
     }
   ]
 }
