@@ -2943,6 +2943,9 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // Which pages a vantage's plate can hold — the same line the brief check
     // `shot_off_plate` measures (shotVocabulary.VANTAGE_SHOT_RULE).
     VANTAGE_SHOT: VANTAGE_SHOT_RULE,
+    // What counts as one location (2026-09-24).
+    PLACE_SEPARATE: PLACE_SEPARATE_RULE,
+    PLACE_INSIDE_OUTSIDE: PLACE_INSIDE_OUTSIDE_RULE,
   });
   return applyTextZoneGate(filledAll, textZoneRulesActive(inputData));
 }
@@ -3186,6 +3189,9 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // inputData; a caller that omits it is named in the log, not silently
     // given today's season — see pageSeasonLabel.
     SEASON: pageSeasonLabel(options.story, `scene-expansion P${pageNumber}`),
+    // The per-page fallback cites a location the bible already holds; only the
+    // inside/outside half of the one-place rule applies (PLACE_INSIDE_OUTSIDE_RULE).
+    PLACE_INSIDE_OUTSIDE: PLACE_INSIDE_OUTSIDE_RULE,
     // ONE counting rule for both Art Director templates — see COUNTING_RULE.
     COUNTING_RULE,
     // 8f, filled here too: the per-page template DECLARES {TRUE_RELATIVE_SIZE}
@@ -8423,6 +8429,22 @@ const PLAN_LINE_FIELD_CONTRACT = "The second field is the complete cast of that 
 const MULTI_PICTURE_PROP_RULE = "An object that shows a different picture on different pages — a book, an album, a board, a screen — has one face-to-camera state per distinct picture the plan lines call for. Each such state's `delta` restates what its page's plan line says the object shows, its `pages` is that page alone, and a page cites only the state whose `delta` is the picture its own plan line names.";
 
 /**
+ * ONE PLACE (owner, 2026-09-24). What counts as one Visual Bible location was
+ * never stated: C1 says reuse a location's id, the vantage paragraph says when
+ * to split one, and nothing said when two places are two. Prod
+ * job_1790107559778_fcmlfa8kn: the Art Director folded a building's front door
+ * (a rainy doorstep page) and an upstairs room's door (three pages, one of them
+ * a child lying on the floor) into one outdoor location, so the room's pages
+ * were drawn on a doorstep plate. The scene review cannot split a location, so
+ * the rule lives on the authoring side only.
+ * PLACE_SEPARATE_RULE: the all-pages Art Director, the only template that
+ * writes locations. PLACE_INSIDE_OUTSIDE_RULE: that one and the per-page
+ * fallback, which cites a location the bible already holds.
+ */
+const PLACE_SEPARATE_RULE = 'Places the plan lines name separately — two different doors, two rooms, a yard and the hall behind it — are separate locations, or separate vantages of one location when they are parts of one building.';
+const PLACE_INSIDE_OUTSIDE_RULE = 'A page whose plan line puts its figures inside — in a room, on a floor, on a stair — never shares a plate with a page set outdoors, and the reverse: a building seen from both sides is an exterior vantage and an interior one, and an indoor page cites the interior.';
+
+/**
  * ONE concealment contract for every stage that writes a page brief -- both Art
  * Director templates and both iterate templates.
  *
@@ -9000,6 +9022,17 @@ const ARC_GIVEN_RULE = 'Nothing is used that the arc has not given: a name is ex
 const ARC_SENSE_RULE = 'Every turn holds against what the story has already made true — how big things are, what they give off (sound, light, warmth, smell), how far apart places are, who is watching, what anyone present would plainly do. No turn leaves a reader asking "but why don\'t they just …?" or saying "that could not happen".';
 
 /**
+ * INSIDE AND OUTSIDE (owner, 2026-09-24). Prod job_1790107559778_fcmlfa8kn:
+ * the creator had a child carry a drawer of keys OUTSIDE to try them on a
+ * reading-room door the story placed up the stairs, and tip them into the
+ * leaves; three panelists passed it, the planner staged it, and the Art
+ * Director then put that interior door on an outdoor plate. ONE string: the
+ * creator's TELLING_RULES, the panel's PLACE lens and the Lab arc review's
+ * check 11.
+ */
+const ARC_PLACE_RULE = 'Every place the story stages is inside or outside, and a move between them goes through a way the place has: a door inside a building is reached from inside it, and a thing dropped, spilled or tipped lands where it happens — never on ground on the other side of a wall.';
+
+/**
  * EVERY CHILD ACTS (owner, 2026-09-23): every commissioned child does something
  * of their own that matters to the plot. It replaced "Everyone else — … — is
  * simply there alongside the main character. No moment of their own, no arc."
@@ -9094,6 +9127,7 @@ function buildTellingRulesSection(inputData = {}) {
     `- ${ARC_ENTRANCE_RULE}`,
     `- ${ARC_GIVEN_RULE}`,
     `- ${ARC_SENSE_RULE}`,
+    `- ${ARC_PLACE_RULE}`,
     `- ${SIZE_LOOK_RULE} A size or a look the commission itself gives is kept once, in its words, where the thing first appears.`,
     '- Each named character speaks with a distinctive voice — word choice and rhythm a child could tell apart with eyes closed.',
     '- An animal or creature that travels with the children is named by them where they decide to help it, and goes by that name after.',
@@ -9217,6 +9251,7 @@ function buildArcPanelPrompt(inputData, committedBlock) {
     ARC_ENTRANCE_RULE,
     ARC_GIVEN_RULE,
     ARC_SENSE_RULE,
+    ARC_PLACE_RULE,
     EVERY_CHILD_ACTS_RULE,
     // A14: the REAL LANDMARKS block is one constant with three consumers
     // (create, panel, retell). The panel is the only independent reader of the
@@ -9951,6 +9986,8 @@ function buildArcReviewPrompt(inputData, arc, auditFindings = '') {
     AGE_MODE: buildAgeModeSection(inputData),
     CURRENT_ARC: String(arc || '').trim(),
     AUDIT_FINDINGS: String(auditFindings || '').trim() || '(no audit ran)',
+    // Check 11 reads the creator's own inside/outside rule.
+    ARC_PLACE_RULE,
   });
 }
 
@@ -11304,6 +11341,7 @@ module.exports = {
   ARC_ENTRANCE_RULE,
   ARC_GIVEN_RULE,
   ARC_SENSE_RULE,
+  ARC_PLACE_RULE,
   SIZE_LOOK_RULE,
   CENTRAL_FIGURE_DEF,
   EVERY_CHILD_ACTS_RULE,
@@ -11312,6 +11350,8 @@ module.exports = {
   ANIMAL_FATE_RULE,
   COUNTING_RULE,
   PLAN_LINE_CAST_RULE,
+  PLACE_SEPARATE_RULE,
+  PLACE_INSIDE_OUTSIDE_RULE,
   PLAN_LINE_FIELD_CONTRACT,
   PAGE_CHANGE_DEF,
   // The five definitions story-beats.txt and plan-check.txt share — one

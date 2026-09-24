@@ -21,6 +21,56 @@ superseded and link forward.
 
 ---
 
+## 2026-09-24 — One place is one place: the arc keeps inside and outside apart, and the Art Director never folds two named places or an indoor page into one outdoor location
+
+**Context:** Prod `job_1790107559778_fcmlfa8kn`. The committed arc (sentence 4) had a child "carry the
+whole key drawer outside to try every key", trip on the step and tip the keys into the leaves — at a
+reading-room door the next sentence stages from the floor inside, next to a windowsill. The three
+panelists (grok-4.6, deepseek-v4-pro, gpt-5.6-luna-pro) all passed it: SENSE and CLAIM ask whether a
+turn holds, and none asked on which side of a wall a place lies. The planner staged it (p4 "keys
+half-buried in wet leaves on the step outside the reading-room door"). The Art Director then folded
+the building's front door (p2, rain, a lantern cart at the doorstep) and the reading-room door (p4-p6,
+p5 a child lying on the floor) into ONE outdoor location, `LOC002 "tower exterior and door step"`,
+setting `outdoor, threshold`, with no vantages. Nothing in `scene-expansion-all.txt` said what counts as
+one location: C1 says to reuse a location's id, the vantage paragraph says when to split one, and
+nothing says when two places are two. The scene review cannot split a location (its bible lane only
+corrects `states[]`), so the fault shipped.
+
+**Decision (owner-approved build, 2026-09-24):**
+1. **Arc: `ARC_PLACE_RULE`** (promptBuilders.js) — every staged place is inside or outside, a move
+   between them goes through a way the place has, an inside door is reached from inside, and a thing
+   dropped lands where it happens. ONE string, three consumers: the creator's and re-teller's
+   `{TELLING_RULES}` (generator), the panel's new PLACE lens in arc-panel.txt, which first lists each
+   staged place as inside or outside (critic), and check 11 of the Lab-only story-arc-review.txt.
+   Registered set `arc-generator-vs-critic` — the same pattern as ENTRANCE / GIVEN / SENSE.
+2. **Art Director: `PLACE_SEPARATE_RULE` + `PLACE_INSIDE_OUTSIDE_RULE`** — places the plan lines
+   name separately (two doors, two rooms) are separate locations, or vantages of one location when
+   they are parts of one building; a page whose plan line puts its figures inside never shares a plate
+   with an outdoor page, and a building seen from both sides is an exterior vantage and an interior one.
+   Both reach scene-expansion-all.txt (the only location author), next to the vantage paragraph. The
+   per-page fallback scene-expansion.txt cites a location the bible already holds, so it gets only the
+   inside/outside half.
+3. **No critic side for the Art Director rule.** scene-review.txt has no check category for place
+   identity (`[continuity]` covers a location changing shape, not two places sharing one), and the
+   reviewer cannot split a location. None was added: a finding the reviewer cannot fix is noise.
+4. **Not given:** the planner (story-beats.txt) — it divides a finished story, and the arc rule
+   upstream is where the fault is authored; the iterate templates — they rewrite one page against its
+   already-cited vantage; the trial writer (story-trial.txt) — it authors locations with no vantages,
+   and the rule's vantage half does not fit it. Each is a candidate if the fault recurs there.
+
+**Rationale:** a place's side of the wall is a fact the arc owns and the Art Director must keep; once
+two places share one plate, every page of them is drawn on the wrong backdrop and no later stage can
+separate them.
+
+**Touched:** `server/lib/promptBuilders.js` (`ARC_PLACE_RULE`, `PLACE_SEPARATE_RULE`,
+`PLACE_INSIDE_OUTSIDE_RULE`, telling rules, panel / arc-review / both Art Director builders),
+`prompts/arc-panel.txt`, `prompts/story-arc-review.txt`, `prompts/scene-expansion-all.txt`,
+`prompts/scene-expansion.txt`, `tests/unit/place-inside-outside-rules.test.ts`.
+
+**Status:** ✅ active (staging).
+
+---
+
 ## 2026-09-24 — Image prompts say each thing once; the shrinker's cut order is one named list the docs render
 
 **Context.** Staging `job_1790100385959_1nitlympp`: every four-character image prompt (pages and
