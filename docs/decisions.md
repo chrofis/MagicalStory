@@ -231,6 +231,93 @@ hand).
 
 **Status:** ✅ active (owner sign-off 2026-09-24).
 
+## 2026-09-24 — A VB description's first noun is its label's noun; the cell gate keeps judging the `type` (naming the object in the gate question was measured WORSE)
+
+**Context:** Prod `job_1790107559778_fcmlfa8kn` ART002 "heavy brass nutcracker" (type `hand tool`)
+rendered as pliers / a bolt cutter, and the gate passed it: "The image shows a brass bolt cutter that
+matches the description". The description carried no identity noun ("a heavy hand tool made of solid
+brass … two thick lever handles connected by a sturdy hinge"): the authoring rule "Name the thing with
+the word that names it" did not stop the model naming it by its `type` family. The owner-approved fix
+had two halves: (a) the gate checks the cell against the element's label, (b) the description carries
+the kind noun.
+
+**Decision:**
+1. SHIPPED — both VB authoring sites (`scene-expansion-all.txt`, `story-trial.txt`): a description's
+   first noun is the noun its `label` ends in, never the family in `type`.
+2. NOT SHIPPED — the gate change. Measured on the stored cells of the three stories (25 cells, the
+   gate model `gemini-2.5-flash-lite`, each story's own art style, old question vs a question naming
+   the object as "the brass nutcracker, a hand tool … another object of the same family … fails"):
+   old gate 7 NO, new gate 1 NO. Naming the object PRIMES the judge: both known-bad scale cells, which
+   the old gate correctly failed ("a ceramic dish, not a reptile scale"; "a plate, not a dragon
+   scale"), PASSED under the new question ("accurately depicts a teal-colored, oval-shaped scale"),
+   and ART002 still passed ("accurately depicts a brass nutcracker"). A variant that asked the judge to
+   name what it sees first, in the same call, also passed the dish ("seen: teal scale") and ART002, and
+   falsely failed a correct possessive-named ball. The old question stays.
+3. What does separate the cells: asked COLD, with no name and no description, flash-lite names the
+   cells "blue shell", "orange plate" and "nut cracker"; `gemini-2.5-flash` names ART002 "gold pliers".
+   A blind naming call (separate, name-free) and/or a stronger gate model is the open option — an
+   owner decision, in BACKLOG.
+4. The cell RENDER prompt is unchanged (its deliberate omission is of the labelled heading form; the
+   2026-09-11 kind sentence already carries the label as prose).
+
+**Touched:** `prompts/scene-expansion-all.txt`, `prompts/story-trial.txt`,
+`tests/unit/vb-authoring-contract.test.ts`. **Status:** ✅ active (authoring); gate unchanged.
+
+## 2026-09-24 — Consolidator votes are clamped to what each source actually said (keeps 09-11 CRITICAL-wins)
+
+**Context:** The severity of a consolidated finding is computed in code from the model's transcribed
+`severities` (2026-08-09 median in code; 2026-09-11 owner reversal: a CRITICAL vote wins). The
+transcription is not reliable: prod `job_1790107559778_fcmlfa8kn` p6 v3 carried a reader MAJOR that
+the consolidator transcribed as `{"reader":"CATASTROPHIC"}`, and one vote's median is that vote — a
+CATASTROPHIC `character_identity`. Across stored `consolidator_calls` (60 days) entries scored above
+every severity their sources showed: prod 9 of 2,204, staging 27 of 8,948.
+
+**Decision:** Before the median, each transcribed vote is clamped to the HIGHEST severity that source
+showed in this page's consolidator input (`sourceSeverityCeilings`, reading the same sections with the
+same defaults `buildFeedbackInput` renders — one `shownSeverity` helper for both). A vote for a source
+that flagged nothing on the page is dropped. When no vote survives, the model's pick is held to the
+page's highest input severity. A source whose findings carry no readable severity (entity `?`) is not
+clamped. The CRITICAL-wins rule is untouched and now fires only on a CRITICAL a source really gave.
+Code reads severities and source NAMES only — never a finding's text, never its type (SETTLED:
+classification is the prompt's; code may only change a severity). The raw transcribed votes stay
+stored in `severities` for audit.
+
+**Measured (free replay over stored `consolidator_calls`, current code vs clamp):** prod: 9 → 0
+entries above their sources, 9 → 0 votes above their source; 11 entries change, all lowered
+(CRITICAL→MAJOR 4, CRITICAL→MODERATE 4, CATASTROPHIC→MAJOR 2 incl. p6 v3, MAJOR→MODERATE 1).
+Staging: 27 → 0 and 31 → 0; 33 entries change, all lowered. Zero raised. Known cost: when the model
+MIS-ATTRIBUTES a real vote (writes `compliance: CRITICAL` for a CRITICAL the semantic judge gave), the
+clamp lowers it — seen on prod `job_1787436913379` p10 (3 entries). The clamp trusts what the
+evaluators said, not what the transcription claims they said.
+
+**Touched:** `server/lib/feedbackConsolidator.js`, `tests/unit/consolidator-vote-clamp.test.ts`.
+**Status:** ✅ active
+
+## 2026-09-24 — The book audit gets each page's brief (moment + cast) and types its IMG findings
+
+**Context:** `bookAudit.js` gave the reader only page text and picture. It charged a character the
+words name but the Art Director never staged: prod `job_1790107559778_fcmlfa8kn` p7 (brief cast: none)
+"Manuel absent", p9 (cast: Lukas) "Sophie and Manuel not visible"; over 17 stories, 40 IMG faults
+named a character outside that page's cast. The Lukas diagnosis first blamed text refinement running
+after images; the pre-refine text already named them, so the cause was the reader lacking the cast.
+Separately its IMG lines reached the consolidator with no type, so the consolidator invented one.
+
+**Decision:** Between each page's text and picture the reader gets a BRIEF line: the moment drawn
+(`sceneMetadata.sceneIntent`) and who it was drawn with — the evaluator's ONE roster
+(`resolveExpectedCastNames`, the arguments images.js passes), "nobody … by design" for a declared
+empty cast, omitted when the page records no cast (covers). The prompt: a character the words name
+but the brief did not draw is no fault, or `FAULT[TEXT]` when the words put them in the very moment
+shown. IMG lines carry a type: `FAULT[IMG][<WEIGHT>][<TYPE>]`, `<TYPE>` from `{FINDING_TYPES}` =
+`evalBuckets.CONSOLIDATED_TYPES`, which a test pins to the consolidator template's closed list;
+`parseRoutes` → `attributeReaderFindings` → the consolidator renders it `(type)` like any evaluator
+line. The audit stays the single text-vs-image cross-check (SETTLED, 2026-09-13): the per-page judges
+still judge image-vs-brief only.
+
+**Touched:** `server/lib/bookAudit.js`, `server/lib/repairLogic.js`, `server/lib/repairPipeline.js`
+(passes `characters`), `server/lib/feedbackConsolidator.js`, `server/lib/evalBuckets.js`,
+`prompts/book-audit.txt`, `prompts/feedback-consolidator.txt`, tests.
+**Status:** ✅ active
+
 ## 2026-09-24 — Image prompts say each thing once; the shrinker's cut order is one named list the docs render
 
 **Context.** Staging `job_1790100385959_1nitlympp`: every four-character image prompt (pages and

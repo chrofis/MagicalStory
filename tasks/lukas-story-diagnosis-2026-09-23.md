@@ -29,11 +29,18 @@ p5/p6 door in the rain, p3 Lukas too big, p1 object behind the boy, most pages f
 - [x] **Writer/AD geography: an interior door placed outdoors.** (2026-09-24: arc PLACE rule + panel lens, AD one-place rule — Lab #1444 3/3 panelists flag it, #1451 keeps the two doors apart; decisions.md) Outline beat 4 drags the key
       drawer "outside to try every key on the door"; AD merged the tower front door and the
       reading-room door into one outdoor LOC002. No check catches interior/exterior contradictions.
-- [ ] **Semantic judge contradicts the VB reference** (p6 "pliers instead of nutcracker" — the VB
+- [x] **Semantic judge contradicts the VB reference** (p6 "pliers instead of nutcracker" — the VB
       nutcracker cell is plier-shaped) and **consolidator escalates severity** (reader MAJOR →
       character_identity CATASTROPHIC on p6 v3).
-- [ ] **Text refinement runs after images** and rewrote all 10 pages; the audit then compared new
+      2026-09-24: the judge was right about the picture — the VB cell itself is plier-shaped. Fixed: the
+      consolidator vote clamp (p6 v3 CATASTROPHIC → MAJOR on replay) and the VB description now opens
+      with the label noun. The cell gate was NOT changed: naming the object in the gate question made
+      flash-lite pass the known-bad cells (decisions.md 2026-09-24); gate options are in BACKLOG.
+- [x] **Text refinement runs after images** and rewrote all 10 pages; the audit then compared new
       words against old pictures (p7 "Manuel absent", p9 "Sophie and Manuel not visible").
+      2026-09-24: shown NOT to be the cause — the pre-refine text already had that content. The real
+      cause was the book-audit reader lacking each page's cast; it now gets the brief (sceneIntent +
+      cast roster). Replay on the shipped book: 0 off-cast absence faults (stored final round: 3).
 
 - [ ] **Scene review deletes a "no figures" instruction.** p7 before: "completely devoid of figures, a silent, empty
       expanse"; after: "a silent expanse" (`[negation_named]` rewrite). An empty page loses its only emptiness statement.
