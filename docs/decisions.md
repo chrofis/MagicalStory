@@ -21,6 +21,25 @@ superseded and link forward.
 
 ---
 
+## 2026-09-24 — A page holds at most 5 paragraphs (was 4)
+
+**Context:** The 2026-09-23 text-stage round made the paragraph shape one constant
+(`PAGE_PARAGRAPHS`) filled into the writer and the refine as `{PARAGRAPH_SHAPE}` and read by the
+counter (`buildWordBudgetFindings`), with a maximum of 4. Owner, 2026-09-24: "Raise the per-page
+paragraph limit from 4 to 5."
+**Decision:** `PAGE_PARAGRAPHS.maxPerPage` 4 → 5. The writer, the refine and the counter all read the
+one constant, so all three move together. The paragraph maximum stays exact; the +50% OVER tolerance
+stays on the sentence and word counts only. The shape still fits every level's sentence band:
+5 × 4 = 20 reaches advanced's ceiling (4 × 4 = 16 did not), and 5 × 2 = 10 stays under 1st-grade's
+tolerated 13.5, so a lean five-paragraph page never trips a sentence fault on its own.
+**Rationale:** Owner call. The band check is pinned by a test so a later change to a level's
+sentence band or to the shape cannot make the two contradict each other.
+**Touched:** `server/lib/promptBuilders.js` (`PAGE_PARAGRAPHS`),
+`tests/unit/text-stage-counter-and-specs.test.ts`.
+**Status:** ✅ active
+
+---
+
 ## 2026-09-24 — One place is one place: the arc keeps inside and outside apart, and the Art Director never folds two named places or an indoor page into one outdoor location
 
 **Context:** Prod `job_1790107559778_fcmlfa8kn`. The committed arc (sentence 4) had a child "carry the

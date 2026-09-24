@@ -48,10 +48,24 @@ describe('buildWordBudgetFindings — sentences and paragraphs', () => {
     expect(fourteen).toContain('14 sentences, budget 4-9');
   });
 
-  it('flags a page with more paragraphs than the shape allows', () => {
-    const five = Array.from({ length: 5 }, () => 'Er lief. Sie lachte.').join('\n\n');
-    const out = TR.buildWordBudgetFindings([{ pageNumber: 3, text: five }], '1st-grade');
-    expect(out).toContain(`5 paragraphs, at most ${PB.PAGE_PARAGRAPHS.maxPerPage}`);
+  it('allows five paragraphs and flags the sixth (owner 2026-09-24: limit 4 -> 5)', () => {
+    const paras = (n: number) => Array.from({ length: n }, () => 'Er lief. Sie lachte.').join('\n\n');
+    expect(TR.buildWordBudgetFindings([{ pageNumber: 3, text: paras(5) }], '1st-grade')).toBe('');
+    const out = TR.buildWordBudgetFindings([{ pageNumber: 3, text: paras(6) }], '1st-grade');
+    expect(out.split('\n')).toHaveLength(1);
+    expect(out).toContain('6 paragraphs, at most 5');
+    expect(PB.paragraphShapeRule()).toContain('at most 5 paragraphs');
+  });
+
+  it('the paragraph shape fits every level\'s sentence band and its OVER tolerance', () => {
+    const [pMin, pMax] = PB.PAGE_PARAGRAPHS.sentencesPerParagraph.split('-').map(Number);
+    for (const [name, level] of Object.entries(PB.LANGUAGE_LEVELS) as Array<[string, any]>) {
+      const bandMax = Number(String(level.sentencesPerPage).split('-').pop());
+      // the fullest shaped page reaches the band's ceiling ...
+      expect(PB.PAGE_PARAGRAPHS.maxPerPage * pMax, name).toBeGreaterThanOrEqual(bandMax);
+      // ... and the leanest full page never trips the tolerated sentence ceiling
+      expect(PB.PAGE_PARAGRAPHS.maxPerPage * pMin, name).toBeLessThanOrEqual(bandMax * 1.5);
+    }
   });
 
   it('keeps the word-only finding and the under-budget finding as they were', () => {

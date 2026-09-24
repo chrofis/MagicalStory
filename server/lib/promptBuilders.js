@@ -1859,8 +1859,13 @@ const LANGUAGE_LEVELS = {
  * filled into the writer and the refine as {PARAGRAPH_SHAPE} and read by the
  * text counter (textRefine.buildWordBudgetFindings), so the rule the prose is
  * written to and the number it is counted against cannot drift (2026-09-23).
+ *
+ * maxPerPage 4 -> 5 (owner 2026-09-24). The paragraph maximum is exact — the
+ * +50% OVER tolerance belongs to the sentence and word counts. The shape stays
+ * inside every level's sentence band: 5 x 4 reaches advanced's 20, 5 x 2 stays
+ * under 1st-grade's tolerated 13.5.
  */
-const PAGE_PARAGRAPHS = { sentencesPerParagraph: '2-4', maxPerPage: 4 };
+const PAGE_PARAGRAPHS = { sentencesPerParagraph: '2-4', maxPerPage: 5 };
 
 function paragraphShapeRule() {
   return `Each paragraph runs ${PAGE_PARAGRAPHS.sentencesPerParagraph} sentences, a page holds at most ${PAGE_PARAGRAPHS.maxPerPage} paragraphs, and a blank line separates them.`;
