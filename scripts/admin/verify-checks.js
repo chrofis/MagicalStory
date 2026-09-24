@@ -188,6 +188,29 @@ checks.letteringFindings = (ctx) => {
   };
 };
 
+/** 8dfdb2b0d — a cover is briefed the way a page is: Scene prose + REQUIRED OBJECTS, no KEY STORY ELEMENTS. */
+checks.coverBriefedLikeAPage = (ctx) => {
+  const hints = ctx.data?.coverHints || {};
+  const covers = ctx.data?.coverImages || {};
+  const keys = ['frontCover', 'initialPage', 'backCover'].filter(k => covers[k]?.prompt);
+  if (!keys.length) return notCovered('no stored cover prompt');
+  const bad = [];
+  const good = [];
+  for (const k of keys) {
+    const prompt = String(covers[k].prompt);
+    const hint = hints[k] || {};
+    const elements = (hint.objects || []).filter(id => /^(ART|ANI|VEH)\d+/i.test(String(id)));
+    const faults = [];
+    if (prompt.includes('KEY STORY ELEMENTS')) faults.push('KEY STORY ELEMENTS present');
+    if (prompt.includes('---METADATA---')) faults.push('METADATA block leaked');
+    if (!String(hint.scene || '').trim()) faults.push('hint has no Scene prose');
+    else if (!prompt.includes(String(hint.scene).trim().slice(0, 40))) faults.push('Scene prose not in the sent prompt');
+    if (elements.length && !prompt.includes('**REQUIRED OBJECTS')) faults.push(`no REQUIRED OBJECTS for ${elements.join(', ')}`);
+    (faults.length ? bad : good).push(`${k}: ${faults.length ? faults.join('; ') : `ok (${elements.length} element(s))`}`);
+  }
+  return { covered: true, pass: bad.length === 0, detail: [...bad, ...good].join(' | ') };
+};
+
 const MOOD_TAG = /\b(mood|atmosphere|tension|standoff|feeling)\b/i;
 /** 67c617743 — sceneIntent no longer ends on a verbless mood tag (baseline 36/177 = 20%). */
 checks.sceneIntentMoodTag = (ctx) => {

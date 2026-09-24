@@ -806,6 +806,24 @@
       "status": "pending",
       "evidence": [],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — Composite stage frames"
+    },
+    {
+      "id": "cover-briefed-like-a-page",
+      "title": "Every cover is briefed the way a page is: Art Director Scene prose + REQUIRED OBJECTS, no KEY STORY ELEMENTS",
+      "commits": [
+        "8dfdb2b0d"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "Each stored full-story cover hint carries a Scene line, and each cover's sent prompt contains that prose and a REQUIRED OBJECTS block for its listed elements, with no KEY STORY ELEMENTS block and no leaked METADATA block.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "coverBriefedLikeAPage"
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }
