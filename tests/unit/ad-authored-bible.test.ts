@@ -158,6 +158,7 @@ describe('the wardrobe half is extracted with its own marker set', () => {
     const parser = new UnifiedStoryParser(transcript);
     expect(parser.extractClothingRequirements().Mia.standard.description).toBe('a red coat');
     expect(parser.extractVisualBible().artifacts[0].id).toBe('ART001');
-    expect(parser.extractCoverHints()).toBeTruthy();
+    // No cover section in the transcript (covers are pages since 2026-09-24): no hints.
+    expect(parser.extractCoverHints()).toBeNull();
   });
 });

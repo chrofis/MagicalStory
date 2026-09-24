@@ -2093,6 +2093,56 @@ function withTrialCoverObjects(description, addIds = []) {
 }
 
 /**
+ * THE TRIAL'S DEFAULT COVER HINTS (bug trial-back-cover-empty-hint, 2026-09-24).
+ *
+ * The trial writer emits one `---COVER SCENE---` JSON (the front cover, which
+ * onCoverScene renders) and no cover-hints section, so the back cover — and the
+ * front, when that JSON is missing — has no parsed hint. These are its hints,
+ * in the STRUCTURED shape every cover consumer reads (mood, objects, characters,
+ * characterDetails, characterClothing): `buildCoverSceneFromHint` builds the
+ * scene from them, the backdrop check gives them the story's location, and the
+ * clothing reconciliation and the stored `coverHints` treat them like any hint.
+ *
+ * They replace the two inline default hints the trial start block used to build.
+ * Those were written as a bare `hint:` prose line that `buildCoverSceneFromHint`
+ * does not read, and they never ran at all: the parser returned a truthy EMPTY
+ * hint for every cover, so every trial back cover rendered from nothing
+ * ("A portrait of a single character set before <place>").
+ *
+ * Cast = the main characters (else the first three), as the old prose named;
+ * a costume trial dresses the whole cast in its costume, as before.
+ *
+ * @param {'frontCover'|'backCover'} coverKey
+ * @param {Object} inputData - the trial job's inputData
+ */
+function trialDefaultCoverHint(coverKey, inputData = {}) {
+  const all = (Array.isArray(inputData.characters) ? inputData.characters : []).filter(c => c && c.name);
+  const mains = all.filter(c => c.isMainCharacter);
+  const cast = (mains.length > 0 ? mains : all.slice(0, 3)).map(c => c.name);
+  const names = cast.join(', ') || 'the main character';
+  const theme = inputData.storyTopic || inputData.storyTheme || 'adventure';
+  const byKey = {
+    frontCover: {
+      mood: 'magical and eye-catching, the characters excited and ready for adventure',
+      hint: `A magical, eye-catching front cover scene featuring ${names} in a ${theme}-themed setting. The main characters are prominently displayed, looking excited and ready for adventure. The composition leaves space at the top for the title.`,
+    },
+    backCover: {
+      mood: 'calm, warm end-of-day light, the characters content and relaxed after the adventure',
+      hint: `A calm closing back-cover scene featuring ${names} at the story's main location, warm end-of-day light, content and relaxed after the adventure. Simple composition with open space, no text.`,
+    },
+  };
+  const t = byKey[coverKey];
+  if (!t) throw new Error(`trialDefaultCoverHint: the trial renders a front and a back cover, not ${coverKey}`);
+  const characterClothing = {};
+  if (inputData._trialCostumeType) {
+    for (const c of all) characterClothing[c.name] = 'costumed';
+  }
+  const characterDetails = {};
+  for (const n of cast) characterDetails[n] = { name: n, position: '', clothing: characterClothing[n] || null, holds: 'nothing', gazesAt: '', priority: 'essential' };
+  return { hint: t.hint, mood: t.mood, objects: [], characters: [...cast], characterClothing, characterDetails };
+}
+
+/**
  * Build a deterministic SCENE prose string from a structured coverHint.
  *
  * This REPLACES the previous Haiku scene-expansion call for covers. The
@@ -2228,6 +2278,7 @@ module.exports = {
   trialCoverLocationId,
   trialCoverPlateDescription,
   buildCoverSceneFromHint,
+  trialDefaultCoverHint,
   coverBriefWithObjects,
   withTrialCoverObjects,
   stripCharacterSentences,

@@ -1923,6 +1923,15 @@
       "fixedAt": "2026-09-24",
       "fixedIn": "c64661d60",
       "fix": "scoring.entityFindingsForPage is the one page reader of an entity report (root issues, characters + objects); entityIssuesForPage bills it, collectAllIssuesForPage lists it, and the evaluation-data route returns each page's entityIssuesForPage list, which the client shows instead of reading the report itself. Pinned by tests/unit/entity-findings-one-reader.test.ts; replayed over the stored back cover (list now has Julian's crop artefact, canonical score 85 unchanged)."
+    },
+    {
+      "id": "trial-back-cover-empty-hint",
+      "title": "Every trial back cover rendered from an empty hint; the intended default back-cover scene never ran",
+      "reportedAt": "2026-09-24",
+      "source": "Found during covers-as-pages (2026-09-24), confirmed from stored data and approved by the owner: the last 3 staging trials (job_1789337873076_qf2at21ui, job_1789296188291_thezv15y1, job_1788725396265_p3dh87hsv) and 3 prod trials (job_1790256136168_pbxibjv0r, job_1790169018278_n57xpnufo, job_1789975900382_dyc1g7wue) all stored coverHints.backCover.hint = \"\" and a back-cover description starting \"A portrait of a single character set before <place>\" — never the \"calm closing back-cover scene\" the trial start block defines.",
+      "rootCause": "outlineParser/unified.js extractCoverHints returned a default object of EMPTY hints when the response had no ---COVER SCENE HINTS--- section, and the trial writer never emits one. The trial start block tests `if (hint)`, so the empty object read as a real hint and its default-hint branches never ran. Those defaults were also written as a bare `hint:` prose line that buildCoverSceneFromHint does not read.",
+      "impact": "Every trial back cover had no mood and no cast in its scene prose: a generic portrait at the first Visual Bible location.",
+      "status": "open"
     }
   ]
 }

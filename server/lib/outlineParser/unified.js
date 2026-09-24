@@ -352,22 +352,25 @@ class UnifiedStoryParser {
   }
 
   /**
-   * Extract cover scene hints with per-character clothing
-   * @returns {{frontCover: {hint: string, characterClothing: Object, characters: string[]}, ...}}
+   * Extract cover scene hints with per-character clothing.
+   *
+   * AN ABSENT HINT IS NO HINT (bug trial-back-cover-empty-hint, 2026-09-24).
+   * This used to return a default object of EMPTY hints when the response had
+   * no cover section — and the trial writer never emits one (it writes a single
+   * `---COVER SCENE---` JSON for the front). Every caller tests `if (hint)`, so
+   * the empty object read as a real hint: the trial back cover rendered from
+   * nothing, and the default back-cover scene written for exactly this case
+   * never ran. Now: no section → null; a cover with no block → no key.
+   *
+   * @returns {null|{frontCover?: {hint: string, characterClothing: Object, characters: string[]}, initialPage?: ..., backCover?: ...}}
    */
   extractCoverHints() {
     if (this._cache.coverHints !== undefined) return this._cache.coverHints;
 
     const sectionMatch = this.response.match(/---COVER SCENE HINTS---\s*([\s\S]*?)(?=---STORY PAGES---|$)/i);
-    const defaults = {
-      frontCover: { hint: '', mood: '', objects: [], characterClothing: {}, characters: [], characterDetails: {} },
-      initialPage: { hint: '', mood: '', objects: [], characterClothing: {}, characters: [], characterDetails: {} },
-      backCover: { hint: '', mood: '', objects: [], characterClothing: {}, characters: [], characterDetails: {} }
-    };
-
     if (!sectionMatch) {
-      this._cache.coverHints = defaults;
-      return defaults;
+      this._cache.coverHints = null;
+      return null;
     }
 
     const section = sectionMatch[1];
@@ -383,9 +386,7 @@ class UnifiedStoryParser {
       const blockPattern = new RegExp(`\\*\\*${label}\\*\\*\\s*([\\s\\S]*?)(?=\\n\\*\\*(?:Title Page|Initial Page|Back Cover)\\*\\*|$)`, 'i');
       const blockMatch = section.match(blockPattern);
 
-      if (!blockMatch) {
-        return { hint: '', mood: '', objects: [], characterClothing: {}, characters: [], characterDetails: {} };
-      }
+      if (!blockMatch) return null;
 
       const block = blockMatch[1];
 
@@ -448,11 +449,16 @@ class UnifiedStoryParser {
       return { hint, mood, objects, characterClothing, characterPerspectives, characters, characterDetails };
     };
 
-    this._cache.coverHints = {
-      frontCover: extractCover('Title Page'),
-      initialPage: extractCover('Initial Page'),
-      backCover: extractCover('Back Cover')
-    };
+    const found = {};
+    for (const [key, label] of [['frontCover', 'Title Page'], ['initialPage', 'Initial Page'], ['backCover', 'Back Cover']]) {
+      const cover = extractCover(label);
+      if (cover) found[key] = cover;
+    }
+    if (Object.keys(found).length === 0) {
+      this._cache.coverHints = null;
+      return null;
+    }
+    this._cache.coverHints = found;
 
     // ONE backdrop per cover, and the title page's is a real landmark when the
     // story has one. Enforced here, not left to the writer: no reviewer sees
@@ -502,7 +508,7 @@ class UnifiedStoryParser {
       cover.objects = [backdrop, ...nonLoc].filter(Boolean);
     }
 
-    log.debug(`[UNIFIED-PARSER] Cover hints extracted: front=${this._cache.coverHints.frontCover.hint.length > 0}, initial=${this._cache.coverHints.initialPage.hint.length > 0}, back=${this._cache.coverHints.backCover.hint.length > 0}`);
+    log.debug(`[UNIFIED-PARSER] Cover hints extracted: ${Object.keys(this._cache.coverHints).join(', ')}`);
     return this._cache.coverHints;
   }
 

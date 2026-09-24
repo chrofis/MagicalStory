@@ -3016,7 +3016,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // (beatsResult.coverScenes, rendered through the page path below); the
     // outline carries no cover section any more. The trial keeps its own cover
     // builder (startCoverGeneration / onCoverScene) and the hints it reads.
-    const coverHints = beatsMode ? null : parser.extractCoverHints();
+    let coverHints = beatsMode ? null : parser.extractCoverHints();
+    // The trial writer emits no cover-hints section (only the front cover's
+    // COVER SCENE JSON), so every trial cover the parse left without a hint gets
+    // its structured default here — before the cast, clothing and backdrop
+    // checks below, which then treat it like any hint, and stored with them.
+    // A cover already rendering (the front, from its streamed COVER SCENE
+    // JSON via onCoverScene) keeps no default: it was not made from one.
+    if (inputData.trialMode) {
+      const { trialDefaultCoverHint } = require('./server/lib/coverIterate');
+      for (const coverType of coverTypesFor(inputData)) {
+        if (coverHints?.[coverType] || streamingCoverPromises.has(coverType)) continue;
+        coverHints = coverHints || {};
+        coverHints[coverType] = trialDefaultCoverHint(coverType, inputData);
+      }
+    }
 
     // Reconcile cover hint clothing against the story's clothingRequirements.
     // Claude can write a cover hint that asks for a clothing category that the
@@ -3437,46 +3451,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       const coverTypes = coverTypesFor(inputData);
       for (const coverType of coverTypes) {
         if (streamingCoverPromises.has(coverType)) continue;
+        // Every trial cover has a hint by now: parsed, or its structured
+        // default (trialDefaultCoverHint, set right after the parse). Covers
+        // run concurrently (streamCoverLimit), so this adds no wall clock.
         const hint = coverHints?.[coverType];
-        if (hint) {
-          startCoverGeneration(coverType, hint);
-        } else if (coverType === 'frontCover') {
-          // Trial mode: Claude may not output cover hints — use a default hint
-          const mainCharNames = inputData.characters
-            ?.filter(c => c.isMainCharacter)
-            .map(c => c.name)
-            .join(', ') || inputData.characters?.map(c => c.name).slice(0, 3).join(', ') || 'the main character';
-          const theme = inputData.storyTopic || inputData.storyTheme || 'adventure';
-          const defaultHint = {
-            hint: `A magical, eye-catching front cover scene featuring ${mainCharNames} in a ${theme}-themed setting. The main characters are prominently displayed, looking excited and ready for adventure. The composition leaves space at the top for the title.`,
-            characterClothing: {}
-          };
-          if (inputData._trialCostumeType) {
-            for (const char of (inputData.characters || [])) {
-              defaultHint.characterClothing[char.name] = 'costumed';
-            }
-          }
-          startCoverGeneration(coverType, defaultHint);
-        } else if (coverType === 'backCover') {
-          // Same fallback as the front cover above: the trial writer emits one
-          // COVER SCENE (the front), so the back cover has no hint. A closing
-          // scene at the story's location, main character only — covers run
-          // concurrently (streamCoverLimit = 3), so this adds no wall clock.
-          const mainCharNames = inputData.characters
-            ?.filter(c => c.isMainCharacter)
-            .map(c => c.name)
-            .join(', ') || inputData.characters?.map(c => c.name).slice(0, 3).join(', ') || 'the main character';
-          const backHint = {
-            hint: `A calm closing back-cover scene featuring ${mainCharNames} at the story's main location, warm end-of-day light, content and relaxed after the adventure. Simple composition with open space, no text.`,
-            characterClothing: {}
-          };
-          if (inputData._trialCostumeType) {
-            for (const char of (inputData.characters || [])) {
-              backHint.characterClothing[char.name] = 'costumed';
-            }
-          }
-          startCoverGeneration(coverType, backHint);
+        if (!hint) {
+          log.error(`❌ [COVER] ${coverType}: no cover hint — the cover is not rendered`);
+          continue;
         }
+        startCoverGeneration(coverType, hint);
       }
       log.debug(`⚡ [UNIFIED] Started ${streamingCoverPromises.size} cover generations (avatars ready)`);
     }
