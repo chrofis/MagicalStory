@@ -21,6 +21,55 @@ superseded and link forward.
 
 ---
 
+## 2026-09-24 — Blind text audit recall measured: 🟡 keep — it adds real faults on one story in four, and recall is unstable
+
+**Context:** Prompt audit 05 left an owner call: is the blind text audit (`text_audit_blind`, grok-4.6,
+`prompts/story-text-audit-blind.txt`, pages only) worth its slot? It returned 0 faults on
+`job_1790100385959_1nitlympp`. Owner approved a Lab recall check 2026-09-24, cap CHF 1.00.
+**Method:** Stored data only, 4 staging stories, replayed on the WRITER text (`data.writerText`, the
+draft the production audits read) with the current prompt: Lab `audit_replay`, `level: text-blind`,
+new `params.fromWriterText`. Experiments **#1454** (4 targets; fcmlfa8kn came back empty, 0 chars
+after 4.4k reasoning tokens — the Lab has no empty-retry, production retries once) and **#1455**
+(fcmlfa8kn retried, 1nitlympp repeated). Answer key = listener-facing faults a reader of the text
+alone could notice, taken from the stored arc-informed audit (each checked against the writer text;
+arc-only LOADBEARING, picture MISMATCH and PULL findings excluded), `docs/audits/prompt-audit-2026-09-23/05-story-text.md`
+§1/§3/§4, and the 2026-09-24 "One place is one place" entry. Grammar slips (lector scope) excluded.
+23 key faults:
+- `job_1790100385959_1nitlympp` (8): deadline broken p7→p12/p17, refusal reversed p10→p16, fear never
+  shown p13, bag pressed to the lost egg p14, «die Jacken der Buben» p16, Nia cannot smell it p12,
+  vague ending p18, Turi glides «von der Mauer» p18 from a nest at the linden.
+- `job_1790107559778_fcmlfa8kn` (5): «cupped» p5, «zuriefrief» p7, phone laid down yet left on the
+  sill p6, hazards Aldric never listed p8, keys carried upstairs fall into leaves outside p4.
+- `job_1789853503332_riqncqg1i` (5): Silvan never heard the knock p7, «Zippis Mami» p12, Silvan back
+  at the hollow unexplained p13, snatcher now only asks p16, cold egg hatches against the stated limit p17.
+- `job_1789420511893_zly5rcdej` (5): at Hans's cart unexplained p7, Kilian behind them p11, Daniel at
+  the gangway p15, «abstiesspegelte» p16, the pirate costume/tricorn never introduced (p3, p14).
+**Result:**
+| | recall | notes |
+|---|---|---|
+| blind, current prompt (#1454/#1455) | **10/23 (43%)** — 4/8, 1/5, 1/5, 4/5 | 1nitlympp repeat: 3/8 |
+| blind, as stored at run time (older prompt) | 8/23 (35%) — 0/8, 3/5, 2/5, 3/5 | |
+| arc-informed, as stored (older prompt) | 16/23 (70%) — 2/8, 4/5, 5/5, 5/5 | |
+- Precision (non-STYLE lines, 5 runs): 20 flagged, 14 key faults, 2 plausible but unkeyed (goggles
+  never mentioned again, why the door stays shut never answered), 4 not faults (a backpack prop, an
+  ignored order, two ENDING lines on endings that state a feeling). 70% strict, 80% lenient.
+- Overlap: on 3 of 4 stories every blind catch was also an arc-informed catch. On 1nitlympp the blind
+  audit alone caught 4: refusal reversed, fear never shown, vague ending, Turi's move from the wall.
+- Instability: fcmlfa8kn fell from 3 catches (stored) to 1 (current); 1nitlympp 4 then 3 on an
+  identical input at temperature 0. It missed both non-words on two stories («zuriefrief»,
+  «abstiesspegelte»); the stored older prompt caught one.
+- STYLE lines are most of its output: 49 of 69 lines over the 5 runs.
+- Cost: $0.10–0.14 per story (4–22k output tokens), 270–410 s. It runs in parallel with the arc-informed
+  audit and behind the image phase, so it adds no wait time.
+**Decision:** Keep the call (🟡). It is the only text critic that caught 4 real faults on one story in
+four, at about $0.12. It does not replace the arc-informed audit. It is not stable enough to count on for
+any single fault class. Open, owner call (BACKLOG): whether its STYLE question crowds out recall (not
+measured), and a non-word check. Spend for this measurement: about $0.66.
+**Touched:** `server/lib/testlab.js` (`audit_replay` `params.fromWriterText`).
+**Status:** 🟡 conditional
+
+---
+
 ## 2026-09-24 — A page holds at most 5 paragraphs (was 4)
 
 **Context:** The 2026-09-23 text-stage round made the paragraph shape one constant
@@ -37,6 +86,159 @@ sentence band or to the shape cannot make the two contradict each other.
 **Touched:** `server/lib/promptBuilders.js` (`PAGE_PARAGRAPHS`),
 `tests/unit/text-stage-counter-and-specs.test.ts`.
 **Status:** ✅ active
+
+---
+
+## 2026-09-24 — Every re-plan round faces the regression guard, round 1 included; a checker verdict that flips on an untouched page is set aside (SUPERSEDES the `round > 1` exemption of 2026-09-20)
+
+**Context:** Owner, 2026-09-24, asked how often the page plan's re-plan makes the plan worse: *"That
+is a serious defect and must be fixed."* The 2026-09-20 convergence entry says "a round that raises
+the cast/focal count is discarded", but the code read `>= bestMustFix && round > 1`, so round 1 could
+never be discarded; its own "Not changed" paragraph left that to the owner, and the 2026-09-23 audit
+corrections (item 5, audit 02 W4) recorded staging `job_1790100385959_1nitlympp` shipping a round 1
+that took the cast/focal must-fix count 5 → 7.
+
+**Measured (rung 1, zero paid calls)** over every stored `beatsReviewReport` with a round-1 recheck on
+staging AND prod — 31 distinct books (34 rows; two prod stories also live on staging), 2026-09-06 to
+2026-09-22 CH, all before today's page-plan fixes (4b708f0cd, 094052d45; no post-fix story exists yet):
+
+| round 1, cast/focal must-fix (current scoring) | books |
+|---|---|
+| **higher than the first check — and shipped** | **8 (26%)** |
+| equal | 6 |
+| lower | 17 |
+
+By class across all 34 rows (count up / same / down per book): focal 8/7/13, Q4 wanted picture 4/8/8,
+Q8 ending 5/9/5, cast (NO_COMMISSIONED) 4/18/6, peopleless 4/11/3. 30 of 34 rechecks mint at least one
+cast/focal must-fix the first check did not raise. Of the 71 minted findings, **56 name a page the
+round re-planned, 11 are whole-book** (NO_PEOPLELESS_PAGE, NO_FOCAL_PAGE — the swap moved the gap to
+someone else) **and 4 name only pages the round never touched** — the checker disagreeing with itself.
+Of the minted findings on re-planned pages (distinct books), 22 of 48 fall on shapes today's keep-list already protects
+(the last page, a character's only focal page; WANTED/ACTION pages cannot be measured on rows older than
+2026-09-23), and the largest remaining class is a page rewritten into an establishing shot that empties
+it of every commissioned character (NO_COMMISSIONED_ON_PAGE 11, MAIN_UNDER_HALF 5,
+UNDER_COVERED_CHARACTER 5). Round 2 ran on 4 books, all discarded; in one (`8ayo2w19e`) a Q8 ending
+finding fixed in round 1 reappeared in round 2. The check's roster of an untouched page drifted on
+**0 of 39** stored pages, so the counters (arithmetic over the roster) are stable between rounds; the
+model's Q4/Q8/Q12 verdicts are not.
+
+**Decision:**
+1. **The guard applies to every round.** `replanRoundRegressed(givenCheck, recheck, changedPages,
+   { round })` (promptBuilders.js) returns `discard` when the round ends with MORE cast/focal must-fix
+   findings than it was given — on any round, round 1 included — and, for a round 2+, also when it does
+   not reduce (unchanged: a later round is bought only to mop up). Round 1 may tie: it also answers the
+   shot and noted findings this measure deliberately does not count, and a book whose first check raised
+   no cast/focal must-fix starts at zero and can only tie. A discarded round 1 ships the first division,
+   which stays on the ledger exactly as any discarded round does (`discardedRounds`).
+2. **The stable measure.** Same scoring as the convergence test (`countsTowardConvergence`), with one
+   correction: a MODEL finding (plan-check question, no counter code) that names only pages the round
+   did not change, and appears in just one of the two checks, is left out of BOTH counts. Its plan
+   line is byte-identical in both checks, so its flip is checker noise, not the round's doing. Counter
+   findings always count (0/39 roster drift), and a finding naming no page always counts.
+3. **The Test Lab `beats_replan` stage behaves the same:** it now rechecks the applied division and
+   reports the same guard verdict (`report.guard`), with round-1 semantics. One extra plan-check call
+   per Lab run.
+
+**Replay of the stored rounds through the new guard:** 7 of 31 books would have discarded round 1 and
+shipped the first division; `1nitlympp` reads 5 → 6 (the Q4 on untouched page 16 is set aside) and is
+discarded; `riqncqg1i` reads raw 4 → 5 but its new Q4 names only untouched page 18, so 4 → 4 and round 1
+is kept.
+
+**Not changed:** the "no further round" gate (`replanRoundConverged`) and the per-change review. The
+establishing-shot class above is left to the guard until a post-fix story shows whether today's
+keep-list closes it (BACKLOG).
+
+**Touched:** `server/lib/promptBuilders.js` (`replanRoundRegressed`, export), `server/lib/storyHelpers.js`
+(facade), `server/lib/beatsPipeline.js` (the guard, `round > 1` removed, `bestMustFix` deleted),
+`server/lib/testlab.js` (`beats_replan` recheck + guard), `scripts/admin/verify-checks.js`
+(`replanRoundNeverRegresses`), `tasks/verify.json`,
+`tests/unit/replan-round-regression-guard.test.ts`.
+**Status:** ✅ active — staging.
+
+---
+
+## 2026-09-24 — The wardrobe review runs with reasoning OFF, in production and in the Lab
+
+**Context:** the wardrobe review (`beats_clothing_review`, `clothingReviewModel` deepseek-v4-pro) is the
+slow call in front of the styled-avatar kickoff. Test Lab on run 6's stored contract
+(`job_1790100385959_1nitlympp`): exp **1425** reasoning on — 232 s, 21,538 reasoning tokens, $0.071;
+exp **1427** reasoning off — 8 s, 0 reasoning tokens, $0.007. Off names the same colour and plot-garment
+faults in its analysis but rewrites fewer outfits (only Max; colour faults left unrewritten). The
+2026-09-23 entry "The wardrobe calls…" left the trade to the owner.
+
+**Decision:** owner, 2026-09-24: *"runs with reasoning/thinking OFF in production … The owner chose
+speed."* `MODEL_DEFAULTS.clothingReviewReasoning = { enabled: false }` sits next to the model in
+`server/config/models.js` (behaviour is code, not env). Production (`beatsPipeline`) and the Lab replay
+(`testlab.runClothingReviewStage`) both pass that one constant as the OpenRouter `reasoning` field; the
+Lab's `noReasoning` parameter is deleted — a replay measures what production runs. Both reports record
+the setting (`clothingReviewReport.reasoning`, Lab result `reasoning`).
+
+**Rationale:** ~3.5 minutes off the path in front of the avatars for a measured loss in rewrite coverage
+the owner accepted. One constant for both sites so the Lab can never silently measure a different
+reviewer from production (the 2026-09-23 fix to the Lab's model choice, applied to reasoning).
+
+**Touched:** `server/config/models.js`, `server/lib/beatsPipeline.js`, `server/lib/testlab.js`,
+`tests/unit/outfit-version.test.ts`, `docs/prompt-inventory.md`.
+**Status:** ✅ active — staging only
+
+---
+
+## 2026-09-24 — A garment the Art Director adds in a filled slot is a new OUTFIT VERSION with its own sheet; the default outfit is never rewritten (answers 2026-09-23 item 4; supersedes the `conflict` half of 2026-09-15 "The Visual Bible outranks the wardrobe contract")
+
+**Context:** the 2026-09-23 entry "The wardrobe contract owns garment wording" left one path open: a
+`conflict` — a Visual Bible garment that is a DIFFERENT garment in a slot the wardrobe contract already
+fills — still rewrote the outfit clause to the bible's garment, re-rendered that character's avatar from
+photos (`onWardrobeCorrected`), and the cover dedupe dropped the contradicting outfit segment. So one
+page's garment became the character's outfit on every page, and the re-render re-rolled the face.
+
+**Decision:** owner, 2026-09-24: *"this becomes a NEW OUTFIT VERSION with its own avatar sheet. The
+default outfit stays untouched."* Built on the existing wardrobe-state variant mechanism (2026-09-19
+"A garment coming off gets an avatar SHEET"), no parallel one:
+1. `applyWardrobeBibleCorrections` marks the entry `outfitVersion = {character, category, slot, replaces,
+   garment, outfit}` (`replaces` = the contract clause, `garment` = the bible's words, `outfit` = the
+   default with that one clause spliced). An entry attributed by name alone is linked `wornAs:
+   "<character>.<slot>"` so the per-page worn machinery sees it. The contract is byte-identical; nothing
+   is re-rendered. A marked entry is settled — the check skips it on a re-run.
+2. **The page that needs the garment selects the version**: a `wornItems` row declaring it, or `objects[]`
+   citing it (`wornItems.resolveWornItemsForPage`). Any other page gets no row for it at all — the default
+   outfit, no text swap, no variant sheet. A version garment declared `off` is the default outfit: nothing
+   is stripped and no off-sheet is keyed.
+3. On a version page the outfit text is the exact splice (`applyWornItemsToOutfit`, never the slot-noun
+   guess), and the state set that keys the sheet (`offIdsForCharacter`) holds the version id —
+   `styled-<category>--off:<ARTid>`, one key algebra with the off-states, so every crop, entity-grid and
+   repair site picks it up unchanged. The suffix keeps its historical name.
+4. **One new sheet per version, never the default re-rendered**: `deriveWardrobeVariantRequirements` asks
+   for the approved default sheet of the version's plain category, redressed by `redressSheetVariant`
+   with an instruction that QUOTES the version's two recorded texts (`versionRedressNote`) — nothing is
+   derived from English. A costumed-category version, or a page that wears a version AND takes a garment
+   off, gets no sheet (logged ERROR; the crop site falls back loudly to the default sheet).
+5. **Covers follow the same rule**: a cover whose hint (objects ∪ holds) cites the version garment wears
+   it — outfit text via `applyCoverOutfitVersions`, sheet via `wornResolved` — at both cover sites
+   (first generation and iterate); the streaming cover waits on `wardrobeVersionsReady` for its sheet.
+   This amends 2026-09-19 item 7 ("covers always take the worn sheet") for versions only; covers still
+   take no off-state.
+6. **Deleted (no fallback):** the contract rewrite, the transcript re-merge for a conflict, the
+   `onWardrobeCorrected` hook and its re-render in `storyJobPipeline`, and the cover dedupe's
+   "drop the contradicting segment" branch (a same-slot item nothing links now leaves both sides).
+
+**Validated (free replay, stored staging `job_1790100385959_1nitlympp`, contract + Visual Bible):**
+stored contract → 1 `adopt`, 0 versions, contract byte-identical, 0 version sheets (the 3 off-state
+variants unchanged); pre-review contract → 3 `adopt` (as in 8dbe8d28b), 0 versions. Synthetic conflict
+on the same story (a yellow raincoat linked to Levin's outer layer, cited on p1 only): 1 `conflict` → 1
+version, Levin's default outfit unchanged, one sheet requested (`standard--off:ART099`, page 1), p1
+wears the raincoat and all 10 other Levin pages keep the default fleece.
+
+**Known limits:** a version mark lives on the in-memory/stored Visual Bible, not in the transcript
+(`syncVisualBibleSection` does not copy it — same as `adopt`), so a resume that re-parses the outline
+loses it. A linked version garment on its own owner drops its element plate like any worn garment
+(`referenceCarriesItem`); if its sheet failed, the page has the default sheet plus the text.
+
+**Touched:** `server/lib/clothingCheck.js`, `server/lib/wornItems.js`, `server/lib/wardrobeVariants.js`,
+`server/lib/beatsPipeline.js`, `storyJobPipeline.js`, `server/lib/coverIterate.js`,
+`tests/unit/outfit-version.test.ts`, `tests/unit/wardrobe-vs-bible.test.ts`,
+`tests/unit/worn-garment-review-chain.test.ts`, `tests/unit/cover-worn-held-slot-conflict.test.ts`,
+`docs/prompt-inventory.md`.
+**Status:** ✅ active — staging only
 
 ---
 
@@ -24078,7 +24280,8 @@ not on the asset being safe.
 - `server/lib/compositeCastBuilder.js` — sibling lazy-gen path logs the unstyled case
 - `tests/manual/avatarStyleAnchorRetry.test.js` — 32 assertions against the real
   sliced function source
-**Status:** ✅ active
+**Status:** ✅ anchor-drop retry active; 🔁 the realistic fallback is SUPERSEDED 2026-09-24
+("No realistic fallback for a style-rejected avatar sheet")
 
 ## 2026-08-20 — The arc is drafted and reviewed BEFORE the pages exist (plan sonnet / review grok)
 
@@ -48850,6 +49053,8 @@ QC retry), `server/lib/evalPipeline.js` (comment), `tests/unit/empty-scene-geome
 
 ## 2026-09-15 — The Visual Bible outranks the wardrobe contract when they dress the same body slot
 
+> → `conflict` half superseded 2026-09-24: a different garment in a filled slot is a new outfit version, the contract is never rewritten and no avatar re-renders, see "2026-09-24 — A garment the Art Director adds in a filled slot is a new OUTFIT VERSION".
+
 > → superseded 2026-09-23 (the wardrobe contract owns garment wording; the Art Director selects versions), see "2026-09-23 — The wardrobe contract owns garment wording".
 
 > → corrected 2026-09-23 (its reconcile half runs opposite to the same-day plot-critical-object entry), see "2026-09-23 — Prompt audit of job_1790100385959: corrections to earlier entries", item 7.
@@ -50191,6 +50396,8 @@ string), `client/src/types/story.ts` (`ImageVersion.prompt: string | null`),
 ---
 
 ## 2026-09-19 — A garment coming off gets an avatar SHEET, not just a sentence: per-state wardrobe variants
+
+> → item 7 amended 2026-09-24 for outfit VERSIONS only: a cover that cites a version garment wears the version sheet, see "2026-09-24 — A garment the Art Director adds in a filled slot is a new OUTFIT VERSION".
 
 **Context.** Staging `job_1789759147125_p08djwhbl` (18 pages) flips three garments: Levin's green fleece
 (off on 9 pages), his red cap (off on 2), Julian's rust scarf (off on 1). `data.characterAvatars` held
@@ -53027,6 +53234,7 @@ is the open alternative, and is a prompt-side change the owner should see first.
 ## 2026-09-20 — The re-plan convergence test counts CAST/FOCAL must-fix findings, not the raw must-fix total
 
 > → corrected 2026-09-23 ("a round that raises the cast/focal count is discarded" holds for round 2+ only), see "2026-09-23 — Prompt audit of job_1790100385959: corrections to earlier entries", item 5.
+> → 🗄 the `round > 1` exemption is SUPERSEDED 2026-09-24: every round, round 1 included, is discarded when it raises the count — see "2026-09-24 — Every re-plan round faces the regression guard, round 1 included".
 
 **Context:** `beatsPipeline.js` decides whether to keep or discard a re-plan
 round by comparing must-fix counts before and after: `stillMustFix.length >=
@@ -57612,6 +57820,8 @@ to, and which prompts are not stored, is in `docs/prompt-inventory.md` ("What ea
    (beatsPipeline.js:1702): round 1 is never discarded, and a tie is. The entry's own "Not changed"
    paragraph discloses `round > 1` and leaves it to the owner. On run 6 round 1 raised cast/focal
    must-fix from 5 to 7 and shipped (audit 02 W4). Still an owner decision; nothing changed.
+   → Decided and fixed 2026-09-24 (owner: "must be fixed"): see "2026-09-24 — Every re-plan round
+   faces the regression guard, round 1 included".
 6. **"A wardrobe correction re-renders its avatar" (2026-09-15)** justifies the re-render as serving "a
    rare conflict". The `reconcile` kind (`checkWardrobeAgainstBible`, clothingCheck.js:653) fires
    whenever a `wornAs` element words a garment differently, even when it is the same garment. On run 6
@@ -57922,6 +58132,8 @@ SHAPE band, which has not returned `standard` since the 2026-09-14 band split, s
 `scripts/admin/sibling-registry.json`, `tasks/bugs.json`, `tasks/BACKLOG.md`.
 
 ## 2026-09-23 — The wardrobe contract owns garment wording; the Art Director selects versions (supersedes the direction of both 2026-09-15 wardrobe/bible entries)
+
+> → item 4 answered 2026-09-24 (owner): a `conflict` is a new outfit version with its own sheet, see "2026-09-24 — A garment the Art Director adds in a filled slot is a new OUTFIT VERSION".
 
 **Context.** Two 2026-09-15 entries disagreed on direction: "A plot-critical worn object is described IN
 FULL in the outfit" (the wardrobe authors the words, the Visual Bible copies them) and "The Visual Bible
@@ -59395,3 +59607,105 @@ entity bill is identical to the old reader's (penalty 0), and the replayed canon
 client/src/hooks/useRepairWorkflow.ts, client/src/services/storyService.ts,
 tests/unit/entity-findings-one-reader.test.ts, tasks/bugs.json.
 **Status:** ✅ active
+
+## 2026-09-24 — No realistic fallback for a style-rejected avatar sheet: the best styled attempt ships with a warning
+
+**Supersedes** the "a rejected Pass 2 falls back to the realistic Pass-1 sheet" half of
+"2026-08-20 — The Pass-2 retry drops the style anchor, and a rejected Pass 2 ships unstyled".
+The anchor-drop retry from that entry stays.
+
+**Context:** when the Pass-2 styled 2×4 sheet failed its style judge on both attempts,
+`generateCharacter2x4Sheet` shipped the realistic Pass-1 sheet, so that child looked unlike
+the art style of every other figure in the book. The 2026-09-23 judge axes (background,
+hair/skin colour drift against the pass-1 sheet) make a both-attempts rejection likelier.
+Owner, 2026-09-24: "ship the BETTER of the two styled attempts (by the judge's computed final
+score) and log a warning. Never fall back to the realistic sheet." — the gates-are-guidelines
+rule (final strike ships with a warning), with two explicit exceptions: never ship a wrong
+person, and fail loudly rather than silently use Pass 1.
+
+**Decision:**
+- An attempt the style judge (`sheet-2x4-style-eval.txt`) scored below 6 on **identity** or
+  **solo** never ships (`STYLED_IDENTITY_AXES`). Identity = same person as the source photo,
+  hair/skin as the pass-1 sheet; solo = no extra or ghosted people — the style-anchor
+  contamination of job_1787252581387_6sn8z0nh2, which was the reason for the 2026-08-20
+  fallback. Both are "a wrong person on every page". Every other axis (layout, style, clean,
+  bodyFace, age, background) is a quality gate.
+- Among the remaining attempts the highest judge `finalScore` ships. An attempt whose judge
+  call threw is unscored and ranks below every judged one (it used to count as a neutral 5
+  and could beat a judged 4 whose identity had been verified).
+- Shipped but style-rejected → `styleJudgeRejected: true` + `styleJudgeReasons` on the result,
+  `log.warn`, and the styled-avatar audit entry is `success: false` with a `warning` naming
+  the score and failed axes — the red card in the dev panel's "Styled Avatars" section.
+- No attempt produced an image, or every attempt failed identity/solo → the sheet generation
+  **throws**. `convertAvatarToStyle` records the error in the audit log and rethrows; the
+  existing downstream handling (costumed→standard retry, `ensureStyledAvatarCoverage`
+  backstop with its `[AVATAR] ❌` logs) is unchanged. The outer try/catch that downgraded a
+  thrown Pass 2 to "ship Pass 1 unstyled" is deleted. `styleTransferShipped` is deleted.
+- Unchanged: realistic art style ships Pass 1 (no style transfer wanted); unjudgeable runs
+  (trial `skipQualityEval`, no Gemini key) ship their single attempt as before; Test Lab
+  `avatar_style` keeps the sheet either way and now records `shippable` / `styleJudgeValid`.
+
+**Evidence (free replay of stored `styledAvatarGeneration` records):** staging
+job_1790100385959_1nitlympp — 6 entries, none fell back before; the rule picks the same sheet
+for all 6. Kiaan's attempt 1 (score 1, failed solo) would be identity-rejected under the new
+rule; attempt 2 passed at 9 and ships either way. Across all staging stories of the last 30
+days exactly one entry fell back (job_1788555701112_99txp8evx, Emma: both attempts 1/10 on
+`clean`, identity 9) — it would now ship the styled attempt with a warning. Production, last
+30 days: zero fallbacks.
+
+**Touched:** `server/lib/character2x4Sheet.js` (`runStyleTransferPass` returns
+`shippable`/`identityFailing`, stores `soloScore`/`ageScore` per attempt;
+`generateCharacter2x4Sheet`), `server/lib/styledAvatars.js`,
+`server/lib/compositeCastBuilder.js`, `server/lib/testlab.js`,
+`tests/unit/avatar-styled-no-realistic-fallback.test.ts` (new) + sandbox constants in the
+four existing Pass-2 vm tests and `tests/manual/avatarStyleAnchorRetry.test.js`,
+`docs/prompt-inventory.md`, `docs/image-routing.md`, `docs/image-generation-methods.html`.
+**Status:** ✅ active (staging)
+
+## 2026-09-24 — A multi-page entity finding counts on each of its pages; a wardrobe finding the page's declared state voids costs nothing
+
+**Context:** staging `job_1790100385959_1nitlympp` (dragon run 6). The final entity report is assembled from the
+shipped picks (repairPipeline Step 4b), which dedupes one finding across pages: Kiaan `clothing_inconsistent`
+MAJOR "missing the rust-brown … body warmer" is stored once with `pageNumbers: [11,12]`, `pageNumber: 11` and
+no `pagesToFix`. The page reader matched `pages` / `pagesToFix` / `pageNumber` only, so p12 neither billed nor
+listed it, and every repair reader (`pagesToFix || pageNumber`) targeted p11 alone. Separately, both pages
+declare `{id: ART004, owner: Kiaan, state: "off"}`: the finding is a garment taken off by design. The
+2026-09-23 entry keeps NEW off pages out of the wearing grid, but nothing tied a wardrobe finding to the page's
+declared state once it existed — a stored report, the identity grid, or a model `pagesToFix` naming a page
+outside its grid still billed it.
+
+**Decision (owner-approved, 2026-09-24):**
+1. `scoring.entityFindingPages(issue)` is the one page accessor: `pagesToFix`, then `pageNumbers`, then `pages`,
+   then `pageNumber`. `entityFindingsByPage(report)` yields one row per (finding, page); `entityFindingsForPage`
+   filters it. Score, panel lists, `repairLogic` (char-fix selection, `decideRepairMethod`), the manual repair
+   route, the consolidator's report path, `repairSinglePage` and the round merge all read through it — one row
+   per page, so a finding stored with all three fields is still counted once. Step 4b stamps
+   `pagesToFix = pageNumbers` (the routing field) and dedupes per grid; `mergeEntityIssues` trims only the
+   re-checked pages off a base finding instead of keeping or dropping it by its first page.
+2. Severity rule in code (owner-approved; classification stays with the prompt): the entity check stamps each
+   character's `declaredOffByPage` from the per-appearance `offIds` that already key the grids (the page's
+   `wornItems` rows). `scoring.offByDesignFinding` voids a finding on a page when it bills as clothing
+   (evalBuckets → `clothing`), the page declares ≥1 of that character's garments off, and the finding's
+   `clothingCategory` is not that exact `--off:` grid (or is unknown). Voided findings go to
+   `entityIssuesForPage(...).excused` — 0 points, never in `issues`, so they never reach the consolidator, the
+   panel list or char-fix — and `entityConsistency` logs each one. Version stamps now carry `clothingCategory`.
+   A wardrobe finding judged IN the page's own off-state grid still counts: the judge was told the removal.
+
+**Rationale:** a finding carries no garment id, so "is this about the garment that is off" cannot be answered
+without reading its text (forbidden, SETTLED). "Was it judged against the page's declared wardrobe state" can
+be answered from ids alone, and a judgement against a reference that still wears a removed garment is invalid
+for that page whatever it says. Consequence, accepted: on such a page a wardrobe finding judged against the
+wrong state is voided even when it is about a different garment (it was judged against the wrong reference).
+No prompt change: the entity prompt already receives the per-page state through the `--off:` grid and its
+Clothing Context (2026-09-23).
+
+**Replay (rung 1, stored run 6, no model calls):** declared off: Kiaan p11/p12 ART004, Levin p16 ART006, Max p9
+ART005. Final report: Kiaan's finding now reaches p12 as well, and is excused on both (p11 entity 15 → 0,
+p12 0 → 0). Per version, stamp through the new rule and the stored consolidated plan without the entity-only
+item it would no longer receive: p11 v0 70 → 85, p12 v0 10 → 10, p12 v1 −15 → 0, p16 v0 13 → 28, p16 v1 and
+p9 v0 unchanged. Pages 14 and −3 (Julian, non-wardrobe findings) unchanged.
+
+**Touched:** server/lib/scoring.js, server/lib/entityConsistency.js, server/lib/repairPipeline.js,
+server/lib/repairLogic.js, server/lib/feedbackConsolidator.js, server/lib/images.js, server/routes/regeneration.js,
+tests/unit/entity-multipage-off-by-design.test.ts, tasks/bugs.json.
+**Status:** ✅ active on staging.

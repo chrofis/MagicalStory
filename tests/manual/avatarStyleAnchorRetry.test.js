@@ -12,8 +12,9 @@
  *   1. the retry DROPS the anchor (re-sending the identical prompt + identical
  *      anchor just re-rolls the same dice), and switches to the no-anchor
  *      prompt so it stops referring to an Image 2 that isn't attached;
- *   2. runStyleTransferPass reports `valid`, so the caller can ship the Pass-1
- *      realistic sheet instead of a rejected styled one.
+ *   2. runStyleTransferPass reports `valid` (style judge) and `shippable`
+ *      (identity/solo) — the caller never ships the realistic Pass-1 sheet
+ *      (2026-09-24, tests/unit/avatar-styled-no-realistic-fallback.test.ts).
  *
  * The module can't be require()'d here (native sharp + side effects), so the
  * REAL function source is sliced out and run in an isolated vm with the backend
@@ -66,6 +67,8 @@ function makeSandbox({ verdicts, hasAnchor = true, skipQualityEval = false }) {
     log: { info: () => {}, warn: () => {}, error: () => {} },
     MODEL_DEFAULTS: { avatarStyleTransferBackend: 'grok', avatarStyleTransferModel: 'x' },
     MAX_SHEET_RETRIES: 1, // production value → 2 attempts total
+    SHEET_VALID_MIN: 6,
+    STYLED_IDENTITY_AXES: ['identity', 'solo'],
     loadStyleAnchor: () => (hasAnchor ? ANCHOR : null),
     buildStyleTransferPrompt: (_style, { hasAnchor: h } = {}) => (h ? 'P_WITH_ANCHOR' : 'P_NO_ANCHOR'),
     styleTransferGenerate: async (prompt, _img, _backendOverride, styleAnchor) => {
@@ -131,7 +134,7 @@ async function run(sandbox, extra = {}) {
     eq(res.valid, true, 'valid=true');
   }
 
-  console.log('\nevery attempt rejected → valid:false (caller ships Pass 1)');
+  console.log('\nevery attempt rejected → valid:false (caller ships the best styled attempt with a warning)');
   {
     const sb = makeSandbox({
       verdicts: [{ valid: false, score: 1, reasons: ['Single Subject — No Other People'] },
@@ -187,7 +190,7 @@ async function run(sandbox, extra = {}) {
     eq(res.valid, true, 'retry still works without an anchor');
   }
 
-  console.log('\nevery attempt throws → explicit error (outer catch ships Pass 1)');
+  console.log('\nevery attempt throws → explicit error (no Pass-1 fallback; the caller fails loudly)');
   {
     const sb = makeSandbox({ verdicts: ['throw', 'throw'] });
     let threw = null;

@@ -77,6 +77,51 @@ function parseWornAs(wornAs) {
 const sameName = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
 
 /**
+ * OUTFIT VERSIONS (owner, 2026-09-24). A Visual Bible garment that puts a
+ * DIFFERENT garment into a slot the wardrobe contract already fills (a
+ * clothingCheck `conflict`) is a new version of that character's outfit, never
+ * a rewrite of the default: `entry.outfitVersion = {character, category, slot,
+ * replaces, garment, outfit}` — `replaces` is the contract clause it stands in
+ * for, `garment` the bible's own words, `outfit` the version's full text.
+ * Marked by clothingCheck.applyWardrobeBibleCorrections; read here.
+ *
+ * The version is worn ONLY on a page that asks for it — a `wornItems` row that
+ * declares it, or a brief whose `objects[]` cites it. Every other page is the
+ * default outfit: no row, no text swap, no variant sheet.
+ */
+function outfitVersionOf(entry) {
+  const v = entry && entry.outfitVersion;
+  return v && v.character && v.replaces && v.garment ? v : null;
+}
+
+/** Does the brief's `objects[]` cite this VB id (any facet)? */
+function briefCitesId(sceneMetadata, id) {
+  const want = String(id || '').trim().toUpperCase();
+  const objects = sceneMetadata && (Array.isArray(sceneMetadata.objects)
+    ? sceneMetadata.objects
+    : (sceneMetadata.fullData && Array.isArray(sceneMetadata.fullData.objects) ? sceneMetadata.fullData.objects : []));
+  return (objects || []).some(o => {
+    const raw = String((typeof o === 'string' ? o : o && o.id) || '').trim().toUpperCase();
+    return raw === want || raw.startsWith(`${want}.`);
+  });
+}
+
+/**
+ * Put `replacement` in place of `clause`, keeping the clause's own joiner and
+ * article (2026-09-23). "…sneakers, and a forest green zip-up fleece jacket"
+ * restated as "forest green long-sleeve … jacket" used to lose its "and a" and
+ * read "…sneakers, forest green long-sleeve … jacket". A replacement that brings
+ * its own article keeps it only when the clause had none.
+ */
+const CLAUSE_LEAD_RE = /^\s*(?:(?:and|or|plus)\s+)?(?:(?:a|an|the)\s+)?/i;
+const ARTICLE_RE = /^\s*(?:a|an|the)\s+/i;
+function spliceClause(description, clause, replacement) {
+  const lead = (clause.match(CLAUSE_LEAD_RE) || [''])[0];
+  const body = /\b(?:a|an|the)\s+$/i.test(lead) ? replacement.replace(ARTICLE_RE, '') : replacement;
+  return description.split(clause).join(lead + body);
+}
+
+/**
  * Normalise the brief's declared `wornItems[]`. Rows without a usable id are
  * dropped; a row with an unrecognised state keeps `state: null` so the
  * mechanical check sees it as undeclared rather than silently guessing.
@@ -397,6 +442,12 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
   for (const item of wornAsEntries(visualBible)) {
     linked.add(item.id);
     const d = declared.get(item.id) || null;
+    // An outfit VERSION garment is on this page only when the page asks for it
+    // (a declared row, or `objects[]` cites it). Otherwise the page is the
+    // default outfit and the garment has no row at all — silence is the
+    // default, not a missing state.
+    const version = outfitVersionOf(item.entry);
+    if (version && !(d && d.state) && !briefCitesId(sceneMetadata, item.id)) continue;
     // The gate tests the person the row CHANGES — owner OR declared wearer.
     // See castKeepsWornRow.
     if (!castKeepsWornRow({ castNames, owner: item.owner, declaredWearer: d && d.wearer, id: item.id, pageLabel })) continue;
@@ -444,6 +495,7 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
       defaulted: !stateDeclared,
       missing,
       redressNote: (d && d.redressNote) || null,
+      outfitVersion: version,
     });
   }
 
@@ -1384,6 +1436,10 @@ function stripOffItemsFromOutfit(description, resolved, characterName) {
   const removals = [];
   for (const r of (resolved || [])) {
     if (!isOffForCharacter(r, characterName)) continue;
+    // An outfit-version garment off is the DEFAULT outfit, which never had it:
+    // there is nothing to strip, and the element's words would otherwise point
+    // the stripper at the default garment of the same slot.
+    if (outfitVersionOf(r.entry)) continue;
     // The Visual Bible entry itself, so the strip identifies the garment by what
     // the element DECLARES rather than by a closed list of English garment
     // nouns. `{ name: r.name }` is the same question asked of the one declared
@@ -1448,6 +1504,21 @@ function applyWornItemsToOutfit(description, resolved, characterName) {
   for (const r of (resolved || [])) {
     if (!r || r.state !== 'worn' || !r.slot) continue;
     if (!sameName(r.wearer || r.owner, characterName)) continue;
+    // AN OUTFIT VERSION (2026-09-24) knows exactly which clause it replaces —
+    // the conflict that created it recorded it — so the page's outfit becomes
+    // the version by one exact splice, never by the slot-noun guess below.
+    const version = outfitVersionOf(r.entry);
+    if (version) {
+      if (!sameName(version.character, characterName)) continue;
+      if (!text.includes(version.replaces)) {
+        log.warn(`[WORN] ${r.id} is ${characterName}'s outfit version but the outfit text does not contain the clause it replaces ("${version.replaces}") — the page keeps its outfit text; the WORN ITEMS block still names the garment`);
+        swaps.push({ id: r.id, slot: r.slot, applied: false, reason: 'version-clause-absent' });
+        continue;
+      }
+      text = spliceClause(text, version.replaces, version.garment);
+      swaps.push({ id: r.id, slot: r.slot, applied: true, reason: 'outfit-version' });
+      continue;
+    }
     const nouns = SLOT_NOUNS[r.slot];
     // An unknown slot ends the swap, and says so (2026-09-18). The element's own
     // words cannot stand in for the vocabulary here the way they do in the
@@ -1526,6 +1597,25 @@ function resolveOutfitForPage(description, resolvedWorn, characterName) {
   const { text: stripped, removals } = stripOffItemsFromOutfit(description, resolvedWorn, characterName);
   const { text, swaps } = applyWornItemsToOutfit(stripped, resolvedWorn, characterName);
   return { text, removals, swaps };
+}
+
+/**
+ * A cover's outfit text for each character who wears an outfit version there
+ * (rows from wardrobeVariants.coverVersionRows) — the page resolver above, so a
+ * cover and a page that wear one version say it in one string. Mutates the
+ * photos' clothingDescription.
+ */
+function applyCoverOutfitVersions(photos, versionRows) {
+  if (!Array.isArray(photos) || !Array.isArray(versionRows) || versionRows.length === 0) return photos;
+  for (const p of photos) {
+    if (!p || !p.name || !p.clothingDescription) continue;
+    const { text, swaps } = resolveOutfitForPage(p.clothingDescription, versionRows, p.name);
+    if (swaps.some(s => s.applied)) {
+      log.info(`👕 [COVER-VERSION] ${p.name}: wears outfit version ${swaps.filter(s => s.applied).map(s => s.id).join('+')} on this cover`);
+      p.clothingDescription = text;
+    }
+  }
+  return photos;
 }
 
 /**
@@ -1660,8 +1750,13 @@ module.exports = {
   stripOffItemsFromOutfit,
   applyWornItemsToOutfit,
   resolveOutfitForPage,
+  applyCoverOutfitVersions,
   resolveOutfitForStoryPage,
   resolveGeneratedOutfit,
   wornItemsBibleOf,
   sameName,
+  outfitVersionOf,
+  briefCitesId,
+  spliceClause,
+  CLAUSE_LEAD_RE,
 };

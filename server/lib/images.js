@@ -5967,7 +5967,8 @@ function collectAllIssuesForPage(scene, storyData, pageNumber) {
   // scoring.entityFindingsForPage — the same reader the score bills from, so
   // this list holds exactly the entity findings the page's score counted.
   const { entityFindingsForPage } = require('./scoring');
-  for (const { name, issue } of entityFindingsForPage(pageNumber, storyData.finalChecksReport?.entity)) {
+  for (const { name, issue, offByDesign } of entityFindingsForPage(pageNumber, storyData.finalChecksReport?.entity)) {
+    if (offByDesign) continue; // the page takes this garment off — not a defect here, never a repair input
     issues.push({
       description: issue.fixInstruction || issue.description,
       severity: issue.severity,

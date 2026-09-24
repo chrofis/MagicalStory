@@ -39,8 +39,8 @@ describe('wardrobe contract vs Visual Bible', () => {
     expect(f[0].slot).toBe('headwear');
     expect(f[0].elementId).toBe('ART002');
     expect(f[0].wardrobeClause).toContain('tricorn');
-    expect(f[0].after).toContain('gold metal anchor');
-    expect(f[0].after).not.toContain('tricorn');
+    expect(f[0].versionOutfit).toContain('gold metal anchor');
+    expect(f[0].versionOutfit).not.toContain('tricorn');
   });
 
   it('does not fault the character whose bible entry IS her wardrobe hat', () => {
@@ -84,14 +84,18 @@ describe('wardrobe contract vs Visual Bible', () => {
     expect(f[0].kind).toBe('conflict');
   });
 
-  it('corrects the contract in place and logs loudly', () => {
+
+  it('turns a different garment into an outfit version and logs loudly; the contract is untouched', () => {
     const r: any = reqs();
+    const vb: any = bible();
     const lines: string[] = [];
-    const { applied } = applyWardrobeBibleCorrections(r, bible(), { log: { warn: (m: string) => lines.push(m) } });
-    expect(applied).toHaveLength(1);
-    expect(r.Sarah.costumed.description).toContain("captain's cap");
-    expect(r.Sarah.costumed.description).not.toContain('tricorn');
+    const { applied, versions } = applyWardrobeBibleCorrections(r, vb, { log: { warn: (m: string) => lines.push(m) } });
+    expect(applied).toHaveLength(0);
+    expect(versions).toHaveLength(1);
+    expect(r.Sarah.costumed.description).toBe(SARAH);
     expect(r.Emma.costumed.description).toBe(EMMA);
+    expect(vb.artifacts[1].outfitVersion.outfit).toContain("captain's cap");
+    expect(vb.artifacts[1].outfitVersion.outfit).not.toContain('tricorn');
     expect(lines.join('\n')).toContain('Sarah/headwear');
     expect(lines.join('\n')).toContain('ART002');
   });
@@ -105,71 +109,53 @@ describe('wardrobe contract vs Visual Bible', () => {
 
 /**
  * THE `corrected` FLAG WAS ALWAYS FALSE (fixed 2026-09-15). The corrector
- * re-derives the findings after every rewrite, so the objects in `applied` are
- * never the objects in `findings` — `applied.includes(f)`, the identity test
- * beatsPipeline used to build wardrobeBibleReport, could not be true even for a
- * correction that landed. Every successful correction was reported as
- * uncorrected and `unresolved` was dropped on the floor.
+ * re-derives the findings after every change, so the objects it returns are
+ * never the objects in `findings` — identity comparison could not be true even
+ * for a change that landed.
  */
 describe('the applied set is identified by value, never by object identity', () => {
-  it('a landed correction is NOT the same object as its finding', () => {
+  it('a landed change is NOT the same object as its finding', () => {
     const r: any = reqs();
-    const { findings, applied, unresolved } = applyWardrobeBibleCorrections(r, bible(), { log: { warn: () => {} } });
+    const { findings, versions, unresolved } = applyWardrobeBibleCorrections(r, bible(), { log: { warn: () => {} } });
     expect(findings).toHaveLength(1);
-    expect(applied).toHaveLength(1);
+    expect(versions).toHaveLength(1);
     expect(unresolved).toHaveLength(0);
-    expect(applied.includes(findings[0])).toBe(false);       // the bug
+    expect(versions.includes(findings[0])).toBe(false);       // the bug
     const key = (f: any) => [f.character, f.category, f.slot, f.elementId || ''].join('|');
-    expect(new Set(applied.map(key)).has(key(findings[0]))).toBe(true);   // the fix
+    expect(new Set(versions.map(key)).has(key(findings[0]))).toBe(true);   // the fix
   });
 
-  it('beatsPipeline reports it by key and carries the applied names to the caller', () => {
+  it('beatsPipeline reports it by key', () => {
     const fs = require('fs');
     const path = require('path');
     const src = fs.readFileSync(path.join(__dirname, '..', '..', 'server', 'lib', 'beatsPipeline.js'), 'utf8');
     expect(src).toContain('corrected: appliedKeys.has(correctionKey(f))');
     expect(src).not.toContain('corrected: applied.includes(f)');
-    expect(src).toContain('onWardrobeCorrected(names, clothingRequirements)');
   });
 });
 
 /**
- * THE AVATAR IS RENDERED BEFORE THE CORRECTION EXISTS (fixed 2026-09-15).
- * The styled-avatar kickoff fires at the story-bible stage — deliberately, it is
- * the long pole in front of every image — while this correction can only run
- * once the Visual Bible exists, several stages later. Page prompts then carried
- * the corrected garment while the avatar reference cell still wore the old one.
- * The kickoff is NOT moved; the affected characters are re-rendered.
+ * NO AVATAR IS RE-RENDERED FOR A CONFLICT (owner, 2026-09-24). The 2026-09-15
+ * hook re-rendered a character from photos after the contract was rewritten to
+ * the bible's garment; the contract is no longer rewritten, the default sheet
+ * stands, and the version gets its own redressed sheet
+ * (tests/unit/outfit-version.test.ts).
  */
-describe('a corrected outfit re-renders its avatar', () => {
+describe('a conflict never re-renders the default avatar', () => {
   const fs = require('fs');
   const path = require('path');
   const root = path.join(__dirname, '..', '..');
   const beats = fs.readFileSync(path.join(root, 'server', 'lib', 'beatsPipeline.js'), 'utf8');
   const pipeline = fs.readFileSync(path.join(root, 'storyJobPipeline.js'), 'utf8');
 
-  it('the kickoff still runs BEFORE the correction — the ordering is the constraint, not the bug', () => {
+  it('the kickoff still runs BEFORE the check', () => {
     expect(beats.indexOf('onClothingRequirements(clothingRequirements)'))
       .toBeLessThan(beats.indexOf('applyWardrobeBibleCorrections(clothingRequirements, visualBible)'));
   });
 
-  it('the correction fires the re-render hook only for characters whose CONTRACT changed', () => {
-    // An `adopt` rewrites the bible entry, not the outfit (2026-09-23) — see
-    // tests/unit/worn-garment-review-chain.test.ts.
-    expect(beats).toContain("const contractChanges = applied.filter(f => f.kind === 'conflict');");
-    expect(beats).toContain("if (contractChanges.length > 0 && typeof onWardrobeCorrected === 'function')");
-    expect(beats).toContain('contractChanges.map(f => f.character)');
-  });
-
-  it('the caller wires it, invalidates those avatars and re-renders only them', () => {
-    expect(pipeline).toContain('onWardrobeCorrected: onWardrobeCorrectedReady');
-    expect(pipeline).toContain('invalidateStyledAvatarForCategory(r.characterNames[0], r.clothingCategory');
-    expect(pipeline).toContain('await prepareStyledAvatars(affected, artStyle, reqs, requirements');
-    expect(pipeline).toContain('streamingAvatarStylingPromise = (async () => {');
-  });
-
-  it('both call sites derive the avatar buckets from ONE helper', () => {
-    expect(pipeline).toContain('const avatarRequirementsFor = (chars, requirements) =>');
-    expect((pipeline.match(/avatarRequirementsFor\(/g) || []).length).toBeGreaterThanOrEqual(2);
+  it('the re-render hook and its wiring are deleted', () => {
+    expect(beats).not.toContain('onWardrobeCorrected');
+    expect(pipeline).not.toContain('onWardrobeCorrected');
+    expect(pipeline).not.toContain('invalidateStyledAvatarForCategory(r.characterNames[0]');
   });
 });

@@ -5536,26 +5536,12 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
         }
       }
 
+      // This character's findings on each page, through the report's ONE
+      // reader (scoring.entityFindingsForPage): a finding on several pages
+      // reaches each page's own repair, and one the page's declared wardrobe
+      // state voids (off by design) reaches none.
       const entityReport = storyData.finalChecksReport?.entity;
-      // Collect issues from both legacy flat format and modern byClothing format
-      const charResult = entityReport?.characters?.[characterName];
-      const charIssues = [];
-      if (charResult) {
-        // Legacy format: issues at character root
-        if (charResult.issues) charIssues.push(...charResult.issues);
-        // Modern format: issues nested under byClothing
-        if (charResult.byClothing) {
-          for (const clothingResult of Object.values(charResult.byClothing)) {
-            for (const issue of (clothingResult.issues || [])) {
-              if (!charIssues.some(i => i.id === issue.id)) charIssues.push(issue);
-            }
-          }
-        }
-      }
-      if (charIssues.length > 0) {
-        log.info(`🔧 [REPAIR-WORKFLOW] Found ${charIssues.length} consistency issues for ${characterName}`);
-      }
-
+      const { entityFindingsForPage } = require('../lib/scoring');
       for (const pageNumber of pages) {
         // A full-story cover made before covers became pages has no brief to
         // repair against (owner, 2026-09-24 — plan covers-as-pages Q1): refused
@@ -5568,10 +5554,12 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             continue;
           }
         }
-        // Filter to issues relevant to this page
-        const pageCharIssues = charIssues.filter(i =>
-          i.pagesToFix?.includes(pageNumber) || i.pageNumber === pageNumber
-        );
+        const pageCharIssues = entityFindingsForPage(pageNumber, entityReport)
+          .filter(f => f.source === 'character' && f.name === characterName && !f.offByDesign)
+          .map(f => f.issue);
+        if (pageCharIssues.length > 0) {
+          log.info(`🔧 [REPAIR-WORKFLOW] Found ${pageCharIssues.length} consistency issue(s) for ${characterName} on page ${pageNumber}`);
+        }
         repairTasks.push({ characterName, character, pageNumber, charIssues: pageCharIssues });
       }
     }

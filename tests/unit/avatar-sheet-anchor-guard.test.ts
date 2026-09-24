@@ -75,6 +75,8 @@ async function runPass2(opts: Opts = {}) {
       error(m: string) { calls.errors.push(m); },
     },
     MAX_SHEET_RETRIES: 1,
+    SHEET_VALID_MIN: 6,
+    STYLED_IDENTITY_AXES: ['identity', 'solo'],
     MODEL_DEFAULTS: { avatarStyleTransferBackend: 'grok' },
     process: { env: geminiKey ? { GEMINI_API_KEY: 'test-key' } : {} },
     loadStyleAnchor: () => 'data:image/jpeg;base64,ANCHOR',

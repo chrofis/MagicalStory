@@ -182,7 +182,7 @@ describe('the pass-2 judge prompt is stored with the pass', () => {
   it('runStyleTransferPass returns the prompt its judge was sent', async () => {
     const noop = { info() {}, warn() {}, error() {}, debug() {} };
     const ctx: any = {
-      module: { exports: {} }, log: noop, MAX_SHEET_RETRIES: 1,
+      module: { exports: {} }, log: noop, MAX_SHEET_RETRIES: 1, SHEET_VALID_MIN: 6, STYLED_IDENTITY_AXES: ['identity', 'solo'],
       MODEL_DEFAULTS: { avatarStyleTransferBackend: 'grok' },
       process: { env: { GEMINI_API_KEY: 'k' } },
       loadStyleAnchor: () => null,

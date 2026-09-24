@@ -861,6 +861,25 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "replan-round-never-regresses",
+      "title": "No kept re-plan round raises the cast/focal must-fix count; round 1 faces the guard too",
+      "commits": [
+        "5a7be3143"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "A full story's kept round 1 ends with no more cast/focal must-fix findings than the first check (stable measure), or the round is under discardedRounds with a 'raised the cast/focal must-fix count' reason.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "replanRoundNeverRegresses"
+      },
+      "status": "pending",
+      "evidence": [],
+      "backlog": "tasks/BACKLOG.md 'Verification pending' — Re-plan regression guard"
     }
   ]
 }

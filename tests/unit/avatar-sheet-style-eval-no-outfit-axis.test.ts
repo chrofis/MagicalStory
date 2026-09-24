@@ -69,6 +69,8 @@ async function runPass2(scores: Record<string, number>) {
     module: { exports: {} },
     log: noopLog,
     MAX_SHEET_RETRIES: 1,
+    SHEET_VALID_MIN: 6,
+    STYLED_IDENTITY_AXES: ['identity', 'solo'],
     MODEL_DEFAULTS: { avatarStyleTransferBackend: 'grok' },
     process: { env: { GEMINI_API_KEY: 'test-key' } },
     loadStyleAnchor: () => null,

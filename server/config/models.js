@@ -450,6 +450,12 @@ const MODEL_DEFAULTS = {
   // Wardrobe review: never measured. Pinned to the pre-2026-08-15 model so it
   // does not inherit a reviewer chosen on beats evidence.
   clothingReviewModel: process.env.CLOTHING_REVIEW_MODEL || 'deepseek-v4-pro',
+  // Reasoning OFF for the wardrobe review (owner, 2026-09-24). Lab 1425 (on):
+  // 232 s, $0.071; Lab 1427 (off): 8 s, $0.007 — off spots the same faults
+  // but rewrites fewer; the review sits in front of the avatars, speed wins.
+  // Production (beatsPipeline) and the Lab replay (testlab
+  // runClothingReviewStage) both pass THIS value. OpenRouter's reasoning field.
+  clothingReviewReasoning: { enabled: false },
   // THE REPAIR PASS of the text chain — the one call that answers the merged
   // findings of both audits (owner ruling 2026-09-03, after the repair
   // bake-off). Its own key so it can be swapped without touching the beats,

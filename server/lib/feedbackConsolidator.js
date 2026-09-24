@@ -244,29 +244,34 @@ function buildFeedbackInput({
  * actually appears. That's how Werner's "bald/glasses" findings from page 4
  * leaked into every other page's repair plan.
  */
-function flattenEntityIssues(entityReport) {
+function flattenEntityIssues(entityReport, pageNumber = null) {
   const out = [];
   if (!entityReport?.characters) return out;
-  for (const [charName, charData] of Object.entries(entityReport.characters)) {
-    for (const iss of charData.issues || []) {
-      out.push({
-        characterName: charName,
-        description: iss.description || iss.issue || '',
-        // The entity prompt already emits a type (face_mismatch, hair_change,
-        // age_shift, clothing_inconsistent, ...) and it was being dropped here,
-        // so 100% of entity findings reached scoring with no category and routed
-        // to a full regenerate. evalBuckets.normalizeType maps these.
-        // The entity report stores its own vocabulary in subType (type is the
-        // constant string "consistency", which routes nowhere), so prefer it.
-        type: iss.subType || iss.type || iss.category || null,
-        severity: iss.severity || 'MODERATE',
-        pageNumbers: iss.pageNumbers,
-        // PROVENANCE. This whitelist is a drop site: anything not named here is
-        // gone. Carried, never re-derived — an entity finding that arrives
-        // without one is stamped, because THIS is the entity pool.
-        sources: mergeSources(sourcesOf(iss), [FINDING_SOURCES.ENTITY]),
-      });
-    }
+  // With a page: the report's ONE page reader (scoring.entityFindingsForPage)
+  // — a finding on several pages reaches each, and one the page's declared
+  // wardrobe state voids (off by design) reaches none.
+  const { entityFindingsForPage, entityFindingPages } = require('./scoring');
+  const rows = pageNumber != null
+    ? entityFindingsForPage(pageNumber, entityReport).filter(f => f.source === 'character' && !f.offByDesign)
+    : Object.entries(entityReport.characters).flatMap(([name, d]) => (d.issues || []).map(issue => ({ name, issue })));
+  for (const { name: charName, issue: iss } of rows) {
+    out.push({
+      characterName: charName,
+      description: iss.description || iss.issue || '',
+      // The entity prompt already emits a type (face_mismatch, hair_change,
+      // age_shift, clothing_inconsistent, ...) and it was being dropped here,
+      // so 100% of entity findings reached scoring with no category and routed
+      // to a full regenerate. evalBuckets.normalizeType maps these.
+      // The entity report stores its own vocabulary in subType (type is the
+      // constant string "consistency", which routes nowhere), so prefer it.
+      type: iss.subType || iss.type || iss.category || null,
+      severity: iss.severity || 'MODERATE',
+      pageNumbers: entityFindingPages(iss),
+      // PROVENANCE. This whitelist is a drop site: anything not named here is
+      // gone. Carried, never re-derived — an entity finding that arrives
+      // without one is stamped, because THIS is the entity pool.
+      sources: mergeSources(sourcesOf(iss), [FINDING_SOURCES.ENTITY]),
+    });
   }
   return out;
 }
@@ -556,10 +561,7 @@ async function consolidateFeedback({
         sources: mergeSources(sourcesOf(e), [FINDING_SOURCES.ENTITY]),
       }));
     } else {
-      entityIssues = flattenEntityIssues(entityReport);
-      if (pageNumber != null) {
-        entityIssues = entityIssues.filter(e => !e.pageNumbers || e.pageNumbers.includes(pageNumber));
-      }
+      entityIssues = flattenEntityIssues(entityReport, pageNumber);
     }
 
     // Build character descriptions from the character profile (source of truth).

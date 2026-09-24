@@ -158,10 +158,10 @@ describe('the contract owns garment wording: a linked same garment takes the con
     expect(f[0].kind).toBe('conflict');
   });
 
-  it('only contract changes reach the avatar re-render hook', () => {
+  it('nothing reaches an avatar re-render — a conflict is an outfit version (2026-09-24)', () => {
     const src = fs.readFileSync(path.join(process.cwd(), 'server/lib/beatsPipeline.js'), 'utf8');
-    expect(src).toContain("const contractChanges = applied.filter(f => f.kind === 'conflict');");
-    expect(src).toContain('const names = [...new Set(contractChanges.map(f => f.character).filter(Boolean))];');
+    expect(src).not.toContain('contractChanges');
+    expect(src).not.toContain('onWardrobeCorrected');
   });
 });
 
@@ -193,12 +193,13 @@ describe('the wardrobe-vs-bible check finds a linked garment by its own words, a
     expect(checkWardrobeAgainstBible(r, v)).toHaveLength(0);
   });
 
-  it('a conflict replacement bringing its own article does not double it', () => {
-    const v = { artifacts: [{ id: 'ART005', name: 'yellow rain parka', label: 'rain parka', wornAs: 'Max.outer layer', type: 'outerwear', pages: [4], description: 'a yellow rain parka' }] };
+  it('a conflict version bringing its own article does not double it; the contract is untouched', () => {
+    const v: any = { artifacts: [{ id: 'ART005', name: 'yellow rain parka', label: 'rain parka', wornAs: 'Max.outer layer', type: 'outerwear', pages: [4], description: 'a yellow rain parka' }] };
     const r: any = { Max: { standard: { used: true, description: 'A white shirt, blue trousers, and a green jacket.' } } };
     applyWardrobeBibleCorrections(r, v, { log: { warn: () => {} } });
-    expect(r.Max.standard.description).toContain('blue trousers, and a yellow rain parka.');
-    expect(r.Max.standard.description).not.toMatch(/\ba a\b/);
+    expect(r.Max.standard.description).toBe('A white shirt, blue trousers, and a green jacket.');
+    expect(v.artifacts[0].outfitVersion.outfit).toContain('blue trousers, and a yellow rain parka.');
+    expect(v.artifacts[0].outfitVersion.outfit).not.toMatch(/\ba a\b/);
   });
 
   it('a linked garment whose words match no clause still displaces the slot occupant (a visible change)', () => {

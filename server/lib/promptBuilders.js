@@ -7359,6 +7359,64 @@ function replanRoundConverged(givenCheck, recheck) {
 }
 
 /**
+ * DID THIS ROUND MAKE THE DIVISION WORSE? — the keep-or-discard guard every
+ * re-plan round faces, round 1 included (owner, 2026-09-24: "That is a serious
+ * defect and must be fixed").
+ *
+ * The measure is the cast/focal must-fix count (`countsTowardConvergence`) of
+ * the check the round was given against the recheck of what it returned, with
+ * ONE correction for the checker's instability: a MODEL finding (a plan-check
+ * question, `check` set, no counter `code`) that names only pages the round did
+ * not change, and appears in just one of the two checks, is left out of BOTH
+ * counts. Such a page's plan line is byte-identical in both checks, so a
+ * verdict that flips on it is the checker disagreeing with itself, not
+ * something the round did — measured 2026-09-24 over every stored recheck on
+ * staging and prod: 4 of 71 new cast/focal must-fix findings sat on untouched
+ * pages. Counter findings always count: they are arithmetic over the check's
+ * roster, and the roster of an untouched page drifted on 0 of 39 stored pages.
+ * A finding naming no page (a whole-book counter) always counts.
+ *
+ *   regressed — the round ends with MORE than it started with: discard it on
+ *               any round. Round 1 used to be exempt (`round > 1`); 10 of 34
+ *               stored round-1 rechecks (8 distinct books) raised the count,
+ *               and every one of those divisions shipped.
+ *   reduced   — strictly fewer. A round 2+ is bought only to mop up
+ *               (`replanRoundConverged`), so a later round that does not
+ *               reduce is discarded too; round 1 may tie, because it also
+ *               answers the shot and noted findings this measure deliberately
+ *               does not count, and a book whose first check raised no cast/
+ *               focal must-fix at all starts from zero and can only tie.
+ *
+ * @param {Object} givenCheck  the check whose findings the round answered
+ * @param {Object} recheck     the check of the division the round returned
+ * @param {number[]} changedPages the pages whose plan line the round changed
+ * @param {{round?:number}} [opts] the round number (1-based)
+ * @returns {{before:number, after:number, regressed:boolean, reduced:boolean, discard:boolean, noise:Array}}
+ */
+function replanRoundRegressed(givenCheck, recheck, changedPages = [], { round = 1 } = {}) {
+  const changed = new Set((changedPages || []).map(Number));
+  const given = ((givenCheck && givenCheck.findings) || []).filter(countsTowardConvergence);
+  const surviving = ((recheck && recheck.findings) || []).filter(countsTowardConvergence);
+  const givenKeys = new Set(given.map(replanFindingKey));
+  const survivingKeys = new Set(surviving.map(replanFindingKey));
+  const untouchedVerdict = (f) => {
+    if (!f || typeof f === 'string' || f.code || f.check == null) return false;
+    const pages = findingPages(f);
+    return pages.length > 0 && pages.every(n => !changed.has(Number(n)));
+  };
+  const noise = [
+    ...given.filter(f => untouchedVerdict(f) && !survivingKeys.has(replanFindingKey(f))),
+    ...surviving.filter(f => untouchedVerdict(f) && !givenKeys.has(replanFindingKey(f))),
+  ];
+  const noiseSet = new Set(noise);
+  const before = given.filter(f => !noiseSet.has(f)).length;
+  const after = surviving.filter(f => !noiseSet.has(f)).length;
+  const regressed = after > before;
+  const reduced = after < before;
+  return { before, after, regressed, reduced, discard: regressed || (Number(round) > 1 && !reduced), noise };
+}
+
+/**
  * The pages a finding names. Counters carry `pages` structurally; a model
  * finding is a line whose format is fixed by prompts/plan-check.txt ("names the
  * page"), so the page NUMBER is read off it — never its prose meaning, which is
@@ -11467,6 +11525,7 @@ module.exports = {
   countsTowardConvergence,
   convergenceMustFixCount,
   replanRoundConverged,
+  replanRoundRegressed,
   replanFindingKey,
   REPLAN_CONVERGENCE_EXEMPT_CODES,
   findingPages,

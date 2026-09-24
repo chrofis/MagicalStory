@@ -31,7 +31,7 @@
 
 const { log } = require('../utils/logger');
 const {
-  WORN_SLOTS, resolveWornItemsForPage, isOffForCharacter, sameName,
+  WORN_SLOTS, resolveWornItemsForPage, isOffForCharacter, sameName, outfitVersionOf,
 } = require('./wornItems');
 
 /**
@@ -89,11 +89,39 @@ function offIdsForCharacter(characterName, wornResolved) {
   if (!characterName || !Array.isArray(wornResolved)) return [];
   const ids = [];
   for (const r of wornResolved) {
-    if (!r || !isOffForCharacter(r, characterName)) continue;
+    if (!r) continue;
+    // OUTFIT VERSIONS (2026-09-24) share this one key algebra: a version
+    // garment WORN by its character is part of the state set — it is the id of
+    // the version sheet — and a version garment OFF is the default outfit,
+    // which never had it, so it contributes nothing. The suffix keeps its
+    // historical name `--off:`; what it keys is "this page differs from the
+    // default outfit by these garments".
+    const version = outfitVersionOf(r.entry);
+    if (version) {
+      if (r.state === 'worn' && sameName(version.character, characterName)
+        && sameName(r.wearer || r.owner, characterName)) ids.push(r.id);
+      continue;
+    }
+    if (!isOffForCharacter(r, characterName)) continue;
     if (!WORN_SLOTS.includes(String(r.slot || '').trim().toLowerCase())) continue;
     ids.push(r.id);
   }
   return normalizeOffIds(ids);
+}
+
+/**
+ * The wardrobe half of a VERSION sheet's redress instruction, from the two
+ * authored strings the version records: the contract's own clause and the
+ * Visual Bible's own garment. Quoted, not derived — no garment is named that
+ * neither text names, and every staying garment is left to the sheet (the
+ * scaffold says Image 1 is their authority).
+ */
+function versionRedressNote(versions) {
+  const { CLAUSE_LEAD_RE } = require('./wornItems');
+  const bare = (t) => String(t || '').replace(CLAUSE_LEAD_RE, '').replace(/[.\s]+$/, '').trim();
+  return (versions || []).map(v =>
+    `The character no longer wears the ${bare(v.replaces)}. In its place they wear ${String(v.garment || '').replace(/[.\s]+$/, '').trim()}. Every other garment stays exactly as the sheet draws it.`
+  ).join('\n');
 }
 
 /**
@@ -213,7 +241,8 @@ function deriveWardrobeVariantRequirements({ visualBible, scenes, clothingRequir
       const offIds = offIdsForCharacter(name, resolved);
       if (offIds.length === 0) continue;
       const key = `${String(name).trim().toLowerCase()}|${offIds.join('+')}`;
-      const rows = resolved.filter(r => offIds.includes(String(r.id).toUpperCase()) && isOffForCharacter(r, name));
+      const rows = resolved.filter(r => offIds.includes(String(r.id).toUpperCase())
+        && (outfitVersionOf(r.entry) ? r.state === 'worn' : isOffForCharacter(r, name)));
       // The Art Director authors the wardrobe half of the redress instruction
       // on the ROW, so one off-set observed on seven pages arrives seven times,
       // worded seven slightly different ways. Collect them all here; the pick
@@ -239,6 +268,41 @@ function deriveWardrobeVariantRequirements({ visualBible, scenes, clothingRequir
 
   for (const { name, offIds, rows, pages, notes } of observed.values()) {
     const where = `${name} off:${offIds.join('+')} (page${pages.length > 1 ? 's' : ''} ${pages.join(', ')})`;
+    // OUTFIT VERSION (2026-09-24): the set holds a garment the Visual Bible put
+    // in place of a contract garment. Its sheet is the approved base sheet of
+    // the version's own category, redressed; the instruction quotes the
+    // version's two recorded texts. A set that ALSO takes a garment off would
+    // need the Art Director's off-note and the version sentence merged into one
+    // instruction, and nothing authors that — refused, loudly.
+    const versions = [...new Map(rows.map(r => outfitVersionOf(r.entry)).filter(Boolean)
+      .map(v => [`${v.slot}|${v.replaces}`, v])).values()];
+    if (versions.length > 0) {
+      if (versions.length !== offIds.length) {
+        log.error(`👕 [WARDROBE-VARIANT] ${where}: an outfit version worn on a page that also takes a garment off — no sheet is built for the combination; the page keeps the default sheet (loud fallback at the crop site)`);
+        refusals.push({ name, offIds, pages, reason: 'version-with-off-state' });
+        continue;
+      }
+      const categories = [...new Set(versions.map(v => String(v.category || '').toLowerCase()))];
+      const baseCat = categories.length === 1 && ['standard', 'winter', 'summer'].includes(categories[0]) ? categories[0] : null;
+      if (!baseCat) {
+        log.error(`👕 [WARDROBE-VARIANT] ${where}: outfit version of category "${categories.join('+')}" — only a plain (standard/winter/summer) sheet can be redressed; no version sheet`);
+        refusals.push({ name, offIds, pages, reason: 'version-not-plain-category' });
+        continue;
+      }
+      requirements.push({
+        pageNumber: 'pre-cover',
+        clothingCategory: buildOffCategory(baseCat, offIds),
+        characterNames: [name],
+        offIds,
+        baseCategory: baseCat,
+        removedItemNames: versions.map(v => v.replaces),
+        redressNote: versionRedressNote(versions),
+        outfitVersion: true,
+        pages,
+      });
+      log.info(`👕 [WARDROBE-VARIANT] ${where}: outfit version requested as "${buildOffCategory(baseCat, offIds)}"`);
+      continue;
+    }
     const baseCategory = baseCategoryFor(clothingRequirements, name);
     if (!baseCategory) {
       log.info(`👕 [WARDROBE-VARIANT] ${where}: no plain clothing category in use (costumed, or nothing declared) — no variant; the page keeps the base sheet + the "leave it off" line`);
@@ -282,8 +346,25 @@ function deriveWardrobeVariantRequirements({ visualBible, scenes, clothingRequir
   return { requirements, refusals };
 }
 
+/**
+ * COVERS FOLLOW THE PAGE RULE FOR OUTFIT VERSIONS (owner, 2026-09-24). A cover
+ * has no `wornItems`, so its only declaration is the hint's element ids
+ * (objects ∪ holds): a cast member whose version garment the hint cites wears
+ * the version. Only version rows are returned — a cover never takes an
+ * off-state, and a default-worn linked garment changes nothing on it.
+ *
+ * @returns {Array} resolved worn rows, each a version garment worn on the cover
+ */
+function coverVersionRows(visualBible, castNames, coverElementIds) {
+  const ids = (Array.isArray(coverElementIds) ? coverElementIds : []).filter(Boolean);
+  if (!visualBible || ids.length === 0) return [];
+  return resolveWornItemsForPage(visualBible, castNames || [], { objects: ids }, { pageNumber: 'cover' })
+    .filter(r => r && r.state === 'worn' && outfitVersionOf(r.entry));
+}
+
 module.exports = {
   OFF_MARK,
+  coverVersionRows,
   pickAuthoredNote,
   authoredNoteFrom,
   normalizeOffIds,
@@ -292,6 +373,7 @@ module.exports = {
   isOffCategory,
   buildOffSlotKey,
   offIdsForCharacter,
+  versionRedressNote,
   baseCategoryFor,
   deriveWardrobeVariantRequirements,
 };

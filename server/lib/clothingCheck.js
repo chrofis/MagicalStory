@@ -551,10 +551,12 @@ function missingGarments(clothingDescription, prose, requiredSlots = ['top', 'bo
  * contract is never touched and no avatar is re-rendered. The Art Director
  * selects outfits and worn states; it does not reword them.
  *
- * A DIFFERENT garment in an occupied slot (`conflict`) still rewrites the
- * outfit clause to the bible entry and re-renders the avatar — who may add a
- * garment version mid-pipeline is an open owner question (docs/decisions.md
- * 2026-09-23 "The wardrobe contract owns garment wording").
+ * A DIFFERENT garment in an occupied slot (`conflict`) is a NEW OUTFIT VERSION
+ * (owner, 2026-09-24): the bible entry is marked `outfitVersion` (the clause it
+ * replaces, its own words, the version's full outfit), the default contract is
+ * untouched and its avatar is never re-rendered. The page that needs the
+ * garment selects the version (wornItems / wardrobeVariants); every other page
+ * keeps the default.
  *
  * Deterministic, no API call. Scope is deliberately narrow:
  *   - only headwear / footwear / outer layer — the slots whose items are named
@@ -568,7 +570,7 @@ function missingGarments(clothingDescription, prose, requiredSlots = ['top', 'bo
  *     tricorn hat" is one hat, described twice).
  */
 
-const { WORN_SLOTS, SLOT_NOUNS, parseWornAs, deriveSlotFromName, slotFromType, indexOfElementAmong, sameName } = require('./wornItems');
+const { WORN_SLOTS, SLOT_NOUNS, parseWornAs, deriveSlotFromName, slotFromType, indexOfElementAmong, sameName, spliceClause, CLAUSE_LEAD_RE, outfitVersionOf } = require('./wornItems');
 
 // The slots this check arbitrates. See the scope note above.
 const ARBITRATED_SLOTS = ['headwear', 'footwear', 'outer layer'];
@@ -607,22 +609,10 @@ function bibleEntrySlot(entry) {
   return slotFromType(entry?.type) || deriveSlotFromName(entry?.label || entry?.name);
 }
 
-/**
- * Put `replacement` in place of `clause`, keeping the clause's own joiner and
- * article (2026-09-23). "…sneakers, and a forest green zip-up fleece jacket"
- * restated as "forest green long-sleeve … jacket" used to lose its "and a" and
- * read "…sneakers, forest green long-sleeve … jacket". A replacement that brings
- * its own article keeps it only when the clause had none.
- */
-const CLAUSE_LEAD_RE = /^\s*(?:(?:and|or|plus)\s+)?(?:(?:a|an|the)\s+)?/i;
-const ARTICLE_RE = /^\s*(?:a|an|the)\s+/i;
+// spliceClause / CLAUSE_LEAD_RE live in wornItems: the page resolver splices an
+// outfit version in with the same function that built the version's text.
 /** A clause without its joiner and article — what "the same words" compares. */
 const clauseBody = (text) => String(text || '').replace(CLAUSE_LEAD_RE, '').trim().toLowerCase();
-function spliceClause(description, clause, replacement) {
-  const lead = (clause.match(CLAUSE_LEAD_RE) || [''])[0];
-  const body = /\b(?:a|an|the)\s+$/i.test(lead) ? replacement.replace(ARTICLE_RE, '') : replacement;
-  return description.split(clause).join(lead + body);
-}
 
 /** The plain colour words a text names, shades folded (`rust-brown` → brown). */
 function colourSet(text) {
@@ -652,7 +642,7 @@ function wearableBibleEntries(visualBible) {
  *
  * @param {Object} clothingRequirements  {Name: {category: {used, description}}}
  * @param {Object} visualBible
- * @returns {Array<{character, category, slot, elementId, elementLabel, elementText, wardrobeClause, before, after}>}
+ * @returns {Array<{kind, character, category, slot, elementId, elementLabel, elementText, wardrobeClause, contractText?, versionOutfit?, element}>}
  */
 function checkWardrobeAgainstBible(clothingRequirements, visualBible) {
   const findings = [];
@@ -668,6 +658,11 @@ function checkWardrobeAgainstBible(clothingRequirements, visualBible) {
       const clauses = outfitClauses(description);
 
       for (const { entry: el, slot } of wearables) {
+        // Already this character's outfit version: settled, not a disagreement.
+        // (Its link now names the slot it was marked in; re-checking it would
+        // read the version's own garment as an `adopt` of the default clause.)
+        const version = outfitVersionOf(el);
+        if (version && sameName(version.character, character)) continue;
         const link = parseWornAs(el.wornAs);
         if (link && !sameName(link.owner, character)) continue;      // someone else's item
         const elName = el.label || el.name;
@@ -720,8 +715,10 @@ function checkWardrobeAgainstBible(clothingRequirements, visualBible) {
           elementLabel: elName,
           elementText: bibleText,
           wardrobeClause: clause,
-          before: description,
-          after: spliceClause(description, clause, bibleText),
+          // The VERSION's outfit: the default with this one clause replaced.
+          // Never written back into the contract.
+          versionOutfit: spliceClause(description, clause, bibleText),
+          element: el,
         });
       }
     }
@@ -730,30 +727,39 @@ function checkWardrobeAgainstBible(clothingRequirements, visualBible) {
 }
 
 /**
- * Run the check and apply it, in place: an `adopt` rewrites the bible entry to
- * the contract's words, a `conflict` rewrites the outfit clause to the bible's
- * garment. Loud by construction: every change logs character, slot and both
- * texts.
+ * Run the check and apply it, in place. Neither kind touches the contract:
+ *   - `adopt` rewrites the bible entry to the contract's words;
+ *   - `conflict` marks the bible entry as a NEW OUTFIT VERSION of that
+ *     character (owner, 2026-09-24): `entry.outfitVersion = {character,
+ *     category, slot, replaces, garment, outfit}`, and an entry attributed by
+ *     name alone is linked (`wornAs`) to the slot it was found in, so the whole
+ *     per-page worn machinery can see it. The page that needs the garment
+ *     selects the version (wornItems.resolveWornItemsForPage — a declared row
+ *     or an `objects[]` citation); every other page keeps the default. The
+ *     version gets its own sheet (wardrobeVariants), the default avatar is
+ *     never re-rendered.
+ * Loud by construction: every change logs character, slot and both texts.
  *
- * @returns {{findings: Array, applied: Array, unresolved: Array}}
+ * @returns {{findings: Array, applied: Array, versions: Array, unresolved: Array}}
  */
 function applyWardrobeBibleCorrections(clothingRequirements, visualBible, opts = {}) {
   const logger = opts.log || log;
   const findings = checkWardrobeAgainstBible(clothingRequirements, visualBible);
   const applied = [];
+  const versions = [];
   // An entry adopts once: a character dressed in two categories that word the
   // same garment differently would otherwise flip it back and forth.
   const adopted = new Set();
   const open = () => checkWardrobeAgainstBible(clothingRequirements, visualBible)
     .filter(f => !(f.kind === 'adopt' && adopted.has(f.element)));
-  // One change at a time, re-deriving after each: two entries can point at the
-  // same outfit, and the second's `before` is the first's `after`.
+  // One change at a time, re-deriving after each: an adopt rewrites the entry
+  // a later finding reads, and a version mark takes its entry out of the check.
   for (let pass = 0; pass < findings.length + 1; pass++) {
     const pending = open();
     if (pending.length === 0) break;
     const f = pending[0];
+    const el = f.element;
     if (f.kind === 'adopt') {
-      const el = f.element;
       adopted.add(el);
       el.description = f.contractText;
       // A short name that states a colour the contract does not is the same
@@ -766,17 +772,25 @@ function applyWardrobeBibleCorrections(clothingRequirements, visualBible, opts =
       logger.warn(`🧥 [WARDROBE-BIBLE] ${f.character}/${f.slot}: ${f.elementId || 'the bible'} "${f.elementLabel}" is declared worn in this slot — its description now carries the contract's words "${f.contractText}" (was "${f.elementText}")`);
       continue;
     }
-    const entry = clothingRequirements?.[f.character]?.[f.category];
-    if (!entry || entry.description !== f.before) break;   // nothing safe to do
-    entry.description = f.after;
-    applied.push(f);
-    logger.warn(`🧥 [WARDROBE-BIBLE] ${f.character}/${f.slot}: the wardrobe said "${f.wardrobeClause}" while ${f.elementId || 'the bible'} says "${f.elementLabel}" on the same body — a different garment; outfit clause rewritten to the bible's`);
+    // `conflict` → a new outfit version. The element carries it; the contract
+    // does not change.
+    el.outfitVersion = {
+      character: f.character,
+      category: f.category,
+      slot: f.slot,
+      replaces: f.wardrobeClause,
+      garment: f.elementText,
+      outfit: f.versionOutfit,
+    };
+    if (!parseWornAs(el.wornAs)) el.wornAs = `${f.character}.${f.slot}`;
+    versions.push(f);
+    logger.warn(`🧥 [WARDROBE-BIBLE] ${f.character}/${f.slot}: ${f.elementId || 'the bible'} "${f.elementLabel}" is a DIFFERENT garment from the contract's "${f.wardrobeClause}" — a new outfit version (${f.category}); the default outfit is unchanged, and only a page that declares or cites ${f.elementId || 'it'} wears the version`);
   }
   const unresolved = checkWardrobeAgainstBible(clothingRequirements, visualBible);
   for (const f of unresolved) {
-    logger.warn(`⚠️ [WARDROBE-BIBLE] ${f.character}/${f.slot}: contract and bible still disagree (${f.elementId || '?'} "${f.elementLabel}" vs "${f.wardrobeClause}") — NOT corrected`);
+    logger.warn(`⚠️ [WARDROBE-BIBLE] ${f.character}/${f.slot}: contract and bible still disagree (${f.elementId || '?'} "${f.elementLabel}" vs "${f.wardrobeClause}") — NOT resolved`);
   }
-  return { findings, applied, unresolved };
+  return { findings, applied, versions, unresolved };
 }
 
 // slotStated + missingGarments are exported so the image-prompt clothing check

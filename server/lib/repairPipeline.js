@@ -242,14 +242,29 @@ function mergeEntityIssues(base, fresh, repairedPages) {
   const merged = { ...base, characters: {}, timestamp: fresh.timestamp || base.timestamp };
   const names = new Set([...Object.keys(base.characters || {}), ...Object.keys(fresh.characters || {})]);
   let total = 0;
+  const { entityFindingPages } = require('./scoring');
   for (const name of names) {
     const b = base.characters?.[name] || { issues: [] };
     const f = fresh.characters?.[name];
-    const issues = [
-      ...(b.issues || []).filter(i => !pages.has(i.pageNumber)),
-      ...((f?.issues) || []),
-    ];
-    merged.characters[name] = { ...b, issues, totalIssues: issues.length, overallConsistent: issues.length === 0 };
+    // A base finding keeps only its pages that were NOT re-checked: a finding
+    // spanning pages [11,12] with p12 repaired still stands on p11, and the
+    // fresh report alone speaks for p12 (2026-09-24 — this used to test the
+    // lone `pageNumber`, so p12 kept the stale finding whenever p11 was first).
+    const kept = [];
+    for (const i of (b.issues || [])) {
+      const all = entityFindingPages(i);
+      const left = all.filter(p => !pages.has(p));
+      if (left.length === 0) continue;
+      kept.push(left.length === all.length ? i
+        : { ...i, pagesToFix: left, pageNumbers: left, pageNumber: left[0] });
+    }
+    const issues = [...kept, ...((f?.issues) || [])];
+    // Each page's declared wardrobe state: the fresh check read the repaired
+    // pages' own (possibly rewritten) briefs, so it speaks for those pages.
+    const declaredOffByPage = { ...(b.declaredOffByPage || {}) };
+    for (const p of pages) delete declaredOffByPage[p];
+    Object.assign(declaredOffByPage, f?.declaredOffByPage || {});
+    merged.characters[name] = { ...b, issues, declaredOffByPage, totalIssues: issues.length, overallConsistent: issues.length === 0 };
     total += issues.length;
   }
   merged.totalIssues = total;
@@ -3355,7 +3370,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const best = finalBestPerPage.get(img.pageNumber);
       for (const iss of (best?.entityIssues || [])) {
         const name = iss.name || iss.affectedCharacter || iss.character || 'UNKNOWN';
-        const key = `${name}|${iss.severity}|${iss.description}`;
+        // The grid it was judged in is part of the identity: the same words
+        // judged in two wardrobe states are two findings (scoring.js
+        // offByDesignFinding reads the state per page).
+        const key = `${name}|${iss.severity}|${iss.description}|${iss.clothingCategory || ''}`;
         let entry = dedup.get(key);
         if (!entry) {
           entry = { name, issue: { ...iss, affectedCharacter: name, pageNumbers: [] } };
@@ -3366,6 +3384,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }
     let total = 0;
     for (const { name, issue } of dedup.values()) {
+      // One finding, every page it was stamped on: `pagesToFix` is the routing
+      // field every reader goes through (scoring.entityFindingPages), so a
+      // deduped finding is billed, listed and repaired on each of its pages —
+      // it used to carry the list in `pageNumbers` only, next to a lone
+      // `pageNumber`, and the page reader saw its first page alone
+      // (job_1790100385959 Kiaan [11,12] reached p11 only).
+      issue.pagesToFix = [...issue.pageNumbers];
       issue.pageNumber = issue.pageNumbers[0];
       if (!assembled.characters[name]) assembled.characters[name] = { byClothing: {}, issues: [] };
       if (!Array.isArray(assembled.characters[name].issues)) assembled.characters[name].issues = [];
@@ -4194,4 +4219,6 @@ module.exports = {
   lastRepairRegressed,
   bothStrategiesTriedAndRegressed,
   resolveCharBbox,
+  // Round merge of entity reports — pinned by entity-multipage-off-by-design.test.ts.
+  mergeEntityIssues,
 };

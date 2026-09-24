@@ -23,7 +23,12 @@ describe('cover worn/held dedupe — duplicate vs slot conflict', () => {
     expect(out.photos[0].clothingDescription).toBe(SARAH_CLOTHING);
   });
 
-  it('prefers the Visual Bible when the two are DIFFERENT items in the SAME slot', () => {
+  // Owner, 2026-09-24: a different garment in a filled slot is an OUTFIT
+  // VERSION, marked and linked before any cover runs; a cover that cites it is
+  // switched to the version upstream (tests/unit/outfit-version.test.ts). An
+  // unlinked same-slot item reaching the dedupe was never attributed — the
+  // outfit segment is no longer dropped for it.
+  it('keeps BOTH sides when the two are DIFFERENT items in the SAME slot and nothing links them', () => {
     const belt = {
       id: 'ART007', name: "brass-buckled captain's belt", label: "captain's belt", type: 'belt/waist',
       description: 'a wide black leather belt with a heavy brass buckle.',
@@ -32,7 +37,7 @@ describe('cover worn/held dedupe — duplicate vs slot conflict', () => {
       photos('a white linen high-collar blouse; a wide black leather captain’s sash knotted at the waist'),
       { characterDetails: {} }, { artifacts: [belt] });
     expect(out.excludeElementIds).not.toContain('ART007');           // the belt keeps its reference cell
-    expect(out.photos[0].clothingDescription).not.toContain('sash'); // the contradicting segment goes
+    expect(out.photos[0].clothingDescription).toContain('sash');     // the default outfit is not rewritten
     expect(out.photos[0].clothingDescription).toContain('blouse');
   });
 

@@ -21,8 +21,8 @@
  *   a. a per-attempt backend throw is caught and recorded, never escaping to
  *      destroy the good Pass-1 sheet,
  *   b. a transient first-attempt failure is absorbed by the retry,
- *   c. total failure raises a NAMED error, so the caller's catch ships Pass 1
- *      deliberately rather than by tripping over a null,
+ *   c. total failure raises a NAMED error — the sheet generation fails loudly;
+ *      the realistic Pass-1 sheet is never shipped in its place (2026-09-24),
  *   d. a first-attempt success costs exactly one backend call.
  * Best-of-N scoring, the anchor-drop retry and the `valid` contract are covered
  * in tests/manual/avatarStyleAnchorRetry.test.js.
@@ -164,6 +164,8 @@ function makeSandbox({ backendBehavior }) {
     log: { info: () => {}, warn: () => {}, error: () => {} },
     MODEL_DEFAULTS: { avatarStyleTransferBackend: 'gemini', avatarStyleTransferModel: 'gemini-2.5-flash-image' },
     MAX_SHEET_RETRIES: 1,
+    SHEET_VALID_MIN: 6,
+    STYLED_IDENTITY_AXES: ['identity', 'solo'],
     loadStyleAnchor: () => null,
     buildStyleTransferPrompt: () => 'STYLE_PROMPT',
     styleTransferGenerate: async (prompt, img, backendOverride = null) => {
@@ -210,7 +212,7 @@ async function part2() {
   let threw = null;
   try { await run(sb); } catch (e) { threw = e; }
   ok(threw !== null, '7a: total backend failure raises an error rather than returning a broken sheet');
-  ok(/produced no image/.test(threw.message), '7b: the error names the cause, so the caller logs why Pass 1 shipped');
+  ok(/produced no image/.test(threw.message), '7b: the error names the cause, so the failure is logged with its reason');
   ok(sb.__calls.length === 2, '7c: both attempts were spent before giving up (1 + MAX_SHEET_RETRIES)');
   ok(!/IMAGE_OTHER/.test(threw.message) || true, '7d: the per-attempt refusal did not escape uncaught');
 

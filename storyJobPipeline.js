@@ -29,7 +29,6 @@ const {
   runInCacheScope,
   clearStyledAvatarCache,
   getStyledAvatarCacheStats,
-  invalidateStyledAvatarForCategory,
   exportStyledAvatarsForPersistence,
   getStyledAvatarGenerationLog,
   clearStyledAvatarGenerationLog
@@ -718,6 +717,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Track parallel tasks started during streaming
     const streamingSceneExpansionPromises = new Map(); // pageNum -> promise
     const streamingCoverPromises = new Map(); // coverType -> promise
+    // Settles once the outfit-version / wardrobe-variant sheets are stored (or
+    // none are needed). A cover that wears an outfit version waits on it.
+    let resolveWardrobeVersions = () => {};
+    const wardrobeVersionsReady = new Promise(r => { resolveWardrobeVersions = r; });
     const streamingTrialPageImagePromises = new Map(); // pageNum -> promise (trial mode only)
     const streamingExpandedPages = new Map(); // pageNum -> page data (for scene expansion)
     let coversStartedDuringStreaming = false;
@@ -1717,11 +1720,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         coverPhotos = applyStyledAvatars(coverPhotos, artStyle);
         // Phase 7: cell-crop refs from story sheets. For covers we use front
         // pose by default (head-on shot) — no per-page scene metadata at this point.
+        // OUTFIT VERSIONS follow the page rule (owner, 2026-09-24): a character
+        // whose version garment the hint cites wears the version — its outfit
+        // text and its sheet. Everyone else keeps the default.
         {
           const sav = require('./server/lib/storyAvatars');
+          const { coverVersionRows } = require('./server/lib/wardrobeVariants');
+          const { applyCoverOutfitVersions } = require('./server/lib/wornItems');
+          const { collectCoverHintElementIds: coverHintIds } = require('./server/lib/coverIterate');
+          const versionRows = coverVersionRows(streamingVisualBible, charactersForCover.map(c => c.name), coverHintIds(hint));
+          if (versionRows.length > 0) {
+            await wardrobeVersionsReady;
+            applyCoverOutfitVersions(coverPhotos, versionRows);
+          }
           const storyAvatars = sav.projectStoryCharacterAvatars(inputData.characters || [], artStyle || 'pixar');
           const fakeMeta = charactersForCover.map(c => ({ name: c.name, pose: 'front', flip: false }));
-          await sav.applyStoryCellRefs(coverPhotos, storyAvatars, fakeMeta);
+          await sav.applyStoryCellRefs(coverPhotos, storyAvatars, fakeMeta, { wornResolved: versionRows });
         }
 
         // Cover prompt setup — routed model/backend determined after scene expansion.
@@ -2055,43 +2069,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             }
           })();
         }
-    };
-
-    // THE AVATAR IS RENDERED BEFORE THE WARDROBE CORRECTION EXISTS.
-    // The kickoff above fires at the story-bible stage; the wardrobe-vs-Visual-
-    // Bible correction can only run once the bible exists, several stages later
-    // (beatsPipeline). The early kickoff is deliberate — avatars are the long
-    // pole in front of every image — so the fix is not to delay it but to
-    // re-render exactly the characters whose outfit VISIBLY changed — a
-    // different garment or other colours in the slot. A same-garment rewording
-    // (the bible restating the clause in its own words) never reaches this hook
-    // (beatsPipeline, 2026-09-23): the rebuild starts from the photos and
-    // re-rolls the face for a garment the sheet already shows.
-    const onWardrobeCorrectedReady = (characterNames, requirements) => {
-      if (inputData.trialMode || skipImages) return;
-      const names = (characterNames || []).filter(Boolean);
-      if (names.length === 0) return;
-      const affected = (inputData.characters || []).filter(c =>
-        names.some(n => String(n).trim().toLowerCase() === String(c.name || '').trim().toLowerCase()));
-      if (affected.length === 0) return;
-      const reqs = avatarRequirementsFor(affected, requirements);
-      // Chained onto the in-flight styling promise, and put BACK into it, so the
-      // downstream awaits wait for the corrected avatar rather than racing it.
-      const prior = streamingAvatarStylingPromise || Promise.resolve();
-      streamingAvatarStylingPromise = (async () => {
-        try { await prior; } catch { /* the kickoff owns its own failure */ }
-        try {
-          for (const r of reqs) {
-            invalidateStyledAvatarForCategory(r.characterNames[0], r.clothingCategory,
-              affected.find(c => c.name === r.characterNames[0]) || null);
-          }
-          log.info(`🧥 [STREAM] Wardrobe corrected for ${names.join(', ')} — re-rendering ${reqs.length} styled avatar(s) against the Visual Bible`);
-          await prepareStyledAvatars(affected, artStyle, reqs, requirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: false, seasonOutfit: trialSeasonOutfit(inputData) });
-          earlyAvatarStylingSucceeded = getStyledAvatarCacheStats().size > 0;
-        } catch (error) {
-          log.warn(`⚠️ [STREAM] Post-correction avatar re-render failed: ${error.message} — the avatar keeps the pre-correction outfit`);
-        }
-      })();
     };
 
     // Progressive parser with callbacks for streaming updates AND parallel task initiation
@@ -2713,7 +2690,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // so kick them off there instead of after the whole pipeline. Same
         // trigger the unified stream uses; the awaits downstream are unchanged.
         onClothingRequirements: onClothingRequirementsReady,
-        onWardrobeCorrected: onWardrobeCorrectedReady,
         // Per-stage progress (2-7%): without it the bar sits at 1% for the
         // whole ~10-minute text phase; heartbeat never moves the percent.
         onStage: async (pct, msg, hint = null) => {
@@ -3583,23 +3559,25 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       };
     });
 
-    // WARDROBE-STATE AVATAR VARIANTS (owner ruling 2026-09-19).
+    // WARDROBE-STATE AVATAR VARIANTS (owner ruling 2026-09-19) and OUTFIT
+    // VERSIONS (owner ruling 2026-09-24).
     //
     // This is the earliest point the flip data exists. The avatar kickoff fires
     // at the story-bible stage, long before any scene brief, so `wornItems[]` —
-    // the per-page declaration of which garment comes OFF — is simply not
-    // available there; and `onWardrobeCorrected` only fires when the wardrobe
-    // check actually rewrote a clause, which most stories never do. So the
-    // derivation rides neither hook: it runs here, once, on the all-pages Art
-    // Director output, and chains onto the in-flight styling promise so the
-    // base sheets it redresses are finished first.
+    // the per-page declaration of which garment comes OFF, or which outfit
+    // version a page wears — is simply not available there. So the derivation
+    // runs here, once, on the all-pages Art Director output, and chains onto
+    // the in-flight styling promise so the base sheets it redresses are
+    // finished first.
     //
-    // Covers are deliberately NOT included: compositeCastBuilder resolves a
-    // cover cast by the page's plain clothing category, so a cover always takes
-    // the worn (base) sheet. A cover is the book's cover, not a page with a
-    // per-page garment state. See docs/decisions.md.
+    // Covers: an off-state never reaches a cover (a cover has no `wornItems`),
+    // so a cover takes the base sheet. An outfit VERSION follows the page rule
+    // (owner, 2026-09-24): a cover whose hint cites the version garment wears
+    // it, and waits on `wardrobeVersionsReady` for its sheet. See
+    // docs/decisions.md.
     // Trials are out of scope — a trial has no Art Director brief to declare a
     // flip in, and `inputData.trialMode` skips avatar styling here anyway.
+    let variantRenderStarted = false;
     if (!inputData.trialMode && !skipImages) {
       const { deriveWardrobeVariantRequirements } = require('./server/lib/wardrobeVariants');
       const vbForVariants = visualBible || streamingVisualBible;
@@ -3619,6 +3597,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         log.warn(`👕 [WARDROBE-VARIANT] derivation failed: ${err.message} — every page keeps the worn sheet + the "leave it off" line`);
       }
       if (variantRows.length > 0) {
+        variantRenderStarted = true;
         const prior = streamingAvatarStylingPromise || Promise.resolve();
         streamingAvatarStylingPromise = (async () => {
           try { await prior; } catch { /* the kickoff owns its own failure */ }
@@ -3631,10 +3610,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             });
           } catch (error) {
             log.warn(`👕 [WARDROBE-VARIANT] variant rendering failed: ${error.message} — every page keeps the worn sheet + the "leave it off" line`);
+          } finally {
+            resolveWardrobeVersions();
           }
         })();
       }
     }
+    if (!variantRenderStarted) resolveWardrobeVersions();
 
     // Batch-translate scene summaries to story language (separate from scene expansion)
     // One cheap Haiku call with all summaries — ~1-2s, ~$0.001
