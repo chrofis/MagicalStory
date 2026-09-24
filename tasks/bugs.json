@@ -1839,6 +1839,16 @@
       "fixedAt": "2026-09-24",
       "fixedIn": "a387828f0",
       "fix": "landmark_view_missing deleted (no derivation: the default is the exterior photo and the views that differ are not in any structured field). shotVocabulary.CLOSEUP_KEPT_RULE shared by AD 11c, scene-review 7b / 10 and shot_widened; shot_off_plate keeps a planned shot and offers only a vantage; 9e / C7 place by the place. Pinned by tests/unit/art-director-audit-2026-09-23.test.ts. docs/decisions.md 2026-09-24."
+    },
+    {
+      "id": "landmark-vantage-id-picks-photo",
+      "title": "A brief's dotted Visual Bible vantage id (LOC002.3) was read as a landmark PHOTO slot, before landmarkView - pages got the photo whose slot number equalled their vantage number",
+      "reportedAt": "2026-09-24",
+      "source": "Found in the Lab 1433/1435 fix work (staging job_1790100385959_1nitlympp, Lindenhof, 18 pages). Read back from stories.data.sceneImages[].landmarkPhotos: p3-5 cite LOC002.2 and were served slot 2 (an aerial rooftop panorama), p6-11 cite LOC002.3 and were served slot 3 (a riverside promenade that is not the Lindenhof at all); p12-16 cite .4/.5, slots that do not exist, and the loader substituted slot 1. Only p17 carried a landmarkView.",
+      "rootCause": "getLandmarkPhotosForScene / sceneMetadata parsed every `LOC###.N` into landmarkVariants and passed it as explicitVariant, which decideLandmarkPhotoSource took BEFORE pickVariantForView(landmarkView). The `.N`-is-a-photo convention predates vantages; once the Visual Bible gave locations vantages[] (`LOC###.N` = camera position) the two meanings shared one namespace. loadLandmarkPhotoVariant then hid the collision by serving another slot for a number that had none.",
+      "impact": "Every story whose Art Director cites a real landmark by a vantage id: the page is anchored to an arbitrary photo of the landmark, or to a photo of a different place.",
+      "status": "open",
+      "fix": ""
     }
   ]
 }

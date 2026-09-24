@@ -21,6 +21,53 @@ superseded and link forward.
 
 ---
 
+## 2026-09-24 — A dotted id is a vantage, never a landmark photo; `landmarkView` picks the kind and the judged score ranks within it
+
+**Context.** Staging `job_1790100385959_1nitlympp` (Lindenhof, 18 pages). The Visual Bible gave the real
+landmark five vantages (`LOC002.1`–`.5`) and the Art Director cited them, as it cites any vantage.
+`getLandmarkPhotosForScene` / `sceneMetadata` still read every `LOC###.N` as an explicit PHOTO slot
+(`landmarkVariants` → `explicitVariant`), and `decideLandmarkPhotoSource` took it before
+`pickVariantForView(landmarkView)`. Stored `sceneImages[].landmarkPhotos`: p3-5 (`.2`) got slot 2, an
+aerial rooftop panorama; p6-11 (`.3`) got slot 3, a riverside guild-house front that is not the Lindenhof
+at all; p12-16 (`.4` / `.5`, no such slot) were answered with slot 1 by `loadLandmarkPhotoVariant`'s
+same-vantage / first-variant substitution. The `.N`-is-a-photo convention (and `.0` = attach nothing,
+2026-08-11) predates vantages; since vantages exist the two meanings share one namespace.
+
+**Is there real data linking a vantage to a photo?** No. A vantage is an Art-Director camera position
+(`name`, `shot`, `description`, `pages`); a photo is an index slot (`photo_type`, `framing`,
+`photo_score`). Nothing joins them, and deriving a kind from the vantage's `shot` is the guess the
+`landmark_view_missing` entry below already rejected.
+
+**Decision.**
+1. The photo is picked by `pickVariantForView` alone: `landmarkView` → accepted kinds in order
+   (missing = the exterior list), and within the first kind that has a photo the judged `photoScore`
+   ranks (slot order breaks ties and orders unjudged photos). A photo judged below `MIN_USABLE_PHOTO`
+   is not a candidate — the same cutoff serving applies. `variantsFromIndexRow` now carries each
+   slot's `photoScore` (`PHOTO_SCORES_SQL`, both index queries). Measured: in 45% of judged kind
+   groups (staging 1,862 / 4,013; prod 2,131 / 4,797) the first slot is not the best-judged one, and
+   in 131 / 185 the first slot is below the usable cutoff.
+2. Deleted: `landmarkVariants` (both metadata parsers), `explicitVariant` / `.0`, and
+   `loadLandmarkPhotoVariant`'s cross-slot substitution — a slot the location does not have is an
+   error and attaches nothing.
+3. Generators that wrote `.N` as a photo number now say what the reader reads: the trial writer's
+   PHOTO ANGLES / `[LOC###.N]` instruction becomes a `landmarkView` field in the trial scene hint (the
+   landmark block still lists what each photo shows); the two iterate templates cite a real landmark
+   by its bare id and let `landmarkView` pick. The Art Director already said so.
+
+**Validation.** Replay of the fixed picker over the stored briefs (free; variants re-read from staging
+with scores): p3-p11 change from slot 2 / 3 to slot 1 (the terrace square with its wall and linden
+trees — the place the vantages "giant linden roots" and "low stone wall" describe); p1-2 and p12-18
+keep slot 1, which they now get by rule rather than by substitution.
+
+**Touched files.** `server/lib/landmarkPhotos.js`, `server/lib/storyHelpers.js`,
+`server/lib/sceneMetadata.js`, `server/lib/promptBuilders.js`, `prompts/story-trial.txt`,
+`prompts/scene-iteration.txt`, `prompts/scene-iteration-free.txt`,
+`tests/unit/landmark-vantage-id-not-photo.test.ts`, `tests/unit/landmark-plate-resolve.test.ts`,
+`tests/unit/landmark-photo-kind-to-prompt.test.ts`, `tasks/bugs.json`, `tasks/BACKLOG.md`.
+Supersedes the 2026-08-11 "variant 0" convention. **Status:** ✅ active.
+
+---
+
 ## 2026-09-24 — `landmark_view_missing` is deleted; the plan's shot wins over the review and over `shot_off_plate`
 
 **Context.** Test Lab experiment **1433** (`scene_review_replay` on staging

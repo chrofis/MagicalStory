@@ -10592,12 +10592,13 @@ The main character has two avatar styles available:
     }
 
     // Build landmarks instruction for the visual bible.
-    // For each landmark we surface ALL indexed photo variants (interior /
-    // exterior / detail / etc) with their descriptions so Claude can pick
-    // the variant whose framing matches each scene. Without this, Claude
-    // writes plain [LOC###] and the renderer always falls back to variant 1
-    // — e.g. Holzbrücke (Baden) has 2 interior shots (variants 4 & 5)
-    // perfect for "on the bridge" scenes, but they never get chosen.
+    // Each landmark lists what its indexed photos show, so the writer knows
+    // which views exist (an interior shot, a view from the top). The scene
+    // hint's `landmarkView` then picks the photo by kind
+    // (landmarkPhotos.pickVariantForView). The writer no longer cites a photo
+    // number as `[LOC###.N]`: a dotted id is a Visual Bible vantage, and
+    // reading it as a photo slot served the wrong photo (docs/decisions.md
+    // 2026-09-24).
     let landmarksInstruction = '';
     if (inputData.ideaKind === 'fantasy') {
       // The make-believe idea: the real town frames the story, the pages
@@ -10617,21 +10618,17 @@ A make-believe world.${worldSentence ? ` ${worldSentence}` : ''} The first scene
         let entry = `- ${l.name}`;
         const variants = l.photoVariants || [];
         if (variants.length >= 2) {
-          const angles = variants.map(v => `    ${v.variantNumber}: ${v.description}`).join('\n');
-          entry += `\n  PHOTO ANGLES (pick the variant whose description matches your scene framing):\n${angles}`;
+          const views = variants.map(v => `    - ${v.description}`).join('\n');
+          entry += `\n  PHOTOS (the views a scene's landmarkView can select):\n${views}`;
         }
         return entry;
       }).join('\n');
-      const hasVariants = top3.some(l => (l.photoVariants?.length || 0) >= 2);
-      const variantHint = hasVariants
-        ? `\nWhen a landmark has PHOTO ANGLES, reference it as \`[LOC###.N]\` in the scene hint's \`setting.location\` (e.g. \`"setting": {"location": "Wooden Bridge [LOC001.4]"}\` to pick the interior shot). Use interior angles for inside/on-the-landmark scenes, exterior angles for distant/establishing shots. Plain \`[LOC###]\` defaults to variant 1.`
-        : '';
       landmarksInstruction = `# Location${cityName ? `: ${cityName}` : ''}
 The story takes place in ${cityName || 'the child\'s hometown'}. Use real place names — do NOT invent fictional city names.
 At least one scene MUST take place at one of these real local landmarks:
 ${landmarkBlock}
 Include the chosen landmark(s) in the visual bible locations section with their real name and accurate visual description.
-Reference the landmark by its LOC ID in the relevant scene hints.${variantHint}`;
+Reference the landmark by its LOC ID in the relevant scene hints.`;
     } else if (inputData.userLocation?.city) {
       landmarksInstruction = `# Location: ${inputData.userLocation.city}
 The story takes place in ${inputData.userLocation.city}. Use real place names — do NOT invent fictional city names.`;

@@ -51,7 +51,6 @@ Last full sweep: **2026-09-06**.
 
 ## Image quality — unresolved render defects
 
-- [ ] A real landmark's dotted VANTAGE id (`LOC002.3`) is read by getLandmarkPhotosForScene as an explicit PHOTO variant and overrides `landmarkView` — job_1790100385959_1nitlympp served variant 2 on p3-5 and 3 on p6-11 by vantage number; `.4`/`.5` (no such photo) fell to variant 1. Owner call: vantage ids and photo variants share one `.N` namespace → docs/decisions.md (2026-09-24 `landmark_view_missing` entry), server/lib/storyHelpers.js:100
 - [ ] An eye-level page grouped into an angled vantage (`shot_off_plate` with the page's shot = the plan's): the fault is the vantage's `shot`, which the scene review cannot edit — needs an Art-Director / bible-side fix (e.g. vantage shot = base class when any of its pages is eye level). Lab 1433 p16 → docs/decisions.md (2026-09-24 entry, item 3)
 - [ ] Location reference cells drawn as isolated objects (kitchen = miniature on plinth, door with no wall) → tasks/lukas-story-diagnosis-2026-09-23.md:15
 - [ ] Shared vantage plate hands its representative page's weather/time to every page (rain on p4-p6) → tasks/lukas-story-diagnosis-2026-09-23.md:20
