@@ -254,3 +254,93 @@ staging only, with `tasks/verify.json` entries for rung 3.
 **Q8 — Trial cover.**
 - (a) Trial cover = trial page −1 through the trial page render path (proposed §4).
 - (b) Keep a separate trial cover builder (not recommended: it is the 3-path duplication this change removes).
+
+---
+
+## 9. Owner answers (2026-09-24) — the plan is executed with these
+
+| Q | Answer |
+|---|---|
+| Q1 | **(b) refuse loudly** — cover iterate / regenerate / repair on a pre-change story (no Art Director cover brief) fails with a clear message. |
+| Q2 | **(a)** the beat says every figure looks at the viewer; the AD writes it; a mechanical brief check flags any other gaze. SETTLED outcome unchanged. |
+| Q3 | **(a)** the three covers go into the one scene-review call. |
+| Q4 | **(b)** the layout (title top third, bottom bands) lives in the beat; the AD stages the copy space like a page's `textPosition`; the judge's text-zone check applies; the render-side layout text that becomes redundant is deleted. |
+| Q5 | **(a)** keep `coverImages` + the cover keys in `story_images`; the page path writes there for cover page numbers. |
+| Q6 | **(b)** code puts the cast into the beat (today's rules); the AD stages exactly that cast; the composite path stays for >5-figure covers, fed from the brief. |
+| Q7 | **(a), AMENDED by the owner (2026-09-24):** full-story covers repair, iterate and regenerate through the page path only; `iterateCover` is KEPT as the trial-only cover iterate, next to the trial-only cover builder (front via `onCoverScene`, back via the default hint). The split is explicit: `iterateCover` and the trial builder are called only for trial stories and throw for a full-story cover; the trial path is its own sibling set. |
+| Q8 | **CHANGED — keep the trial cover separate.** The change is FULL-STORY ONLY. The trial cover builder stays (speed: target ≈1 min, rendered first from the writer's streamed cover JSON); only what is genuinely dead once the full-path code is gone leaves the trial path. Separately: measure the trial cover's time-to-image (§10). |
+
+Execution rules: CLAUDE.md (sibling registry, generator-critic sync, SETTLED/decisions entries for every §6
+reversal); tests in the same commits; today's commits REPLACED, not reverted; validate on rungs 1 and 2 only
+(cap CHF 1.00, burn-loop rule); STOP before rung 3 and ask.
+
+## 10. Trial cover latency (measured 2026-09-24)
+
+**The stored data cannot measure the trial cover's time-to-image.**
+- `stories.data.generationLog` of a trial has no cover event at all (prod `job_1790169018278_n57xpnufo`: 32 events
+  — `stage_start`, `page_streamed`, VB cell gates, `generation_complete`, `api_usage`, `timing_summary`; nothing for
+  the cover). The only cover lines are Railway `log.info` lines (`[TRIAL-COVER] Starting title page generation`,
+  `Title page image ready in Xs`), which are not stored and not reachable from this machine (no Railway CLI login).
+- `coverImages.frontCover.generatedAt` is stamped at the FINAL assembly, not when the cover is ready, and the
+  `story_images` cover row is written at the final save too: both equal the end of the job (cover row and first
+  page row are within 1 s of each other on every one of 15 staging and 9 prod trials).
+- The `partial_cover` checkpoint (written the moment the cover is ready) is deleted with the job's checkpoints.
+
+What the stored data does say (job start → job complete, recent trials):
+| env | trials | job total |
+|---|---|---|
+| prod (09-11 … 09-24) | 9 | 137-199 s |
+| staging (09-08 … 09-15) | 15 | 110-181 s |
+On `job_1790169018278_n57xpnufo` the writer streamed page 1 at 52 s, so the cover JSON (written before the pages)
+and the VB were in by ~50 s; the cover then also waits for avatar styling, then renders (~15-30 s per Grok call).
+
+**Plate-or-fail (8c1a6b4b3, 2026-09-23) — code reading, not measurement.** Since that commit the trial cover:
+1. waits for the page plate of its LOC when a trial page shares it (`await pagePlate.promise`,
+   storyJobPipeline ~l.2513) — the plate render is started when the backgrounds section streams, so the wait is
+   whatever of that plate's ~10-20 s is still outstanding when the cover is otherwise ready;
+2. otherwise renders its OWN plate first (`buildCoverReferences` → one extra `generateImageOnly`, sequential,
+   ~10-20 s), then the cover.
+Either way the cover now has a plate render on its critical path that it did not have before. **No trial has run on
+staging since 8c1a6b4b3, and it is not on prod**, so the added latency has never been observed.
+
+**To actually measure it** (options, not done — the trial latency path is not to be changed without asking):
+- (a) add one genLog event `trial_cover_ready` with ms since job start and the waits (VB, avatars, plate, render) —
+  no behaviour change — then one staging trial (rung 3, needs approval, ≈CHF 0.7);
+- (b) read the `[TRIAL-COVER]` Railway lines for recent prod trials with an owner Railway login.
+
+**If it breaks ≈1 min** (options for the owner): (a) start the cover's plate the moment the cover JSON arrives, in
+parallel with avatar styling, instead of after; (b) reuse the page plate only if it is already done, else render the
+cover plate in parallel; (c) render the cover plate at the cover aspect from the cover JSON setting at VB time.
+
+## 11. Execution record (2026-09-24)
+
+Commit `6fbd2b599` (staging) — decisions.md "Full-story covers are pages".
+
+- [x] Cover beats in code (`coverBeats.js`), appended after the story beats; AD template's cover section deleted.
+- [x] Covers briefed in the one AD call and reviewed in the one scene review (Q3); checks `cover_gaze_not_viewer`,
+      `cover_text_zone_mismatch` (Q2, Q4); negative page headings parsed everywhere the briefs flow.
+- [x] Render through the page path with `coverRenderOptions` only; `{COVER_COMPOSITION}` empty for full-story covers
+      (Q4); storage unchanged, record marked `briefedAsPage` (Q5).
+- [x] Repair pipeline: covers iterate via `iteratePage`, char-fix allowed; `iterateCover` branch removed there (Q7).
+- [x] Routes (`/iterate/-N`, `/regenerate/cover`, manual character repair) and the Lab cover stage route by
+      `coverIteratePath`; pre-change covers refused with 409 (Q1).
+- [x] Trial split explicit (Q7 amendment, Q8); dead trial pieces removed (initialPage composition, Scene line).
+- [x] Consumers: clothing, entity collection, EXPECTED CAST, pose fill line.
+- [x] Tests (`covers-as-pages.test.ts` + updated cover tests), sibling registry (3 new sets, 2 updated), verify entry
+      `covers-are-pages` (supersedes `cover-briefed-like-a-page`), SETTLED gaze line, prompt inventory.
+- [x] Rung 1 — free replay of the real cover-beat + AD builders over 4 stored staging stories.
+- [ ] Rung 2 — Lab `beats_scenes` with cover beats + render of the three returned briefs (see below).
+- [ ] Rung 3 — needs owner approval (smoke story / trial).
+
+Deviations from the plan, and why:
+- The regenerate route's cast picker on a full-story cover maps to a free iterate with a rule naming exactly the picked
+  cast (the page path has no cast-override render); the edited scene becomes the brief the rewrite starts from.
+- The composite cover path (Q6 (b)) is kept in code but is unreachable for a full story: the beat caps the cast at 5
+  and the page path has no composite route for covers.
+- The pixel calm-zone repair stays page-only: on a cover it would wash the baked title.
+
+Found, not fixed (trial path — the owner asked for no trial change without asking): the trial's
+`parser.extractCoverHints()` returns a truthy EMPTY hint for every cover (the trial writer emits no COVER SCENE HINTS
+section), so the trial start block's "default hint" branches never run and the back cover renders from an empty hint:
+every one of the last 3 staging and 3 prod trials stored `coverHints.backCover.hint = ""` and a back-cover description
+starting "A portrait of a single character set before <place>" — never the intended "calm closing back-cover scene".

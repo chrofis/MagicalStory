@@ -59270,3 +59270,82 @@ server/routes/regeneration.js, server/lib/testlab.js, server/lib/sceneComposite.
 tasks/verify.json, tests/unit/repair-descriptor-vb-figures.test.ts, tests/unit/char-fix-page-state.test.ts,
 tests/unit/inpaint-direct-fix.test.ts.
 **Status:** ✅ active — verify entry `repair-descriptor-vb-figures`.
+
+## 2026-09-24 — Full-story covers are pages: the Art Director briefs them from code-written cover beats
+
+**Context.** A full-story cover was built by code from the Art Director's `---COVER SCENE HINTS---` section
+(Mood / Objects / Scene / Characters lines) through `buildCoverSceneFromHint`, rendered by its own builder
+(`startCoverGeneration` → `buildCoverPrompt` + `cover-composition.txt`) and iterated by `iterateCover`: a third
+brief format, a second render path and a second iterate path next to the page's. Owner (2026-09-24): "Do it the
+same as a page. The AD makes full briefs of the image. No code telling the AD what is in the code. Basically what
+is in the code should be the beats for the cover pages, and the AD treats it like any other page." Plan and the
+owner's eight answers: `tasks/covers-as-pages-2026-09-24.md` §9.
+
+**Decision.**
+1. **Cover beats (Q2, Q4, Q6).** `server/lib/coverBeats.js` writes one plan line per cover, page numbers −1/−2/−3
+   (`COVER_PAGE_NUMBERS`), appended AFTER the story beats: `wide — <cast> — <facts> — <after>`. The facts are what
+   code owned as prompt rules: the cover's purpose, the cast (front = the main characters; opening and back = mains
+   then the others, max 5 — the former `buildCoverCastLines`), the real-landmark rule, solid ground, **every figure
+   looks at the viewer (`looksAt: "viewer"`)**, costumed when the wardrobe contract uses a costume, any VB
+   animal/artifact/vehicle up to `VB_ELEMENT_BUDGET` (front: a creature the story centres on appears), and the copy
+   space as a page `textPosition` (`COVER_TEXT_POSITION` in `coverKeys.js`: front `top-full`, opening and back
+   `bottom-full`). The AD template has no cover section any more.
+2. **Brief, review, checks (Q3).** The cover briefs are written in the one all-pages AD call and go through the one
+   scene review, `applyBriefUsage` and the mechanical checks. New checks (`sceneBriefCheck.checkCoverBrief`,
+   REVIEWABLE): `cover_gaze_not_viewer`, `cover_text_zone_mismatch`. Page-only checks skip cover pages (object-state
+   base, text-zone distribution). The parsers accept negative headings (`parseRefinedText`, `parseCastRemovals`,
+   FAULTED PAGES, `extractBibleSections`).
+3. **Render (Q4, Q5).** Covers render through the page path (`preparePageData` → Phase 5a) with only their
+   cover-only options (`coverRender.coverRenderOptions`): the cover aspect, text always in the image, the
+   baked-title model and REQUIRED TEXT tail (`withBakedTitle`, one implementation with the trial builder), the text
+   contract for the judges, the `cover_images` usage bucket and the `partial_cover` checkpoint.
+   `{COVER_COMPOSITION}` stays empty for them — the layout lives in the beat. Covers are kept out of the vantage
+   plate groups. Storage is unchanged: `coverImages.{frontCover,initialPage,backCover}` + the cover keys in
+   `story_images`; the record adds the brief fields (`sceneDescription`, `sceneMetadata`, `outlineExtract`,
+   `perCharClothing`, plate) and `briefedAsPage: true`, and the shipped version's brief travels back after repair.
+4. **Repair / iterate / regenerate (Q7 (a) as amended by the owner).** A full-story cover is evaluated and repaired
+   in the repair pipeline like a page: iterate → `iteratePage` (cover aspect, cover text contract, baked title),
+   char-fix allowed (the `pageNumber > 0` gates are now `!== 0`), inpaint as before. The post-generation cover routes
+   (`/iterate/-N`, `/regenerate/cover/:type`), the manual character repair and the Lab `cover` stage route by
+   `coverBeats.coverIteratePath`: `'page'` → `coverRender.iterateFullStoryCover` (page iterate + the app-side
+   typography re-stamp `coverTypography.stampRepaintedCover`, one implementation with `iterateCover`); `'trial'` →
+   `iterateCover`. The regenerate route's user edits map onto the page path: an edited scene becomes the brief the
+   rewrite starts from; a picked cast becomes a free iterate with a rule naming exactly that cast.
+5. **Stored stories (Q1 (b)).** A full-story cover made before this change has no brief: `coverIteratePath` throws
+   a clear message; the routes answer 409. No second path.
+6. **The trial stays separate (Q8; Q7 amendment).** The trial keeps its own cover builder (front from the streamed
+   cover JSON via `onCoverScene`, back via `startCoverGeneration`) and `iterateCover` as its iterate. The split is
+   explicit: `startCoverGeneration`, `onCoverScene` and `iterateCover` throw for a full story, `iteratePageCore`
+   throws for a trial cover; the trial path is its own sibling set (`trial-cover-path`). Removed from the trial path
+   only what the full-path removal made dead: the `initialPage` section of `cover-composition.txt` and
+   `buildInitialPageComposition` (the trial renders front and back only; `buildCoverPrompt` throws for any other
+   type), the hint `Scene` parse, `hint.scene`, and `buildPlateDescription`'s `excludeText`.
+7. **Consumers.** A briefed cover's clothing is its own `perCharClothing` (`resolvePageClothingCategory`, the entity
+   collection); its EXPECTED CAST is the cast its brief declares, like a page — prose name-matching stays for hint
+   covers only. `buildExactPosesBlock` adds no "not at the viewer" fill line for a figure whose `looksAt` is the viewer.
+
+**Supersedes.** 2026-05-10 structured-only cover hints (full story); 2026-07-11 "cover gaze code-owned" is
+restated, not reversed — code states it in the beat, the AD writes it, a check enforces it (SETTLED line updated,
+outcome unchanged); 2026-09-23 C4 (covers follow the AD cast via hints); the 2026-09-23 cover entries of the same
+session (title-named creature and any-element as AD cover rules, the `Scene` line + `coverBriefWithObjects` for
+full-path covers, KEY STORY ELEMENTS must-keep for covers) — their outcomes live on in the beat (element budget,
+creature on the front), and `coverBriefWithObjects` / REQUIRED OBJECTS remain for the trial cover. Verify entry
+`cover-briefed-like-a-page` → superseded by `covers-are-pages`.
+
+**Not done / flagged.** (a) The pixel calm-zone repair (`ensureCalmZone`) runs on story pages only
+(`pageNumber > 0`): it would wash a baked title; covers rely on the brief's copy space and the judge's text-zone
+check. (b) The composite cover path (Q6 (b)) is unreachable for a full story: the beat caps the cast at 5, and the
+page path has no composite route. (c) Trial cover time-to-image is not measurable from stored data (plan §10).
+
+**Rationale.** One brief format, one render path, one repair path: the AD writes every picture, code writes only what
+it knows — as the beat.
+
+**Touched:** server/lib/coverBeats.js (new), server/lib/coverRender.js (new), server/lib/coverKeys.js,
+server/lib/beatsPipeline.js, storyJobPipeline.js, server/lib/promptBuilders.js, server/lib/sceneBriefCheck.js,
+server/lib/sceneReviewGuard.js, server/lib/images.js, server/lib/repairPipeline.js, server/lib/repairLogic.js,
+server/lib/iterateBeat.js, server/lib/coverIterate.js, server/lib/coverTypography.js, server/lib/evalPipeline.js,
+server/lib/clothingCategories.js, server/lib/entityConsistency.js, server/lib/outlineParser/unified.js,
+server/lib/testlab.js, server/routes/regeneration.js, prompts/scene-expansion-all.txt, prompts/scene-expansion.txt,
+prompts/cover-composition.txt, scripts/admin/sibling-registry.json, scripts/admin/verify-checks.js, tasks/verify.json,
+docs/SETTLED.md, tests/unit/covers-as-pages.test.ts and the updated cover tests.
+**Status:** ✅ active on staging — verify entry `covers-are-pages` (needs a full-story run).
