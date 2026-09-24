@@ -882,6 +882,42 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "wait-screen-until-complete",
+      "title": "Readers wait on the progress screen until the story is complete; hour message; bar moves with time",
+      "commits": [
+        "3f904bcd3"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "Starting a story on staging shows the hour message prominently, then as a small note under the spinner; the modal stays (no partial book, no stage text) until the job completes and then opens the finished story; the bar is near the server percent (about 57% when the text is done) and never drops at the end.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Start a story on staging as a NON-dev account (or dev mode off): first ~7 s a large panel says the story takes about an hour and an email follows; then it shrinks to a small line under the spinner and tips/avatars rotate. The modal must not close when the first image exists; after completion the reader lands on the finished story. Nav % and My Stories card show only a percentage and never go backwards near the end."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "idea-cards-final-only",
+      "title": "Idea cards show only the final idea text, never [DRAFT]/[REVIEW] scratch",
+      "commits": [
+        "e472d3e02"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "Generating ideas on staging leaves each card in its loading state until the final idea text appears in one piece; no [DRAFT] or [REVIEW] text ever shows in the box.",
+      "runShape": [
+        "needs-fresh-idea"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "In the wizard story step, click generate ideas and watch both cards: spinner/progress until a clean idea appears at once; no text streaming in, no [DRAFT]/[REVIEW] words."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }
