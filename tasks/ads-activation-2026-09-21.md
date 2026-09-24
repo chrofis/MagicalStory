@@ -102,7 +102,15 @@ serves immediately; the three new campaigns ramp as Google reviews their ads (~2
 - [x] **Measurement gap 2 CLOSED 2026-09-23.** `scripts/ads/set-keyword-suffix.js` set Search-Deutschschweiz-v1's
       final URL suffix to `utm_term={keyword}` - no ad rebuild. Verified after: suffix live, campaign ENABLED,
       all 3 ads still APPROVED/REVIEWED (the tracking change did not send them back to review).
-- [ ] First real paid click: verify it lands in prod `trial_events` with its utm_term (chain unproven end to end).
+- [x] **First paid trial, 2026-09-24 22:36-22:43 CH — chain proven end to end.** Search-Deutschschweiz-v1, keyword
+      `kinderbuch selbst gestalten` (tagged by the 09-23 suffix), phone, gclid present: /try landing -> account
+      22:39 -> story completed 22:43 (job completed). ~CHF 2.50 spend for it once Google posts the click.
+- [x] **Ad arrivals + exits recorded (owner 2026-09-24).** `site_arrival` / `site_exit` in trial_events, outside
+      the funnel steps; report shows arrived / median seconds / >1 page per campaign and keyword. On STAGING
+      (fbb75e248). 33 tagged browser visits: arrivals 30/30, exits ~95% (Chrome + WebKit; see commit).
+- [ ] Production: needs owner OK. staging is 311 commits ahead of master — ship THIS change alone by
+      cherry-picking the 6 app/test files onto origin/master (dry-run: applies cleanly; the report script
+      conflicts but only runs locally). Not a staging->master merge.
 - [ ] End of week: `node scripts/ads/attribution-report.js --days=7`.
 
 ## Expectation stated to the owner up front
