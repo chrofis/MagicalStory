@@ -169,6 +169,8 @@ drafts/
 
 # The clear-bug registry is TRACKED — the pre-push gate reads it on every clone
 !tasks/bugs.json
+# The verification registry is TRACKED — gate 4b and verify-run.js read it (2026-09-24)
+!tasks/verify.json
 
 # The backlog index is TRACKED for the same reason bugs.json is: it must survive.
 # tasks/* is ignored so per-session scratch plans stay local — correct, but it

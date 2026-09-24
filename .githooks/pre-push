@@ -39,6 +39,14 @@ node "$HOOK_DIR/../scripts/admin/check-doc-drift.js" || exit 1
 # bypassed, and a bypassed gate is worse than none.
 node "$HOOK_DIR/../scripts/admin/check-doc-coupling.js" || exit 1
 
+# Gate 4b: a push that changes behaviour says how a story run will prove it
+# (owner, 2026-09-24: "we do 20 changes that need a new story ... we should
+# ensure if all 20 are tested or not"). Same WATCHED files as gate 4. The push
+# adds/changes an entry in tasks/verify.json, or each such commit carries
+# `Verify: <entry-id>` or `Verify: none (<reason>)`. Commits older than this
+# gate are never judged. After a run: node scripts/admin/verify-run.js <storyId> --write
+node "$HOOK_DIR/../scripts/admin/check-verify-coupling.js" || exit 1
+
 # Gate 5: no OPEN reported bugs (tasks/bugs.json). CLAUDE.md has said "just fix
 # it" since the beginning and it kept not happening — clear bugs were backlogged
 # while unrelated work shipped over them. While any registry entry is open,

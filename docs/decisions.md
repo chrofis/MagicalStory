@@ -58450,3 +58450,49 @@ page rewritable. Applies to every finding category, not only STYLE. No audit-sid
 **Rationale:** The judgement belongs to the stage that holds the full context; audit precision stops being a
 rewrite risk.
 **Touched:** prompts/text-refine.txt, tests/unit/text-style-rulebook.test.ts.
+
+## 2026-09-24 — Changes that need a story run are a registry; a stored run is judged against it
+
+**Context:** Owner: "we do 20 changes that need a new story. When we rerun it we should ensure if all 20 are
+tested or not. Now I say check all past commits but that is weak." Proof obligations lived in commit messages
+and a free-text BACKLOG section, and every validation run was followed by a hand re-read of history to guess
+which changes it had exercised. Owner chose: registry + script + gate.
+
+**Decision:**
+- `tasks/verify.json` — one entry per change that needs a run: `commits`, a one-sentence `claim`, the
+  `runShape` that can exercise it (`full-story`, `trial`, `age-band:N`, `needs-shot:<shot>`,
+  `needs-iterate-repair`, `needs-char-fix`, `needs-inpaint`, `needs-fresh-idea`, `needs-worn-off`,
+  `needs-fresh-avatar-sheet`, `needs-composite`), a `check` (auto: a function in
+  `scripts/admin/verify-checks.js`; human: what to look at), `status` and appended `evidence`.
+- `scripts/admin/verify-run.js <storyId> [--env=prod] [--write]` reads the stored run (stories.data,
+  story_images urls, story_jobs) and prints per pending entry CONFIRMED / FAILED / HUMAN / NOT COVERED.
+  **A run is evidence only for commits its recorded build contains** (`analytics.build.commitFull`,
+  `git merge-base --is-ancestor`); a run with no recorded build, or without the run shape, is NOT COVERED —
+  never a pass and never inferred from dates. For a build that lacks the commit the check still runs and is
+  printed as "old code:", so a pre-change run shows the check can see the old state. `--write` records
+  evidence and flips `confirmed` only on an auto pass with no human part; an auto FAILED stays pending and is
+  printed loudly. `--mark=<id>:confirmed|failed --note=...` records a human verdict.
+- Gate 4b `scripts/admin/check-verify-coupling.js` (pre-push, after check-doc-coupling, reusing its WATCHED
+  list by import): a pushed commit changing a watched behaviour file needs the push to add/re-specify a
+  registry entry (evidence-only edits do not count), or a `Verify: <entry-id>` / `Verify: none (<reason>)`
+  trailer. Commits that are ancestors of the gate's introducing commit are never judged, so older unpushed
+  work is not blocked retroactively. Fails closed on its own errors.
+- Seeded with this session's 2026-09-22..24 behaviour commits (17 entries) and the still-live run
+  verifications from BACKLOG "Verification pending" (21 entries, 2 of them superseded); BACKLOG lines now
+  point at registry ids, non-run chores stay in BACKLOG.
+
+**Validation:** dragon run 6 (staging job_1790100385959_1nitlympp, build b03c64b03 — predates most entries):
+2 CONFIRMED (repair-descriptor-no-names, avatars-before-pages — both in its build), 7 HUMAN, 27 NOT COVERED;
+every pre-change entry's "old code" reading shows the old state (aerial owed, 3/3 VB animals carry a scale
+phrase, 0/32 enum emotions, 11 size comparisons, p17 iterate drew four absent boys, p14 "Issues to fix:",
+four off pages in the wearing grid, diff prompt without findings). Side observation from the descriptor check:
+a creature NAME (Turi) reached Grok in p13's inpaint instruction — outside that entry's claim.
+
+**Honest limits:** the gate cannot judge whether a claim is the right one, and one registered entry in a push
+satisfies every behaviour commit of that push. Text measurements (size comparisons, mood tags, fragments) are
+regex counts for a human read, never a classification of a judge's finding. Inventory lettering is not
+persisted, so zero lettering findings cannot be told from "check did not run" — it goes to a human look.
+
+**Touched:** tasks/verify.json, scripts/admin/verify-run.js, scripts/admin/verify-checks.js,
+scripts/admin/check-verify-coupling.js, scripts/admin/check-doc-coupling.js (exports WATCHED), .githooks/pre-push,
+tests/unit/verify-registry.test.ts, tasks/BACKLOG.md, CLAUDE.md.
