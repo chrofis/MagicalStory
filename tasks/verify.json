@@ -24,7 +24,8 @@
       "title": "Unrequested lettering on a page becomes a rendered_text finding in code",
       "commits": [
         "1d4f1bcf1",
-        "67c617743"
+        "67c617743",
+        "f23f81e16"
       ],
       "addedAt": "2026-09-24",
       "claim": "Every evaluated scene version stores letteringInventory {items, declared} (what the check compared), and readable writing the page did not declare is stored on that version as a rendered_text finding with source lettering-check: overlay, misspelled or misplaced-legible CRITICAL quoting the text, misplaced scribble MINOR, a fitting correctly spelled sign silent.",
