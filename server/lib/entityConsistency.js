@@ -1015,6 +1015,14 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
           // it is mechanically fixable, so it must not charge severity points or
           // trigger a redraw (decisions.md 2026-08-06).
           garmentColourMismatches: [],
+          // The wardrobe state each page's brief declares for this character
+          // ({ [page]: [offIds] }, pages with a garment OFF only), from the
+          // same per-appearance stamp that keys the grids. scoring.js
+          // entityFindingsForPage reads it so a wardrobe finding judged in any
+          // other state costs nothing on that page (owner, 2026-09-24).
+          declaredOffByPage: Object.fromEntries(appearances
+            .filter(a => Array.isArray(a.offIds) && a.offIds.length > 0)
+            .map(a => [a.pageNumber, a.offIds])),
           overallConsistent: true,
           overallScore: 10,
           totalIssues: 0
@@ -1511,6 +1519,15 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
           report.characters[charName].issues.push(
             require('./findingSources').stampFindingSource([annotated], require('./findingSources').FINDING_SOURCES.ENTITY)[0]
           );
+          // Say so once, here, when a page's declared wardrobe state voids the
+          // finding there (scoring.offByDesignFinding: 0 points, no repair).
+          const { entityFindingPages, offByDesignFinding } = require('./scoring');
+          for (const p of entityFindingPages(annotated)) {
+            const excused = offByDesignFinding(annotated, report.characters[charName].declaredOffByPage?.[p]);
+            if (excused) {
+              log.info(`👕 [ENTITY-CHECK] ${charName} p${p}: ${annotated.subType || annotated.type} judged in "${clothingCategory}" but the page takes off ${excused.declaredOffIds.join('+')} — off by design, 0 points, no repair`);
+            }
+          }
         }
 
         for (const m of (evalResult.garmentColourMismatches || [])) {
@@ -3384,7 +3401,7 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
     let issuesFoundText = '';
     if (options.issues && options.issues.length > 0) {
       const pageIssues = options.issues.filter(issue =>
-        issue.pagesToFix?.includes(pageNumber)
+        require('./scoring').entityFindingPages(issue).includes(pageNumber)
       );
       if (pageIssues.length > 0) {
         issuesFoundText = '\n## Issues to Fix\n\nThe consistency check found these specific problems on this page:\n';
@@ -3485,7 +3502,7 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
         whiteoutTarget,
         issueDescription: issuesFoundText || '',
         // Structured type only — the prompt never carries the judge's sentence.
-        defectTypes: (options.issues || []).filter(i => i.pagesToFix?.includes(pageNumber)).map(i => i.subType || i.type).filter(Boolean),
+        defectTypes: (options.issues || []).filter(i => require('./scoring').entityFindingPages(i).includes(pageNumber)).map(i => i.subType || i.type).filter(Boolean),
         clothingDescription: clothingDescription || '',
         sceneDescription: sceneDesc,
         faceBbox: targetAppearance.faceBox || null,

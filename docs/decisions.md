@@ -59582,3 +59582,51 @@ days exactly one entry fell back (job_1788555701112_99txp8evx, Emma: both attemp
 four existing Pass-2 vm tests and `tests/manual/avatarStyleAnchorRetry.test.js`,
 `docs/prompt-inventory.md`, `docs/image-routing.md`, `docs/image-generation-methods.html`.
 **Status:** ✅ active (staging)
+
+## 2026-09-24 — A multi-page entity finding counts on each of its pages; a wardrobe finding the page's declared state voids costs nothing
+
+**Context:** staging `job_1790100385959_1nitlympp` (dragon run 6). The final entity report is assembled from the
+shipped picks (repairPipeline Step 4b), which dedupes one finding across pages: Kiaan `clothing_inconsistent`
+MAJOR "missing the rust-brown … body warmer" is stored once with `pageNumbers: [11,12]`, `pageNumber: 11` and
+no `pagesToFix`. The page reader matched `pages` / `pagesToFix` / `pageNumber` only, so p12 neither billed nor
+listed it, and every repair reader (`pagesToFix || pageNumber`) targeted p11 alone. Separately, both pages
+declare `{id: ART004, owner: Kiaan, state: "off"}`: the finding is a garment taken off by design. The
+2026-09-23 entry keeps NEW off pages out of the wearing grid, but nothing tied a wardrobe finding to the page's
+declared state once it existed — a stored report, the identity grid, or a model `pagesToFix` naming a page
+outside its grid still billed it.
+
+**Decision (owner-approved, 2026-09-24):**
+1. `scoring.entityFindingPages(issue)` is the one page accessor: `pagesToFix`, then `pageNumbers`, then `pages`,
+   then `pageNumber`. `entityFindingsByPage(report)` yields one row per (finding, page); `entityFindingsForPage`
+   filters it. Score, panel lists, `repairLogic` (char-fix selection, `decideRepairMethod`), the manual repair
+   route, the consolidator's report path, `repairSinglePage` and the round merge all read through it — one row
+   per page, so a finding stored with all three fields is still counted once. Step 4b stamps
+   `pagesToFix = pageNumbers` (the routing field) and dedupes per grid; `mergeEntityIssues` trims only the
+   re-checked pages off a base finding instead of keeping or dropping it by its first page.
+2. Severity rule in code (owner-approved; classification stays with the prompt): the entity check stamps each
+   character's `declaredOffByPage` from the per-appearance `offIds` that already key the grids (the page's
+   `wornItems` rows). `scoring.offByDesignFinding` voids a finding on a page when it bills as clothing
+   (evalBuckets → `clothing`), the page declares ≥1 of that character's garments off, and the finding's
+   `clothingCategory` is not that exact `--off:` grid (or is unknown). Voided findings go to
+   `entityIssuesForPage(...).excused` — 0 points, never in `issues`, so they never reach the consolidator, the
+   panel list or char-fix — and `entityConsistency` logs each one. Version stamps now carry `clothingCategory`.
+   A wardrobe finding judged IN the page's own off-state grid still counts: the judge was told the removal.
+
+**Rationale:** a finding carries no garment id, so "is this about the garment that is off" cannot be answered
+without reading its text (forbidden, SETTLED). "Was it judged against the page's declared wardrobe state" can
+be answered from ids alone, and a judgement against a reference that still wears a removed garment is invalid
+for that page whatever it says. Consequence, accepted: on such a page a wardrobe finding judged against the
+wrong state is voided even when it is about a different garment (it was judged against the wrong reference).
+No prompt change: the entity prompt already receives the per-page state through the `--off:` grid and its
+Clothing Context (2026-09-23).
+
+**Replay (rung 1, stored run 6, no model calls):** declared off: Kiaan p11/p12 ART004, Levin p16 ART006, Max p9
+ART005. Final report: Kiaan's finding now reaches p12 as well, and is excused on both (p11 entity 15 → 0,
+p12 0 → 0). Per version, stamp through the new rule and the stored consolidated plan without the entity-only
+item it would no longer receive: p11 v0 70 → 85, p12 v0 10 → 10, p12 v1 −15 → 0, p16 v0 13 → 28, p16 v1 and
+p9 v0 unchanged. Pages 14 and −3 (Julian, non-wardrobe findings) unchanged.
+
+**Touched:** server/lib/scoring.js, server/lib/entityConsistency.js, server/lib/repairPipeline.js,
+server/lib/repairLogic.js, server/lib/feedbackConsolidator.js, server/lib/images.js, server/routes/regeneration.js,
+tests/unit/entity-multipage-off-by-design.test.ts, tasks/bugs.json.
+**Status:** ✅ active on staging.

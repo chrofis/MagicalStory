@@ -698,40 +698,27 @@ function selectCharRepairTasks(entityReport, options = {}) {
   const fixTasks = [];
   const seenPairs = new Set();
 
-  for (const [charName, charResult] of Object.entries(entityReport?.characters || {})) {
-    // Collect all issues: top-level + byClothing
-    const allIssues = [...(charResult.issues || [])];
-    if (charResult.byClothing) {
-      for (const clothingResult of Object.values(charResult.byClothing)) {
-        for (const issue of (clothingResult.issues || [])) {
-          if (!allIssues.some(i => i.id === issue.id)) {
-            allIssues.push(issue);
-          }
-        }
-      }
-    }
-
-    for (const issue of allIssues) {
-      // CRITICAL only, case-insensitive — same gate as decideRepairMethod's
-      // entity block (owner ruling 2026-09-01). The old lowercase-only
-      // major/critical compare never matched the evaluator's UPPERCASE
-      // severities, so this selector was dead code too.
-      const sev = String(issue.severity || '').toLowerCase();
-      if (sev !== 'critical' || isCropArtifact(issue, { entity: true })) continue;
-
-      const pagesToFix = issue.pagesToFix || (issue.pageNumber ? [issue.pageNumber] : []);
-      for (const pageNum of pagesToFix) {
-        const key = `${pageNum}-${charName}`;
-        if (seenPairs.has(key)) continue; // one task per page+character
-        seenPairs.add(key);
-        fixTasks.push({
-          pageNumber: pageNum,
-          charName,
-          severity: sev,
-          issueDescription: issue.description || issue.fixInstruction || '',
-        });
-      }
-    }
+  // The report's ONE reader (scoring.entityFindingsByPage): every page a
+  // finding names is its own row, each targeting that page's own image, and a
+  // wardrobe finding the page's declared state voids is not a repair target.
+  const { entityFindingsByPage } = require('./scoring');
+  for (const { name: charName, source, issue, pageNumber: pageNum, offByDesign } of entityFindingsByPage(entityReport)) {
+    if (source !== 'character' || offByDesign) continue;
+    // CRITICAL only, case-insensitive — same gate as decideRepairMethod's
+    // entity block (owner ruling 2026-09-01). The old lowercase-only
+    // major/critical compare never matched the evaluator's UPPERCASE
+    // severities, so this selector was dead code too.
+    const sev = String(issue.severity || '').toLowerCase();
+    if (sev !== 'critical' || isCropArtifact(issue, { entity: true })) continue;
+    const key = `${pageNum}-${charName}`;
+    if (seenPairs.has(key)) continue; // one task per page+character
+    seenPairs.add(key);
+    fixTasks.push({
+      pageNumber: pageNum,
+      charName,
+      severity: sev,
+      issueDescription: issue.description || issue.fixInstruction || '',
+    });
   }
 
   // Sort: worst page score (ascending) first, then page number as tiebreaker
@@ -978,22 +965,15 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
 
   if (pageNumber > 0 && entityReport?.characters) {
     let worst = null; // {severity, charName, issue}
-    for (const [charName, charResult] of Object.entries(entityReport.characters)) {
-      const allIssues = [...(charResult.issues || [])];
-      if (charResult.byClothing) {
-        for (const cr of Object.values(charResult.byClothing)) {
-          for (const i of (cr.issues || [])) {
-            if (!allIssues.some(x => x.id === i.id)) allIssues.push(i);
-          }
-        }
-      }
-      for (const issue of allIssues) {
-        const sev = String(issue.severity || '').toLowerCase();
-        if (sev !== 'critical' || isCropArtifact(issue, { entity: true })) continue;
-        const pages = issue.pagesToFix || (issue.pageNumber ? [issue.pageNumber] : []);
-        if (!pages.includes(pageNumber)) continue;
-        if (!worst) worst = { severity: sev, charName, issue };
-      }
+    // The page's entity findings through the report's ONE reader
+    // (scoring.entityFindingsForPage) — a finding on several pages reaches
+    // each; one voided by the page's declared wardrobe state reaches none.
+    const { entityFindingsForPage } = require('./scoring');
+    for (const { name: charName, source, issue, offByDesign } of entityFindingsForPage(pageNumber, entityReport)) {
+      if (source !== 'character' || offByDesign) continue;
+      const sev = String(issue.severity || '').toLowerCase();
+      if (sev !== 'critical' || isCropArtifact(issue, { entity: true })) continue;
+      if (!worst) worst = { severity: sev, charName, issue };
     }
     const entityGap = worst && charFixImpossible(worst.charName);
     if (entityGap) {

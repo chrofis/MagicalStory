@@ -1150,8 +1150,18 @@ function shouldRedo(version) {
  * type ceilings are reproducible downstream.
  */
 function entityIssuesForPage(pageNumber, report) {
-  const out = { penalty: 0, issues: [] };
-  for (const { name, source, issue } of entityFindingsForPage(pageNumber, report)) {
+  const out = { penalty: 0, issues: [], excused: [] };
+  for (const { name, source, issue, offByDesign } of entityFindingsForPage(pageNumber, report)) {
+    // OFF BY DESIGN (owner, 2026-09-24): a wardrobe finding on a page whose
+    // brief takes one of this character's garments off, judged against a
+    // wardrobe state other than the page's own, is not a defect there —
+    // 0 points, never a repair target. Kept aside so the caller can log it.
+    if (offByDesign) {
+      out.excused.push({ name, type: issue.type || null, subType: issue.subType || null,
+        severity: issue.severity, description: findingText(issue), source,
+        clothingCategory: issue.clothingCategory || null, declaredOffIds: offByDesign.declaredOffIds });
+      continue;
+    }
     // Charge through deductionPoints so the TYPE ceilings actually apply
     // here. This path used to bill severity alone, so every
     // MAX_SEVERITY_TYPES entry — accessory, unverified_absence,
@@ -1172,9 +1182,55 @@ function entityIssuesForPage(pageNumber, report) {
       severity: issue.severity,
       description: findingText(issue),
       source,
+      // The wardrobe state the finding was judged in. Carried into the
+      // version's stamp so a report assembled from stamps can still tell
+      // whether it was judged against the page's own declared state.
+      clothingCategory: issue.clothingCategory || null,
     });
   }
   return out;
+}
+
+/**
+ * The pages ONE entity finding is about. The single accessor every reader
+ * routes through: the model's / emitter's `pagesToFix` (the routing contract),
+ * then `pageNumbers` (a report assembled from the shipped picks, which dedupes
+ * one finding across pages — job_1790100385959 Kiaan: pageNumbers [11,12],
+ * pageNumber 11), then legacy `pages`, then a lone `pageNumber`. A finding that
+ * names several pages counts on each of them, once.
+ */
+function entityFindingPages(issue) {
+  for (const list of [issue?.pagesToFix, issue?.pageNumbers, issue?.pages]) {
+    if (Array.isArray(list) && list.length) return [...new Set(list.filter(p => p != null))];
+  }
+  return issue?.pageNumber != null ? [issue.pageNumber] : [];
+}
+
+/**
+ * Is this finding a wardrobe finding that the page's declared wardrobe state
+ * makes void? Structural only — never reads the finding's text:
+ *   - the finding bills as clothing (evalBuckets bucket → 'clothing'),
+ *   - the page's brief declares ≥1 of this character's garments OFF
+ *     (`declaredOffIds`, stamped per page on the report by the entity check
+ *     from the page's wornItems rows), and
+ *   - the finding was NOT judged in that exact wardrobe state: its grid key
+ *     (`clothingCategory`, e.g. `standard--off:ART004`) carries a different
+ *     off-set, or none, or is unknown. Such a judge compared the page against
+ *     a reference that still wears the removed garment.
+ * A wardrobe finding judged in the page's own off-state grid still counts —
+ * the judge was told the removal, so what it reports is about the rest.
+ * Returns null, or { declaredOffIds }.
+ */
+function offByDesignFinding(issue, declaredOffIds) {
+  if (!Array.isArray(declaredOffIds) || declaredOffIds.length === 0) return null;
+  const { bucketForType } = require('./evalBuckets');
+  const bucket = bucketForType(issue?.subType || issue?.type) || 'other';
+  if ((BUCKET_BILLING_CATEGORY[bucket] || bucket) !== 'clothing') return null;
+  const { parseOffCategory, normalizeOffIds } = require('./wardrobeVariants');
+  const declared = normalizeOffIds(declaredOffIds);
+  const judged = parseOffCategory(issue?.clothingCategory)?.offIds || [];
+  if (issue?.clothingCategory && judged.join('+') === declared.join('+')) return null;
+  return { declaredOffIds: declared };
 }
 
 /**
@@ -1195,14 +1251,25 @@ function entityIssuesForPage(pageNumber, report) {
  * artefact counted by the score, absent from the list).
  */
 function entityFindingsForPage(pageNumber, report) {
+  return entityFindingsByPage(report).filter(f => f.pageNumber === pageNumber);
+}
+
+/**
+ * Every (finding, page) pair of an entity report — one row per page a finding
+ * names, so a finding on [11,12] is one row on p11 and one on p12, never two
+ * on either. entityFindingsForPage is this, filtered to one page; readers that
+ * walk the whole report (char-fix task selection) use it directly.
+ * Rows: { name, source, issue, pageNumber, offByDesign }.
+ */
+function entityFindingsByPage(report) {
   const out = [];
-  const onPage = (issue) => issue.pages?.includes(pageNumber)
-    || issue.pagesToFix?.includes(pageNumber)
-    || issue.pageNumber === pageNumber;
   for (const [source, entities] of [['character', report?.characters], ['object', report?.objects]]) {
     for (const [name, data] of Object.entries(entities || {})) {
       for (const issue of (data?.issues || [])) {
-        if (onPage(issue)) out.push({ name, source, issue });
+        for (const pageNumber of entityFindingPages(issue)) {
+          const declaredOffIds = data?.declaredOffByPage?.[pageNumber] || null;
+          out.push({ name, source, issue, pageNumber, offByDesign: offByDesignFinding(issue, declaredOffIds) });
+        }
       }
     }
   }
@@ -1228,6 +1295,9 @@ module.exports = {
   deductionPoints,
   entityIssuesForPage,
   entityFindingsForPage,
+  entityFindingsByPage,
+  entityFindingPages,
+  offByDesignFinding,
   ENTITY_ONLY_ZERO_POINT_TYPES,
   isEntitySourced,
   deductionClassKey,

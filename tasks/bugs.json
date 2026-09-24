@@ -1935,6 +1935,30 @@
       "fixedAt": "2026-09-24",
       "fixedIn": "5a7be3143",
       "fix": "promptBuilders.replanRoundRegressed is the one guard: every round, round 1 included, is discarded when it ends with more cast/focal must-fix findings than it was given (a round 2+ must also reduce, unchanged); a model finding naming only untouched pages that appears in just one of the two checks is set aside on both sides. The Test Lab beats_replan stage rechecks and applies the same guard. Replayed free over the stored rounds: 7 of 31 books would have discarded round 1, including 1nitlympp (5 -> 6 after noise). Pinned by tests/unit/replan-round-regression-guard.test.ts."
+    },
+    {
+      "id": "entity-multipage-finding-scored-on-first-page-only",
+      "title": "An entity finding that names several pages was billed, listed and repaired on its first page only",
+      "reportedAt": "2026-09-24",
+      "source": "Owner-approved report 2026-09-24, reproduced from stored data: staging job_1790100385959_1nitlympp finalChecksReport.entity (assembledFromPicks) holds Kiaan clothing_inconsistent MAJOR \"Kiaan is missing the rust-brown sleeveless front-zip body warmer...\" with pageNumbers [11,12], pageNumber 11 and no pagesToFix. scoring.entityFindingsForPage (c64661d60) matched pages / pagesToFix / pageNumber only, so replaying the stored report gave p11 entity 15 and p12 entity 0 with the finding absent from p12's list.",
+      "rootCause": "repairPipeline Step 4b assembles the final report by deduping the shipped versions' stamps on (name, severity, description) and collecting the pages into pageNumbers, then set pageNumber = pageNumbers[0] and no pagesToFix - while every reader routed on pagesToFix || pageNumber (repairLogic selectCharRepairTasks + decideRepairMethod, the manual repair route) or on pagesToFix/pageNumber (the page reader). The round merge (mergeEntityIssues) likewise dropped or kept a base finding by its lone pageNumber, so a re-checked second page kept a stale finding. Each reader carried its own page test.",
+      "impact": "Every final entity report with a finding shared by two or more shipped pages: pages after the first were scored, listed (re-evaluate route, Collect Feedback) and char-fix-targeted without it.",
+      "status": "fixed",
+      "fixedAt": "2026-09-24",
+      "fixedIn": "FIXCOMMIT",
+      "fix": "scoring.entityFindingPages is the one page accessor (pagesToFix, then pageNumbers, then pages, then pageNumber); entityFindingsByPage yields one row per (finding, page) and entityFindingsForPage filters it. Score, panel lists, repairLogic char-fix selection and decideRepairMethod, the manual repair route, feedbackConsolidator's report path, repairSinglePage and mergeEntityIssues (trims only the re-checked pages) all read through it. Step 4b now stamps pagesToFix = pageNumbers. Pinned by tests/unit/entity-multipage-off-by-design.test.ts; replayed over the stored story (p12 now reaches the finding)."
+    },
+    {
+      "id": "entity-offbydesign-garment-charged-on-stored-and-cross-grid-findings",
+      "title": "A wardrobe finding on a page whose brief takes that character's garment off still cost points and drove repair when the judge had not judged that page in its own wardrobe state",
+      "reportedAt": "2026-09-24",
+      "source": "Owner-approved report 2026-09-24. Staging job_1790100385959_1nitlympp: briefs p11/p12 declare {id: ART004, owner: Kiaan, state: off}, p16 declares Levin ART006 off. Stored stamps p11 v0 (entity -15, final 70), p12 v1 (-15, final -15), p16 v0 (-15, final 13) all carry the clothing_inconsistent \"missing\" finding. The 2026-09-23 fix (17bbd887a) moved off pages into their own --off: grid for NEW checks, but a finding carries no garment id and scoring had no rule tying a wardrobe finding to the page's declared state, so any finding judged in another state (a stored report, the identity grid, a model pagesToFix naming a page outside its grid) still billed.",
+      "rootCause": "entityIssuesForPage billed every wardrobe finding on a page regardless of the page's declared worn state; the report did not carry that state, and the version stamps dropped the grid key (clothingCategory) the finding was judged in.",
+      "impact": "False MAJOR clothing deductions and char-fix/consolidator inputs on pages that take a garment off by design; on run 6 it also swung pick-best comparisons on p12 and p16.",
+      "status": "fixed",
+      "fixedAt": "2026-09-24",
+      "fixedIn": "FIXCOMMIT",
+      "fix": "Owner-approved severity rule (code, structural): runEntityConsistencyChecks stamps each character's declaredOffByPage (from the same per-appearance offIds that key the grids, i.e. the page's wornItems rows); scoring.offByDesignFinding voids a finding on a page when it bills as clothing (evalBuckets), the page declares >=1 of the character's garments off, and the finding's clothingCategory is not that exact off-state grid (or is unknown). entityIssuesForPage returns it under excused (0 points), never in issues, so it never reaches the consolidator, the panel list or char-fix; entityConsistency logs each one. Stamps now carry clothingCategory and Step 4b dedupes per grid. No prompt change: the judge already gets the page state through the --off: grid (17bbd887a). Replay: p11 v0 70->85, p12 v1 -15->0, p16 v0 13->28; p9 (Max ART005 off) unchanged 75."
     }
   ]
 }
