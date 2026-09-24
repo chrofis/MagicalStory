@@ -487,6 +487,27 @@ checks.repairDescriptorNoNames = (ctx) => {
   return { covered: true, pass: bad.length === 0, detail: (bad.length ? bad.join('; ') : `${n} inpaint instruction(s), no cast name, no fallback descriptor`) + extra };
 };
 
+/** 2026-09-24 — a creature or secondary character is identified in an inpaint instruction by its description, never its bible name. */
+checks.repairDescriptorNoVbFigureNames = (ctx) => {
+  const vb = ctx.data?.visualBible || {};
+  const figs = ['animals', 'secondaryCharacters']
+    .flatMap(pool => (vb[pool] || []).flatMap(e => [e?.name, e?.properName]))
+    .filter(nm => typeof nm === 'string' && nm.trim())
+    .map(nm => nm.trim());
+  if (!figs.length) return notCovered('no named creature or secondary character in the bible');
+  const esc = (v) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const bad = []; let n = 0;
+  for (const p of pages(ctx)) versions(p).forEach((v, i) => {
+    if (!v.inpaintInstruction || /^char-fix/.test(v.source || '')) return;
+    n += 1;
+    const s = String(v.inpaintInstruction);
+    const hit = figs.filter(nm => new RegExp(`(?<![\\p{L}\\p{N}])${esc(nm)}(?![\\p{L}\\p{N}])`, 'u').test(s));
+    if (hit.length) bad.push(`p${p.pageNumber} v${i} names ${hit.join(', ')}`);
+  });
+  if (!n) return notCovered('no inpaint instruction');
+  return { covered: true, pass: bad.length === 0, detail: bad.length ? bad.join('; ') : `${n} inpaint instruction(s), no creature or secondary-character name (${figs.length} in the bible)` };
+};
+
 /** d49cbf0e0 — a grouped face fix names each child by clothing and states remove AND show. */
 checks.groupedFaceFix = (ctx) => {
   const cast = castNames(ctx);

@@ -312,6 +312,24 @@
       ]
     },
     {
+      "id": "repair-descriptor-vb-figures",
+      "title": "A creature or secondary character is named by sight in a repair instruction, never by its bible name",
+      "commits": [
+        "cd9958ae2"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "No inpaint instruction names a Visual Bible animal or secondary character (name or properName); such a figure is identified by kind, colouring/garment and position.",
+      "runShape": [
+        "needs-inpaint"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "repairDescriptorNoVbFigureNames"
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
       "id": "grouped-face-fix-clothing",
       "title": "A grouped face fix identifies each child by clothing and states the expression to remove AND to show",
       "commits": [
