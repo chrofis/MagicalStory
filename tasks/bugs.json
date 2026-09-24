@@ -1933,7 +1933,7 @@
       "impact": "One book in four shipped a page division with more cast/focal must-fix findings than the division it replaced: lost focal pages, a commissioned character missing from a page, the ending's wanted picture gone.",
       "status": "fixed",
       "fixedAt": "2026-09-24",
-      "fixedIn": "pending",
+      "fixedIn": "5a7be3143",
       "fix": "promptBuilders.replanRoundRegressed is the one guard: every round, round 1 included, is discarded when it ends with more cast/focal must-fix findings than it was given (a round 2+ must also reduce, unchanged); a model finding naming only untouched pages that appears in just one of the two checks is set aside on both sides. The Test Lab beats_replan stage rechecks and applies the same guard. Replayed free over the stored rounds: 7 of 31 books would have discarded round 1, including 1nitlympp (5 -> 6 after noise). Pinned by tests/unit/replan-round-regression-guard.test.ts."
     }
   ]
