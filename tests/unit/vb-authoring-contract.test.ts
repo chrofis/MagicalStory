@@ -306,7 +306,11 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
   it('requires the description to read as the named thing, not as its geometry', () => {
     const t = templates['sceneExpansionAll'];
     expect(t).toMatch(/It must read as that thing at a glance/);
-    expect(t).toMatch(/Name the thing with the word that names it/);
+    // 2026-09-24: the naming noun is the label's, never the `type` family —
+    // prod ART002 "brass nutcracker" was described as "a heavy hand tool…"
+    // and rendered as a bolt cutter. Both VB authoring sites carry it.
+    expect(t).toMatch(/first noun is the noun its `label` ends in/);
+    expect(templates['storyTrial']).toMatch(/first noun the noun its `label` ends in/);
     expect(t).toMatch(/separates it from the everyday object its bare geometry would otherwise describe/);
     expect(t).toMatch(/Geometry serves recognition; it is never the whole description/);
   });
