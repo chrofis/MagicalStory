@@ -1945,7 +1945,7 @@
       "impact": "Every final entity report with a finding shared by two or more shipped pages: pages after the first were scored, listed (re-evaluate route, Collect Feedback) and char-fix-targeted without it.",
       "status": "fixed",
       "fixedAt": "2026-09-24",
-      "fixedIn": "FIXCOMMIT",
+      "fixedIn": "f636291c5",
       "fix": "scoring.entityFindingPages is the one page accessor (pagesToFix, then pageNumbers, then pages, then pageNumber); entityFindingsByPage yields one row per (finding, page) and entityFindingsForPage filters it. Score, panel lists, repairLogic char-fix selection and decideRepairMethod, the manual repair route, feedbackConsolidator's report path, repairSinglePage and mergeEntityIssues (trims only the re-checked pages) all read through it. Step 4b now stamps pagesToFix = pageNumbers. Pinned by tests/unit/entity-multipage-off-by-design.test.ts; replayed over the stored story (p12 now reaches the finding)."
     },
     {
@@ -1957,7 +1957,7 @@
       "impact": "False MAJOR clothing deductions and char-fix/consolidator inputs on pages that take a garment off by design; on run 6 it also swung pick-best comparisons on p12 and p16.",
       "status": "fixed",
       "fixedAt": "2026-09-24",
-      "fixedIn": "FIXCOMMIT",
+      "fixedIn": "f636291c5",
       "fix": "Owner-approved severity rule (code, structural): runEntityConsistencyChecks stamps each character's declaredOffByPage (from the same per-appearance offIds that key the grids, i.e. the page's wornItems rows); scoring.offByDesignFinding voids a finding on a page when it bills as clothing (evalBuckets), the page declares >=1 of the character's garments off, and the finding's clothingCategory is not that exact off-state grid (or is unknown). entityIssuesForPage returns it under excused (0 points), never in issues, so it never reaches the consolidator, the panel list or char-fix; entityConsistency logs each one. Stamps now carry clothingCategory and Step 4b dedupes per grid. No prompt change: the judge already gets the page state through the --off: grid (17bbd887a). Replay: p11 v0 70->85, p12 v1 -15->0, p16 v0 13->28; p9 (Max ART005 off) unchanged 75."
     }
   ]
