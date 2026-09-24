@@ -59270,3 +59270,30 @@ server/routes/regeneration.js, server/lib/testlab.js, server/lib/sceneComposite.
 tasks/verify.json, tests/unit/repair-descriptor-vb-figures.test.ts, tests/unit/char-fix-page-state.test.ts,
 tests/unit/inpaint-direct-fix.test.ts.
 **Status:** ✅ active — verify entry `repair-descriptor-vb-figures`.
+
+## 2026-09-24 — The repair panel lists a page's entity findings through the reader the score bills from
+
+**Context:** Staging `job_1790100385959_1nitlympp` back cover. The entity report there is assembled from the
+shipped picks: Julian's crop-artefact finding sits in the root `issues` only, `byClothing.standard` has 0 issues.
+The canonical score (scoring.js `entityIssuesForPage`, root issues) counts it at 0 points; the panel list did not
+show it, because `images.js collectAllIssuesForPage` and the client's Collect Feedback both read byClothing first
+and the root only when byClothing was empty.
+
+**Decision:** `scoring.entityFindingsForPage(pageNumber, report)` is the one page reader of an entity report —
+root `issues` of characters and objects, filtered by `pages` / `pagesToFix` / `pageNumber`.
+`entityIssuesForPage` bills exactly that list; `collectAllIssuesForPage` lists it; the evaluation-data route
+returns each page's `entityIssuesForPage(...).issues`, and `useRepairWorkflow` shows those instead of reading the
+report itself. byClothing issues are never read for a page list: they are the evaluator's raw copies of the
+root findings (entityConsistency.js pushes each one to the root with page attribution), so the root alone has
+every finding once.
+
+**Rationale:** the panel cannot list a finding the score did not count, or miss one it did. A second reader
+drifted once already.
+
+**Replay (rung 1, no paid call):** stored back cover — the list now holds Julian's MAJOR cutout_artifact, the
+entity bill is identical to the old reader's (penalty 0), and the replayed canonical score stays 85.
+
+**Touched:** server/lib/scoring.js, server/lib/images.js, server/routes/stories.js,
+client/src/hooks/useRepairWorkflow.ts, client/src/services/storyService.ts,
+tests/unit/entity-findings-one-reader.test.ts, tasks/bugs.json.
+**Status:** ✅ active

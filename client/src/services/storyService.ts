@@ -611,6 +611,15 @@ export const storyService = {
       fixableIssues: Array<{ description: string; severity: string; type: string; fix: string }> | null;
       fixTargets: Array<{ boundingBox: number[]; issue: string; fixPrompt: string }> | null;
       consistencyRegen: any | null;
+      /** The page's entity findings, as scoring.js entityIssuesForPage bills them. */
+      entityIssues: Array<{
+        name: string;
+        source: 'character' | 'object';
+        type: string | null;
+        subType: string | null;
+        severity: string;
+        description: string;
+      }>;
     }>;
     finalChecksReport: FinalChecksReport | null;
   }> {

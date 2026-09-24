@@ -1151,49 +1151,58 @@ function shouldRedo(version) {
  */
 function entityIssuesForPage(pageNumber, report) {
   const out = { penalty: 0, issues: [] };
-  if (!report?.characters) return out;
-  for (const [charName, charData] of Object.entries(report.characters)) {
-    const charIssues = charData.issues || [];
-    for (const issue of charIssues) {
-      if (issue.pages?.includes(pageNumber) || issue.pagesToFix?.includes(pageNumber) || issue.pageNumber === pageNumber) {
-        // Charge through deductionPoints so the TYPE ceilings actually apply
-        // here. This path used to bill severity alone, so every
-        // MAX_SEVERITY_TYPES entry — accessory, unverified_absence,
-        // face_drift, hair_nuance — was silently ignored for entity
-        // findings: the bounding existed in code but not on the path that
-        // does the entity billing. Measured cost on one production book:
-        // 75 points across four pages and a cover for hair differing by a
-        // shade, which the owner reads as a nuance.
-        // { entity: true }: this IS the entity report, so its source-scoped
-        // zero (scoring.js ENTITY_ONLY_ZERO_POINT_TYPES) applies.
-        out.penalty += deductionPoints(issue, { entity: true });
-        out.issues.push({
-          name: charName,
-          // Carried so the ceiling is reproducible downstream and the dev
-          // panel can show WHY a MAJOR-looking finding cost 2 points.
-          type: issue.type || null,
-          subType: issue.subType || null,
-          severity: issue.severity,
-          description: findingText(issue),
-          source: 'character',
-        });
-      }
-    }
+  for (const { name, source, issue } of entityFindingsForPage(pageNumber, report)) {
+    // Charge through deductionPoints so the TYPE ceilings actually apply
+    // here. This path used to bill severity alone, so every
+    // MAX_SEVERITY_TYPES entry — accessory, unverified_absence,
+    // face_drift, hair_nuance — was silently ignored for entity
+    // findings: the bounding existed in code but not on the path that
+    // does the entity billing. Measured cost on one production book:
+    // 75 points across four pages and a cover for hair differing by a
+    // shade, which the owner reads as a nuance.
+    // { entity: true }: this IS the entity report, so its source-scoped
+    // zero (scoring.js ENTITY_ONLY_ZERO_POINT_TYPES) applies.
+    out.penalty += deductionPoints(issue, { entity: true });
+    out.issues.push({
+      name,
+      // Carried so the ceiling is reproducible downstream and the dev
+      // panel can show WHY a MAJOR-looking finding cost 2 points.
+      type: issue.type || null,
+      subType: issue.subType || null,
+      severity: issue.severity,
+      description: findingText(issue),
+      source,
+    });
   }
-  // Also include object-level issues so the panel surfaces missing/wrong props.
-  for (const [objName, objData] of Object.entries(report.objects || {})) {
-    const objIssues = objData.issues || [];
-    for (const issue of objIssues) {
-      if (issue.pages?.includes(pageNumber) || issue.pagesToFix?.includes(pageNumber) || issue.pageNumber === pageNumber) {
-        out.penalty += deductionPoints(issue, { entity: true });
-        out.issues.push({
-          name: objName,
-          type: issue.type || null,
-          subType: issue.subType || null,
-          severity: issue.severity,
-          description: findingText(issue),
-          source: 'object',
-        });
+  return out;
+}
+
+/**
+ * The entity report's findings for ONE page, raw: [{ name, source, issue }],
+ * source 'character' | 'object'. THE page reader of an entity report:
+ * entityIssuesForPage bills exactly this list, and the repair panel's issue
+ * list (images.js collectAllIssuesForPage for the re-evaluate route, the
+ * evaluation-data route for Collect Feedback) shows exactly this list — the
+ * panel cannot list a finding the score did not count, or miss one it did.
+ *
+ * Reads each entity's ROOT `issues` only. entityConsistency.js pushes every
+ * finding there with its page attribution stamped (pageNumbers / pagesToFix /
+ * pageNumber); byClothing[cat].issues holds the evaluator's raw copies, and a
+ * report assembled from the shipped picks (repairPipeline) carries findings
+ * at the root only while byClothing stays from the base report. The panel's
+ * old byClothing-first readers hid every root finding whenever a byClothing
+ * entry existed (2026-09-24, job_1790100385959 back cover: Julian's crop
+ * artefact counted by the score, absent from the list).
+ */
+function entityFindingsForPage(pageNumber, report) {
+  const out = [];
+  const onPage = (issue) => issue.pages?.includes(pageNumber)
+    || issue.pagesToFix?.includes(pageNumber)
+    || issue.pageNumber === pageNumber;
+  for (const [source, entities] of [['character', report?.characters], ['object', report?.objects]]) {
+    for (const [name, data] of Object.entries(entities || {})) {
+      for (const issue of (data?.issues || [])) {
+        if (onPage(issue)) out.push({ name, source, issue });
       }
     }
   }
@@ -1218,6 +1227,7 @@ module.exports = {
   sumDeductionPoints,
   deductionPoints,
   entityIssuesForPage,
+  entityFindingsForPage,
   ENTITY_ONLY_ZERO_POINT_TYPES,
   isEntitySourced,
   deductionClassKey,

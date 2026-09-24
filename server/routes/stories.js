@@ -1515,6 +1515,15 @@ router.get('/:id/evaluation-data', authenticateToken, async (req, res) => {
 
     const finalChecksReport = reportRows[0]?.final_checks_report || null;
 
+    // Each page's entity findings, read by the reader the score bills from
+    // (scoring.entityIssuesForPage), so Collect Feedback lists exactly the
+    // entity findings the page's score counted — the panel keeps no reader
+    // of its own.
+    const { entityIssuesForPage } = require('../lib/scoring');
+    for (const ev of sceneEvaluations) {
+      ev.entityIssues = entityIssuesForPage(ev.pageNumber, finalChecksReport?.entity).issues;
+    }
+
     res.json({ sceneEvaluations, finalChecksReport });
   } catch (err) {
     console.error('❌ Error fetching evaluation data:', err);

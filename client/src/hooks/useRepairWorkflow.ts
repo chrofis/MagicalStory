@@ -373,72 +373,22 @@ export function useRepairWorkflow({
       let totalIssues = 0;
 
       // Entity-report findings (characters + objects) for one page — shared by
-      // scenes and covers. type/subType are carried so entityIssuePoints can
-      // apply the per-type rules (a crop artefact costs 0).
+      // scenes and covers. The server reads them with the reader the score
+      // bills from (scoring.js entityIssuesForPage), so this list holds
+      // exactly the entity findings the page's score counted. type/subType are
+      // carried so entityIssuePoints can apply the per-type rules (a crop
+      // artefact costs 0).
       const collectEntityIssues = (pageNumber: number, feedback: PageFeedback) => {
-        // Get entity issues from finalChecksReport - CHARACTERS
-        if (fcReport?.entity) {
-          for (const [charName, charResult] of Object.entries((fcReport.entity as any).characters || {})) {
-            const cr = charResult as any;
-            // Mutually exclusive: prefer byClothing (detailed), fall back to root issues (legacy flattening)
-            const allIssues: any[] = [];
-            if (cr.byClothing && Object.keys(cr.byClothing).length > 0) {
-              for (const clothingResult of Object.values(cr.byClothing) as any[]) {
-                if (clothingResult.issues) {
-                  allIssues.push(...clothingResult.issues);
-                }
-              }
-            } else if (cr.issues) {
-              allIssues.push(...cr.issues);
-            }
-
-            // Filter to issues affecting this page
-            const charIssues = allIssues.filter((i: any) =>
-              i.pagesToFix?.includes(pageNumber) || i.pageNumber === pageNumber
-            );
-
-            for (const issue of charIssues) {
-              feedback.entityIssues.push({
-                character: charName,
-                issue: issue.description,
-                severity: issue.severity,
-                type: issue.type,
-                subType: issue.subType,
-                source: 'entity check',
-              });
-            }
-          }
-
-          // Get entity issues from finalChecksReport - OBJECTS
-          for (const [objectName, objectResult] of Object.entries((fcReport.entity as any).objects || {})) {
-            const or = objectResult as any;
-            const allIssues: any[] = [];
-            if (or.byClothing && Object.keys(or.byClothing).length > 0) {
-              for (const clothingResult of Object.values(or.byClothing) as any[]) {
-                if (clothingResult.issues) {
-                  allIssues.push(...clothingResult.issues);
-                }
-              }
-            } else if (or.issues) {
-              allIssues.push(...or.issues);
-            }
-
-            // Filter to issues affecting this page
-            const objectIssues = allIssues.filter((i: any) =>
-              i.pagesToFix?.includes(pageNumber) || i.pageNumber === pageNumber
-            );
-
-            for (const issue of objectIssues) {
-              feedback.objectIssues.push({
-                object: objectName,
-                issue: issue.description,
-                severity: issue.severity,
-                type: issue.type,
-                subType: issue.subType,
-                source: 'entity check',
-              });
-            }
-          }
+        for (const ei of evalByPage.get(pageNumber)?.entityIssues || []) {
+          const row = {
+            issue: ei.description,
+            severity: ei.severity,
+            type: ei.type ?? undefined,
+            subType: ei.subType ?? undefined,
+            source: 'entity check',
+          };
+          if (ei.source === 'object') feedback.objectIssues.push({ object: ei.name, ...row });
+          else feedback.entityIssues.push({ character: ei.name, ...row });
         }
       };
 
