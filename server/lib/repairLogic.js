@@ -1565,11 +1565,38 @@ function detectionForRetryEntry(scene, entry, index = null) {
  */
 function describeFigureForRepair({
   name, characters = null, characterClothing = null, clothingRequirements = null,
-  artStyle = null, detectedFigures = null,
+  artStyle = null, detectedFigures = null, visualBible = null,
 } = {}) {
   const wanted = String(name || '').trim().toLowerCase();
   if (!wanted) return null;
   const character = (characters || []).find(c => String(c?.name || '').trim().toLowerCase() === wanted);
+
+  // PLACE. Rank by the box centre so the phrase says which of several it is.
+  // Detector boxes are [ymin, xmin, ymax, xmax].
+  let place = null;
+  const figs = (detectedFigures || []).filter(f => f?.name && Array.isArray(f.bodyBox || f.box));
+  if (figs.length > 1) {
+    const cx = (f) => { const b = f.bodyBox || f.box; return (b[1] + b[3]) / 2; };
+    const ordered = [...figs].sort((a, b) => cx(a) - cx(b));
+    const idx = ordered.findIndex(f => String(f.name).trim().toLowerCase() === wanted);
+    if (idx >= 0) {
+      const ORDINAL = ['', 'second', 'third', 'fourth', 'fifth'];
+      if (idx === 0) place = 'on the far left';
+      else if (idx === ordered.length - 1) place = 'on the far right';
+      else if (idx < ORDINAL.length) place = `${ORDINAL[idx]} from the left`;
+    }
+  }
+
+  // A NAMED VISUAL BIBLE FIGURE — a creature or a secondary character. The
+  // image model knows it no better than the cast (owner, 2026-09-24): staging
+  // job_1790100385959_1nitlympp p13 sent "Sit <creature name> heavily back on
+  // his haunches". Described from its own bible entry; never its size.
+  const vbFigure = character ? null : findVbFigure(visualBible, wanted);
+  if (vbFigure) {
+    const clauses = [describeVbFigure(vbFigure.entry, vbFigure.pool)];
+    if (place) clauses.push(place);
+    return clauses.join(', ');
+  }
 
   // NOUN. Age plus the child/adult word, never bare "male figure".
   const age = character?.age != null && String(character.age).trim() ? String(character.age).trim() : null;
@@ -1594,27 +1621,78 @@ function describeFigureForRepair({
     }
   } catch { /* a missing wardrobe is one clause fewer, never a thrown repair */ }
 
-  // PLACE. Rank by the box centre so the phrase says which of several it is.
-  // Detector boxes are [ymin, xmin, ymax, xmax].
-  let place = null;
-  const figs = (detectedFigures || []).filter(f => f?.name && Array.isArray(f.bodyBox || f.box));
-  if (figs.length > 1) {
-    const cx = (f) => { const b = f.bodyBox || f.box; return (b[1] + b[3]) / 2; };
-    const ordered = [...figs].sort((a, b) => cx(a) - cx(b));
-    const idx = ordered.findIndex(f => String(f.name).trim().toLowerCase() === wanted);
-    if (idx >= 0) {
-      const ORDINAL = ['', 'second', 'third', 'fourth', 'fifth'];
-      if (idx === 0) place = 'on the far left';
-      else if (idx === ordered.length - 1) place = 'on the far right';
-      else if (idx < ORDINAL.length) place = `${ORDINAL[idx]} from the left`;
-    }
-  }
-
   const clauses = [garment ? `the ${noun} in ${garment}` : `the ${noun}`];
   if (place) clauses.push(place);
   return clauses.join(', ');
 }
 
+// The bible pools whose entries are FIGURES the image model paints and a fix
+// can be about. Artifacts, vehicles and locations are things, and their names
+// are already rewritten by sanitizeVbIdsInPrompt.
+const VB_FIGURE_POOLS = ['secondaryCharacters', 'animals'];
+
+// Identity lookup by the entry's own name (or properName) — never by reading prose.
+function findVbFigure(visualBible, lowerName) {
+  if (!visualBible || !lowerName) return null;
+  for (const pool of VB_FIGURE_POOLS) {
+    for (const entry of (visualBible[pool] || [])) {
+      const names = [entry?.name, entry?.properName].map(n => String(n || '').trim().toLowerCase());
+      if (names.includes(lowerName)) return { entry, pool };
+    }
+  }
+  return null;
+}
+
+// Kind + the entry's own look fields. No size: `scaleClass` is never read, and
+// the stored `description` (which may still carry a size phrase on older
+// bibles) is used only for its FIRST clause, the kind.
+function describeVbFigure(entry, pool) {
+  const { clauseRef } = require('./visualBible');
+  const str = (v) => (typeof v === 'string' ? v.trim().replace(/[.]\s*$/, '') : '');
+  const label = str(entry.label);
+  if (pool === 'animals') {
+    const kind = label || str(entry.species) || clauseRef(entry.description, { minWords: 1 }) || 'animal';
+    const coloring = str(entry.coloring);
+    const features = str(entry.features).split(',').map(s => s.trim()).filter(Boolean).slice(0, 2);
+    return `the ${kind}${coloring ? ` with ${coloring}` : ''}${features.length ? ` (${features.join(', ')})` : ''}`;
+  }
+  // Secondary character: age + label, and the garment that sets them apart.
+  const age = /^\d{1,3}$/.test(String(entry.age ?? '').trim()) ? `${String(entry.age).trim()}-year-old` : null;
+  const noun = [age, label || 'figure'].filter(Boolean).join(' ');
+  const garment = clauseRef(entry.clothing, { minWords: 1 });
+  return garment ? `the ${noun} in ${garment}` : `the ${noun}`;
+}
+
+/**
+ * Every name a repair instruction may carry, and the descriptor that replaces
+ * it: the cast plus the bible's named figures. One map for every repair path
+ * that hands text to an image model (images.inpaintPage, the manual repair
+ * endpoint), so none of them keeps its own list.
+ *
+ * @returns {{ names: string[], fallbackByName: Map<string,string> }}
+ */
+function buildRepairNameMap({
+  characters = null, visualBible = null, characterClothing = null, clothingRequirements = null,
+  artStyle = null, detectedFigures = null,
+} = {}) {
+  const names = [];
+  const fallbackByName = new Map();
+  const add = (name, fallback) => {
+    const n = String(name || '').trim();
+    if (!n || fallbackByName.has(n.toLowerCase())) return;
+    const described = describeFigureForRepair({
+      name: n, characters, characterClothing, clothingRequirements, artStyle, detectedFigures, visualBible,
+    });
+    names.push(n);
+    fallbackByName.set(n.toLowerCase(), described || fallback);
+  };
+  for (const c of (characters || [])) add(c?.name, 'the character');
+  for (const pool of VB_FIGURE_POOLS) {
+    for (const e of (visualBible?.[pool] || [])) { add(e?.name, 'the figure'); add(e?.properName, 'the figure'); }
+  }
+  return { names, fallbackByName };
+}
+
 module.exports = {
-  describeFigureForRepair,
+  describeFigureForRepair, buildRepairNameMap,
   repairAttemptFromResult, detectionForRetryEntry, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, attributeReaderFindings, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, CROP_ARTIFACT_TYPES, isCropArtifact, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX };

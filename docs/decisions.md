@@ -59199,3 +59199,39 @@ heads the image prompt (THIS IMAGE DEPICTS) — p6 of run 6 painted it as a capt
 emotion field (the shared enum, 3d8f4871d), the light carries the rest. The verify entry `sceneintent-no-mood-tag`
 now passes only when no brief ends on a mood sentence; the earlier "pass <= 10%" bar had no basis.
 **Touched:** server/lib/promptBuilders.js, scripts/admin/verify-checks.js, tasks/verify.json.
+
+## 2026-09-24 — Creatures and secondary characters are named by sight in repair instructions, like the cast
+
+**Context:** dbdc6b1c2 made every inpaint instruction identify a CAST character by age, garment and position
+(`describeFigureForRepair`). The Visual Bible's named figures were outside that list, so a creature's name went to
+the image model untouched: staging `job_1790100385959_1nitlympp` p13 v1 sent "For the rust-red dragon in the
+center: Sit Turi heavily back on his haunches." A second route re-introduced names after the strip:
+`sanitizeVbIdsInPrompt` resolves an `ANI`/`CHR` id to the figure's NAME (the page prompt's identity anchor), and
+it ran after the name strip.
+
+**Decision (owner: "Replace with their description. Same as for characters."):** the same helper and the same
+code substitution, extended — no prompt change, following dbdc6b1c2, which was code-only.
+- `describeFigureForRepair` resolves a name not in the cast against the bible's `animals` and
+  `secondaryCharacters` (by `name`/`properName` — identity lookup, never prose). A creature is its kind
+  (`label` / `species` / first clause of `description`) + `coloring` + the first two `features`; a secondary
+  character is age + label + the first clause of its `clothing`. Position as for the cast. Never a size:
+  `scaleClass` is not read and only the first clause of a stored description is (older bibles carry a size
+  phrase in the second).
+- `buildRepairNameMap` (repairLogic.js) returns the one name list + descriptor map; `inpaintPage` uses it for the
+  plan strip, the preserve clause and the lone-fix shortcut check.
+- VB ids resolve BEFORE the strip, so an id cannot come back as a name.
+- Page prompts are unchanged: there animal names stay identity anchors next to their labelled references
+  (`sanitizeVbIdsInPrompt`: character and animal ids resolve to their names). A repair instruction has no such label.
+
+**Replay (rung 1, stored p13 plan, no paid call):** before "…Sit Turi heavily back on his haunches." → after
+"For the rust-red dragon in the center: Sit this character heavily back on his haunches."; no cast or bible name
+anywhere in the payload. Descriptor for a creature with no plan identifier, p17: "the young dragon with warm
+rust-red smooth scales (rounded snout, single pair of short blunt-tipped horns on head), on the far left".
+
+**Not changed (reported):** the manual `POST /:id/repair/image/:pageNum` route sends raw judge text with cast AND
+creature names and no strip; char-fix's `buildActionContext` pose lines can name a creature. Both carry cast names
+the same way today, so "same as characters" does not decide them.
+
+**Touched:** server/lib/repairLogic.js, server/lib/images.js, scripts/admin/verify-checks.js, tasks/verify.json,
+tests/unit/repair-descriptor-vb-figures.test.ts, tests/unit/inpaint-direct-fix.test.ts.
+**Status:** ✅ active — verify entry `repair-descriptor-vb-figures`.

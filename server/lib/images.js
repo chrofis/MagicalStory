@@ -3300,15 +3300,24 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   // "Resize the egg to match the size of the boy", deleting the word "smaller".
   // A target with no direction is read as already satisfied, so the repair did
   // nothing on one page and inverted on the other. Send the finding as written.
+  // WHO A FIX IS ABOUT, by sight: every cast and bible-figure name this page's
+  // repair text may carry, mapped to its descriptor. Built once, read by the
+  // shortcut check below and by the plan's name strip.
+  const repairNameMap = require('./repairLogic').buildRepairNameMap({
+    characters, visualBible, characterClothing, clothingRequirements, artStyle, detectedFigures,
+  });
+  const resolveIds = (text) => getStoryHelpers().sanitizeVbIdsInPrompt(text, visualBible, pageNumber);
+
   const soleDirectFix = (() => {
     if (inpaintableIssues.length !== 1) return null;
     const only = inpaintableIssues[0];
     const fix = typeof only.fix === "string" ? only.fix.trim() : "";
     if (!fix) return null;
-    const names = (characters || []).map(c => c?.name).filter(Boolean);
-    // Rule 3 is the consolidator’s to enforce: if a name is present, it has real
-    // work to do and we do not shortcut past it.
-    if (stripCharacterNames(fix, { names }) !== fix) return null;
+    // Rule 3 is the consolidator’s to enforce: if a name is present — written,
+    // or as a figure id that resolves to one — it has real work to do and we
+    // do not shortcut past it.
+    const resolved = resolveIds(fix);
+    if (stripCharacterNames(resolved, { names: repairNameMap.names }) !== resolved) return null;
     return fix;
   })();
 
@@ -3351,10 +3360,9 @@ async function inpaintPage(imageData, evaluation, options = {}) {
 
     // SAFETY NET — Haiku is told never to use character names in fix
     // instructions, but sometimes slips "Werner's body" or "Lukas's gaze"
-    // into the text. Strip any main-character names and replace with the
-    // character's own visual identifier (from per_character_fixes). Falls
-    // back to "the character" for names not in the plan.
-    const characterNames = (characters || []).map(c => c?.name).filter(Boolean);
+    // into the text. Strip every cast and bible-figure name and replace it
+    // with the figure's own visual identifier (from per_character_fixes), else
+    // the shared descriptor (repairLogic.buildRepairNameMap).
     // Per-name visual-identifier lookup from the consolidator plan.
     const visualIdByName = new Map();
     for (const pcf of (consolidatedPlan.per_character_fixes || [])) {
@@ -3375,16 +3383,10 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // they are WEARING and where they STAND, and the page knows both, so the
     // descriptor is built by one helper off the canonical wardrobe renderer
     // rather than re-derived here.
-    const { describeFigureForRepair } = require('./repairLogic');
-    const descriptorByName = new Map();
-    for (const c of (characters || [])) {
-      if (!c?.name) continue;
-      const described = describeFigureForRepair({
-        name: c.name, characters, characterClothing, clothingRequirements, artStyle,
-        detectedFigures,
-      });
-      descriptorByName.set(c.name.toLowerCase(), described || 'the character');
-    }
+    // The bible's named figures — creatures and secondary characters — are in
+    // the same map (owner, 2026-09-24): a creature's name means nothing to the
+    // image model either.
+    const { names: figureNames, fallbackByName: descriptorByName } = repairNameMap;
     // ONE PASS, NEVER RE-SCANNING WHAT WE INJECTED (owner, 2026-08-26). This
     // looped name-by-name, replacing into the running result. A
     // `visual_identifier` legitimately mentions other characters to locate its
@@ -3398,8 +3400,11 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // A single alternation over the ORIGINAL text fixes it by construction:
     // replacement output is never re-examined. Longest name first so a name
     // that contains another ("Anna Maria" over "Anna") wins.
-    const stripNames = (text, ownVisualId, ownName = null) => stripCharacterNames(text, {
-      names: characterNames,
+    // VB ids resolve FIRST: sanitizeVbIdsInPrompt turns a figure's id into its
+    // name (the page prompt's identity anchor), so an id left for the later
+    // pass would come back as the very name this strip removes.
+    const stripNames = (text, ownVisualId, ownName = null) => stripCharacterNames(resolveIds(text), {
+      names: figureNames,
       vidByName: visualIdByName,
       fallbackByName: descriptorByName,
       ownVisualId,

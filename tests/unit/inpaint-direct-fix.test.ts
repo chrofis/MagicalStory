@@ -42,7 +42,8 @@ describe('inpaintPage: a lone name-free instruction skips consolidation', () => 
 
   it('refuses the shortcut when a character name is present', () => {
     // Rule 3 is the consolidator's to enforce. A name means it has real work.
-    expect(src).toContain('if (stripCharacterNames(fix, { names }) !== fix) return null;');
+    // Cast AND bible-figure names, after figure ids resolve to them (2026-09-24).
+    expect(src).toContain('if (stripCharacterNames(resolved, { names: repairNameMap.names }) !== resolved) return null;');
   });
 
   it('sends that finding verbatim — no trim, no cap, no critique', () => {
