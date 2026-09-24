@@ -1196,8 +1196,35 @@ async function iterateCover(coverKey, storyData, options = {}) {
     previousImage = rehydratedCoverBytes;
   }
 
+  // --- Composite-vs-direct decision (unchanged gate) ────────────────────
+  // Composite dispatch is the standalone `_maybeGenerateComposite` route
+  // helper (images.js). We decide compositeOn exactly as before and call the
+  // helper directly; it returns null when the landmark-buffer prerequisite is
+  // missing or the composite generator throws, and the direct render below
+  // runs instead.
+  //
+  // options.compositeCovers === false is an explicit opt-out: the user-facing
+  // "Überarbeiten" (regenerate-from-scratch) endpoint passes it so a from-scratch
+  // render never routes through composite. Direct render handles up to 5 figures
+  // fine (Pixar @5 verified, user decision 2026-07-19), so composite — slower,
+  // needs the analyzer, looks more "assembled" — is only worth it for CROWDED
+  // covers (>5 figures). The default flag gates on figure count; an explicit
+  // options.compositeCovers === true (Test Lab) still forces composite.
+  const coverFigureCount = coverCharacterPhotos?.length || 0;
+  const compositeOn = options.compositeCovers === false
+    ? false
+    : options.compositeCovers === true
+      ? true
+      : (MODEL_DEFAULTS.compositeCovers === true && coverFigureCount > 5);
+  if (!compositeOn && MODEL_DEFAULTS.compositeCovers === true && options.compositeCovers == null) {
+    log.info(`🔄 [COVER-ITERATE] ${coverKey}: ${coverFigureCount} figure(s) ≤ 5 — direct render (composite reserved for >5)`);
+  }
+
   // --- Build cover references (landmark photos, empty-scene plate, VB grid) ---
   // Shared with the streaming initial-gen path so v0 and iterate use the same anchors.
+  // `use` (see buildCoverReferences): the composite route is left as it was;
+  // an edit of an existing cover gets no plate and no landmark photo; every
+  // other render is plated or fails.
   const coverLabelStr = coverLabel(coverKey);
   const refs = await buildCoverReferences({
     coverKey,
@@ -1206,6 +1233,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
     sceneDescription,
     coverHint,
     logLabel: `${coverLabelStr} ITERATE`,
+    use: compositeOn ? 'composite' : (previousImage ? 'edit' : 'render'),
   });
   const {
     landmarkPhotos: coverLandmarkPhotos,
@@ -1256,30 +1284,6 @@ async function iterateCover(coverKey, storyData, options = {}) {
   const coverSceneBackground = isEditOfExistingCover ? null : rawCoverSceneBackground;
   if (isEditOfExistingCover && rawCoverSceneBackground) {
     log.info(`🔄 [COVER-ITERATE] ${coverLabelStr}: edit of an existing cover — empty-scene plate withheld (it composes instead of edits)`);
-  }
-
-  // --- Composite-vs-direct decision (unchanged gate) ────────────────────
-  // Composite dispatch is the standalone `_maybeGenerateComposite` route
-  // helper (images.js). We decide compositeOn exactly as before and call the
-  // helper directly; it returns null when the landmark-buffer prerequisite is
-  // missing or the composite generator throws, and the direct render below
-  // runs instead.
-  //
-  // options.compositeCovers === false is an explicit opt-out: the user-facing
-  // "Überarbeiten" (regenerate-from-scratch) endpoint passes it so a from-scratch
-  // render never routes through composite. Direct render handles up to 5 figures
-  // fine (Pixar @5 verified, user decision 2026-07-19), so composite — slower,
-  // needs the analyzer, looks more "assembled" — is only worth it for CROWDED
-  // covers (>5 figures). The default flag gates on figure count; an explicit
-  // options.compositeCovers === true (Test Lab) still forces composite.
-  const coverFigureCount = coverCharacterPhotos?.length || 0;
-  const compositeOn = options.compositeCovers === false
-    ? false
-    : options.compositeCovers === true
-      ? true
-      : (MODEL_DEFAULTS.compositeCovers === true && coverFigureCount > 5);
-  if (!compositeOn && MODEL_DEFAULTS.compositeCovers === true && options.compositeCovers == null) {
-    log.info(`🔄 [COVER-ITERATE] ${coverKey}: ${coverFigureCount} figure(s) ≤ 5 — direct render (composite reserved for >5)`);
   }
 
   // When composite is on, assemble the inputs the composite generator needs
@@ -1744,7 +1748,7 @@ function trialCoverPlateDescription(coverScene) {
  * @param {Function} [args.usageTracker] - (usage, modelId) => void for empty-scene cost tracking
  * @param {string} [args.logLabel] - prefix for log lines (defaults to cover label)
  * @param {string} [args.sceneBackground] - an existing people-free plate for this cover's location; skips the plate render
- * @param {boolean} [args.requirePlate] - always plate, and throw when a landmark photo resolved but no plate exists
+ * @param {'render'|'edit'|'composite'} [args.use] - what the caller does with the refs (see the parameter comment)
  * @returns {Promise<{landmarkPhotos: Array, visualBibleGrid: Buffer|null, sceneBackground: string|null, sceneMetadata: Object|null, coverPageNumber: number}>}
  */
 async function buildCoverReferences({
@@ -1764,13 +1768,24 @@ async function buildCoverReferences({
   // A people-free plate that already exists for this cover's location (the
   // trial cover reuses its pages' plate). When given, no plate is rendered here.
   sceneBackground: providedSceneBackground = null,
-  // The caller never renders this cover without a plate: the plate is built
-  // whatever singlePassScene says, and a landmark photo with no plate throws
-  // instead of reaching the render — packReferences would otherwise promote
-  // the raw photograph into the scene slot and the model edits the photo,
-  // people and all (prod trial job_1790169018278_n57xpnufo).
-  requirePlate = false,
+  // What the caller does with the references:
+  //  'render'    — a fresh cover render (every first-generation cover, a
+  //                from-scratch iterate). ALWAYS plated, whatever
+  //                singlePassScene says, and a landmark photo with no plate
+  //                THROWS: packReferences would otherwise promote the raw
+  //                photograph into the scene slot and the model edits the
+  //                photo, people and all (prod trial job_1790169018278_n57xpnufo).
+  //  'edit'      — an edit of an existing cover. An edit gets only the image
+  //                being edited (iterateCover A1), so no plate is rendered and
+  //                no landmark photo is returned — none reaches the edit.
+  //  'composite' — the composite cover route. Unchanged by owner decision
+  //                (2026-09-24): plate unless singlePassScene, no throw, and
+  //                the raw photo stays its background input.
+  use = 'render',
 }) {
+  if (!['render', 'edit', 'composite'].includes(use)) {
+    throw new Error(`buildCoverReferences: unknown use "${use}"`);
+  }
   const { resolveArtStyle, resolveArtStyleForEmptyScene, extractSceneMetadata, getLandmarkPhotosForScene } = getStoryHelpers();
   const { generateImageOnly } = require('./images');
   const { buildVisualBibleGrid, buildEmptySceneVbGrid } = require('./referenceSheets');
@@ -1865,13 +1880,19 @@ async function buildCoverReferences({
 
   const coverPageNumber = COVER_PAGE_NUMBERS[coverKey] ?? -1;
 
+  // An edit sends no landmark photo at all — not as the scene anchor, not as a
+  // secondary grid cell.
+  if (use === 'edit') landmarkPhotos = [];
+
   // --- Generate empty scene for style anchoring ---
-  // Respect MODEL_DEFAULTS.singlePassScene: when true (the default), pages render
-  // in a single pass with no plate.
-  let sceneBackground = providedSceneBackground || null;
-  if (sceneBackground) {
+  // A rendered cover is always plated; singlePassScene only governs the
+  // composite route (see `use`).
+  let sceneBackground = use === 'edit' ? null : (providedSceneBackground || null);
+  if (use === 'edit') {
+    log.info(`🎬 [COVER-REFS] ${label}: edit of an existing cover — no plate, no landmark photo`);
+  } else if (sceneBackground) {
     log.info(`🎬 [COVER-REFS] ${label}: reusing the existing people-free plate for this location`);
-  } else if (MODEL_DEFAULTS.singlePassScene === true && !requirePlate) {
+  } else if (use === 'composite' && MODEL_DEFAULTS.singlePassScene === true) {
     log.info(`🎛️ [COVER-REFS] ${label}: singlePassScene=true — skipping empty-scene plate`);
   } else {
     try {
@@ -1942,7 +1963,8 @@ async function buildCoverReferences({
       log.warn(`⚠️ [COVER-REFS] ${label}: empty scene failed: ${err.message}`);
     }
   }
-  if (requirePlate && landmarkPhotos.length > 0 && !sceneBackground) {
+  if (use === 'render' && landmarkPhotos.length > 0 && !sceneBackground) {
+    log.error(`❌ [COVER-REFS] ${label}: no people-free plate for landmark "${landmarkPhotos[0]?.name || 'unknown'}" — cover not rendered`);
     throw new Error(`${label}: no people-free plate for landmark "${landmarkPhotos[0]?.name || 'unknown'}" — the cover is not rendered on the raw photograph`);
   }
 

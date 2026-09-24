@@ -21,6 +21,46 @@ superseded and link forward.
 
 ---
 
+## 2026-09-24 — Plate or fail: no render is ever built on a raw landmark photo (covers, trial pages, Gemini); cover edits send no photo; composite covers unchanged
+
+**Context:** The 2026-09-23 trial-cover fix (entry below) left three paths where a missing plate still let
+`packReferences` promote the raw landmark photograph into the scene slot: full-account covers (streaming
+and `iterateCover`, via `buildCoverReferences`, whose plate failure was only a warning), trial pages
+(`plate unavailable (rendering without it)` then the raw photo was packed), and Gemini's branch of
+`generateImageOnly`, which attached the primary landmark photo as its own part even beside a `[Background]`
+plate. Owner ruling 2026-09-24: fail loudly everywhere, with two scope rules — an edit of an existing cover
+is exempt from the plate provided it sends no photo, and the composite cover route stays as it is.
+**Decision:**
+- `buildCoverReferences` takes `use` instead of `requirePlate`: `'render'` (the default — every streaming,
+  trial and from-scratch iterate cover) is ALWAYS plated, whatever `singlePassScene` says, and a landmark
+  with no plate logs an error and throws, so that cover fails (`cover_failed` in the stored genLog);
+  `'edit'` (iterateCover with a `previousImage`) renders no plate and returns NO landmark photo — the edit
+  used to get the photo packed as an extra slot beside the image being edited; `'composite'` (iterateCover's
+  composite route and regeneration.js's scene-composite route) keeps the old behaviour exactly. iterateCover
+  now decides `compositeOn` before it builds its references. The streaming cover's `singlePassScene` /
+  `generateEmptyScenes` skip is deleted (it only ever switched usage tracking off).
+- Trial page: a plate that failed, or a landmark photo with no plate, throws in the streaming render; the
+  page then goes through the normal page render like any other failed trial page (Phase 5a-pre plates it).
+- Gemini: no primary landmark part when a `sceneBackground` plate is present — the rule packReferences
+  already applies on the Grok side.
+- Sibling registry: `cover-and-plate-reference-builders` (storyJobPipeline.js, coverIterate.js,
+  regeneration.js; anchor `buildCoverReferences`) and `scene-slot-landmark-rule` (grok.js, images.js).
+**Rationale:** NO FALLBACKS — a render quietly built on a photograph is worse than a failed one, and the
+failed one is visible. Edits never used the plate (A1 withholds it), so requiring one there would only fail
+edits; removing the photo from them is what keeps strangers off an edited cover. Composite is the owner's call.
+**Evidence / validation (free replays):** staging full-account `job_1790100385959_1nitlympp` front cover
+(Lindenhof square): render + stored plate → slot 1 plate, photo not packed; render with the plate stubbed to
+fail → throws; edit → 0 landmarks, slots = source image + characters; composite with a failed plate → returns
+with the photo (unchanged); Gemini parts with the plate = `[Background]` only. Prod trial
+`job_1790169018278_n57xpnufo` cover: page plate reused, 0 plate calls, photo not packed. Recent prod trials
+all carried a plate on every landmark page; the landmark-without-plate pages found were two early-September
+prod trials and older staging trials that predate the persisted plate prompt.
+**Touched:** `server/lib/coverIterate.js`, `storyJobPipeline.js`, `server/routes/regeneration.js`,
+`server/lib/images.js`, `scripts/admin/sibling-registry.json`,
+`tests/unit/plate-or-fail-covers-and-trial-pages.test.ts`, `tests/unit/trial-cover-plate-not-raw-photo.test.ts`,
+`docs/image-routing.md`, `docs/image-generation-methods.html`.
+**Status:** ✅ active on staging.
+
 ## 2026-09-24 — `landmark_view_missing` is deleted; the plan's shot wins over the review and over `shot_off_plate`
 
 **Context.** Test Lab experiment **1433** (`scene_review_replay` on staging
@@ -99,11 +139,8 @@ the failure lands in the stored genLog (`cover_failed`) instead of a silent `nul
 Visual Bible time, and it keeps the cover in the same painted place as the pages. The square page plate is
 brought to the 3:4 cover aspect by the same slot-0 magenta extension that used to extend the landscape raw
 photo. No fallback to the photo: a cover without a plate is not rendered (NO FALLBACKS).
-**Not changed (open, owner call):** the full-account callers (streaming cover, `iterateCover`,
-regeneration.js) do not pass `requirePlate`, so a failed plate there still leaves the raw photo to be promoted
-to slot 0. Trial PAGES do the same when their plate fails (`plate unavailable (rendering without it)` then the
-raw photo is packed). Gemini's branch of `generateImageOnly` adds the primary landmark photo as its own part
-even beside a `[Background]` plate (only reached on a Grok failure for Grok-routed covers).
+**Not changed here:** full-account covers, trial pages and the Gemini branch — all three closed by the
+2026-09-24 "Plate or fail" entry above, which also replaced `requirePlate` with `use`.
 **Touched:** `storyJobPipeline.js` (`trialPlatesByLoc`, `onCoverScene`), `server/lib/coverIterate.js`
 (`buildCoverReferences` `sceneBackground`/`requirePlate`, `trialCoverLocationId`,
 `trialCoverPlateDescription`), `tests/unit/trial-cover-plate-not-raw-photo.test.ts`,

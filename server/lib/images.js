@@ -1372,7 +1372,14 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
   }
 
   // Primary landmark reference photo only (1st landmark as separate image).
-  if (landmarkPhotos && landmarkPhotos.length > 0) {
+  // Never beside a plate: the plate already carries the landmark, painted and
+  // people-free, and the raw photo next to it gets copied — people included.
+  // Same rule packReferences applies on the Grok side.
+  const hasScenePlate = typeof sceneBackground === 'string' && sceneBackground.startsWith('data:image');
+  if (hasScenePlate && landmarkPhotos?.length > 0) {
+    log.info(`🌍 [${logLabel}] Plate present — raw landmark photo "${landmarkPhotos[0]?.name || 'unknown'}" not attached`);
+  }
+  if (!hasScenePlate && landmarkPhotos && landmarkPhotos.length > 0) {
     const primaryLandmark = landmarkPhotos[0];
     const candidates = [primaryLandmark.photoUrl, primaryLandmark.photoData].filter(s => typeof s === 'string' && s.length > 0);
     if (candidates.length > 0) {
