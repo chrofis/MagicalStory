@@ -1859,7 +1859,10 @@
       "source": "Reproduced from stored data, staging job_1790100385959_1nitlympp: backCover v0 entity issue cutout_artifact MAJOR ('jagged white edges ... cropping artifact'), consolidated as figure_completeness MAJOR sources ['entity'] → deductions.entity −15, finalScore 70, per_character_fixes 'Fill Julian's left arm and jacket to remove white cropping artifacts'. Same on p16 v1 (−15). Audit 09-covers.md C7.",
       "rootCause": "The consolidator relabels the entity check's cutout_artifact as figure_completeness; that type had no source-scoped cost or route rule, so a defect of our grid crop was billed and repaired as a defect of the page.",
       "impact": "Covers and pages lose 15 points and get paid inpaint fixes for gaps the image does not have. Staging and production.",
-      "status": "open"
+      "status": "fixed",
+      "fixedAt": "2026-09-24",
+      "fixedIn": "d5dd79baf",
+      "fix": "Owner 'log only': scoring.js ENTITY_ONLY_ZERO_POINT_TYPES charges an entity-only figure_completeness 0; repairLogic.isCropArtifact closes its char-fix and critical routes; feedbackConsolidator.dropCropArtifactFixes drops its plan fix. Pinned by tests/unit/entity-crop-figure-completeness.test.ts. docs/decisions.md 2026-09-24."
     }
   ]
 }
