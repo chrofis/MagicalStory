@@ -49,6 +49,11 @@ Last full sweep: **2026-09-06**.
       staging verification pending (photo upload, 4-page smoke, Lab experiment, RSS ~53MB idle)
       → `tasks/analyzer-workers-2026-08-23.md`
 
+- [ ] Arc creation "logic first" (owner 2026-09-24): one arc, a STORY LOGIC block before the
+      sentences, a logic-first critique with no model counting, the rulebook cut to logic. The plan
+      is written; owner decisions D1-D7 are open; nothing is built. Lab validation is capped at $8
+      → `tasks/arc-logic-first-2026-09-24.md`
+
 ## Image quality — unresolved render defects
 
 - [ ] An eye-level page grouped into an angled vantage (`shot_off_plate` with the page's shot = the plan's): the fault is the vantage's `shot`, which the scene review cannot edit — needs an Art-Director / bible-side fix (e.g. vantage shot = base class when any of its pages is eye level). Lab 1433 p16 → docs/decisions.md (2026-09-24 entry, item 3)
