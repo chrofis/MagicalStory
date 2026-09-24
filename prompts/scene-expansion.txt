@@ -1,7 +1,7 @@
 #! UNIFIED PAGE FALLBACK — used at server.js:3239 to expand a story page's
 #! scene hint into prose + METADATA when the unified pass produced no usable
-#! sceneProse. Covers do NOT use this file (buildCoverSceneFromHint in
-#! coverIterate.js templates cover hints without an LLM call). Page-only
+#! sceneProse. Covers do NOT use this file (a full story's covers are briefed
+#! as pages by scene-expansion-all.txt; the trial's by buildCoverSceneFromHint). Page-only
 #! composition rules (text overlay / calm zone) are BUILDER-GATED: the
 #! TEXT_ZONE_OVERRIDE placeholder is filled only for story-page calls and
 #! left empty otherwise, so a cover fill renders without any text-zone

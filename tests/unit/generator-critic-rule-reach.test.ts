@@ -110,7 +110,7 @@ describe('generator-side counterparts of judge rules reach the built image promp
       })}`;
     };
     const page = String(PB.buildImagePrompt(longBrief(), inputData, null, VISUAL_BIBLE, 1, null, {}));
-    const cover = String(PB.buildCoverPrompt('initialPage', {
+    const cover = String(PB.buildCoverPrompt('back', {
       sceneDescription: 'A wide group portrait set before the pier. '.repeat(160),
       inputData, visualBible: VISUAL_BIBLE, referencePhotos: [],
     }));

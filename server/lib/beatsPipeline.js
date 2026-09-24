@@ -29,7 +29,8 @@ const { buildCharacterDescription } = require('./visualBible');
  *      checking happens at this layer by design (owner, 2026-09-01)
  *   3. beats_story_bible     MODEL_DEFAULTS.outline    CLOTHING REQUIREMENTS only
  *   4. beats_scene_expansion MODEL_DEFAULTS.sceneDescription  ONE call over ALL pages: the VISUAL BIBLE
- *      and the COVER SCENE HINTS first, then every page's brief (cross-page
+ *      first, then every page's brief — the covers included, as pages -1/-2/-3
+ *      from code-written cover beats (coverBeats.js, 2026-09-24) — (cross-page
  *      continuity, and no page can cite an element nobody declared)
  *   5. beats_scene_review    MODEL_DEFAULTS.sceneReviewModel  ONE call over ALL briefs, rewrites faulted
  *   6. beats_story_text      MODEL_DEFAULTS.storyText  page text written from the arc + the locked plan lines
@@ -65,8 +66,8 @@ const { buildCharacterDescription } = require('./visualBible');
  *    are the long pole in front of every image and start the moment it returns,
  *    so the wardrobe cannot wait for the Art Director. Clothing depends on the
  *    cast and the setting, both already fixed by the plan.
- *  - Step 4 — the ART DIRECTOR — writes the VISUAL BIBLE and the COVER SCENE
- *    HINTS, ahead of page 1, then the page briefs. One author owns both what is
+ *  - Step 4 — the ART DIRECTOR — writes the VISUAL BIBLE ahead of page 1, then
+ *    the page briefs, the cover pages' among them. One author owns both what is
  *    in each picture and what each thing looks like, so the two cannot
  *    contradict each other, and a page's `objects[]` cannot name an entry that
  *    was never declared. Before this, step 3 had to GUESS page assignment from
@@ -246,9 +247,9 @@ const NOOP_LOG = { info: () => {}, warn: () => {}, error: () => {}, setStage: ()
  * cite an element that was never declared. beatsPipeline concatenates the two
  * bodies in this order, which is the order the transcript has always carried.
  */
-const BIBLE_MARKERS = ['---CLOTHING REQUIREMENTS---', '---VISUAL BIBLE---', '---COVER SCENE HINTS---'];
+const BIBLE_MARKERS = ['---CLOTHING REQUIREMENTS---', '---VISUAL BIBLE---'];
 const CLOTHING_MARKERS = ['---CLOTHING REQUIREMENTS---'];
-const AD_BIBLE_MARKERS = ['---VISUAL BIBLE---', '---COVER SCENE HINTS---'];
+const AD_BIBLE_MARKERS = ['---VISUAL BIBLE---'];
 
 /**
  * Strip any preamble the model wrote before the first section marker, and
@@ -271,7 +272,8 @@ function extractBibleSections(raw, markers = BIBLE_MARKERS) {
   let body = text.slice(Math.min(...present)).trim();
   const ends = [
     body.search(/---\s*STORY PAGES\s*---/i),
-    body.search(/^\s*#{1,4}\s*\**\s*(?:Page|Seite|Pagina)\s*\**\s*\d+/im),
+    // `-?`: a cover page carries a negative number (coverKeys.COVER_PAGE_NUMBERS).
+    body.search(/^\s*#{1,4}\s*\**\s*(?:Page|Seite|Pagina)\s*\**\s*-?\d+/im),
   ].filter(i => i >= 0);
   if (ends.length) body = body.slice(0, Math.min(...ends)).trim();
   if (!body) return null;
@@ -457,7 +459,10 @@ function applyReviewBibleCorrections(raw, visualBible, pageCount, citedHandles) 
     let uncovered = null;
     for (const o of current) {
       const pages = (Array.isArray(o.pages) ? o.pages : []).map(Number).filter(n => Number.isFinite(n));
-      const lost = pages.filter(p => !coveredNow.has(p));
+      // A cover page (negative number) is not a story page this correction
+      // could leave uncovered: covers take the object's final state by rule
+      // (visualBible.resolveObjectState rule 0), never a page table entry.
+      const lost = pages.filter(p => p > 0 && !coveredNow.has(p));
       if (lost.length > 0) { uncovered = { from: o, lost }; break; }
     }
     if (uncovered) {
@@ -2240,9 +2245,19 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   }
 
   t = Date.now();
-  const beatPageNumbers = beats.map(b => b.pageNumber);
+  // COVERS ARE PAGES (owner, 2026-09-24). Each cover the job renders is a page
+  // whose BEAT code writes (coverBeats.js: purpose, cast, costumes, the landmark
+  // rule, the element budget, gaze and the copy space), briefed by the Art
+  // Director with every other page and reviewed with them. They ride AFTER the
+  // story pages, so the story's own page order is untouched, and they never
+  // reach the page text writer or the plan counters — `beats` stays the story.
+  const { buildCoverBeats, isCoverPage } = require('./coverBeats');
+  const { coverTypesFor } = require('./coverKeys');
+  const coverBeats = buildCoverBeats(inputData, { coverTypes: coverTypesFor(inputData), clothingRequirements });
+  const briefBeats = [...beats, ...coverBeats];
+  const beatPageNumbers = briefBeats.map(b => b.pageNumber);
   let expansions = [];
-  // The Visual Bible + cover hints the Art Director emits ahead of page 1.
+  // The Visual Bible the Art Director emits ahead of page 1.
   let adBible = null;
   // THE REPLY AS RETURNED, one row per all-pages attempt (2026-09-23). Only
   // parsed parts were stored — the briefs, and the bible after the post-review
@@ -2254,7 +2269,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // No rulings travel here any more (2026-09-01): the beats reviewer that
   // produced them is gone, and the plan check never rules on anything — it
   // counts, and the planner re-divides. CARRY_ROUTES stays for the Lab.
-  const allPrompt = buildSceneExpansionAllPrompt(inputData, beats, {
+  const allPrompt = buildSceneExpansionAllPrompt(inputData, briefBeats, {
       availableAvatars,
       maxCharactersPerScene,
       // The whole story, read-only, for the Art Director's judgment — it
@@ -2337,18 +2352,18 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         log.error(`🚨 [BEATS] All-pages attempt ${attempt}: incomplete brief(s) — ${detail} — treating them as NOT delivered`);
         gl.warn('beats_scene_brief_incomplete', `Brief(s) for page(s) ${pages.join(', ')} came back incomplete — ${detail}. Not accepted; re-expanded instead`, null, { pages });
       }
-      if (byPage.size >= beats.length && adBible) break;
+      if (briefBeats.every(b => byPage.has(b.pageNumber)) && adBible) break;
       if (attempt === 1) {
-        const missingNow = beats.filter(b => !byPage.has(b.pageNumber)).map(b => b.pageNumber);
+        const missingNow = briefBeats.filter(b => !byPage.has(b.pageNumber)).map(b => b.pageNumber);
         const what = [
           missingNow.length ? `missing page(s) ${missingNow.join(', ')}` : null,
           adBible ? null : 'no parseable Visual Bible',
         ].filter(Boolean).join(' and ');
-        log.error(`🚨 [BEATS] All-pages expansion incomplete: ${byPage.size}/${beats.length} briefs parsed, ${what} — retrying the batch ONCE at full cap`);
-        gl.warn('beats_scene_expansion_truncated', `All-pages call returned ${byPage.size}/${beats.length} briefs, ${what} — retrying the batch once at full output cap`);
+        log.error(`🚨 [BEATS] All-pages expansion incomplete: ${byPage.size}/${briefBeats.length} briefs parsed, ${what} — retrying the batch ONCE at full cap`);
+        gl.warn('beats_scene_expansion_truncated', `All-pages call returned ${byPage.size}/${briefBeats.length} briefs, ${what} — retrying the batch once at full output cap`);
       }
     }
-    expansions = beats
+    expansions = briefBeats
       .filter(b => byPage.has(b.pageNumber))
       .map(b => ({ pageNumber: b.pageNumber, brief: byPage.get(b.pageNumber), prompt: allPrompt, modelId: allModelId }));
   }
@@ -2365,10 +2380,6 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   if (adBible) {
     visualBible = adBible.visualBible;
     let bibleBody = adBible.body;
-    if (!adBible.found.includes('---COVER SCENE HINTS---')) {
-      log.warn('⚠️ [BEATS] Art Director emitted no ---COVER SCENE HINTS--- section — covers fall back to the default hint');
-      gl.warn('beats_story_bible_partial', 'Art Director emitted no cover scene hints — covers use the default hint');
-    }
 
     // An invented child the bible declares a PEER of the commissioned children
     // must state an age inside their band. The band went into the prompt above;
@@ -2422,8 +2433,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       }
     }
 
-    // Append to the wardrobe transcript in the order the transcript has always
-    // carried: CLOTHING REQUIREMENTS, VISUAL BIBLE, COVER SCENE HINTS.
+    // Append to the wardrobe transcript: CLOTHING REQUIREMENTS, VISUAL BIBLE.
     bibleSections = bibleSections ? `${bibleSections.trimEnd()}
 
 ${bibleBody}` : bibleBody;
@@ -2433,8 +2443,8 @@ ${bibleBody}` : bibleBody;
       vbEntries: vbCount, sections: adBible.found,
     });
   } else if (allPrompt) {
-    log.error('🚨 [BEATS] All-pages call produced NO parseable Visual Bible after both attempts — story ships with an empty bible, no cover hints and blind briefs');
-    gl.warn('beats_visual_bible_missing', 'The Art Director returned no parseable Visual Bible — story ships with an empty bible and no cover hints');
+    log.error('🚨 [BEATS] All-pages call produced NO parseable Visual Bible after both attempts — story ships with an empty bible and blind briefs');
+    gl.warn('beats_visual_bible_missing', 'The Art Director returned no parseable Visual Bible — story ships with an empty bible');
   }
 
   // The page images need each real landmark's PHOTO VARIANTS on the bible entry
@@ -2534,10 +2544,10 @@ ${bibleBody}` : bibleBody;
 
   // Page-count guard: a short response must never ship a story with pages that
   // have no brief. Only the MISSING pages are re-expanded per-page.
-  const missingBriefs = beats.filter(b => !expansions.some(x => x.pageNumber === b.pageNumber));
+  const missingBriefs = briefBeats.filter(b => !expansions.some(x => x.pageNumber === b.pageNumber));
   if (missingBriefs.length > 0) {
-    log.error(`🚨 [BEATS] All-pages expansion returned ${expansions.length}/${beats.length} briefs — re-expanding page(s) ${missingBriefs.map(b => b.pageNumber).join(', ')} per-page`);
-    gl.warn('beats_scene_expansion_incomplete', `All-pages call returned ${expansions.length}/${beats.length} briefs — page(s) ${missingBriefs.map(b => b.pageNumber).join(', ')} expanded per-page`);
+    log.error(`🚨 [BEATS] All-pages expansion returned ${expansions.length}/${briefBeats.length} briefs — re-expanding page(s) ${missingBriefs.map(b => b.pageNumber).join(', ')} per-page`);
+    gl.warn('beats_scene_expansion_incomplete', `All-pages call returned ${expansions.length}/${briefBeats.length} briefs — page(s) ${missingBriefs.map(b => b.pageNumber).join(', ')} expanded per-page`);
     const recovered = await Promise.all(missingBriefs.map(expandOnePage));
     expansions = expansions.concat(recovered).sort((a, b) => a.pageNumber - b.pageNumber);
   }
@@ -2650,7 +2660,7 @@ ${bibleBody}` : bibleBody;
   // authority on what is in the picture, and the brief's objects[] is the only
   // route by which any of it reaches the illustrator. Hoisted — the re-check
   // after the review must compare against the same lines.
-  const planLineOf = (pageNumber) => (beats.find(b => b && b.pageNumber === pageNumber) || {}).planLine || '';
+  const planLineOf = (pageNumber) => (briefBeats.find(b => b && b.pageNumber === pageNumber) || {}).planLine || '';
   // Hoisted for the post-review re-check below, which needs the same cast list
   // and the pre-review fault set to tell a SURVIVING fault from an INTRODUCED one.
   let briefCastNames = [];
@@ -2720,7 +2730,7 @@ ${bibleBody}` : bibleBody;
     // the bible feeds check 9f (a stated object's state page ranges).
     // clothingRequirements: the reviewer's CHARACTER DETAILS is the same cast
     // block the Art Director wrote from, outfits included (check 3b/10c).
-    { clothingFindings, briefFindings, beats, visualBible, clothingRequirements }
+    { clothingFindings, briefFindings, beats: briefBeats, visualBible, clothingRequirements }
   );
   if (!srPrompt) {
     log.warn('⚠️ [BEATS] scene-review template unavailable — scene briefs shipped unreviewed');
@@ -2812,7 +2822,7 @@ ${bibleBody}` : bibleBody;
       // predates the contract → skip rather than guess.
       const faultLine = sceneReviewAnalysis.match(/^\s*FAULTED PAGES?:\s*(.+)\s*$/mi);
       const namedPages = faultLine
-        ? [...new Set((faultLine[1].match(/\d+/g) || [])
+        ? [...new Set((faultLine[1].match(/-?\d+/g) || [])
             .map(Number)
             .filter(n => expansions.some(x => x.pageNumber === n)))]
         : null;
@@ -2924,7 +2934,7 @@ ${bibleBody}` : bibleBody;
               if (h.includes('.')) citedHandles.add(h);
             }
           }
-          const corr = applyReviewBibleCorrections(srRes.text || '', visualBible, expansions.length, citedHandles);
+          const corr = applyReviewBibleCorrections(srRes.text || '', visualBible, beats.length, citedHandles);
           bibleCorrections = corr;
           for (const r of corr.rejected) {
             log.warn(`⚠️ [BEATS] Scene review bible correction REJECTED for ${r.id}: ${r.reason}`);
@@ -3285,6 +3295,18 @@ ${bibleBody}` : bibleBody;
     log.warn(`⚠️ [BEATS] VB element budget check failed (${vbErr.message}) — briefs ship as written`);
   }
 
+  // ── The covers leave here ─────────────────────────────────────────────────
+  // Briefed and reviewed with the pages; from here on they are not story
+  // pages: no page text, no story-page assembly. Returned as `coverScenes`.
+  const coverExpansions = expansions.filter(x => isCoverPage(x.pageNumber));
+  expansions = expansions.filter(x => !isCoverPage(x.pageNumber));
+  for (const cb of coverBeats) {
+    if (!coverExpansions.some(x => x.pageNumber === cb.pageNumber)) {
+      log.error(`🚨 [BEATS] ${cb.coverKey} (page ${cb.pageNumber}) has no Art Director brief — that cover will not be rendered`);
+      gl.error('beats_cover_brief_missing', `${cb.coverKey} has no Art Director brief — the cover is not rendered`, null, { coverKey: cb.coverKey });
+    }
+  }
+
   // ── Step 6: page text — runs HERE, after the scene review, with the briefs ─
   await stage(51, 'Writing the page text...', { next: 56, ms: 75000 });
   const textResult = await runStoryText(expansions);
@@ -3453,6 +3475,32 @@ ${bibleBody}` : bibleBody;
   }
   if (pages.length === 0) throw new Error('Beats pipeline produced no usable pages');
 
+  // THE COVER PAGES — each one a brief the Art Director wrote from its cover
+  // beat, in the same record shape a story scene has (no text). The caller
+  // renders them through the page path into `coverImages` (coverKeys:
+  // COVER_PAGE_NUMBERS). `coverKey` names the cover.
+  const { coverKeyOfPage } = require('./coverBeats');
+  const coverScenes = coverExpansions.map((exp) => {
+    const cb = coverBeats.find(b => b.pageNumber === exp.pageNumber) || {};
+    const sm = extractSceneMetadata(exp.brief);
+    if (!sm) log.warn(`⚠️ [BEATS] Cover page ${exp.pageNumber}: brief has no parseable METADATA block`);
+    return {
+      pageNumber: exp.pageNumber,
+      coverKey: coverKeyOfPage(exp.pageNumber),
+      text: '',
+      sceneHint: cb.planLine || '',
+      sceneDescription: exp.brief,
+      sceneDescriptionPrompt: exp.prompt || null,
+      sceneDescriptionModelId: exp.modelId || sceneModel,
+      characterClothing: sm?.characterClothing || {},
+      characters: sm?.characters || [],
+      outlineCharacters: sm?.characters || [],
+      outlineExtract: `PLAN: ${cb.planLine || ''}`,
+      wornStateUnresolved: exp.wornStateUnresolved || false,
+      ...(vbOverflowByPage.has(exp.pageNumber) ? { vbElementOverflow: vbOverflowByPage.get(exp.pageNumber) } : {}),
+    };
+  });
+
   // USAGE COMES FROM THE BRIEFS. The bible's `pages` were guessed before a
   // single brief existed; the briefs are now final, so rebuild every entry's
   // `appearsInPages` (and its states/vantages) from what they actually cite.
@@ -3465,7 +3513,9 @@ ${bibleBody}` : bibleBody;
   // contributes nothing, and with no briefs at all this is a no-op.
   if (visualBible) {
     const { applyBriefUsage } = require('./vbElementBudget');
-    const usage = applyBriefUsage(visualBible, scenes);
+    // The covers count: an element only a cover cites still needs its reference
+    // cell. Their negative page numbers mark cover rows in the page tables.
+    const usage = applyBriefUsage(visualBible, [...scenes, ...coverScenes]);
     // A BRIEF THAT COULD NOT BE READ IS NOT A BRIEF THAT ASKS FOR NOTHING.
     // Those pages keep the bible's own assignment rather than withdrawing every
     // element from it (applyBriefUsage header) — and they are named here, so the
@@ -3581,7 +3631,7 @@ ${bibleBody}` : bibleBody;
   // trimmed, age-clamped, landmark-linked. The caller prefers it over a
   // re-parse of rawOutline so the two can never diverge (the transcript is
   // kept in step by syncVisualBibleSection; the re-parse is the fallback).
-  return { title, titleJudge, beats, pages, scenes, rawOutline, visualBible, meta, challengeDrawIds, challengeTakenIds, challengeDraw, arcReviewReport, beatsReviewReport, storyBibleReport, clothingReviewReport, wardrobeBibleReport, sceneExpansionReport, sceneReviewReport };
+  return { title, titleJudge, beats, pages, scenes, coverScenes, rawOutline, visualBible, meta, challengeDrawIds, challengeTakenIds, challengeDraw, arcReviewReport, beatsReviewReport, storyBibleReport, clothingReviewReport, wardrobeBibleReport, sceneExpansionReport, sceneReviewReport };
 }
 
 module.exports = { generateStoryViaBeats, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };

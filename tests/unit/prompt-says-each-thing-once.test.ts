@@ -42,7 +42,7 @@ const hint: any = {
   },
 };
 
-const coverPrompt = (key: 'front' | 'initialPage' | 'back') => String(PB.buildCoverPrompt(key, {
+const coverPrompt = (key: 'front' | 'back') => String(PB.buildCoverPrompt(key, {
   sceneDescription: CI.buildCoverSceneFromHint(hint, bible, chars, { language: 'en' }),
   inputData, characters: chars, visualBible: bible, referencePhotos: photos,
   options: {
@@ -60,7 +60,7 @@ beforeAll(async () => { await loadPromptTemplates(); });
 
 describe('a cover does not build what cannot apply to it', () => {
   it('no facing bullet and no COUNTS on any cover; the ground and size bullets stay', () => {
-    for (const key of ['front', 'initialPage', 'back'] as const) {
+    for (const key of ['front', 'back'] as const) {
       const p = coverPrompt(key);
       expect(p, key).not.toContain(PB.COMPOSITION_FACING_BULLET);
       expect(p, key).not.toContain('**COUNTS:**');
@@ -84,7 +84,7 @@ describe('each rule is said once', () => {
   });
 
   it('no "2 hands" cover bullet beside the HANDS anchor, no ALL MAIN CHARACTERS bullet beside REQUIRED CAST', () => {
-    for (const key of ['front', 'initialPage', 'back'] as const) {
+    for (const key of ['front', 'back'] as const) {
       const p = coverPrompt(key);
       expect(p, key).not.toMatch(/has 2 hands/);
       expect(p, key).not.toMatch(/ALL MAIN CHARACTERS/);

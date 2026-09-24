@@ -902,10 +902,14 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             // Pull per-cover characterClothing from outline coverHints so the entity
             // collector can drive bbox detection with the actual cover cast instead
             // of falling back to the full story roster (too noisy for Gemini to ID).
-            const coverHint = storyData.coverHints?.[coverType] || null;
-            const characterClothing = coverHint?.characterClothing
-              && Object.keys(coverHint.characterClothing).length > 0
-              ? coverHint.characterClothing
+            // A cover briefed as a page (2026-09-24) carries its own
+            // per-character clothing; a trial or pre-change cover's lives on
+            // the outline hint it was made from.
+            const coverClothing = cover.briefedAsPage === true
+              ? cover.perCharClothing
+              : (storyData.coverHints?.[coverType] || null)?.characterClothing;
+            const characterClothing = coverClothing && Object.keys(coverClothing).length > 0
+              ? coverClothing
               : null;
             coverEntries.push({
               pageNumber: COVER_PAGE_NUMBERS[coverType],

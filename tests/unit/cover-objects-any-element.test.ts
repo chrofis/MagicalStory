@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { createRequire } from 'node:module';
 
-// A COVER IS BRIEFED THE WAY A PAGE IS (owner, 2026-09-23).
-//   - an element's LOOK comes from the Art Director's prose — the cover hint's
-//     `Scene` field, parsed like the rest of the hint;
-//   - its PRESENCE comes from REQUIRED OBJECTS, built by the page builder from
-//     the brief's `---METADATA---` block (coverBriefWithObjects);
-//   - there is no separate cover block (KEY STORY ELEMENTS is deleted).
-// Stored stories whose hint has no `Scene` get no substitute look text.
+// COVERS AND THEIR ELEMENTS (owner, 2026-09-23 / 2026-09-24).
+//   - A FULL-STORY cover is a page: the Art Director briefs it from its cover
+//     beat (coverBeats.js), and the beat carries the element budget — any VB
+//     animal, artifact or vehicle, at most VB_ELEMENT_BUDGET.
+//   - A TRIAL cover keeps its own builder: the hint's prose, and the elements'
+//     presence from REQUIRED OBJECTS (coverBriefWithObjects).
+//   - There is no separate cover block (KEY STORY ELEMENTS is deleted).
 
 const require_ = createRequire(import.meta.url);
 const CI = require_('../../server/lib/coverIterate');
@@ -25,9 +25,8 @@ const bible = () => ({
     description: 'a red wooden fishing boat. Signature: a white wheelhouse', referenceImageUrl: 'https://r2/veh.jpg' }],
   artifacts: [{ id: 'ART001', name: 'brass lantern', label: 'brass lantern', description: 'a small brass lantern with a glass chimney', referenceImageUrl: 'https://r2/art.jpg' }],
 });
-const SCENE = 'A small grey seal with a speckled back rests on the wall beside a red wooden fishing boat with a white wheelhouse.';
-const hint = (objects: string[], scene = SCENE, holds = 'nothing') => ({
-  objects, scene,
+const hint = (objects: string[], holds = 'nothing') => ({
+  objects,
   characterDetails: { Ada: { name: 'Ada', position: 'center', holds, priority: 'essential' } },
 });
 const requiredObjects = (prompt: string) => {
@@ -35,40 +34,21 @@ const requiredObjects = (prompt: string) => {
   return m ? m[1] : '';
 };
 
-describe('the cover hint carries the Art Director\'s Scene prose', () => {
-  it('the live parser reads a Scene line per cover; a hint without one has none', () => {
-    const { UnifiedStoryParser } = require_('../../server/lib/outlineParser/unified');
-    const raw = [
-      '---COVER SCENE HINTS---',
-      '**Title Page**', 'Mood: calm morning', 'Objects: LOC001, ANI001', `Scene: ${SCENE}`,
-      'Characters:', '- Ada (center): standard, holds: nothing, priority: essential',
-      '', '**Initial Page**', 'Mood: quiet', 'Objects: LOC001',
-      'Characters:', '- Ada (center): standard, holds: nothing, priority: essential',
-    ].join('\n');
-    const hints = new UnifiedStoryParser(raw).extractCoverHints();
-    expect(hints.frontCover.scene).toBe(SCENE);
-    expect(hints.initialPage.scene).toBe('');
-  });
-
-  it('buildCoverSceneFromHint makes it the cover\'s scene prose', () => {
-    const prose = CI.buildCoverSceneFromHint(hint(['LOC001', 'ANI001', 'VEH001']), bible(), [], { language: 'en' });
-    expect(prose).toContain(SCENE);
-  });
-
-  it('a stored hint with no Scene gets no substitute look text', () => {
-    const prose = CI.buildCoverSceneFromHint(hint(['LOC001', 'ANI001'], ''), bible(), [], { language: 'en' });
-    expect(prose).not.toContain('seal');
-    expect(prose).not.toContain('Also in the scene');
-  });
-
+describe('a trial cover hint builds its scene prose', () => {
   it('a one-person cover forbids other PEOPLE, not the listed animal', () => {
     const prose = CI.buildCoverSceneFromHint(hint(['LOC001', 'ANI001']), bible(), [], { language: 'en' });
     expect(prose).not.toMatch(/no other figures/);
     expect(prose).toMatch(/no other people/);
   });
+  it('the parser no longer reads a Scene line (the Art Director cover section is gone)', () => {
+    const { UnifiedStoryParser } = require_('../../server/lib/outlineParser/unified');
+    const raw = ['---COVER SCENE HINTS---', '**Title Page**', 'Mood: calm', 'Objects: LOC001', 'Scene: a harbour at dawn',
+      'Characters:', '- Ada (center): standard, holds: nothing, priority: essential'].join('\n');
+    expect(new UnifiedStoryParser(raw).extractCoverHints().frontCover.scene).toBeUndefined();
+  });
 });
 
-describe('REQUIRED OBJECTS on a full-path cover, through the page builder', () => {
+describe('REQUIRED OBJECTS on a trial cover, through the page builder', () => {
   beforeAll(async () => { await loadPromptTemplates(); });
   const build = (objects: string[], exclude: string[] = []) => {
     const prose = CI.buildCoverSceneFromHint(hint(objects), bible(), [], { language: 'en' });
@@ -86,21 +66,22 @@ describe('REQUIRED OBJECTS on a full-path cover, through the page builder', () =
     expect(block).toMatch(/brass lantern\*\* \(object\)/);
     expect(block).not.toContain('harbour'); // a location is never listed
     expect(prompt).not.toContain('KEY STORY ELEMENTS');
-    // the look is in the scene prose, not in the checklist (2026-09-02 name-only rule)
-    expect(block).not.toContain('speckled');
-    expect(prompt).toContain('speckled back');
+    // the checklist is name-only (2026-09-02 rule)
+    expect(block).not.toContain('grey harbour seal');
     // the metadata block itself never reaches the image model
     expect(prompt).not.toContain('---METADATA---');
   });
   it('a worn-wins item is not listed as a loose object', () => {
     expect(requiredObjects(build(['LOC001', 'ART001'], ['ART001']))).not.toMatch(/lantern/);
   });
-  it('the plate drops the Scene prose and the metadata', () => {
+  it('the plate drops the metadata', () => {
     const prose = CI.buildCoverSceneFromHint(hint(['LOC001', 'ANI001']), bible(), [], { language: 'en' });
     const brief = CI.coverBriefWithObjects(prose, ['LOC001', 'ANI001']);
-    const plate = CI.buildPlateDescription(require_('../../server/lib/sceneMetadata').splitBrief(brief).prose, ['Ada'], bible(), -3, { excludeText: [SCENE] });
-    expect(plate).not.toContain('seal');
+    const plate = CI.buildPlateDescription(require_('../../server/lib/sceneMetadata').splitBrief(brief).prose, ['Ada'], bible(), -3);
     expect(plate).not.toContain('METADATA');
+  });
+  it('the trial builder renders a front or a back cover, nothing else', () => {
+    expect(() => PB.buildCoverPrompt('initialPage', { sceneDescription: 'x', inputData: { language: 'en' } })).toThrow(/front or a back cover/);
   });
 });
 
@@ -136,15 +117,22 @@ describe('vehicleDescription — the authored shape has no description field', (
   });
 });
 
-describe('the cover element cap is the page element budget, in both writers', () => {
+describe('the cover element cap is the page element budget, in both paths', () => {
   beforeAll(async () => { await loadPromptTemplates(); });
   const input = { language: 'en', characters: [{ id: 1, name: 'Ada', isMainCharacter: true }], mainCharacters: [1], pages: 4 };
-  it('trial writer and Art Director are filled with VB_ELEMENT_BUDGET', () => {
+  it('the trial writer is filled with VB_ELEMENT_BUDGET; every full-story cover beat carries it', () => {
     const trial = String(PB.buildTrialStoryPrompt(input, 4));
-    const ad = String(PB.buildSceneExpansionAllPrompt(input, [{ pageNumber: 1, planLine: 'medium — Ada — x — y' }], {}));
-    for (const p of [trial, ad]) expect(p).not.toContain('{COVER_ELEMENT_CAP}');
+    expect(trial).not.toContain('{COVER_ELEMENT_CAP}');
     expect(trial).toContain(`up to ${VB_ELEMENT_BUDGET} Visual Bible animals`);
-    expect(ad).toContain(`at most ${VB_ELEMENT_BUDGET}, on any of the three covers`);
-    expect(ad).toContain('Scene: [English prose');
+    const { buildCoverBeats } = require_('../../server/lib/coverBeats');
+    const beats = buildCoverBeats(input);
+    expect(beats).toHaveLength(3);
+    for (const b of beats) {
+      expect(b.planLine).toContain(`any animal, artifact or vehicle from the Visual Bible the picture calls for, at most ${VB_ELEMENT_BUDGET}`);
+    }
+    // the Art Director template itself carries no cover section any more
+    const ad = String(PB.buildSceneExpansionAllPrompt(input, [{ pageNumber: 1, planLine: 'medium — Ada — x — y' }], {}));
+    expect(ad).not.toContain('COVER SCENE HINTS');
+    expect(ad).not.toContain('{COVER_ELEMENT_CAP}');
   });
 });

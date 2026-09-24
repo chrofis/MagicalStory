@@ -1357,7 +1357,12 @@ function buildExpectedCastBlock({
     // never joins a cast roster.
     for (const n of require('./sceneMetadata').collectSceneObjectFigureNames(sceneMeta, visualBible)) add(n, vbKind(n));
   } catch { /* a page without parseable metadata keeps its photo-backed cast */ }
-  if (evaluationType === 'cover' && visualBible) {
+  // A cover whose Art Director brief DECLARES its cast (a full-story cover,
+  // briefed as a page since 2026-09-24) is judged against that cast, exactly
+  // like a page. Reading names back out of the prose is for a trial cover,
+  // rendered from a hint that declares no cast.
+  const coverBriefDeclaresCast = Array.isArray(sceneMetadata?.characters);
+  if (evaluationType === 'cover' && visualBible && !coverBriefDeclaresCast) {
     try {
       const { matchVbEntitiesInText } = require('./coverIterate');
       // THE JUDGE GETS THE GENERATOR'S TRIM (owner, 2026-09-15: "Cover the

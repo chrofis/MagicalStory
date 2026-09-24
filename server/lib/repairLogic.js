@@ -783,8 +783,8 @@ function selectCharRepairTasks(entityReport, options = {}) {
  * yet). Iterate first; if the next round still has identity issues,
  * char-fix on the iterated result.
  *
- * Char-fix is scene-only (covers don't get char-fix). Cover pages with
- * entity issues — rare — fall through to inpaint/iterate.
+ * A full-story cover is a page (2026-09-24, covers-as-pages) and routes
+ * exactly like one, char-fix included.
  *
  * @param {number} pageNumber - Page number; negative for covers (-1/-2/-3)
  * @param {Object} evaluation - Per-page eval with qualityScore, semanticScore, fixableIssues, etc.
@@ -923,7 +923,7 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
     return { method: 'iterate', reason: 'scene fix requires restaging (camera/composition/medium) — full regen' };
   }
 
-  // 2. Entity issue — char-fix wins. Scene-only (covers fall through).
+  // 2. Entity issue — char-fix wins (pages and full-story covers alike).
   //
   // CRITICAL ONLY, CASE-INSENSITIVE (owner ruling 2026-09-01, G5/option 2:
   // character faults route to character repair "only for critical for now").
@@ -976,7 +976,7 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
     reason: `${what} — char-fix already failed on this version (no usable image), flipping to iterate`,
   });
 
-  if (pageNumber > 0 && entityReport?.characters) {
+  if (pageNumber !== 0 && entityReport?.characters) {
     let worst = null; // {severity, charName, issue}
     for (const [charName, charResult] of Object.entries(entityReport.characters)) {
       const allIssues = [...(charResult.issues || [])];
@@ -1034,7 +1034,7 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   // fields: `character` (the missing name) and `figure` (the evaluator's figure
   // id, whose box the repair paints). A name with no roster entry has nothing to
   // paint from and is left to gate 2c.
-  if (pageNumber > 0) {
+  if (pageNumber !== 0) {
     const identity = severityIssues.find(i => String(i?.type || '').toLowerCase() === 'character_identity'
       && /^(critical|catastrophic)$/i.test(String(i?.severity || ''))
       && Number.isFinite(Number(i?.figure)) && i?.figure !== null
@@ -1076,7 +1076,7 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   // page — entity findings carry cross-page evidence and keep priority.
   // `accessory` is deliberately EXCLUDED: it caps at MODERATE, and a bandana
   // knot is not worth redrawing a person over.
-  if (pageNumber > 0) {
+  if (pageNumber !== 0) {
     const clothingIssue = severityIssues.find(i =>
       String(i?.type || '').toLowerCase() === 'clothing'
       && /^(major|critical|catastrophic)$/i.test(String(i?.severity || ''))
@@ -1170,7 +1170,7 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   // The salvage floor is deliberately not consulted, for the same reason a spec
   // conflict and a CATASTROPHIC finding skip it: there is no local repair to
   // prefer, the alternative is shipping the CRITICAL.
-  if (pageNumber > 0) {
+  if (pageNumber !== 0) {
     const critical = severityIssues.filter(i => /^critical$/i.test(String(i?.severity || '')));
     const orphan = critical.find((i) => {
       const type = String(i?.type || '').toLowerCase();

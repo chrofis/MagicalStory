@@ -360,9 +360,9 @@ class UnifiedStoryParser {
 
     const sectionMatch = this.response.match(/---COVER SCENE HINTS---\s*([\s\S]*?)(?=---STORY PAGES---|$)/i);
     const defaults = {
-      frontCover: { hint: '', mood: '', scene: '', objects: [], characterClothing: {}, characters: [], characterDetails: {} },
-      initialPage: { hint: '', mood: '', scene: '', objects: [], characterClothing: {}, characters: [], characterDetails: {} },
-      backCover: { hint: '', mood: '', scene: '', objects: [], characterClothing: {}, characters: [], characterDetails: {} }
+      frontCover: { hint: '', mood: '', objects: [], characterClothing: {}, characters: [], characterDetails: {} },
+      initialPage: { hint: '', mood: '', objects: [], characterClothing: {}, characters: [], characterDetails: {} },
+      backCover: { hint: '', mood: '', objects: [], characterClothing: {}, characters: [], characterDetails: {} }
     };
 
     if (!sectionMatch) {
@@ -374,8 +374,8 @@ class UnifiedStoryParser {
 
     // Extract each cover hint with per-character clothing.
     //
-    // Outline format (post-2026-05-10 restructure): Mood: + Objects: + Scene: (the Art
-    // Director's cover prose, since 2026-09-23) + per-character bullets with holds / gazes at / priority. Legacy stories may still
+    // Outline format (post-2026-05-10 restructure): Mood: + Objects: + per-character
+    // bullets with holds / gazes at / priority. Legacy stories may still
     // carry a `Hint:` prose line — kept as a passthrough for downstream consumers that
     // display it, but no rendering decision should rely on it.
     const extractCover = (label) => {
@@ -384,7 +384,7 @@ class UnifiedStoryParser {
       const blockMatch = section.match(blockPattern);
 
       if (!blockMatch) {
-        return { hint: '', mood: '', scene: '', objects: [], characterClothing: {}, characters: [], characterDetails: {} };
+        return { hint: '', mood: '', objects: [], characterClothing: {}, characters: [], characterDetails: {} };
       }
 
       const block = blockMatch[1];
@@ -396,13 +396,6 @@ class UnifiedStoryParser {
       // Extract Mood: line — short atmospheric phrase used by render methods.
       const moodLineMatch = block.match(/^Mood:\s*(.+)$/im);
       const mood = moodLineMatch ? moodLineMatch[1].trim() : '';
-
-      // Scene: the Art Director's cover prose (2026-09-23) — each listed element
-      // named with its identifying look, exactly as a page brief carries it.
-      // buildCoverSceneFromHint makes it the cover's scene prose. Stories
-      // written before the field have none (''), and get no substitute text.
-      const sceneLineMatch = block.match(/^Scene:\s*(.+)$/im);
-      const scene = sceneLineMatch ? sceneLineMatch[1].trim() : '';
 
       // Extract Objects: line — list of Visual Bible element IDs (LOC, ANI, ART, OBJ, VEH, CHR)
       const objectsMatch = block.match(/^Objects?:\s*(.+)$/im);
@@ -452,7 +445,7 @@ class UnifiedStoryParser {
         }
       }
 
-      return { hint, mood, scene, objects, characterClothing, characterPerspectives, characters, characterDetails };
+      return { hint, mood, objects, characterClothing, characterPerspectives, characters, characterDetails };
     };
 
     this._cache.coverHints = {

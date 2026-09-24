@@ -67,7 +67,41 @@ function coverLabelForPage(pageNumber) {
   return key ? coverLabel(key) : null;
 }
 
+/**
+ * Which covers a job renders. `inputData.coverTypes` is the explicit list
+ * (trial: title page + back cover, no dedication page — trials store no
+ * dedication); otherwise the legacy `titlePageOnly` boolean decides. One
+ * resolver so the start-guard and the start-loop can never disagree.
+ */
+function coverTypesFor(inputData = {}) {
+  if (Array.isArray(inputData.coverTypes) && inputData.coverTypes.length > 0) {
+    // Legacy compat: jobs queued before the 2026-08-23 naming unification
+    // carry 'titlePage' in coverTypes — normalize at this one boundary.
+    // (Was written as `ct === 'frontCover' ? 'frontCover' : ct` — a no-op that
+    // mapped the NEW name to itself and let the legacy token through, so a
+    // pre-rename queued job's front cover would silently never start.)
+    return inputData.coverTypes.map(ct => ct === 'titlePage' ? 'frontCover' : ct);
+  }
+  return inputData.titlePageOnly
+    ? ['frontCover']
+    : ['frontCover', 'initialPage', 'backCover'];
+}
+
+/**
+ * Where each full-story cover's text goes, as a page `textPosition`
+ * (covers-as-pages, 2026-09-24). The cover beat states it (coverBeats.js), the
+ * Art Director stages it like any page's copy space, the brief check holds the
+ * brief to it, and the iterate locks it. A leaf constant, so a script can read it.
+ */
+const COVER_TEXT_POSITION = Object.freeze({
+  frontCover: 'top-full',     // the book title
+  initialPage: 'bottom-full', // the dedication
+  backCover: 'bottom-full',   // the back-cover line
+});
+
 module.exports = {
+  COVER_TEXT_POSITION,
+  coverTypesFor,
   COVER_KEYS,
   COVER_PAGE_NUMBERS,
   coverKeyToType,

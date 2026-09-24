@@ -297,10 +297,11 @@
     {
       "id": "cover-generator-vs-critic",
       "axis": "generator-vs-critic",
-      "reason": "cover-evaluation-notes.txt is the cover-only preamble the evaluator is given (viewer gaze, flat title, and the text regime), and cover-composition.txt plus the cover hint assembly in coverIterate.js is what the cover was painted from; a text or gaze rule tightened on one side and not the other scores a cover for a brief it never had. Extracted from evalPipeline.js string literals on 2026-09-15 so this pair can name a path instead of a 5,000-line module. Widened 2026-09-23: a cover is also judged by the semantic judge (image-semantic.txt, via evalPipeline.js's cover branch), consolidated by feedback-consolidator.txt (repairPipeline.js), and its structured {TEXT_RULES} comes from requiredText.js. None of the three carried the baked title, so on staging job_1790100385959_1nitlympp the semantic judge filed the correctly painted title as CRITICAL, the consolidator ordered it removed and the front cover shipped without one (docs/audits/prompt-audit-2026-09-23/09-covers.md C1). The title generator itself is buildCoverPrompt/bakedTitleLine in promptBuilders.js, not listed here because every commit touches that module. Since 2026-09-23 the title is a required-text item (requiredText.coverRequiredTexts) in every judge's {TEXT_RULES}, the consolidator input and the inpaint clause, and the generator's title block is headed REQUIRED TEXT — change the title contract there, on both sides at once.",
+      "reason": "cover-evaluation-notes.txt is the cover-only preamble the evaluator is given (viewer gaze, flat title, and the text regime), and cover-composition.txt plus the cover hint assembly in coverIterate.js is what the cover was painted from; a text or gaze rule tightened on one side and not the other scores a cover for a brief it never had. Extracted from evalPipeline.js string literals on 2026-09-15 so this pair can name a path instead of a 5,000-line module. Widened 2026-09-23: a cover is also judged by the semantic judge (image-semantic.txt, via evalPipeline.js's cover branch), consolidated by feedback-consolidator.txt (repairPipeline.js), and its structured {TEXT_RULES} comes from requiredText.js. None of the three carried the baked title, so on staging job_1790100385959_1nitlympp the semantic judge filed the correctly painted title as CRITICAL, the consolidator ordered it removed and the front cover shipped without one (docs/audits/prompt-audit-2026-09-23/09-covers.md C1). The title generator itself is buildCoverPrompt/bakedTitleLine in promptBuilders.js, not listed here because every commit touches that module. Since 2026-09-23 the title is a required-text item (requiredText.coverRequiredTexts) in every judge's {TEXT_RULES}, the consolidator input and the inpaint clause, and the generator's title block is headed REQUIRED TEXT — change the title contract there, on both sides at once. Since 2026-09-24 a FULL-STORY cover is a page (covers-as-pages): what it is painted from is the Art Director's brief of its cover beat, and the beat's cover facts (gaze at the viewer, the copy-space textPosition, the element budget) live in coverBeats.js — a generator of this set. cover-composition.txt and coverIterate.js now paint the TRIAL cover only.",
       "generators": [
         "prompts/cover-composition.txt",
-        "server/lib/coverIterate.js"
+        "server/lib/coverIterate.js",
+        "server/lib/coverBeats.js"
       ],
       "critics": [
         "prompts/cover-evaluation-notes.txt",
@@ -631,7 +632,7 @@
     {
       "id": "cover-and-plate-reference-builders",
       "axis": "trial cover vs streaming cover vs iterateCover vs regeneration cover route vs trial page plate",
-      "reason": "Every cover render gets its landmark photo, plate and VB grid from coverIterate.buildCoverReferences, and its `use` ('render' plated-or-fail, 'edit' no plate and no photo, 'composite' unchanged) is picked at each call site: the trial and streaming covers and the trial page plate path in storyJobPipeline.js, iterateCover in coverIterate.js, the scene-composite cover route in regeneration.js. The trial cover once hand-rolled its own references and sent the raw landmark photo with no plate (prod job_1790169018278_n57xpnufo: strangers from the photo painted beside the child); a reference or plate rule changed at one site belongs at all of them.",
+      "reason": "Every cover render gets its landmark photo, plate and VB grid from coverIterate.buildCoverReferences, and its `use` ('render' plated-or-fail, 'edit' no plate and no photo, 'composite' unchanged) is picked at each call site: the trial and streaming covers and the trial page plate path in storyJobPipeline.js, iterateCover in coverIterate.js, the scene-composite cover route in regeneration.js. The trial cover once hand-rolled its own references and sent the raw landmark photo with no plate (prod job_1790169018278_n57xpnufo: strangers from the photo painted beside the child); a reference or plate rule changed at one site belongs at all of them. Since 2026-09-24 these are the TRIAL cover's sites only: a full-story cover is a page and takes the page path's references (storyJobPipeline preparePageData / images.js iteratePageCore).",
       "members": [
         "storyJobPipeline.js",
         "server/lib/coverIterate.js",
@@ -671,6 +672,49 @@
           "landmarkScene"
         ]
       }
+    },
+    {
+      "id": "trial-cover-path",
+      "axis": "trial cover first render vs trial cover iterate",
+      "reason": "The trial keeps its own cover path (owner, 2026-09-24, covers-as-pages Q7 (a) / Q8): the trial cover builder in storyJobPipeline.js (startCoverGeneration, onCoverScene — front from the streamed cover JSON, back from the default hint) renders it first, and iterateCover in coverIterate.js iterates it afterwards. Both build the prompt with buildCoverPrompt and both refuse a full-story cover (coverIteratePath); a rule added to the trial cover's first render and not to its iterate — or the reverse — changes the trial cover the moment a user regenerates it.",
+      "members": [
+        "storyJobPipeline.js",
+        "server/lib/coverIterate.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "buildCoverPrompt"
+        ]
+      }
+    },
+    {
+      "id": "cover-page-render-vs-iterate",
+      "axis": "full-story cover first render vs full-story cover iterate",
+      "reason": "A full-story cover is a page (2026-09-24): its first render (storyJobPipeline.js preparePageData / Phase 5a) and its iterate (images.js iteratePageCore, reached from the repair pipeline, the cover routes and the Lab via coverRender.iterateFullStoryCover) must apply the SAME cover-only options — coverRenderOptions (aspect, text always in the image, baked-title model, text contract, usage bucket) and withBakedTitle (the REQUIRED TEXT tail). An option honoured on one side only renders or judges the cover differently the first time and after every repair.",
+      "members": [
+        "storyJobPipeline.js",
+        "server/lib/images.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "coverRenderOptions",
+          "withBakedTitle"
+        ]
+      }
+    },
+    {
+      "id": "cover-beat-vs-brief-check",
+      "axis": "generator-vs-critic",
+      "reason": "coverBeats.js writes a full-story cover's beat — every figure looks at the viewer, the copy space as a textPosition (COVER_TEXT_POSITION) — and sceneBriefCheck.js checkCoverBrief holds the Art Director's brief to exactly those facts (cover_gaze_not_viewer, cover_text_zone_mismatch) before the scene review. One constant feeds both; a cover fact added to the beat and not the check is unenforced, and a check the beat never states is a fault the Art Director was never asked to avoid.",
+      "generators": [
+        "server/lib/coverBeats.js"
+      ],
+      "critics": [
+        "server/lib/sceneBriefCheck.js"
+      ],
+      "severity": "block"
     }
   ],
   "withinFile": [

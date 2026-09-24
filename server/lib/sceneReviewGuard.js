@@ -122,7 +122,8 @@ function parseCastRemovals(analysis) {
     // that literally: `page 5 = Levin: …`. Accept the word form as well as the
     // bare number — a prefixed entry used to land in `malformed` and then be
     // re-raised as an undeclared removal (job_1789348171785_9oxos7dwv).
-    const m = entry.match(/^(?:(?:page|seite|p\.?)\s*)?(\d+)\s*=\s*([^:]+?)\s*:\s*(.+)$/i);
+    // `-?`: a cover page's number is negative (coverKeys.COVER_PAGE_NUMBERS).
+    const m = entry.match(/^(?:(?:page|seite|p\.?)\s*)?(-?\d+)\s*=\s*([^:]+?)\s*:\s*(.+)$/i);
     if (!m) { malformed.push(entry); continue; }
     const names = m[2].split(',').map(n => n.trim()).filter(Boolean);
     if (!names.length) { malformed.push(entry); continue; }

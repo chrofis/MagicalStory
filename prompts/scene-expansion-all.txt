@@ -1,6 +1,7 @@
 #! ALL-PAGES SCENE EXPANSION — beats pipeline only (server/lib/beatsPipeline.js,
-#! via buildSceneExpansionAllPrompt). ONE call writes the VISUAL BIBLE, the COVER
-#! SCENE HINTS and every page's brief with all the other pages in view, so
+#! via buildSceneExpansionAllPrompt). ONE call writes the VISUAL BIBLE and every
+#! page's brief — the book's covers included, as pages with their own plan lines
+#! (server/lib/coverBeats.js, 2026-09-24) — with all the other pages in view, so
 #! location, time of day, clothing and composition cannot drift between
 #! neighbouring pages — and so no page can cite an element nobody declared.
 #!
@@ -10,7 +11,7 @@
 #!
 #! scene-expansion.txt is the PER-PAGE variant and is still the unified
 #! pipeline's fallback (server.js). The two share their PAGE rule set; the bible
-#! and cover sections have no per-page counterpart. Do not merge either file.
+#! section has no per-page counterpart. Do not merge either file.
 #!
 #! Output is parsed by extractBibleSections(raw, AD_BIBLE_MARKERS) (the two
 #! leading sections) and parseRefinedText(raw, expectedPages, 'SCENES') (the
@@ -194,33 +195,9 @@ One backdrop plate is painted per vantage, and every page of that vantage is dra
 
 ---
 
-## Cover scene hints
-
-Each cover is a structured spec, not prose. The fields are the spec.
-
-- Each cover lists EXACTLY ONE LOC### in `Objects:`, first, as its backdrop — never two, never a LOC you did not put in the Visual Bible.
-- Each cover takes a different LOC as its backdrop, preferring LOCs with `isRealLandmark: true` that the story's pages already use. Never add a real landmark to the Visual Bible only for a cover; when the story uses fewer than three, reuse one or use an invented LOC.
-- The Title Page backdrop is a LOC with `isRealLandmark: true` whenever the Visual Bible holds one — never a fictional, underground or imagined LOC. With no real landmark in the bible at all, take the most story-defining invented LOC.
-- EVERY cover backdrop is a LOC the cast can stand in, dressed as the cover dresses them — never one whose own description says there is no floor, and never an underwater, submerged or airborne LOC. A cover is a group portrait: the figures stand. Where the story's world is water or air, the cover takes the nearest LOC that has ground.
-- A cover's `Objects:` hold only props that belong in that backdrop. A fixture the bible describes as mounted, bolted, planted or fixed somewhere else does not travel to a different LOC, and a light source is only lit where it would burn.
-- List every character by name. Never "the family", "everyone", "the group".
-- Only names from the cast lists below. No invented, descriptive or unnamed figures.
-- Clothing is one of `standard | winter | summer | costumed` and must be a category AVAILABLE CLOTHING PER CHARACTER offers that character. When any character has a costumed variant, every cover character wears theirs.
-- `holds` is exactly one ART### from `Objects:`, or the word `nothing`.
-- `priority` is `essential | normal | low`.
-- `Mood` is one phrase of 2-5 words.
-- After the LOC, a cover's `Objects:` list any `ART###`, `ANI###` or `VEH###` from the Visual Bible that the cover calls for — at most {COVER_ELEMENT_CAP}, on any of the three covers. Each one listed appears in that cover's scene.
-- `Scene` is the cover's prose, in English, one to three sentences written like a page brief: name each entry `Objects:` lists after the LOC and interleave its identifying detail (rule 10). It does not place, pose or dress the characters of the Characters lines and says nothing about gaze — those lines and the code own them. With no element after the LOC, `Scene` describes the backdrop in one sentence.
-- When the story centres on a creature or animal — the title names it, or the plot turns on it — the Title Page lists that `ANI###` in `Objects:` right after the LOC.
-- No perspective or depth on covers — every figure faces the viewer and is fully visible. If the cast does not fit, drop the least essential character instead of hiding them.
-
-{COVER_CAST}
-
----
-
 ## OUTPUT
 
-Three parts, in this order: the Visual Bible, the cover scene hints, then the {PAGE_COUNT} page briefs. Declaring the cast and the props first is what lets each page cite ids that already exist.
+Two parts, in this order: the Visual Bible, then the {PAGE_COUNT} page briefs. Declaring the cast and the props first is what lets each page cite ids that already exist.
 
 First, exactly:
 
@@ -316,31 +293,7 @@ First, exactly:
 }
 ```
 
-Then, exactly:
-
----COVER SCENE HINTS---
-**Title Page**
-Mood: [one phrase]
-Objects: [LOC###, then the ART### / ANI### / VEH### this cover shows]
-Scene: [English prose naming each element above with its identifying detail]
-Characters:
-- [Name] ([position]): [clothing], holds: [ART### or nothing], priority: [essential|normal|low]
-
-**Initial Page**
-Mood: [one phrase]
-Objects: [LOC###, then the ART### / ANI### / VEH### this cover shows]
-Scene: [English prose naming each element above with its identifying detail]
-Characters:
-- [Name] ([position]): [clothing], holds: [ART### or nothing], priority: [essential|normal|low]
-
-**Back Cover**
-Mood: [one phrase]
-Objects: [LOC###, then the ART### / ANI### / VEH### this cover shows]
-Scene: [English prose naming each element above with its identifying detail]
-Characters:
-- [Name] ([position]): [clothing], holds: [ART### or nothing], priority: [essential|normal|low]
-
-Then, for each page, in ascending page order, exactly:
+Then, for each plan line, in the order the plan lines are listed, exactly:
 
 ```
 ## Page <number>
@@ -350,7 +303,7 @@ Then, for each page, in ascending page order, exactly:
 <single-line JSON object>
 ```
 
-Nothing before the `---VISUAL BIBLE---` marker, nothing between the cover hints and page 1's heading, nothing after the last page's metadata. Every one of the {PAGE_COUNT} pages must appear exactly once — a missing page has no illustration.
+Nothing before the `---VISUAL BIBLE---` marker, nothing between the Visual Bible and the first page's heading, nothing after the last page's metadata. Every one of the {PAGE_COUNT} pages must appear exactly once — a missing page has no illustration.
 
 Each paragraph starts immediately with the main subject and main action — no preamble, headers, or bullets — and must include, interleaved naturally:
 - the main action of this page, opening the prose

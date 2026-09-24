@@ -211,6 +211,48 @@ checks.coverBriefedLikeAPage = (ctx) => {
   return { covered: true, pass: bad.length === 0, detail: [...bad, ...good].join(' | ') };
 };
 
+/**
+ * covers-as-pages (2026-09-24) — every full-story cover is a page the Art
+ * Director briefed from its cover beat: the stored record is marked
+ * `briefedAsPage`, carries its brief (prose + METADATA) and its plan line,
+ * every figure looks at the viewer, the copy space is the beat's textPosition,
+ * and the sent prompt has no KEY STORY ELEMENTS and no leaked METADATA.
+ */
+checks.coversArePages = (ctx) => {
+  const { COVER_TEXT_POSITION } = require(path.join(LIB, 'coverKeys.js'));
+  const covers = ctx.data?.coverImages || {};
+  const keys = ['frontCover', 'initialPage', 'backCover'].filter(k => covers[k] && (covers[k].prompt || covers[k].sceneDescription));
+  if (!keys.length) return notCovered('no stored cover');
+  const bad = [];
+  const good = [];
+  for (const k of keys) {
+    const c = covers[k];
+    const meta = c.sceneMetadata?.fullData || c.sceneMetadata || {};
+    const faults = [];
+    if (c.briefedAsPage !== true) faults.push('not marked briefedAsPage');
+    if (!String(c.sceneDescription || '').includes('---METADATA---')) faults.push('no Art Director brief (prose + METADATA)');
+    if (!/^PLAN:/.test(String(c.outlineExtract || ''))) faults.push('no plan line');
+    const figs = Array.isArray(meta.characters) ? meta.characters : [];
+    const off = figs.filter(f => !/^(viewer|the viewer|camera)$/i.test(String(f?.looksAt || '').trim())).map(f => f?.name);
+    if (!figs.length) faults.push('brief declares no cast');
+    if (off.length) faults.push(`gaze not at the viewer: ${off.join(', ')}`);
+    if (String(meta.textPosition || '') !== COVER_TEXT_POSITION[k]) faults.push(`textPosition "${meta.textPosition || ''}" (beat: ${COVER_TEXT_POSITION[k]})`);
+    const prompt = String(c.prompt || '');
+    if (prompt.includes('KEY STORY ELEMENTS')) faults.push('KEY STORY ELEMENTS present');
+    if (prompt.includes('---METADATA---')) faults.push('METADATA block leaked');
+    (faults.length ? bad : good).push(`${k}: ${faults.length ? faults.join('; ') : `ok (${figs.length} figure(s))`}`);
+  }
+  const log = Array.isArray(ctx.data?.generationLog) ? ctx.data.generationLog : [];
+  const coverErrors = log.filter(e => /^(cover_failed|beats_cover_brief_missing)$/.test(String(e?.event || '')));
+  if (coverErrors.length) bad.push(`${coverErrors.length} cover error event(s): ${coverErrors.map(e => trunc(e.message || e.event, 80)).join('; ')}`);
+  return {
+    covered: true,
+    pass: bad.length === 0,
+    detail: [...bad, ...good].join(' | '),
+    human: `look at each cover: the title / dedication band clear, the cast whole and facing the viewer — ${keys.map(k => `${k} ${imageRow(ctx, k, null, ctx.versionMeta?.[k]?.activeVersion ?? null)?.image_url || '(no url)'}`).join(' | ')}`,
+  };
+};
+
 const MOOD_TAG = /\b(mood|atmosphere|tension|standoff|feeling)\b/i;
 /** 67c617743 + the 2026-09-24 rule change — sceneIntent carries no mood sentence at all (baseline 36/177 = 20%). */
 checks.sceneIntentMoodTag = (ctx) => {
