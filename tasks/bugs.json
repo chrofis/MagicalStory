@@ -1981,7 +1981,7 @@
       "impact": "Readers who left the wizard (as the wait screen now tells them to) lost the nav %, the My Stories generating card and the auto-open on completion after minute 60 of every long story; only the email remained.",
       "status": "fixed",
       "fixedAt": "2026-09-24",
-      "fixedIn": "(this commit; hash recorded in the follow-up)",
+      "fixedIn": "39c3d55bd",
       "fix": "Removed the 60-minute orphan cutoff and the 24h restore cap. The tracker ends only on a terminal server status via jobStatusOutcome (client/src/context/jobStatusOutcome.ts): completed, failed/cancelled (silent for stalls, abandonment and user cancels), or the row gone (404). Pinned in tests/unit/generation-tracking-no-age-cutoff.test.ts."
     }
   ]

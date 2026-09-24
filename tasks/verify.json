@@ -936,6 +936,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "generation-tracking-past-60-min",
+      "title": "A reader who left the wizard keeps tracking a story past 60 minutes",
+      "commits": [
+        "39c3d55bd"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "After leaving the wizard, the nav % and the My Stories generating card keep tracking a story that runs longer than 60 minutes, and the story opens (Ready badge / auto-open) on completion.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Start a story on staging, click Continue in Background, browse elsewhere; return after 60+ minutes: the nav % button and the My Stories generating card are still there and advancing; on completion the Ready badge appears and opens the finished story."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }
