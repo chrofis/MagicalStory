@@ -33,6 +33,9 @@ p5/p6 door in the rain, p3 Lukas too big, p1 object behind the boy, most pages f
 - [ ] **Text refinement runs after images** and rewrote all 10 pages; the audit then compared new
       words against old pictures (p7 "Manuel absent", p9 "Sophie and Manuel not visible").
 
+- [ ] **Scene review deletes a "no figures" instruction.** p7 before: "completely devoid of figures, a silent, empty
+      expanse"; after: "a silent expanse" (`[negation_named]` rewrite). An empty page loses its only emptiness statement.
+
 ## Page 8
 Owner 2026-09-23: v3 (shipped) is the best version — the picker was right; v1/v2 were the
 intermediate regressions.
