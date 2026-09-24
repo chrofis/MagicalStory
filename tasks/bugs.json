@@ -1983,6 +1983,30 @@
       "fixedAt": "2026-09-24",
       "fixedIn": "39c3d55bd",
       "fix": "Removed the 60-minute orphan cutoff and the 24h restore cap. The tracker ends only on a terminal server status via jobStatusOutcome (client/src/context/jobStatusOutcome.ts): completed, failed/cancelled (silent for stalls, abandonment and user cancels), or the row gone (404). Pinned in tests/unit/generation-tracking-no-age-cutoff.test.ts."
+    },
+    {
+      "id": "outfit-description-plot-prose",
+      "title": "The wardrobe writer put page numbers, events, carried items and other figures' names into clothingRequirements outfit descriptions",
+      "reportedAt": "2026-09-24",
+      "source": "Stored evidence, staging job_1790277448294_5herh01j7 (dragon run 7): Julian standard.description ends \"The pocket holds the warm paper bag of Marroni from page 2 until he hands it to Nebla on page 16\"; Levin's \"— the jacket he removes on page 7 to wrap the egg and wears again from page 14\". The text reaches Grok verbatim through the styled-avatar prompts.",
+      "rootCause": "prompts/story-bible-from-beats.txt plot-garment rule (feab902fc) told the writer \"a page that takes it off says so on that page\", the description rule had no appearance-only rule, and clothing-review.txt check 12 re-prompted the plot.",
+      "impact": "Plot prose, page numbers and non-cast names in every avatar sheet prompt and in repair descriptors.",
+      "status": "fixed",
+      "fixedAt": "2026-09-24",
+      "fixedIn": "da8aa330d",
+      "fix": "OUTFIT_APPEARANCE_RULE (promptBuilders.js), one constant filled into story-bible-from-beats.txt and clothing-review.txt (new check 13); the plot-garment rule now says the garment stays in the outfit as worn and the page wornItems row records it off. Pinned in tests/unit/outfit-appearance-only.test.ts; verify check outfitAppearanceOnly."
+    },
+    {
+      "id": "repair-descriptor-embeds-outfit-sentence",
+      "title": "describeFigureForRepair embedded the whole outfit sentence, so cast and creature names and a garment the page takes off reached the image model",
+      "reportedAt": "2026-09-24",
+      "source": "Stored evidence, staging job_1790277448294_5herh01j7 p2 v1 and p13 v1: \"the 3-year-old boy in Julian wears … hands it to Nebla on page 16\"; p13 named the orange jacket the same fix removes.",
+      "rootCause": "repairLogic.describeFigureForRepair built `the ${noun} in ${garment}` from buildClothingDescription, which returns the full \"<Name> wears …\" sentence; stripCharacterNames does not rescan inserted text, and the page worn state was never consulted.",
+      "impact": "Names the image model cannot resolve, plot text, and wrong garments in repair instructions.",
+      "status": "fixed",
+      "fixedAt": "2026-09-24",
+      "fixedIn": "da8aa330d",
+      "fix": "repairGarmentPhrase builds colour word + garment noun from closed vocabularies (tracked item worn on the page first, then the outfit by slot), excluding garments the page resolved worn state takes off; log.error when none. buildRepairNameMap/buildPageRepairNameMap/inpaintPage pass the page metadata. Replay on run 7: p2 \"the 3-year-old boy in the blue anorak\", p13 \"the 5-year-old boy in the green jumper, on the far left\"."
     }
   ]
 }

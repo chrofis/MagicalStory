@@ -1422,6 +1422,24 @@
           "note": "all 7 entity finding(s) carry a listed type"
         }
       ]
+    },
+    {
+      "id": "outfit-appearance-only",
+      "title": "Outfit descriptions carry appearance only, and repair descriptors carry no name or plot text",
+      "commits": [
+        "da8aa330d"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "Every clothingRequirements outfit description of a new full story carries no page number and no name of another cast member or Visual Bible figure (baseline: job_1790277448294_5herh01j7 fails, 2/4 outfits); repair instructions describe a figure by a colour + garment phrase and never name a garment the page takes off.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "outfitAppearanceOnly"
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }
