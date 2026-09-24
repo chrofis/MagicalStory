@@ -143,6 +143,94 @@ location entries (`promptBuilders.js`), as before.
 
 ---
 
+## 2026-09-24 — A page declares its time of day and weather; a plate in another light is re-lit from its vantage's base
+
+**Supersedes** the time/weather half of 2026-08-11 "Scene-metadata migration orphans" ("prose covers
+lighting/weather", dead `time`/`weather` passthroughs deleted), the "Rejected for now: a declared
+time-of-day" paragraph of 2026-08-15 "The garment fix has no lighting factor", the keyword extractor of
+2026-08-26 "Visual flow: time-of-day is judged against the page's DECLARED time", and item 3 "One plate,
+one light" of 2026-09-23 "The all-pages Art Director and the scene review see no page text". Owner
+sign-off 2026-09-24, framed as a reversal of the first two.
+
+**Context.** The light lived only in free prose, and nothing structured carried it:
+- Pages sharing a vantage plate inherited the representative page's light and weather
+  (`storyJobPipeline.js` `repPageData`), and `image-generation.txt` told the illustrator to "copy its
+  setting, geography and light direction". Prod `job_1790107559778_fcmlfa8kn`: the p2/p4/p5/p6 plates
+  are byte-identical, with p2's rain.
+- `sceneIntent` named no light on 135 of 294 staging pages.
+- `sceneGeometry.js` skipped any sentence over 240 characters; p10's "at night" sentence (247) never
+  reached its plate.
+- Pixel sample: 7 of 15 staging shared-plate pages whose light differed from the representative's rendered
+  the wrong light — night usually won, evening and rain lost.
+- The visual-flow judge read the declared hour with a keyword scan of the prose.
+- The 2026-09-23 AD rule "split a vantage when its pages differ in time or weather" was a second,
+  prose-only mechanism for the same problem, and could not reach a plate already shared.
+
+**Decision.**
+1. **Two closed enums, one module** (`server/lib/sceneLight.js`): `timeOfDay` ∈ dawn | morning | midday |
+   afternoon | evening | dusk | night; `weather` ∈ clear | overcast | rain | snow | fog | storm | none
+   (`none` = an interior, where weather is not visible). One rule constant `SCENE_LIGHT_FIELD_RULE` is
+   filled into both Art Director templates, both iterate templates, the trial writer and scene-review
+   check 3a `[light_fields]`. The parser (`sceneMetadata.js`) normalises both fields on every branch; an
+   unknown word is null.
+2. **The fields survive every rewrite.** The scene review and its worn-state round
+   (`beatsPipeline.keepDeclaredLight`) and the iterate rewrite (`images.js`) carry the parent's fields
+   forward when a rewrite states none (`carryForwardLightInBrief`); a rewrite that states a value wins.
+   `sceneBriefCheck` reports `light_undeclared` (REVIEWABLE; not an iterate type, since the carry makes it
+   unanswerable there).
+3. **Plates: re-light, don't regenerate.** The vantage group stays one place. Its base plate is painted
+   in the light most of its pages declare (representative = a plate-sharing page in that light), and a
+   page declaring another light gets a plate EDITED from the base by the existing derive machinery — same
+   edit model, art style, plate QC and one fed-back retry — keyed by (shot class, light). An angled page
+   in another light takes ONE edit that moves the camera and re-lights (`buildPlateDeriveInstruction`
+   `relight`). Chosen over a fresh plate because the derive keeps the place's buildings, trees and palette
+   between adjacent pages of one location, which is what a shared plate exists for; a fresh generation
+   breaks it (the 2026-09-21 angle-derive rationale). The plate prompt and the per-page plate path carry
+   the light as a fixed `**LIGHT:**` line from the fields; the plate QC judges it (`LIGHT_CHECK`). The AD
+   no longer splits a vantage for light, and its plate prose names no time of day or weather — **one
+   mechanism**.
+4. **Page prompt.** `buildImagePrompt` writes the fixed `**LIGHT:**` line from the fields into the
+   protected tail (`PROMPT_NEVER_CUT` marker, so no shrink cuts it). `image-generation.txt` now copies
+   the plate's "setting and geography"; its time of day and weather give way to the LIGHT line.
+5. **Critics read the fields, not the prose.** The semantic judge gets `{DECLARED_LIGHT}` and skips the
+   light check when it is empty; the visual-flow judge compares `renderedTime`/`renderedWeather` (same
+   enums) to the brief's fields, with neighbouring hours not a contradiction (`timeContradicts`) — still
+   warn-only. `extractDeclaredLight` is deleted. Registry set `scene-light-generator-vs-critic`.
+6. **240-char filter:** a long sentence is never forwarded whole, but its clauses are salvaged; a cut
+   clause that opens on a verb, an adverb, a body part or a colour lost its figure subject and is dropped
+   (`ELIDED_SUBJECT_RE`) — measured over 54 stored staging pages: without that guard 12 of the 17
+   pages whose facts changed gained a figure-action fragment; with it, 9 pages gain facts, 4 of them a light fact (p10 "in the fading
+   afternoon light").
+7. **Stored stories** (every brief written before today) declare no light: no LIGHT line, their vantage
+   plate is shared exactly as before, no judge can call their light wrong. Not a fallback — the
+   declaration is absent and nothing is inferred from prose. A page repaired through the iterate rewrite
+   gains the fields, since that template now asks for them. Covers carry no fields: a cover hint's `Mood`
+   line sets its light, and a cover is not in the book's time flow. Trial plates are not split by light: they render from
+   `backgrounds[]` during outline streaming, before any scene hint exists, and the trial's latency is its
+   product requirement; trial page prompts do carry the LIGHT line from the hint's fields, which wins over
+   the plate.
+
+**Evidence (rung 2, Test Lab on staging, ~$0.28):** relit plate (`edit_image`, the production derive
+instruction) then the page on it with the new template — exps 1442/1443 (`job_1789506283204_3kxqshifx`
+p13, dusk: was bright daylight with white clouds, now a dusk sky with the lamp lit, same plaza), 1445/1446
+(`job_1789853503332_riqncqg1i` p17, night: starry dark sky, lit windows, same tree), 1447/1448
+(`job_1789343124794_z2c779f7i` p10, evening: low sun through the beeches, long shadows) and 1449/1450
+(riqncqg1i p12, dusk). Every relit plate kept its place's geometry. Not exercised: the combined
+angle-and-relight edit, and an Art Director run emitting the fields (stored briefs were given them by
+hand).
+
+**Touched:** `server/lib/sceneLight.js` (new), `server/lib/sceneMetadata.js`, `server/lib/promptBuilders.js`,
+`server/lib/beatsPipeline.js`, `server/lib/images.js`, `server/lib/sceneBriefCheck.js`,
+`server/lib/shotVocabulary.js`, `server/lib/sceneGeometry.js`, `server/lib/evalPipeline.js`,
+`server/lib/sceneValidator.js`, `server/lib/styleConsistency.js`, `server/lib/testlab.js`,
+`server/services/prompts.js`, `storyJobPipeline.js`, `prompts/scene-expansion-all.txt`,
+`prompts/scene-expansion.txt`, `prompts/scene-iteration.txt`, `prompts/scene-iteration-free.txt`,
+`prompts/story-trial.txt`, `prompts/scene-review.txt`, `prompts/image-generation.txt`,
+`prompts/empty-scene.txt`, `prompts/empty-scene-qc.txt`, `prompts/image-semantic.txt`,
+`scripts/admin/sibling-registry.json`, `tests/unit/scene-light.test.ts`.
+
+**Status:** ✅ active (owner sign-off 2026-09-24).
+
 ## 2026-09-24 — Image prompts say each thing once; the shrinker's cut order is one named list the docs render
 
 **Context.** Staging `job_1790100385959_1nitlympp`: every four-character image prompt (pages and
@@ -881,7 +969,7 @@ aerial plate; p14/16/17 on the high-angle one; p18 medium on the ultra-wide one)
    carried over from the parent in code). The AD's vantage rule is `shotVocabulary.VANTAGE_SHOT_RULE`, built
    from `PLATE_DERIVED_SHOTS`, the set the check and the plate derive read: an angled vantage holds only
    pages of its own shot, because nothing derives an eye-level plate from an angled one.
-3. **One plate, one light.** A vantage is split when its pages differ in time of day or weather.
+3. **One plate, one light.** A vantage is split when its pages differ in time of day or weather. *(🗄 Superseded 2026-09-24: pages declare `timeOfDay` / `weather` and a plate in another light is re-lit from the vantage's base — "A page declares its time of day and weather".)*
 4. **Check 4** stages a same-goal group where the plan line puts it; **9f** matches the AD (dotted state
    id on every page).
 5. **The raw AD reply is stored**, one row per attempt, in `sceneExpansionReport.replies[]`. Only parsed
@@ -18784,7 +18872,7 @@ anachronism guard on any beats page), `setting{}` (camera fallback dead), `actio
 (superseded by interactions[]), `framingPattern`/`pose`/`flip` (OTS niche / killed composite).
 
 **Decision:** restore `shot` + `era` (templates emit them again; parser passthroughs live).
-`setting{}` stays dead ON PURPOSE — `shot` covers the camera, prose covers lighting/weather;
+`setting{}` stays dead ON PURPOSE — `shot` covers the camera, prose covers lighting/weather *(the lighting/weather half is 🗄 superseded 2026-09-24: a page declares `timeOfDay` / `weather` — see "A page declares its time of day and weather")*;
 do not re-emit it. `action`/`holding` stay superseded by interactions[] (comment fixed);
 dead `time`/`weather` passthroughs deleted. `framingPattern`/`pose`/`flip` not restored.
 
@@ -20993,7 +21081,7 @@ field vanishing. `medianSkinL` is deleted.
 disease in a new place - a night scene and a dark watercolour both read "dark", so median page L
 cannot separate illumination from medium either.
 
-**Rejected for now: a declared time-of-day.** That is the only signal that could work, and no such
+*(🗄 Superseded 2026-09-24: the field now exists — "A page declares its time of day and weather". The garment lighting factor stays removed; nothing reads the new fields for it.)* **Rejected for now: a declared time-of-day.** That is the only signal that could work, and no such
 field exists: `sceneMetadata` carries 25 keys and not one about lighting or time of day, and the
 scene-expansion prompt asks for lighting only as free prose (on the page checked, the prose contains
 no lighting words at all). Adding `timeOfDay` to the schema is a prompt-and-schema decision and needs
@@ -29287,7 +29375,7 @@ rather than to an error.
 "page 3 is morning and page 13 is evening" is a story, not a defect. Nothing
 infers an hour from the plot, from neighbouring pages, or from an assumed single
 day. The declaration comes from a deliberately **dumb and transparent**
-extractor (`extractDeclaredLight`): a keyword hit in the page's own brief picks
+extractor (`extractDeclaredLight`, 🗄 deleted 2026-09-24 — the declaration is now the brief's `timeOfDay` / `weather` fields): a keyword hit in the page's own brief picks
 a bucket, and the sentence carrying it is handed to the judge verbatim. Bare
 `light` and bare `dark` are banned as keywords — every brief opens with hair and
 clothing ("light blonde", "dark red") and keying on them classifies a

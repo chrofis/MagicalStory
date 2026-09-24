@@ -19,11 +19,11 @@ p5/p6 door in the rain, p3 Lukas too big, p1 object behind the boy, most pages f
       LOC002 door became a free-standing door slab (p2/p4/p5/p6). Cell gate passed both.
       FIXED 2026-09-24 (owner decision): locations get no cell at all; the plate is built from the
       bible text, stored location cells are ignored (decisions.md "Invented locations are TEXT only").
-- [ ] **Shared vantage plate carries the representative page's weather/time to every page.**
+- [x] **Shared vantage plate carries the representative page's weather/time to every page.** *(fixed 2026-09-24 — decisions.md "A page declares its time of day and weather")*
       `storyJobPipeline.js` repPageData (~4637/4741 staging). p2/p4/p5/p6 plates byte-identical
       with p2's "heavy rain"; p3 got p1's morning light. Page prompt tells Grok to copy the
       plate's light. Related: BACKLOG D18, M1, shared-plate camera decision.
-- [ ] **Plate geometry drops sentences > 240 chars** (`server/lib/sceneGeometry.js` ~173
+- [x] **Plate geometry drops sentences > 240 chars** *(fixed 2026-09-24 — clauses salvaged; light is a declared field)* (`server/lib/sceneGeometry.js` ~173
       `if (s.length > 240) continue;`) — p10's "at night" sentence (247) was lost; an action
       clause leaked into the plate geometry instead. `sceneIntent` also carries no time of day.
 - [x] **Writer/AD geography: an interior door placed outdoors.** (2026-09-24: arc PLACE rule + panel lens, AD one-place rule — Lab #1444 3/3 panelists flag it, #1451 keeps the two doors apart; decisions.md) Outline beat 4 drags the key
