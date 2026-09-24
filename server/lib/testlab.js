@@ -2753,6 +2753,33 @@ async function runCoverStage(target, { experimentId, promptOverride, params = {}
       : Buffer.from(bg.image_data, 'base64');
   }
   if (params.artStyle) storyData.artStyle = params.artStyle;
+  // Same split as production (plan covers-as-pages Q1/Q7, 2026-09-24): a
+  // full-story cover is a page and renders through the page path; a trial
+  // cover through iterateCover; a pre-change full-story cover is refused.
+  const { coverIteratePath } = require('./coverBeats');
+  if (coverIteratePath(storyData, coverKey) === 'page') {
+    if (params.composite === true || promptOverride || params.skipTypography === true) {
+      throw new Error('cover stage: composite / promptOverride / skipTypography are trial-cover (iterateCover) levers — a full-story cover renders through the page path');
+    }
+    const { mergeFreshAvatars } = require('./characterPhotos');
+    storyData.characters = mergeFreshAvatars(storyData.characters || [], freshCharacters, storyData.artStyle || 'pixar');
+    const pageResult = await require('./coverRender').iterateFullStoryCover(coverKey, storyData, {
+      modelOverrides: params.imageModel ? { imageModel: params.imageModel } : {},
+    });
+    const elapsed = Date.now() - t0;
+    if (!pageResult?.imageData) throw new Error('Cover render returned no image');
+    const vIdx = await saveTestVersion(
+      target.storyId, coverKey, null, pageResult.imageData, experimentId,
+      pageResult.score != null ? Math.round(pageResult.score) : null
+    );
+    return {
+      imageType: coverKey, coverType: coverKey, versionIndex: vIdx,
+      promptUsed: pageResult.prompt || null, modelId: pageResult.modelId || null, elapsedMs: elapsed,
+      scores: { final: pageResult.score ?? null },
+      issuesSummary: pageResult.reasoning || null,
+      sceneUsed: pageResult.newScene || null,
+    };
+  }
   const result = await iterateCover(coverKey, storyData, {
     // params.imageModel: A/B the cover render model (e.g. grok-imagine vs
     // gemini-2.5-flash-image) — style-adherence routing tests. Defaults to prod.
@@ -4195,7 +4222,15 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     const { IMAGE_MODELS } = require('../config/models');
 
     const expandLimit = parseInt(params.expandPages, 10) || finalBeats.length;
-    const toExpand = finalBeats.slice(0, expandLimit);
+    // THE COVER PAGES ride with the story pages, exactly as in production
+    // (beatsPipeline: covers are pages the Art Director briefs from code-written
+    // beats, 2026-09-24). `params.coverBeats: false` measures the story pages alone.
+    const { buildCoverBeats } = require('./coverBeats');
+    const { coverTypesFor } = require('./coverKeys');
+    const labCoverBeats = params.coverBeats === false ? [] : buildCoverBeats(storyData, {
+      coverTypes: coverTypesFor(storyData), clothingRequirements: storyData.clothingRequirements || null,
+    });
+    const toExpand = [...finalBeats.slice(0, expandLimit), ...labCoverBeats];
     const lang = storyData.language || 'en';
     const imgModelConfig = IMAGE_MODELS[storyData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageRenderImage];
     const availableAvatars = buildAvailableAvatarsForPrompt
@@ -4448,7 +4483,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       }
       // finalBeats feeds the review's check 5 (character in beat vs brief),
       // same as the production callsite in beatsPipeline.js.
-      const srPrompt = buildSceneReviewPrompt(storyData, okScenes.map(x => ({ pageNumber: x.pageNumber, brief: x.fromBeats })), { beats: finalBeats, briefFindings, visualBible: vb, clothingRequirements: storyData.clothingRequirements || null });
+      const srPrompt = buildSceneReviewPrompt(storyData, okScenes.map(x => ({ pageNumber: x.pageNumber, brief: x.fromBeats })), { beats: toExpand, briefFindings, visualBible: vb, clothingRequirements: storyData.clothingRequirements || null });
       if (srPrompt) {
         const reviewOnce = async (srModel) => {
           const t2 = Date.now();
@@ -7362,7 +7397,8 @@ const STAGE_RUNNERS = {
 // round N's frozen output, not the story's original artifact.
 function parsePageBlocks(text) {
   const out = [];
-  const re = /---\s*Page\s+(\d+)\s*---\s*\n?([\s\S]*?)(?=\n---\s*Page\s+\d+\s*---|$)/gi;
+  // `-?`: a cover page (-1/-2/-3) is a page block too since 2026-09-24.
+  const re = /---\s*Page\s+(-?\d+)\s*---\s*\n?([\s\S]*?)(?=\n---\s*Page\s+-?\d+\s*---|$)/gi;
   let m;
   while ((m = re.exec(String(text || ''))) !== null) out.push({ pageNumber: parseInt(m[1], 10), text: m[2].trim() });
   return out.sort((a, b) => a.pageNumber - b.pageNumber);

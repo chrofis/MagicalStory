@@ -1071,7 +1071,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
   // Helper: execute an iterate action for a page
   const executeIterateAction = async (img, latestEval) => {
-    const canIterate = effectiveUseIteratePage && img.pageNumber > 0;
+    // A full-story cover is a page (2026-09-24): it iterates through
+    // iteratePage from its Art Director brief. Trial stories never run this
+    // pipeline (skipQualityEval), and a pre-change cover is refused inside
+    // iteratePageCore (coverIteratePath) — there is no second cover path.
+    const canIterate = effectiveUseIteratePage && img.pageNumber !== 0;
     let result;
     if (canIterate) {
       // THE EVALUATOR'S OWN ACCOUNT, not just its verdict (2026-09-17). Until
@@ -1092,9 +1096,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // Read the per-scene aspect from saved metadata so a 1:1 advanced page
       // doesn't get redone as 3:4. img.imageAspect (preserved in pipelineStoryData)
       // is the source of truth; null falls back to global default in iteratePageCore.
-      const sceneAspect = img.imageAspect
-        || storyData?.sceneImages?.find(s => s.pageNumber === img.pageNumber)?.imageAspect
-        || null;
+      // A cover keeps the cover aspect whatever the page layout is.
+      const sceneAspect = img.pageNumber < 0
+        ? null
+        : (img.imageAspect
+          || storyData?.sceneImages?.find(s => s.pageNumber === img.pageNumber)?.imageAspect
+          || null);
       result = await images().iteratePage(inputImage, img.pageNumber, storyData, {
         aspectRatio: sceneAspect,
         modelOverrides,
@@ -1116,28 +1123,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         skipEval: true,
       });
       // iteratePage tracks its own usage internally; nothing to add here
-    } else if (img.pageNumber < 0 && storyData) {
-      const { iterateCover } = require('./coverIterate');
-      const coverKeys = { '-1': 'frontCover', '-2': 'initialPage', '-3': 'backCover' };
-      const ck = coverKeys[String(img.pageNumber)];
-      if (ck && storyData.coverImages?.[ck]?.imageData) {
-        const coverFeedback = latestEval ? {
-          score: latestEval.score ?? latestEval.qualityScore,
-          reasoning: latestEval.reasoning?.substring(0, 1000),
-          fixableIssues: (latestEval.fixableIssues || []).slice(0, 10),
-        } : null;
-        result = await iterateCover(ck, storyData, {
-          imageModel: modelOverrides?.imageModel,
-          evaluationFeedback: coverFeedback,
-          usageTracker,
-          // The round loop scores + detects this result itself (round detect
-          // + batch eval) — skip the in-iterate eval so covers are evaluated
-          // exactly once per version.
-          skipEval: true,
-        });
-      } else if (ck) {
-        log.debug(`⏭️  [UNIFIED PIPELINE] Skipping cover ${ck} iterate — no image data available yet`);
-      }
     } else {
       const feedbackSuffix = buildRegenFeedback(latestEval);
       const regenPrompt = feedbackSuffix
@@ -1156,6 +1141,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         sceneBackground: regenScene.sceneBackground,
         visualBibleGrid: img.visualBibleGrid,
         pageNumber: img.pageNumber,
+        // A cover re-renders at the cover aspect, like its first render.
+        ...(img.pageNumber < 0 ? { aspectRatio: MODEL_DEFAULTS.coverAspect } : {}),
         skipCache: true
       });
       if (result?.usage && usageTracker) {
@@ -1333,13 +1320,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // Char-fix as a per-page round method. Same shape as executeIterate /
   // executeInpaint so the round-body parallel runner dispatches uniformly.
   // Body extracted from the (deleted) Step 5 character-repair pass; bbox
-  // tier-search + avatar lookup logic preserved verbatim. Char-fix is
-  // scene-only — covers fall through to iterate via decideRepairMethod.
+  // tier-search + avatar lookup logic preserved verbatim. A full-story cover
+  // is a page (2026-09-24) and takes a char-fix like one; trial stories never
+  // run this pipeline.
   const executeCharFixAction = async (img, decision, roundNum, inputOverride = null) => {
     const pageNumber = img.pageNumber;
-    if (pageNumber <= 0) {
-      return { pageNumber, imageData: null, error: 'char-fix not applicable to covers' };
-    }
     const charName = decision.charName;
     if (!charName) {
       return { pageNumber, imageData: null, error: 'no charName in decision' };

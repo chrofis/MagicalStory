@@ -132,10 +132,14 @@ describe('built prompts', () => {
     review = String(PB.buildSceneReviewPrompt(inputData, [{ pageNumber: 1, brief: brief({}) }], { beats: BEATS }));
   });
 
-  it('a cast with no primary characters never reads "and None" in the cover lines', () => {
-    expect(ad).not.toMatch(/\bNone\b\./);
+  it('a cast with no primary characters never reads "and None" in the cover beats', () => {
+    // The cover cast moved out of the Art Director template into the cover
+    // pages' own beats (coverBeats.js, 2026-09-24).
+    const { buildCoverBeats } = require_('../../server/lib/coverBeats.js');
+    const beats = buildCoverBeats(inputData);
     expect(ad).not.toMatch(/and None/);
-    expect(ad).toContain('Initial Page and Back Cover: Mira, Tom.');
+    expect(beats.map((b: any) => b.planLine).join('\n')).not.toMatch(/\bNone\b/);
+    expect(beats.find((b: any) => b.coverKey === 'initialPage').planLine).toMatch(/^wide — Mira, Tom — /);
   });
 
   it('eyes-open and the creature face reach the generator and the critic from one constant', () => {

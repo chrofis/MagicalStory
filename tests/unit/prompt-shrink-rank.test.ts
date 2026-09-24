@@ -72,7 +72,7 @@ describe('the split-state markings rule is emitted only where a listed element h
 
 describe('a cover carries no SHOT block', () => {
   it('the "portrait" in a cover prose is not read as a close-up', () => {
-    const cover = String(PB.buildCoverPrompt('initialPage', {
+    const cover = String(PB.buildCoverPrompt('back', {
       sceneDescription: 'Crisp afternoon. A wide group portrait set before the pier. Mira stands in the center, eyes on the viewer.',
       inputData, visualBible: bible(undefined), referencePhotos: [],
     }));

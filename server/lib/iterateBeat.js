@@ -522,6 +522,9 @@ const INTRODUCED_TYPES = new Set([
   // surplus. Introduced-only: a parent that already contradicted itself is the
   // scene review's fault, not this rewrite's.
   'population_contradicted',
+  // A full-story cover rewrite writes its own `looksAt` (the cover beat, which
+  // the rewriter is given as its plan line, sends every figure to the viewer).
+  'cover_gaze_not_viewer',
 ]);
 
 /**

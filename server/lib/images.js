@@ -4076,7 +4076,17 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   const effectiveSinglePass = typeof singlePassScene === 'boolean'
     ? singlePassScene
     : CONFIG_DEFAULTS.singlePassScene === true;
-  const sceneAspect = aspectRatioIn || CONFIG_DEFAULTS.pageAspect;
+  // A FULL-STORY COVER IS A PAGE (2026-09-24, plan covers-as-pages Q7): it
+  // iterates here, from the Art Director brief stored on its coverImages
+  // record. coverIteratePath refuses a pre-change cover (no brief — plan Q1)
+  // and names the trial path for a trial cover, which never comes here.
+  const { coverKeyOfPage, coverIteratePath, COVER_TEXT_POSITION } = require('./coverBeats');
+  const coverKey = coverKeyOfPage(pageNumber);
+  if (coverKey && coverIteratePath(storyData, coverKey) !== 'page') {
+    throw new Error(`[ITERATE] ${coverKey}: a trial cover iterates through iterateCover, never the page path`);
+  }
+  const coverRecord = coverKey ? storyData.coverImages[coverKey] : null;
+  const sceneAspect = aspectRatioIn || (coverKey ? CONFIG_DEFAULTS.coverAspect : CONFIG_DEFAULTS.pageAspect);
 
   const {
     analyzeGeneratedImage
@@ -4111,14 +4121,17 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
 
   // Get page text
   const fullStoryText = storyData.storyText || storyData.story || '';
-  const pageText = getPageText(fullStoryText, pageNumber);
-  if (!pageText) {
+  // A cover has no page text: its beat (the plan line) is its narrative anchor.
+  const pageText = coverKey ? '' : getPageText(fullStoryText, pageNumber);
+  if (!coverKey && !pageText) {
     throw new Error(`Page ${pageNumber} text not found`);
   }
 
-  // Get current scene description
-  const currentScene = sceneDescriptions.find(s => s.pageNumber === pageNumber);
-  if (!currentScene) {
+  // Get current scene description — a cover's brief lives on its own record.
+  const currentScene = coverKey
+    ? { pageNumber, description: coverRecord.sceneDescription, outlineExtract: coverRecord.outlineExtract }
+    : sceneDescriptions.find(s => s.pageNumber === pageNumber);
+  if (!currentScene || !currentScene.description) {
     throw new Error(`No scene description found for page ${pageNumber}`);
   }
 
@@ -4126,8 +4139,11 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // re-pick it (would break the spread rule and shift the calm zone). Pull the
   // saved value from sceneImages so buildImagePrompt and the empty-scene
   // re-gen can both inject the same COPY SPACE instruction the original had.
-  const savedScene = (storyData.sceneImages || []).find(s => s.pageNumber === pageNumber) || {};
-  const lockedTextPosition = savedScene.textPosition || null;
+  const savedScene = coverKey
+    ? coverRecord
+    : ((storyData.sceneImages || []).find(s => s.pageNumber === pageNumber) || {});
+  // A cover's copy space is fixed by its beat (the title / dedication zone).
+  const lockedTextPosition = coverKey ? COVER_TEXT_POSITION[coverKey] : (savedScene.textPosition || null);
 
   log.info(`🔄 [ITERATE] Page ${pageNumber}: Analyzing current image with vision model...`);
 
@@ -4260,7 +4276,8 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // value becomes the rewrite prompt's "This page's clothing" line, so a
   // guessed 'standard' actively instructs the rewriter to dress the page in a
   // category the story may not use.
-  const expectedClothing = pageClothingData?.pageClothing?.[pageNumber] || pageClothingData?.primaryClothing;
+  const expectedClothing = (coverKey ? coverRecord.perCharClothing : pageClothingData?.pageClothing?.[pageNumber])
+    || pageClothingData?.primaryClothing;
   if (!expectedClothing) {
     throw new Error(`[ITERATE] Page ${pageNumber}: no per-page clothing and no primaryClothing on the story. Refusing to tell the rewriter 'standard'.`);
   }
@@ -4372,7 +4389,8 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // by the unified pipeline at server.js:5980), falling back to story-level
   // layout. Defaults false so non-overlay stories never carry calm-zone
   // instructions through iterate.
-  const iterateTextInImage = (
+  // A cover always carries its text in the image.
+  const iterateTextInImage = coverKey ? true : (
     storyData?.sceneImages?.find(s => s.pageNumber === pageNumber)?.textInImage
     ?? storyData?.layout?.textInImage
     ?? false
@@ -4795,7 +4813,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   let clothingCategory;
   let effectiveClothingRequirements = clothingRequirements;
 
-  const storedPageClothing = pageClothingData?.pageClothing?.[pageNumber];
+  const storedPageClothing = coverKey ? (coverRecord.perCharClothing || null) : pageClothingData?.pageClothing?.[pageNumber];
   // Normalize string form ("costumed:mittelalterlich" applied page-wide) into per-character
   // map so the override below catches both string and object input shapes.
   const storedPageClothingMap = (() => {
@@ -5029,6 +5047,16 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // .pageImage = the edit tier), so an iterate could redo on a different model
   // than the one that produced V1. pageRenderImage is that same page tier.
   let imageModelOverride = modelOverrides?.imageModel || CONFIG_DEFAULTS.pageRenderImage;
+  // A cover's own render options — its baked title and the typography-aware
+  // model that paints it — one resolver with the generation path (coverRender.js).
+  const coverOpts = coverKey
+    ? require('./coverRender').coverRenderOptions(pageNumber, {
+        title: storyData.title || storyData.storyTitle || '',
+        dedication: storyData.dedication || null,
+        coverTitleMode: modelOverrides?.coverTitleMode || null,
+      })
+    : null;
+  if (coverOpts?.imageModel) imageModelOverride = coverOpts.imageModel;
 
   // Route by scene complexity when no explicit model override
   if (!imageModelOverride) {
@@ -5079,6 +5107,9 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     // the REQUIRED OBJECTS checklist can point at the attached references.
     vbRefElementIds: (visualBibleGrid?.rawElements || []).map(e => e.id).filter(Boolean),
   });
+  // A baked front cover's REQUIRED TEXT block, at the prompt's absolute end —
+  // the same tail the generation path appends.
+  if (coverOpts?.bakeTitle) imagePrompt = getStoryHelpers().withBakedTitle(imagePrompt, coverOpts.bakeTitle);
 
   // Eval feedback was already routed to Claude via previewFeedback.fixIssues
   // (see Step 2 above). The image API gets a prose-only prompt — it cannot
@@ -5162,7 +5193,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     // Shared page generation — same entry Phase 5a uses. Eval + detection run
     // via the shared primitives below (skipped for pipeline callers, which
     // score round results themselves).
-    const iterLabel = `PAGE ${pageNumber} ITERATE`;
+    const iterLabel = coverKey ? `${coverKey.toUpperCase()} ITERATE` : `PAGE ${pageNumber} ITERATE`;
     const genResult = await generateImageOnly(imagePrompt, refApplied.characterPhotos, {
       previousImage,
       imageModelOverride,
@@ -5174,12 +5205,12 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       artStyle,
       skipCache: true,
       aspectRatio: sceneAspect,
-      captureLabel: 'image_scene',
+      captureLabel: coverOpts ? coverOpts.captureLabel : 'image_scene',
     });
     if (usageTracker && genResult?.usage) {
       const m = genResult.modelId || '';
       const genProvider = m.startsWith('runware:') ? 'runware' : m.startsWith('grok-imagine') ? 'grok' : 'gemini_image';
-      usageTracker(genProvider, genResult.usage, 'page_images', genResult.modelId);
+      usageTracker(genProvider, genResult.usage, coverOpts ? coverOpts.usageLabel : 'page_images', genResult.modelId);
     }
     let iterQuality = null;
     let iterDetection = null;
@@ -5233,7 +5264,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
           sceneCharacters: sceneCharacters || null,
           originalPrompt: newSceneDescription || '',
           visualBible,
-          evaluationType: 'scene',
+          evaluationType: coverOpts ? 'cover' : 'scene',
           pageLabel: `${iterLabel} `,
           sceneMetadata: iterateSceneMetadata,
           pageNumber,
@@ -5258,8 +5289,11 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
           // genResult.prompt is the string generateImageOnly actually sent
           // (post-shrink); imagePrompt is the pre-shrink build.
           genResult.imageData, resolveEvalImagePrompt({ promptSent: genResult.prompt, originalPrompt: imagePrompt }),
-          refApplied.characterPhotos, 'scene', null,
+          refApplied.characterPhotos, coverOpts ? 'cover' : 'scene', null,
           iterLabel, null, null, sceneCharacters, {
+            // A cover's text contract (baked title / app-side typography),
+            // resolved by the same resolver as its first render.
+            ...(coverOpts ? { expectedText: coverOpts.expectedText, textMode: coverOpts.textMode } : {}),
             // Era-aware landmark protection — iterate uses the same refs it
             // just rendered from and the era it resolved above.
             landmarkPhotos: refApplied.landmarkPhotos || null,

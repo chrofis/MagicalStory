@@ -62,8 +62,9 @@ describe('orphan CRITICAL routing', () => {
     expect(d.method).not.toBe('iterate');
   });
 
-  it('never claims a cover', () => {
-    const d = decideRepairMethod(-1, { ...SCORES, fixableIssues: [ORPHAN] }, null, { characters: ROSTER });
-    expect(d.method).not.toBe('iterate');
+  it('routes a full-story cover exactly like a page (covers are pages, 2026-09-24)', () => {
+    const page = decideRepairMethod(15, { ...SCORES, fixableIssues: [ORPHAN] }, null, { characters: ROSTER });
+    const cover = decideRepairMethod(-1, { ...SCORES, fixableIssues: [ORPHAN] }, null, { characters: ROSTER });
+    expect(cover.method).toBe(page.method);
   });
 });

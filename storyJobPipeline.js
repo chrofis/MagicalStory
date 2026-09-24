@@ -124,25 +124,8 @@ function trialSeasonOutfit(inputData = {}) {
   }
 }
 
-/**
- * Which covers a job renders. `inputData.coverTypes` is the explicit list
- * (trial: title page + back cover, no dedication page — trials store no
- * dedication); otherwise the legacy `titlePageOnly` boolean decides. One
- * resolver so the start-guard and the start-loop can never disagree.
- */
-function coverTypesFor(inputData = {}) {
-  if (Array.isArray(inputData.coverTypes) && inputData.coverTypes.length > 0) {
-    // Legacy compat: jobs queued before the 2026-08-23 naming unification
-    // carry 'titlePage' in coverTypes — normalize at this one boundary.
-    // (Was written as `ct === 'frontCover' ? 'frontCover' : ct` — a no-op that
-    // mapped the NEW name to itself and let the legacy token through, so a
-    // pre-rename queued job's front cover would silently never start.)
-    return inputData.coverTypes.map(ct => ct === 'titlePage' ? 'frontCover' : ct);
-  }
-  return inputData.titlePageOnly
-    ? ['frontCover']
-    : ['frontCover', 'initialPage', 'backCover'];
-}
+// coverTypesFor lives in server/lib/coverKeys.js (the beats Art Director needs it too).
+const { coverTypesFor } = require('./server/lib/coverKeys');
 
 // Image generation mode: 'parallel' (fast) or 'sequential' (consistent - passes previous image)
 const IMAGE_GEN_MODE = process.env.IMAGE_GEN_MODE || 'parallel';
@@ -1450,7 +1433,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     };
 
     // Helper: Start cover generation
+    // TRIAL-ONLY cover builder (owner, 2026-09-24 — plan covers-as-pages Q7/Q8):
+    // the trial renders its covers from the writer's streamed cover JSON, fast.
+    // A full story briefs its covers as pages (coverBeats.js) and never comes here.
     const startCoverGeneration = (coverType, hint) => {
+      if (!inputData.trialMode) {
+        throw new Error(`[COVER] ${coverType}: startCoverGeneration is the trial cover builder — a full-story cover is a page`);
+      }
       if (streamingCoverPromises.has(coverType) || skipImages) return;
       if (!coverTypesFor(inputData).includes(coverType)) return;
       if (skipCovers) return;
@@ -1846,7 +1835,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Same builder as pages and as every other cover path (owner,
         // 2026-08-26). Art is generated textless; the title, dedication and
         // branding are composited afterwards by coverTypography.js.
-        const { buildInitialPageComposition } = require('./server/lib/coverIterate');
         // `let`, not `const`: the VB-id sanitizer below REASSIGNS this. The
         // 2026-08-26 template retirement (c0d594a75) turned it into a const and
         // every cover then threw "Assignment to constant variable" ten lines
@@ -1875,14 +1863,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           log.info(`🅰️ [STREAM-COVER] ${coverLabel}: BAKED title mode — "${coverTitleModeInfo.bakeTitle}" rendered into the artwork on ${coverTitleModeInfo.bakedModel}, typography composite skipped`);
         }
         let coverPrompt = buildCoverPrompt(
-          coverType === 'frontCover' ? 'front' : coverType === 'backCover' ? 'back' : 'initialPage',
+          coverType === 'frontCover' ? 'front' : 'back',
           {
             sceneDescription,
             inputData,
             characters: (inputData.characters || []).filter(c => coverPhotos.some(ph => ph.name === c.name)),
             visualBible: streamingVisualBible,
             referencePhotos: coverPhotos,
-            groupComposition: coverType === 'initialPage' ? buildInitialPageComposition(coverPhotos.length) : '',
             options: {
               customStyleDescription: styleDescription,
               characterReferenceListOverride: characterRefList,
@@ -2316,8 +2303,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }
       },
       onCoverScene: (coverData) => {
-        // TRIAL MODE: Generate title page from the structured cover scene JSON
-        if (!inputData.trialMode) return;
+        // TRIAL ONLY: the trial front cover renders from the writer's streamed
+        // cover JSON (fast, owner 2026-09-24). A full story's covers are pages.
+        if (!inputData.trialMode) {
+          throw new Error('[COVER] onCoverScene is the trial cover builder — a full-story cover is a page');
+        }
         if (streamingCoverPromises.has('frontCover') || skipImages || skipCovers) return;
 
         const coverTitle = coverData.title || streamingTitle || 'My Story';
@@ -2997,7 +2987,26 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       log.info('[STREAM] Backfilled streamingVisualBible from authoritative full parse (streaming detection had missed it)');
     }
     streamEnded = true;
-    const coverHints = parser.extractCoverHints();
+    // COVER HINTS ARE THE TRIAL'S ONLY (2026-09-24). A full story's covers are
+    // PAGES the Art Director briefs from code-written cover beats
+    // (beatsResult.coverScenes, rendered through the page path below); the
+    // outline carries no cover section any more. The trial keeps its own cover
+    // builder (startCoverGeneration / onCoverScene) and the hints it reads.
+    let coverHints = beatsMode ? null : parser.extractCoverHints();
+    // The trial writer emits no cover-hints section (only the front cover's
+    // COVER SCENE JSON), so every trial cover the parse left without a hint gets
+    // its structured default here — before the cast, clothing and backdrop
+    // checks below, which then treat it like any hint, and stored with them.
+    // A cover already rendering (the front, from its streamed COVER SCENE
+    // JSON via onCoverScene) keeps no default: it was not made from one.
+    if (inputData.trialMode) {
+      const { trialDefaultCoverHint } = require('./server/lib/coverIterate');
+      for (const coverType of coverTypesFor(inputData)) {
+        if (coverHints?.[coverType] || streamingCoverPromises.has(coverType)) continue;
+        coverHints = coverHints || {};
+        coverHints[coverType] = trialDefaultCoverHint(coverType, inputData);
+      }
+    }
 
     // Reconcile cover hint clothing against the story's clothingRequirements.
     // Claude can write a cover hint that asks for a clothing category that the
@@ -3013,12 +3022,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // prompt, the reference packing and the cover eval all read from here — is
     // real people. Nobody is added: the cover cast is the Art Director's
     // (owner, 2026-09-23 — the refill that padded covers to five is deleted).
-    {
+    if (coverHints) {
       const { validateCoverHintCast } = require('./server/lib/coverIterate');
       validateCoverHintCast(coverHints, inputData.characters, { logger: log });
     }
 
-    const reconcileResult = reconcileCoverClothingWithRequirements(coverHints, clothingRequirements, log);
+    const reconcileResult = coverHints
+      ? reconcileCoverClothingWithRequirements(coverHints, clothingRequirements, log)
+      : { overrides: [] };
     if (reconcileResult.overrides.length > 0) {
       log.warn(`⚠️ [UNIFIED] Cover clothing reconciliation: ${reconcileResult.overrides.length} override(s) applied`);
     }
@@ -3411,61 +3422,37 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     }
 
     // Start cover generation NOW that avatars are ready (covers need avatars as reference photos)
-    if (!skipImages && !skipCovers) {
+    // TRIAL ONLY: a full story's covers are pages (beatsResult.coverScenes).
+    if (!skipImages && !skipCovers && inputData.trialMode) {
       const coverTypes = coverTypesFor(inputData);
       for (const coverType of coverTypes) {
         if (streamingCoverPromises.has(coverType)) continue;
+        // Every trial cover has a hint by now: parsed, or its structured
+        // default (trialDefaultCoverHint, set right after the parse). Covers
+        // run concurrently (streamCoverLimit), so this adds no wall clock.
         const hint = coverHints?.[coverType];
-        if (hint) {
-          startCoverGeneration(coverType, hint);
-        } else if (coverType === 'frontCover') {
-          // Trial mode: Claude may not output cover hints — use a default hint
-          const mainCharNames = inputData.characters
-            ?.filter(c => c.isMainCharacter)
-            .map(c => c.name)
-            .join(', ') || inputData.characters?.map(c => c.name).slice(0, 3).join(', ') || 'the main character';
-          const theme = inputData.storyTopic || inputData.storyTheme || 'adventure';
-          const defaultHint = {
-            hint: `A magical, eye-catching front cover scene featuring ${mainCharNames} in a ${theme}-themed setting. The main characters are prominently displayed, looking excited and ready for adventure. The composition leaves space at the top for the title.`,
-            characterClothing: {}
-          };
-          if (inputData._trialCostumeType) {
-            for (const char of (inputData.characters || [])) {
-              defaultHint.characterClothing[char.name] = 'costumed';
-            }
-          }
-          startCoverGeneration(coverType, defaultHint);
-        } else if (coverType === 'backCover') {
-          // Same fallback as the front cover above: the trial writer emits one
-          // COVER SCENE (the front), so the back cover has no hint. A closing
-          // scene at the story's location, main character only — covers run
-          // concurrently (streamCoverLimit = 3), so this adds no wall clock.
-          const mainCharNames = inputData.characters
-            ?.filter(c => c.isMainCharacter)
-            .map(c => c.name)
-            .join(', ') || inputData.characters?.map(c => c.name).slice(0, 3).join(', ') || 'the main character';
-          const backHint = {
-            hint: `A calm closing back-cover scene featuring ${mainCharNames} at the story's main location, warm end-of-day light, content and relaxed after the adventure. Simple composition with open space, no text.`,
-            characterClothing: {}
-          };
-          if (inputData._trialCostumeType) {
-            for (const char of (inputData.characters || [])) {
-              backHint.characterClothing[char.name] = 'costumed';
-            }
-          }
-          startCoverGeneration(coverType, backHint);
+        if (!hint) {
+          log.error(`❌ [COVER] ${coverType}: no cover hint — the cover is not rendered`);
+          continue;
         }
+        startCoverGeneration(coverType, hint);
       }
       log.debug(`⚡ [UNIFIED] Started ${streamingCoverPromises.size} cover generations (avatars ready)`);
     }
 
     // PHASE 3: Scene descriptions
     let expandedScenes;
+    // The full story's cover pages: briefed and reviewed with the story pages
+    // by the Art Director (coverBeats.js), rendered through the page path below
+    // with only their cover render options (coverRender.js), stored into
+    // coverImages. Never part of expandedScenes: they carry no page text.
+    let coverScenes = [];
 
     if (beatsMode) {
       // Beats mode: scenes were expanded AND reviewed inside generateStoryViaBeats
       // (steps 3 + 4), so there is nothing left to expand here.
       expandedScenes = beatsResult.scenes;
+      coverScenes = skipCovers ? [] : (beatsResult.coverScenes || []);
       log.info(`⏭️ [BEATS] Using ${expandedScenes.length} scene brief(s) from the beats pipeline`);
       genLog.info('scenes_complete', `${expandedScenes.length} scene briefs from the beats pipeline`);
     } else if (inputData.trialMode) {
@@ -4220,6 +4207,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // Helper function to prepare page data without generation (for later use by pipeline)
       const preparePageData = async (scene, index) => {
         const pageNum = scene.pageNumber;
+        // A full-story COVER page: the page path with its cover-only render
+        // options (aspect, copy space always in the image, baked title, text
+        // contract). null for every story page.
+        const coverOpts = require('./server/lib/coverRender').coverRenderOptions(pageNum, {
+          title: title || inputData.title || inputData.storyTitle || '',
+          dedication: inputData.dedication || null,
+          coverTitleMode: modelOverrides.coverTitleMode || null,
+        });
 
         // Spread-parity flip: when Sonnet picks a textPosition on the wrong
         // side for the spread (odd=left / even=right), enforceSpreadTextPosition
@@ -4478,6 +4473,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           pageImageModel = modelOverrides.imageModel;
           pageImageBackend = modelOverrides.imageBackend;
         }
+        // The baked front cover renders on the typography-aware model
+        // (runtime coverTitleBakedModel), whatever the page tier is.
+        if (coverOpts?.imageModel) {
+          pageImageModel = coverOpts.imageModel;
+          pageImageBackend = IMAGE_MODELS[pageImageModel]?.backend || pageImageBackend;
+        }
 
         // Skip Visual Bible text when using Grok (8000 char limit; VB grid sent as reference image)
         const imageModelConfig = IMAGE_MODELS[pageImageModel];
@@ -4491,14 +4492,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // in 5a-pre-grid from the cells actually sent, which is what the trial
         // path (`trialVbGrid.rawElements`) and the iterate path (images.js)
         // already do.
-        const makeImagePrompt = (vbRefElementIds) => buildImagePrompt(
+        const makeImagePrompt = (vbRefElementIds) => require('./server/lib/promptBuilders').withBakedTitle(buildImagePrompt(
           scene.sceneDescription, inputData, sceneCharacters, visualBible, pageNum, pagePhotos, {
             skipVisualBible: isGrokImage,
             // Elements whose reference render rides with this call: grid cells,
             // or (for a plate-filtered vehicle in 5a-pre-grid) the plate itself.
             vbRefElementIds,
           }
-        );
+        ), coverOpts?.bakeTitle || '');
         const imagePrompt = makeImagePrompt(elementReferences.map(r => r.id).filter(Boolean));
         // Extract emptyScenePrompt from outline hint (Sonnet-generated, high quality)
         // Falls back to scene expansion's emptyScenePrompt via sceneMetadata
@@ -4535,6 +4536,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           sceneComplexity,
           // Outline-level emptyScenePrompt (from Sonnet) — used if scene expansion doesn't produce one
           emptyScenePrompt: outlineEmptyScenePrompt,
+          // Cover pages only (null on story pages) — see coverRender.js.
+          coverOpts,
+          // The aspect and the copy-space switch this page renders with: a
+          // cover's own (coverAspect; text always in the image), else the
+          // book layout's.
+          renderAspect: coverOpts ? coverOpts.aspectRatio : (inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect),
+          textInImage: coverOpts ? true : (inputData?.layout?.textInImage !== false),
         };
       };
 
@@ -4565,9 +4573,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       }
 
       // Phase 5a: Prepare all page data
-      log.info(`📸 [UNIFIED] Phase 5a: Preparing ${expandedScenes.length} pages for image generation...`);
+      log.info(`📸 [UNIFIED] Phase 5a: Preparing ${expandedScenes.length} pages${coverScenes.length ? ` + ${coverScenes.length} cover page(s)` : ''} for image generation...`);
       const pageDataArray = await Promise.all(
-        expandedScenes.map((scene, index) => preparePageData(scene, index))
+        [...expandedScenes, ...coverScenes].map((scene, index) => preparePageData(scene, index))
       );
 
       // Reference-mode + single-pass flags resolved once for the run. Per-page
@@ -4611,7 +4619,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // (per packReferences), partly defeating singlePassScene.
       if (modelOverrides.generateEmptyScenes !== false && !runSinglePassScene && visualBible?.locations?.length > 0) {
         const { groupPagesByVantage, resolvePagePlate, enforceSpreadTextPosition, buildTextZoneInstruction, buildEraGuard } = require('./server/lib/storyHelpers');
-        const groups = groupPagesByVantage(pageDataArray, visualBible);
+        // Covers never share a vantage plate: a vantage canvas is rendered at the
+        // PAGE aspect with no copy space; a cover renders its own plate
+        // (renderPagePlate) at the cover aspect with its textPosition mask.
+        const groups = groupPagesByVantage(pageDataArray.filter(pd => !pd.coverOpts), visualBible);
         const allRealGroups = Array.from(groups.entries()).filter(([key]) => key !== '__unassigned__');
         // A vantage whose pages ALL have zero cast needs no canvas — nobody
         // will be placed on it, so the page render is the scene (owner ruling,
@@ -5190,8 +5201,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // textInImage drives whether we ask the model to keep a calm zone for
             // text overlay AND whether we attach the visual mask reference. When
             // text is rendered below the image (advanced layout), neither is needed.
-            const layoutTextInImage = inputData?.layout?.textInImage !== false;
-            const layoutAspect = inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect;
+            const layoutTextInImage = pageData.textInImage;
+            const layoutAspect = pageData.renderAspect;
             // Load pre-built text area mask (black=text zone ~20%, white=scene ~80%).
             // Sent as a reference slot so the model sees the shape directly.
             const { getTextAreaMask } = require('./server/lib/textMasks');
@@ -5708,7 +5719,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 // THE CAST-0 EXEMPTION: a page with no named cast renders on its
                 // landmark photo (owner ruling 2026-09-02).
                 landmarkScene: pageLandmarkScene(pageData),
-                aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
+                aspectRatio: pageData.renderAspect,
                 imageModelOverride: pageData.pageImageModel,
                 imageBackendOverride: pageData.pageImageBackend,
                 landmarkPhotos: refApplied.landmarkPhotos,
@@ -5716,11 +5727,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 pageNumber: pageData.pageNumber,
                 sceneBackground: refApplied.sceneBackground,
                 // Text-zone mask only attached when text is overlaid on image
-                // (textInImage=true). For square+below layout this is null —
-                // the model is free to fill the whole frame.
-                textAreaMask: (inputData?.layout?.textInImage !== false)
+                // (textInImage=true; always on a cover). For square+below layout
+                // this is null — the model is free to fill the whole frame.
+                textAreaMask: pageData.textInImage
                   ? (sceneBackgrounds[pageData.pageNumber]?.textAreaMask || null)
-                  : null
+                  : null,
+                ...(pageData.coverOpts ? { captureLabel: pageData.coverOpts.captureLabel } : {}),
               }
             );
 
@@ -5729,7 +5741,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               const isRunware = genResult.modelId && genResult.modelId.startsWith('runware:');
               const isGrok = genResult.modelId && genResult.modelId.startsWith('grok-imagine');
               const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
-              addUsage(provider, genResult.usage, 'page_images', genResult.modelId);
+              addUsage(provider, genResult.usage, pageData.coverOpts ? pageData.coverOpts.usageLabel : 'page_images', genResult.modelId);
             }
             imageGenHeartbeat();  // per-page heartbeat — image done, keeps the phase alive
 
@@ -5925,7 +5937,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                       ...buildBlendMetadata(fdMeta, pageData, inputData.clothingRequirements || inputData.outline?.clothingRequirements || null),
                     },
                     cleanBackgroundPrompt: String(sceneBackgrounds[pageData.pageNumber]?.prompt || pageData.sceneMetadata?.emptyScenePrompt || pageData.emptyScenePrompt || fdMeta.emptyScenePrompt || ''),
-                    aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
+                    aspectRatio: pageData.renderAspect,
                     // Labelled portrait grid as Image 2 — the blend prompt calls it
                     // the authoritative face/clothing reference, and this path was
                     // passing nothing, leaving identity to the pasted pixels alone.
@@ -5966,7 +5978,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const activeModelId = scaleRepairResult?.modelId || genResult.modelId;
 
             // Save checkpoint for progressive display
-            if (activeImageData) {
+            if (activeImageData && pageData.coverOpts) {
+              // A cover's progressive display is the cover checkpoint (read by
+              // routes/jobs.js and the salvage path), never a story page.
+              await saveCheckpoint(jobId, 'partial_cover', {
+                type: pageData.coverOpts.coverKey,
+                imageData: activeImageData,
+                description: pageData.scene.sceneDescription,
+                modelId: activeModelId,
+                titleBaked: pageData.coverOpts.titleBaked,
+                ...(pageData.coverOpts.coverKey === 'frontCover' ? { storyTitle: title || inputData.title || '' } : {}),
+              }, ['frontCover', 'initialPage', 'backCover'].indexOf(pageData.coverOpts.coverKey));
+            } else if (activeImageData) {
               await saveCheckpoint(jobId, 'partial_page', {
                 pageNumber: pageData.pageNumber,
                 text: pageData.scene.text,
@@ -6054,6 +6077,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               perCharClothing: pageData.perCharClothing,
               scene: pageData.scene,
               calmRegion,
+              // A cover page's record carries what the cover judges and the
+              // cover store read: the text contract, the cast it was drawn
+              // with, and which cover it is. The page's own fields above stay.
+              ...(pageData.coverOpts ? {
+                coverKey: pageData.coverOpts.coverKey,
+                evaluationType: 'cover',
+                expectedText: pageData.coverOpts.expectedText,
+                textMode: pageData.coverOpts.textMode,
+                titleBaked: pageData.coverOpts.titleBaked,
+                referencePhotos: pageData.characterPhotos,
+                excludedCastNames: [],
+              } : {}),
             };
           } catch (genError) {
             log.error(`❌ [UNIFIED] Page ${pageData.pageNumber} generation failed: ${genError.message}`);
@@ -6108,7 +6143,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             pageData.prompt,
             pageData.characterPhotos,
             {
-              aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
+              aspectRatio: pageData.renderAspect,
               imageModelOverride: pageData.pageImageModel,
               imageBackendOverride: pageData.pageImageBackend,
               landmarkPhotos: pageData.landmarkPhotos,
@@ -6118,9 +6153,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               sceneBackground: sceneBackgrounds[pageData.pageNumber]?.imageData || null,
               // Never serve the failed attempt back out of the gen-only cache.
               skipCache: true,
-              textAreaMask: (inputData?.layout?.textInImage !== false)
+              textAreaMask: pageData.textInImage
                 ? (sceneBackgrounds[pageData.pageNumber]?.textAreaMask || null)
-                : null
+                : null,
+              ...(pageData.coverOpts ? { captureLabel: pageData.coverOpts.captureLabel } : {}),
             }
           );
           if (retryResult?.imageData) {
@@ -6137,7 +6173,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             if (retryResult.usage) {
               const m = retryResult.modelId || '';
               const provider = m.startsWith('runware:') ? 'runware' : m.startsWith('grok-imagine') ? 'grok' : 'gemini_image';
-              addUsage(provider, retryResult.usage, 'page_images', retryResult.modelId);
+              addUsage(provider, retryResult.usage, pageData.coverOpts ? pageData.coverOpts.usageLabel : 'page_images', retryResult.modelId);
             }
             genLog.info('page_image_recovered', `Page ${raw.pageNumber} recovered on retry (${retryResult.modelId})`);
             log.info(`♻️ [UNIFIED] Page ${raw.pageNumber} recovered on retry`);
@@ -6147,6 +6183,44 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         } catch (retryErr) {
           genLog.error('page_image_retry_failed', `Page ${raw.pageNumber} retry failed: ${retryErr.message}`);
           log.error(`❌ [UNIFIED] Page ${raw.pageNumber} retry failed: ${retryErr.message}`);
+        }
+      }
+
+      // THE FULL STORY'S COVERS ARE STORED HERE, from their page records
+      // (2026-09-24). Same `coverImages[key]` fields the client, the PDF, the
+      // typography pass and the story loader read; plus the page brief fields
+      // (sceneDescription, sceneMetadata, outlineExtract, plate) that make the
+      // cover repairable exactly like a page. The record itself stays in
+      // rawImages, so the repair pipeline evaluates and repairs it with the pages.
+      if (!inputData.trialMode) {
+        for (const raw of rawImages) {
+          if (!raw || !raw.coverKey) continue;
+          if (!raw.imageData) {
+            genLog.error('cover_failed', `${raw.coverKey} produced no image: ${raw.error || 'unknown error'}`);
+            continue;
+          }
+          coverImages[raw.coverKey] = {
+            imageData: raw.imageData,
+            description: raw.sceneDescription,
+            sceneDescription: raw.sceneDescription,
+            sceneMetadata: raw.sceneMetadata || null,
+            outlineExtract: raw.scene?.outlineExtract || null,
+            sceneCharacters: raw.sceneCharacters || null,
+            perCharClothing: raw.perCharClothing || null,
+            prompt: raw.prompt,
+            compressedScene: raw.compressedScene || null,
+            referencePhotos: raw.referencePhotos || raw.characterPhotos || [],
+            landmarkPhotos: raw.landmarkPhotos || [],
+            grokRefImages: raw.grokRefImages || null,
+            emptySceneImage: raw.emptySceneImage || null,
+            emptyScenePrompt: raw.emptyScenePrompt || null,
+            modelId: raw.modelId,
+            titleBaked: raw.titleBaked === true,
+            // The mark coverIteratePath reads: this cover is a page, and it
+            // iterates, regenerates and repairs through the page path.
+            briefedAsPage: true,
+            generatedAt: new Date().toISOString(),
+          };
         }
       }
 
@@ -6721,8 +6795,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               : (textRegionResults[r.pageNumber]?.position
                 || enforceSpreadTextPosition(r.sceneMetadata?.textPosition || null, r.pageNumber)),
           })),
-          coverImages,  // Needed by iterateCover when pipeline redoes low-scoring covers
-          coverHints,   // Needed by iterateCover for per-character clothing on covers
+          coverImages,  // a full-story cover's brief record — iteratePageCore reads it (covers are pages)
+          trialMode: !!inputData.trialMode, // coverIteratePath: trial covers never reach the page path
           title,
           dedication: inputData.dedication || '',
         };
@@ -7043,6 +7117,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // fallback: this field is a model input on the re-run path, so it
               // is never null while the cover rendered at all).
               coverImages[coverKey].prompt = img.prompt ?? coverImages[coverKey].prompt ?? null;
+              // A FULL-STORY cover is a page (2026-09-24): its brief is its scene
+              // contract, and an iterate rewrites it. The shipped version's brief
+              // travels back like its prompt, so the next iterate / repair reads
+              // the brief the shipped pixels were painted from.
+              if (!inputData.trialMode) {
+                coverImages[coverKey].sceneDescription = img.sceneDescription ?? coverImages[coverKey].sceneDescription ?? null;
+                coverImages[coverKey].description = coverImages[coverKey].sceneDescription;
+                coverImages[coverKey].sceneMetadata = img.sceneMetadata ?? coverImages[coverKey].sceneMetadata ?? null;
+                coverImages[coverKey].sceneCharacters = img.sceneCharacters ?? coverImages[coverKey].sceneCharacters ?? null;
+              }
               if (img.wasRegenerated) coverImages[coverKey].wasRegenerated = true;
               log.info(`📸 [UNIFIED] ${coverKey} pipeline result: score ${img.qualityScore}, ${img.wasRegenerated ? 'regenerated' : 'original'}`);
             }

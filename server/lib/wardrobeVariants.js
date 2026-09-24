@@ -110,6 +110,24 @@ function offIdsForCharacter(characterName, wornResolved) {
 }
 
 /**
+ * The garments this page truly takes OFF this character — offIdsForCharacter
+ * minus the outfit versions: a worn version is a different outfit, not a
+ * removal, and an "off" version is the default outfit. Read by the entity
+ * check's off-by-design rule (scoring.offByDesignFinding), which must never
+ * excuse a clothing finding on a page that merely wears a version.
+ */
+function removedIdsForCharacter(characterName, wornResolved) {
+  if (!characterName || !Array.isArray(wornResolved)) return [];
+  const ids = [];
+  for (const r of wornResolved) {
+    if (!r || outfitVersionOf(r.entry) || !isOffForCharacter(r, characterName)) continue;
+    if (!WORN_SLOTS.includes(String(r.slot || '').trim().toLowerCase())) continue;
+    ids.push(r.id);
+  }
+  return normalizeOffIds(ids);
+}
+
+/**
  * The wardrobe half of a VERSION sheet's redress instruction, from the two
  * authored strings the version records: the contract's own clause and the
  * Visual Bible's own garment. Quoted, not derived — no garment is named that
@@ -373,6 +391,7 @@ module.exports = {
   isOffCategory,
   buildOffSlotKey,
   offIdsForCharacter,
+  removedIdsForCharacter,
   versionRedressNote,
   baseCategoryFor,
   deriveWardrobeVariantRequirements,

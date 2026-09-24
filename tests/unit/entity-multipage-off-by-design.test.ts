@@ -7,6 +7,12 @@ const { collectAllIssuesForPage } = require('../../server/lib/images.js');
 const { selectCharRepairTasks, decideRepairMethod } = require('../../server/lib/repairLogic.js');
 const { flattenEntityIssues } = require('../../server/lib/feedbackConsolidator.js');
 const { mergeEntityIssues } = require('../../server/lib/repairPipeline.js');
+const { applyWardrobeBibleCorrections } = require('../../server/lib/clothingCheck');
+const { resolveWornItemsForPage } = require('../../server/lib/wornItems');
+const wv = require('../../server/lib/wardrobeVariants');
+
+// A page's declared wardrobe state as the entity check stamps it: removals + the full grid key.
+const OFF = { offIds: ['ART004'], stateIds: ['ART004'] };
 
 // Shape from staging job_1790100385959_1nitlympp (dragon run 6), 2026-09-24:
 // the final entity report is assembled from the shipped picks and dedupes one
@@ -77,7 +83,7 @@ describe('a finding that names several pages counts on each page, once', () => {
 
 describe('a wardrobe finding on a page that takes the garment off by design costs nothing', () => {
   const offReport = (issue: Record<string, unknown>) => ({
-    characters: { Kiaan: { issues: [issue], declaredOffByPage: { 11: ['ART004'], 12: ['ART004'] } } },
+    characters: { Kiaan: { issues: [issue], declaredOffByPage: { 11: OFF, 12: OFF } } },
   });
 
   it('judged against the wearing grid: 0 points, excused, never a repair input', () => {
@@ -106,7 +112,7 @@ describe('a wardrobe finding on a page that takes the garment off by design cost
   });
 
   it('a page that declares nothing off still charges the same finding', () => {
-    const report = { characters: { Kiaan: { issues: [multiPage({ pageNumbers: [9], pageNumber: 9, clothingCategory: 'standard' })], declaredOffByPage: { 11: ['ART004'] } } } };
+    const report = { characters: { Kiaan: { issues: [multiPage({ pageNumbers: [9], pageNumber: 9, clothingCategory: 'standard' })], declaredOffByPage: { 11: OFF } } } };
     expect(entityIssuesForPage(9, report).issues).toHaveLength(1);
   });
 
@@ -124,9 +130,47 @@ describe('a wardrobe finding on a page that takes the garment off by design cost
   });
 
   it('the round merge carries each page\'s declared state from the check that read it', () => {
-    const base = { characters: { Kiaan: { issues: [], declaredOffByPage: { 11: ['ART004'], 12: ['ART004'] } } } };
+    const base = { characters: { Kiaan: { issues: [], declaredOffByPage: { 11: OFF, 12: OFF } } } };
     const fresh = { characters: { Kiaan: { issues: [], declaredOffByPage: {} } } };
     const merged = mergeEntityIssues(base, fresh, [12]);
-    expect(merged.characters.Kiaan.declaredOffByPage).toEqual({ 11: ['ART004'] });
+    expect(merged.characters.Kiaan.declaredOffByPage).toEqual({ 11: OFF });
+  });
+});
+
+// OUTFIT VERSIONS (984c71192) share the `--off:` key algebra: a page that WEARS
+// a version carries the version id in its grid key (offIdsForCharacter), but it
+// has taken nothing off. Setup mirrors tests/unit/outfit-version.test.ts.
+describe('a page that wears an outfit version is not off by design', () => {
+  const MIA = 'A red long-sleeve cotton t-shirt; blue denim jeans; a green zip-up fleece jacket; white canvas sneakers.';
+  const quiet = { warn: () => {}, info: () => {}, error: () => {} };
+  const versioned = () => {
+    const reqs: any = { Mia: { standard: { used: true, description: MIA }, costumed: { used: false } } };
+    const vb: any = { artifacts: [{ id: 'ART007', name: 'yellow raincoat', label: 'raincoat', type: 'outer layer',
+      wornAs: 'Mia.outer layer', description: 'a yellow hooded raincoat with wooden toggles' }] };
+    applyWardrobeBibleCorrections(reqs, vb, { log: quiet });
+    return vb;
+  };
+
+  it('removedIdsForCharacter leaves the worn version out while offIdsForCharacter keys it', () => {
+    const vb = versioned();
+    const meta = { characters: [{ name: 'Mia' }], wornItems: [{ id: 'ART007', owner: 'Mia', state: 'worn' }] };
+    const resolved = resolveWornItemsForPage(vb, ['Mia'], meta, { pageNumber: 3 });
+    expect(wv.offIdsForCharacter('Mia', resolved)).toEqual(['ART007']);
+    expect(wv.removedIdsForCharacter('Mia', resolved)).toEqual([]);
+  });
+
+  it('a clothing finding on a version-wearing page is still charged', () => {
+    // The entity check stamps no declaredOffByPage entry for a page with nothing removed.
+    const report = { characters: { Mia: { issues: [multiPage({ pageNumbers: [3], pageNumber: 3, clothingCategory: 'standard' })], declaredOffByPage: {} } } };
+    expect(entityIssuesForPage(3, report).issues).toHaveLength(1);
+    expect(entityIssuesForPage(3, report).excused).toHaveLength(0);
+  });
+
+  it('a page that wears a version AND takes a garment off: only its own full grid key counts the finding', () => {
+    const declared = { offIds: ['ART004'], stateIds: ['ART004', 'ART007'] };
+    const inOwnGrid = { characters: { Mia: { issues: [multiPage({ pageNumbers: [5], pageNumber: 5, clothingCategory: 'standard--off:ART004+ART007' })], declaredOffByPage: { 5: declared } } } };
+    expect(entityIssuesForPage(5, inOwnGrid).issues).toHaveLength(1);
+    const inOffOnlyGrid = { characters: { Mia: { issues: [multiPage({ pageNumbers: [5], pageNumber: 5, clothingCategory: 'standard--off:ART004' })], declaredOffByPage: { 5: declared } } } };
+    expect(entityIssuesForPage(5, inOffOnlyGrid).excused).toHaveLength(1);
   });
 });

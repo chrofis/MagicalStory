@@ -1210,27 +1210,30 @@ function entityFindingPages(issue) {
  * Is this finding a wardrobe finding that the page's declared wardrobe state
  * makes void? Structural only — never reads the finding's text:
  *   - the finding bills as clothing (evalBuckets bucket → 'clothing'),
- *   - the page's brief declares ≥1 of this character's garments OFF
- *     (`declaredOffIds`, stamped per page on the report by the entity check
- *     from the page's wornItems rows), and
- *   - the finding was NOT judged in that exact wardrobe state: its grid key
- *     (`clothingCategory`, e.g. `standard--off:ART004`) carries a different
- *     off-set, or none, or is unknown. Such a judge compared the page against
- *     a reference that still wears the removed garment.
- * A wardrobe finding judged in the page's own off-state grid still counts —
- * the judge was told the removal, so what it reports is about the rest.
+ *   - the page's brief truly takes ≥1 of this character's garments OFF
+ *     (`declared.offIds`, stamped per page on the report by the entity check
+ *     from the page's wornItems rows; an outfit VERSION the page wears is not
+ *     a removal and never lands here), and
+ *   - the finding was NOT judged in the page's own wardrobe state: its grid
+ *     key (`clothingCategory`, e.g. `standard--off:ART004`) differs from the
+ *     page's key (`declared.stateIds`, removals plus any worn version), or is
+ *     unknown. Such a judge compared the page against a reference that still
+ *     wears the removed garment.
+ * A wardrobe finding judged in the page's own grid still counts — the judge
+ * was told the removal, so what it reports is about the rest.
+ * @param {{offIds: string[], stateIds: string[]}|null} declared
  * Returns null, or { declaredOffIds }.
  */
-function offByDesignFinding(issue, declaredOffIds) {
-  if (!Array.isArray(declaredOffIds) || declaredOffIds.length === 0) return null;
+function offByDesignFinding(issue, declared) {
+  if (!Array.isArray(declared?.offIds) || declared.offIds.length === 0) return null;
   const { bucketForType } = require('./evalBuckets');
   const bucket = bucketForType(issue?.subType || issue?.type) || 'other';
   if ((BUCKET_BILLING_CATEGORY[bucket] || bucket) !== 'clothing') return null;
   const { parseOffCategory, normalizeOffIds } = require('./wardrobeVariants');
-  const declared = normalizeOffIds(declaredOffIds);
+  const pageKey = normalizeOffIds(declared.stateIds || declared.offIds);
   const judged = parseOffCategory(issue?.clothingCategory)?.offIds || [];
-  if (issue?.clothingCategory && judged.join('+') === declared.join('+')) return null;
-  return { declaredOffIds: declared };
+  if (issue?.clothingCategory && judged.join('+') === pageKey.join('+')) return null;
+  return { declaredOffIds: normalizeOffIds(declared.offIds) };
 }
 
 /**
@@ -1267,8 +1270,8 @@ function entityFindingsByPage(report) {
     for (const [name, data] of Object.entries(entities || {})) {
       for (const issue of (data?.issues || [])) {
         for (const pageNumber of entityFindingPages(issue)) {
-          const declaredOffIds = data?.declaredOffByPage?.[pageNumber] || null;
-          out.push({ name, source, issue, pageNumber, offByDesign: offByDesignFinding(issue, declaredOffIds) });
+          const declared = data?.declaredOffByPage?.[pageNumber] || null;
+          out.push({ name, source, issue, pageNumber, offByDesign: offByDesignFinding(issue, declared) });
         }
       }
     }

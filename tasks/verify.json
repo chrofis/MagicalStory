@@ -835,13 +835,31 @@
         "8dfdb2b0d"
       ],
       "addedAt": "2026-09-24",
-      "claim": "Each stored full-story cover hint carries a Scene line, and each cover's sent prompt contains that prose and a REQUIRED OBJECTS block for its listed elements, with no KEY STORY ELEMENTS block and no leaked METADATA block.",
+      "claim": "Superseded 2026-09-24 by covers-are-pages: the full-story cover hint (and its Scene line) is gone — a full-story cover is a page the Art Director briefs from its cover beat; the trial cover keeps its own builder.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "none — superseded by covers-are-pages"
+      },
+      "status": "superseded",
+      "evidence": []
+    },
+    {
+      "id": "covers-are-pages",
+      "title": "A full-story cover is a page: the Art Director briefs it from a code-written cover beat; it renders, is evaluated and repairs through the page path",
+      "commits": [
+        "6fbd2b599"
+      ],
+      "addedAt": "2026-09-24",
+      "claim": "On a new full story every cover record is briefedAsPage with an Art Director brief (prose + METADATA) and its PLAN line, every figure looksAt the viewer, the textPosition is the beat's copy space, the sent prompt carries no KEY STORY ELEMENTS and no METADATA, and no cover_failed / beats_cover_brief_missing event is logged.",
       "runShape": [
         "full-story"
       ],
       "check": {
         "kind": "auto",
-        "fn": "coverBriefedLikeAPage"
+        "fn": "coversArePages"
       },
       "status": "pending",
       "evidence": []

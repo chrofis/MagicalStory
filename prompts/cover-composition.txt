@@ -2,11 +2,6 @@
 - The characters form one balanced, uncluttered group, each clearly recognizable.
 - The top third of the canvas is always open background in the scene's own colors and lighting — sky outdoors, upper wall or ceiling indoors, never plain white — and holds no character, head, hair, hand, prop, raised arm or effect, whatever the scene describes. Scale the whole group down so the tallest head and anything held sit below the one-third line while feet rest at the bottom; the figures fill only the lower two-thirds.
 
-### initialPage
-{GROUP_COMPOSITION}
-- Create a warm, inviting atmosphere that draws readers in and sets the mood for the story.
-- The bottom 20% of the canvas contains no character, face, or prop — only calm ground or floor continuing the scene in its own colors and lighting. Never plain white.
-
 ### back
 - Draw EXACTLY the characters listed in the scene — no more, no fewer. Do not invent extra figures.
 - If only one character is listed, center it with comfortable negative space around the figure. If more than one is listed, arrange them as a balanced group with equal prominence.

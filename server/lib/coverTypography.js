@@ -1032,7 +1032,64 @@ async function paintServedCoverTitle(storyId, storyData, { coverKey = 'frontCove
   }
 }
 
+/**
+ * THE APP-SIDE TYPOGRAPHY OF A REPAINTED COVER — one implementation for the
+ * trial cover iterate (`iterateCover`) and a full-story cover iterated through
+ * the page path (`coverRender.iterateFullStoryCover`, 2026-09-24).
+ *
+ * The render is TEXTLESS; the title / dedication / branding are re-composited
+ * so the served cover keeps its text after the repaint, and the textless bytes
+ * come back as `artImageData` so the caller persists `${key}Art` for future
+ * no-AI title edits. Stamps only once the post-persist bake has already run
+ * (the `${key}Art` row exists) or when the caller forces it (user-triggered
+ * repaints); during initial generation the bake stamps later. A baked title,
+ * or `skip`, serves the raw render.
+ *
+ * @returns {Promise<{servedImageData, artImageData, typographySpec}>}
+ */
+async function stampRepaintedCover(storyData, coverKey, imageResult, { force = false, skip = false, logTag = 'COVER-ITERATE' } = {}) {
+  const { log } = require('../utils/logger');
+  let servedImageData = imageResult.imageData;
+  let artImageData = null;
+  let typographySpec = null;
+  let bakeAlreadyRan = false;
+  try {
+    const { dbQuery } = require('../services/database');
+    const rows = await dbQuery("SELECT 1 FROM story_images WHERE story_id=$1 AND image_type=$2 LIMIT 1", [storyData.id, `${coverKey}Art`]);
+    bakeAlreadyRan = rows.length > 0;
+  } catch (e) { /* check failed → skip restamp (safe: textless served, initial bake handles it) */ }
+  if (skip) {
+    log.info(`🅰️ [${logTag}] ${coverKey}: typography composite SKIPPED (baked title) — served bytes are the raw render`);
+  } else if (bakeAlreadyRan || force) {
+    try {
+      // Typography must dodge the figures on the bytes it is stamping: the
+      // fresh detection of THIS render, never the previous render's boxes. On
+      // the skipEval path no detection ran: pass NO figures and let composeCover
+      // use its figure-less placement, loudly — stale boxes are worse than none.
+      const figures = imageResult.bboxDetection?.figures || [];
+      if (!imageResult.bboxDetection) {
+        log.warn(`⚠️ [${logTag}] ${coverKey}: no fresh detection for this render (skipEval path) — restamping WITHOUT figure avoidance`);
+      }
+      const stamped = await restampCover(storyData, coverKey, imageResult.imageData, { seed: storyData.title, figures });
+      servedImageData = stamped.titledData;
+      artImageData = stamped.textlessData;
+      typographySpec = stamped.spec;
+      // The detection ran on the textless render; the served bytes are the
+      // stamped ones. Re-point the fp (the ONLY sanctioned fp restamp — see
+      // restampDetectionForCoverText) so the stored boxes stay pairable.
+      if (imageResult.bboxDetection) {
+        require('./images').restampDetectionForCoverText(imageResult.bboxDetection, servedImageData);
+      }
+      log.info(`🅰️ [${logTag}] ${coverKey}: re-composited text (${typographySpec?.fontId || '?'}/${typographySpec?.layout || '?'})`);
+    } catch (e) {
+      log.warn(`⚠️ [${logTag}] ${coverKey}: restamp failed (${e.message}) — serving textless render`);
+    }
+  }
+  return { servedImageData, artImageData, typographySpec };
+}
+
 module.exports = {
+  stampRepaintedCover,
   composeCover, composeFrontTitle, composeDedication, composeBrand, applyCoverTypography, bakeCoverTypographyPostPersist,
   resolveCoverTitleMode,
   resolveCoverTextContract,
