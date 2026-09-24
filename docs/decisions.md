@@ -59093,7 +59093,17 @@ initial page with VEH001, front cover with ANI001 + ART001) on the streaming seq
 (`job_1790169018278_n57xpnufo`) on the trial sequence and the real `iterateCover` over its JSON brief: every
 built prompt has REQUIRED OBJECTS (e.g. "**Zippi** (animal) — about as long as an adult's forearm", "**tram**
 (vehicle)", the crown with its final-state delta), no KEY STORY ELEMENTS, no leaked METADATA block, and the D-16b
-checklist and the bbox labels are non-empty (source: prompt). Rung 2: see the Lab entry appended below.
+checklist and the bbox labels are non-empty (source: prompt). Rung 2: Test Lab **1453** (`beats_scenes`,
+stored beats, no review, ONE Art Director call on gemini-3.1-pro, $0.205, the DEPLOYED template on staging story
+`job_1788555701112_99txp8evx`, 4 pages). The rebuilt sent prompt reads "at most 4, on any of the three covers"
+(placeholder filled; the stored copy of the sent prompt is truncated at 60k before the cover section). The Art
+Director returned a `Scene:` line on all three covers and the live parser read each: e.g. the Title Page
+(`LOC002, ART001, ANI001, ART005`) "The small furry marten sits at the top of the steep wooden ladder, holding the
+soft grey stuffed rabbit toy. …". Replaying the real builders on those hints: each cover prompt carries the Scene
+prose, REQUIRED OBJECTS ("**stuffed rabbit** (object) — about as long as an adult's forearm | **marten** (animal) |
+**wooden ladder** (object) — several adults high"), no KEY STORY ELEMENTS, no METADATA leak, and a non-empty D-16b
+checklist. (Lab **1452**, the same request minutes earlier, was killed mid-run by another session's staging deploy
+and left no result.)
 
 **Touched:** `prompts/scene-expansion-all.txt`, `server/lib/outlineParser/unified.js`, `server/lib/coverIterate.js`,
 `server/lib/promptBuilders.js`, `server/lib/visualBible.js`, `server/lib/images.js`, `storyJobPipeline.js`,
