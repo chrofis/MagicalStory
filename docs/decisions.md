@@ -21,6 +21,76 @@ superseded and link forward.
 
 ---
 
+## 2026-09-24 — Image prompts say each thing once; the shrinker's cut order is one named list the docs render
+
+**Context.** Staging `job_1790100385959_1nitlympp`: every four-character image prompt (pages and
+covers) sat at or over ~10,010 characters, the line above which the shrinker (Grok cap 7,900) spends
+REQUIRED CAST; the front cover crossed it (10,129 built, REQUIRED CAST cut). Most of the overshoot was
+the same thing said twice. The ranked cut of 769c655ff existed only as a builder function with a
+docblock, and prompt-inventory.md kept a hand-written copy of the rank. Owner, 2026-09-24:
+"remove the pure repetition" (seven listed items) and "make clear what gets removed in which order" —
+one explicit ordered list in code, code and docs reading the same list, the log naming each cut block.
+
+**Decision — repetition (shared builders, so pages and covers stay identical per 2026-08-26).**
+1. ONE ground/feet rule: the cover-composition.txt ground bullet (all three covers) is deleted; the
+   shared Composition ground bullet (`COMPOSITION_GROUND_BULLET`) gains the one clause a page also
+   needs, "then no ground is invented under" a figure that swims, floats or flies. "Feet level with
+   each other" is not carried over: it contradicts a cover figure placed in the background.
+2. No `**CHARACTER REFERENCE PHOTOS:** [Name], …` line (`buildCharacterReferenceList`); REQUIRED CAST
+   reads "Every named character" instead of "named in the reference list" (pages never had the list).
+3. `buildCharacterPhysicalDescription` states the age once (no "(Looks: X)"), no height in cm
+   (HEIGHT ORDER carries relative size; nothing compares cm), and drops the midpoint build "average"
+   (same logic as the midpoint faces); slim / athletic / stocky stay. This line also feeds the entity
+   judge, consolidator and detector rich line, so generator and critic move together.
+4. `buildCoverSceneFromHint` no longer restates the age per figure and states the gaze once
+   ("Each of them looks at the viewer." / "<Name> looks at the viewer."); the empty-plate strip drops
+   the group sentence. Gaze stays code-owned at the viewer (SETTLED).
+5. The cover "Each character has 2 hands / at most 2 items" bullet is deleted (HANDS anchor carries it).
+6. The front "ALL MAIN CHARACTERS are prominently featured…" bullet is shortened to "The characters
+   form one balanced, uncluttered group, each clearly recognizable." (REQUIRED CAST carries the cast).
+7. Covers do not build the Composition facing bullet or COUNTS: both are now code constants
+   (`buildCompositionBlock({cover})`, `COUNTS_RULE`, placeholders `{COMPOSITION}` / `{COUNTS}` in
+   image-generation.txt). Same "inapplicable text is not built" precedent as the 2026-09-23 cover SHOT.
+Untouched: face text (d5dd79baf), the baked title block (SETTLED), the NO MARKS / HANDS anchors.
+
+**Decision — cut order.** `PROMPT_CUT_ORDER` (server/lib/images.js) is the one ordered list: each step
+has label, what, why and approximate size, and builds the exact-text remover the shrinker runs.
+`PROMPT_NEVER_CUT` lists what no step may remove (NO MARKS, HANDS, REQUIRED TEXT — checked by
+construction — plus SHOT, EXACT POSES and the `marker` entries REQUIRED OBJECTS, KEY STORY ELEMENTS, SEASON, COMPOSITION GUIDELINES, ART STYLE, which open the protected tail: b794b9731's MUST_KEEP_MARKERS is now derived from this list, not a second copy). The rank
+itself is unchanged from 769c655ff. The docs' section is generated from these constants by
+`scripts/admin/sync-prompt-cut-order-docs.js`; `tests/unit/prompt-cut-order-docs.test.ts` fails when
+a doc is stale, and the hand-written copy in prompt-inventory.md is replaced by a pointer. The log line
+and the generation-log event now read `cut in order: #1 COUNTS (-233) > #2 Composition: size (-305) …`
+(`droppedSteps` carries step, label, chars).
+
+**Evidence (rung 1, free).** The stored story rebuilt through the real builders (covers as
+storyJobPipeline builds them; pages 12 and 1 via `buildImagePrompt` from the stored brief, cast and
+reference photos) and the real shrinker at 7,900:
+
+| prompt | built before → after | sent before → after | cut after |
+|---|---|---|---|
+| front cover | 10,129 → 8,641 | 7,494 → 7,688 | size, DEPTH AND SIZE (REQUIRED CAST and ground now kept) |
+| initial page | 9,329 → 7,975 | 7,777 → 7,671 | size (DEPTH AND SIZE now kept) |
+| back cover | 9,280 → 7,907 | 7,728 → 7,603 | size (DEPTH AND SIZE now kept) |
+| page 12 (4 children) | 10,022 → 10,043 | 7,567 → 7,545 | COUNTS … ground (unchanged; REQUIRED CAST kept) |
+| page 1 (2 children) | 8,944 → 8,965 | 7,391 → 7,412 | unchanged |
+
+Every judge-checked rule (REQUIRED CAST, NO MARKS, HANDS, DEPTH AND SIZE, size, COUNTS, ground, HEIGHT
+ORDER, title, top third, viewer gaze) was grepped in each sent prompt: none went from sent to cut; on
+pages the only text change is the ground clause and the REQUIRED CAST wording. Page prompts carry no
+character lines or name list, so Task A saves nothing on pages; a four-child page still loses
+DEPTH AND SIZE and Composition to the cap.
+
+**Touched:** `prompts/image-generation.txt`, `prompts/cover-composition.txt`,
+`server/lib/promptBuilders.js`, `server/lib/coverIterate.js`, `server/lib/images.js`,
+`scripts/admin/sync-prompt-cut-order-docs.js`, `docs/image-generation-methods.html`,
+`docs/prompt-inventory.md`, `tests/unit/prompt-says-each-thing-once.test.ts`,
+`tests/unit/prompt-cut-order-docs.test.ts` (+ three tests moved to the constants).
+
+**Status:** ✅ active
+
+---
+
 ## 2026-09-24 — Cells get no size: a Visual Bible description states no scale; page-side readers add it via `withScaleNote`
 
 **Context:** Owner, 2026-09-23: *"Cells get no size."* A reference cell paints one element alone, so it

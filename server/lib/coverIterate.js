@@ -722,6 +722,15 @@ function validateCoverHintCast(coverHints, characters, opts = {}) {
  */
 /** Lead of the one sentence buildCoverSceneFromHint emits for the hint's unheld elements. */
 const COVER_ALSO_IN_SCENE_LEAD = 'Also in the scene with them:';
+/**
+ * The cover's gaze, stated ONCE for a group (owner, 2026-09-24): it was
+ * ", eyes on the viewer" at the end of every figure's sentence. Gaze is
+ * code-owned on covers (SETTLED: every figure looks at the viewer). A lone
+ * character's sentence carries its own name instead, which the plate strip
+ * already removes; this group sentence names nobody, so the plate drops it
+ * by this exact text.
+ */
+const COVER_GROUP_GAZE_SENTENCE = 'Each of them looks at the viewer.';
 
 function stripCharacterSentences(description, characterNames = []) {
   if (!description) return description;
@@ -755,7 +764,7 @@ function buildPlateDescription(emptyDescRaw, characterNames, visualBible, pageNu
     // (an animal painted into the plate is a duplicate once the render adds it).
     // The sentence is emitted by buildCoverSceneFromHint with this exact lead.
     .split(/(?<=[.!?])\s+/)
-    .filter(s => !s.startsWith(COVER_ALSO_IN_SCENE_LEAD))
+    .filter(s => !s.startsWith(COVER_ALSO_IN_SCENE_LEAD) && s !== COVER_GROUP_GAZE_SENTENCE)
     .join(' ')
     .replace(/\ba wide group portrait set before\b/gi, 'A wide view of')
     .replace(/\ba portrait of (?:two characters|a single character) set before\b/gi, 'A wide view of')
@@ -2185,29 +2194,15 @@ function buildCoverSceneFromHint(hint, visualBible, characters, opts = {}) {
     .filter(d => d && d.name)
     .sort((a, b) => (PRIO_RANK[a.priority] ?? 1) - (PRIO_RANK[b.priority] ?? 1));
 
+  // The age is NOT restated here (owner, 2026-09-24): the cover's
+  // CHARACTERS IN THIS IMAGE line already opens "<Name> is a <age> <noun>".
+  // `characters` is kept in the signature for callers.
   const charSentences = sortedDetails.map(d => {
     const pos = d.position ? `in the ${d.position}` : '';
-    const physChar = Array.isArray(characters)
-      ? characters.find(c => canonicalName(c?.name) === canonicalName(d.name))  // COMPARE
-      : null;
-    // Brief physical descriptor — the cover prompt template's CHARACTER_REFERENCE_LIST
-    // also provides per-character details, but mentioning the name in prose ties
-    // pose to identity. APPARENT-AGE bucket, never the numeric age: avatar and
-    // eval anchor to the bucket ("school-age boy", not "8-year-old male") and
-    // scene prose forbids numeric ages — same source the scene path uses.
-    let physTraits = '';
-    if (physChar) {
-      const { extractCharacterVisualProfile } = getStoryHelpers();
-      const prof = extractCharacterVisualProfile(physChar);
-      const bucket = prof.ageCategory ? prof.ageCategory.replace(/-/g, ' ') : null;
-      const term = prof.genderTerm || null;
-      physTraits = bucket && term ? `a ${bucket} ${term}` : (term ? `a ${term}` : '');
-    }
-    const intro = physTraits ? `${d.name}, ${physTraits},` : `${d.name}`;
-
     // Action: holds resolved; gaze is code-owned (decision 2026-07-11):
-    // covers are head-on portraits, every figure looks at the viewer. Any
-    // parsed `gazes at:` value (old stored stories) is ignored.
+    // covers are head-on portraits, every figure looks at the viewer — stated
+    // once below, not per figure. Any parsed `gazes at:` value (old stored
+    // stories) is ignored.
     const holds = String(d.holds || '').trim();
     const parts = [];
     if (pos) parts.push(`stands ${pos}`);
@@ -2216,9 +2211,11 @@ function buildCoverSceneFromHint(hint, visualBible, characters, opts = {}) {
       const name = heldId ? (resolveHoldable(heldId) || holds) : holds;
       parts.push(`holds the ${name}`);
     }
-    parts.push('eyes on the viewer');
-    return `${intro} ${parts.join(', ')}.`;
+    return parts.length > 0 ? `${d.name} ${parts.join(', ')}.` : `${d.name} is in the picture.`;
   });
+  const gazeSentence = sortedDetails.length === 1
+    ? `${sortedDetails[0].name} looks at the viewer.`
+    : sortedDetails.length > 1 ? COVER_GROUP_GAZE_SENTENCE : '';
 
   // Mood at the front; landmark behind everything; per-character sentences.
   // The hint's mood is authored in English on every story (the Art Director's
@@ -2260,7 +2257,7 @@ function buildCoverSceneFromHint(hint, visualBible, characters, opts = {}) {
   const alsoLine = shownRefs.length > 0
     ? `${COVER_ALSO_IN_SCENE_LEAD} ${shownRefs.join(', ')}.`
     : '';
-  const lines = [moodPhrase, sceneStarter, ...charSentences, alsoLine].filter(Boolean);
+  const lines = [moodPhrase, sceneStarter, ...charSentences, gazeSentence, alsoLine].filter(Boolean);
   return lines.join(' ');
 }
 

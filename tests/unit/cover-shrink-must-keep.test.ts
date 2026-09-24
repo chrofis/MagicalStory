@@ -12,6 +12,8 @@ import path from 'path';
 
 // @ts-expect-error - JS module without types
 import { shrinkPromptForModel } from '../../server/lib/images.js';
+// @ts-expect-error - JS module without types
+import { COUNTS_RULE, buildCompositionBlock } from '../../server/lib/promptBuilders.js';
 
 const TEMPLATE = fs.readFileSync(path.join(process.cwd(), 'prompts', 'image-generation.txt'), 'utf-8');
 const para = (prefix: string) => {
@@ -30,7 +32,7 @@ const coverPrompt = (proseRepeat: number, styleRepeat = 20) => [
   'A wide group portrait set before the harbour. The main character stands in the center, eyes on the viewer. '
     + 'Gulls wheel above the stone wall and the tide runs out slowly. '.repeat(proseRepeat),
   '',
-  para('**Composition:**'),
+  buildCompositionBlock(),
   '',
   '**KEY STORY ELEMENTS:**',
   '**Pip** (animal): SENTINEL_ELEMENT_DEFINITION a small grey harbour seal',
@@ -46,7 +48,7 @@ const coverPrompt = (proseRepeat: number, styleRepeat = 20) => [
   '',
   para('**DEPTH AND SIZE:**'),
   '',
-  para('**COUNTS:**'),
+  COUNTS_RULE,
 ].join('\n');
 
 const MUST_KEEP = ['SENTINEL_ELEMENT_DEFINITION', 'SENTINEL_SEASON', 'SENTINEL_COMPOSITION', '**ART STYLE:**'];

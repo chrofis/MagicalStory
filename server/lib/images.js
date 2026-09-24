@@ -799,7 +799,7 @@ function dedupeIdenticalBullets(prompt) {
 //      the drop in front of it: the front cover of the same story lost its
 //      whole cast block — every garment, age and height — because the
 //      `**CHARACTERS IN THIS IMAGE` header was not a marker. Blocks are now
-//      removed by their EXACT text, read from the template that emitted them,
+//      removed by their EXACT text, read from the template or constant that emitted them,
 //      so there is no range to overrun and no list to keep in sync.
 //
 // The scene prose, the reference-card colour map, the cast blocks, REQUIRED
@@ -816,7 +816,10 @@ function dedupeIdenticalBullets(prompt) {
 // lost both (docs/audits/prompt-audit-2026-09-23/08-page-images.md S3,
 // 09-covers.md C3). REQUIRED TEXT is protected the same way. None of them is a
 // unit below, and cutBlocks() throws if a unit would ever remove one.
-const { NO_CHARACTER_MARKING_RULE, HANDS_HOLD_ONLY_NAMED_RULE } = require('./promptBuilders');
+const {
+  NO_CHARACTER_MARKING_RULE, HANDS_HOLD_ONLY_NAMED_RULE,
+  COMPOSITION_HEADER, COMPOSITION_FACING_BULLET, COMPOSITION_GROUND_BULLET, COMPOSITION_SIZE_BULLET, COUNTS_RULE,
+} = require('./promptBuilders');
 
 /**
  * A literal paragraph of prompts/image-generation.txt, by its opening text.
@@ -836,111 +839,180 @@ function templateParagraph(prefix) {
   const tpl = PROMPT_TEMPLATES.imageGeneration || IMAGE_GENERATION_TEMPLATE_ON_DISK;
   const para = tpl.split(/\n{2,}/).map(x => x.trim()).find(x => x.startsWith(prefix));
   if (!para) {
-    throw new Error(`prompt-shrink: prompts/image-generation.txt has no paragraph starting "${prefix}" — the drop list is stale`);
+    throw new Error(`prompt-shrink: prompts/image-generation.txt has no paragraph starting "${prefix}" — the cut order is stale`);
   }
   return para;
 }
 
-/** A whole template paragraph, removed by its exact text (every occurrence). */
-function paragraphUnit(label, prefix) {
-  const text = templateParagraph(prefix);
-  return {
-    label,
-    apply(s) {
-      const n = s.split(text).length - 1;
-      return { text: n ? s.split(text).join('') : s, entitled: n * text.length };
-    },
+/** An exact string, removed wherever it occurs. */
+function exactTextUnit(text) {
+  return (s) => {
+    const n = s.split(text).length - 1;
+    return { text: n ? s.split(text).join('') : s, entitled: n * text.length };
   };
 }
 
 /** A block found by a regex (one match) — the cast-derived page facts. */
-function regexUnit(label, re) {
-  return {
-    label,
-    apply(s) {
-      const m = s.match(re);
-      return m ? { text: s.replace(re, ''), entitled: m[0].length } : { text: s, entitled: 0 };
-    },
+function regexUnit(re) {
+  return (s) => {
+    const m = s.match(re);
+    return m ? { text: s.replace(re, ''), entitled: m[0].length } : { text: s, entitled: 0 };
   };
 }
 
 /**
- * ONE BULLET of a bulleted template paragraph. Composition used to go whole —
- * 1,176 chars on p12 of staging job_1790100385959_1nitlympp, which was ~110
- * chars over the cap when its turn came — so a page lost its feet-on-the-ground
- * rule to pay for one sentence. Bullets go one at a time, in rank order; the
- * header goes with the last one, so no empty heading is ever sent.
+ * ONE BULLET of the Composition block (promptBuilders.buildCompositionBlock).
+ * Composition used to go whole — 1,176 chars on p12 of staging
+ * job_1790100385959_1nitlympp, which was ~110 chars over the cap when its turn
+ * came — so a page lost its feet-on-the-ground rule to pay for one sentence.
+ * Bullets go one at a time; the header goes with the last one, so no empty
+ * heading is ever sent.
  */
-function bulletUnit(label, paragraphPrefix, bulletPrefix) {
-  const para = templateParagraph(paragraphPrefix);
-  const [header, ...bullets] = para.split('\n');
-  const line = bullets.find(b => b.startsWith(`- ${bulletPrefix}`));
-  if (!line) {
-    throw new Error(`prompt-shrink: the "${paragraphPrefix}" paragraph has no bullet starting "- ${bulletPrefix}" — the drop list is stale`);
-  }
-  const escaped = header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function compositionBulletUnit(bullet) {
+  const escaped = COMPOSITION_HEADER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const orphanHeader = new RegExp(`^${escaped}[ \\t]*(?!\\n- )(?=\\n|$)`, 'm');
-  const needle = `\n${line}`;
-  return {
-    label,
-    apply(s) {
-      const n = s.split(needle).length - 1;
-      if (!n) return { text: s, entitled: 0 };
-      let out = s.split(needle).join('');
-      let entitled = n * needle.length;
-      if (orphanHeader.test(out)) {
-        out = out.replace(orphanHeader, '');
-        entitled += header.length;
-      }
-      return { text: out, entitled };
-    },
+  const needle = `\n${bullet}`;
+  return (s) => {
+    const n = s.split(needle).length - 1;
+    if (!n) return { text: s, entitled: 0 };
+    let out = s.split(needle).join('');
+    let entitled = n * needle.length;
+    if (orphanHeader.test(out)) {
+      out = out.replace(orphanHeader, '');
+      entitled += COMPOSITION_HEADER.length;
+    }
+    return { text: out, entitled };
   };
 }
 
 /**
- * The droppable units, LEAST LOAD-BEARING FIRST. Built lazily (the templates
- * are loaded asynchronously at boot) and cached.
+ * THE CUT ORDER — what shrinkPromptForModel removes, and in which order, when a
+ * built image prompt is over the model's cap (Grok: 7,900 chars,
+ * models.js maxPromptLength). ONE list. The shrinker walks it top to bottom and
+ * stops the moment the prompt fits; docs/image-generation-methods.html and
+ * docs/prompt-inventory.md render THIS array (scripts/admin/sync-prompt-cut-order-docs.js,
+ * pinned by tests/unit/prompt-cut-order-docs.test.ts) — there is no second copy.
  *
- * THE RANK (2026-09-23). A unit goes early when something else in the prompt
- * already carries most of what it says, or when it binds few pages:
- *   - COUNTS binds only a page that states a number of like things.
- *   - the Composition SIZE bullet restates what the REQUIRED OBJECTS scale
- *     riders and DEPTH AND SIZE ("a size stated for an element always wins")
- *     state per element.
- *   - the Composition FACING bullet yields to every declared facing, and EXACT
- *     POSES / EXPRESSIONS AND EYES declare one per figure on a page (a cover
- *     declares "eyes on the viewer" for everyone).
- *   - DEPTH AND SIZE defines the brief's foreground/midground/background words.
- *   - the Composition GROUND bullet is a page's only feet-on-the-ground rule
- *     (a cover carries a short one of its own).
- *   - REQUIRED CAST puts in every figure the prose gives no action to.
- * Then the page facts — height, age, the reference-photo binding, the frame
- * rule — last to go, as the 2026-09-21 ranking set them.
+ * Each step removes its block's EXACT text and nothing else. A step whose block
+ * is not in the prompt (a cover has no facing bullet or COUNTS; a one-character
+ * page has no HEIGHT ORDER) removes nothing and is not logged.
+ *
+ * THE RANK (2026-09-23, docs/decisions.md "The shrink ranks its cuts"): a block
+ * goes early when something else in the prompt already carries most of what it
+ * says or when it binds few pages; the page facts — height, age, the
+ * reference-photo binding, the frame rule — go last, as the 2026-09-21 ranking
+ * set them. `approxChars` is the block's size on a typical page (staging
+ * job_1790100385959_1nitlympp, measured 2026-09-24).
  */
+const PROMPT_CUT_ORDER = [
+  {
+    label: 'COUNTS',
+    what: 'the "three or fewer" counting rule',
+    why: 'binds only a page whose prose states a number of like things; never built on a cover',
+    approxChars: 235,
+    unit: () => exactTextUnit(COUNTS_RULE),
+  },
+  {
+    label: 'Composition: size',
+    what: 'the vessel / building / vehicle true-size bullet',
+    why: 'the REQUIRED OBJECTS scale riders and DEPTH AND SIZE ("a size stated for an element always wins") state it per element',
+    approxChars: 305,
+    unit: () => compositionBulletUnit(COMPOSITION_SIZE_BULLET),
+  },
+  {
+    label: 'Composition: facing',
+    what: 'the "faces the target, not the camera" bullet',
+    why: 'yields to every declared facing, and EXACT POSES / EXPRESSIONS AND EYES declare one per figure; never built on a cover',
+    approxChars: 367,
+    unit: () => compositionBulletUnit(COMPOSITION_FACING_BULLET),
+  },
+  {
+    label: 'DEPTH AND SIZE',
+    what: 'the foreground / midground / background definitions',
+    why: 'defines the brief\'s depth words; the prose still places every figure',
+    approxChars: 647,
+    unit: () => exactTextUnit(templateParagraph('**DEPTH AND SIZE:**')),
+  },
+  {
+    label: 'Composition: ground',
+    what: 'the feet-on-the-ground bullet (the header goes with it)',
+    why: 'the one feet-on-the-ground rule for pages and covers; kept longer than the generic rules above',
+    approxChars: 600,
+    unit: () => compositionBulletUnit(COMPOSITION_GROUND_BULLET),
+  },
+  {
+    label: 'REQUIRED CAST',
+    what: 'every named character in frame, exactly one of each, nobody added',
+    why: 'the generator half of D-03 / D-04b; the prose and the character lines still name the cast, so it is the last generic rule to go',
+    approxChars: 500,
+    unit: () => exactTextUnit(templateParagraph('**REQUIRED CAST:**')),
+  },
+  // Page facts. Last to go.
+  {
+    label: 'HEIGHT ORDER',
+    what: 'the shortest-to-tallest line',
+    why: 'a page fact: the relative size the height judge compares',
+    approxChars: 140,
+    unit: () => regexUnit(/^\*\*HEIGHT ORDER[^\n]*\n/m),
+  },
+  {
+    label: 'AGE & PROPORTIONS',
+    what: 'the per-age head-count proportions',
+    why: 'a page fact: without it an infant is drawn as a preschooler',
+    approxChars: 485,
+    unit: () => regexUnit(/^AGE & PROPORTIONS[\s\S]*?(?=\n\n|$)/m),
+  },
+  {
+    label: 'reference-photo rule',
+    what: 'which attached photo is a place and which is a person',
+    why: 'a page fact: the plate-vs-identity binding of the attached images',
+    approxChars: 512,
+    unit: () => exactTextUnit(templateParagraph('When the FIRST reference photo')),
+  },
+  {
+    label: 'single-illustration rule',
+    what: 'one full-bleed picture, no lettering, ids are not painted',
+    why: 'the frame rule; the very last block the cut may spend',
+    approxChars: 503,
+    unit: () => exactTextUnit(templateParagraph('Generate a SINGLE illustration')),
+  },
+];
+
+/**
+ * NEVER CUT. None of these is a step above, and no step may reach one:
+ * cutBlocks() throws if a step would remove an exact-text entry (`text`).
+ * Entries with a `marker` open the PROTECTED TAIL — everything from the first
+ * of them to the end of the prompt (protectedTailStart). Once every step has
+ * run, only the text before that tail (the scene prose and the page's own
+ * lines) is trimmed, at a sentence boundary; if the tail alone leaves no room
+ * the render fails loudly instead (owner, 2026-09-23).
+ */
+const PROMPT_NEVER_CUT = [
+  { label: 'NO MARKS', why: 'generator half of D-24 (sibling-registry page-image-generator-vs-critics parity anchor)', text: () => NO_CHARACTER_MARKING_RULE },
+  { label: 'HANDS', why: 'generator half of D-16b (same parity anchor set)', text: () => HANDS_HOLD_ONLY_NAMED_RULE },
+  { label: 'REQUIRED TEXT', why: 'the baked cover title and any lettering a Visual Bible element must carry (SETTLED: baked title)', text: () => '**REQUIRED TEXT:**' },
+  { label: 'REQUIRED OBJECTS', why: 'the commissioned elements of the page', marker: '**REQUIRED OBJECTS' },
+  { label: 'KEY STORY ELEMENTS', why: 'a cover\'s Visual Bible elements (owner, 2026-09-23: must-keep on every cover path)', marker: '**KEY STORY ELEMENTS:**' },
+  { label: 'SEASON', why: 'the book-wide season, even against a reference photo from another season', marker: '**SEASON:**' },
+  { label: 'COMPOSITION GUIDELINES', why: 'a cover\'s own composition: title-safe top third, group, bottom margin', marker: '**COMPOSITION GUIDELINES:**' },
+  { label: 'ART STYLE', why: 'the style the book is commissioned in', marker: '**ART STYLE' },
+  { label: 'SHOT', why: 'the page\'s declared framing (a cover carries none)' },
+  { label: 'EXACT POSES / EXPRESSIONS AND EYES', why: 'the declared pose and gaze per figure' },
+];
+
 let CUT_BLOCKS = null;
 function cutBlocks() {
   if (CUT_BLOCKS) return CUT_BLOCKS;
-  const units = [
-    paragraphUnit('COUNTS', '**COUNTS:**'),
-    bulletUnit('Composition: size', '**Composition:**', 'A vessel, building or vehicle'),
-    bulletUnit('Composition: facing', '**Composition:**', 'Each character does a specific action'),
-    paragraphUnit('DEPTH AND SIZE', '**DEPTH AND SIZE:**'),
-    bulletUnit('Composition: ground', '**Composition:**', 'A standing character stands'),
-    paragraphUnit('REQUIRED CAST', '**REQUIRED CAST:**'),
-    // Page facts. Last to go.
-    regexUnit('HEIGHT ORDER', /^\*\*HEIGHT ORDER[^\n]*\n/m),
-    regexUnit('AGE & PROPORTIONS', /^AGE & PROPORTIONS[\s\S]*?(?=\n\n|$)/m),
-    paragraphUnit('reference-photo rule', 'When the FIRST reference photo'),
-    paragraphUnit('single-illustration rule', 'Generate a SINGLE illustration'),
-  ];
-  // The anchors are protected by construction; this makes a unit added later
+  const units = PROMPT_CUT_ORDER.map((step, i) => ({ step: i + 1, label: step.label, apply: step.unit() }));
+  // The anchors are protected by construction; this makes a step added later
   // that would reach one fail at the first shrink instead of shipping.
   const tpl = PROMPT_TEMPLATES.imageGeneration || IMAGE_GENERATION_TEMPLATE_ON_DISK;
-  for (const anchor of [NO_CHARACTER_MARKING_RULE, HANDS_HOLD_ONLY_NAMED_RULE]) {
+  for (const keep of PROMPT_NEVER_CUT.filter(k => k.text)) {
+    const anchor = keep.text();
     let probe = `${tpl}\n\n${anchor}`;
     for (const unit of units) probe = unit.apply(probe).text;
     if (!probe.includes(anchor)) {
-      throw new Error('prompt-shrink: a drop unit removes a generator↔critic parity anchor — anchors are never cut');
+      throw new Error(`prompt-shrink: a cut step removes ${keep.label} — it is on the never-cut list`);
     }
   }
   CUT_BLOCKS = units;
@@ -954,11 +1026,12 @@ function cutBlocks() {
 const BLANK_RUN_SLACK = 64;
 
 /**
- * @returns {{ text: string, dropped: string[], proseCut: number }}
+ * @returns {{ text: string, dropped: string[], droppedSteps: Array<{step:number,label:string,chars:number}>, proseCut: number }}
  */
 function sectionAwareCut(prompt, maxLen, logLabel) {
   let out = prompt;
   const dropped = [];
+  const droppedSteps = [];
   for (const block of cutBlocks()) {
     if (out.length <= maxLen) break;
     const before = out.length;
@@ -984,7 +1057,10 @@ function sectionAwareCut(prompt, maxLen, logLabel) {
       // cheaper prompt, it is the wrong picture (CLAUDE.md — no fallbacks).
       throw new Error(`prompt-shrink: dropping "${block.label}" removed ${removed} chars but that block is only ${entitled} — the cut reached past it into the page's own facts`);
     }
-    if (removed > 0) dropped.push(block.label);
+    if (removed > 0) {
+      dropped.push(block.label);
+      droppedSteps.push({ step: block.step, label: block.label, chars: removed });
+    }
   }
 
   let proseCut = 0;
@@ -999,7 +1075,7 @@ function sectionAwareCut(prompt, maxLen, logLabel) {
       // Not an image prompt (the Grok edit body, the composite blend): no
       // section markers, nothing must-keep to protect.
       const truncated = truncatePromptForModel(out, maxLen, logLabel);
-      return { text: truncated, dropped, proseCut: out.length - truncated.length };
+      return { text: truncated, dropped, droppedSteps, proseCut: out.length - truncated.length };
     }
     const tail = out.slice(tailStart);
     const headBudget = maxLen - tail.length - 5;
@@ -1021,13 +1097,18 @@ function sectionAwareCut(prompt, maxLen, logLabel) {
   }
 
   log.warn(`✂️ [${logLabel}] Section-aware cut: ${prompt.length}→${out.length} chars`
-    + (dropped.length ? `, dropped ${dropped.join(' + ')}` : '')
+    + (droppedSteps.length ? `, cut in order: ${describeCutSteps(droppedSteps)}` : '')
     + (proseCut ? `, AND ${proseCut} chars of scene prose — a character may be missing` : ''));
-  return { text: out, dropped, proseCut };
+  return { text: out, dropped, droppedSteps, proseCut };
+}
+
+/** "#1 COUNTS (-235) > #2 Composition: size (-305)" — step numbers are PROMPT_CUT_ORDER positions. */
+function describeCutSteps(steps) {
+  return steps.map(s => `#${s.step} ${s.label} (-${s.chars})`).join(' > ');
 }
 
 /**
- * THE MUST-KEEP SECTIONS. Everything from the first of these to the end of the
+ * THE MUST-KEEP SECTIONS (the `marker` entries of PROMPT_NEVER_CUT). Everything from the first of these to the end of the
  * prompt is the protected tail: the shrink never trims into it, and fails
  * loudly rather than cut it (sectionAwareCut). REQUIRED OBJECTS and ART STYLE
  * were the only two markers until 2026-09-23, so a prompt with no REQUIRED
@@ -1037,7 +1118,7 @@ function sectionAwareCut(prompt, maxLen, logLabel) {
  * staging job_1789853503332_riqncqg1i's back cover shipped with all three gone
  * (owner, 2026-09-23: those three are must-keep on every cover path).
  */
-const MUST_KEEP_MARKERS = ['**REQUIRED OBJECTS', '**KEY STORY ELEMENTS:**', '**SEASON:**', '**COMPOSITION GUIDELINES:**', '**ART STYLE'];
+const MUST_KEEP_MARKERS = PROMPT_NEVER_CUT.filter(k => k.marker).map(k => k.marker);
 
 /** Index where the protected tail begins (the earliest must-keep marker), or -1. */
 function protectedTailStart(prompt) {
@@ -1096,7 +1177,7 @@ async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName
   // 2. Guarantee: drop ranked blocks, generic guidance before page facts.
   const cut = sectionAwareCut(out, maxPromptLength, logLabel);
   recordPromptShrink({ logLabel, modelName, branch: 'cut', before: prompt.length, after: cut.text.length,
-    cap: maxPromptLength, dropped: cut.dropped, proseCut: cut.proseCut });
+    cap: maxPromptLength, dropped: cut.dropped, droppedSteps: cut.droppedSteps, proseCut: cut.proseCut });
   if (meta) meta.compressedScene = sceneHeadOf(cut.text) || undefined;
   return cut.text;
 }
@@ -1110,13 +1191,13 @@ async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName
  * per page, so a whole book could ship with AGE & PROPORTIONS missing from
  * every prompt and nothing in the story record said so.
  */
-function recordPromptShrink({ logLabel, modelName, branch, before, after, cap, dropped, proseCut }) {
+function recordPromptShrink({ logLabel, modelName, branch, before, after, cap, dropped, droppedSteps = [], proseCut }) {
   const genLog = getCurrentLogger();
   if (!genLog) return;  // not in a generation context (ad-hoc Lab / script call)
   const details = { label: logLabel, model: modelName || null, branch, before, after, cap,
-    charsCut: before - after, dropped, proseCut };
+    charsCut: before - after, dropped, droppedSteps, proseCut };
   const msg = `${logLabel}: ${before}→${after} chars (cap ${cap}) via ${branch}`
-    + (dropped.length ? `, dropped ${dropped.join(' + ')}` : '')
+    + (droppedSteps.length ? `, cut in order: ${describeCutSteps(droppedSteps)}` : '')
     + (proseCut ? `, ${proseCut} chars of scene prose trimmed` : '');
   if (dropped.length || proseCut) genLog.warn('prompt_shrink', msg, null, details);
   else genLog.info('prompt_shrink', msg, null, details);
@@ -5953,5 +6034,7 @@ module.exports = {
   resolveOutputAspect,
   truncatePromptForModel,
   shrinkPromptForModel,
+  PROMPT_CUT_ORDER,
+  PROMPT_NEVER_CUT,
   extractDataImageUrls
 };
