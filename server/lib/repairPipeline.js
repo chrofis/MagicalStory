@@ -748,7 +748,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           // does the entity billing. Measured cost on one production book:
           // 75 points across four pages and a cover for hair differing by a
           // shade, which the owner reads as a nuance.
-          out.penalty += deductionPoints(issue);
+          // { entity: true }: this IS the entity report, so its source-scoped
+          // zero (scoring.js ENTITY_ONLY_ZERO_POINT_TYPES) applies.
+          out.penalty += deductionPoints(issue, { entity: true });
           out.issues.push({
             name: charName,
             // Carried so the ceiling is reproducible downstream and the dev
@@ -767,7 +769,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const objIssues = objData.issues || [];
       for (const issue of objIssues) {
         if (issue.pages?.includes(pageNumber) || issue.pagesToFix?.includes(pageNumber) || issue.pageNumber === pageNumber) {
-          out.penalty += deductionPoints(issue);
+          out.penalty += deductionPoints(issue, { entity: true });
           out.issues.push({
             name: objName,
             type: issue.type || null,
@@ -811,15 +813,25 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   //
   // Findings go into the consolidator's PROMPT as a labelled section and
   // nothing more — the consolidator decides what becomes a fix target. No code
-  // reads the fault text. Rewritten wholesale after each audit: the faults
-  // describe the state that audit read, not an accumulating list.
+  // reads the fault text.
+  //
+  // THEY BELONG TO THE VERSION THE AUDIT READ (2026-09-23). They used to sit in
+  // a page-keyed map handed to the NEXT round's consolidation of the version
+  // that round had just painted, so a finding charged pixels it never
+  // described (job_1790107559778_fcmlfa8kn p5 v3: a CATASTROPHIC read off v0).
+  // Now runBookAuditRound binds each finding to the version object it read
+  // (repairLogic.attributeReaderFindings) and re-consolidates THAT version with
+  // them — its score carries them, and its plan is what the next round repairs
+  // from. A newly painted version is consolidated on its own evidence only.
   // ---------------------------------------------------------------------
-  const readerFindingsByPage = new Map();   // pageNumber -> [{ severity, line }]
   const bookAuditRounds = [];
   // Per-round, per-method repair effectiveness — see summarizeRepairRound.
   const repairRounds = [];
 
-  const consolidatePageEval = async (ev, entityIssues, pageNumber, round, sceneDescriptionOverride = null) => {
+  // `readerFindings` is passed ONLY when the version being consolidated is the
+  // one the book audit read (rescoreWithReaderFindings); every other caller
+  // consolidates a version on its own evidence.
+  const consolidatePageEval = async (ev, entityIssues, pageNumber, round, sceneDescriptionOverride = null, readerFindings = []) => {
     try {
       const orig = rawImages.find(i => i.pageNumber === pageNumber);
       // The variant this page actually wears. Inpaint used to resolve this for
@@ -837,7 +849,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         evalResult: ev,
         entityIssues,
         sceneClothing,
-        readerFindings: readerFindingsByPage.get(pageNumber) || [],
+        readerFindings,
         // A repaired version is consolidated against ITS OWN contract (an
         // iterate rewrite resolves spec conflicts — checking the ORIGINAL
         // description would re-flag the fixed version and loop the repair).
@@ -1372,13 +1384,18 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // so they can't disagree. detectAllBoundingBoxes is NOT re-called on miss;
     // its internal safety+model retries already exhausted before storing the
     // result, so a re-call just burns another API hit.
-    const targetResolved = resolveCharBbox(charName, {
-      bestEval, entityReport: currentEntityReport, pageNumber, imageData: currentImageData,
-    });
+    // A decision carrying `targetFigure` (the presence model's MIXED case)
+    // paints THAT figure into `charName`; the name is on no figure yet.
+    const byFigure = decision.targetFigure != null;
+    const targetResolved = byFigure
+      ? require('./charRepairTarget').resolveFigureBbox(decision.targetFigure, { bestEval })
+      : resolveCharBbox(charName, {
+        bestEval, entityReport: currentEntityReport, pageNumber, imageData: currentImageData,
+      });
     const faceBbox = targetResolved.faceBbox;
     const bodyBbox = targetResolved.bodyBbox;
     if (!faceBbox && !bodyBbox) {
-      return { pageNumber, imageData: null, error: `no bbox for ${charName}` };
+      return { pageNumber, imageData: null, error: byFigure ? `no box for figure ${decision.targetFigure} (target ${charName})` : `no bbox for ${charName}` };
     }
 
     // SAME GUARD THE MANUAL ENDPOINT USES. The detector distributes the names
@@ -1387,8 +1404,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // borrowed label. Repainting the face under a borrowed label destroys a
     // bystander — an automatic repair does it without anyone watching, which is
     // worse than the manual case, not better.
+    // Not for a figure-targeted repaint: there the figure is chosen by id from
+    // the evaluation, and no detector label is borrowed.
     const { findBorrowedLabel } = require('./charRepairTarget');
-    const borrowed = findBorrowedLabel({
+    const borrowed = !byFigure && findBorrowedLabel({
       figures: Array.isArray(targetResolved.figures) ? targetResolved.figures : null,
       sceneCharacters: img.sceneCharacters || [],
       sceneMetadata: img.sceneMetadata || {},
@@ -1466,7 +1485,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // derivation. Prefer the intent the decision already emitted (repairParams),
     // but finalise faceOnly here since only now do we know a face box exists.
     const { resolveRepairAxes } = require('./faceRepair');
-    const repairAxes = resolveRepairAxes(decision.issueDescription, { hasFaceBbox: !!faceBbox, issueTypes: decision.issueTypes || null });
+    // A figure repainted INTO another character is a whole-figure redraw, never
+    // a face patch.
+    const repairAxes = resolveRepairAxes(decision.issueDescription, { hasFaceBbox: !!faceBbox, issueTypes: decision.issueTypes || null, ...(byFigure ? { forceTarget: 'body' } : {}) });
     const useFaceOnly = repairAxes.faceOnly;
     // THE FIGURE BOX, for a face repair too — the face goes separately as
     // `faceBbox`, and the face crop is built from that. Passing the face box
@@ -2044,8 +2065,36 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
    * A run that converged in round 2 of 3 left the loop before this block and
    * was never audited at all.
    */
+  /**
+   * Charge the book audit's findings to the version it read: re-consolidate
+   * that version's OWN evaluation + entity issues together with the reader
+   * findings and re-stamp its score with the same applyScore every writer uses.
+   * Its new plan is what the next round's repair works from. A later audit of
+   * the same version replaces the findings — they describe what that audit read.
+   * A failed consolidation leaves the version exactly as it was and says so.
+   */
+  const rescoreWithReaderFindings = async (pageNumber, version, findings, round) => {
+    const ev = version.evaluation;
+    if (!ev) {
+      log.error(`❌ [BOOK-AUDIT] p${pageNumber}: the audited version (${version.source || '?'}) carries no evaluation — ${findings.length} reader finding(s) cannot be charged to it`);
+      return;
+    }
+    const entityResult = { issues: version.entityIssues || [], penalty: version.entityPenaltyRaw ?? version.entityPenalty ?? 0 };
+    const plan = await consolidatePageEval(ev, entityResult.issues, pageNumber, round, version.description || null, findings);
+    if (!plan) {
+      log.error(`❌ [BOOK-AUDIT] p${pageNumber}: consolidation with ${findings.length} reader finding(s) failed — ${version.source || '?'} keeps its previous score, the findings are not charged`);
+      return;
+    }
+    const before = computeFinalScore(version);
+    version.readerFindings = findings;
+    version.readerFindingsRound = round;
+    version.pageNumber = pageNumber;
+    applyScore(version, { evalResult: ev, entityResult, consolidatedPlan: plan });
+    log.info(`📖 [BOOK-AUDIT] Round ${round} p${pageNumber}: ${findings.length} reader finding(s) charged to ${version.source || '?'} (the version read) — finalScore ${before} → ${version.finalScore}`);
+  };
+
   const runBookAuditRound = async ({ round, bookUnchanged, finalRound }) => {
-    const { planBookAuditRound, admitPagesFromAudit } = require('./repairLogic');
+    const { planBookAuditRound, admitPagesFromAudit, attributeReaderFindings } = require('./repairLogic');
     const auditPlan = planBookAuditRound({ round, roundLimit, bookUnchanged, extraRoundUsed: extraAuditRoundUsed, finalRound, maxPasses: maxRegenAttempts });
     if (auditPlan.runAudit) {
       try {
@@ -2054,7 +2103,16 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         // the picked version's bytes and the final page text. Never rebuild
         // this expression inline: the inline version read `img.text` straight
         // off the page object, which was PRE-REFINE prose.
-        const auditPages = buildAuditPages(rawImages, (pageNumber) => selectBestVersion(pageVersions.get(pageNumber) || []));
+        // The version each page is read from, held as the OBJECT the reader
+        // saw — its findings are attributed to exactly this version below. A
+        // version without bytes is not what buildAuditPages shows, so it is not
+        // recorded as read.
+        const auditedVersionByPage = new Map();
+        for (const img of rawImages) {
+          const v = selectBestVersion(pageVersions.get(img.pageNumber) || []);
+          if (v?.imageData) auditedVersionByPage.set(img.pageNumber, v);
+        }
+        const auditPages = buildAuditPages(rawImages, (pageNumber) => auditedVersionByPage.get(pageNumber) || null);
         const audit = auditPages.length > 0
           // The BIBLE rides along (2026-09-20). `auditPages` is a projection —
           // page number, final text, shipped bytes, cited object ids — and the
@@ -2067,23 +2125,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
               { usageTracker })
           : null;
         if (audit) {
-          readerFindingsByPage.clear();
-          for (const f of audit.byRoute.IMG) {
-            // Page-scoped only — a fault with no page number cannot be routed
-            // to a consolidator call, which is per page.
-            if (f.page == null) continue;
-            if (!readerFindingsByPage.has(f.page)) readerFindingsByPage.set(f.page, []);
-            // PROVENANCE (2026-09-14): a `missing_character` CRITICAL that came
-            // from the READER pass rather than a per-page judge is by design, not
-            // a bug — a diagnosis that cost an investigation because this merge
-            // dropped the origin. `reader` rides along from here.
-            const fs_ = require('./findingSources');
-            readerFindingsByPage.get(f.page).push({
-              severity: f.severity || null,
-              line: f.line,
-              sources: fs_.mergeSources(fs_.sourcesOf(f), [fs_.FINDING_SOURCES.READER]),
-            });
-          }
+          // Each IMG fault is bound to the version the audit read on its page
+          // and charged to THAT version only: it is re-consolidated with the
+          // findings and re-scored. A version painted after this audit is
+          // judged on its own evidence (decisions.md 2026-09-23).
+          const attributed = attributeReaderFindings(audit.byRoute.IMG, auditedVersionByPage);
+          await Promise.all([...attributed.entries()].map(([pageNumber, { version, findings }]) =>
+            consolidateLimit(() => rescoreWithReaderFindings(pageNumber, version, findings, round))));
           // Compact per-round record — same shape as entityHistory's entries.
           // The full `raw` transcript is kept for the FINAL audit only.
           bookAuditRounds.push({
@@ -2133,7 +2181,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             : (finalRound === true || round >= roundLimit)
               ? 'the stored audit record only — no further repair round is available'
               : "next round's consolidator";
-          log.info(`📖 [BOOK-AUDIT] Round ${round}: ${audit.byRoute.IMG.length} IMG fault(s) on ${readerFindingsByPage.size} page(s) → ${auditRouteNote}`);
+          log.info(`📖 [BOOK-AUDIT] Round ${round}: ${audit.byRoute.IMG.length} IMG fault(s) on ${attributed.size} page(s), charged to the version each was read from → ${auditRouteNote}`);
 
           // FINAL AUDIT → ONE EXTRA ROUND. Severity decides admission and
           // nothing else; the fault lines reach the consolidator unread by code.
@@ -2392,7 +2440,14 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // The roster travels with the decision so the two char-fix gates can
       // decline a figure the repaint has no reference for (an invented
       // secondary) instead of spending the page's round on a certain failure.
-      const decision = decideRepairMethod(img.pageNumber, latestEval, currentEntityReport, { characters });
+      // The version's DECLARED cast (an iterate rewrite carries its own) lets the
+      // router see a page written for nobody; the methods that already failed on
+      // this very version stop a failed char-fix from being repeated on it.
+      const decision = decideRepairMethod(img.pageNumber, latestEval, currentEntityReport, {
+        characters,
+        expectedCast: resolveDeclaredCast(bestSoFar?.sceneCharacters, img.sceneCharacters),
+        failedMethods: (bestSoFar?.failedRepairs || []).map(f => f.method),
+      });
       let method = decision.method;
       let reason = decision.reason;
 
@@ -2758,6 +2813,16 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     for (const f of roundResults.filter(r => r && !r.imageData)) {
       const img = rawImages.find(i => i.pageNumber === f.pageNumber);
       if (!img) continue;
+      // Skipped pages are not failures (they have no method and no parent).
+      // A real failure is recorded ON THE VERSION IT WAS ATTEMPTED ON: a failed
+      // repair makes no version, so that version stays best and the next round
+      // must know which method already failed on its pixels (decideRepairMethod
+      // `failedMethods`).
+      const parent = f.skipped ? null : roundParent.get(f.pageNumber);
+      if (parent) {
+        const { baseRepairMethod } = require('./repairLogic');
+        parent.failedRepairs = [...(parent.failedRepairs || []), { method: baseRepairMethod(f.method), round, error: f.error || 'no result' }];
+      }
       img.retryHistory = img.retryHistory || [];
       img.retryHistory.push({
         attempt: img.retryHistory.length + 1,
@@ -3019,8 +3084,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
     // ── MID-LOOP BOOK AUDIT — the reader's-eye pass, fed forward ──────────
     // Reads the CURRENT state of the book (each page's picked version + its
-    // text, in order) and hands its IMG faults to the next round's
-    // consolidator via readerFindingsByPage.
+    // text, in order) and charges its IMG faults to the version each page was
+    // read from (re-consolidated with them), whose plan the next round repairs.
     //
     // It runs on the LAST round too (owner, 2026-09-13, superseding the
     // 2026-09-01 removal): the book that actually ships must be read. Its

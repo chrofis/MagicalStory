@@ -70,17 +70,22 @@ function enrichCoverHintWithArtifacts(coverHint, visualBible, opts = {}) {
       }
     }
   }
+  const coverPageNumber = COVER_PAGE_NUMBERS[opts.coverKey];
+  if (coverPageNumber === undefined) {
+    throw new Error(`enrichCoverHintWithArtifacts: unknown coverKey "${opts.coverKey}" — the prop's state cannot be resolved`);
+  }
   for (const raw of (coverHint?.objects || [])) {
-    // Base state: a cover never shows the object mid-transformation, and the
-    // id is a lookup key - a dotted state handle matched no artifact at all.
+    // The id is a lookup key - a dotted state handle matched no artifact at
+    // all, so it is normalised to its parent here and passed whole below.
     const id = baseVbId(raw);
     if (!id || !/^ART\d+$/.test(id)) continue;
     const art = (visualBible?.artifacts || []).find(a => baseVbId(a?.id) === id);
     if (!art) continue;
     // A stated object has no base render — its cells live on its state rows —
-    // so the cover prop image must be resolved through elementRefCell (the
-    // default state), never read off the entry.
-    const { cell } = require('./visualBible').elementRefCell(art);
+    // so the cover prop image is resolved through elementRefCell: the state
+    // the hint cites, else the object's FINAL state (a cover shows the object
+    // as the story leaves it — visualBible.resolveObjectState rule 0).
+    const { cell } = elementRefCell(art, String(raw), coverPageNumber);
     const src = cell.referenceImageUrl || cell.referenceImageData;
     if (src) enriched._artifactImages[id] = src;
   }
@@ -90,7 +95,7 @@ function enrichCoverHintWithArtifacts(coverHint, visualBible, opts = {}) {
 // englishEntityRef / englishLocationRef / significantEntityTokens moved to
 // visualBible.js (canonical implementations, shared with the page-prompt
 // builders in storyHelpers.js). Re-exported below for existing consumers.
-const { englishEntityRef, englishLocationRef, significantEntityTokens, hasElementReference } = require('./visualBible');
+const { englishEntityRef, englishLocationRef, significantEntityTokens, hasElementReference, elementRefCell } = require('./visualBible');
 
 /**
  * VB ids the cover hint actually asks for: `Objects:` list ∪ every character's
@@ -200,6 +205,49 @@ function matchVbEntitiesInText(text, visualBible) {
     }
   }
   return matched.sort((a, b) => a.priority - b.priority);
+}
+
+// Case- and accent-insensitive form of a name or title, for the warning below
+// only: "l'Écureuil" and "L’ecureuil" compare equal.
+const foldForTitleMatch = (s) => String(s || '')
+  .normalize('NFD').replace(/\p{M}/gu, '')
+  .replace(/[‘’ʼ]/g, "'")
+  .toLowerCase();
+
+/**
+ * WARN-ONLY (owner, 2026-09-23): a Visual Bible entity the TITLE names belongs
+ * in the front cover's objects — the writer templates expect a title-named
+ * creature there (story-trial.txt COVER SCENE, scene-expansion-all.txt cover
+ * rules). When the writer left it out, this logs it and changes NOTHING:
+ * the name match decides whether to warn, never what the cover shows.
+ *
+ * @param {Object} args
+ * @param {string} args.title - the story title
+ * @param {Array<string|Object>} args.objects - the cover's objects (ids or {id})
+ * @param {Object} args.visualBible
+ * @param {string} [args.label]
+ * @returns {Array<{id: string, name: string}>} the title-named entries missing from objects
+ */
+function warnTitleNamedEntitiesMissingFromCover({ title, objects, visualBible, label = 'FRONT COVER' } = {}) {
+  const folded = foldForTitleMatch(title);
+  if (!folded.trim() || !visualBible) return [];
+  const listed = new Set((Array.isArray(objects) ? objects : [])
+    .map(o => baseVbId(typeof o === 'string' ? o : o?.id))
+    .filter(Boolean));
+  const missing = [];
+  for (const pool of ['animals', 'secondaryCharacters', 'artifacts', 'vehicles']) {
+    for (const entry of (Array.isArray(visualBible[pool]) ? visualBible[pool] : [])) {
+      const id = baseVbId(entry?.id);
+      if (!id || listed.has(id)) continue;
+      const names = [entry.name, entry.properName].map(n => String(n || '').trim()).filter(Boolean);
+      if (!names.some(n => entityNameRegex(foldForTitleMatch(n)).test(folded))) continue;
+      missing.push({ id, name: names[0] });
+    }
+  }
+  if (missing.length > 0) {
+    log.warn(`⚠️ [COVER-TITLE-CAST] ${label}: the title "${title}" names ${missing.map(m => `${m.name} (${m.id})`).join(', ')}, which the cover's objects do not list — the cover gets no definition or reference for it. Not added (warn only).`);
+  }
+  return missing;
 }
 
 /**
@@ -672,6 +720,9 @@ function validateCoverHintCast(coverHints, characters, opts = {}) {
  * final render then keeps those placeholders alongside the real cast —
  * phantom duplicate figures.
  */
+/** Lead of the one sentence buildCoverSceneFromHint emits for the hint's unheld elements. */
+const COVER_ALSO_IN_SCENE_LEAD = 'Also in the scene with them:';
+
 function stripCharacterSentences(description, characterNames = []) {
   if (!description) return description;
   const names = (characterNames || [])
@@ -700,6 +751,12 @@ function stripCharacterSentences(description, characterNames = []) {
 function buildPlateDescription(emptyDescRaw, characterNames, visualBible, pageNumber) {
   const { sanitizeVbIdsInPrompt } = getStoryHelpers();
   const stripped = stripCharacterSentences(emptyDescRaw, characterNames)
+    // The hint's own elements go in with the cast, never onto the empty plate
+    // (an animal painted into the plate is a duplicate once the render adds it).
+    // The sentence is emitted by buildCoverSceneFromHint with this exact lead.
+    .split(/(?<=[.!?])\s+/)
+    .filter(s => !s.startsWith(COVER_ALSO_IN_SCENE_LEAD))
+    .join(' ')
     .replace(/\ba wide group portrait set before\b/gi, 'A wide view of')
     .replace(/\ba portrait of (?:two characters|a single character) set before\b/gi, 'A wide view of')
     .replace(/\bOnly (?:these two people|this one person) appears?[^.]*\.\s*/gi, '')
@@ -1191,8 +1248,35 @@ async function iterateCover(coverKey, storyData, options = {}) {
     previousImage = rehydratedCoverBytes;
   }
 
+  // --- Composite-vs-direct decision (unchanged gate) ────────────────────
+  // Composite dispatch is the standalone `_maybeGenerateComposite` route
+  // helper (images.js). We decide compositeOn exactly as before and call the
+  // helper directly; it returns null when the landmark-buffer prerequisite is
+  // missing or the composite generator throws, and the direct render below
+  // runs instead.
+  //
+  // options.compositeCovers === false is an explicit opt-out: the user-facing
+  // "Überarbeiten" (regenerate-from-scratch) endpoint passes it so a from-scratch
+  // render never routes through composite. Direct render handles up to 5 figures
+  // fine (Pixar @5 verified, user decision 2026-07-19), so composite — slower,
+  // needs the analyzer, looks more "assembled" — is only worth it for CROWDED
+  // covers (>5 figures). The default flag gates on figure count; an explicit
+  // options.compositeCovers === true (Test Lab) still forces composite.
+  const coverFigureCount = coverCharacterPhotos?.length || 0;
+  const compositeOn = options.compositeCovers === false
+    ? false
+    : options.compositeCovers === true
+      ? true
+      : (MODEL_DEFAULTS.compositeCovers === true && coverFigureCount > 5);
+  if (!compositeOn && MODEL_DEFAULTS.compositeCovers === true && options.compositeCovers == null) {
+    log.info(`🔄 [COVER-ITERATE] ${coverKey}: ${coverFigureCount} figure(s) ≤ 5 — direct render (composite reserved for >5)`);
+  }
+
   // --- Build cover references (landmark photos, empty-scene plate, VB grid) ---
   // Shared with the streaming initial-gen path so v0 and iterate use the same anchors.
+  // `use` (see buildCoverReferences): the composite route is left as it was;
+  // an edit of an existing cover gets no plate and no landmark photo; every
+  // other render is plated or fails.
   const coverLabelStr = coverLabel(coverKey);
   const refs = await buildCoverReferences({
     coverKey,
@@ -1201,6 +1285,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
     sceneDescription,
     coverHint,
     logLabel: `${coverLabelStr} ITERATE`,
+    use: compositeOn ? 'composite' : (previousImage ? 'edit' : 'render'),
   });
   const {
     landmarkPhotos: coverLandmarkPhotos,
@@ -1253,30 +1338,6 @@ async function iterateCover(coverKey, storyData, options = {}) {
     log.info(`🔄 [COVER-ITERATE] ${coverLabelStr}: edit of an existing cover — empty-scene plate withheld (it composes instead of edits)`);
   }
 
-  // --- Composite-vs-direct decision (unchanged gate) ────────────────────
-  // Composite dispatch is the standalone `_maybeGenerateComposite` route
-  // helper (images.js). We decide compositeOn exactly as before and call the
-  // helper directly; it returns null when the landmark-buffer prerequisite is
-  // missing or the composite generator throws, and the direct render below
-  // runs instead.
-  //
-  // options.compositeCovers === false is an explicit opt-out: the user-facing
-  // "Überarbeiten" (regenerate-from-scratch) endpoint passes it so a from-scratch
-  // render never routes through composite. Direct render handles up to 5 figures
-  // fine (Pixar @5 verified, user decision 2026-07-19), so composite — slower,
-  // needs the analyzer, looks more "assembled" — is only worth it for CROWDED
-  // covers (>5 figures). The default flag gates on figure count; an explicit
-  // options.compositeCovers === true (Test Lab) still forces composite.
-  const coverFigureCount = coverCharacterPhotos?.length || 0;
-  const compositeOn = options.compositeCovers === false
-    ? false
-    : options.compositeCovers === true
-      ? true
-      : (MODEL_DEFAULTS.compositeCovers === true && coverFigureCount > 5);
-  if (!compositeOn && MODEL_DEFAULTS.compositeCovers === true && options.compositeCovers == null) {
-    log.info(`🔄 [COVER-ITERATE] ${coverKey}: ${coverFigureCount} figure(s) ≤ 5 — direct render (composite reserved for >5)`);
-  }
-
   // When composite is on, assemble the inputs the composite generator needs
   // (artifact-enriched hint + resolved landmark bytes). These stay HERE because
   // they are cover-domain producer helpers; the shared image path only consumes
@@ -1289,7 +1350,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
     // Pull artifact prop bytes + a full-VB id→name map so the composite layer
     // has everything ready (shared producer helper — same enrichment the
     // regeneration test-models path uses).
-    const enrichedHint = enrichCoverHintWithArtifacts(coverHint, visualBible, { language: storyData.language });
+    const enrichedHint = enrichCoverHintWithArtifacts(coverHint, visualBible, { language: storyData.language, coverKey });
     const landmarkBuf = options.landmarkBufOverride
       || (coverLandmarkPhotos?.[0] ? await loadLandmarkBytes(coverLandmarkPhotos[0]) : null);
     compositeInputs = {
@@ -1739,7 +1800,7 @@ function trialCoverPlateDescription(coverScene) {
  * @param {Function} [args.usageTracker] - (usage, modelId) => void for empty-scene cost tracking
  * @param {string} [args.logLabel] - prefix for log lines (defaults to cover label)
  * @param {string} [args.sceneBackground] - an existing people-free plate for this cover's location; skips the plate render
- * @param {boolean} [args.requirePlate] - always plate, and throw when a landmark photo resolved but no plate exists
+ * @param {'render'|'edit'|'composite'} [args.use] - what the caller does with the refs (see the parameter comment)
  * @returns {Promise<{landmarkPhotos: Array, visualBibleGrid: Buffer|null, sceneBackground: string|null, sceneMetadata: Object|null, coverPageNumber: number}>}
  */
 async function buildCoverReferences({
@@ -1759,13 +1820,24 @@ async function buildCoverReferences({
   // A people-free plate that already exists for this cover's location (the
   // trial cover reuses its pages' plate). When given, no plate is rendered here.
   sceneBackground: providedSceneBackground = null,
-  // The caller never renders this cover without a plate: the plate is built
-  // whatever singlePassScene says, and a landmark photo with no plate throws
-  // instead of reaching the render — packReferences would otherwise promote
-  // the raw photograph into the scene slot and the model edits the photo,
-  // people and all (prod trial job_1790169018278_n57xpnufo).
-  requirePlate = false,
+  // What the caller does with the references:
+  //  'render'    — a fresh cover render (every first-generation cover, a
+  //                from-scratch iterate). ALWAYS plated, whatever
+  //                singlePassScene says, and a landmark photo with no plate
+  //                THROWS: packReferences would otherwise promote the raw
+  //                photograph into the scene slot and the model edits the
+  //                photo, people and all (prod trial job_1790169018278_n57xpnufo).
+  //  'edit'      — an edit of an existing cover. An edit gets only the image
+  //                being edited (iterateCover A1), so no plate is rendered and
+  //                no landmark photo is returned — none reaches the edit.
+  //  'composite' — the composite cover route. Unchanged by owner decision
+  //                (2026-09-24): plate unless singlePassScene, no throw, and
+  //                the raw photo stays its background input.
+  use = 'render',
 }) {
+  if (!['render', 'edit', 'composite'].includes(use)) {
+    throw new Error(`buildCoverReferences: unknown use "${use}"`);
+  }
   const { resolveArtStyle, resolveArtStyleForEmptyScene, extractSceneMetadata, getLandmarkPhotosForScene } = getStoryHelpers();
   const { generateImageOnly } = require('./images');
   const { buildVisualBibleGrid, buildEmptySceneVbGrid } = require('./referenceSheets');
@@ -1860,13 +1932,19 @@ async function buildCoverReferences({
 
   const coverPageNumber = COVER_PAGE_NUMBERS[coverKey] ?? -1;
 
+  // An edit sends no landmark photo at all — not as the scene anchor, not as a
+  // secondary grid cell.
+  if (use === 'edit') landmarkPhotos = [];
+
   // --- Generate empty scene for style anchoring ---
-  // Respect MODEL_DEFAULTS.singlePassScene: when true (the default), pages render
-  // in a single pass with no plate.
-  let sceneBackground = providedSceneBackground || null;
-  if (sceneBackground) {
+  // A rendered cover is always plated; singlePassScene only governs the
+  // composite route (see `use`).
+  let sceneBackground = use === 'edit' ? null : (providedSceneBackground || null);
+  if (use === 'edit') {
+    log.info(`🎬 [COVER-REFS] ${label}: edit of an existing cover — no plate, no landmark photo`);
+  } else if (sceneBackground) {
     log.info(`🎬 [COVER-REFS] ${label}: reusing the existing people-free plate for this location`);
-  } else if (MODEL_DEFAULTS.singlePassScene === true && !requirePlate) {
+  } else if (use === 'composite' && MODEL_DEFAULTS.singlePassScene === true) {
     log.info(`🎛️ [COVER-REFS] ${label}: singlePassScene=true — skipping empty-scene plate`);
   } else {
     try {
@@ -1937,7 +2015,8 @@ async function buildCoverReferences({
       log.warn(`⚠️ [COVER-REFS] ${label}: empty scene failed: ${err.message}`);
     }
   }
-  if (requirePlate && landmarkPhotos.length > 0 && !sceneBackground) {
+  if (use === 'render' && landmarkPhotos.length > 0 && !sceneBackground) {
+    log.error(`❌ [COVER-REFS] ${label}: no people-free plate for landmark "${landmarkPhotos[0]?.name || 'unknown'}" — cover not rendered`);
     throw new Error(`${label}: no people-free plate for landmark "${landmarkPhotos[0]?.name || 'unknown'}" — the cover is not rendered on the raw photograph`);
   }
 
@@ -1963,7 +2042,7 @@ async function buildCoverReferences({
       }
     }
     if (sceneIds.length > 0) {
-      const idBasedRefs = getElementReferenceImagesByIds(visualBible, sceneIds);
+      const idBasedRefs = getElementReferenceImagesByIds(visualBible, sceneIds, coverPageNumber);
       const existingIds = new Set(elementRefs.map(r => r.id));
       const newRefs = idBasedRefs.filter(r => !existingIds.has(r.id));
       if (newRefs.length > 0) {
@@ -1981,12 +2060,17 @@ async function buildCoverReferences({
     {
       const nameMatched = matchVbEntitiesInText(sceneDescription, visualBible)
         .filter(e => e.hasReference)
-        .map(e => ({
-          id: e.id, name: e.name, type: e.type, description: e.description,
-          referenceImageData: e.referenceImageData,
-          referenceImageUrl: e.referenceImageUrl,
-          priority: e.priority,
-        }));
+        .map(e => {
+          // A stated object has no base render — its cells are its states —
+          // so the cell comes from the one resolver (a cover's final state).
+          const { cell } = elementRefCell(e.entry, null, coverPageNumber);
+          return {
+            id: e.id, name: e.name, type: e.type, description: e.description,
+            referenceImageData: cell.referenceImageData,
+            referenceImageUrl: cell.referenceImageUrl,
+            priority: e.priority,
+          };
+        });
       const have = new Set(elementRefs.map(r => String(r.id || r.name).toUpperCase()));
       const addable = nameMatched.filter(r => !have.has(String(r.id || r.name).toUpperCase()));
       if (addable.length > 0) {
@@ -2145,12 +2229,38 @@ function buildCoverSceneFromHint(hint, visualBible, characters, opts = {}) {
   // out the "group" — so only say "group" for 3+; otherwise state the exact
   // count and forbid extra figures.
   const nChars = sortedDetails.length;
+  // "no other PEOPLE", not "no other figures": an animal the hint lists is a
+  // figure too, and the old wording forbade it in the same breath the objects
+  // sentence below asks for it.
   const sceneStarter = nChars >= 3
     ? `A wide group portrait set before ${landmarkName}.`
     : nChars === 2
-      ? `A portrait of two characters set before ${landmarkName}. Only these two people appear; no other figures, no crowd.`
-      : `A portrait of a single character set before ${landmarkName}. Only this one person appears; no other figures, no crowd.`;
-  const lines = [moodPhrase, sceneStarter, ...charSentences].filter(Boolean);
+      ? `A portrait of two characters set before ${landmarkName}. Only these two people appear; no other people, no crowd.`
+      : `A portrait of a single character set before ${landmarkName}. Only this one person appears; no other people, no crowd.`;
+  // THE HINT'S OWN ELEMENTS, IN THE PROSE (2026-09-23). A listed ART/ANI/VEH
+  // that nobody holds reached the image model only as a KEY STORY ELEMENTS
+  // definition and a reference cell — the scene never said it was THERE, and
+  // this prose is also the brief the cover judges score against, so a judge
+  // told to catch "extra objects" had no line placing it. Held ids are already
+  // named in their holder's sentence.
+  const heldIds = new Set(sortedDetails.map(d => parseHoldsId(String(d.holds || ''))).filter(Boolean).map(id => baseVbId(id)));
+  const shownRefs = [];
+  for (const raw of objects) {
+    const id = baseVbId(raw);
+    if (!id || !/^(ART|ANI|VEH)\d+$/.test(id) || heldIds.has(id)) continue;
+    const ref = resolveHoldable(id);
+    if (!ref) {
+      log.warn(`⚠️ [COVER-SCENE] cover hint lists ${id}, which is in no Visual Bible pool — not named in the cover scene`);
+      continue;
+    }
+    // An animal keeps its name (as in KEY STORY ELEMENTS); a thing takes "the".
+    const phrase = id.startsWith('ANI') ? ref : `the ${ref}`;
+    if (!shownRefs.includes(phrase)) shownRefs.push(phrase);
+  }
+  const alsoLine = shownRefs.length > 0
+    ? `${COVER_ALSO_IN_SCENE_LEAD} ${shownRefs.join(', ')}.`
+    : '';
+  const lines = [moodPhrase, sceneStarter, ...charSentences, alsoLine].filter(Boolean);
   return lines.join(' ');
 }
 
@@ -2174,6 +2284,7 @@ module.exports = {
   matchVbEntitiesInText,
   stripEntityNameFromDescription,
   reconcileCoverSceneEntities,
+  warnTitleNamedEntitiesMissingFromCover,
   COVER_ELEMENT_REF_CAP,
   applyCoverWornHeldDedupe,
   buildInitialPageComposition,

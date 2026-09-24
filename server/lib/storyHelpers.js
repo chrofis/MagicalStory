@@ -66,7 +66,7 @@ function calculateStoryPageCount(storyData, includeCoverPages = true) {
  * Also checks setting.location for landmark references
  * Supports on-demand loading of photo variants for Swiss landmarks
  * @param {Object} visualBible - Visual Bible object with locations
- * @param {Object} sceneMetadata - Scene metadata with objects array, setting.location, and landmarkVariants
+ * @param {Object} sceneMetadata - Scene metadata with objects array, setting.location and landmarkView
  * @param {Object} [opts]
  * @param {number} [opts.pageNumber] - Current page. When given (positive int), a
  *   landmark is served only if its VB pages list includes this page — the
@@ -76,7 +76,7 @@ function calculateStoryPageCount(storyData, includeCoverPages = true) {
  * @param {Array} [opts.misses] - caller-owned array; every landmark the scene
  *   cites that SHOULD have produced a photo but could not (fetch failed, no
  *   photo source at all) is pushed as {id, name, reason}. By-design "attach
- *   nothing" outcomes (.0 variant, no photo for the scene's vantage) are NOT
+ *   nothing" outcomes (no photo for the scene's landmarkView) are NOT
  *   misses. Lets the page renderer downgrade loudly instead of silently
  *   rendering a real landmark blind (dragon run job_1788551692337_bc479p945:
  *   Commons fetches failed, 5 pages rendered with zero reference photos and
@@ -86,33 +86,27 @@ function calculateStoryPageCount(storyData, includeCoverPages = true) {
 async function getLandmarkPhotosForScene(visualBible, sceneMetadata, opts = {}) {
   if (!visualBible?.locations) return [];
 
-  // Extract LOC IDs and names from objects like "Burgruine Stein [LOC002]" or "Kennedy Space Center [LOC001.2]"
+  // Extract LOC IDs and names from objects like "Burgruine Stein [LOC002]" or "Kennedy Space Center [LOC001.2]".
+  // A dotted `.N` is a Visual Bible VANTAGE id (the plate's camera position),
+  // never a photo slot: it is dropped here, and the page's `landmarkView`
+  // alone picks the photo (pickVariantForView; docs/decisions.md 2026-09-24).
   const locIds = [];
   const locNames = [];
-  const variantMap = {};
 
   // Helper to extract LOC ID and name from a string like "Ruine Stein [LOC001]" or "Ruine Stein [LOC001.2]"
   const extractLocFromString = (str) => {
     if (!str || typeof str !== 'string') return;
     // Match [LOC###] or [LOC###.N] pattern
-    const bracketMatch = str.match(/\[LOC(\d+)(?:\.(\d+))?\]/i);
+    const bracketMatch = str.match(/\[LOC(\d+)(?:\.\d+)?\]/i);
     if (bracketMatch) {
-      const locId = `LOC${bracketMatch[1].padStart(3, '0')}`;
-      locIds.push(locId);
-      // Store variant if specified (e.g., [LOC003.2] → variant 2)
-      if (bracketMatch[2]) {
-        variantMap[locId] = parseInt(bracketMatch[2]);
-      }
+      locIds.push(`LOC${bracketMatch[1].padStart(3, '0')}`);
       // Also extract the name before the bracket
       const namePart = str.replace(/\s*\[LOC\d+(?:\.\d+)?\]\s*/gi, '').trim();
       if (namePart) locNames.push(namePart.toLowerCase());
     }
     // Also match plain "LOC002" or "LOC002.3" format
     else if (str.match(/^LOC\d+(\.\d+)?$/i)) {
-      const parts = str.split('.');
-      const locId = parts[0].toUpperCase();
-      locIds.push(locId);
-      if (parts[1]) variantMap[locId] = parseInt(parts[1]);
+      locIds.push(str.split('.')[0].toUpperCase());
     }
     // Fallback: treat as location name (for historical locations)
     else if (str.trim()) {
@@ -138,9 +132,6 @@ async function getLandmarkPhotosForScene(visualBible, sceneMetadata, opts = {}) 
   }
 
   if (locIds.length === 0 && locNames.length === 0) return [];
-
-  // Per-landmark variants from [LOC003.2] format, falling back to metadata landmarkVariants
-  const perLandmarkVariants = { ...variantMap, ...(sceneMetadata?.landmarkVariants || {}) };
 
   // Find matching locations
   let matchingLocations = visualBible.locations.filter(loc =>
@@ -180,7 +171,6 @@ async function getLandmarkPhotosForScene(visualBible, sceneMetadata, opts = {}) 
   const results = [];
   for (const loc of matchingLocations) {
     const photo = await resolveLandmarkPhotoForLocation(visualBible, loc, {
-      explicitVariant: perLandmarkVariants[loc.id],
       sceneView,
       misses: opts.misses,
     });
@@ -210,19 +200,18 @@ async function getLandmarkPhotosForScene(visualBible, sceneMetadata, opts = {}) 
  * bystanders, real signage, in a watercolour book). Both callers now share this
  * resolver — never inline a third copy.
  *
- * Variant 0 = "no photo matches this scene's vantage" (owner, 2026-08-11): the
- * Art Director writes `.0` when the action is inside/under a landmark and no
- * interior variant exists — attaching an exterior photo to an interior scene
- * anchors the model to the wrong view. Explicit `.N` from the brief wins
- * (`.0` = attach nothing). Without one, the scene's declared landmark view
- * picks the photo by KIND — and a view the index has no photo for (underwater,
- * an unphotographed interior) attaches nothing rather than falling back to
- * slot 1, which is how a surface photo ended up anchoring underwater scenes.
+ * The scene's declared landmark view picks the photo by KIND
+ * (pickVariantForView), ranked by the judged photo score — and a view the index
+ * has no photo for (underwater, an unphotographed interior) attaches nothing
+ * rather than falling back to slot 1, which is how a surface photo ended up
+ * anchoring underwater scenes. A dotted id in the brief (`LOC002.3`) is a
+ * Visual Bible vantage and plays no part here; the old `.N`-is-a-photo-slot
+ * channel (and its `.0` = attach nothing) was deleted 2026-09-24 — `none` /
+ * `underwater` is how a page asks for no photo.
  *
  * @param {Object} visualBible
  * @param {Object} loc - one VB location (isRealLandmark)
  * @param {Object} [opts]
- * @param {number} [opts.explicitVariant] - `.N` from the brief; 0 = attach nothing
  * @param {string|null} [opts.sceneView] - declared landmark view; null picks an exterior
  * @param {Array} [opts.misses] - see getLandmarkPhotosForScene; failure-to-serve
  *   entries {id, name, reason} are pushed here (never by-design nulls)
@@ -232,8 +221,8 @@ async function resolveLandmarkPhotoForLocation(visualBible, loc, opts = {}) {
   const misses = Array.isArray(opts.misses) ? opts.misses : null;
   const decision = decideLandmarkPhotoSource(loc, opts);
   if (!decision) {
-    // A variant-backed landmark returning null is by design (.0, or no photo
-    // for the scene's vantage — the prose carries the setting). A landmark
+    // A variant-backed landmark returning null is by design (no photo for the
+    // scene's view — the prose carries the setting). A landmark
     // with NO variants and no successful photo is a genuine miss: the scene
     // cites a real landmark and we have nothing to show the model.
     if (misses && !(loc.photoVariants?.length > 0)) {
@@ -250,15 +239,14 @@ async function resolveLandmarkPhotoForLocation(visualBible, loc, opts = {}) {
       }
       return null;
     }
-    log.debug(`[LANDMARK-SCENE] Loaded "${loc.name}" variant ${variant.variantNumber} (requested: ${decision.variantNumber})`);
+    log.debug(`[LANDMARK-SCENE] Loaded "${loc.name}" variant ${variant.variantNumber}`);
     // Carry the indexer's own classification of THIS photo (photo_type:
     // exterior | distant | close | interior | view-from) and its description
     // through to the prompt. pickVariantForView selects on `kind` and then
     // every consumer dropped it, so buildLandmarkFidelityBlock had only a name
     // to go on and told the model "preserve the silhouette… never a tiny speck
     // against a wide cityscape" even when the reference was a village panorama,
-    // which has no silhouette to preserve. The loader can return a different
-    // slot than was requested, so read the kind off the slot actually served.
+    // which has no silhouette to preserve.
     const served = (loc.photoVariants || []).find(v => v.variantNumber === variant.variantNumber);
     return {
       name: loc.name,
@@ -300,15 +288,15 @@ async function resolveLandmarkPhotoForLocation(visualBible, loc, opts = {}) {
  */
 function decideLandmarkPhotoSource(loc, opts = {}) {
   if (!loc) return null;
-  const { explicitVariant, sceneView = null } = opts;
+  const { sceneView = null } = opts;
 
   if (loc.photoVariants && loc.photoVariants.length > 0) {
-    const requestedVariant = explicitVariant ?? pickVariantForView(loc, sceneView);
-    if (requestedVariant === 0 || requestedVariant == null) {
-      log.info(`📍 [LANDMARK-SCENE] ${loc.name}: no photo attached (view=${sceneView || 'unset'}${explicitVariant === 0 ? ', explicit .0' : ''}) — prose carries the setting`);
+    const variantNumber = pickVariantForView(loc, sceneView);
+    if (variantNumber == null) {
+      log.info(`📍 [LANDMARK-SCENE] ${loc.name}: no photo attached (view=${sceneView || 'unset'}) — prose carries the setting`);
       return null;
     }
-    return { mode: 'variant', variantNumber: requestedVariant };
+    return { mode: 'variant', variantNumber };
   }
 
   if ((loc.referencePhotoUrl || loc.referencePhotoData) && loc.photoFetchStatus === 'success') {

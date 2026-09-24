@@ -219,6 +219,25 @@ function charFixReferenceGap({ characters = [], characterName = '' } = {}) {
  * MOVED HERE from repairPipeline.js so the manual endpoint stops carrying a
  * second, different ladder.
  */
+/**
+ * The box of ONE evaluator figure, by its id (owner, 2026-09-24). The presence
+ * model's MIXED case repaints an unmatched figure into the missing cast member,
+ * and that member's name is by definition on no figure, so the name ladder
+ * below cannot find it. The figure id and its box come from the SAME
+ * evaluation that produced the finding. The evaluator writes `[x1,y1,x2,y2]`
+ * (image-evaluation output contract); repair boxes are `[ymin,xmin,ymax,xmax]`,
+ * so the axes are swapped here, once.
+ */
+function resolveFigureBbox(figureId, { bestEval } = {}) {
+  const id = Number(figureId);
+  const m = (bestEval?.matches || []).find(x => Number(x?.figure) === id);
+  const swap = (b) => (Array.isArray(b) && b.length === 4 ? [b[1], b[0], b[3], b[2]] : null);
+  const faceBbox = swap(m?.face_bbox);
+  const bodyBbox = swap(m?.body_bbox);
+  if (!faceBbox && !bodyBbox) return { faceBbox: null, bodyBbox: null, source: null };
+  return { faceBbox, bodyBbox, source: `eval-figure-${id}` };
+}
+
 function resolveCharBbox(charName, { bestEval, entityReport, pageNumber, imageData = null } = {}) {
   if (!charName || charName === 'UNKNOWN') {
     return { faceBbox: null, bodyBbox: null, source: null };
@@ -387,5 +406,6 @@ module.exports = {
   findBorrowedLabel,
   charFixReferenceGap,
   resolveCharBbox,
+  resolveFigureBbox,
   resolveFigureMask,
 };

@@ -17,8 +17,8 @@ const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = requi
 // this module was the prose worn-vs-held matcher deleted 2026-09-18. It stays
 // exported from visualBible.js for coverIterate.js, which still uses it.
 const { REQUIRED_TEXT_AUTHORING_RULE, declaredText } = require('./requiredText');
-const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote, withScaleNote } = require('./visualBible');
-const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE } = require('./shotVocabulary');
+const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote, withScaleNote, COVER_KEY_ELEMENT_CAP } = require('./visualBible');
+const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { castCoverage, castCoverageRule, castActionRule } = require('./castCoverage');
 // REQUIRED IN-IMAGE TEXT: one source for the generator block, the repair
@@ -33,7 +33,7 @@ const { frameColorForName } = require('./characterFrames');
 const { getLanguageNote, getLanguageInstruction, getLanguageNameEnglish } = require('./languages');
 const { getEventById } = require('./historicalEvents');
 const { getSwissStoryResearch, getSwissCityById } = require('./swissStories');
-const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata, resolveTextStagePictureSpec, buildTextStagePictureSpecs, characterLookSignature, dropAppearanceAppositive } = require('./sceneMetadata');
+const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata, resolveTextStagePictureSpec, buildTextStagePictureSpecs, SHARED_GRIP_RULE } = require('./sceneMetadata');
 const { resolveClothingForPage, buildUsedClothingText, buildAvailableAvatarsForPrompt } = require('./clothingResolve');
 const { seasonLabel, buildSeasonNote, buildSeasonInstruction } = require('./season');
 const { isNotSetRelationship, isStrangersRelationship } = require('./relationships');
@@ -140,6 +140,32 @@ function stripAgeWords(text) {
 }
 
 /**
+ * A character's face as every prompt carries it — ONE builder for the page
+ * path (Art Director input), the cover path (CHARACTERS IN THIS IMAGE), the
+ * detector identity line and the single-page repair prompt (owner,
+ * 2026-09-24: "Shorten each child's face everywhere. Same logic.").
+ *
+ * The stored face is a comma list from character-analysis.txt's fixed scale:
+ * jawline, chin, nose, cheekbones, lips. Descriptors at their scale's MIDPOINT
+ * — `neutral` chin, `medium` cheekbones, `medium` lips — say "nothing unusual
+ * here" and separate nobody: over 149 staging faces, 147 carry "neutral chin"
+ * and "medium cheekbones" and 140 "medium lips". They are dropped; a
+ * non-midpoint value (full lips, high cheekbones, a dimpled chin) stays. The
+ * reference card carries the face itself. Mean face text 91 → 46 characters,
+ * which matters on a four-child cover over the image model's prompt cap.
+ * Age words are stripped first, as before.
+ */
+const FACE_MIDPOINT_RE = /^(?:neutral|medium)\b/i;
+function buildFaceDescription(face) {
+  if (isNone(face)) return '';
+  return String(stripAgeWords(String(face)))
+    .split(',')
+    .map(s => s.trim())
+    .filter(s => s && !FACE_MIDPOINT_RE.test(s))
+    .join(', ');
+}
+
+/**
  * Build physical age-marker cues from an apparentAge category.
  *
  * The analyzer emits apparentAge as a single category ("teenager", "school-age"),
@@ -157,33 +183,41 @@ function getAgeMarkers(apparentAge) {
   // ignore adjectives but respect proportion numbers (same table the avatar
   // prompt uses: infant≈4, child≈6, teen≈7, adult≈8 head-heights).
   switch (apparentAge) {
-    // Every bucket is bounded on BOTH sides against its neighbours, and the
-    // head-heights rise monotonically with no ties. Merged buckets were the
+    // Every bucket is bounded against its neighbours by PROPORTION and LOOK, and
+    // the head-heights rise monotonically with no ties. Merged buckets were the
     // original defect: apparentAge is allowed to drift one bucket
     // (clampApparentAge), so a bucket phrased at its neighbour's age turns a
     // legal drift into a two-bucket error. That is how an 8-year-old was
     // described as a "very young child" — and how a preschooler reading one
     // young was described with "baby proportions, rounded baby features".
+    //
+    // NO SIZE COMPARISON (owner, 2026-09-23: "if we have height then height
+    // decides"). The buckets used to say "clearly smaller than a preschooler",
+    // "taller than a toddler" — a size claim read off the photo's age bucket,
+    // which contradicted the entered heights on staging
+    // job_1790100385959_1nitlympp (a toddler-looking 3-year-old at 102 cm listed
+    // above a 98 cm preschooler). Relative size comes from HEIGHT ORDER alone
+    // (buildRelativeHeightDescription); a marker states proportions and look.
     case 'infant':
-      return 'infant proportions about 3.5-4 heads tall, very large head relative to body, rounded baby features, not yet walking — clearly smaller than a toddler';
+      return 'infant proportions about 3.5-4 heads tall, very large head relative to body, rounded baby features, not yet walking';
     case 'toddler':
-      return 'toddler proportions about 4 heads tall, large head relative to body, soft rounded features and a rounded belly, walking but unsteady — no longer a baby, clearly smaller than a preschooler';
+      return 'toddler proportions about 4 heads tall, large head relative to body, soft rounded features and a rounded belly, walking but unsteady — no longer a baby';
     case 'preschooler':
-      return 'preschool-age proportions about 4.5 heads tall, large head relative to body, soft rounded features, clearly taller than a toddler and smaller than a kindergarten child';
+      return 'preschool-age proportions about 4.5 heads tall, large head relative to body, soft rounded features, steady on their feet';
     case 'kindergartner':
-      return 'kindergarten-age proportions about 5 heads tall, head still large relative to body but less than a toddler, softly rounded features, clearly older and taller than a preschooler and shorter than a grade-schooler';
+      return 'kindergarten-age proportions about 5 heads tall, head still large relative to body but less than a toddler, softly rounded features, clearly older than a preschooler';
     case 'young-school-age':
-      return 'early grade-school proportions about 5.5 heads tall, rounded child features, clearly taller than a kindergarten child and shorter than an older grade-schooler — NOT toddler proportions';
+      return 'early grade-school proportions about 5.5 heads tall, rounded child features, older than a kindergarten child — NOT toddler proportions';
     case 'school-age':
-      return 'grade-school proportions about 6 heads tall, child features starting to lengthen, clearly taller than an early grade-schooler and clearly not yet a preteen — NOT toddler proportions';
+      return 'grade-school proportions about 6 heads tall, child features starting to lengthen, clearly not yet a preteen — NOT toddler proportions';
     case 'preteen':
       return 'late-child proportions about 6.25 heads tall, slightly longer limbs than a grade-schooler, visibly older than grade-schoolers and clearly not yet a teenager';
     case 'young-teen':
-      return 'early adolescent proportions about 6.5 heads tall, longer limbs than a child, face more elongated than a child, taller than a preteen but not yet at full teenage height';
+      return 'early adolescent proportions about 6.5 heads tall, longer limbs than a child, face more elongated than a child';
     case 'teenager':
-      return 'teenage proportions about 7 heads tall, long limbs, clearly taller than a young teen and not yet at adult build — visibly NOT a child, render as a 15-16 year old';
+      return 'teenage proportions about 7 heads tall, long limbs, not yet at adult build — visibly NOT a child, render as a 15-16 year old';
     case 'young-adult':
-      return 'young adult proportions about 7.5-8 heads tall, full adult height, clearly taller and more developed than a teenager, mature face with defined bone structure and no adolescent softness, no signs of middle age';
+      return 'young adult proportions about 7.5-8 heads tall, full adult height, more developed than a teenager, mature face with defined bone structure and no adolescent softness, no signs of middle age';
     case 'adult':
       return 'adult proportions about 7.5-8 heads tall, full adult height, mature bone structure, clearly older than a young adult and not yet showing the age signs of middle age';
     case 'middle-aged':
@@ -651,7 +685,8 @@ function buildCastIdentityDescription(char, clothingText = '') {
   const hair = buildHairDescription(phys, char.physicalTraitsSource);
   if (hair) parts.push(`hair: ${hair}`);
   if (phys.build) parts.push(`build: ${phys.build}`);
-  if (phys.face) parts.push(phys.face);
+  const face = buildFaceDescription(phys.face);
+  if (face) parts.push(face);
   if (Array.isArray(char.traits) && char.traits.length) parts.push(char.traits.filter(t => typeof t === 'string').join(', '));
   const base = parts.filter(Boolean).join(', ');
   if (!base) return '';
@@ -840,6 +875,16 @@ function buildEraGuard(era) {
  *        no clause, because no such rule is in the prompt.
  * @returns {string} the fidelity block, or '' when no named landmark.
  */
+// THE PHOTO WINS OVER THE WORDS (owner, 2026-09-23). A landmark's written
+// description (index photo_description → Visual Bible features → brief) can be
+// wrong; the photo cannot. One sentence, injected into the plate/page author's
+// fidelity block AND the plate judge's landmark check (buildEmptySceneQcPrompt),
+// so the judge never fails a plate for matching the photo instead of the text.
+// prod job_1790107559778_fcmlfa8kn: a mis-described photo put "lattice metal
+// structure" in the brief; the judge failed the photo-faithful plate and its
+// "must be lattice" feedback repainted the landmark as something else.
+const LANDMARK_PHOTO_AUTHORITY = 'The photo is the authority on what the landmark looks like: where any words in this prompt describe its shape, structure, material or colour differently from the photo, the photo is right.';
+
 function buildLandmarkFidelityBlock(landmark, opts = {}) {
   const name = typeof landmark === 'string'
     ? landmark.trim()
@@ -861,7 +906,7 @@ function buildLandmarkFidelityBlock(landmark, opts = {}) {
     // master before it has it.
     return `**LANDMARK IN THIS SCENE: ${name}.** The attached reference photo is a WIDE VIEW: it shows this real place as a whole, not one building close up. The scene is set in this place.
 
-**IDENTITY (from the photo):** Take the character of the place — the shapes and pitch of its roofs, the materials and colours of walls and roofs, how densely the buildings stand, and the landscape around them: hills, water, trees, skyline. Someone who knows the place must recognise it from those, not from one façade. Do not pull a single structure out of the photo and make it the subject unless the scene description asks for it.
+**IDENTITY (from the photo):** Take the character of the place — the shapes and pitch of its roofs, the materials and colours of walls and roofs, how densely the buildings stand, and the landscape around them: hills, water, trees, skyline. Someone who knows the place must recognise it from those, not from one façade. Do not pull a single structure out of the photo and make it the subject unless the scene description asks for it. ${LANDMARK_PHOTO_AUTHORITY}
 
 **MEDIUM (never from the photo):** The photo supplies geometry and nothing else. Every surface is painted in the ART STYLE, with the same brushwork, edges, texture and palette as the rest of the page — no photographic detail, no lens depth of field, no camera grain.
 
@@ -871,7 +916,7 @@ function buildLandmarkFidelityBlock(landmark, opts = {}) {
   }
   return `**LANDMARK IN THIS SCENE: ${name}.** The attached reference photo shows this exact real-world landmark. The scene depicts this specific building (or part of it), not a generic version.
 
-**IDENTITY (from the photo):** Preserve the silhouette, architectural details, distinctive features and overall proportions exactly as in the photo. Someone who has seen the real building must immediately recognise it.
+**IDENTITY (from the photo):** Preserve the silhouette, architectural details, distinctive features and overall proportions exactly as in the photo. Someone who has seen the real building must immediately recognise it. ${LANDMARK_PHOTO_AUTHORITY}
 
 **MEDIUM (never from the photo):** The photo supplies geometry and nothing else. Every surface of the landmark is painted in the ART STYLE, with the same brushwork, edges, texture and palette as the rest of the page — no photographic detail, no lens depth of field, no camera grain. A page whose landmark reads sharper or more photographic than its sky, ground and figures is wrong.
 
@@ -1784,7 +1829,10 @@ const LANGUAGE_LEVELS = {
     description: 'Simple words and very short sentences for early readers',
     wordsPerPageMin: 25,
     wordsPerPageMax: 70,
-    sentencesPerPage: '3-6',
+    // 4-9, not 3-6 (owner 2026-09-23: "rather lift the limit or give it more
+    // space"). Run 6's writer ran 6-13 a page, median 8.5; the counter's +50%
+    // flags only a page past 13.
+    sentencesPerPage: '4-9',
     pacing: 'Small amount of variation is fine — some pages can sit at the low end (a quiet beat), others near the top. Don\'t aim for a uniform word count. The extra room buys more sentences, never longer ones: keep sentences short, one idea each.',
   },
   'standard': {
@@ -1832,8 +1880,62 @@ function measurePageText(text) {
   const t = String(text || '').trim();
   if (!t) return { words: 0, sentences: 0, paragraphs: 0 };
   const paragraphs = t.split(/\n\s*\n/).filter(p => p.trim());
-  const sentences = paragraphs.reduce((n, p) => n + Math.max(1, (p.trim().match(SENTENCE_END_RE) || []).length), 0);
-  return { words: t.split(/\s+/).filter(Boolean).length, sentences, paragraphs: paragraphs.length };
+  return { words: t.split(/\s+/).filter(Boolean).length, sentences: pageSentences(t).length, paragraphs: paragraphs.length };
+}
+
+/** How many quotations are still open at the end of `s` («» „“ “” and straight "). */
+function openQuoteDepth(s) {
+  let depth = 0;
+  let straight = 0;
+  for (const ch of String(s)) {
+    if (ch === '«' || ch === '„') depth += 1;
+    else if (ch === '“') depth += depth > 0 ? -1 : 1;   // German close, English open
+    else if ((ch === '»' || ch === '”') && depth > 0) depth -= 1;
+    else if (ch === '"') straight ^= 1;
+  }
+  return depth + straight;
+}
+
+/**
+ * A page's sentences with their offsets in the page text — the unit the
+ * counter counts and the grammar check edits (a numbered sentence is the only
+ * thing that pass may change, and it can only be replaced or re-inserted).
+ * A paragraph break ends a sentence; an unterminated tail is a sentence.
+ * @param {string} text
+ * @returns {Array<{text:string, start:number, end:number, paragraph:number}>}
+ */
+function pageSentences(text) {
+  const t = String(text || '');
+  const out = [];
+  const paraRe = /\S[\s\S]*?(?=\n\s*\n|\s*$)/g;
+  let pm;
+  let paragraph = 0;
+  while ((pm = paraRe.exec(t)) !== null) {
+    const pStart = pm.index;
+    const para = pm[0];
+    let cursor = 0;
+    const endRe = new RegExp(SENTENCE_END_RE.source, SENTENCE_END_RE.flags);
+    let em;
+    while ((em = endRe.exec(para)) !== null) {
+      const end = em.index + em[0].length;
+      // A spoken line is one unit: «Halt. Bleib hier.» is never cut inside the
+      // quote, so no edit can take one half of it and leave its mark unpaired.
+      if (openQuoteDepth(para.slice(0, end)) > 0) continue;
+      const raw = para.slice(cursor, end);
+      const lead = raw.length - raw.trimStart().length;
+      if (raw.trim()) out.push({ text: raw.trim(), start: pStart + cursor + lead, end: pStart + end, paragraph });
+      cursor = end;
+      if (em[0].length === 0) endRe.lastIndex += 1;
+    }
+    const rest = para.slice(cursor);
+    if (rest.trim()) {
+      const lead = rest.length - rest.trimStart().length;
+      out.push({ text: rest.trim(), start: pStart + cursor + lead, end: pStart + cursor + lead + rest.trim().length, paragraph });
+    }
+    paragraph += 1;
+    if (pm[0].length === 0) paraRe.lastIndex += 1;
+  }
+  return out;
 }
 
 // ============================================================================
@@ -1953,7 +2055,8 @@ function buildLabeledPhysicalParts(profile, options = {}) {
       : `Facial hair: ${profile.facialHair}`);
   }
 
-  if (includeFace && !isNone(profile.face)) parts.push(`Face: ${stripAgeWords(profile.face)}`);
+  const face = includeFace ? buildFaceDescription(profile.face) : '';
+  if (face) parts.push(`Face: ${face}`);
   if (!isNone(profile.glasses)) parts.push(`Glasses: ${profile.glasses}`);
   if (!isNone(profile.other)) parts.push(`Distinctive marks: ${stripAgeWords(profile.other)}`);
 
@@ -1995,7 +2098,8 @@ function buildCharacterPhysicalDescription(char, clothingOverride = null) {
       ? '. Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face'
       : `. Facial hair: ${p.facialHair}`;
   }
-  if (!isNone(p.face)) s += `, ${stripAgeWords(p.face)}`;
+  const face = buildFaceDescription(p.face);
+  if (face) s += `, ${face}`;
   if (!isNone(p.glasses)) s += `. Glasses: ${p.glasses}`;
   if (!isNone(p.other)) s += `, ${stripAgeWords(p.other)}`;
   if (p.clothing) s += `. Wearing: ${p.clothing}`;
@@ -2036,39 +2140,22 @@ function buildGroundingPrompt(char) {
  * height is set. Used purely for relative ordering — exact values don't
  * matter, only the rank preservation.
  *
- * @param {Object} char - Character with optional age, apparentAge, gender
- * @returns {number|null} Estimated height in cm, or null if no signal
+ * AGE AND GENDER ONLY (owner, 2026-09-23: "if we have height then height
+ * decides; if no height we estimate it based on age and gender"). The photo's
+ * apparent-age bucket was a fallback here and is gone: it is a read of how old
+ * someone looks, not of how tall they are. No numeric age means no estimate,
+ * and the character is left out of the order rather than placed by a guess.
+ *
+ * @param {Object} char - Character with optional age, gender
+ * @returns {number|null} Estimated height in cm, or null if no age
  */
 function estimateHeightFromAgeGender(char) {
   const gender = char?.gender;
   const isMale = gender === 'male';
   const isFemale = gender === 'female';
 
-  // Prefer numeric age when present
-  let age = parseInt(char?.age);
-  if (isNaN(age)) {
-    // Fall back to apparent age category → approximate years
-    const physical = getPhysicalFromChar(char) || {};
-    const apparent = physical.apparentAge || char?.apparentAge || char?.ageCategory;
-    const APPARENT_AGE_YEARS = {
-      infant: 0.5,
-      toddler: 2,
-      preschooler: 4,
-      kindergartner: 5,
-      'young-school-age': 7,
-      'school-age': 9,
-      preteen: 11,
-      'young-teen': 13,
-      teenager: 16,
-      'young-adult': 25,
-      adult: 35,
-      'middle-aged': 50,
-      senior: 70,
-      elderly: 80,
-    };
-    age = APPARENT_AGE_YEARS[apparent];
-  }
-  if (age == null || isNaN(age)) return null;
+  const age = parseInt(char?.age);
+  if (isNaN(age)) return null;
 
   // Growth curve in cm, averaged WHO/CDC references. Gender diverges from ~12.
   // Values are order-preserving approximations — not medically precise.
@@ -2754,6 +2841,9 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // inputs the bible rules need travel here instead of to the bible stage.
     CHARACTER_NAMES: characters.map(c => c.name).filter(Boolean).join(', ') || 'None',
     COVER_CAST: buildCoverCastLines(inputData),
+    // How many elements a cover's Objects may list after its LOC — the number
+    // KEY STORY ELEMENTS defines on the cover prompt (visualBible.js).
+    COVER_ELEMENT_CAP: String(COVER_KEY_ELEMENT_CAP),
     // Each landmark's PHOTOS line: the bible may only name a viewpoint one of
     // them shows, and the per-page `landmarkView` is picked from the same list.
     // The Art Director variant: it marks which of the plan's places are listed
@@ -2795,6 +2885,7 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     GAP_ACTION_FRAMING: GAP_ACTION_FRAMING_RULE,
     // Rules 6d / 8l, shared with scene-review.txt check 6.
     EYES_OPEN: EYES_OPEN_RULE,
+    SHARED_GRIP: SHARED_GRIP_RULE,
     CREATURE_FACE: CREATURE_FACE_RULE,
     // SEVEN page-brief contracts, one constant each, filled at all FOUR sites
     // that author a page brief — see ONE_INSTANT_RULE and the block around it.
@@ -2831,6 +2922,9 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // The below-waist verbs a close-up may not stage, from the one constant the
     // plan counter and the brief check read (shotVocabulary).
     CLOSEUP_BELOW_WAIST: CLOSEUP_BELOW_WAIST_PHRASE,
+    // 11c: a planned close-up is restaged, never widened — the scene review's
+    // 7b / 10 and `shot_widened` state the same constant.
+    CLOSEUP_KEPT: CLOSEUP_KEPT_RULE,
     // The over-the-shoulder near figure is a crop, and never on a contact page
     // (owner, 2026-09-23) — the same constant at all four brief-authoring sites.
     OTS_NEAR_FIGURE: OTS_NEAR_FIGURE_RULE,
@@ -3108,6 +3202,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     GAP_ACTION_FRAMING: GAP_ACTION_FRAMING_RULE,
     // Rules 6d / 8l, shared with scene-review.txt check 6.
     EYES_OPEN: EYES_OPEN_RULE,
+    SHARED_GRIP: SHARED_GRIP_RULE,
     CREATURE_FACE: CREATURE_FACE_RULE,
     // SEVEN page-brief contracts, one constant each, filled at all FOUR sites
     // that author a page brief — see ONE_INSTANT_RULE and the block around it.
@@ -3140,6 +3235,9 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // The below-waist verbs a close-up may not stage, from the one constant the
     // plan counter and the brief check read (shotVocabulary).
     CLOSEUP_BELOW_WAIST: CLOSEUP_BELOW_WAIST_PHRASE,
+    // 11c: a planned close-up is restaged, never widened — the scene review's
+    // 7b / 10 and `shot_widened` state the same constant.
+    CLOSEUP_KEPT: CLOSEUP_KEPT_RULE,
     // The over-the-shoulder near figure is a crop, and never on a contact page
     // (owner, 2026-09-23) — the same constant at all four brief-authoring sites.
     OTS_NEAR_FIGURE: OTS_NEAR_FIGURE_RULE,
@@ -9656,11 +9754,25 @@ function buildTextProofreadPrompt(inputData, pages = []) {
 }
 
 /**
- * The post-repair DIFF review (2026-09-06). Same quoted-span output contract as
- * buildTextProofreadPrompt above — parseLectorFindings/applyLectorFindings read
- * it unchanged — but the unit of judgement is a CHANGE, not a page: each
- * repaired page is rendered as its BEFORE and its AFTER, and only pages the
- * repair pass actually rewrote are passed in.
+ * A page as numbered sentences (`A1: …`), a blank line between paragraphs —
+ * the grammar check edits by number (pageSentences is the one splitter).
+ */
+function numberedSentences(text, prefix) {
+  const sentences = pageSentences(text);
+  if (!sentences.length) return '(empty)';
+  return sentences
+    .map((x, i) => `${i > 0 && x.paragraph !== sentences[i - 1].paragraph ? '\n' : ''}${prefix}${i + 1}: ${x.text}`)
+    .join('\n');
+}
+
+/**
+ * The post-repair GRAMMAR CHECK (was "the diff review", 2026-09-06). Owner,
+ * 2026-09-23: "No new sentences, the last pass is a grammar check." Each
+ * rewritten page is rendered as its BEFORE and AFTER as NUMBERED SENTENCES,
+ * and the pass answers in edits against those numbers only — FIX A<k> (the
+ * same sentence, corrected) or RESTORE B<j> AFTER A<k> (a writer sentence put
+ * back word for word). parseDiffEdits / applyDiffEdits (textRefine.js) apply
+ * them; the lector's free quote/correction contract is no longer shared.
  *
  * THE FINDINGS EACH PAGE WAS ANSWERING (owner decision 2026-09-23). The pass
  * used to see BEFORE and AFTER only, so a deliberate fix read as a dropped
@@ -9689,7 +9801,7 @@ function buildTextDiffPrompt(inputData, pairs = []) {
       const answered = (p.findings || [])
         .map(f => `- p${f.pageNumber} [${f.category || 'UNTAGGED'}] ${String(f.text || '').trim()}`)
         .join('\n');
-      return `--- Page ${p.pageNumber} ---\nFINDINGS THE REWRITE ANSWERED:\n${answered || '(none)'}\n\nBEFORE:\n${String(p.before || '').trim()}\n\nAFTER:\n${String(p.after || '').trim()}`;
+      return `--- Page ${p.pageNumber} ---\nFINDINGS THE REWRITE ANSWERED:\n${answered || '(none)'}\n\nBEFORE:\n${numberedSentences(p.before, 'B')}\n\nAFTER:\n${numberedSentences(p.after, 'A')}`;
     })
     .join('\n\n');
   return fillTemplate(template, { LANGUAGE: lang, PAGES: body, STYLE_RULEBOOK });
@@ -9778,6 +9890,11 @@ function buildTextAuditPrompt(inputData, pages = [], arc = '', { arcHints = '' }
     PULL_QUESTION: simpleBand
       ? 'skip this question — this book is built from self-contained moments, so a page that leaves nothing open is correct.'
       : 'does anything remain open at the end of the page that the next page answers? The last page is exempt.',
+    // Owner 2026-09-23: a hint the writer dropped is a finding the refine
+    // fixes. Asked only when the story has hints.
+    HINT_QUESTION: String(arcHints || '').trim()
+      ? '15. HINT: is every hint under HINTS applied on the pages it concerns? Name each hint no page follows, on the page where it belongs.'
+      : '',
     PAGES: body,
   });
 }
@@ -10206,6 +10323,7 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
     // drawability (owner, 2026-09-23).
     // Check 6, from the constants both Art Director templates state as 6d / 8l.
     EYES_OPEN: EYES_OPEN_RULE,
+    SHARED_GRIP: SHARED_GRIP_RULE,
     CREATURE_FACE: CREATURE_FACE_RULE,
     // ONE authoring contract for readable in-image lettering, shared with the
     // two Visual Bible authoring templates — see REQUIRED_TEXT_AUTHORING_RULE.
@@ -10215,6 +10333,9 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
     // still spelling the list out by hand, which is how the critic went on
     // naming poses after the rule stopped forbidding them.
     CLOSEUP_BELOW_WAIST: CLOSEUP_BELOW_WAIST_PHRASE,
+    // 7b / 10: the plan's close-up wins — the constant the Art Director gets
+    // as 11c and `shot_widened` states (shotVocabulary.CLOSEUP_KEPT_RULE).
+    CLOSEUP_KEPT: CLOSEUP_KEPT_RULE,
   });
 }
 
@@ -10275,16 +10396,16 @@ function doNotWriteListBody({ forChecker = false } = {}) {
  *   scene briefs, post scene-review. Text is written to match the picture that
  *   will actually be drawn; see the ordering note in beatsPipeline.
  */
-function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], arc = '', { arcHints = '' } = {}) {
+function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], arc = '', { arcHints = '', visualBible = null, clothingRequirements = null } = {}) {
   const template = PROMPT_TEMPLATES.storyTextFromBeats;
   if (!template) {
     log.error('[PROMPT] storyTextFromBeats template not loaded — beats text writing unavailable');
     return null;
   }
-  // Brief per page, as every text-stage reader gets it (buildTextStagePictureSpecs,
-  // sceneMetadata.js): METADATA, Visual-Bible ids and repeated looks removed.
-  // The audit and the refine read the same specs.
-  const briefByPage = buildTextStagePictureSpecs(expansions);
+  // The compact picture spec per page (buildTextStagePictureSpecs,
+  // sceneMetadata.js — owner 2026-09-23): where, what happens, who wears what in
+  // short form, what else is in view. The audit and the refine read the same.
+  const briefByPage = buildTextStagePictureSpecs(expansions, { visualBible, clothingRequirements });
   const blocks = beats
     .map(b => {
       const brief = briefByPage.get(b.pageNumber);
@@ -10511,12 +10632,13 @@ The main character has two avatar styles available:
     }
 
     // Build landmarks instruction for the visual bible.
-    // For each landmark we surface ALL indexed photo variants (interior /
-    // exterior / detail / etc) with their descriptions so Claude can pick
-    // the variant whose framing matches each scene. Without this, Claude
-    // writes plain [LOC###] and the renderer always falls back to variant 1
-    // — e.g. Holzbrücke (Baden) has 2 interior shots (variants 4 & 5)
-    // perfect for "on the bridge" scenes, but they never get chosen.
+    // Each landmark lists what its indexed photos show, so the writer knows
+    // which views exist (an interior shot, a view from the top). The scene
+    // hint's `landmarkView` then picks the photo by kind
+    // (landmarkPhotos.pickVariantForView). The writer no longer cites a photo
+    // number as `[LOC###.N]`: a dotted id is a Visual Bible vantage, and
+    // reading it as a photo slot served the wrong photo (docs/decisions.md
+    // 2026-09-24).
     let landmarksInstruction = '';
     if (inputData.ideaKind === 'fantasy') {
       // The make-believe idea: the real town frames the story, the pages
@@ -10536,21 +10658,17 @@ A make-believe world.${worldSentence ? ` ${worldSentence}` : ''} The first scene
         let entry = `- ${l.name}`;
         const variants = l.photoVariants || [];
         if (variants.length >= 2) {
-          const angles = variants.map(v => `    ${v.variantNumber}: ${v.description}`).join('\n');
-          entry += `\n  PHOTO ANGLES (pick the variant whose description matches your scene framing):\n${angles}`;
+          const views = variants.map(v => `    - ${v.description}`).join('\n');
+          entry += `\n  PHOTOS (the views a scene's landmarkView can select):\n${views}`;
         }
         return entry;
       }).join('\n');
-      const hasVariants = top3.some(l => (l.photoVariants?.length || 0) >= 2);
-      const variantHint = hasVariants
-        ? `\nWhen a landmark has PHOTO ANGLES, reference it as \`[LOC###.N]\` in the scene hint's \`setting.location\` (e.g. \`"setting": {"location": "Wooden Bridge [LOC001.4]"}\` to pick the interior shot). Use interior angles for inside/on-the-landmark scenes, exterior angles for distant/establishing shots. Plain \`[LOC###]\` defaults to variant 1.`
-        : '';
       landmarksInstruction = `# Location${cityName ? `: ${cityName}` : ''}
 The story takes place in ${cityName || 'the child\'s hometown'}. Use real place names — do NOT invent fictional city names.
 At least one scene MUST take place at one of these real local landmarks:
 ${landmarkBlock}
 Include the chosen landmark(s) in the visual bible locations section with their real name and accurate visual description.
-Reference the landmark by its LOC ID in the relevant scene hints.${variantHint}`;
+Reference the landmark by its LOC ID in the relevant scene hints.`;
     } else if (inputData.userLocation?.city) {
       landmarksInstruction = `# Location: ${inputData.userLocation.city}
 The story takes place in ${inputData.userLocation.city}. Use real place names — do NOT invent fictional city names.`;
@@ -10593,6 +10711,8 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       CLOTHING_RULE: clothingRule,
       COVER_CLOTHING_NOTE: coverClothingNote,
       COVER_CLOTHING: coverClothing,
+      // Same cap as the full path's Title Page Objects (visualBible.js).
+      COVER_ELEMENT_CAP: String(COVER_KEY_ELEMENT_CAP),
       LANDMARKS: landmarksInstruction,
       // Same resolver the trial's images use, so prose and pictures agree.
       SEASON: buildSeasonInstruction(inputData),
@@ -11044,6 +11164,7 @@ module.exports = {
   buildTextZoneInstruction,
   buildEraGuard,
   buildLandmarkFidelityBlock,
+  LANDMARK_PHOTO_AUTHORITY,
   getAgeCategory,
   getAgeCategoryLabel,
   AGE_CATEGORY_ORDER,
@@ -11077,6 +11198,7 @@ module.exports = {
   PAGE_PARAGRAPHS,
   paragraphShapeRule,
   measurePageText,
+  pageSentences,
   getReadingLevel,
   getTokensPerPage,
   NONE_WORDS,
@@ -11084,6 +11206,7 @@ module.exports = {
   extractCharacterVisualProfile,
   buildLabeledPhysicalParts,
   buildCharacterPhysicalDescription,
+  buildFaceDescription,
   buildGroundingPrompt,
   estimateHeightFromAgeGender,
   buildCharacterDescriptionForExpansion,
@@ -11254,8 +11377,6 @@ module.exports = {
   buildSceneReviewBibleBlock,
   buildDoNotWriteSection,
   buildStoryTextFromBeatsPrompt,
-  characterLookSignature,
-  dropAppearanceAppositive,
   buildTitleRule,
   buildStoryBibleFromBeatsPrompt,
   buildTrialStoryPrompt,

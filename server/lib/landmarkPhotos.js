@@ -1453,7 +1453,8 @@ async function resolveSwissLandmarkFromIndex(query) {
         photo_url_3, photo_description_3, photo_attribution_3, photo_type_3, photo_r2_url_3,
         photo_url_4, photo_description_4, photo_attribution_4, photo_type_4, photo_r2_url_4,
         photo_url_5, photo_description_5, photo_attribution_5, photo_type_5, photo_r2_url_5,
-        photo_url_6, photo_description_6, photo_attribution_6, photo_type_6, photo_r2_url_6
+        photo_url_6, photo_description_6, photo_attribution_6, photo_type_6, photo_r2_url_6,
+        ${PHOTO_SCORES_SQL}
       FROM landmark_index
       WHERE country = 'Switzerland'
         AND ${HAS_PHOTO_SQL}
@@ -2789,6 +2790,12 @@ const MIN_USABLE_PHOTO = 40;
 
 const JUDGED_USABLE_SQL = `(story_score IS NULL OR story_score >= ${MIN_USABLE_PHOTO})`;
 
+// Each slot's judged photo_score as {slot: score}, selected beside the slot
+// columns so variantsFromIndexRow can hand every variant its own score and
+// pickVariantForView can rank photos of one kind. NULL when never judged.
+const PHOTO_SCORES_SQL = `(SELECT jsonb_object_agg(s.slot, s.photo_score)
+          FROM landmark_photo_scores s WHERE s.landmark_id = landmark_index.id) AS photo_scores`;
+
 // Fame is a GLOBAL measure, so inside one town it ranks the wrong way round: a
 // synagogue 7km away in another village (5 language editions) beat the town's
 // own bridge 400m from the centre (3 editions), and the neighbouring village's
@@ -3733,12 +3740,24 @@ function normalizePhotoKind(raw) {
  * caller attaches nothing: prose carries the place. Silently serving slot 1
  * instead is how a sunset exterior ended up anchoring riverbed scenes.
  *
+ * This is the ONLY selector. A dotted id in a brief (`LOC002.3`) names a
+ * Visual Bible VANTAGE — a camera position the plate is grouped by — and has
+ * no link to an index photo slot, so it never picks a photo (staging
+ * job_1790100385959_1nitlympp served a riverside promenade on six Lindenhof
+ * pages because vantage 3 was read as slot 3; docs/decisions.md 2026-09-24).
+ *
+ * Within the first accepted kind that has a photo, the judged `photoScore`
+ * ranks (slot order breaks ties and orders unjudged photos); a photo judged
+ * below MIN_USABLE_PHOTO is not a candidate, the same cutoff serving applies.
+ *
  * @param {Object} location - VB location with photoVariants[] carrying `kind`
+ *   and, when judged, `photoScore`
  * @param {string|null} view - scene's landmark view
  * @returns {number|null} variantNumber to attach, or null for "no photo"
  */
 function pickVariantForView(location, view) {
-  const variants = (location?.photoVariants || []).filter(v => v?.url && v.kind !== 'bad');
+  const variants = (location?.photoVariants || []).filter(v => v?.url && v.kind !== 'bad'
+    && !(Number.isFinite(v.photoScore) && v.photoScore < MIN_USABLE_PHOTO));
   if (variants.length === 0) return null;
   const v = normalizePhotoKind(view) || (String(view || '').trim().toLowerCase() || null);
   if (v === 'underwater' || v === 'none') return null;
@@ -3749,9 +3768,12 @@ function pickVariantForView(location, view) {
     interior: ['interior'],
     'view-from': ['view-from'],
   };
+  const score = x => (Number.isFinite(x.photoScore) ? x.photoScore : -1);
   for (const kind of (ACCEPTS[v] || ACCEPTS.exterior)) {
-    const hit = variants.find(x => x.kind === kind);
-    if (hit) return hit.variantNumber;
+    const ofKind = variants.filter(x => x.kind === kind);
+    if (ofKind.length === 0) continue;
+    ofKind.sort((a, b) => score(b) - score(a) || a.variantNumber - b.variantNumber);
+    return ofKind[0].variantNumber;
   }
   return null;
 }
@@ -3784,9 +3806,12 @@ function variantsFromIndexRow(row) {
       // 4-6 interior) is a guess, the column is data.
       const kind = normalizePhotoKind(cfg.kind) || (cfg.num >= 4 ? 'interior' : 'exterior');
       if (kind === 'bad') continue;
+      const judged = row.photo_scores?.[String(cfg.num)];
       variants.push({
         variantNumber: cfg.num,
         kind,
+        // Judged photo_score (landmark_photo_scores); null = never judged.
+        photoScore: Number.isFinite(judged) ? judged : null,
         vantage: kind === 'interior' ? 'interior' : 'exterior',
         url: cfg.url,
         sourceUrl: cfg.sourceUrl,
@@ -3831,7 +3856,8 @@ async function loadLandmarkPhotoDescriptions(visualBible) {
         photo_url_3, photo_description_3, photo_attribution_3, photo_type_3, photo_r2_url_3,
         photo_url_4, photo_description_4, photo_attribution_4, photo_type_4, photo_r2_url_4,
         photo_url_5, photo_description_5, photo_attribution_5, photo_type_5, photo_r2_url_5,
-        photo_url_6, photo_description_6, photo_attribution_6, photo_type_6, photo_r2_url_6
+        photo_url_6, photo_description_6, photo_attribution_6, photo_type_6, photo_r2_url_6,
+        ${PHOTO_SCORES_SQL}
       FROM landmark_index
       WHERE id = ANY($1)
     `, [ids]);
@@ -3915,18 +3941,14 @@ async function loadLandmarkPhotoVariant(visualBible, locId, variantNumber = 1) {
 
   // Look up by variantNumber (the slot id), never by array position — slots
   // compact (e.g. slots 1,2,4 present), so position indexing serves the wrong
-  // photo. Missing slot: fall back to a variant of the SAME vantage (1-3
-  // exterior, 4-6 interior) before crossing vantages.
-  let variant = location.photoVariants.find(v => v.variantNumber === variantNumber);
+  // photo. The number always comes from pickVariantForView, which only returns
+  // a slot the location has; a slot that is not there is an error, never a
+  // cue to serve some other photo (that substitution is how brief vantage ids
+  // `.4` / `.5` were quietly answered with slot 1).
+  const variant = location.photoVariants.find(v => v.variantNumber === variantNumber);
   if (!variant) {
-    const wantInterior = variantNumber >= 4;
-    variant = location.photoVariants.find(v => (v.vantage ? v.vantage === (wantInterior ? 'interior' : 'exterior') : (v.variantNumber >= 4) === wantInterior));
-    if (variant) {
-      log.warn(`[LANDMARK-VARIANT] "${location.name}": variant ${variantNumber} missing — using same-vantage variant ${variant.variantNumber}`);
-    } else {
-      variant = location.photoVariants[0];
-      log.warn(`[LANDMARK-VARIANT] "${location.name}": no ${wantInterior ? 'interior' : 'exterior'} variant — falling back to variant ${variant.variantNumber} (different vantage)`);
-    }
+    log.error(`[LANDMARK-VARIANT] "${location.name}": variant ${variantNumber} is not one of its photos (${location.photoVariants.map(v => v.variantNumber).join(',')}) — no photo attached`);
+    return null;
   }
   if (!variant?.url) {
     log.debug(`[LANDMARK-VARIANT] No URL for variant ${variant.variantNumber} of "${location.name}"`);
@@ -4280,6 +4302,7 @@ module.exports = {
   // Lazy photo variant loading
   loadLandmarkPhotoDescriptions,
   pickVariantForView,
+  variantsFromIndexRow,
   loadLandmarkPhotoVariant,
 
   // Swiss source routing (owner, 2026-09-05): Swiss stories resolve landmarks

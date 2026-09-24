@@ -30,6 +30,9 @@ export const ENTITY_PENALTIES = { catastrophic: 60, critical: 25, major: 15, mod
 // MAX_SEVERITY_TYPES / MIN_SEVERITY_TYPES (see deductionPoints there).
 // Keep in sync with server/lib/scoring.js.
 const ZERO_POINT_TYPES = new Set(['garment_colour', 'garment_color', 'cutout_artifact']);
+// scoring.js ENTITY_ONLY_ZERO_POINT_TYPES: free when only the entity check
+// reported it — and every issue this function prices is an entity issue.
+const ENTITY_ONLY_ZERO_POINT_TYPES = new Set(['figure_completeness']);
 const MAX_SEVERITY_TYPES: Record<string, keyof typeof ENTITY_PENALTIES> = {
   accessory: 'moderate',
   accessory_missing: 'moderate',
@@ -46,12 +49,12 @@ const MIN_SEVERITY_TYPES: Record<string, keyof typeof ENTITY_PENALTIES> = {
 /** Points one issue costs — severity points bounded by per-type ceiling/floor,
  *  mirroring scoring.js deductionPoints. Unknown severity defaults to minor
  *  (existing client convention; the server drops it). */
-export function entityIssuePoints(issue: { type?: string; subType?: string; severity?: string } | null | undefined): number {
+export function entityIssuePoints(issue: { type?: string; subType?: string; severity?: string } | null | undefined, fromEntity = true): number {
   // subType FIRST, mirroring deductionPoints in scoring.js: entity findings are
   // normalised to a flat `type: 'consistency'` with the real classification in
   // `subType`, so reading `type` alone made every ceiling and floor inert here.
   const type = String(issue?.subType || issue?.type || '').toLowerCase();
-  if (ZERO_POINT_TYPES.has(type)) return 0;
+  if (ZERO_POINT_TYPES.has(type) || (fromEntity && ENTITY_ONLY_ZERO_POINT_TYPES.has(type))) return 0;
   const raw = ENTITY_PENALTIES[String(issue?.severity || '').toLowerCase() as keyof typeof ENTITY_PENALTIES] ?? ENTITY_PENALTIES.minor;
   const ceiling = MAX_SEVERITY_TYPES[type];
   let pts = ceiling ? Math.min(raw, ENTITY_PENALTIES[ceiling]) : raw;
@@ -536,7 +539,7 @@ export function useRepairWorkflow({
           entityPenalty += entityIssuePoints(oi);
         }
         for (const si of feedback.semanticIssues) {
-          entityPenalty += entityIssuePoints(si);
+          entityPenalty += entityIssuePoints(si, false);
         }
         feedback.entityPenalty = capEntityPenalty(entityPenalty);
         // Score convention: qualityScore = raw visual (Gemini), score = final after penalties.

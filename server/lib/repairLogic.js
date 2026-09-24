@@ -11,7 +11,7 @@
  */
 
 const { REPAIR_DEFAULTS } = require('../config/models');
-const { computeFinalScore, SCORE_THRESHOLDS, findingText } = require('./scoring');
+const { computeFinalScore, SCORE_THRESHOLDS, findingText, ENTITY_ONLY_ZERO_POINT_TYPES, isEntitySourced } = require('./scoring');
 const { log } = require('../utils/logger');
 
 /**
@@ -183,7 +183,7 @@ const AUDIT_ADMIT_MAX = 5;
  * Severity is the ONLY thing code reads here, and it decides ONE thing: whether
  * the page re-enters repair. WHAT to fix on that page stays entirely the
  * consolidator's decision from the prompt (the fault lines are handed to it via
- * `readerFindingsByPage`, unread by code). Never pattern-match the fault text.
+ * attributeReaderFindings, unread by code). Never pattern-match the fault text.
  *
  * @param {Array<{page:number, severity:string}>} imgFaults
  * @returns {number[]} page numbers, first-seen order
@@ -196,6 +196,49 @@ function admitPagesFromAudit(imgFaults) {
     if (!pages.includes(f.page)) pages.push(f.page);
   }
   return pages;
+}
+
+/**
+ * A READER FINDING BELONGS TO THE VERSION THE READER READ (2026-09-23).
+ *
+ * The book audit reads each page's picked version. Its IMG faults used to go
+ * into a page-keyed map that the NEXT round handed to the consolidator of the
+ * version that round had just painted — a version the audit never saw. So a
+ * reader finding charged the new version and never the one it described:
+ * production job_1790107559778_fcmlfa8kn p5 v3 was billed a CATASTROPHIC
+ * "the book is held by Lukas" that described v0's pixels (v3 does not have
+ * him holding it), and p8 v2 was billed "the root is not visible" from the
+ * audit of v1 although the inpaint had painted the root in.
+ *
+ * Now each finding is bound to the version object the audit read on its page,
+ * and only that version is re-scored with it. Every other version is judged on
+ * its own evidence. Severity and line pass through verbatim — code never
+ * reads the fault text.
+ *
+ * @param {Array<{page:number, severity?:string, line?:string}>} imgFaults
+ * @param {Map<number, Object>} auditedVersionByPage  page → the version the audit read
+ * @returns {Map<number, {version:Object, findings:Array<{severity, line, sources}>}>}
+ */
+function attributeReaderFindings(imgFaults, auditedVersionByPage) {
+  const fs_ = require('./findingSources');
+  const out = new Map();
+  for (const f of imgFaults || []) {
+    // Page-scoped only: a fault with no page has no version to belong to.
+    if (!f || f.page == null) continue;
+    const version = auditedVersionByPage?.get(f.page) || null;
+    if (!version) {
+      log.warn(`📖 [BOOK-AUDIT] p${f.page}: reader finding has no audited version to belong to — not charged`);
+      continue;
+    }
+    if (!out.has(f.page)) out.set(f.page, { version, findings: [] });
+    out.get(f.page).findings.push({
+      severity: f.severity || null,
+      line: f.line,
+      // PROVENANCE (2026-09-14): a finding from the READER pass carries it.
+      sources: fs_.mergeSources(fs_.sourcesOf(f), [fs_.FINDING_SOURCES.READER]),
+    });
+  }
+  return out;
 }
 
 /**
@@ -611,6 +654,9 @@ function collectCriticalFindings(result) {
     if (!Array.isArray(list)) continue;
     for (const i of list) {
       if (!/^(critical|catastrophic)$/i.test(String(i?.severity || ''))) continue;
+      // A crop artefact is not a defect of the page: it never makes the page
+      // critical (it costs 0 and takes no repair route, see isCropArtifact).
+      if (isCropArtifact(i)) continue;
       out.push({
         type: i.type || i.category || null,
         severity: String(i.severity),
@@ -669,7 +715,7 @@ function selectCharRepairTasks(entityReport, options = {}) {
       // major/critical compare never matched the evaluator's UPPERCASE
       // severities, so this selector was dead code too.
       const sev = String(issue.severity || '').toLowerCase();
-      if (sev !== 'critical' || isCropArtifact(issue)) continue;
+      if (sev !== 'critical' || isCropArtifact(issue, { entity: true })) continue;
 
       const pagesToFix = issue.pagesToFix || (issue.pageNumber ? [issue.pageNumber] : []);
       for (const pageNum of pagesToFix) {
@@ -721,7 +767,10 @@ function selectCharRepairTasks(entityReport, options = {}) {
  *
  * Decision order:
  *   1. Catastrophic visual / semantic break    → iterate (regenerate)
- *   2. Major/critical entity (character) issue → char-fix
+ *   2. Major/critical entity (character) issue → char-fix (iterate when a
+ *      char-fix already failed on this version)
+ *   2a. Presence MIXED (an unmatched figure is a missing cast member) →
+ *      char-fix at that figure
  *   2c. A CRITICAL no method owns (not inpaintable, no roster entry to
  *       char-fix from) and nothing else to execute → iterate
  *   3. Has fixable quality / semantic content   → inpaint
@@ -743,6 +792,12 @@ function selectCharRepairTasks(entityReport, options = {}) {
  * @param {Array} [options.characters] - the uploaded roster. Present, the two char-fix
  *        gates decline a figure with no roster entry (charFixReferenceGap) instead of
  *        routing a repaint that has no reference to paint from. Absent, no opinion.
+ * @param {Array|null} [options.expectedCast] - the DECLARED cast of the version being
+ *        repaired (resolveDeclaredCast). A name outside it is never char-fixed — the
+ *        figure is not that character. null/absent = not declared, no opinion.
+ * @param {string[]} [options.failedMethods] - bare repair methods that already FAILED
+ *        (produced no image) on the version being repaired. A failed char-fix is not
+ *        repeated on the same pixels: the page flips to iterate.
  * @returns {{method: 'skip'|'inpaint'|'iterate'|'char-fix', reason: string, charName?: string, severity?: string, issueDescription?: string}}
  */
 function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) {
@@ -887,11 +942,37 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   // through to the gates below exactly as it would with no entity finding.
   // `options.characters` absent ⇒ no opinion, every name stays routable (the
   // unit tests and any caller that does not carry the roster).
+  // A NAME THE PAGE DOES NOT HOLD IS NOT A CHAR-FIX TARGET (2026-09-23/24). A
+  // figure the entity check maps onto a roster name that the version's DECLARED
+  // cast does not contain is not that character — it is a figure the page never
+  // commissioned, and the presence model's EXTRA case (remove) owns it.
+  // Production job_1790107559778_fcmlfa8kn p7: cast [], two invented children,
+  // one read as a roster girl with a CRITICAL age_shift, and all three rounds
+  // went to char-fixes that repainted nothing. Structured data only: the
+  // declared cast, compared by canonical name, never a finding's prose.
+  // `expectedCast` not an array ⇒ undeclared, no opinion.
+  const { canonicalName: canonName } = require('./castResolver');
+  const pageCast = Array.isArray(options.expectedCast)
+    ? new Set(options.expectedCast.map(c => canonName(typeof c === 'string' ? c : c?.name || '')).filter(Boolean))
+    : null;
   const charFixImpossible = (name) => {
+    if (pageCast && !pageCast.has(canonName(name || ''))) {
+      return { reason: 'not-in-page-cast', message: `${name || 'the figure'} is not in this page's declared cast (${pageCast.size ? [...pageCast].join(', ') : 'nobody'}), so the figure is not that character — there is nobody to char-fix` };
+    }
     if (!Array.isArray(options.characters)) return null;
     const { charFixReferenceGap } = require('./charRepairTarget');
     return charFixReferenceGap({ characters: options.characters, characterName: name });
   };
+  // A CHAR-FIX THAT FAILED ON THESE PIXELS IS NOT REPEATED (2026-09-23). A failed
+  // char-fix produces no version, so the same version stays best and the next
+  // round used to pick char-fix on it again: p7 of the job above failed three
+  // times with "char-fix produced no usable image". The character defect still
+  // needs a repair, and iterate is the other method that can redraw a figure.
+  const charFixAlreadyFailed = Array.isArray(options.failedMethods) && options.failedMethods.includes('char-fix');
+  const flippedFromFailedCharFix = (what) => ({
+    method: 'iterate',
+    reason: `${what} — char-fix already failed on this version (no usable image), flipping to iterate`,
+  });
 
   if (pageNumber > 0 && entityReport?.characters) {
     let worst = null; // {severity, charName, issue}
@@ -906,7 +987,7 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
       }
       for (const issue of allIssues) {
         const sev = String(issue.severity || '').toLowerCase();
-        if (sev !== 'critical' || isCropArtifact(issue)) continue;
+        if (sev !== 'critical' || isCropArtifact(issue, { entity: true })) continue;
         const pages = issue.pagesToFix || (issue.pageNumber ? [issue.pageNumber] : []);
         if (!pages.includes(pageNumber)) continue;
         if (!worst) worst = { severity: sev, charName, issue };
@@ -916,6 +997,9 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
     if (entityGap) {
       log.warn(`🚫 [REPAIR-DECIDE] page ${pageNumber}: entity ${worst.severity} on ${worst.charName} cannot take a char fix — ${entityGap.message}`);
       worst = null;
+    }
+    if (worst && charFixAlreadyFailed) {
+      return flippedFromFailedCharFix(`entity ${worst.severity} on ${worst.charName}`);
     }
     if (worst) {
       const issueDescription = worst.issue.description || worst.issue.fixInstruction || '';
@@ -937,6 +1021,39 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
         issueDescription,
         issueTypes,
         repairParams,
+      };
+    }
+  }
+
+  // 2a. THE PRESENCE MODEL'S MIXED CASE → char-fix AT THE FIGURE (owner,
+  // 2026-09-24). A cast member is absent and an unmatched figure stands in the
+  // frame: that figure IS the missing character drawn wrong, so it is redrawn
+  // as them — never deleted. The finding carries both halves as structured
+  // fields: `character` (the missing name) and `figure` (the evaluator's figure
+  // id, whose box the repair paints). A name with no roster entry has nothing to
+  // paint from and is left to gate 2c.
+  if (pageNumber > 0) {
+    const identity = severityIssues.find(i => String(i?.type || '').toLowerCase() === 'character_identity'
+      && /^(critical|catastrophic)$/i.test(String(i?.severity || ''))
+      && Number.isFinite(Number(i?.figure)) && i?.figure !== null
+      && String(i?.character || '').trim()
+      && !charFixImpossible(String(i.character).trim()));
+    if (identity) {
+      const charName = String(identity.character).trim();
+      if (charFixAlreadyFailed) return flippedFromFailedCharFix(`figure ${identity.figure} is ${charName} drawn wrong`);
+      const issueDescription = require('./scoring').findingText(identity);
+      const { resolveRepairAxes } = require('./faceRepair');
+      return {
+        method: 'char-fix',
+        reason: `figure ${identity.figure} is ${charName} drawn wrong — redraw it as ${charName}`,
+        charName,
+        // The figure the repaint targets. The missing name is by definition NOT
+        // on any figure, so the name-based bbox ladder cannot locate it.
+        targetFigure: Number(identity.figure),
+        severity: String(identity.severity).toLowerCase(),
+        issueDescription,
+        issueTypes: ['character_identity'],
+        repairParams: resolveRepairAxes(issueDescription, { hasFaceBbox: true, forceTarget: 'body' }),
       };
     }
   }
@@ -994,6 +1111,9 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
     const clothingGap = clothingIssue && charFixImpossible(String(clothingIssue.character).trim());
     if (clothingGap) {
       log.warn(`🚫 [REPAIR-DECIDE] page ${pageNumber}: clothing ${String(clothingIssue.severity).toLowerCase()} on ${String(clothingIssue.character).trim()} cannot take a figure redo — ${clothingGap.message}`);
+    }
+    if (clothingIssue && !worseNonClothing && !clothingGap && charFixAlreadyFailed) {
+      return flippedFromFailedCharFix(`clothing ${String(clothingIssue.severity).toLowerCase()} on ${String(clothingIssue.character).trim()}`);
     }
     if (clothingIssue && !worseNonClothing && !clothingGap) {
       const charName = String(clothingIssue.character).trim();
@@ -1258,12 +1378,13 @@ const NOT_INPAINTABLE_TYPES = new Set([
   'clothing', 'clothing_inconsistent', 'clothing_detail', 'garment_colour', 'garment_color',
   // body form
   'scale',
-  // extra_character: the finding is an identity reconciliation, not a deletion
-  // (owner, 2026-09-13). Inpaint was the removal route — a Grok whole-frame
-  // edit executing "remove this figure" erased a commissioned child from a
-  // cover. The finding stays scored and stays in the shippedDefective report;
-  // only its ROUTE is closed, like every other entry here.
-  'extra_character',
+  // extra_character is NOT here (owner, 2026-09-24, superseding 2026-09-13).
+  // Under the three-case presence model an `extra_character` means every cast
+  // member is already matched and this figure is surplus, so removing it cannot
+  // erase a commissioned character — the danger that closed the route. The
+  // removal is an inpaint (whole-frame Grok edit), the method that can actually
+  // take a figure out; a figure that might BE a missing cast member is the
+  // MIXED case (`character_identity`), which stays here and goes to char-fix.
   // cutout_artifact: see CROP_ARTIFACT_TYPES — the page has no such defect.
   'cutout_artifact',
 ]);
@@ -1278,8 +1399,18 @@ const NOT_INPAINTABLE_TYPES = new Set([
  * a white block that existed only in the grid crop. Keyed on the declared type.
  */
 const CROP_ARTIFACT_TYPES = new Set(['cutout_artifact']);
-function isCropArtifact(issue) {
-  return [issue?.type, issue?.subType].some(t => CROP_ARTIFACT_TYPES.has(String(t || '').toLowerCase()));
+// Also a crop artefact: a type in scoring.js ENTITY_ONLY_ZERO_POINT_TYPES
+// (`figure_completeness`) that ONLY the entity check reported (owner,
+// 2026-09-24: "log only"). The entity judge sees the crop, never the page. On
+// job_1790100385959_1nitlympp's back cover the consolidator relabelled a
+// `cutout_artifact` as `figure_completeness` and planned "Fill the arm and
+// jacket to remove white cropping artifacts". Source-scoped, never by wording:
+// the same type from the quality judge keeps every route. `entity: true` is for
+// callers reading the entity report itself, whose issues carry no `sources`.
+function isCropArtifact(issue, { entity = false } = {}) {
+  const types = [issue?.type, issue?.subType].map(t => String(t || '').toLowerCase());
+  if (types.some(t => CROP_ARTIFACT_TYPES.has(t))) return true;
+  return types.some(t => ENTITY_ONLY_ZERO_POINT_TYPES.has(t)) && (entity || isEntitySourced(issue));
 }
 
 /**
@@ -1484,4 +1615,4 @@ function describeFigureForRepair({
 
 module.exports = {
   describeFigureForRepair,
-  repairAttemptFromResult, detectionForRetryEntry, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, CROP_ARTIFACT_TYPES, isCropArtifact, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX };
+  repairAttemptFromResult, detectionForRetryEntry, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, attributeReaderFindings, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, CROP_ARTIFACT_TYPES, isCropArtifact, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX };

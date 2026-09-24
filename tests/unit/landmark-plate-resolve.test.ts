@@ -44,15 +44,6 @@ describe('decideLandmarkPhotoSource — variant landmarks', () => {
     expect(d?.mode).toBe('variant');
   });
 
-  it('honours an explicit variant from the brief', () => {
-    const d = decideLandmarkPhotoSource(variantLandmark(), { explicitVariant: 2 });
-    expect(d).toEqual({ mode: 'variant', variantNumber: 2 });
-  });
-
-  it('attaches nothing when the brief writes .0', () => {
-    expect(decideLandmarkPhotoSource(variantLandmark(), { explicitVariant: 0 })).toBeNull();
-  });
-
   it('picks an interior variant for an interior view', () => {
     const d = decideLandmarkPhotoSource(variantLandmark(), { sceneView: 'interior' });
     expect(d).toEqual({ mode: 'variant', variantNumber: 2 });

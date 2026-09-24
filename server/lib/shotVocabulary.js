@@ -490,6 +490,19 @@ const CLOSEUP_BELOW_WAIST_PHRASE = CLOSEUP_BELOW_WAIST_VERBS
   .join(', ');
 
 /**
+ * THE PLAN'S CLOSE-UP WINS (2026-09-24, Lab 1433). One rule for everyone who
+ * may change a planned close-up: the Art Director (11c), the scene review (7b,
+ * 10) and the code check `shot_widened` (sceneBriefCheck.js). Before it, 7b
+ * and 10 told the reviewer to answer a below-waist or environment fault by
+ * setting `shot` to `medium`, while `shot_widened` reported exactly that
+ * widening as a fault — on Lab 1433 p8 the reviewer widened the plan's
+ * close-up under its own 7b label and the re-check flagged the result. Only
+ * the plan line's own words decide whether a close-up page needs the room.
+ */
+const CLOSEUP_KEPT_RULE = 'A close-up the page\'s plan asks for stays `close-up`: restage the moment waist-up — holding, reaching, reacting — and never widen the shot for staging the plan does not name. '
+  + `Only a plan whose own words put the subject below the frame line — ${CLOSEUP_BELOW_WAIST_PHRASE} — makes that page \`medium\`.`;
+
+/**
  * A capitalised name or a person pronoun — kept for the entry that needs an
  * actor named BEFORE the match rather than inside it. No current entry does
  * (every one is `selfSubject`), and the guard stays because the next pattern
@@ -638,6 +651,7 @@ module.exports = {
   SHOT_FLOOR_CODE,
   SHOT_FLOOR_TIERS,
   CLOSEUP_BELOW_WAIST_VERBS,
+  CLOSEUP_KEPT_RULE,
   CLOSEUP_BELOW_WAIST_PHRASE,
   closeUpBelowWaistVerbs,
   shotFloors,

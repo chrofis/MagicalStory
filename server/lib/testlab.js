@@ -847,6 +847,7 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
       storyEra: meta.era || null,
       artStyle: plateStyle,
       shot: (meta.fullData?.shot || meta.shot || '').trim() || null,
+      landmarkPhoto: ctx.landmarkPhotos?.[0] || null,
     });
     qc = { pass: qcRes.pass, issues: qcRes.issues || [], visionFeedback: qcRes.visionFeedback || null };
   } catch (err) {
@@ -3635,7 +3636,7 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
     // copy this replaced carried the untrimmed brief and no plan line, so the
     // replay audited against a longer spec and "(no page plan was recorded)".
     const { extractRefinablePages } = require('./textRefine');
-    const pages = extractRefinablePages(storyData.sceneImages || []);
+    const pages = extractRefinablePages(storyData.sceneImages || [], { visualBible: storyData.visualBible, clothingRequirements: storyData.clothingRequirements });
     if (!pages.length) throw new Error('story has no page text to audit');
     // params.fromExperiment (2026-09-23): audit the page text a stored Lab
     // writer run produced (story_text_replay's results[i].pages) instead of the
@@ -4500,7 +4501,7 @@ async function runTextRefineStage(target, { params = {}, promptOverride = null }
 
   // Delegates to the SAME loop production runs (textRefine.js), so a Lab result
   // is evidence about the real thing rather than about a copy of it.
-  const pages = extractRefinablePages(storyData.sceneImages || []);
+  const pages = extractRefinablePages(storyData.sceneImages || [], { visualBible: storyData.visualBible, clothingRequirements: storyData.clothingRequirements });
   if (pages.length === 0) throw new Error(`Story ${target.storyId} has no page text to refine`);
 
   // EXACT REPLAY — params.fromWriterText restores the text the refiner actually
@@ -5419,9 +5420,13 @@ async function runRepairRoundStage(ctx, { experimentId, params = {} }) {
     latestEval = fresh;
   }
   const entityReport = params.entityReport || storyData.finalChecksReport?.entity || null;
-  const decision = decideRepairMethod(ctx.pageNumber, latestEval, entityReport);
+  // The page's DECLARED cast, as production passes it: a name the page does
+  // not hold is never char-fixed.
+  const decision = decideRepairMethod(ctx.pageNumber, latestEval, entityReport, {
+    expectedCast: require('./repairLogic').resolveDeclaredCast(ctx.scene.sceneCharacters),
+  });
 
-  const base = { decision: { method: decision.method, reason: decision.reason, charName: decision.charName || null } };
+  const base = { decision: { method: decision.method, reason: decision.reason, charName: decision.charName || null, targetFigure: decision.targetFigure ?? null } };
   // decideOnly: report the routing decision + the scores that drove it and
   // STOP — no repair executed, no image credits spent. For "is the routing
   // reliable on this page" experiments.
@@ -5452,9 +5457,17 @@ async function runRepairRoundStage(ctx, { experimentId, params = {} }) {
     return { ...base, ...r };
   }
   if (decision.method === 'char-fix') {
+    // A figure-targeted decision (presence MIXED case) paints THAT figure into
+    // the missing character — same box resolver production uses.
+    let figureBox = {};
+    if (decision.targetFigure != null) {
+      const fb = require('./charRepairTarget').resolveFigureBbox(decision.targetFigure, { bestEval: latestEval });
+      if (!fb.bodyBbox && !fb.faceBbox) throw new Error(`char-fix targets figure ${decision.targetFigure}, but the evaluation carries no box for it`);
+      figureBox = { bbox: fb.bodyBbox || fb.faceBbox, faceBbox: fb.faceBbox || null, whiteoutTarget: 'body' };
+    }
     const r = await runCharRepairStage(ctx, {
       experimentId,
-      params: { ...params, characterName: decision.charName, repairMode: 'auto' },
+      params: { ...params, ...figureBox, characterName: decision.charName, repairMode: 'auto' },
     });
     return { ...base, ...r };
   }
@@ -7948,7 +7961,7 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
     const prior = parsePageBlocks(params.fromText);
     if (!prior.length) throw new Error('fromText has no parseable pages');
     const priorBy = new Map(prior.map(p => [p.pageNumber, p.text]));
-    const basePages = extractRefinablePages(storyData.sceneImages || []);
+    const basePages = extractRefinablePages(storyData.sceneImages || [], { visualBible: storyData.visualBible, clothingRequirements: storyData.clothingRequirements });
     const pages = (basePages.length ? basePages : prior.map(p => ({ pageNumber: p.pageNumber, text: p.text, sceneIntent: '', sceneBrief: '' })))
       .map(p => ({ ...p, text: priorBy.get(p.pageNumber) || p.text }));
     const t = Date.now();
@@ -7990,7 +8003,7 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
   let prompt;
   try {
     prompt = buildStoryTextFromBeatsPrompt(
-      storyData, textArgs.beats, textArgs.expansions, textArgs.arc, { arcHints: textArgs.arcHints });
+      storyData, textArgs.beats, textArgs.expansions, textArgs.arc, { arcHints: textArgs.arcHints, visualBible: storyData.visualBible, clothingRequirements: storyData.clothingRequirements });
   } finally { PROMPT_TEMPLATES.storyTextFromBeats = orig; }
   if (!prompt) throw new Error('story-text-from-beats template unavailable');
 
@@ -8154,7 +8167,7 @@ async function runWriterCompareStage(target, { params = {} }) {
           // Production: buildStoryTextFromBeatsPrompt(inputData, beats, finalExpansions,
           // approvedArc, { arcHints }) — beatsPipeline.js:2327.
           const r = await call(SH.buildStoryTextFromBeatsPrompt(
-            storyData, beats, textArgs.expansions, textArgs.arc, { arcHints: textArgs.arcHints }), model, 'text');
+            storyData, beats, textArgs.expansions, textArgs.arc, { arcHints: textArgs.arcHints, visualBible: storyData.visualBible, clothingRequirements: storyData.clothingRequirements }), model, 'text');
           // Same parse production uses (beatsPipeline.js:3126). Without TITLE
           // named as a trailing marker the last page swallows the whole
           // ---TITLE--- block, and every arm was scored on a final page

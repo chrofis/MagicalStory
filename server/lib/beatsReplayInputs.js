@@ -114,7 +114,8 @@ function resolveReplayExpansions(storyData) {
  *
  *     const a = buildReplayTextArgs(storyData, beats, { parseBeats });
  *     buildStoryTextFromBeatsPrompt(storyData, a.beats, a.expansions, a.arc,
- *                                   { arcHints: a.arcHints });
+ *                                   { arcHints: a.arcHints, visualBible: storyData.visualBible,
+ *                                     clothingRequirements: storyData.clothingRequirements });
  *
  * `overrides` is the A/B lever and must be explicit: pass
  * `{ expansions: [] }` to deliberately measure the blind-writer arm.

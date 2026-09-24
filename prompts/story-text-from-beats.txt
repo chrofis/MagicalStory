@@ -27,7 +27,7 @@ Characters: {CHARACTER_NAMES}
 
 # LOCKED ILLUSTRATIONS (given — one PLAN line per page, the text matches them, page for page)
 
-The pictures are already done. Each page's PLAN line names the shot, who is in frame, the single instant the picture shows, and what is true after that page that was not before. ILLUSTRATION is the finished brief the artist drew from.
+The pictures are already done. Each page's PLAN line names the shot, who is in frame, the single instant the picture shows, and what is true after that page that was not before. ILLUSTRATION is what the finished picture shows: where, what happens, who is in it and what they wear, what else is in view.
 
 The plan lines divide the story into pages: a page tells the stretch of the story that leads to its picture's instant, the move that gets them there included, and that instant's consequence — everything the pages before have not told. The picture shows the named instant; the text tells everything else the page needs — above all what the picture cannot show. It never merely describes the picture, and never contradicts it: what a plan line says is true after a page is true from that page on and not before; what the picture shows still happening has not yet finished on that page.
 

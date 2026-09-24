@@ -1,5 +1,5 @@
 ### BODY
-This is a background plate for a children's book illustration: the place a page's characters are painted into later.{SCENE_CTX}{ERA_BLOCK}{PLACEMENTS_BLOCK}{MAIN_SCENE_BLOCK}
+This is a background plate for a children's book illustration: the place a page's characters are painted into later.{SCENE_CTX}{ERA_BLOCK}{PLACEMENTS_BLOCK}{MAIN_SCENE_BLOCK}{LANDMARK_CHECK}
 
 Check:
 - Setting / location: does it roughly match the expected scene? (FAIL if completely wrong location — e.g. expected a forest but got a city)
@@ -18,7 +18,10 @@ Reply JSON only: {"pass": true/false, "issues": ["short issue"], "feedback": "on
 - Camera: the plate is framed {SHOT}. Does the camera read that way? (FAIL if it clearly does not — e.g. eye level where it should look down from above.)
 
 ### ERA_CHECK
-- Anachronistic elements for the stated STORY ERA above: are there objects that don't fit the period? (FAIL — name them. Cars, parked vehicles, modern street lights, traffic signs, billboards, power lines, utility poles, satellite dishes, air conditioners, modern shopfront windows with price stickers, commercial ads, plastic bins, painted crosswalks, road markings, telephone poles, fire hydrants. Skip this check only if the story era is "present-day" or "modern".)
+- Anachronistic elements for the stated STORY ERA above: are there objects that don't fit the period? (FAIL — name them. Cars, parked vehicles, modern street lights, traffic signs, billboards, power lines, utility poles, satellite dishes, air conditioners, modern shopfront windows with price stickers, commercial ads, plastic bins, painted crosswalks, road markings, telephone poles, fire hydrants. A real landmark the scene is set at is never one of them — it stays as it really stands. Skip this check only if the story era is "present-day" or "modern".)
 
 ### PLACEMENTS_CHECK
 4. Given the character placements above, does the empty scene have open, flat, usable ground at EACH of those frame positions? FAIL if a character position (e.g. "far-left background") maps to a frame region that is blocked by a wall, a building facade, a large prop, or the very edge of a receding corridor. Name the blocked position in the issue.
+
+### LANDMARK_CHECK
+LANDMARK REFERENCE PHOTO: the second attached image is a real photograph of {LANDMARK_NAME}. {LANDMARK_PHOTO_AUTHORITY} In every check below, judge the landmark's look against that photograph, never against a written description of it. FAIL for the landmark only if it clearly does not resemble the photograph — name what differs from the photograph. A landmark that matches the photograph and not the words is a PASS, and the feedback never asks for a change that moves it away from the photograph. Its medium, camera, season, weather and light come from the scene, not the photograph.

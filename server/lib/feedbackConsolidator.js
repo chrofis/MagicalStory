@@ -347,6 +347,44 @@ function enforceNotADefectDrops(plan, pageNumber = null) {
   return removed;
 }
 
+/**
+ * A crop artefact takes no repair route (repairLogic.isCropArtifact) — and the
+ * plan is where a route is written. Drop every per-character fix whose declared
+ * types are ALL crop artefacts: `cutout_artifact`, or a type that only the entity
+ * check reported for that character (the deduped issue with `sources:
+ * ['entity']`). Matched on declared type and character, never on prose. The
+ * finding stays in deduped_issues (logged, costing 0); the fix moves to
+ * dropped_issues with the reason. Runs before the 3-fix cap so a crop artefact
+ * never takes a real fix's slot.
+ */
+function dropCropArtifactFixes(plan, pageNumber = null) {
+  if (!plan || !Array.isArray(plan.per_character_fixes)) return 0;
+  const { isCropArtifact, CROP_ARTIFACT_TYPES } = require('./repairLogic');
+  const key = (v) => (typeof v === 'string' ? v.trim().toLowerCase() : '');
+  const cropKeys = new Set((Array.isArray(plan.deduped_issues) ? plan.deduped_issues : [])
+    .filter(i => isCropArtifact(i))
+    .map(i => `${key(i.character)}|${key(i.type)}`));
+  if (!Array.isArray(plan.dropped_issues)) plan.dropped_issues = [];
+  let removed = 0;
+  plan.per_character_fixes = plan.per_character_fixes.filter(pcf => {
+    const types = Array.isArray(pcf?.types) ? pcf.types.map(key).filter(Boolean) : [];
+    if (types.length === 0) return true;
+    const who = key(pcf.characterName);
+    if (!types.every(t => CROP_ARTIFACT_TYPES.has(t) || cropKeys.has(`${who}|${t}`))) return true;
+    plan.dropped_issues.push({
+      issue: `${pcf.characterName || 'character'}: ${(pcf.issues || []).join('; ')}`,
+      type: types.join('/'),
+      character: pcf.characterName || null,
+      severity: pcf.severity,
+      reason: 'crop artefact — reported by the entity crop only, logged, not repaired',
+    });
+    removed++;
+    return false;
+  });
+  if (removed) log.info(`🧠 [FEEDBACK-CONSOLIDATOR] page ${pageNumber}: ${removed} per-char fix(es) dropped — crop artefact, logged only`);
+  return removed;
+}
+
 async function consolidateFeedback({
   sceneDescription,
   evaluation = {},
@@ -620,6 +658,7 @@ async function consolidateFeedback({
 
     enforceNotADefectDrops(plan, pageNumber);
     applyRule7SceneFixGuard(plan, pageNumber);
+    dropCropArtifactFixes(plan, pageNumber);
 
     // Enforce the 3-fix cap even if the consolidator slipped past the prompt.
     // When Grok is handed more than 3 fixes, it usually executes none of them —
@@ -908,6 +947,7 @@ async function consolidateEvaluation({
 module.exports = {
   applyRule7SceneFixGuard,
   enforceNotADefectDrops, // exported for testing
+  dropCropArtifactFixes, // exported for testing
   consolidateFeedback,
   medianSeverity, // exported for testing
   consolidateEvaluation,

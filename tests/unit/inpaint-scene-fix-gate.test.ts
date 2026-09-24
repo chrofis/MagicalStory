@@ -25,7 +25,7 @@ const {
 
 describe('typesAreInpaintable — the gate both plan channels share', () => {
   it('blocks a fix whose every declared type is forbidden', () => {
-    expect(typesAreInpaintable(['extra_character'])).toBe(false);
+    expect(typesAreInpaintable(['character_identity'])).toBe(false);
     expect(typesAreInpaintable(['clothing', 'hair'])).toBe(false);
   });
 
@@ -48,16 +48,19 @@ describe('typesAreInpaintable — the gate both plan channels share', () => {
   });
 
   it('matches on the declared type, case-insensitively, never on prose', () => {
-    expect(typesAreInpaintable(['EXTRA_CHARACTER'])).toBe(false);
+    expect(typesAreInpaintable(['CHARACTER_IDENTITY'])).toBe(false);
     expect(typesAreInpaintable(['Clothing'])).toBe(false);
     // prose that merely mentions a forbidden word is not a type
-    expect(typesAreInpaintable(['remove the extra character'])).toBe(true);
+    expect(typesAreInpaintable(['repaint the character identity'])).toBe(true);
   });
 
-  it('keeps the entry that motivated the gate', () => {
-    // Owner ruling 2026-09-13; if this leaves the set the gate stops mattering
-    // for the case it was written for.
-    expect(NOT_INPAINTABLE_TYPES.has('extra_character')).toBe(true);
+  it('lets a confirmed surplus figure through — the owner reversed the 2026-09-13 closure on 2026-09-24', () => {
+    // The gate was written for `extra_character`; under the three-case presence
+    // model that type means every cast member is matched, so its removal can no
+    // longer erase a commissioned figure. The figure that might BE a missing
+    // member is `character_identity`, which the gate still blocks.
+    expect(typesAreInpaintable(['extra_character'])).toBe(true);
+    expect(NOT_INPAINTABLE_TYPES.has('character_identity')).toBe(true);
   });
 
   it('does not block the types the four measured pages actually carried', () => {

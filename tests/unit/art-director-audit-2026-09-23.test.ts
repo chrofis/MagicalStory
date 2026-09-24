@@ -32,18 +32,15 @@ const brief = (meta: any) => `Prose.\n\n---METADATA---\n${JSON.stringify({ chara
 const typesOn = (pageNumber: number, meta: any) =>
   checkPage({ pageNumber, brief: brief(meta) }, [], bible(), {}).map((f: any) => f.type);
 
-describe('landmark_view_missing', () => {
-  it('fires on a page citing a real landmark with no landmarkView', () => {
-    expect(typesOn(3, { shot: 'medium', objects: ['LOC002.2'] })).toContain('landmark_view_missing');
+// DELETED 2026-09-24 (Lab 1433): sent on 18 of 18 pages, answered `exterior`
+// on every one — the value a missing field already resolves to — and the
+// review rewrote every page to set it.
+describe('landmark_view_missing is gone', () => {
+  it('a real-landmark page with no landmarkView raises nothing', () => {
+    expect(typesOn(3, { shot: 'medium', objects: ['LOC002.2'] })).toEqual([]);
   });
-  it('is quiet when the page says how it sees the landmark', () => {
-    expect(typesOn(3, { shot: 'medium', objects: ['LOC002.2'], landmarkView: 'exterior' })).not.toContain('landmark_view_missing');
-  });
-  it('is quiet on an invented location', () => {
-    const vb = bible();
-    vb.locations[0].isRealLandmark = false;
-    const f = checkPage({ pageNumber: 3, brief: brief({ shot: 'medium', objects: ['LOC002.2'] }) }, [], vb, {});
-    expect(f.map((x: any) => x.type)).not.toContain('landmark_view_missing');
+  it('is not a type the scene review can be sent', () => {
+    expect(REVIEWABLE.has('landmark_view_missing')).toBe(false);
   });
 });
 
@@ -67,12 +64,56 @@ describe('shot_off_plate', () => {
   it('the Art Director is told the same line, built from the same shot set', () => {
     for (const shot of PLATE_DERIVED_SHOTS) expect(VANTAGE_SHOT_RULE).toContain('`' + shot + '`');
   });
+  it('is REVIEWABLE', () => {
+    expect(REVIEWABLE.has('shot_off_plate')).toBe(true);
+  });
+
+  // The plan's shot wins (2026-09-24, Lab 1433): a page whose shot is the plan
+  // line's is never told to take the plate's shot instead.
+  const onPlan = (pageNumber: number, planLine: string, meta: any) =>
+    checkPage({ pageNumber, planLine, brief: brief(meta) }, [], bible(), {}).find((x: any) => x.type === 'shot_off_plate');
+  it('a planned close-up on the aerial plate is offered a vantage, never a new shot (p13)', () => {
+    const hit = onPlan(13, 'close-up — Turi — Turi sits among the leaves — he is frightened', { shot: 'close-up', objects: ['LOC002.4'] });
+    expect(hit).toBeTruthy();
+    expect(hit.detail).toContain('LOC002.2');
+    expect(hit.detail).toContain("Keep `shot`: it is the plan line's.");
+    expect(hit.detail).not.toContain('set `shot` to');
+  });
+  it('with no vantage that can hold it, a planned shot stands', () => {
+    const vb = bible();
+    vb.locations[0].vantages = vb.locations[0].vantages.filter((v: any) => v.id !== 'LOC002.2');
+    const hit = checkPage({ pageNumber: 13, planLine: 'close-up — Turi — x — y', brief: brief({ shot: 'close-up', objects: ['LOC002.4'] }) }, [], vb, {})
+      .find((x: any) => x.type === 'shot_off_plate');
+    expect(hit.detail).toContain('say it stands');
+    expect(hit.detail).not.toContain('set `shot` to');
+  });
+  it('a shot the plan line did not ask for may still take the plate\'s shot', () => {
+    const hit = onPlan(13, 'aerial — Turi — x — y', { shot: 'close-up', objects: ['LOC002.4'] });
+    expect(hit.detail).toContain('set `shot` to `aerial`');
+  });
 });
 
-describe('both new types reach the scene review', () => {
-  it('are REVIEWABLE', () => {
-    expect(REVIEWABLE.has('landmark_view_missing')).toBe(true);
-    expect(REVIEWABLE.has('shot_off_plate')).toBe(true);
+// The plan's close-up wins (2026-09-24, Lab 1433 p8): the reviewer widened a
+// planned close-up under 7b while `shot_widened` reported that very widening.
+describe('one close-up rule for the Art Director, the review and shot_widened', () => {
+  const { CLOSEUP_KEPT_RULE } = require_('../../server/lib/shotVocabulary');
+  it('shot_widened states the rule', () => {
+    const hit = checkPage({ pageNumber: 8, planLine: 'close-up — Mira — Mira presses the bag against the shell — it is warm', brief: brief({ shot: 'medium' }) }, [], bible(), {})
+      .find((x: any) => x.type === 'shot_widened');
+    expect(hit.detail).toContain(CLOSEUP_KEPT_RULE);
+  });
+  it('the review no longer turns a planned close-up into a medium', async () => {
+    await loadPromptTemplates();
+    const inputData = { language: 'en', pages: 1, characters: [{ id: 1, name: 'Mira' }], mainCharacters: [1] };
+    const review = String(PB.buildSceneReviewPrompt(inputData, [{ pageNumber: 1, brief: brief({}) }], { beats: [{ pageNumber: 1, planLine: 'close-up — Mira — x — y' }] }));
+    const ad = String(PB.buildSceneExpansionAllPrompt(inputData, [{ pageNumber: 1, planLine: 'close-up — Mira — x — y' }], {}));
+    for (const text of [review, ad]) {
+      expect(text).toContain(CLOSEUP_KEPT_RULE);
+      expect(text).not.toContain('{CLOSEUP_KEPT}');
+    }
+    expect(review).not.toContain("Rewrite that page's `shot` to `medium` and change nothing else.");
+    expect(review).not.toContain('or changing `shot` to `medium`');
+    expect(ad).not.toContain('or make the page a `medium` shot');
   });
 });
 
@@ -173,8 +214,32 @@ describe('the hand-off counters never count a location id as a one-grip object',
     expect(typesD(rows)).not.toContain('interaction_object_shared_hands');
     expect(typesC3(rows)).not.toContain('interaction_object_shared_hands');
   });
-  it('both still fire on a shared grip on a real object', () => {
-    expect(typesD(shared)).toContain('interaction_object_shared_hands');
-    expect(typesC3(shared)).toContain('interaction_object_shared_hands');
+  // Owner, 2026-09-23: a joint hold is allowed when it is the page's ONLY action.
+  it('a joint hold that is the page\'s only action is allowed by both counters', () => {
+    expect(typesD(shared)).not.toContain('interaction_object_shared_hands');
+    expect(typesC3(shared)).not.toContain('interaction_object_shared_hands');
+    const withWatcher = [...shared, { character: 'Max', object: 'Levin', hands: false, action: 'watching' }];
+    expect(typesD(withWatcher)).not.toContain('interaction_object_shared_hands');
+  });
+  it('both fire when the joint hold sits beside another action', () => {
+    const busy = [...shared, { character: 'Max', object: 'ART003', hands: true, action: 'waving the scale' }];
+    expect(typesD(busy)).toContain('interaction_object_shared_hands');
+    expect(typesC3(busy)).toContain('interaction_object_shared_hands');
+  });
+  it('a hand-over (two rows, two actions) still fires', () => {
+    const handover = [
+      { character: 'Levin', object: 'ART002.1', hands: true, action: 'handing the egg' },
+      { character: 'Kiaan', object: 'ART002.1', hands: true, action: 'taking the egg' },
+    ];
+    expect(typesD(handover)).toContain('interaction_object_shared_hands');
+    expect(typesC3(handover)).toContain('interaction_object_shared_hands');
+  });
+  it('a row with no action label is never the sole action', () => {
+    expect(typesD([{ character: 'Levin + Kiaan', object: 'ART002.1', hands: true }])).toContain('interaction_object_shared_hands');
+  });
+  it('the Art Director and the reviewer carry the same rule', () => {
+    const { SHARED_GRIP_RULE } = require_('../../server/lib/sceneMetadata');
+    expect(String(PB.buildSceneExpansionAllPrompt({ language: 'en', characters: [{ id: 1, name: 'Mira' }], mainCharacters: [1] }, [{ pageNumber: 1, planLine: 'medium \u2014 Mira \u2014 x \u2014 y' }], {}))).toContain(SHARED_GRIP_RULE);
+    expect(String(PB.buildSceneReviewPrompt({ language: 'en', characters: [{ id: 1, name: 'Mira' }], mainCharacters: [1] }, [{ pageNumber: 1, brief: 'x' }], {}))).toContain(SHARED_GRIP_RULE);
   });
 });

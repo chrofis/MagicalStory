@@ -58,7 +58,7 @@ const { checkVbElementBudget } = require('./vbElementBudget');
 // with a non-ASCII hyphen (3 pages in the stored corpus) cannot read as a
 // different shot on one side and the same shot on the other.
 const { planSegments, classifyShot } = require('./planCounters');
-const { closeUpBelowWaistVerbs, CLOSEUP_BELOW_WAIST_PHRASE } = require('./shotVocabulary');
+const { closeUpBelowWaistVerbs, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE } = require('./shotVocabulary');
 
 // A visual-bible id: three letters, three digits, optionally a landmark variant
 // suffix (`LOC003.1` is variant 1 of LOC003 and resolves to it). Anything not
@@ -736,15 +736,15 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
   // same story. Counted from the declared `hands` flag and the character names
   // already on the row — a fused "A + B" row is two pairs of hands on one
   // object, which is the hand-off shape. Rows without the flag never count.
-  // A location id is never a one-grip object (sceneMetadata.handsPerObject).
-  const perObject = require('./sceneMetadata').handsPerObject(interactions);
-  for (const [obj, who] of perObject) {
-    if (who.length < 2) continue;
+  // A location id is never a one-grip object, and a joint hold that is the
+  // page's only action is allowed (owner, 2026-09-23 — sceneMetadata).
+  const { forbiddenSharedGrips, SHARED_GRIP_RULE } = require('./sceneMetadata');
+  for (const { obj, who } of forbiddenSharedGrips(interactions)) {
     findings.push({
       pageNumber: page.pageNumber,
       type: 'interaction_object_shared_hands',
-      detail: `${who.length} characters (${who.join(', ')}) have hands on "${obj}" at once; one object takes one pair of hands. `
-        + `Draw the moment before or after the hand-over — one holds it out, the other reaches — or move the second character to watching.`,
+      detail: `${who.length} characters (${who.join(', ')}) have hands on "${obj}" at once, and that joint hold is not the page's only action. ${SHARED_GRIP_RULE} `
+        + `Make the joint hold the one action, or draw the moment before or after the hand-over, or move the second character to watching.`,
     });
   }
 
@@ -806,15 +806,17 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
         detail: `The page plan asks for a close-up and the brief came back \`${declaredShot}\`. `
           + `The plan line names none of ${CLOSEUP_BELOW_WAIST_PHRASE}, so nothing in the beat forces the wider frame. `
           + `A sitting, kneeling or crouching pose does NOT force it: a close-up crops the legs away, which is what a close-up is, and a crouch brings the head down to what it is looking at. `
-          + `Restage the moment waist-up — holding, reaching, reacting — and put \`shot\` back to \`close-up\`. `
-          + `Keep the wider shot only if the picture must SHOW something below the frame line, and then say in the prose what needs the room.`,
+          // The same constant scene-review 7b / 10 and the Art Director's 11c
+          // state, so the reviewer is never told to widen what this check
+          // reports (Lab 1433 p8, 2026-09-24).
+          + `${CLOSEUP_KEPT_RULE} Put \`shot\` back to \`close-up\`, unless the plan line's own words put the subject below the frame line in a phrasing that list does not cover — then keep the wider shot and say in the prose what needs the room.`,
       });
     }
   }
 
-  // L — the page cites a real landmark and never says how it sees it.
-  const landmarkView = checkLandmarkView(page, metadata, visualBible);
-  if (landmarkView) findings.push(landmarkView);
+  // (No L. `landmark_view_missing` was removed 2026-09-24, Lab 1433 — see
+  // docs/decisions.md: a missing landmarkView already resolves to the
+  // exterior photo, and the views it cannot give are not derivable here.)
 
   // M — the page's camera is one its vantage's plate cannot hold.
   const offPlate = checkShotOffPlate(page, metadata, visualBible);
@@ -842,36 +844,6 @@ function briefField(metadata, key) {
 }
 
 /**
- * L — a real-landmark page with no `landmarkView` (2026-09-23).
- *
- * The field picks the landmark's reference photo (storyHelpers
- * resolveLandmarkPhotoForLocation); without it every page is served the
- * exterior, including a page set inside the landmark or looking out from it.
- * On staging job_1790100385959_1nitlympp it was missing on all 17 landmark
- * pages and nothing downstream said so. Structured only: the cited LOC ids, the
- * bible's `isRealLandmark` and the field's presence.
- */
-function checkLandmarkView(page, metadata, visualBible) {
-  const n = Number(page && page.pageNumber);
-  if (!Number.isFinite(n) || n <= 0 || briefField(metadata, 'landmarkView')) return null;
-  const locations = Array.isArray(visualBible && visualBible.locations) ? visualBible.locations : [];
-  const cited = citedBaseIds(metadata);
-  const landmarks = locations.filter(l => l && l.isRealLandmark && cited.has(String(l.id || '').trim().toUpperCase()));
-  if (landmarks.length === 0) return null;
-  const { elementDisplayLabel } = require('./vbIdGuard');
-  return {
-    pageNumber: n,
-    type: 'landmark_view_missing',
-    ids: landmarks.map(l => String(l.id).toUpperCase()),
-    detail: `Cites the real landmark ${landmarks.map(l => `${elementDisplayLabel(l) || l.name || l.id} (${l.id})`).join(' and ')} with no \`landmarkView\`, so it gets the exterior photo. `
-      + `Set it: ${LANDMARK_VIEWS.join(' | ')}.`,
-  };
-}
-
-/** The `landmarkView` values the photo picker reads (landmarkPhotos.pickVariantForView). */
-const LANDMARK_VIEWS = ['exterior', 'distant', 'close', 'interior', 'view-from', 'underwater', 'none'];
-
-/**
  * M — a page whose `shot` its vantage's plate cannot hold (2026-09-23).
  *
  * One plate is painted per vantage, from the vantage's own `shot`. Pages at eye
@@ -882,6 +854,14 @@ const LANDMARK_VIEWS = ['exterior', 'distant', 'close', 'interior', 'view-from',
  * aerial plate (p13), three eye-level pages on the high-angle one (p14, p16,
  * p17) and a medium on the ultra-wide one (p18). The page is resolved to its
  * vantage by getPrimaryVantageForPage, the function the plate grouping uses.
+ *
+ * THE PLAN'S SHOT WINS (2026-09-24, Lab 1433). When the page's `shot` is the
+ * one its plan line asks for, the fault is the VANTAGE's shot, not the page's:
+ * the finding never asks for the page's shot to change (the contradiction
+ * `shot_widened` and scene-review 7b had), only for a vantage that can hold
+ * it. With none, the page stands and the review says so — the review cannot
+ * edit a vantage's `shot`. On Lab 1433 p13 and p14 the old wording asked for
+ * planned close-ups to become `aerial` / `high-angle`.
  */
 function checkShotOffPlate(page, metadata, visualBible) {
   const n = Number(page && page.pageNumber);
@@ -898,14 +878,25 @@ function checkShotOffPlate(page, metadata, visualBible) {
   const plate = plateClass(plateShot);
   if (plate === PLATE_BASE_CLASS || plateClass(shot) === plate) return null;
   const fits = vantages.filter(v => v && v !== hit.vantage && [PLATE_BASE_CLASS, plateClass(shot)].includes(plateClass(v.shot)));
+  const planSegs = planSegments(String((page && page.planLine) || ''));
+  const plannedShot = planSegs.length ? classifyShot(planSegs[0]) : 'other';
+  const shotIsPlanned = plannedShot !== 'other' && classifyShot(shot) === plannedShot;
+  const recite = `Cite a vantage of this place whose plate can: ${fits.map(v => `${v.id} (\`${v.shot}\`)`).join(', ')}`;
+  let fix;
+  if (shotIsPlanned) {
+    fix = fits.length
+      ? `${recite}, if one of them shows the place this page needs. Keep \`shot\`: it is the plan line's. If none does, leave the page and say it stands.`
+      : '`shot` is the plan line\'s and no vantage of this place can hold it, so leave the page and say it stands.';
+  } else {
+    fix = fits.length
+      ? `${recite}. If none shows the place this page needs, set \`shot\` to \`${plateShot}\`.`
+      : `This place has no vantage whose plate can, so set \`shot\` to \`${plateShot}\` and stage the moment at that distance.`;
+  }
   return {
     pageNumber: n,
     type: 'shot_off_plate',
     ids: [String(hit.vantageId)],
-    detail: `This page is a \`${shot}\` and cites ${hit.vantageId}, whose plate is painted \`${plateShot}\`; a \`${plateShot}\` plate cannot hold a \`${shot}\`. `
-      + (fits.length
-        ? `Cite a vantage of this place whose plate can: ${fits.map(v => `${v.id} (\`${v.shot}\`)`).join(', ')}. If none shows the place this page needs, set \`shot\` to \`${plateShot}\`.`
-        : `This place has no vantage whose plate can, so set \`shot\` to \`${plateShot}\` and stage the moment at that distance.`),
+    detail: `This page is a \`${shot}\` and cites ${hit.vantageId}, whose plate is painted \`${plateShot}\`; a \`${plateShot}\` plate cannot hold a \`${shot}\`. ${fix}`,
   };
 }
 
@@ -1086,10 +1077,13 @@ const REVIEWABLE = new Set(['cast_unlisted', 'cast_id_unresolved', 'interaction_
   // The review owns `population` the same way it owns every other metadata
   // field it rewrites, and the fix is one field or one clause — no extra round.
   'population_contradicted',
-  // Both one metadata field on the page the review already rewrites
-  // (2026-09-23): the Art Director is given each rule and the reviewer had no
-  // check for either — see checkLandmarkView / checkShotOffPlate.
-  'landmark_view_missing', 'shot_off_plate',
+  // One citation on the page the review already rewrites (2026-09-23) — see
+  // checkShotOffPlate. Its sibling `landmark_view_missing` was DELETED on
+  // 2026-09-24 (Lab 1433): sent on 18 of 18 pages, it came back `exterior` on
+  // every one — the value a missing field already resolves to — and on 17 of
+  // them the page cites a dotted LOC id the photo picker reads first, so the
+  // field could not have changed the photo at all. docs/decisions.md.
+  'shot_off_plate',
   'textzone_character_collision', 'textzone_fullwidth_floor', 'textzone_top_floor', 'textzone_bottom_floor', 'textzone_half_streak']);
 
 // Reserved `action` labels for characters who are present but not acting. They
@@ -1127,5 +1121,5 @@ module.exports = {
   checkBiblePageTable, bibleEntries, citedBaseIds, CITABLE_POOLS,
   checkTextZoneDistribution, checkTextZoneCollision, parseTextPosition,
   checkPopulationContradiction,
-  checkLandmarkView, checkShotOffPlate, LANDMARK_VIEWS,
+  checkShotOffPlate,
 };

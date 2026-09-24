@@ -3177,8 +3177,10 @@ function buildPhysicalTraitsDescription(character) {
   // Build
   if (p.build) parts.push(`${p.build} build`);
 
-  // Face shape
-  if (p.face) parts.push(`${p.face} face`);
+  // Face shape — the ONE face builder pages and covers use (promptBuilders
+  // buildFaceDescription), so a repair describes the face the render was given.
+  const face = require('./promptBuilders').buildFaceDescription(p.face);
+  if (face) parts.push(`${face} face`);
 
   // Facial hair (for males)
   if (p.facialHair && p.facialHair !== 'none') parts.push(p.facialHair);

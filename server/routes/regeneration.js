@@ -1503,7 +1503,7 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
           // Pull artifact prop bytes + full-VB id→name map so the cast's prop
           // references resolve (shared producer helper — same enrichment the
           // coverIterate composite path uses).
-          const enrichedHint = enrichCoverHintWithArtifacts(coverHint, visualBible, { language: storyData.language });
+          const enrichedHint = enrichCoverHintWithArtifacts(coverHint, visualBible, { language: storyData.language, coverKey: coverType });
           // Back-cover main-only narrowing — FALLBACK only. When the hint
           // lists characters, the cast builder below intersects with the
           // hint's characterDetails, and every hint-listed character must
@@ -1528,8 +1528,7 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
             throw new Error('Cover composite cast is empty (no resolvable characters in coverHint)');
           }
           // Reference bundle — same one iterateCover uses (landmark photos
-          // + styled empty scene + VB grid). buildCoverReferences handles
-          // empty-scene generation when MODEL_DEFAULTS.singlePassScene is off.
+          // + styled empty scene + VB grid).
           const refs = await buildCoverReferences({
             coverKey: coverType,
             visualBible,
@@ -1537,6 +1536,9 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
             sceneDescription: (storyData.coverImages?.[coverType]?.description) || '',
             coverHint: enrichedHint,
             logLabel: `${coverLabel(coverType)} TEST-MODELS`,
+            // Composite route: left as it was (owner, 2026-09-24) — plate unless
+            // singlePassScene, the raw photo stays its background input.
+            use: 'composite',
             // test-models doesn't bill — pass no usageTracker so empty-scene
             // generation either uses cached or skips depending on defaults.
           });

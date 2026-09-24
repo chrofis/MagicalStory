@@ -22,29 +22,6 @@ const TR = require('../../server/lib/textRefine.js');
 
 const HINTS = 'ISSUE: The helper searches the place he sent the other to. → CHANGE: He searches the other place himself.';
 
-describe('restoredSentences — provenance of a diff correction', () => {
-  const writer = 'The fox ran home. The fox hid the key under the stone.';
-  const rewritten = 'The fox ran home. The fox hid the key in the hollow tree.';
-
-  it('a correction that puts back the writer\'s sentence is a restoration', () => {
-    expect(TR.restoredSentences('The fox hid the key under the stone.', writer, rewritten))
-      .toEqual(['The fox hid the key under the stone.']);
-  });
-
-  it('a language fix with new words restores nothing', () => {
-    expect(TR.restoredSentences('The fox hid the key inside the hollow tree.', writer, rewritten)).toEqual([]);
-  });
-
-  it('a sentence both texts carry is not a restoration', () => {
-    expect(TR.restoredSentences('The fox ran home.', writer, rewritten)).toEqual([]);
-  });
-
-  it('finds a restored sentence inside a longer correction', () => {
-    expect(TR.restoredSentences('It was late. The fox hid the key under the stone.', writer, rewritten))
-      .toEqual(['The fox hid the key under the stone.']);
-  });
-});
-
 describe('settleLedgerAfterDiff', () => {
   const ledger = [
     { pageNumber: 3, category: 'MISMATCH', text: 'x', outcome: 'page-rewritten', reason: null },
@@ -85,8 +62,9 @@ describe('refineStoryText — ledger and counter after the diff, hints to the si
       if (label === 'text_audit') text = 'FAULT[CAUSE]: p1 - nothing says how the map tore.\nFAULTS: 1';
       else if (label === 'text_audit_blind') text = 'FAULTS: 0';
       else if (label.startsWith('text_refine')) text = ['---ANALYSIS---', 'fixed', '---STORY TEXT---', '## Page 1', 'Die Karte ist alt. Beim Auspacken riss der Rand ein.'].join('\n');
-      // The diff pass puts the writer's sentence back over the fix.
-      else if (label === 'text_diff') text = "PAGE 1: 'Beim Auspacken riss der Rand ein.' -> 'Der Rand ist eingerissen.'";
+      // The grammar check restores the writer's sentence (a numbered RESTORE)
+      // and tries a free rewrite, which is dropped (owner 2026-09-23).
+      else if (label === 'text_diff') text = 'PAGE 1 RESTORE B2 AFTER A1\nPAGE 1 FIX A2: Der Hund lief weg und niemand sah ihn je wieder im Wald.';
       else if (label === 'text_lector') text = 'NONE';
       return { text, modelId: `stub-${model}`, usage: { input_tokens: 10, output_tokens: 20, direct_cost: 0 } };
     };
@@ -95,15 +73,18 @@ describe('refineStoryText — ledger and counter after the diff, hints to the si
 
   it('re-settles the ledger, counts the shipped text, and hands the hints to the audit and the repair only', async () => {
     const res = await TR.refineStoryText(STORY, PAGES, { arc: '1. A map tears.', arcHints: HINTS });
-    // The fix was undone on the shipped page, and the ledger says so.
-    expect(res.pages[0].text).toBe('Die Karte ist alt. Der Rand ist eingerissen.');
+    // The writer's sentence is back on the shipped page, and the ledger says so.
+    expect(res.pages[0].text).toBe('Die Karte ist alt. Der Rand ist eingerissen. Beim Auspacken riss der Rand ein.');
+    // A sentence neither version had never ships.
+    expect(res.pages[0].text).not.toContain('Hund lief weg');
+    expect(res.diffDropped[0].reason).toBe('rewrites-the-sentence');
     const cause = res.findingLedger.find((f: any) => f.category === 'CAUSE');
     expect(cause.outcome).toBe(TR.FINDING_OUTCOME.REWRITE_RESTORED);
     expect(res.diffApplied[0].restored).toEqual(['Der Rand ist eingerissen.']);
     expect(TR.projectTextRefineReport(res).diffApplied[0].restored).toEqual(['Der Rand ist eingerissen.']);
     // The shipped text is counted.
     expect(res.wordBudget.shipped.counts).toEqual([
-      { pageNumber: 1, words: 8, sentences: 2, paragraphs: 1 },
+      { pageNumber: 1, words: 14, sentences: 3, paragraphs: 1 },
       { pageNumber: 2, words: 5, sentences: 1, paragraphs: 1 },
     ]);
     // Hints: both sighted critics, with the writer's arc-outranks-hint rule; never the blind audit.

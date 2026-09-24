@@ -1803,6 +1803,102 @@
       "fixedAt": "2026-09-23",
       "fixedIn": "747058ae9",
       "fix": "sceneMetadata.splitBrief: one split recognising delimiter, trailing fence and trailing bare object, read by every brief consumer; stripSceneMetadata throws rather than rebuild a brief with prose from its JSON. Pinned by tests/unit/brief-carrier-split.test.ts."
+    },
+    {
+      "id": "cover-stated-object-default-state",
+      "title": "A cover drew a stated object in its FIRST state (raw materials) instead of its finished state",
+      "reportedAt": "2026-09-23",
+      "source": "Production trial job_1790169018278_n57xpnufo (\"La Couronne de William et l'Écureuil du Parvis\", fr-ch, 2026-09-23), read from stories.data. coverImages.frontCover.prompt REQUIRED OBJECTS: \"laurel leaf crown (object) - tas de feuilles de laurier détachées, non liées, posées à plat\" = visualBible.artifacts ART001.states[0] (pages 1-3); the cover description held \"la couronne de laurier finie\" (ART001.2, pages 4-6).",
+      "rootCause": "resolveObjectState finds no state whose pages[] covers a negative cover page number, so a bare citation fell to defaultObjectState (first row); cover cell sites called elementRefCell with no page at all.",
+      "impact": "Every cover showing an object the story makes or transforms rendered its starting look - here a pile of leaves on the ground.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "684f51d93",
+      "fix": "resolveObjectState rule 0: covers take the cited dotted state, else finalObjectState; getElementReferenceImagesByIds / enrichCoverHintWithArtifacts / cover VB-NAME-MATCH resolve through it with the cover page number. Pinned by tests/unit/cover-object-final-state.test.ts."
+    },
+    {
+      "id": "plate-qc-judges-landmark-against-text-not-photo",
+      "title": "The plate QC failed a photo-faithful landmark plate against a wrong written description and its feedback repainted the landmark",
+      "reportedAt": "2026-09-23",
+      "source": "Production story job_1790107559778_fcmlfa8kn p7/p8 (vantage LOC003.1, Fernsehturm Uetliberg, landmark_index 5854). stories.data sceneImages[p7].emptySceneQc.v1Issues: 'The tower is a solid concrete structure, not a lattice metal structure as specified'; visionFeedback 'The tower must be a lattice metal structure with metal legs'. photo_description_2 described the separate lattice observation tower in slot 2 as the TV tower's support structure.",
+      "rootCause": "validateEmptyScene was never sent the landmark photo and had no rule placing the photo above the text, so it judged the landmark against the brief; its feedback was appended to the retry prompt. The index description of slot 2 was wrong.",
+      "impact": "A real landmark repainted as a different structure on the plate every page of that vantage is drawn on. Staging and production.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "c55871cbf",
+      "fix": "DB: 5854 (prod) / 2149 (staging) descriptions rewritten from the photos. Code: LANDMARK_PHOTO_AUTHORITY in buildLandmarkFidelityBlock and the new LANDMARK_CHECK of empty-scene-qc.txt; the landmark photo is attached to the plate judge at every call site; era lines aligned with the generator. Pinned by tests/unit/landmark-photo-authority.test.ts. Model-level effect of the final wording not yet replayed (docs/decisions.md 2026-09-23)."
+    },
+    {
+      "id": "landmark-view-check-rewrites-every-page",
+      "title": "landmark_view_missing made the scene review rewrite 18 of 18 pages to set the default value, and the rewrite widened a planned close-up (p8) and named an absent character (p9)",
+      "reportedAt": "2026-09-24",
+      "source": "Test Lab experiment 1433 (scene_review_replay, staging job_1790100385959_1nitlympp): BRIEF FAULTS carried landmark_view_missing on all 18 pages; changedPages 1-18; every page came back landmarkView exterior (pages 1, 3, 15 changed nothing else). Re-check after: p8 shot_widened (reviewer set shot medium under its own 7b), p9 cast_unlisted (9e clause 'where Julian pressed it'), p16 shot_off_plate open.",
+      "rootCause": "4994fe530 made a field whose absence already resolves to the exterior photo a REVIEWABLE page fault; scene-review 7b / 10 told the reviewer to widen close-ups that shot_widened forbids widening; shot_off_plate offered 'set shot to the plate's' on planned shots; 9e's clause invited naming who left an element.",
+      "impact": "Every story citing a real landmark: a full-book review rewrite for no change, with planned close-ups lost and new cast faults introduced.",
+      "status": "fixed",
+      "fixedAt": "2026-09-24",
+      "fixedIn": "a387828f0",
+      "fix": "landmark_view_missing deleted (no derivation: the default is the exterior photo and the views that differ are not in any structured field). shotVocabulary.CLOSEUP_KEPT_RULE shared by AD 11c, scene-review 7b / 10 and shot_widened; shot_off_plate keeps a planned shot and offers only a vantage; 9e / C7 place by the place. Pinned by tests/unit/art-director-audit-2026-09-23.test.ts. docs/decisions.md 2026-09-24."
+    },
+    {
+      "id": "landmark-vantage-id-picks-photo",
+      "title": "A brief's dotted Visual Bible vantage id (LOC002.3) was read as a landmark PHOTO slot, before landmarkView - pages got the photo whose slot number equalled their vantage number",
+      "reportedAt": "2026-09-24",
+      "source": "Found in the Lab 1433/1435 fix work (staging job_1790100385959_1nitlympp, Lindenhof, 18 pages). Read back from stories.data.sceneImages[].landmarkPhotos: p3-5 cite LOC002.2 and were served slot 2 (an aerial rooftop panorama), p6-11 cite LOC002.3 and were served slot 3 (a riverside promenade that is not the Lindenhof at all); p12-16 cite .4/.5, slots that do not exist, and the loader substituted slot 1. Only p17 carried a landmarkView.",
+      "rootCause": "getLandmarkPhotosForScene / sceneMetadata parsed every `LOC###.N` into landmarkVariants and passed it as explicitVariant, which decideLandmarkPhotoSource took BEFORE pickVariantForView(landmarkView). The `.N`-is-a-photo convention predates vantages; once the Visual Bible gave locations vantages[] (`LOC###.N` = camera position) the two meanings shared one namespace. loadLandmarkPhotoVariant then hid the collision by serving another slot for a number that had none.",
+      "impact": "Every story whose Art Director cites a real landmark by a vantage id: the page is anchored to an arbitrary photo of the landmark, or to a photo of a different place.",
+      "status": "fixed",
+      "fixedAt": "2026-09-24",
+      "fixedIn": "cb6413614",
+      "fix": "pickVariantForView is the only selector: landmarkView picks the kind, the judged photoScore ranks within it (below MIN_USABLE_PHOTO is no candidate). landmarkVariants / explicitVariant / `.0` and the loader's cross-slot substitution deleted. Trial writer emits landmarkView instead of [LOC###.N]; iterate templates cite real landmarks bare. Replay: p3-p11 slot 2/3 -> slot 1. Pinned by tests/unit/landmark-vantage-id-not-photo.test.ts. docs/decisions.md 2026-09-24."
+    },
+    {
+      "id": "entity-crop-figure-completeness-charged",
+      "title": "A crop artefact only the entity check saw was charged −15 as figure_completeness and got an inpaint fix",
+      "reportedAt": "2026-09-24",
+      "source": "Reproduced from stored data, staging job_1790100385959_1nitlympp: backCover v0 entity issue cutout_artifact MAJOR ('jagged white edges ... cropping artifact'), consolidated as figure_completeness MAJOR sources ['entity'] → deductions.entity −15, finalScore 70, per_character_fixes 'Fill Julian's left arm and jacket to remove white cropping artifacts'. Same on p16 v1 (−15). Audit 09-covers.md C7.",
+      "rootCause": "The consolidator relabels the entity check's cutout_artifact as figure_completeness; that type had no source-scoped cost or route rule, so a defect of our grid crop was billed and repaired as a defect of the page.",
+      "impact": "Covers and pages lose 15 points and get paid inpaint fixes for gaps the image does not have. Staging and production.",
+      "status": "fixed",
+      "fixedAt": "2026-09-24",
+      "fixedIn": "d5dd79baf",
+      "fix": "Owner 'log only': scoring.js ENTITY_ONLY_ZERO_POINT_TYPES charges an entity-only figure_completeness 0; repairLogic.isCropArtifact closes its char-fix and critical routes; feedbackConsolidator.dropCropArtifactFixes drops its plan fix. Pinned by tests/unit/entity-crop-figure-completeness.test.ts. docs/decisions.md 2026-09-24."
+    },
+    {
+      "id": "reader-findings-charged-to-next-version",
+      "title": "The book audit's reader findings were charged to the next round's newly repaired version instead of the version the audit read",
+      "reportedAt": "2026-09-23",
+      "source": "Production job_1790107559778_fcmlfa8kn: p5 v3 (iterate-round-3, scored 23:19:33 CH) carried object_presence CATASTROPHIC src=reader 'Book is held by Lukas' read off v0's pixels by the round-2 audit (23:15:33 CH); without it v3 scores 68 vs v0's 58. p8 v2 was billed 'root is not visible' from the audit of v1 although the inpaint added the root (-14, 3 on its own evidence).",
+      "rootCause": "repairPipeline kept a page-keyed readerFindingsByPage map filled by each audit and passed it to every consolidatePageEval call of the next round, i.e. to versions painted after the audit.",
+      "impact": "Reader findings penalised every new version and never the one they described; good repairs lost the pick to the faulted original.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "c3bac9a52",
+      "fix": "repairLogic.attributeReaderFindings binds each IMG fault to the version object the audit read; runBookAuditRound re-consolidates and re-scores that version only (final audit included, owner-approved 2026-09-24); the map is deleted. Pinned by tests/unit/repair-reader-attribution-and-cast0.test.ts."
+    },
+    {
+      "id": "cast0-page-loops-on-failed-char-fix",
+      "title": "A page written with no cast routed invented figures to char-fix as roster characters, and a failed char-fix was repeated every round",
+      "reportedAt": "2026-09-23",
+      "source": "Production job_1790107559778_fcmlfa8kn p7: sceneCharacters [], two generic children drawn, entity check mapped one to Sophie with CRITICAL age_shift; decideRepairMethod gate 2 chose char-fix in rounds 1-3 and every attempt returned 'char-fix produced no usable image' (finalChecksReport.repairRounds); the page shipped with both children.",
+      "rootCause": "decideRepairMethod never saw the page's declared cast; a failed char-fix produces no version so the same version stayed best with no record that char-fix had failed on it; and the 2026-09-13 presence rule barred extra_character from its only removal route and told the model to redraw the figure as an EXPECTED CAST entry even for a roster of 0.",
+      "impact": "All repair rounds on such a page wasted; the uncommissioned figures shipped.",
+      "status": "fixed",
+      "fixedAt": "2026-09-24",
+      "fixedIn": "c3bac9a52, ef7ed5f2e",
+      "fix": "Owner reversal 2026-09-24: three-case presence model in derivePresenceFinding (missing → add, extra → remove via inpaint, mixed → figure-targeted char-fix redrawing the unmatched figure as the missing name); a char-fix is never aimed at a name outside the version's declared cast; failures are recorded on the version attempted and a failed char-fix flips to iterate. Pinned by tests/unit/repair-reader-attribution-and-cast0.test.ts and tests/unit/extra-character-type.test.ts."
+    },
+    {
+      "id": "vehicle-description-undefined-on-covers",
+      "title": "A cover's KEY STORY ELEMENTS defined a vehicle as \"**Vehicle**: undefined\"",
+      "reportedAt": "2026-09-23",
+      "source": "Staging job_1789343124794_z2c779f7i coverImages.initialPage.prompt; its visualBible.vehicles[0] (VEH001 tram) carries colorAndDetails + signatureElement and no description. 4 of 51 staging vehicles and 1 of 3 prod vehicles (job_1790107559778_fcmlfa8kn) in the last 30 days lack the field.",
+      "rootCause": "The live Visual Bible parse (outlineParser/unified.js) keeps the authored vehicle shape raw; only the uncalled visualBible.parseVisualBible derived `description`, and every consumer reads `description`.",
+      "impact": "A vehicle listed on a cover reached the image model with no definition, only the word undefined.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "30f2c6913",
+      "fix": "visualBible.vehicleDescription derives it (authored description stands) in both parse paths. Stored rows keep the gap (parse-time fix; recorded in decisions.md). Pinned by tests/unit/cover-objects-any-element.test.ts."
     }
   ]
 }

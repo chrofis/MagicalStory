@@ -1,19 +1,20 @@
-A rewriter has revised pages of a {LANGUAGE} children's book to answer findings. You see each revised page as its BEFORE and its AFTER, with the findings on it and on the pages beside it, each labelled with the page it names: a finding filed on one page may be answered on the next. Judge only the AFTER text, and only against its BEFORE.
+You are the grammar check on pages of a {LANGUAGE} children's book that a rewriter revised to answer findings. You see each revised page as its BEFORE and its AFTER, sentence by sentence and numbered, with the findings on it and on the pages beside it, each labelled with the page it names: a finding filed on one page may be answered on the next.
 
-A change that does what a listed finding asks is the fix, not damage: never report it, and never bring back what it replaced. Beyond that, the rewrite may change how a page reads. It may not make the page worse or wrong. Report where it did: a meaning or fact changed, dropped or contradicted that no listed finding asked to change, a phrase no fluent speaker of {LANGUAGE} would say, a new grammar or word-choice fault. Then read the AFTER on its own, in order, and report anything in it that now lands on the wrong person, thing or moment. Say nothing about pacing or a change that is merely different, and about style only where the AFTER breaks a rule below that the BEFORE kept: that is damage too.
+You may make two kinds of edit and no other:
+1. FIX a sentence of AFTER: its grammar, spelling, punctuation, a word no fluent speaker of {LANGUAGE} would use there, or a pronoun that lands on the wrong person. Change only the faulty words and the agreement they force — the article, the preposition and its contraction, the adjective, the participle. The sentence keeps its meaning and stays one sentence.
+2. RESTORE a sentence of BEFORE that the rewrite lost, where losing it drops a fact of the story that no listed finding asked to change. It comes back word for word.
+
+Never write a sentence that neither BEFORE nor AFTER has, never join or split sentences, and never bring back what a listed finding asked to remove or change. A fix never breaks a rule below.
 
 {STYLE_RULEBOOK}
-
-A dropped or contradicted fact comes back in the words BEFORE gave it. A language fault is fixed by changing only the faulty words. Never write a sentence that says what neither BEFORE nor AFTER says, and never one that breaks a rule above.
 
 # PAGES
 
 {PAGES}
 
-One line per fault, nothing else:
+One line per edit, nothing else:
 
-PAGE <n>: '<the faulty words, copied exactly as they stand in that page's AFTER text>' -> '<the corrected words>'
+PAGE <n> FIX A<k>: <the whole of sentence A<k>, corrected>
+PAGE <n> RESTORE B<j> AFTER A<k>
 
-Quote the WHOLE SENTENCE the fault stands in, character for character as it stands in that page's AFTER text, and give that whole sentence corrected. A fix that changes a word's gender, number or case forces agreement on the words around it — the article, the preposition and its contraction, the adjective, the participle — and a span that stops short of them leaves the sentence broken in a new way. Read the sentences before and after to judge the fault; quote and correct only the sentence it is in.
-
-One line per sentence, not one line per fault: a sentence with several faults is quoted once and comes back with all of them corrected. Give one correction, never alternatives. Change nothing in the sentence but the faults and the agreement they force. A page the rewrite did not damage gets no line. Write NONE when no page was damaged.
+RESTORE puts sentence B<j> after sentence A<k>; AFTER A0 puts it first. A sentence with several faults gets one FIX line with all of them corrected. Give one correction, never alternatives. A page that needs no edit gets no line. Write NONE when no page needs one.

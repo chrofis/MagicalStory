@@ -220,7 +220,7 @@ describe('wiring — production still passes what the resolver mirrors', () => {
   // these must be revisited together.
   it('production hands the text writer finalExpansions, the approved arc and arcHints', () => {
     expect(beatsSrc).toContain(
-      'buildStoryTextFromBeatsPrompt(inputData, beats, finalExpansions, approvedArc, { arcHints })');
+      'buildStoryTextFromBeatsPrompt(inputData, beats, finalExpansions, approvedArc, { arcHints, visualBible, clothingRequirements })');
   });
 
   it('production hands the all-pages Art Director the approved arc', () => {
