@@ -33,7 +33,8 @@ Characters: {CHARACTER_NAMES}
 9. Coverage — name any character listed under `Characters:` whom a page costumes or transforms (a tail, wings, an animal form, a disguise) and whose wardrobe has no category covering that appearance. Add the missing entry under the heading `## <CharacterName> / costumed:<costume>` with the full outfit describing the transformed or costumed appearance. Animals, creatures and other figures of the plan have no wardrobe here; never add one.
 10. Child coverage — name any child wearing a `bikini`, a bare chest, or a bare midriff; replace with a modest full-coverage form of the same garment (`swim shirt`, `swim top`, a one-piece).
 11. Garment variety — name any two characters whose outfits share the same set of garments and differ only in colour, counting the garments left once a page takes an outer layer off. Rewrite one with different garment types and silhouette; the story world decides the wardrobe.
-12. Plot garments — name any garment the page plan uses as an object (held, lent, wrapped, spread, lost) that no outfit names, or that the outfit names as a different garment. Rewrite the outfit of the character the plan gives it to so it wears that garment.
+12. Plot garments — name any garment the page plan uses as an object (held, lent, wrapped, spread, lost) that no outfit names, or that the outfit names as a different garment. Rewrite the outfit of the character the plan gives it to so it wears that garment, described as worn — never when, where or to whom it is lent or taken off.
+13. Appearance only — {OUTFIT_APPEARANCE_RULE} Name any outfit that carries more, and rewrite it as the appearance alone.
 
 Fixing check 1 outranks fixing check 3: a character in the right costume sharing a colour with someone else is better than a distinct colour on a garment that does not read as the costume. Two characters of different age or sex may wear the same headwear.
 

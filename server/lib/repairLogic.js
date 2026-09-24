@@ -1533,6 +1533,84 @@ function detectionForRetryEntry(scene, entry, index = null) {
 }
 
 /**
+ * Outfit slots in the order a repair descriptor reaches for them: the outer
+ * layer is the largest, most distinguishing garment; a garment outside the slot
+ * vocabulary (a dress, a robe) is the last resort.
+ */
+const REPAIR_GARMENT_SLOTS = ['outer layer', 'top', 'bottom', 'headwear', 'footwear'];
+
+/**
+ * "blue anorak" — colour word + garment noun, both from closed vocabularies,
+ * for one character on one page. Sources, in order: a tracked worn item this
+ * character wears on the page (its Visual Bible name), then the story outfit
+ * by slot. Every garment the page's resolved worn state takes off this
+ * character is excluded, by its slot and by the nouns of its name.
+ *
+ * Null (logged as an error) when no garment can be built: the descriptor then
+ * carries no garment clause, never prose.
+ */
+function repairGarmentPhrase({
+  character, category = null, artStyle = null, clothingRequirements = null,
+  visualBible = null, sceneMetadata = null, pageNumber = null,
+} = {}) {
+  const name = String(character?.name || '').trim();
+  if (!name) return null;
+  const { SLOT_NOUNS, resolveWornItemsForPage, isOffForCharacter, sameName } = require('./wornItems');
+  const { colourBefore, GARMENT_NOUNS } = require('./clothingCheck');
+  const words = (text) => String(text || '').toLowerCase().split(/[^a-z]+/).filter(Boolean);
+  const phraseFor = (text, allowed) => {
+    const w = words(text);
+    for (let i = 0; i < w.length; i++) {
+      if (!allowed(w[i])) continue;
+      const colour = colourBefore(w, i);
+      return colour ? `${colour} ${w[i]}` : w[i];
+    }
+    return null;
+  };
+
+  const rows = visualBible
+    ? resolveWornItemsForPage(visualBible, [name], sceneMetadata || {}, { pageNumber: pageNumber ?? undefined, castComplete: false })
+    : [];
+  const offSlots = new Set();
+  const offNouns = new Set();
+  for (const r of rows) {
+    if (!isOffForCharacter(r, name)) continue;
+    if (r.slot) offSlots.add(r.slot);
+    for (const w of words(r.name)) offNouns.add(w);
+  }
+  const allNouns = new Set([...Object.values(SLOT_NOUNS).flat(), ...GARMENT_NOUNS]);
+  const wearable = (w) => allNouns.has(w) && !offNouns.has(w);
+  const inOffSlot = (w) => [...offSlots].some(s => (SLOT_NOUNS[s] || []).includes(w));
+
+  // 1. A tracked item this character wears on this page — the story's own
+  //    distinguishing garment, including one handed to them.
+  for (const r of rows) {
+    if (r.state !== 'worn' || !sameName(r.wearer || r.owner, name)) continue;
+    const phrase = phraseFor(r.name, wearable);
+    if (phrase) return phrase;
+  }
+
+  // 2. The story outfit, by slot, then any other garment it names. A character
+  //    the page's brief does not dress is not on this page: no garment to name.
+  if (!category) return null;
+  const { buildClothingDescription } = require('./entityConsistency');
+  const outfit = String(buildClothingDescription(character, category, artStyle, clothingRequirements) || '');
+  // The whole text, not clause heads: an outfit sentence opens its outer layer
+  // with "over these he wears …", which the clause splitter files as a
+  // dependent of the garment before it.
+  for (const slot of REPAIR_GARMENT_SLOTS) {
+    if (offSlots.has(slot)) continue;
+    const inSlot = new Set(SLOT_NOUNS[slot] || []);
+    const phrase = phraseFor(outfit, w => inSlot.has(w) && wearable(w));
+    if (phrase) return phrase;
+  }
+  const anyGarment = phraseFor(outfit, w => wearable(w) && !inOffSlot(w));
+  if (anyGarment) return anyGarment;
+  log.error(`[REPAIR-NAMES] ${name}${pageNumber != null ? ` p${pageNumber}` : ''}: no garment from the closed vocabulary in the ${category} outfit — the descriptor carries no garment`);
+  return null;
+}
+
+/**
  * WHO IS THIS, in words the image model can act on.
  *
  * A fix instruction may only identify a figure visually — the image model has
@@ -1555,7 +1633,7 @@ function detectionForRetryEntry(scene, entry, index = null) {
  */
 function describeFigureForRepair({
   name, characters = null, characterClothing = null, clothingRequirements = null,
-  artStyle = null, detectedFigures = null, visualBible = null,
+  artStyle = null, detectedFigures = null, visualBible = null, sceneMetadata = null, pageNumber = null,
 } = {}) {
   const wanted = String(name || '').trim().toLowerCase();
   if (!wanted) return null;
@@ -1598,20 +1676,23 @@ function describeFigureForRepair({
   })();
   const noun = age ? `${age}-year-old ${genderWord}` : genderWord;
 
-  // GARMENT. The one renderer that knows this story's wardrobe — never the
-  // character's cross-story avatars (see project_clothing_canonical_source).
+  // GARMENT. One closed-vocabulary phrase ("the blue anorak"), never the
+  // wardrobe sentence: that sentence opens with the character's own name and can
+  // carry plot notes naming other figures and pages, and the name strip does not
+  // rescan text it inserts (staging job_1790277448294_5herh01j7 p2/p13 sent
+  // "the 3-year-old boy in Julian wears … hands it to <creature> on page 16").
+  // Only vocabulary words are emitted, so no name or plot text can pass, and a
+  // garment the page takes off is never named as worn.
   let garment = null;
-  try {
+  if (character) {
     const category = characterClothing && typeof characterClothing === 'object'
-      ? characterClothing[character?.name || name] : null;
-    if (character && category) {
-      const { buildClothingDescription } = require('./entityConsistency');
-      const worn = buildClothingDescription(character, category, artStyle, clothingRequirements);
-      if (worn && String(worn).trim()) garment = String(worn).trim().replace(/[.]\s*$/, '');
-    }
-  } catch { /* a missing wardrobe is one clause fewer, never a thrown repair */ }
+      ? characterClothing[character.name] : null;
+    garment = repairGarmentPhrase({
+      character, category, artStyle, clothingRequirements, visualBible, sceneMetadata, pageNumber,
+    });
+  }
 
-  const clauses = [garment ? `the ${noun} in ${garment}` : `the ${noun}`];
+  const clauses = [garment ? `the ${noun} in the ${garment}` : `the ${noun}`];
   if (place) clauses.push(place);
   return clauses.join(', ');
 }
@@ -1666,7 +1747,7 @@ function describeVbFigure(entry, pool) {
  */
 function buildRepairNameMap({
   characters = null, visualBible = null, characterClothing = null, clothingRequirements = null,
-  artStyle = null, detectedFigures = null, pageNumber = null,
+  artStyle = null, detectedFigures = null, pageNumber = null, sceneMetadata = null,
 } = {}) {
   const names = [];
   const fallbackByName = new Map();
@@ -1675,6 +1756,7 @@ function buildRepairNameMap({
     if (!n || fallbackByName.has(n.toLowerCase())) return;
     const described = describeFigureForRepair({
       name: n, characters, characterClothing, clothingRequirements, artStyle, detectedFigures, visualBible,
+      sceneMetadata, pageNumber,
     });
     names.push(n);
     fallbackByName.set(n.toLowerCase(), described || fallback);
@@ -1694,6 +1776,7 @@ function buildRepairNameMap({
  */
 function buildPageRepairNameMap({ storyData, sceneDescription = '', detectedFigures = null, pageNumber = null, artStyle = null } = {}) {
   const { parseCharacterClothing } = require('./clothingResolve');
+  const { extractSceneMetadata } = require('./sceneMetadata');
   return buildRepairNameMap({
     characters: storyData?.characters || null,
     visualBible: storyData?.visualBible || null,
@@ -1702,6 +1785,8 @@ function buildPageRepairNameMap({ storyData, sceneDescription = '', detectedFigu
     artStyle: storyData?.artStyle || artStyle || null,
     detectedFigures,
     pageNumber,
+    // The page's worn state: a garment this page takes off is never named.
+    sceneMetadata: sceneDescription ? extractSceneMetadata(sceneDescription) : null,
   });
 }
 

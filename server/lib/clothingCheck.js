@@ -796,4 +796,4 @@ function applyWardrobeBibleCorrections(clothingRequirements, visualBible, opts =
 // slotStated + missingGarments are exported so the image-prompt clothing check
 // (storyHelpers buildImagePrompt) uses THIS definition of "is this garment in
 // the prose" rather than growing a second one.
-module.exports = { checkPage, checkWardrobeAgainstBible, applyWardrobeBibleCorrections, outfitClauses, checkScenes, renderFindingsBlock, splitSlots, slotStated, missingGarments, characterProse, characterWindow, tokens, contractPairs, colourBefore };
+module.exports = { GARMENT_NOUNS, checkPage, checkWardrobeAgainstBible, applyWardrobeBibleCorrections, outfitClauses, checkScenes, renderFindingsBlock, splitSlots, slotStated, missingGarments, characterProse, characterWindow, tokens, contractPairs, colourBefore };

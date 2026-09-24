@@ -21,6 +21,45 @@ superseded and link forward.
 
 ---
 
+## 2026-09-24 — An outfit description is appearance only, and a repair descriptor names one closed-vocabulary garment, never the outfit sentence
+
+**Context:** Staging job_1790277448294_5herh01j7 (dragon run 7). The wardrobe writer put plot notes in
+`clothingRequirements[name].standard.description` ("… hands it to <creature> on page 16", "the jacket
+he removes on page 7 … wears again from page 14"), prompted by story-bible-from-beats.txt's plot-garment
+rule ("a page that takes it off says so on that page") and never checked by clothing-review.txt. The
+text reached Grok through the styled-avatar prompts and through repairs: `describeFigureForRepair`
+wrapped the whole `buildClothingDescription` sentence into "the 3-year-old boy in <Name> wears …", and
+`stripCharacterNames` does not rescan inserted text, so cast and creature names reached the image model
+(p2 v1, p13 v1). On p13 it also named the jacket the page takes off.
+
+**Decision:**
+- One constant, `OUTFIT_APPEARANCE_RULE` (promptBuilders.js), filled into story-bible-from-beats.txt and
+  clothing-review.txt (new check 13): garments, colours, materials, fastenings only — no page numbers,
+  events, other characters or creatures, carried items or pocket contents. A garment a page takes off
+  stays in the outfit as worn; the page's `wornItems` row records it off. Check 12's rewrite describes
+  the garment as worn, never when or to whom it is lent. The trial writer writes no outfit text (it picks
+  a category), so it has no sibling here.
+- `describeFigureForRepair` builds its garment clause with `repairGarmentPhrase`: colour word + garment
+  noun from closed vocabularies (`clothingCheck.COLOUR_WORDS`/`GARMENT_NOUNS`, `wornItems.SLOT_NOUNS`),
+  preferring a tracked item the character wears on the page, then the outfit by slot (outer layer
+  first). Garments the page's resolved worn state (`resolveWornItemsForPage`) takes off the character
+  are excluded. No phrase buildable for a character the page dresses → `log.error`, no garment clause.
+  `buildRepairNameMap` / `buildPageRepairNameMap` / `inpaintPage` pass the page's parsed metadata.
+
+**Rationale:** Only vocabulary words are emitted, so no name or plot text can pass whatever the wardrobe
+text says; the prompt rule stops it at the source for the avatar path, which uses the description
+verbatim.
+
+**Evidence (rung 1, stored run 7):** p2 "the 3-year-old boy in Julian wears … hands it to Nebla on page
+16" → "the 3-year-old boy in the blue anorak"; p13 "the 5-year-old boy in Levin wears … the jacket he
+removes on page 7 …" → "the 5-year-old boy in the green jumper, on the far left". Verify check
+`outfitAppearanceOnly` fails run 7 (2/4 outfits carry plot text) as the baseline.
+
+**Touched:** `prompts/story-bible-from-beats.txt`, `prompts/clothing-review.txt`,
+`server/lib/promptBuilders.js`, `server/lib/repairLogic.js`, `server/lib/images.js`,
+`server/lib/clothingCheck.js`, `scripts/admin/verify-checks.js`, `tests/unit/outfit-appearance-only.test.ts`
+**Status:** ✅ active
+
 ## 2026-09-24 — `body_build` is a scored entity type: whole-figure repair, billed in the per-character build class
 
 **Context:** The entity grid judge is told to assess body build (severity guide, the wardrobe pass's

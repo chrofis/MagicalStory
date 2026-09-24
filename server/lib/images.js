@@ -3310,6 +3310,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   const { buildRepairNameMap, nameRepairText, resolveRepairIds } = require('./repairLogic');
   const repairNameMap = buildRepairNameMap({
     characters, visualBible, characterClothing, clothingRequirements, artStyle, detectedFigures, pageNumber,
+    sceneMetadata: sceneDescription ? require('./sceneMetadata').extractSceneMetadata(sceneDescription) : null,
   });
 
   const soleDirectFix = (() => {

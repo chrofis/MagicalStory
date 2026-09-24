@@ -10147,6 +10147,15 @@ function wardrobeAppearanceBlock(char) {
 }
 
 /**
+ * What an outfit `description` may carry — ONE string, filled into the bible
+ * writer (story-bible-from-beats.txt) and the wardrobe reviewer
+ * (clothing-review.txt) as {OUTFIT_APPEARANCE_RULE}. The description reaches
+ * the avatar generator verbatim; staging job_1790277448294_5herh01j7 wrote
+ * page numbers, a carried bag's contents and another figure's name into it.
+ */
+const OUTFIT_APPEARANCE_RULE = 'An outfit `description` is appearance only: garments, colours, materials, fastenings. No page numbers, no events, no other character or creature, no carried item or what a pocket holds. A garment a page takes off stays in the outfit as worn; the `wornItems` row of that page records it off, never the outfit.';
+
+/**
  * Wardrobe review of the bible's clothing contract. Returns null when the
  * story has no dressed character to review — a bible that produced no usable
  * outfit has nothing for a reviewer to correct.
@@ -10181,6 +10190,7 @@ function buildClothingReviewPrompt(inputData, clothingRequirements, beats = []) 
     STYLE_WARDROBE: buildStyleWardrobeBlock(inputData.artStyle),
     CURRENT_CLOTHING: blocks.join('\n\n'),
     PLAN_LINES: planBlocks(beats) || '(page plan not available)',
+    OUTFIT_APPEARANCE_RULE,
   });
 }
 
@@ -10704,6 +10714,7 @@ function buildStoryBibleFromBeatsPrompt(inputData, beats = [], { arc = '' } = {}
       ? '\n- The story is set in a real period. Every character uses the `costumed` variant, named for that period (`medieval`, `1920s`, …). `standard` is not an option here.'
       : '',
     PLAN_LINES: planBlocks(beats),
+    OUTFIT_APPEARANCE_RULE,
   });
 }
 
@@ -11552,6 +11563,7 @@ module.exports = {
   challengeCatalogueBands,
   parseArcReview,
   buildClothingReviewPrompt,
+  OUTFIT_APPEARANCE_RULE,
   parseClothingReview,
   parseBeats,
   parsePagePlan,

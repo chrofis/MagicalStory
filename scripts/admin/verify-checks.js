@@ -790,4 +790,37 @@ checks.entityClosedTypes = (ctx) => {
   return { covered: true, pass: true, detail: `all ${all.length} entity finding(s) carry a listed type` };
 };
 
+// An outfit description is appearance only (OUTFIT_APPEARANCE_RULE): no page
+// number, and no name of another cast member or bible figure. The character's
+// own name may open the sentence.
+checks.outfitAppearanceOnly = (ctx) => {
+  const reqs = ctx.data?.clothingRequirements;
+  if (!reqs || typeof reqs !== 'object') return notCovered('no clothingRequirements');
+  const vb = ctx.data?.visualBible || {};
+  const figureNames = [
+    ...(ctx.data?.characters || []).map(c => c?.name),
+    ...['secondaryCharacters', 'animals'].flatMap(p => (vb[p] || []).flatMap(e => [e?.name, e?.properName])),
+  ].map(n => String(n || '').trim()).filter(n => n.length > 1);
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  let n = 0;
+  const bad = [];
+  for (const [who, cats] of Object.entries(reqs)) {
+    for (const [cat, e] of Object.entries(cats || {})) {
+      const d = e && typeof e === 'object' ? String(e.description || '') : '';
+      if (!d.trim()) continue;
+      n += 1;
+      const hits = [];
+      if (/\bpages?\s+\d/i.test(d)) hits.push('page number');
+      for (const f of figureNames) {
+        if (f.toLowerCase() === who.toLowerCase()) continue;
+        if (new RegExp(`\\b${esc(f)}\\b`, 'i').test(d)) hits.push(f);
+      }
+      if (hits.length) bad.push(`${who}/${cat}: ${hits.join(', ')}`);
+    }
+  }
+  if (!n) return notCovered('no outfit description');
+  if (bad.length) return { covered: true, pass: false, detail: `${bad.length}/${n} outfit(s) carry plot text: ${bad.slice(0, 8).join('; ')}` };
+  return { covered: true, pass: true, detail: `all ${n} outfit description(s) free of page numbers and other figures' names` };
+};
+
 module.exports = { checks, SHAPES, evalRunShape, helpers: { pages, brief, versions, shotOf, activeImageUrl, plateUrl, pageFindings, splitSentences, sizeHits } };
