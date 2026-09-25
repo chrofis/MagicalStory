@@ -6492,7 +6492,10 @@ const CAUSAL_COHERENCE_RULE =
 // arc's principles state the ONE event budget (arcEventRange) and a second
 // number beside it disagreed with it — "three or four challenges" against one
 // happening for a toddler book (2026-09-25). The trial writer keeps the line.
-function buildStoryShapeSection(inputData, pageCount, { arc = false, challengeLine = true } = {}) {
+// `castRule: false`: the arc (create, retell, the arc judge's context) leaves
+// every character's scene to the page plan (stage split, owner 2026-09-25).
+// The trial writer, which is plot and plan in one, keeps EVERY_CHILD_ACTS_RULE.
+function buildStoryShapeSection(inputData, pageCount, { arc = false, challengeLine = true, castRule = true } = {}) {
   const pages = parseInt(pageCount, 10) || (inputData.sceneImages || []).length || 10;
   const chars = inputData.characters || [];
   const { mains, focus, others } = pickMainCharacters(inputData);
@@ -6503,7 +6506,7 @@ function buildStoryShapeSection(inputData, pageCount, { arc = false, challengeLi
   const othersNames = others.map(c => c.name).join(', ');
   const shapeHeader = '# STORY SHAPE (fixed by the age of the main character — not yours to change)';
   const alongside = othersNames
-    ? `Everyone else — ${othersNames} — carries no arc of their own. ${EVERY_CHILD_ACTS_RULE}`
+    ? `Everyone else — ${othersNames} — carries no arc of their own.${castRule ? ` ${EVERY_CHILD_ACTS_RULE}` : ''}`
     : '';
 
   // The three simple bands carry no budgeted challenge, so the arithmetic below
@@ -9129,7 +9132,7 @@ const ARC_LOGIC_CHECK = 'an act against the want, motive, ability or limit the s
  * findings are also checked in code: filterPanelFindings drops a finding whose
  * quote is not in the arc it reviews.
  */
-const ARC_FINDING_RULE = 'Each finding quotes the words that conflict, exactly as they stand: s<N> "<words from that arc sentence>" against "<words from the story-logic line or the earlier sentence it breaks>". A finding about an act no motive line causes, or a happening that causes nothing later, quotes that sentence alone. A finding that quotes nothing is not a finding.';
+const ARC_FINDING_RULE = 'Each finding quotes the words that conflict, exactly as they stand: s<N> "<words from that arc sentence>" against "<words from the story-logic line or the earlier sentence it breaks>". A finding about an act no motive line causes, or a happening that causes nothing later, quotes that sentence alone. A finding about a main character with no turn, or an opposition that never acts, names that figure and quotes the sentence where they only watch or wait. A finding that quotes nothing is not a finding.';
 
 /**
  * Generator-side twins of three arc-panel lenses (ENTRANCE, ASSUMED, SENSE).
@@ -9169,6 +9172,38 @@ const ARC_PLACE_RULE = 'Every place the story stages is inside or outside, and a
  * commissioned character on the pages, from castCoverage.castActionRule.
  */
 const EVERY_CHILD_ACTS_RULE = 'Every child on the character list does at least one thing of their own that matters to the plot — never only present. Only where the book is too short for its cast do several children share one action, and no child is left with nothing.';
+
+/**
+ * ARC PROMPTS v3 (owner, 2026-09-25, on Lab #1462-1465): "The other main
+ * character must also have an important role. 2 brothers on a journey is fine.
+ * And all characters must have a scene. This is what we are selling. [...]
+ * Exciting is most important next to logical. Both are needed; trading a
+ * logical story for a boring one is not acceptable." v2 on Opus 5.5 (#1464) was
+ * the most coherent arc and a dull one: the evening cold was its only opponent,
+ * and the second main character and the friends mostly watched.
+ *
+ * THE STAGE SPLIT (owner, 2026-09-25): "first a very strong exciting and
+ * logical plot. Then all the rules: who enters when, how everyone gets their
+ * scene, an exciting start and a happy ending." The arc (stage 1) is the plot:
+ * logical and exciting, carried by the main characters. Every commissioned
+ * character's scene is the page plan's (stage 2: story-beats.txt CAST_COVERAGE,
+ * plan-check Q12), so the arc no longer states EVERY_CHILD_ACTS_RULE
+ * (buildStoryShapeSection castRule:false) and its panel has no ACTION lens.
+ *
+ * ONE string each, generator and critic: the principles (arcPrinciples —
+ * create, retell and the arc judge's context) and the anchored critique
+ * (ARC_PART_CHECK in arcCritiqueSpec).
+ */
+const ARC_EXCITING_DEF = 'an opponent or a danger that presses and acts, more than weather alone; a close call; the outcome in doubt until the turn; and wonder from the commission\'s world, a creature that is a character';
+// The simple bands forbid anyone unwilling (buildTellingRulesSection): there
+// the pressure is a problem that moves, never a villain.
+const ARC_EXCITING_DEF_SIMPLE = 'a problem that moves and pushes back — a thing, an animal or the weather doing something; a near miss; the outcome in doubt until the turn; and wonder from the commission\'s world, a creature that is a character';
+const ARC_MAIN_TURN_RULE = 'Each main character the STORY SHAPE names carries an important part of the journey, with a turn of their own that changes the outcome — with two, one\'s idea and the other\'s deed; never one hero and a passenger';
+const ARC_PART_CHECK = 'a main character with no turn of their own that changes the outcome; an opposition or danger that only waits and never acts.';
+
+function arcExcitingDef(inputData = {}) {
+  return SIMPLE_BANDS.has(resolveAgeBand(inputData)) ? ARC_EXCITING_DEF_SIMPLE : ARC_EXCITING_DEF;
+}
 
 /**
  * The commission's CENTRAL FIGURE (born 2026-08-31, decisions.md "the title
@@ -9283,16 +9318,21 @@ function happeningsLabel(inputData, pageCount) {
  * chain states and arcShapeCounts checks); nothing asks the model to count it
  * in a critique.
  */
+// v3 (owner, 2026-09-25): logical AND exciting leads; every main character
+// has a turn of their own. "One main character solves it" left: it made the
+// second main character a passenger (Lab #1464). Each commissioned character's
+// scene is the page plan's job (the stage split above).
 function arcPrinciples(inputData = {}, pageCount = 10) {
   const pages = Math.max(4, parseInt(pageCount, 10) || 10);
   return [
     '# HOW THIS STORY IS BUILT',
+    `- Logical and exciting at once, neither traded for the other. Exciting is ${arcExcitingDef(inputData)}: a child keeps listening while the heroes could still lose, and believes an ending that follows from what came before.`,
     '- One problem, from the first sentence to the last, and no second storyline: a listening child follows one question.',
-    '- One main character solves it, deciding and doing the deed that turns the story: a child roots for the one who acts.',
+    `- ${ARC_MAIN_TURN_RULE}: every child the book is about sees themselves matter.`,
     `- ${happeningsLabel(inputData, pageCount)} a child would retell: the child remembers the happenings on the way to the ending and forgets the rest.`,
     '- Every happening causes the ending; one that causes nothing is cut, not explained: a dead end costs a page and is forgotten.',
     `- ${arcLengthRange(pages)} sentences for ${pages} pages: the telling follows the book, about one sentence a page.`,
-    '- Few figures, each carrying the one thing the plot uses: every new figure is a name the child has to hold.',
+    '- Few new figures, each carrying the one thing the plot uses: every new figure is a name the child has to hold.',
   ].join('\n');
 }
 
@@ -9365,7 +9405,7 @@ function arcLogicSpec(inputData = {}, pageCount = 10) {
 function arcCritiqueSpec({ retell = false } = {}) {
   const remain = retell ? ' that remain' : '';
   return [
-    `"Faults:" then up to 6 numbered faults${remain}, or the single word "none". A fault is one of these: ${ARC_LOGIC_CHECK} ${ARC_FINDING_RULE} Tag each [CRITICAL] — the story is broken; [MAJOR] — a real fault repairable inside the existing structure, which an act from no motive line always is; or [MINOR] — a blemish. A fault is never a count, a page number or a sourced measurement.`,
+    `"Faults:" then up to 6 numbered faults${remain}, or the single word "none". A fault is one of these: ${ARC_LOGIC_CHECK} Or one of these: ${ARC_PART_CHECK} ${ARC_FINDING_RULE} Tag each [CRITICAL] — the story is broken; [MAJOR] — a real fault repairable inside the existing structure, which an act from no motive line and a main character with no turn always are; or [MINOR] — a blemish. A fault is never a count, a page number or a sourced measurement.`,
     '',
     '"Commission honored:" one line — "yes", or the commission\'s own words the arc drops or inverts, quoted.',
   ].join('\n');
@@ -9382,7 +9422,7 @@ function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null } = 
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: pageCount,
     ARC_PRINCIPLES: arcPrinciples(inputData, pageCount),
-    STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true, challengeLine: false }),
+    STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true, challengeLine: false, castRule: false }),
     // The premise view (premise + mechanics): the band's craft lines belong to
     // the planner and the text writer; the low point they carried is stated in
     // the CHAIN spec (owner, 2026-09-24).
@@ -9444,7 +9484,7 @@ function buildArcRetellPrompt(inputData, pageCount, committedBlock, panelSolutio
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: pageCount,
     ARC_PRINCIPLES: arcPrinciples(inputData, pageCount),
-    STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true, challengeLine: false }),
+    STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true, challengeLine: false, castRule: false }),
     AGE_MODE: buildAgeModeSection(inputData, { bandView: 'premise' }),
     TELLING_RULES: buildTellingRulesSection(inputData),
     // The event budget the re-telling may not exceed: cut before add.
@@ -11689,6 +11729,11 @@ module.exports = {
   SIZE_LOOK_RULE,
   CENTRAL_FIGURE_DEF,
   EVERY_CHILD_ACTS_RULE,
+  ARC_EXCITING_DEF,
+  ARC_EXCITING_DEF_SIMPLE,
+  ARC_MAIN_TURN_RULE,
+  ARC_PART_CHECK,
+  arcExcitingDef,
   GUIDE_USE_RULE,
   RISK_FRAMING_RULE,
   ANIMAL_FATE_RULE,

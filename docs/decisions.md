@@ -60298,3 +60298,65 @@ the Lab run (`tasks/verify.json` `arc-opus55-max-output`) is the measurement.
 **Touched:** `server/config/models.js`, `server/lib/textModels.js`, `server/lib/testlab.js`,
 `tests/unit/opus55-task-budget.test.ts`, `tasks/verify.json`.
 **Status:** ✅ committed on `staging`, not pushed.
+
+## 2026-09-25 — Arc prompts v3: logical AND exciting, every main character turns it, the arc is the plot and the page plan does the rest
+
+**Context:** Lab #1462-1465 (dragon commission, staging `job_1790277448294_5herh01j7`, same challenge
+draw). v2 on Opus 5.5 (#1464) wrote the most coherent arc and a dull one: the evening cold was its
+only opposition ("Opposition: The evening cold … it answers to no one"), the tries ran scarf → patch
+of sun → jacket, the second main character Julian and the friends mostly watched while Levin did the
+deeds, and no dragon was a character until the hatchling on the last pages. The v2 principle "One main
+character solves it" made the second main character a passenger.
+
+**Owner, 2026-09-25:** "The other main character must also have an important role. 2 brothers on a
+journey is fine. And all characters must have a scene. This is what we are selling. We can not
+completely remove that. The rule of 3 I don't like that much. Exciting is most important next to
+logical. Both are needed; trading a logical story for a boring one is not acceptable." And on the
+stage split: "first a very strong exciting and logical plot. Then all the rules: who enters when, how
+everyone gets their scene, an exciting start and a happy ending." And: the arc may name the
+character's change ("he is proud that he decided himself"); the text stage shows it. Priority: strong
+arcs at reasonable cost now; stage 2 afterwards.
+
+**Decision:**
+1. `arcPrinciples()` opens with "Logical and exciting at once, neither traded for the other", defined
+   by one shared string: `ARC_EXCITING_DEF` (an opponent or a danger that presses and acts, more than
+   weather alone; a close call; the outcome in doubt until the turn; wonder from the commission's world,
+   a creature that is a character). The simple bands (routine, quest, tries), whose rules forbid anyone
+   unwilling, get `ARC_EXCITING_DEF_SIMPLE` (a problem that moves and pushes back) — `arcExcitingDef()`.
+2. "One main character solves it" is replaced by `ARC_MAIN_TURN_RULE`: each main character the STORY
+   SHAPE names carries an important part of the journey with a turn of their own that changes the
+   outcome — with two, one's idea and the other's deed.
+3. The critic is kept in sync: the anchored critique (`arcCritiqueSpec`, create and retell) now also
+   finds `ARC_PART_CHECK` — a main character with no turn of their own, an opposition that only waits
+   and never acts — quoted per `ARC_FINDING_RULE` (the finding names the figure and quotes the sentence
+   where they only watch or wait); a main character with no turn is always [MAJOR]. No count.
+4. STAGE SPLIT. Every commissioned character's scene is the page plan's job (story-beats.txt
+   `{CAST_COVERAGE}`, plan-check Q12). The arc no longer carries `EVERY_CHILD_ACTS_RULE`
+   (`buildStoryShapeSection({ castRule: false })` for arc create, retell and the arc judge context; the
+   trial writer, plot and plan in one, keeps it). No cast-scene rule enters the arc principles or its
+   critique, and the panel's ACTION lens stays retired.
+5. No rule of three: the arc prompts built for ages 5 and 7 carry no fixed count of tries or attempts
+   (grep of `prompts/arc-*.txt`, the age-band premise views and `arcPrinciples` found none; the three
+   tries came from the model). "Few figures" became "Few new figures".
+6. Arc judge (`story-arc-judge.txt`, `ARC_RUBRIC`): the `entrances` dimension leaves (the page plan's
+   job); `change` no longer deducts a change the arc names outright — only a restated trait. Arc means
+   before this date average 14 dims, after it 13.
+
+Kept from v2: the fact ledger and its caps, motive → act lines, quoted findings and
+`filterPanelFindings`, the edit-only re-telling, the event budget.
+
+**Sizes** on the dragon's stored inputs (same draw, no landmark block, rung 0, no paid call): create
+21,267 → 21,901 chars (+634), no unfilled placeholder; retell fixed text 22,706 → 23,340; panel fixed
+text 7,594 → 7,748 (the finding rule's new sentence).
+
+**Open:** the age-3 band `age-band-tries.txt` is a "three tries" band by name and rule ("One problem,
+met three times … Three tries, no more"), settled by earlier owner decisions (2026-09-14 "Three tries
+means three DIFFERENT tries"); it reaches the arc through the premise view for three-year-olds and was
+left unchanged pending an owner call. The trial writer's STORY SHAPE line still says "about three" /
+"three or four challenges". Stage-2 gaps are listed in `tasks/BACKLOG.md`.
+
+**Touched:** `server/lib/promptBuilders.js`, `server/lib/storyScorecard.js`,
+`prompts/story-arc-judge.txt`, `scripts/admin/sibling-registry.json`, `tasks/verify.json`
+(`arc-prompts-v3`), `tasks/BACKLOG.md`, `tests/unit/arc-logic-first.test.ts`,
+`tests/unit/arc-prompt-audit-2026-09-23.test.ts`.
+**Status:** ✅ committed on `staging`, not pushed; Lab validation pending (owner).

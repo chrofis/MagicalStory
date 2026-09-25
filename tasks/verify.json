@@ -1528,6 +1528,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "arc-prompts-v3",
+      "title": "Arc prompts v3: logical AND exciting, every main character has a turn, the arc is the plot",
+      "commits": [],
+      "addedAt": "2026-09-25",
+      "claim": "On the dragon commission (staging job_1790277448294_5herh01j7, 18 pages, same challenge draw) the create and retell arcs have an opposition that ACTS on the page (more than weather), each main character on the STORY SHAPE line (Levin, Julian) has a turn of their own that changes the outcome, and every commissioned child (Levin, Julian, Max, Kiaan) has a deed sentence that matters to the plot — in the arc or, since the stage split, at the latest in the page plan (plan-check Q12 ACTION lines); logic stays at v2's level (baseline Lab #1464: the cold as the only opponent, Julian and the friends mostly watching).",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Lab arc_effort stage=pipeline, challengesFromStory + baselineFromStory, on job_1790277448294_5herh01j7: read arms[create|retell].logic (Opposition, Motives) and .arc — name the sentence where the opposition acts, the turn sentence of each main character, and a deed sentence per commissioned child; read the critique for ARC_PART_CHECK findings; compare judge means with #1464"
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }

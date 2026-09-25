@@ -58,6 +58,22 @@ Last full sweep: **2026-09-06**.
       Open: Lab validation (`tasks/verify.json` `arc-prompts-v2`); the forced invented-overcount round
       still allows a second re-telling against the owner's "one round only"
       → `docs/decisions.md` "2026-09-25 — Arc prompts v2"
+- [ ] Arc prompts v3 (owner 2026-09-25): logical AND exciting first, every main character has a turn,
+      the arc is the plot. BUILT on staging (not pushed). Open: Lab validation (`tasks/verify.json`
+      `arc-prompts-v3`); owner call on the age-3 "three tries" band (`prompts/age-band-tries.txt:6-17`)
+      and the trial's "about three" challenge line (`server/lib/promptBuilders.js` buildStoryShapeSection
+      `challengeBudget`) → `docs/decisions.md` "2026-09-25 — Arc prompts v3"
+- [ ] Stage 2 (page plan) owes what the arc no longer carries (owner 2026-09-25: "who enters when, how
+      everyone gets their scene, an exciting start and a happy ending"). Present: entrances
+      (`prompts/story-beats.txt:76` / `prompts/plan-check.txt:32` Q2, shared NAMING_DEF). Partial: each
+      character's scene — `castActionRule` stages "the action the story gives them", and since v3 the arc
+      no longer guarantees one, so the planner needs leave to add a deed inside an existing event
+      (`prompts/story-beats.txt:67` {CAST_COVERAGE}, `prompts/plan-check.txt:46` Q12,
+      `server/lib/castCoverage.js:89`). Missing: an exciting start (no page-1 "opens on an action already
+      under way" line in `prompts/story-beats.txt` or `prompts/plan-check.txt`); a happy ending
+      (ENDING_EVENT_DEF only stages the ending's event — `prompts/story-beats.txt:78`,
+      `prompts/plan-check.txt:38`, `server/lib/promptBuilders.js` ENDING_EVENT_DEF). Deferred by the owner
+      until the arcs are strong → `docs/decisions.md` "2026-09-25 — Arc prompts v3"
 
 ## Image quality — unresolved render defects
 

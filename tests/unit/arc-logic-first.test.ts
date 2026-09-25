@@ -380,3 +380,70 @@ describe('filterPanelFindings — a finding must quote the arc (2026-09-25)', ()
     expect(PB.filterPanelFindings('ISSUE s2 "takes it" — x', block).kept).toHaveLength(0);
   });
 });
+
+describe('the arc prompts v3 (owner, 2026-09-25): a logical AND exciting plot, carried by every main character', () => {
+  beforeAll(async () => { await loadPromptTemplates(); });
+  const committed = PB.parseArcCreate(CREATE).committed;
+  const build = (data: any) => ({
+    create: PB.buildArcCreatePrompt(data, 18),
+    retell: PB.buildArcRetellPrompt(data, 18, committed, '## PANELIST A\nSOLUTION: one'),
+    panel: PB.buildArcPanelPrompt(data, committed),
+  });
+
+  it('logical-and-exciting is the first principle; the simple bands get a problem that moves, never a villain', () => {
+    const lines = PB.arcPrinciples(input(5), 18).split('\n');
+    expect(lines[1]).toMatch(/^- Logical and exciting at once, neither traded for the other/);
+    expect(lines[1]).toContain(PB.ARC_EXCITING_DEF);
+    const toddler = input(3, { characters: [{ id: 'a', name: 'Levin', age: 3 }], mainCharacters: ['a'] });
+    expect(PB.arcPrinciples(toddler, 12)).toContain(PB.ARC_EXCITING_DEF_SIMPLE);
+    expect(PB.arcPrinciples(toddler, 12)).not.toContain(PB.ARC_EXCITING_DEF);
+  });
+
+  it('every main character has a turn: the principle and the critique check share one pair of strings; the judge context carries it', () => {
+    const b = build(input(5));
+    for (const stage of ['create', 'retell'] as const) {
+      expect(b[stage], stage).toContain(PB.ARC_MAIN_TURN_RULE);
+      expect(b[stage], stage).toContain(PB.ARC_PART_CHECK);
+    }
+    expect(PB.arcCritiqueSpec({ retell: true })).toContain(PB.ARC_PART_CHECK);
+    expect(PB.arcPrinciples(input(5), 18)).not.toMatch(/One main character solves it/);
+    const ctx = sc.buildBriefContext({ ...input(5), pages: 18 }, { arc: true });
+    expect(ctx).toContain(PB.ARC_MAIN_TURN_RULE);
+    expect(ctx).toContain(PB.ARC_EXCITING_DEF);
+  });
+
+  it('stage split: every character\'s scene is the page plan\'s — the arc, its critique and its panel carry no cast rule', () => {
+    const b = build(input(5));
+    for (const [stage, p] of Object.entries(b)) {
+      expect(p, stage).not.toContain(PB.EVERY_CHILD_ACTS_RULE);
+      expect(p, stage).not.toMatch(/^- ACTION\b/m);
+    }
+    expect(sc.buildBriefContext({ ...input(5), pages: 18 }, { arc: true })).not.toContain(PB.EVERY_CHILD_ACTS_RULE);
+    // The trial writer is plot and plan in one: it keeps the rule.
+    expect(PB.buildStoryShapeSection(input(5), 18, { arc: true })).toContain(PB.EVERY_CHILD_ACTS_RULE);
+  });
+
+  it('a no-turn finding quotes the sentence, and the code filter keeps it', () => {
+    expect(PB.ARC_FINDING_RULE).toMatch(/names that figure and quotes the sentence where they only watch or wait/);
+    const block = '# ARC\n1. Levin finds the egg.\n2. Julian stands and watches the egg roll away.';
+    expect(PB.filterPanelFindings('ISSUE s2 "Julian stands and watches" — LOGIC: Julian has no turn', block).kept).toHaveLength(1);
+  });
+
+  it('the arc judge: no entrances dimension (the page plan is where that lives), and a change the arc names outright is not deducted', async () => {
+    const fs = await import('fs');
+    const judge = fs.readFileSync(require('path').join(__dirname, '../../prompts/story-arc-judge.txt'), 'utf8');
+    expect(sc.ARC_RUBRIC.arc).not.toContain('entrances');
+    const keys = Object.keys(JSON.parse(judge.slice(judge.lastIndexOf('{\n  "arc"'))).arc.dims);
+    expect(keys).toEqual(sc.ARC_RUBRIC.arc);
+    expect(judge).not.toMatch(/never stated outright/);
+    expect(judge).toMatch(/a restated trait is not a change/);
+  });
+
+  it('no rule of three: the arc prompts state no fixed count of tries or attempts', () => {
+    for (const age of [5, 7]) {
+      for (const [stage, p] of Object.entries(build(input(age)))) {
+        expect(p, `${stage} age ${age}`).not.toMatch(/rule of three|\bthree (?:tries|attempts|times|challenges)\b/i);
+      }
+    }
+  });
+});

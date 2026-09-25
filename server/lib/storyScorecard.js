@@ -78,7 +78,10 @@ const RUBRIC_V3 = {
 // reads — so it is a separate rubric, never a variant of the storyText dims.
 const RETELL_RUBRIC = { storyText: ['comprehension', 'stake', 'resolution', 'engagement'] };
 
-const ARC_RUBRIC = { arc: ['shape', 'attempts', 'lost', 'agency', 'ensemble', 'change', 'blockers', 'grounding', 'fit', 'focus', 'entrances', 'difficulty', 'sense', 'engaging'] };
+// `entrances` left 2026-09-25 (owner, stage split): who joins when is the page
+// plan's job (story-beats.txt, plan-check Q2), not the arc's. Arc means before
+// that date average 14 dims, after it 13.
+const ARC_RUBRIC = { arc: ['shape', 'attempts', 'lost', 'agency', 'ensemble', 'change', 'blockers', 'grounding', 'fit', 'focus', 'difficulty', 'sense', 'engaging'] };
 
 const EVALUATORS = {
   '1.0': { name: 'legacy 1.0', promptKey: 'storyScorecardJudge', rubric: RUBRIC_V1, judge: null },
@@ -283,7 +286,7 @@ function buildBriefContext(d = {}, { arc = false } = {}) {
       // The arc's principles (its event budget among them) lead its prompt
       // since 2026-09-25, so they lead the judge's context too.
       if (arc) lines.push(`\n${arcPrinciples(d, pages)}`);
-      const shape = buildStoryShapeSection(d, pages, arc ? { arc: true, challengeLine: false } : undefined);
+      const shape = buildStoryShapeSection(d, pages, arc ? { arc: true, challengeLine: false, castRule: false } : undefined);
       if (shape) lines.push(`\n${shape}`);
       if (arc) {
         const ageMode = buildAgeModeSection(d, { bandView: 'premise' });
