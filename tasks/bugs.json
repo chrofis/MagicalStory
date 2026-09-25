@@ -2055,6 +2055,18 @@
       "fixedAt": "2026-09-25",
       "fixedIn": "49ae547ec",
       "fix": "One projection, sceneMetadata.sceneDescriptionRecord, builds the stored sceneDescriptions record (brief under `description`) for the stored story AND for the repair pipeline's story data (projected at repair time, so a side-mirrored brief is the one iterated). iteratePageCore's lookup is resolveIterateScene; the `|| sceneDescription` aliases in images.js and entityConsistency.js are gone. Replay over the stored p7/p14 briefs: old input throws, fixed input resolves the stored brief."
+    },
+    {
+      "id": "central-figure-absent-third-false-findings",
+      "title": "CENTRAL_FIGURE_ABSENT_THIRD filed must-fix findings for all three thirds of a book that stages the central figure on most pages",
+      "reportedAt": "2026-09-25",
+      "source": "Stored evidence, staging testlab_experiments #1488 and #1489 (beats_replan on the arc of #1483, job_1790277448294_5herh01j7): results[0].report.castFindings carry \"the central figure (das Ei / Marroni) is in frame on no page of the setup/middle/ending\" while the plan stages the egg on pages 3-4, 7-11 and 15-16. The stored ROSTER lists \"the egg\" under things on pages 15-16 only. #1491 carries the same finding.",
+      "rootCause": "planCounters.centralFigureAbsentThirds matched the arc STORY LOGIC names whole-word against the plan-check ROSTER. The logic line gave the name in the book language (\"das Ei\", the arc prompts keep names as they will appear in the book) against an English roster, and the roster reads the who column, which carries people, so an object-like figure staged in the instant never reached it.",
+      "impact": "Three false must-fix findings per affected plan, which the re-plan must answer by adding the figure to pages. Lab only: 0 staging and 0 production stories since cf672a0f8.",
+      "status": "fixed",
+      "fixedAt": "2026-09-25",
+      "fixedIn": "2d727d23b",
+      "fix": "The plan check (handed the name in Q12) answers a CENTRAL line with the pages whose picture shows the figure; parsePlanCheckCentralPages reads it and the counter counts on it. The name-vs-roster matcher is deleted; a missing CENTRAL line files nothing and logs an error. Test: the #1488 shape (German name, English roster) returned three thirds before and none now."
     }
   ]
 }

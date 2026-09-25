@@ -1645,6 +1645,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "central-figure-central-line",
+      "title": "The plan check answers a CENTRAL line and CENTRAL_FIGURE_ABSENT_THIRD counts on it",
+      "commits": [
+        "2d727d23b"
+      ],
+      "addedAt": "2026-09-25",
+      "claim": "On the next staging full story whose arc names a central figure, every plan-check reply carries a CENTRAL line (beatsReviewReport counterStats.centralFigure.unanswered is false) and no CENTRAL_FIGURE_ABSENT_THIRD finding names a third whose plan lines stage the figure.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "stories.data.beatsReviewReport: the stored plan-check reply has a CENTRAL: pages line; counterStats.centralFigure.pages against the plan lines; compare to Lab #1488 (three false thirds)"
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }
