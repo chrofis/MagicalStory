@@ -60,3 +60,37 @@ describe('the plate edge rule reaches both sides', () => {
     expect(built).not.toMatch(/\{PLATE_[A-Z_]+\}/);
   });
 });
+
+// BEHAVIOUR PINNED (2026-09-25, Lab 1479/1480/1484): the watercolor style text
+// sent with every page, cover, plate and character sheet no longer asks for the
+// picture's rim to be unpainted paper, and the plate QC fails a deckle edge.
+describe('a watercolor render is painted to its edges', () => {
+  const builders = () => require_('../../server/lib/promptBuilders.js');
+
+  it('the style text every consumer resolves keeps the paper texture, denies a paper edge, never dissolves into the paper', () => {
+    for (const text of [builders().resolveArtStyle('watercolor'), builders().resolveArtStyleForSheet('watercolor')]) {
+      expect(text).toMatch(/cold-press paper texture/i);
+      expect(text).toMatch(/vignette/i);
+      expect(text).toMatch(/deckle/i);
+      expect(text).not.toMatch(/into the paper/i);
+    }
+  });
+
+  it('no art style asks for an edge dissolving into the paper', () => {
+    for (const [id, text] of Object.entries(builders().ART_STYLES as Record<string, string>)) {
+      expect(text, id).not.toMatch(/dissolv\w* into the paper/i);
+    }
+  });
+
+  it('the plate author and the plate QC both name a deckle edge, torn paper and a vignette', () => {
+    const author = prompts().buildEmptyScenePrompt({ style: builders().resolveArtStyle('watercolor'), description: 'An empty meadow.' });
+    const { buildEmptySceneQcPrompt } = require_('../../server/lib/evalPipeline.js');
+    const qc = buildEmptySceneQcPrompt({ sceneDescription: 'An empty meadow.' });
+    for (const built of [author, qc]) {
+      expect(built).toContain(shots().PLATE_SURROUNDS);
+      expect(shots().PLATE_SURROUNDS).toMatch(/deckle/);
+      expect(shots().PLATE_SURROUNDS).toMatch(/torn-paper/);
+      expect(shots().PLATE_SURROUNDS).toMatch(/vignette/);
+    }
+  });
+});

@@ -1411,6 +1411,14 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
     maxRefSlots = null,                  // Test Lab only: raise packReferences/editWithGrok's
                                           // slot budget above the production default of 3
                                           // (xAI's edit cap is 5). null = production default.
+    // Test Lab only, landmark PLATE calls only (RC5, 2026-09-25): how the
+    // photo reaches Grok. plateExtensionPrefix picks the magenta-extension
+    // prefix variant ('default' = pixel-faithful centre; 'structure_only' =
+    // repaint the whole frame, the photo gives structure only). plateRefFit
+    // 'crop' centre-crops the photo to the page aspect instead of padding it,
+    // so no pad and no prefix reach Grok. Production keeps 'default' / 'pad'.
+    plateExtensionPrefix = 'default',
+    plateRefFit = 'pad',
     // Out-param: receives `compressedScene` when the prompt went over the
     // model's cap and shrinkPromptForModel LLM-compressed the scene prose.
     // Callers stamp it onto the page record so the batch eval judges the render
@@ -1427,8 +1435,18 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
   // sentinel, so a failing fallback reports both errors (withUpstreamErrors).
   const upstreamErrors = [];
 
+  if (!['default', 'structure_only'].includes(plateExtensionPrefix)) throw new Error(`[${logLabel}] unknown plateExtensionPrefix "${plateExtensionPrefix}"`);
+  if (!['pad', 'crop'].includes(plateRefFit)) throw new Error(`[${logLabel}] unknown plateRefFit "${plateRefFit}"`);
+  if ((plateExtensionPrefix !== 'default' || plateRefFit !== 'pad') && landmarkScene !== 'plate') {
+    throw new Error(`[${logLabel}] plateExtensionPrefix/plateRefFit apply to landmark plate calls only (landmarkScene is ${landmarkScene})`);
+  }
+  if (plateExtensionPrefix !== 'default' && plateRefFit === 'crop') {
+    throw new Error(`[${logLabel}] plateRefFit 'crop' sends no extension prefix — plateExtensionPrefix "${plateExtensionPrefix}" would be ignored`);
+  }
+
   // Whether slot-0 scene plates get magenta-extension padding (gen-only only).
-  const slot0IsScenePlate = usePadExtension && !!(sceneBackground || (Array.isArray(landmarkPhotos) && landmarkPhotos.length) || previousImage);
+  // A cropped plate source already has the page aspect: nothing to extend.
+  const slot0IsScenePlate = usePadExtension && plateRefFit !== 'crop' && !!(sceneBackground || (Array.isArray(landmarkPhotos) && landmarkPhotos.length) || previousImage);
 
   // A PLATE call (emptyScenePlateRouting marks it landmarkScene 'plate') is
   // fitted by its own cut order, with the worst-case magenta-extension prefix
@@ -1507,12 +1525,12 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
     try {
       const refImages = await packReferences(
         { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground, textAreaMask, landmarkScene },
-        { aspectRatio: grokAspect, pageLabel, padInputWithExtension: slot0IsScenePlate, ...(maxRefSlots ? { maxSlots: maxRefSlots } : {}), ...(vbColumnFraction ? { vbColumnFraction } : {}) }
+        { aspectRatio: grokAspect, pageLabel, padInputWithExtension: slot0IsScenePlate, plateSourceFit: plateRefFit, ...(maxRefSlots ? { maxSlots: maxRefSlots } : {}), ...(vbColumnFraction ? { vbColumnFraction } : {}) }
       );
 
       let result;
       if (refImages.length > 0) {
-        result = await editWithGrok(grokPrompt, refImages, { model: grokModel, aspectRatio: grokAspect, padInputWithExtension: slot0IsScenePlate, ...(maxRefSlots ? { maxRefs: maxRefSlots } : {}) });
+        result = await editWithGrok(grokPrompt, refImages, { model: grokModel, aspectRatio: grokAspect, padInputWithExtension: slot0IsScenePlate, extensionPrefix: plateExtensionPrefix, ...(maxRefSlots ? { maxRefs: maxRefSlots } : {}) });
       } else {
         result = await generateWithGrok(grokPrompt, { model: grokModel, aspectRatio: grokAspect });
       }
@@ -1753,13 +1771,13 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
       } else {
         refImages = await packReferences(
           { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground, landmarkScene },
-          { aspectRatio: grokAspect, pageLabel, padInputWithExtension: slot0IsScenePlate }
+          { aspectRatio: grokAspect, pageLabel, padInputWithExtension: slot0IsScenePlate, plateSourceFit: plateRefFit }
         );
       }
 
       let result;
       if (refImages.length > 0) {
-        result = await editWithGrok(effectivePrompt, refImages, { model: grokModel, aspectRatio: grokAspect, padInputWithExtension: slot0IsScenePlate });
+        result = await editWithGrok(effectivePrompt, refImages, { model: grokModel, aspectRatio: grokAspect, padInputWithExtension: slot0IsScenePlate, extensionPrefix: plateExtensionPrefix });
       } else {
         result = await generateWithGrok(effectivePrompt, { model: grokModel, aspectRatio: grokAspect });
       }
@@ -2275,6 +2293,9 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     // | null) — server/lib/landmarkScene.js. Checked BEFORE the cache, so a
     // cached render can never stand in for a refused one.
     landmarkScene = null,
+    // Test Lab only, landmark plate calls: see _dispatchImageGeneration.
+    plateExtensionPrefix = 'default',
+    plateRefFit = 'pad',
   } = options;
   assertLandmarkScene({ landmarkPhotos, sceneBackground, landmarkScene, label: `IMAGE GEN-ONLY P${pageNumber ?? '?'}` });
 
@@ -2286,7 +2307,10 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
   const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null, pageNumber, sceneBackground ? 'bg' : null);
 
   // For generateImageOnly, we use a separate cache namespace to avoid conflicts with evaluated images
-  const genOnlyCacheKey = `genonly_${cacheKey}`;
+  // A plate-fit arm is a different request than the production default, so it
+  // gets its own key; the production key is unchanged.
+  const plateArm = (plateExtensionPrefix !== 'default' || plateRefFit !== 'pad') ? `_${plateExtensionPrefix}_${plateRefFit}` : '';
+  const genOnlyCacheKey = `genonly_${cacheKey}${plateArm}`;
 
   if (!skipCache && imageCache.has(genOnlyCacheKey)) {
     log.debug(`💾 [IMAGE GEN-ONLY] Cache HIT (${imageCache.size} cached)`);
@@ -2336,6 +2360,8 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     includeSceneBackgroundPart: true,
     maxRefSlots,
     vbColumnFraction,
+    plateExtensionPrefix,
+    plateRefFit,
   });
 
   // Strip a stray uniform frame the model painted despite the D-01 prompt ban
@@ -4194,6 +4220,24 @@ async function resolveIteratePlate({
 }
 
 /**
+ * The scene an iterate rewrites: `{ pageNumber, description, outlineExtract }`.
+ * A story page's row comes from `storyData.sceneDescriptions[]`, whose brief
+ * is `description` (sceneMetadata.sceneDescriptionRecord — the stored story
+ * and the in-generation repair pipeline's story data are both that shape). A
+ * full-story cover's brief lives on its coverImages record (covers are pages,
+ * 2026-09-24). No brief throws: an iterate with nothing to rewrite is refused.
+ */
+function resolveIterateScene(storyData, pageNumber, coverRecord = null) {
+  const currentScene = coverRecord
+    ? { pageNumber, description: coverRecord.sceneDescription, outlineExtract: coverRecord.outlineExtract }
+    : (storyData.sceneDescriptions || []).find(s => s.pageNumber === pageNumber);
+  if (!currentScene || !currentScene.description) {
+    throw new Error(`No scene description found for page ${pageNumber}`);
+  }
+  return currentScene;
+}
+
+/**
  * Core iterate function — shared by the pipeline (executeIterateAction) and the
  * UI route (POST /:id/iterate/:pageNum).  Analyzes the current image, re-expands
  * the scene description with Claude's 17-check prompt, then regenerates.
@@ -4312,13 +4356,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     throw new Error(`Page ${pageNumber} text not found`);
   }
 
-  // Get current scene description — a cover's brief lives on its own record.
-  const currentScene = coverKey
-    ? { pageNumber, description: coverRecord.sceneDescription, outlineExtract: coverRecord.outlineExtract }
-    : sceneDescriptions.find(s => s.pageNumber === pageNumber);
-  if (!currentScene || !currentScene.description) {
-    throw new Error(`No scene description found for page ${pageNumber}`);
-  }
+  const currentScene = resolveIterateScene(storyData, pageNumber, coverRecord);
 
   // The page's textPosition is locked at first generation — iterate must NOT
   // re-pick it (would break the spread rule and shift the calm zone). Pull the
@@ -4367,7 +4405,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       // decides which one this is.
       const metaNames = (() => {
         try {
-          const m = extractSceneMetadata(currentScene.description || currentScene.sceneDescription || '');
+          const m = extractSceneMetadata(currentScene.description);
           const cs = m?.characters;
           return Array.isArray(cs) ? cs.map(c => String(c?.name || c || '').trim()).filter(Boolean) : [];
         } catch { return []; }
@@ -4471,8 +4509,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   const availableAvatars = buildAvailableAvatarsForPrompt(characters, clothingRequirements);
 
   // Extract short scene description from current scene
-  // Handle both field names: 'description' (saved stories) and 'sceneDescription' (pipeline)
-  const sceneDescText = currentScene.description || currentScene.sceneDescription || '';
+  const sceneDescText = currentScene.description;
   let shortSceneDesc = '';
   const sceneMetadata = extractSceneMetadata(sceneDescText);
   // THE PARENT BRIEF'S METADATA -- ONE RESOLVER (2026-09-17, staging
@@ -6304,6 +6341,7 @@ module.exports = {
 
   // Active repair primitives
   iteratePageCore,
+  resolveIterateScene,
   iteratePage,
   repairCharacterMismatch,
 

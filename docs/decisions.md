@@ -21,6 +21,26 @@ superseded and link forward.
 
 ---
 
+## 2026-09-25 — `storyData.sceneDescriptions[]` has one shape everywhere: the brief is `description`, built by `sceneDescriptionRecord`
+
+**Context:** Staging job_1790277448294_5herh01j7: every in-generation page iterate failed with "No scene
+description found for page N" (finalChecksReport.repairRounds p7, p14). The repair pipeline's story data
+carried the raw `expandedScenes` (brief under `sceneDescription`) while every reader of
+`storyData.sceneDescriptions` — iteratePageCore, entity consistency, the style check, the Lab, the manual
+routes — reads `description`. iteratePageCore hid the mismatch with `description || sceneDescription` until
+covers-as-pages (6fbd2b599) made a missing `description` a throw.
+**Decision:** `sceneMetadata.sceneDescriptionRecord(scene, scenePromptRefs)` is the one projection of an Art
+Director scene into a `sceneDescriptions[]` record. storyJobPipeline uses it for the stored story and for
+the repair pipeline's story data (projected at repair time, so a spread-side-mirrored brief is the one
+iterated). `images.resolveIterateScene` is the iterate lookup; the `|| sceneDescription` aliases on
+`sceneDescriptions[]` rows are deleted. (`sceneImages[]` rows and `coverImages` records are other
+collections and keep their own fields.)
+**Rationale:** two shapes under one name let a reader silently read nothing; an alias hid it until a
+stricter reader turned it into a failed repair on every page.
+**Touched:** server/lib/sceneMetadata.js, storyJobPipeline.js, server/lib/images.js,
+server/lib/entityConsistency.js, tests/unit/iterate-scene-description-shape.test.ts
+**Status:** ✅ active
+
 ## 2026-09-25 — Every repair that repaints pixels carries the page's declared light; every repaired version is judged against it
 
 **Context:** Staging job_1790277448294_5herh01j7 p15 declares `timeOfDay: night`, `weather: fog`. v0 was

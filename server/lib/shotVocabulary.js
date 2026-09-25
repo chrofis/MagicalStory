@@ -636,7 +636,10 @@ if ([...PLATE_DERIVED_SHOTS].some(id => !DERIVE_CAMERA_MOVE[id])) {
  * "Frame edge" check.
  */
 const PLATE_MARKS = 'signature, monogram or initials';
-const PLATE_SURROUNDS = 'paper margin, mat, border, keyline or frame around the picture';
+// Deckle, torn paper and vignette named 2026-09-25: Lab 1480 (a cream deckle
+// edge) and 1479 (a torn-paper corner) passed the plate QC, whose judge did not
+// read a deckle edge as a "margin".
+const PLATE_SURROUNDS = 'paper margin, mat, deckle or torn-paper edge, vignette, border, keyline or frame around the picture';
 const PLATE_EDGE_RULE = `The painting fills the frame edge to edge, the scene itself reaching all four sides; it carries no ${PLATE_MARKS} and no ${PLATE_SURROUNDS}.`;
 
 /*

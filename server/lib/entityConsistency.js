@@ -1846,7 +1846,7 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
     let pageWornResolved = [];
     if (wornItemsVisualBible) {
       const sceneDesc = sceneDescriptions.find(s => s.pageNumber === pageNumber);
-      const desc = sceneDesc && (sceneDesc.description || sceneDesc.sceneDescription);
+      const desc = sceneDesc && sceneDesc.description;
       if (desc) {
         try {
           const meta = extractSceneMetadata(desc);
@@ -1928,7 +1928,7 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
       if (pageCharNames.length > 0) {
         // Build expected characters with physical descriptions + clothing for Gemini
         const { extractSceneMetadata, resolveSceneCastEntries } = require('./storyHelpers');
-        const sceneMetadata = sceneDesc ? extractSceneMetadata(sceneDesc.description || sceneDesc.sceneDescription) : null;
+        const sceneMetadata = sceneDesc ? extractSceneMetadata(sceneDesc.description) : null;
         const charClothing = sceneMetadata?.characterClothing || {};
 
         const vb = visualBible || null;
