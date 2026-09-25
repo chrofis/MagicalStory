@@ -60446,3 +60446,22 @@ tags or quotes. Not yet validated on a live panel: `tasks/verify.json` `arc-rete
 `tests/unit/arc-creator-effort.test.ts`, `tests/unit/arc-logic-first.test.ts` (+ three retell-builder
 call sites in tests).
 **Status:** ✅ committed on `staging`, not pushed; Lab validation pending.
+
+## 2026-09-25 — REQUIRED CAST is never cut by the prompt shrink
+
+**Context.** On staging `job_1790277448294_5herh01j7` (covers-as-pages build, commit 30e5d33c) the shrink cut
+REQUIRED CAST on p3, p10 and p14 (step #6 of the cut order) and on the back cover's Grok edit (7388 → 6886 against a
+7290 cap); on p14 a character then wore a coat that should have lain on the heap.
+
+**Decision (owner, 2026-09-25).** REQUIRED CAST leaves `PROMPT_CUT_ORDER` and joins `PROMPT_NEVER_CUT` (an exact-text
+entry). It already sits after ART STYLE, inside the protected tail, so no prose trim reaches it; `cutBlocks()` now
+throws at load if any step would remove it, and a prompt the tail alone cannot fit still fails loudly. One list, so
+every path that shrinks an image prompt — pages, covers, the Grok edit — gets it.
+
+**Consequence (measured, free replay of the real builder over that story).** The same caps are met by cutting the page
+facts further down the order instead: p3 / p10 / p14 now lose HEIGHT ORDER, AGE & PROPORTIONS and the reference-photo
+rule (10660 → 7703, 10637 → 7680, 10496 → 7539 at 7900); the back cover keeps REQUIRED CAST at both 7900 (→ 7584) and
+the edit's 7290 (→ 6780, also losing those three). The cut-order docs are regenerated from the code.
+
+**Touched:** server/lib/images.js, docs/image-generation-methods.html, docs/prompt-inventory.md (generated),
+tests/unit/cover-shrink-must-keep.test.ts, tests/unit/prompt-says-each-thing-once.test.ts.

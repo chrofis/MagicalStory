@@ -116,17 +116,17 @@ Grok image cap: **7,900 characters** (`server/config/models.js` `maxPromptLength
 3. **Composition: facing** (~367 chars) — the "faces the target, not the camera" bullet. *Why here:* yields to every declared facing, and EXACT POSES / EXPRESSIONS AND EYES declare one per figure; never built on a cover.
 4. **DEPTH AND SIZE** (~647 chars) — the foreground / midground / background definitions. *Why here:* defines the brief's depth words; the prose still places every figure.
 5. **Composition: ground** (~600 chars) — the feet-on-the-ground bullet (the header goes with it). *Why here:* the one feet-on-the-ground rule for pages and covers; kept longer than the generic rules above.
-6. **REQUIRED CAST** (~500 chars) — every named character in frame, exactly one of each, nobody added. *Why here:* the generator half of D-03 / D-04b; the prose and the character lines still name the cast, so it is the last generic rule to go.
-7. **HEIGHT ORDER** (~140 chars) — the shortest-to-tallest line. *Why here:* a page fact: the relative size the height judge compares.
-8. **AGE & PROPORTIONS** (~485 chars) — the per-age head-count proportions. *Why here:* a page fact: without it an infant is drawn as a preschooler.
-9. **reference-photo rule** (~512 chars) — which attached photo is a place and which is a person. *Why here:* a page fact: the plate-vs-identity binding of the attached images.
-10. **single-illustration rule** (~503 chars) — one full-bleed picture, no lettering, ids are not painted. *Why here:* the frame rule; the very last block the cut may spend.
+6. **HEIGHT ORDER** (~140 chars) — the shortest-to-tallest line. *Why here:* a page fact: the relative size the height judge compares.
+7. **AGE & PROPORTIONS** (~485 chars) — the per-age head-count proportions. *Why here:* a page fact: without it an infant is drawn as a preschooler.
+8. **reference-photo rule** (~512 chars) — which attached photo is a place and which is a person. *Why here:* a page fact: the plate-vs-identity binding of the attached images.
+9. **single-illustration rule** (~503 chars) — one full-bleed picture, no lettering, ids are not painted. *Why here:* the frame rule; the very last block the cut may spend.
 
 **Never cut. Once every step has run, only the text before the protected tail (from the first of REQUIRED OBJECTS / SEASON / LIGHT / COMPOSITION GUIDELINES / ART STYLE) is trimmed, at a sentence boundary; if the tail alone leaves no room, the render fails loudly.**
 
 - **NO MARKS** — generator half of D-24 (sibling-registry page-image-generator-vs-critics parity anchor)
 - **HANDS** — generator half of D-16b (same parity anchor set)
 - **REQUIRED TEXT** — the baked cover title and any lettering a Visual Bible element must carry (SETTLED: baked title)
+- **REQUIRED CAST** — the generator half of D-03 / D-04b: every named character in frame, exactly one of each, nobody added
 - **REQUIRED OBJECTS** — the commissioned elements of the page
 - **SEASON** — the book-wide season, even against a reference photo from another season
 - **LIGHT** — the page's declared time of day and weather, which wins over the plate's light (sceneLight.js)

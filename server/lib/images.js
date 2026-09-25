@@ -945,13 +945,6 @@ const PROMPT_CUT_ORDER = [
     approxChars: 600,
     unit: () => compositionBulletUnit(COMPOSITION_GROUND_BULLET),
   },
-  {
-    label: 'REQUIRED CAST',
-    what: 'every named character in frame, exactly one of each, nobody added',
-    why: 'the generator half of D-03 / D-04b; the prose and the character lines still name the cast, so it is the last generic rule to go',
-    approxChars: 500,
-    unit: () => exactTextUnit(templateParagraph('**REQUIRED CAST:**')),
-  },
   // Page facts. Last to go.
   {
     label: 'HEIGHT ORDER',
@@ -996,6 +989,12 @@ const PROMPT_NEVER_CUT = [
   { label: 'NO MARKS', why: 'generator half of D-24 (sibling-registry page-image-generator-vs-critics parity anchor)', text: () => NO_CHARACTER_MARKING_RULE },
   { label: 'HANDS', why: 'generator half of D-16b (same parity anchor set)', text: () => HANDS_HOLD_ONLY_NAMED_RULE },
   { label: 'REQUIRED TEXT', why: 'the baked cover title and any lettering a Visual Bible element must carry (SETTLED: baked title)', text: () => '**REQUIRED TEXT:**' },
+  // REQUIRED CAST left the cut order on 2026-09-25 (owner): cut on four prompts of
+  // staging job_1790277448294_5herh01j7 (p3, p10, p14 and the back cover's Grok
+  // edit, 7388 -> 6886 against 7290), and on p14 a character then wore a coat
+  // that should have lain on the heap. It sits after ART STYLE, inside the
+  // protected tail, so no prose trim reaches it either.
+  { label: 'REQUIRED CAST', why: 'the generator half of D-03 / D-04b: every named character in frame, exactly one of each, nobody added', text: () => '**REQUIRED CAST:**' },
   { label: 'REQUIRED OBJECTS', why: 'the commissioned elements of the page', marker: '**REQUIRED OBJECTS' },
   { label: 'SEASON', why: 'the book-wide season, even against a reference photo from another season', marker: '**SEASON:**' },
   { label: 'LIGHT', why: "the page's declared time of day and weather, which wins over the plate's light (sceneLight.js)", marker: '**LIGHT:**' },
