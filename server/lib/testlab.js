@@ -8470,6 +8470,9 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
       return {
         arm: {
           phase, effort, ok: true, parseError,
+          // The advisory task budget this call carried (models.js
+          // taskBudgetAtEffort; Opus 5.5 at max, 2026-09-25), or null.
+          taskBudget: TEXT_MODELS[model].taskBudgetAtEffort?.[effort] ?? null,
           cost: costOf(res), elapsedMs: Date.now() - t,
           inputTokens: res.usage?.input_tokens || 0,
           outputTokens: out,

@@ -120,6 +120,60 @@ function calculateOptimalBatchSize(totalPages, tokensPerPage = 400, safetyMargin
 /**
  * Call Anthropic Claude API
  */
+/**
+ * TASK BUDGET (2026-09-25). `options.taskBudget` — set by callTextModel /
+ * callTextModelStreaming from the model's `taskBudgetAtEffort` (models.js) —
+ * rides as output_config.task_budget with its beta header. It is the one
+ * documented way to leave an Opus 5.5 reply room at effort `max`:
+ * budget_tokens is rejected on that model and 128K is its real ceiling.
+ */
+const TASK_BUDGET_BETA = 'task-budgets-2026-03-13';
+const TASK_BUDGET_MIN = 20000; // the API's documented minimum; smaller is a 400
+
+function anthropicHeaders(apiKey, options = {}) {
+  return {
+    'Content-Type': 'application/json',
+    'x-api-key': apiKey,
+    'anthropic-version': '2023-06-01',
+    ...(options.taskBudget ? { 'anthropic-beta': TASK_BUDGET_BETA } : {}),
+  };
+}
+
+function anthropicOutputConfig(options = {}) {
+  const cfg = {};
+  if (options.effort) cfg.effort = options.effort;
+  if (options.taskBudget) cfg.task_budget = { type: 'tokens', total: options.taskBudget };
+  return Object.keys(cfg).length ? { output_config: cfg } : {};
+}
+
+/** The model's task budget at this effort, or null. Throws on a value the API would refuse. */
+function taskBudgetFor(model, options = {}) {
+  const total = model?.taskBudgetAtEffort?.[options.effort];
+  if (total == null) return null;
+  if (!Number.isInteger(total) || total < TASK_BUDGET_MIN || total >= model.maxOutputTokens) {
+    throw new Error(`${model.modelId}: taskBudgetAtEffort.${options.effort}=${total} must be an integer from ${TASK_BUDGET_MIN} to below maxOutputTokens (${model.maxOutputTokens})`);
+  }
+  return total;
+}
+
+/**
+ * NO TEXT IS A FAILED CALL (2026-09-25). On Lab #1421 an Opus 5.5 call at
+ * effort max spent its whole 128,000-token output on thinking and came back
+ * with an empty text and stop_reason max_tokens — which reached the caller as
+ * an ordinary, empty reply. It throws here, after usage is recorded (the
+ * tokens were billed), with the stop_reason in the message, and outside
+ * withRetry: repeating the same call would burn the same budget again.
+ */
+function assertAnthropicText(result, modelName) {
+  if (String(result?.text || '').trim()) return;
+  const stop = result?.stop_reason || 'none';
+  const out = result?.usage?.output_tokens || 0;
+  const err = new Error(`${modelName} (${result?.modelId || '?'}) returned no text: stop_reason=${stop}, ${out} output tokens${stop === 'max_tokens' ? ' — the output budget was spent on thinking' : ''}`);
+  err.stopReason = stop;
+  err.usage = result?.usage || null;
+  throw err;
+}
+
 async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
   prompt = guardPromptString(prompt, 'textModels.callAnthropicAPI');
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -177,11 +231,7 @@ async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
   const data = await withAnthropic(() => withRetry(async () => {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      },
+      headers: anthropicHeaders(apiKey, options),
       body: JSON.stringify({
         model: modelId,
         max_tokens: maxTokens,
@@ -192,7 +242,7 @@ async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
         // and never returned. Measured on the arc: 30,674 billed output tokens
         // against ~4,000 tokens of visible text. This is the lever on that, and
         // it stays OPT-IN: no caller's cost or quality moves unless it asks.
-        ...(options.effort ? { output_config: { effort: options.effort } } : {}),
+        ...anthropicOutputConfig(options),
         messages
       }),
       signal: AbortSignal.timeout(timeoutMs)
@@ -225,7 +275,9 @@ async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
   // With assistant prefill, Claude continues AFTER the prefill (not including it), so we must prepend.
   // For Claude 4+ models, the prefill was moved into the prompt instruction, so Claude's response
   // already includes it — prepending would create invalid/doubled content.
-  const responseText = (options.prefill && supportsAssistantPrefill) ? options.prefill + data.content[0].text : data.content[0].text;
+  // The TEXT blocks only: with thinking on, content[0] is a thinking block.
+  const replyText = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+  const responseText = (options.prefill && supportsAssistantPrefill) ? options.prefill + replyText : replyText;
 
   return {
     text: responseText,
@@ -287,17 +339,13 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk, op
     try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      },
+      headers: anthropicHeaders(apiKey, options),
       body: JSON.stringify({
         model: modelId,
         max_tokens: maxTokens,
         stream: true,
         // See the note on the non-streaming call: opt-in only.
-        ...(options.effort ? { output_config: { effort: options.effort } } : {}),
+        ...anthropicOutputConfig(options),
         messages
       }),
       signal: controller.signal
@@ -1247,7 +1295,7 @@ async function callTextModel(prompt, maxTokens = null, modelOverride = null, opt
   const startedAt = Date.now();
   switch (model.provider) {
     case 'anthropic':
-      result = await callAnthropicAPI(prompt, effectiveMaxTokens, model.modelId, options);
+      result = await callAnthropicAPI(prompt, effectiveMaxTokens, model.modelId, { ...options, taskBudget: taskBudgetFor(model, options) });
       break;
     case 'google':
       result = await callGeminiTextAPI(prompt, effectiveMaxTokens, model.modelId, options);
@@ -1277,6 +1325,7 @@ async function callTextModel(prompt, maxTokens = null, modelOverride = null, opt
   // Director, the scene reviewer) are allow-listed by label in vbIdGuard.js; an
   // unknown label warns by design.
   require('./vbIdGuard').warnIfVbIds(prompt, options.usageLabel || 'text', { kind: 'text' });
+  if (model.provider === 'anthropic') assertAnthropicText({ ...result, modelId: result.modelId || model.modelId }, modelName);
   return guardReply({ ...result, modelId: result.modelId || model.modelId }, model, modelName, effectiveMaxTokens, options);
 }
 
@@ -1317,7 +1366,7 @@ async function callTextModelStreaming(prompt, maxTokens = null, onChunk = null, 
   const streamStartedAt = Date.now();
   switch (model.provider) {
     case 'anthropic':
-      result = await callAnthropicAPIStreaming(prompt, effectiveMaxTokens, model.modelId, onChunk, options);
+      result = await callAnthropicAPIStreaming(prompt, effectiveMaxTokens, model.modelId, onChunk, { ...options, taskBudget: taskBudgetFor(model, options) });
       break;
     case 'google':
       result = await callGeminiTextAPIStreaming(prompt, effectiveMaxTokens, model.modelId, onChunk, options);
@@ -1352,6 +1401,7 @@ async function callTextModelStreaming(prompt, maxTokens = null, onChunk = null, 
   // Director, the scene reviewer) are allow-listed by label in vbIdGuard.js; an
   // unknown label warns by design.
   require('./vbIdGuard').warnIfVbIds(prompt, options.usageLabel || 'text', { kind: 'text' });
+  if (model.provider === 'anthropic') assertAnthropicText({ ...result, modelId: result.modelId || model.modelId }, modelName);
   return guardReply({ ...result, modelId: result.modelId || model.modelId }, model, modelName, effectiveMaxTokens, options);
 }
 
@@ -1373,6 +1423,10 @@ module.exports = {
 
   // Utility
   withRetry,
+  taskBudgetFor,
+  anthropicOutputConfig,
+  anthropicHeaders,
+  assertAnthropicText,
 
   // API functions
   callTextModel,

@@ -1512,6 +1512,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "arc-opus55-max-output",
+      "title": "Opus 5.5 at effort max returns an arc: a task budget below max_tokens leaves room for the reply",
+      "commits": [],
+      "addedAt": "2026-09-25",
+      "claim": "A Lab arc_effort create call on claude-opus-5-5 at createEffort max, sent with output_config.task_budget (beta task-budgets-2026-03-13) below the 128k max_tokens, returns a parseable arc instead of spending all 128k output tokens on thinking (baseline Lab #1421: no text returned); an empty reply fails with its stop_reason.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Lab arc_effort stage=create, model claude-opus-5-5, efforts max, on one stored story: the arm is ok with no parseError, outputTokens below 128000, and arms[].taskBudget recorded"
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }

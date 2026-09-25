@@ -60264,3 +60264,37 @@ second panel + re-telling round; the owner's "one round only" is not enforced th
 `server/lib/storyScorecard.js`, `server/lib/storyHelpers.js`, `scripts/admin/sibling-registry.json`,
 `tasks/verify.json` (`arc-prompts-v2`), tests.
 **Status:** ✅ committed on `staging`, not pushed; Lab validation pending (owner).
+
+## 2026-09-25 — Opus 5.5 at effort max carries a task budget; a reply with no text fails with its stop_reason
+
+**Context:** Lab #1421 (memory `project_arc_effort_opus55_2026_09_23`): `claude-opus-5-5` at effort
+`max` spent all 128,000 output tokens on thinking and returned no arc (xhigh on the same prompt:
+62,669 tokens, ~4k visible). The Anthropic call sent `{model, max_tokens: 128000, output_config:
+{effort}}` with no thinking config, and the empty reply reached the caller as an ordinary one.
+
+**Verdict source (Anthropic docs, read 2026-09-25):** `platform.claude.com/docs/en/build-with-claude/effort`
+and `.../task-budgets`, plus the claude-api skill's Opus 5.5 migration notes. Opus 5.5 has the same
+128K max output as Opus 5 (no beta header raises it). Thinking is always on: `{type: "disabled"}` and
+`{type: "enabled", budget_tokens}` return 400 at every effort level, so an explicit thinking budget is
+not possible. "Set a large max_tokens at the higher levels: it's a hard limit on total output
+(thinking plus response text)." `output_config.task_budget` (beta `task-budgets-2026-03-13`, Opus 5.5
+supported, minimum 20,000) is an advisory budget covering thinking and output that the model sees as
+a countdown and paces against; `max_tokens` stays the hard cap.
+
+**Decision:** `TEXT_MODELS['claude-opus-5-5'].taskBudgetAtEffort = { max: 96000 }`, with
+`max_tokens` at the 128,000 ceiling. `callTextModel` / `callTextModelStreaming` resolve it
+(`taskBudgetFor`, which throws on a value the API would refuse) and the Anthropic calls send
+`output_config.task_budget` with the beta header; other efforts and models send nothing new. 96,000
+lets `max` think past xhigh's measured 62,669 and leaves 32,000 under the cap for an overshoot and
+the ~4k-token reply. An Anthropic reply with no text now throws at the chokepoint, after usage is
+recorded and outside `withRetry`, with `stop_reason` and the output token count in the message
+(`assertAnthropicText`). The non-streaming path reads the text blocks (with thinking on, `content[0]`
+is a thinking block). The Lab `arc_effort` stage records the budget per arm (`arms[].taskBudget`);
+`model: claude-opus-5-5, createEffort: max` runs with it unchanged.
+
+**Open:** the 96,000 value is sized from #1421/#1375 spend, not measured with the budget in place;
+the Lab run (`tasks/verify.json` `arc-opus55-max-output`) is the measurement.
+
+**Touched:** `server/config/models.js`, `server/lib/textModels.js`, `server/lib/testlab.js`,
+`tests/unit/opus55-task-budget.test.ts`, `tasks/verify.json`.
+**Status:** ✅ committed on `staging`, not pushed.

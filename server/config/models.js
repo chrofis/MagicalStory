@@ -40,10 +40,27 @@ const TEXT_MODELS = {
   // no default names this key. Ceiling from GET /v1/models/claude-opus-5-5 ->
   // max_tokens 128000 (read 2026-09-23). Unlike Opus 5, its DEFAULT effort is
   // `medium`, not `high` — a call that sends no effort runs one level lower.
+  //
+  // TASK BUDGET AT EFFORT MAX (2026-09-25). Lab #1421: at `max` the create call
+  // spent all 128,000 output tokens on thinking and returned no text. 128K is
+  // the model's real output ceiling (docs: "same 128K max output"; no beta
+  // raises it), and thinking cannot be capped with budget_tokens — Opus 5.5
+  // returns 400 for `thinking: {type: "enabled", budget_tokens}` at every
+  // effort level. The documented control is `output_config.task_budget` (beta
+  // header task-budgets-2026-03-13; Opus 5.5 listed as supported, minimum
+  // 20,000): an advisory budget covering thinking AND output, which the model
+  // sees as a countdown and wraps up against, while max_tokens stays the hard
+  // cap. Sources: platform.claude.com/docs/en/build-with-claude/task-budgets,
+  // .../effort (read 2026-09-25). Value: measured spend on the same arc prompt
+  // was 62,669 tokens at xhigh (#1421) with ~4k visible, and 52,998 for Opus 5
+  // at max (#1375); 96,000 lets max think past xhigh and leaves 32,000 under
+  // the cap for an overshoot and the reply. Keyed by effort: the other levels
+  // never hit the cap and send no budget.
   'claude-opus-5-5': {
     provider: 'anthropic',
     modelId: 'claude-opus-5-5',
     maxOutputTokens: 128000,
+    taskBudgetAtEffort: { max: 96000 },
     description: 'Claude Opus 5.5 - ($4/$20 per 1M). Default effort medium. Lab-only, not routed.'
   },
   'claude-haiku': {
