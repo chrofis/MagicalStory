@@ -4971,21 +4971,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // light takes ONE edit that moves the camera and re-lights. A page
               // that declares no light (a brief written before the fields) keeps
               // the base plate's light.
+              // A page is derived only for what its base plate lacks: a camera
+              // move when its class differs from the class the base was ACTUALLY
+              // painted in (a vantage with no eye-level page paints its base from
+              // its angled page), a re-light when its light differs (platePlan.js).
               const derivedPlates = new Map();
-              const baseShotForDerive = plateClass(vantageShot) === PLATE_BASE_CLASS ? vantageShot : '';
-              const plateKeyOf = (pn) => {
-                const cls = plateClass(shotOfPage(pn));
-                const light = lightOfPage(pn);
-                const k = lightKey(light);
-                const relit = !!k && k !== baseLightKey;
-                return { cls, light, relit, key: `${cls}|${relit ? k : ''}` };
-              };
+              const { plateEditForPage } = require('./server/lib/platePlan');
+              const plateKeyOf = (pn) => ({
+                ...plateEditForPage({ pageShot: shotOfPage(pn), baseShot: vantageShot, pageLight: lightOfPage(pn), baseLight }),
+                light: lightOfPage(pn),
+              });
               for (const pn of group.pageNumbers) {
-                const { cls, light: pageLight, relit, key } = plateKeyOf(pn);
-                if ((cls === PLATE_BASE_CLASS && !relit) || derivedPlates.has(key)) continue;
-                const deriveInstruction = cls === PLATE_BASE_CLASS
-                  ? buildPlateRelightInstruction(pageLight)
-                  : buildPlateDeriveInstruction(baseShotForDerive, cls, { relight: relit ? relightClause(pageLight) : '' });
+                const { cls, camera, light: pageLight, relit, key } = plateKeyOf(pn);
+                if ((!camera && !relit) || derivedPlates.has(key)) continue;
+                const deriveInstruction = camera
+                  ? buildPlateDeriveInstruction(vantageShot, cls, { relight: relit ? relightClause(pageLight) : '' })
+                  : buildPlateRelightInstruction(pageLight);
                 if (!deriveInstruction) continue;
                 const deriveLabel = `${cls}${relit ? ` (${describeLight(pageLight)})` : ''}`;
                 try {
@@ -4997,7 +4998,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   const derive = async (instruction) => {
                     const r = await editImageWithPrompt(
                       plateImage, instruction, MODEL_DEFAULTS.emptyScenePlateModel, [], inputData.artStyle || null, layoutAspect);
-                    if (r?.usage) addUsage('gemini_image', r.usage, 'page_images', r.usage.model || MODEL_DEFAULTS.emptyScenePlateModel);
+                    if (r?.usage) addUsage(String(r.usage.model || '').startsWith('grok-imagine') ? 'grok' : 'gemini_image', r.usage, 'page_images', r.usage.model || MODEL_DEFAULTS.emptyScenePlateModel);
                     return r?.imageData || null;
                   };
                   // Judged on what the derive was told: its camera, the medium,
@@ -5041,7 +5042,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   }
                   if (derivedImage) {
                     derivedPlates.set(key, { imageData: derivedImage, prompt: derivedPrompt, qcRecord: derivedQcRecord, label: deriveLabel, light: relit ? pageLight : baseLight });
-                    log.info(`🏛️ [VANTAGE] ${vantageId}: derived a ${deriveLabel} plate from the ${baseShotForDerive || 'base'}${baseLightKey ? ` ${describeLight(baseLight)}` : ''} one`);
+                    log.info(`🏛️ [VANTAGE] ${vantageId}: derived a ${deriveLabel} plate from the ${vantageShot || 'base'}${baseLightKey ? ` ${describeLight(baseLight)}` : ''} one`);
                   } else {
                     log.error(`❌ [VANTAGE] ${vantageId}: ${deriveLabel} plate derive returned no image — those pages keep the base plate, drawn for a camera or a light that is not theirs`);
                   }

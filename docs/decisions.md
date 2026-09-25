@@ -60076,6 +60076,29 @@ fitted by the plate cut order alone. Unit tests: `tests/unit/plate-prompt-fit.te
 `storyJobPipeline.js`, `docs/image-generation-methods.html`, `tests/unit/plate-prompt-fit.test.ts`.
 **Status:** ✅ active on staging.
 
+## 2026-09-25 — A page is derived from its base plate only for what the base lacks (amends 2026-09-21 "An angled page takes a plate DERIVED")
+
+**Context:** The derive loop compared a page's plate class with `PLATE_BASE_CLASS` ('eye-level') only. A
+vantage with no eye-level page paints its base from its angled page, and that page was then "derived" into
+the camera it already had: staging job_1790277448294_5herh01j7 p10 (ultra-wide from an ultra-wide base) and
+p14 (high-angle from a high-angle base) each took a second camera move — an extra paid edit that can only
+drift the place.
+
+**Decision (owner, 2026-09-25):** `plateEditForPage` (`server/lib/platePlan.js`) compares the page's class
+with the class the base was actually painted in (`plateClass(vantageShot)`): a camera move only when they
+differ, a re-light only when the declared light differs, neither → the page shares the base. A camera
+derive names the base's real shot ("painted as a ultra-wide shot"), not "eye level". The derive is booked
+under the provider that ran it (`grok` for the plate model; `editImageWithPrompt`'s Gemini fallback now
+reports the Gemini model it called).
+
+**Evidence (rung 1, free):** replay of the old and new key logic over the stored run: the old logic
+reproduces the stored `plateDerivedFor` on all 18 pages; the new one derives 4 plates instead of 6 — p10 and
+p14 share their base, the four re-lights (p3, p13, p15-17, p18) are unchanged.
+
+**Touched:** `server/lib/platePlan.js` (new), `storyJobPipeline.js`, `server/lib/images.js`,
+`tests/unit/plate-plan.test.ts`.
+**Status:** ✅ active on staging.
+
 ## 2026-09-24 — The plan check is given the over-the-shoulder contact rule
 
 **Context:** Staging job_1790277448294_5herh01j7 planned "Page 12: over-the-shoulder — Kiaan — Kiaan

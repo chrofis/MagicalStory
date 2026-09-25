@@ -5979,7 +5979,7 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
     const inputTokens = data.usageMetadata?.promptTokenCount || 0;
     const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
     const thinkingTokens = data.usageMetadata?.thoughtsTokenCount || 0;
-    log.debug(`📊 [IMAGE EDIT] Token usage - input: ${inputTokens}, output: ${outputTokens}${thinkingTokens ? `, thinking: ${thinkingTokens}` : ''}, model: ${modelId}`);
+    log.debug(`📊 [IMAGE EDIT] Token usage - input: ${inputTokens}, output: ${outputTokens}${thinkingTokens ? `, thinking: ${thinkingTokens}` : ''}, model: ${geminiModelId}`);
 
     // Extract thinking text
     const thinkingText = extractThinkingFromParts(data.candidates?.[0]?.content?.parts, 'IMAGE EDIT');
@@ -5996,13 +5996,13 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
           const respMimeType = inlineData.mimeType || inlineData.mime_type || 'image/png';
           const editedImageData = `data:${respMimeType};base64,${inlineData.data}`;
           log.info(`✅ [IMAGE EDIT] Successfully edited image`);
-          return { imageData: editedImageData, thinkingText, usage: { inputTokens, outputTokens, thinkingTokens, model: modelId } };
+          return { imageData: editedImageData, thinkingText, usage: { inputTokens, outputTokens, thinkingTokens, model: geminiModelId } };
         }
       }
     }
 
     log.warn('⚠️  [IMAGE EDIT] No edited image in response');
-    return { imageData: null, usage: { inputTokens, outputTokens, model: modelId } };
+    return { imageData: null, usage: { inputTokens, outputTokens, model: geminiModelId } };
   } catch (error) {
     log.error('❌ [IMAGE EDIT] Error editing image:', error);
     throw withUpstreamErrors(error, grokFailure ? [grokFailure] : []);

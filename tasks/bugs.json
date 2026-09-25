@@ -2031,6 +2031,18 @@
       "fixedAt": "2026-09-25",
       "fixedIn": "",
       "fix": "AD prose emitted once; plate calls fitted by fitPlatePrompt (own cut order: landmark photo note, over-the-shoulder line; nothing else cut) against cap minus the worst-case magenta prefix (616); PromptFitError is rethrown by every provider-fallback catch (rethrowLocalFault, prompt_fit_failed error event) instead of falling back. Replay over 134 stored plate prompts (both DBs, 14 days): 134/134 fit, none cut, largest landmark plate 7,267 + 616 = 7,883."
+    },
+    {
+      "id": "plate-derived-into-its-own-camera",
+      "title": "An angled page whose vantage base plate was already painted in its camera got a second, needless camera derive",
+      "reportedAt": "2026-09-25",
+      "source": "Stored evidence, staging job_1790277448294_5herh01j7: p10 (LOC002.1, ultra-wide, alone on its vantage) and p14 (LOC001.4, high-angle, alone) carry plateDerivedFor ultra-wide / high-angle although their base plates were painted from those same pages' shots.",
+      "rootCause": "The derive loop (storyJobPipeline.js vantage plates) compared the page's plate class with PLATE_BASE_CLASS ('eye-level') only, not with the class the base was actually painted in; a vantage with no eye-level page paints its base from its angled page.",
+      "impact": "An extra paid Grok edit per such page that can only drift the place away from its base; the derive instruction also claimed the base was painted at eye level.",
+      "status": "fixed",
+      "fixedAt": "2026-09-25",
+      "fixedIn": "",
+      "fix": "plateEditForPage (server/lib/platePlan.js) derives a camera move only when the page class differs from plateClass(vantageShot), a re-light only when the light differs; the derive names the base's real shot. Replay on the stored run: old logic reproduces all 18 stored plateDerivedFor values; new logic 4 derives instead of 6, p10 and p14 share their base."
     }
   ]
 }
