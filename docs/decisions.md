@@ -14061,6 +14061,47 @@ self-shutdown could never actually fire, and the feature was silently saving not
 (`/api/health/busy`), `CLAUDE.md`.
 **Status:** ✅ kept.
 
+### Addendum 2026-09-25 — the build window: a deploy-pending flag
+
+**Context:** the gate checks ONE instant, the moment before the push. Railway then
+needs 2-3 minutes to build and cut over, and the old container keeps accepting work the
+whole time. On 2026-09-25 two staging pushes (a5a1fba6 at 16:03:17 CH, 166d0330 at
+16:38:22 CH) passed the gate correctly — nothing was running — and Test Lab experiments
+1472 and 1477 were started 35 s and 4 s after those pushes landed. Their last heartbeats
+(16:05:22, 16:40:56) put the cutover 2m05s-3m04s after each push. Every worktree's
+`core.hooksPath` was the absolute main-clone path, and the busy probe counts a new
+experiment from its first INSERT, so it was neither a bypass nor a probe blind spot.
+
+**Decision:** after an idle verdict the hook sets a "deploy pending" flag on each LIVE
+target (`POST /api/admin/deploy-pending`, token from `get-admin-token.js --base`). The
+flag is one `config` row (`deploy_pending`, JSON with the target commit and an ISO
+expiry, TTL 10 min). The Test Lab START routes (`POST /experiments`,
+`POST /sets/:id/run`) refuse with 409 while it is set. It ends when a container boots on
+the FLAGGED commit, or at the TTL.
+
+- **Cleared on the target commit, not on "any other commit".** Push A then push B
+  overwrites the flag with B; A's container booting must not reopen the window while B's
+  deploy is still coming.
+- **Setting it can fail the push.** A missing token, a 404 or a 500 from the endpoint
+  blocks: a push that goes ahead unflagged is exactly the race this closes. A STOPPED
+  container (502/503/refused) is skipped — nothing is serving, so nothing can accept a
+  run. Constraint: the first push to an environment that does not have the endpoint yet
+  (production, until this reaches `master`) is refused and needs `--no-verify` once.
+- **`/api/health/busy` reports the flag, it does not block on it.** A second push inside
+  the window kills nothing the first would not, and it re-points the flag at its own
+  commit; blocking it would stall every back-to-back push for a deploy's length.
+- **Story creation is NOT refused (yet).** Boot recovery does not resume jobs — it marks
+  every `pending`/`processing` job failed and refunds it — so a story accepted in the
+  window is lost. Refusing a paying user is the owner's call; open.
+- **Residual:** the new container clears the flag at boot, a few seconds before Railway
+  stops routing to the old one; a flag set but whose push then fails blocks Lab starts
+  until its TTL.
+
+**Touched:** `server/lib/deployPending.js` (new), `server/routes/admin/deploy.js` (new),
+`server/routes/admin/index.js`, `server/routes/admin/testlab.js`, `server.js` (boot
+clear, busy field), `scripts/admin/check-push-idle.js`, `tests/unit/deploy-pending.test.ts`
+(new), `tests/unit/push-idle-gate-agreement.test.ts`, `CLAUDE.md`.
+
 ---
 
 ## 2026-08-04 — Blend: `blendShape 'figure-exact'` — the correct paste construction (figure-repair default)

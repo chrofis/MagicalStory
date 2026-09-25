@@ -30,6 +30,7 @@ router.use('/swiss-landmarks', swissLandmarksRouter);  // Swiss pre-indexed land
 router.use('/stripe-webhook-retry', stripeWebhookRetryRouter);  // Buffered Stripe events that need triage
 router.use('/activity', activityRouter);  // Chronological activity feed (Aktivitaet tab + daily email)
 router.use('/testlab', testlabRouter);
+router.use('/deploy-pending', require('./deploy'));  // push gate: Test Lab refuses starts while a deploy is coming
 router.use('/diagnostics', diagnosticsRouter);  // one-page health answer (DB, templates, keys, Anthropic ping, running commit)    // Test Lab: prompt A/B experiments, benchmark scenes, test versions
 router.use('/', analyticsRouter);  // stats, database-size, user-storage, config, token-usage
 router.use('/', databaseRouter);   // cleanup endpoints

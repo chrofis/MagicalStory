@@ -17,6 +17,10 @@ const router = express.Router();
 const { dbQuery, isDatabaseMode, setActiveVersion, offloadJsonbImages, inlineOffloadPrefix } = require('../../services/database');
 const { authenticateToken, requireAdmin } = require('../../middleware/auth');
 const { log } = require('../../utils/logger');
+// Both experiment START routes refuse while a deploy is pending: the gate said
+// idle, but the container restarts within minutes and would kill the run
+// (server/lib/deployPending.js).
+const { refuseWhileDeployPending } = require('../../lib/deployPending');
 
 const requireDb = (req, res, next) => {
   if (!isDatabaseMode()) return res.status(501).json({ error: 'Database mode required' });
@@ -499,7 +503,7 @@ router.delete('/sets/:id/members/:memberId', async (req, res) => {
 // promptOverride is the point of a set: the SAME cases re-run with a new prompt,
 // so the prompt is the only variable. Stored on the experiment like any other
 // override, so the run is reproducible from its row.
-router.post('/sets/:id/run', async (req, res) => {
+router.post('/sets/:id/run', refuseWhileDeployPending, async (req, res) => {
   let claimed = false;
   try {
     if (runningExperiments >= MAX_CONCURRENT_EXPERIMENTS) {
@@ -675,7 +679,7 @@ async function executeExperiment(experimentId, stage, targets, opts) {
 
 // POST /api/admin/testlab/experiments
 // body: { stage, label?, promptOverride?, params?, targets?: [{storyId,pageNumber}], benchmarkIds?: [id] }
-router.post('/experiments', async (req, res) => {
+router.post('/experiments', refuseWhileDeployPending, async (req, res) => {
   let runnerStarted = false;
   try {
     const { stage, label, promptOverride, params, benchmarkIds } = req.body;

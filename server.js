@@ -1436,8 +1436,19 @@ app.get('/api/health/busy', async (req, res) => {
   try {
     const { busyReport } = require('./server/lib/idleShutdown');
     const report = await busyReport();
+    // Reported, not a busy reason: a second push during the build window does
+    // not kill anything the first one would not, and it re-sets the flag onto
+    // its own commit (server/lib/deployPending.js). Blocking it would stall
+    // every back-to-back push for the length of a deploy.
+    let deployPending;
+    try {
+      deployPending = await require('./server/lib/deployPending').getDeployPending();
+    } catch (err) {
+      deployPending = { error: err.message };
+    }
     res.json({
       ...report,
+      deployPending,
       env: process.env.RAILWAY_ENVIRONMENT_NAME || 'unknown',
       commit: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 8) || null,
     });
@@ -2610,6 +2621,12 @@ initialize().then(() => {
   // and 1163). Fire-and-forget; the reaper never throws.
   require('./server/lib/testlabReaper')
     .reapOrphanedExperiments('server restarted mid-run (reaped at boot)');
+
+  // The push gate set a deploy-pending flag so the Test Lab refused new runs
+  // while Railway built this container. This container booting on the flagged
+  // commit is the end of that window. Never throws; the flag's TTL backs it up.
+  require('./server/lib/deployPending')
+    .clearDeployPendingAtBoot(process.env.RAILWAY_GIT_COMMIT_SHA || null);
 
   // Staging-only: stop the container once it's provably idle so we stop paying
   // for ~1.2 GB of resident RAM per minute between test runs. Triple-gated and
