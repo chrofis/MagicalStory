@@ -625,7 +625,12 @@ function centralFigureAbsentThirds(rows, centralPages, centralFigure) {
  *   (`parsePlanCheckCentralPages`); null = the check gave none
  * @returns {{findings: Array, lines: string[], stats: Object, cast: Object|null, skipped?: string}}
  */
-function runPlanCounters({ pages = [], commissionedNames = [], listedNames = null, placeNames = [], maxCharactersPerScene = 3, declaredInvented = null, inventedAllowance = null, roster = null, peoplelessPick = null, centralFigure = null, centralPages = null } = {}) {
+// `mainName`: the book's focus character (promptBuilders.pickMainCharacters —
+//   the ONE place that decides it). MAIN_UNDER_HALF runs only when it is given.
+// `castTable`: the CAST block the planner wrote (castCoverage.parsePlanCastBlock);
+//   `actions`: the check's Q12 ACTION lines. CAST_PROMISE_BROKEN runs only
+//   when a table is given.
+function runPlanCounters({ pages = [], commissionedNames = [], listedNames = null, placeNames = [], maxCharactersPerScene = 3, declaredInvented = null, inventedAllowance = null, roster = null, peoplelessPick = null, centralFigure = null, centralPages = null, mainName = null, castTable = null, actions = null } = {}) {
   const findings = [];
   const add = (code, pageList, detail) => findings.push({ code, pages: pageList, detail });
 
@@ -845,12 +850,17 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
   }
 
   // 5. The main character carries the book: present in at least half the images.
-  const mainName = cast.commissioned[0] || null;
-  if (mainName) {
-    const mainPages = rows.filter(r => r.present.includes(mainName)).map(r => r.pageNumber);
+  //    WHO the main character is comes from the caller (pickMainCharacters),
+  //    never from the order of the character list: until 2026-09-25 this read
+  //    `cast.commissioned[0]`, and on staging job_1789207854566_l43qgl34w —
+  //    whose declared main is the fourth child on the list — it held the first
+  //    child to half the book (Lab #1496: "Sarah is in frame on 3/16 pages").
+  const main = mainName ? (namesIn(mainName, cast.commissioned, cast.aliases)[0] || null) : null;
+  if (main) {
+    const mainPages = rows.filter(r => r.present.includes(main)).map(r => r.pageNumber);
     if (pageCount > 0 && mainPages.length * 2 < pageCount) {
       add('MAIN_UNDER_HALF', mainPages,
-        `${mainName} is in frame on ${mainPages.length}/${pageCount} pages — the main character belongs in at least half`);
+        `${main} is in frame on ${mainPages.length}/${pageCount} pages — the main character belongs in at least half`);
     }
   }
 
@@ -1021,6 +1031,13 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
     }
   }
 
+  // 8a. THE CAST TABLE'S PROMISES (owner, 2026-09-25). The planner wrote, before
+  //     its plan lines, each character's deed page and the pages they are in
+  //     frame on, and the last page's cast (castCoverage.parsePlanCastBlock).
+  //     Each plan line that breaks a promise is a finding naming the page.
+  const castTableResult = castTable ? castTablePromises({ rows, castTable, actions, cast, focalEach: !!(coverageRule && coverageRule.focalEach) }) : null;
+  if (castTableResult) for (const b of castTableResult.broken) add('CAST_PROMISE_BROKEN', [b.page], b.detail);
+
   // 8b. THE CENTRAL FIGURE IN EACH THIRD (owner, 2026-09-24, d4). The arc's
   //     critique used to certify "the central figure acts in every third"
   //     itself; the arc now only NAMES the figure in its STORY LOGIC
@@ -1072,6 +1089,9 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
       focalPages: focal,
       coveragePages: coverage,
       castCoverage: coverageRule,
+      mainCharacter: main,
+      // The table's promises as counted: null when no table was given.
+      castTable: castTableResult ? { kept: castTableResult.kept, broken: castTableResult.broken.length, unanswered: castTableResult.unanswered } : null,
       // Only when the arc named a central figure: the pages the check said
       // show it, or `unanswered` when it gave no CENTRAL line.
       ...(Array.isArray(centralFigure) && centralFigure.length
@@ -1079,6 +1099,82 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
         : {}),
     },
   };
+}
+
+/**
+ * Hold each plan line to the CAST block the planner wrote before it.
+ *
+ *   deed page   the check's ACTION line for the character names that page
+ *               (Q12 reads the plan lines, never the table); and, when the book
+ *               has room for a focal page each, the page holds the character
+ *               alone or with one companion — the planner's own definition.
+ *   also on     the character is in frame on each page the line promises.
+ *   ending      everyone the ending line names, that this book's cast knows,
+ *               is in frame on that page.
+ *
+ * A character with no ACTION line leaves the deed half uncounted and says so
+ * (`unanswered`); it is never read as kept or broken.
+ *
+ * @returns {{broken: Array<{page:number, name:string|null, promise:string, detail:string}>, kept:number, unanswered:string[]}}
+ */
+function castTablePromises({ rows, castTable, actions, cast, focalEach }) {
+  const byPage = new Map(rows.map(r => [Number(r.pageNumber), r]));
+  const acts = Array.isArray(actions) ? actions : [];
+  const broken = [];
+  const unanswered = [];
+  let kept = 0;
+  const canon = n => namesIn(n, cast.all, cast.aliases)[0] || null;
+  const actionOf = (name) => {
+    const forms = new Set([name, ...(cast.aliases[name] || [])].map(f => String(f).toLowerCase()));
+    return acts.find(a => forms.has(String(a.key || '').trim().toLowerCase())) || null;
+  };
+  const whoseAction = (page, except) => acts
+    .filter(a => Number(a.page) === page)
+    .map(a => canon(String(a.key || '')) || String(a.key || '').trim())
+    .filter(n => n && n !== except);
+  for (const entry of castTable.characters || []) {
+    const name = canon(entry.name);
+    if (!name) { unanswered.push(entry.name); continue; }
+    const deed = Number(entry.deedPage);
+    const row = byPage.get(deed);
+    const act = actionOf(name);
+    if (!row) {
+      broken.push({ page: deed, name, promise: 'deed', detail: `the CAST block promises ${name} page ${deed} as their deed page, but the book has no page ${deed}` });
+    } else if (!act) {
+      unanswered.push(name);
+    } else if (Number(act.page) !== deed) {
+      const others = whoseAction(deed, name);
+      const instead = others.length ? `page ${deed}'s instant is ${others.join(' and ')}'s` : `page ${deed}'s instant is not ${name}'s own action`;
+      const where = act.page == null ? 'no page stages it' : `the check finds it on page ${act.page}`;
+      broken.push({ page: deed, name, promise: 'deed', detail: `the CAST block promises ${name} page ${deed} as their deed page, but ${instead} (${where})` });
+    } else if (focalEach && (!row.present.includes(name) || row.present.length > 2)) {
+      broken.push({ page: deed, name, promise: 'focal', detail: `the CAST block promises page ${deed} as ${name}'s deed page, alone or with one companion, but it holds ${row.present.join(', ') || 'nobody'}` });
+    } else {
+      kept++;
+    }
+    for (const p of entry.alsoOn || []) {
+      const r = byPage.get(Number(p));
+      if (r && r.present.includes(name)) { kept++; continue; }
+      broken.push({
+        page: Number(p), name, promise: 'also',
+        detail: r
+          ? `the CAST block promises ${name} on page ${p}, but page ${p}'s who column does not carry ${name}`
+          : `the CAST block promises ${name} on page ${p}, but the book has no page ${p}`,
+      });
+    }
+  }
+  const end = castTable.ending;
+  if (end) {
+    const r = byPage.get(Number(end.page));
+    const wanted = [...new Set((end.names || []).map(canon).filter(Boolean))];
+    const missing = r ? wanted.filter(n => !r.present.includes(n)) : wanted;
+    if (missing.length) {
+      broken.push({ page: Number(end.page), name: null, promise: 'ending', detail: `the CAST block keeps ${wanted.join(', ')} together on page ${end.page}, but page ${end.page}'s who column leaves out ${missing.join(', ')}` });
+    } else if (wanted.length) {
+      kept++;
+    }
+  }
+  return { broken, kept, unanswered };
 }
 
 /** The who-in-frame column of a plan line; the whole line when it has no segments. */
@@ -1235,6 +1331,9 @@ const REPLAN_FINDING_DIRECTION = new Map([
   ['INVENTED_DOMINANT_CONSECUTIVE', 'more'],
   // The central figure missing from a third is answered by putting it in frame.
   ['CENTRAL_FIGURE_ABSENT_THIRD', 'more'],
+  // A plan line that breaks the CAST block's promise is answered by casting the
+  // promised character in (2026-09-25).
+  ['CAST_PROMISE_BROKEN', 'more'],
   ['CAST_OVER_CEILING', 'fewer'],
   ['NO_SOLO_PAGE', 'fewer'],
   ['NO_PEOPLELESS_PAGE', 'fewer'],

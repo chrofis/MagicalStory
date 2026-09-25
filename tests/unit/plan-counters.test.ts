@@ -243,7 +243,7 @@ describe('runPlanCounters', () => {
       page(3, line('wide', 'Ben')),
       page(4, line('wide', 'Cara')),
     ];
-    const r = runPlanCounters({ roster: rosterFor(pages), pages, commissionedNames: CAST });
+    const r = runPlanCounters({ roster: rosterFor(pages), pages, commissionedNames: CAST, mainName: 'Ana' });
     expect(r.findings.map((f: any) => f.code)).toContain('MAIN_UNDER_HALF');
   });
 
@@ -616,7 +616,7 @@ describe('the roster decides, not the shape of the sentence (replaces the acts-l
     const cast = resolveCast(REAL, COMMISSIONED, places, rosterFor(REAL, ['Grossmünster', 'Sturmfeder', 'Krummhafen']));
     expect(cast.invented).toEqual(['Malva Grimm']);
     expect(cast.places).toEqual(['Grossmünster', 'Sturmfeder', 'Krummhafen']);
-    const res = runPlanCounters({ roster: rosterFor(REAL, ['Grossmünster', 'Sturmfeder', 'Krummhafen']), pages: REAL, commissionedNames: COMMISSIONED, placeNames: places, declaredInvented: ['Malva Grimm'] });
+    const res = runPlanCounters({ roster: rosterFor(REAL, ['Grossmünster', 'Sturmfeder', 'Krummhafen']), pages: REAL, commissionedNames: COMMISSIONED, placeNames: places, declaredInvented: ['Malva Grimm'], mainName: 'Fiona' });
     // SHOT_NO_CAMERA_POSITION joined 2026-09-19: every one of this book's
     // eighteen plan lines declares a camera DISTANCE, so the whole book is shot
     // at eye level. That is true of every story stored before the vocabulary
@@ -627,10 +627,13 @@ describe('the roster decides, not the shape of the sentence (replaces the acts-l
     // position at all. Its 2 ultra-wides and 4 close-ups already clear their
     // floors, which is why neither count appears below. It has no aerial either,
     // and since 2026-09-23 that is not a finding: the aerial is allowed, never owed.
+    // MAIN_UNDER_HALF left this list on 2026-09-25: it used to hold the FIRST
+    // child on the list (Sarah) to half the book, while this story's declared
+    // main (stories.data.mainCharacters) is Fiona, who is on more than half.
     expect(res.findings.map((f: any) => f.code)).toEqual([
       'SHOT_MEDIUM_WIDE_EXCESS', 'SHOT_OTS_COUNT',
       'SHOT_NO_CAMERA_POSITION',
-      'MAIN_UNDER_HALF', 'NO_COMMISSIONED_ON_PAGE', 'UNDER_COVERED_CHARACTER', 'UNDER_COVERED_CHARACTER', 'CONSECUTIVE_SAME_SHOT_CAST',
+      'NO_COMMISSIONED_ON_PAGE', 'UNDER_COVERED_CHARACTER', 'UNDER_COVERED_CHARACTER', 'CONSECUTIVE_SAME_SHOT_CAST',
     ]);
     // Five children in sixteen pages owe 3 pages in frame each since 2026-09-23
     // (castCoverage, owner: "ideally each one is on 3-4 images"); the floor was 2.

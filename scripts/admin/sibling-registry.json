@@ -377,6 +377,23 @@
       "severity": "block"
     },
     {
+      "id": "plan-cast-table-prod-vs-lab",
+      "axis": "Test Lab stage vs production call site",
+      "reason": "The planner's CAST block (owner, 2026-09-25, Lab #1495/#1496) is read off the first division by castCoverage.parsePlanCastBlock and threaded into the plan check, the counters (CAST_PROMISE_BROKEN, with the check's ACTION lines and the focus character from pickMainCharacters) and the re-plan — in production by beatsPipeline.js and in the Lab's beats_replan stage by testlab.js runBeatsReplanStage. A table threaded on one side only makes the Lab measure a round production never runs.",
+      "members": [
+        "server/lib/beatsPipeline.js",
+        "server/lib/testlab.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "parsePlanCastBlock",
+          "castTable",
+          "pickMainCharacters"
+        ]
+      }
+    },
+    {
       "id": "entity-grid-generator-vs-critic",
       "axis": "generator-vs-critic",
       "reason": "A page can declare one of a character's garments OFF. image-generation.txt states the removal to the illustrator and wardrobeVariants.js decides which reference sheet that page is drawn from; entity-consistency-check.txt is the grid judge that then reads the result. Before the wardrobe-state split (2026-09-19) the judge was never told a state existed, so it read the garment off the reference cell and reported it missing from every page that correctly did without it. A rule about what a removal means belongs on both sides: the generator half says take it off, the critic half says its absence is not a finding.",

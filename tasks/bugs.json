@@ -2067,6 +2067,18 @@
       "fixedAt": "2026-09-25",
       "fixedIn": "2d727d23b",
       "fix": "The plan check (handed the name in Q12) answers a CENTRAL line with the pages whose picture shows the figure; parsePlanCheckCentralPages reads it and the counter counts on it. The name-vs-roster matcher is deleted; a missing CENTRAL line files nothing and logs an error. Test: the #1488 shape (German name, English roster) returned three thirds before and none now."
+    },
+    {
+      "id": "main-under-half-first-listed",
+      "title": "MAIN_UNDER_HALF held the first child on the character list to half the book instead of the story's declared main character",
+      "reportedAt": "2026-09-25",
+      "source": "Stored evidence: staging testlab_experiments #1496 (beats_replan on job_1789207854566_l43qgl34w) filed \"PLAN[MAIN_UNDER_HALF] Sarah is in frame on 3/16 pages\" in the check and the recheck. stories.data.mainCharacters for that story is [1787422997245] = Fiona, the fourth of five characters; Sarah is first on the list.",
+      "rootCause": "planCounters.runPlanCounters took the main character as cast.commissioned[0], the first name of the commission list, ignoring the declared mainCharacters that pickMainCharacters reads everywhere else.",
+      "impact": "A must-fix finding against the wrong child on every story whose declared main is not first on the list; the re-plan then casts that child onto more pages.",
+      "status": "fixed",
+      "fixedAt": "2026-09-25",
+      "fixedIn": "the feat(plan) CAST-table commit of 2026-09-25 (hash filled in the follow-up chore commit)",
+      "fix": "runPlanCounters takes mainName; beatsPipeline and the Lab beats_replan stage pass pickMainCharacters(inputData).focus.name. No mainName, no MAIN_UNDER_HALF. Test: plan-cast-table.test.ts (Fiona declared fourth), and the csjcyp1q9 real-plan test no longer expects MAIN_UNDER_HALF for Sarah."
     }
   ]
 }

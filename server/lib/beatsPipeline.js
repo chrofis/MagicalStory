@@ -1,7 +1,7 @@
 
 
 const { runPlanCounters, collectPlaceNames, castLostByReplan, reviewPlanChanges, refreshPlanShot } = require('./planCounters');
-const { commissionedCast, castCoverage } = require('./castCoverage');
+const { commissionedCast, castCoverage, parsePlanCastBlock } = require('./castCoverage');
 const { lookupByName } = require('./castResolver');
 const { textZoneRulesActive } = require('../config/runtime');
 const { commissionedChildBand, applySecondaryAgeBand } = require('./inventedAgeBand');
@@ -123,6 +123,7 @@ const {
   buildClothingReviewPrompt,
   parseClothingReview,
   parsePlanResponse,
+  pickMainCharacters,
   buildSceneExpansionPrompt,
   buildSceneExpansionAllPrompt,
   buildSceneReviewPrompt,
@@ -1411,6 +1412,27 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   gl.info('beats_plan', `Page plan: ${plan.pages.length}/${pageCount} pages by ${planRes.modelId || planModel} (${(meta.timings.planMs / 1000).toFixed(1)}s)`, null, {
     pages: plan.pages.length, model: planRes.modelId || planModel,
   });
+  // THE CAST TABLE (owner, 2026-09-25): the promises the planner wrote before
+  // its plan lines — each character's deed page and the pages they are in
+  // frame on, and the last page's cast. The counters hold every plan line to
+  // it (CAST_PROMISE_BROKEN) in the check and in each recheck, and a re-plan is
+  // shown it and keeps it. A reply without a readable table is an ERROR, never
+  // a default: the table's counter does not run, and the run says so.
+  let castTable = null;
+  let castTableError = null;
+  if ((inputData?.characters || []).some(c => c && c.name)) {
+    try {
+      castTable = parsePlanCastBlock(plannerReply, { listed: commissionedCast(inputData).listed });
+      log.info(`📋 [BEATS] CAST block: ${castTable.characters.map(c => `${c.name} deed p${c.deedPage} + ${c.alsoOn.join(',') || '-'}`).join('; ')}; ending p${castTable.ending.page}`);
+    } catch (err) {
+      castTableError = err.message;
+      log.error(`❌ [BEATS] CAST block unreadable (${err.message}) — no plan line is held to a cast table this run`);
+      gl.error('beats_cast_table_unreadable', `The planner's CAST block could not be read: ${err.message}. CAST_PROMISE_BROKEN does not run this run.`, null, { error: err.message });
+    }
+  }
+  // The book's focus character, from the one place that decides it — never
+  // the first name on the character list (MAIN_UNDER_HALF, 2026-09-25).
+  const mainName = pickMainCharacters(inputData).focus?.name || null;
 
   // ── Step 2: THE PLAN CHECK — counters, one cheap call, ONE re-plan ────────
   //
@@ -1511,7 +1533,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     try {
       // No counter findings ride in: they do not exist yet. See the builder's
       // header — the counters read this call's ROSTER, so they run below.
-      prompt = buildPlanCheckPrompt(inputData, pages, approvedArc, planText, { arcHints, centralFigure: arcCentralFigure });
+      prompt = buildPlanCheckPrompt(inputData, pages, approvedArc, planText, { arcHints, centralFigure: arcCentralFigure, castTable });
       if (!prompt) throw new Error('plan-check template unavailable');
       const res = await textModels.callTextModelStreaming(prompt, null, onChunk, planCheckModel, {
         usageLabel: label,
@@ -1545,7 +1567,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       log.error(`❌ [BEATS] Plan check (${label}) failed (${err.message}) — NO ROSTER, so the entire plan-counter layer is skipped this round`);
       gl.error(`${label}_failed`, `Plan check failed: ${err.message} — no roster, so every plan counter (cast, invented cast, shot variety, focal pages) is skipped this round`, null, { error: err.message, model: planCheckModel });
     }
-    const counters = runPlanCounters({ pages, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit, roster, peoplelessPick, centralFigure: arcCentralFigure, centralPages });
+    const counters = runPlanCounters({ pages, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit, roster, peoplelessPick, centralFigure: arcCentralFigure, centralPages, mainName, castTable, actions });
     // The central-figure counter counts on the CENTRAL line alone; a check
     // that named no pages for a named figure leaves it uncounted — loudly.
     if (counters.stats?.centralFigure?.unanswered) {
@@ -1664,7 +1686,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
           finalArc: approvedArc,
           arcHints,
           centralFigure: arcCentralFigure,
-          replan: buildReplanSection(pagePlan, pendingCheck.findings, { pageCount: beats.length, keep, refused: lastRefusals, castFloor: coverageRule ? coverageRule.appearances.min : null }),
+          castTable,
+          replan: buildReplanSection(pagePlan, pendingCheck.findings, { pageCount: beats.length, keep, refused: lastRefusals, castFloor: coverageRule ? coverageRule.appearances.min : null, castTable }),
         });
         if (!replanPrompt) throw new Error('story-beats template unavailable');
         const rpRes = await textModels.callTextModelStreaming(replanPrompt, null, onChunk, planModel, { usageLabel: 'beats_replan' });
@@ -2034,6 +2057,10 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       counterStats: check1.counters.stats,
       cast: check1.counters.cast,
       modelFindings: check1.modelFindings,
+      // The CAST block the first division wrote, parsed (2026-09-25); null
+      // with `castTableError` when the reply carried none that could be read.
+      castTable,
+      castTableError,
       changedPages: shipped.changedPages,
       pages: shipped.changedPages.map(n => ({
         pageNumber: n,

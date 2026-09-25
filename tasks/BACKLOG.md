@@ -66,6 +66,10 @@ Last full sweep: **2026-09-06**.
 - [ ] Every child acts, in the arc (variant B made the default 2026-09-25, Lab #1490): BUILT on staging
       (not pushed). Open: validation on the next full story (`tasks/verify.json` `arc-every-child-acts`)
       → `docs/decisions.md` "2026-09-25 — Every child acts, in the arc"
+- [ ] Planner CAST block (deed page + floor pages per child, the last page's cast) before the plan lines,
+      held by counter CAST_PROMISE_BROKEN; MAIN_UNDER_HALF now reads the declared main — BUILT 2026-09-25 on
+      staging (not pushed). Open: paid beats_replan reruns of #1495/#1496, `tasks/verify.json` `planner-cast-table`
+      → `docs/decisions.md` "2026-09-25 — The planner writes a CAST block before its plan lines"
 - [x] Stage 2 (page plan) owes what the arc no longer carries — BUILT 2026-09-25 on staging (not pushed):
       the exciting start and the happy ending are shared constants (EXCITING_START_DEF, HAPPY_ENDING_DEF,
       plan-check Q15/Q16, must-fix); a cast finding carries its fix, the review holds the character list to

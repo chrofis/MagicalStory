@@ -609,7 +609,8 @@ describe('the re-plan asks for only the pages it changes', () => {
 
   it('a first plan still demands every page through the page count', () => {
     const p = firstPrompt();
-    expect(p).toMatch(/One line per page, through page 4\./);
+    // Since 2026-09-25 the CAST block precedes the plan lines (castCoverage.castTableFormat).
+    expect(p).toMatch(/The CAST block, then one line per page, through page 4\./);
     expect(p).not.toMatch(/named under RE-DIVIDE/);
     expect(unfilled(p)).toEqual([]);
   });

@@ -60928,3 +60928,50 @@ planner now answers the cast findings needs a paid beats_replan run (verify `sta
 server/lib/beatsPipeline.js, server/lib/testlab.js, prompts/story-beats.txt, prompts/plan-check.txt,
 scripts/admin/sibling-registry.json, docs/prompt-inventory.md, tests/unit/stage2-cast-coverage.test.ts,
 tests/unit/plan-check-question-count.test.ts, tests/unit/plan-shared-definitions.test.ts.
+
+## 2026-09-25 — The planner writes a CAST block before its plan lines; the counters hold every line to it
+
+**Context.** Lab #1495 (dragon, arc from #1490, staging job_1790277448294_5herh01j7, 18 pages, four boys, floor 3)
+and #1496 (Fiona, arc from #1492, staging job_1789207854566_l43qgl34w, 16 pages, five children, floor 3), stage
+beats_replan. The first division missed the appearance floor (Kiaan 2, Lorena 2 of 3), gave Kiaan no focal page, and
+on Fiona put only Fiona and the guard on the last page although HAPPY_ENDING_DEF says the whole group. The re-plan
+repaired part of it (#1495 recheck: Kiaan 3 pages, still no focal page; #1496: Lorena still 2, p16 unchanged).
+The floor reached the planner as a sentence; nothing made it count before dividing.
+
+**Decision.**
+- Planner question 7 (`{CAST_TABLE}`, `castCoverage.castTableSpec`) and the output format (`{CAST_FORMAT}`,
+  `castTableFormat`): before the plan lines, a `---CAST---` block with one line per commissioned character —
+  `<name> — deed page <N>: <their own action>, <alone, or with whom> — also on pages <N>, <N>` — and
+  `Ending page <last>: <everyone the story keeps together>`. The number of "also on" pages is the castCoverage
+  floor minus one, filled from code; the ending page number is the page count.
+- `parsePlanCastBlock` reads it and throws on a missing block, a missing ending line or a character without a line —
+  no default. Production records the error (`beats_cast_table_unreadable`, `beatsReviewReport.castTableError`) and
+  the table counter does not run; the Lab stage fails.
+- Counter `CAST_PROMISE_BROKEN` (planCounters `castTablePromises`), must-fix, direction 'more', counts toward
+  convergence: a deed page whose Q12 ACTION line for that character names another page ("the CAST block promises
+  Kiaan page 12 as their deed page, but page 12's instant is Max's"), a deed page that is not focal when the book has
+  room for one each, a promised page whose roster lacks the character, an ending page missing someone the block
+  keeps together. A character the check gave no ACTION line is `unanswered`, never kept or broken. Runs in the first
+  check and every recheck against the first division's table.
+- The re-plan is shown the block under RE-DIVIDE (`## YOUR CAST BLOCK`) and told it stands; it writes none. The plan
+  check reads it as `# THE CAST BLOCK` and answers from the plan lines, never from it — the ACTION line stays an
+  independent reading, so the counter compares two sources, not one.
+- Stored: `beatsReviewReport.castTable` / `castTableError`; the Lab puts `castTable` (or `castTableNote` for a stored
+  division, which predates the block) in `report`.
+- **MAIN_UNDER_HALF held the wrong child** (bug `main-under-half-first-listed`). It read `cast.commissioned[0]`, the
+  first name on the character list; #1496's story declares Fiona (`mainCharacters` = her id, fourth on the list), and
+  the counter filed "Sarah is in frame on 3/16 pages". It now takes `mainName` from `pickMainCharacters().focus`, the
+  one place that decides the focus character; without a `mainName` the counter does not run. The dragon story's focus
+  stays Levin (all four are declared mains; the oldest is the focus).
+- New sibling set `plan-cast-table-prod-vs-lab` (beatsPipeline.js / testlab.js; anchors `parsePlanCastBlock`,
+  `castTable`, `pickMainCharacters`).
+
+**Evidence (rung 1, free).** The planner prompt rebuilt for #1495's inputs (story row + #1490's retell arc) carries
+question 7 ("… and 2 more pages they are in frame on. Then page 18, the last, …") and one `---CAST---` format block;
+the same for #1496 (page 16). The #1496 roster puts Fiona on 9 of 16 pages, so the fixed MAIN_UNDER_HALF files
+nothing there. Whether the planner keeps its own table needs a paid beats_replan run (verify `planner-cast-table`).
+
+**Touched:** server/lib/castCoverage.js, server/lib/planCounters.js, server/lib/promptBuilders.js,
+server/lib/beatsPipeline.js, server/lib/testlab.js, prompts/story-beats.txt, prompts/plan-check.txt,
+scripts/admin/sibling-registry.json, docs/prompt-inventory.md, tests/unit/plan-cast-table.test.ts,
+tests/unit/plan-counters.test.ts, tests/unit/plan-collective-cast.test.ts, tests/unit/built-prompt-values.test.ts.

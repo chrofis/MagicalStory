@@ -10087,8 +10087,9 @@ async function runBeatsReplanStage(target, { params = {} }) {
     buildBeatsPrompt, buildPlanCheckPrompt, parsePlanCheck, parsePlanCheckRoster, parsePlanCheckCentralPages,
     parsePlanCheckObstacles, buildReplanSection, getHistoricalLocations, getHistoricalObjects,
     parsePlanCheckWanted, parsePlanCheckActions, replanKeepPages, replanRoundRegressed,
-    parseStoryLogic, parsePlanResponse, arcInventedAllowance,
+    parseStoryLogic, parsePlanResponse, arcInventedAllowance, pickMainCharacters,
   } = require('./promptBuilders');
+  const { parsePlanCastBlock, commissionedCast } = require('./castCoverage');
   const { parseBeats } = require('./storyHelpers');
   const { runPlanCounters, collectPlaceNames } = require('./planCounters');
   const { callTextModelStreaming } = require('./textModels');
@@ -10110,6 +10111,12 @@ async function runBeatsReplanStage(target, { params = {} }) {
   let firstPlan = null;
   let planRes = null;
   let planMs = 0;
+  // THE CAST TABLE (2026-09-25), as beatsPipeline reads it off the first
+  // division. A division this stage plans must carry one — the parse throws
+  // and the run fails loudly otherwise. A STORED division predates the table
+  // and is replayed without one, which the report states.
+  let castTable = null;
+  let castTableNote = null;
   if (params.arcFromExperiment != null && params.arcFromExperiment !== '') {
     const { dbQuery } = require('../services/database');
     const expId = parseInt(params.arcFromExperiment, 10);
@@ -10137,6 +10144,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
     standing = parsed.pages.map(pg => ({ pageNumber: Number(pg.pageNumber), planLine: pg.planLine }));
     pagePlan = parsed.pagePlan;
     pageCount = standing.length;
+    castTable = parsePlanCastBlock(planRes.text || '', { listed: commissionedCast(storyData).listed });
     firstPlan = { prompt: planPrompt, rawResponse: (planRes.text || '').slice(0, 40000), missingPages: parsed.missing };
   } else {
     // ROUND ONE'S DIVISION, FROZEN. `briefsIn` is written from `plan.pages` — the
@@ -10159,7 +10167,10 @@ async function runBeatsReplanStage(target, { params = {} }) {
     approvedArc = resolveReplayArc(storyData, { parseBeats });
     arcHints = resolveReplayArcHints(storyData);
     centralFigure = resolveReplayCentralFigure(storyData);
+    castTableNote = 'the stored division predates the CAST block; no plan line is held to one';
   }
+  // The focus character, as production passes it (MAIN_UNDER_HALF, 2026-09-25).
+  const mainName = pickMainCharacters(storyData).focus?.name || null;
 
   // Production's counter inputs. On the arcFromExperiment path the arc's STORY
   // LOGIC supplies what beatsPipeline takes from the committed arc — the
@@ -10183,7 +10194,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
   // runCheck: the model call, its roster, the counters on that roster, and the
   // findings structured the way the re-plan and the round guard read them.
   const runCheckOn = async (pages, planText, usageLabel) => {
-    const prompt = buildPlanCheckPrompt(storyData, pages, approvedArc, planText, { arcHints, centralFigure, mayAddDeeds });
+    const prompt = buildPlanCheckPrompt(storyData, pages, approvedArc, planText, { arcHints, centralFigure, mayAddDeeds, castTable });
     if (!prompt) throw new Error('plan-check template unavailable');
     const res = await callTextModelStreaming(prompt, null, null, checkModel, {
       usageLabel,
@@ -10195,6 +10206,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
     const counters = runPlanCounters({
       pages, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, roster, centralFigure,
       centralPages: parsePlanCheckCentralPages(res.text || ''), ...inventedArgs,
+      mainName, castTable, actions: parsePlanCheckActions(res.text || ''),
     });
     return {
       prompt, res, roster, counters,
@@ -10221,7 +10233,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
     aliases: (counters.cast && counters.cast.aliases) || {},
   });
   // Echoed so the row says which prompt variant it measured.
-  const variant = { plannerMayAddDeeds: mayAddDeeds, arcSource: expArc ? expArc.source : 'stored story arc' };
+  const variant = { plannerMayAddDeeds: mayAddDeeds, arcSource: expArc ? expArc.source : 'stored story arc', castTable, ...(castTableNote ? { castTableNote } : {}) };
   const firstPlanOut = firstPlan && {
     ...firstPlan,
     modelId: planRes.modelId || planModel,
@@ -10267,8 +10279,8 @@ async function runBeatsReplanStage(target, { params = {} }) {
     focalPages: (counters.stats && counters.stats.focalPages) || {},
   });
   const coverageRule = require('./castCoverage').castCoverage({ pageCount, castCount: commission.listed.length });
-  const replanSection = buildReplanSection(pagePlan, findings, { pageCount, keep, castFloor: coverageRule ? coverageRule.appearances.min : null });
-  const replanPrompt = buildBeatsPrompt(storyData, pageCount, { finalArc: approvedArc, arcHints, centralFigure, replan: replanSection, mayAddDeeds });
+  const replanSection = buildReplanSection(pagePlan, findings, { pageCount, keep, castFloor: coverageRule ? coverageRule.appearances.min : null, castTable });
+  const replanPrompt = buildBeatsPrompt(storyData, pageCount, { finalArc: approvedArc, arcHints, centralFigure, replan: replanSection, mayAddDeeds, castTable });
   if (!replanPrompt) throw new Error('story-beats template unavailable');
   t = Date.now();
   const rpRes = await callTextModelStreaming(replanPrompt, null, null, planModel, { usageLabel: 'testlab_beats_replan' });
@@ -10359,7 +10371,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
 // The first check's findings that answer "does every commissioned character
 // get a page": the coverage counters here, and every plan-check Q12 (ACTION)
 // finding by its check number.
-const CAST_FINDING_CODES = new Set(['UNDER_COVERED_CHARACTER', 'NO_FOCAL_PAGE', 'CENTRAL_FIGURE_ABSENT_THIRD', 'NO_COMMISSIONED_ON_PAGE']);
+const CAST_FINDING_CODES = new Set(['UNDER_COVERED_CHARACTER', 'NO_FOCAL_PAGE', 'CENTRAL_FIGURE_ABSENT_THIRD', 'NO_COMMISSIONED_ON_PAGE', 'CAST_PROMISE_BROKEN']);
 
 /**
  * Per commissioned character (the character list), what the plan check's

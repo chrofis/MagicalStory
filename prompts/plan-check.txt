@@ -14,6 +14,8 @@ One line per page: shot — who is in frame — the instant the picture shows �
 
 {PAGE_PLAN}
 
+{CAST_TABLE_SECTION}
+
 # THE ROSTER
 
 Before the checks, read each page's who column and say who is in frame. A PERSON is a human or a named animal that acts in the story; a THING is everything else the column names — a prop, a vehicle, a building, a place, a river. A name carried by a possessive or an article ("his lit lamp", "their bikes", "the stone railing") is a thing however the sentence is shaped, and a commissioned name is always a person.

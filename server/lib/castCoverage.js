@@ -180,7 +180,137 @@ function commissionedCast(inputData, suppliedNames = []) {
   return { listed, supplied, all: [...listed, ...supplied] };
 }
 
+/**
+ * THE CAST TABLE (owner, 2026-09-25, on Lab #1495/#1496). The planner writes,
+ * BEFORE its plan lines, one promise per commissioned character — the page
+ * whose instant is their own action, and the other pages they are in frame on —
+ * and one line for the last page's cast. The plan lines then keep it.
+ *
+ * Measured on #1495 (dragon, 18 pages, four boys) and #1496 (Fiona, 16 pages,
+ * five children): the first division left Kiaan on 2 pages with no focal page,
+ * Lorena on 2 of 3, and Fiona's last page held Fiona and the guard while the
+ * story keeps all five together; the re-plan repaired part of it. The floor was
+ * stated as a sentence the planner read and did not count against. A table it
+ * fills in is a count it makes before it divides, and a promise the counters can
+ * hold each plan line to (planCounters CAST_PROMISE_BROKEN).
+ *
+ * The number of "also on" pages is computed here, from the same castCoverage()
+ * floor the counters measure — never hand-written into the prompt.
+ *
+ * One wording, three readers: the planner's question (castTableSpec), its
+ * output format (castTableFormat), and the parser (parsePlanCastBlock).
+ */
+const CAST_TABLE_HEADER = '---CAST---';
+
+/** The "also on" page count the table asks for: the floor, minus the deed page. */
+function castTableAlsoCount(cov) {
+  return cov ? Math.max(0, cov.appearances.min - 1) : 0;
+}
+
+/** The deed line's shape, as the planner is shown it. */
+function castTableDeedLine(cov) {
+  const also = castTableAlsoCount(cov);
+  const focal = cov && cov.focalEach ? ', <alone, or with whom>' : '';
+  const alsoPart = also > 0 ? ` — also on pages ${Array.from({ length: also }, () => '<N>').join(', ')}` : '';
+  return `<name> — deed page <N>: <their own action from the story>${focal}${alsoPart}`;
+}
+
+/**
+ * The planner's question (story-beats.txt {CAST_TABLE}, first division only).
+ * @param {ReturnType<typeof castCoverage>} cov
+ * @param {number} pageCount
+ * @returns {string} '' when the book has no commissioned cast
+ */
+function castTableSpec(cov, pageCount, { replan = false, table = null } = {}) {
+  if (!cov) return 'The book has no commissioned characters, so it has no CAST block.';
+  // A re-plan keeps the table the first division wrote (it is shown under
+  // RE-DIVIDE by buildReplanSection) and writes none of its own.
+  if (replan) {
+    return table
+      ? 'Your CAST block, under RE-DIVIDE, stands: every page you return keeps what it promises, and the block itself is not rewritten.'
+      : 'The division that stands has no CAST block; answer the findings and write none.';
+  }
+  const also = castTableAlsoCount(cov);
+  const where = cov.focalEach
+    ? 'the page whose instant is their own action from the story, alone or with one companion'
+    : 'the page whose instant is their own action from the story, which they may share with the group';
+  const more = also > 0 ? `, and ${also} more page${also === 1 ? '' : 's'} they are in frame on` : '';
+  return `Write the CAST block before the plan lines. One line per commissioned character: ${where}${more}. Then page ${pageCount}, the last, with everyone the story keeps together at the end. Every plan line keeps what the block promises.`;
+}
+
+/** The block as the OUTPUT FORMAT shows it (first division only). */
+function castTableFormat(cov, pageCount, { replan = false } = {}) {
+  if (!cov || replan) return '';
+  return [CAST_TABLE_HEADER, castTableDeedLine(cov), `Ending page ${pageCount}: <everyone the story keeps together at the end>`].join('\n');
+}
+
+/**
+ * The CAST block out of a planner reply. FAILS LOUDLY — no silent default: a
+ * reply without the block, without the ending line, or without a line for a
+ * character on the list throws, and the caller records the error.
+ *
+ * "Kiaan — deed page 12: holds up the round stone he found, with Max — also on pages 1, 18"
+ *   → { name: 'Kiaan', deedPage: 12, deed: 'holds up …, with Max', alsoOn: [1, 18] }
+ * "Ending page 18: Levin, Julian, Max and Kiaan" → { page: 18, names: [...] }
+ *
+ * @param {string} raw the planner's reply
+ * @param {{ listed: string[] }} opts the commission's character list
+ * @returns {{ raw: string, characters: Array<{name:string, deedPage:number, deed:string, alsoOn:number[]}>,
+ *   ending: {page:number, names:string[]}, extra: string[] }}
+ */
+function parsePlanCastBlock(raw, { listed = [] } = {}) {
+  const full = String(raw || '');
+  const m = full.match(/---\s*CAST\s*---([\s\S]*?)(?=\n\s*---\s*[A-Z][A-Z ]*---|$)/i);
+  if (!m) throw new Error('the planner wrote no ---CAST--- block');
+  const block = m[1].trim();
+  const characters = [];
+  const extra = [];
+  let ending = null;
+  const byLower = new Map(listed.map(n => [String(n).trim().toLowerCase(), n]));
+  for (const rawLine of block.split('\n')) {
+    const line = rawLine.replace(/\*\*/g, '').replace(/^\s*[-*•]\s*/, '').trim();
+    if (!line) continue;
+    const end = line.match(/^ending\s+page\s+(\d+)\s*:\s*(.+)$/i);
+    if (end) {
+      const names = end[2].split(/\s*,\s*|\s+and\s+|\s*&\s*/i).map(s => s.trim()).filter(Boolean);
+      ending = { page: Number(end[1]), names };
+      continue;
+    }
+    const deed = line.match(/^(.+?)\s+[—–-]+\s+deed\s+page\s+(\d+)\s*:\s*(.+)$/i);
+    if (!deed) throw new Error(`CAST block line unreadable: "${line.slice(0, 160)}"`);
+    let rest = deed[3];
+    let alsoOn = [];
+    const alsoAt = rest.search(/\s+[—–-]+\s+also\s+on\s+pages?\b/i);
+    if (alsoAt >= 0) {
+      alsoOn = [...rest.slice(alsoAt).matchAll(/\d+/g)].map(x => Number(x[0]));
+      rest = rest.slice(0, alsoAt);
+    }
+    const name = deed[1].trim();
+    const known = byLower.get(name.toLowerCase());
+    if (!known) { extra.push(name); continue; }
+    characters.push({ name: known, deedPage: Number(deed[2]), deed: rest.trim(), alsoOn });
+  }
+  if (!ending) throw new Error('the CAST block has no "Ending page" line');
+  const missing = listed.filter(n => !characters.some(c => c.name === n));
+  if (missing.length) throw new Error(`the CAST block has no line for ${missing.join(', ')}`);
+  return { raw: block, characters, ending, extra };
+}
+
+/**
+ * The table as the re-plan and the plan check are shown it: the block the
+ * planner wrote, verbatim.
+ */
+function castTableBlock(table) {
+  return table && table.raw ? `${CAST_TABLE_HEADER}\n${table.raw}` : '';
+}
+
 module.exports = {
+  CAST_TABLE_HEADER,
+  castTableAlsoCount,
+  castTableSpec,
+  castTableFormat,
+  castTableBlock,
+  parsePlanCastBlock,
   commissionedCast,
   castCoverage,
   castActionRule,

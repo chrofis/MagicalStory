@@ -20,7 +20,7 @@ const { REQUIRED_TEXT_AUTHORING_RULE, declaredText } = require('./requiredText')
 const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote, withScaleNote } = require('./visualBible');
 const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
-const { castCoverage, castCoverageRule, castActionRule } = require('./castCoverage');
+const { castCoverage, castCoverageRule, castActionRule, castTableSpec, castTableFormat, castTableBlock } = require('./castCoverage');
 // REQUIRED IN-IMAGE TEXT: one source for the generator block, the repair
 // clause and the judges' TEXT RULES block. Safe as a top-level require --
 // requiredText.js requires promptBuilders LAZILY.
@@ -7283,6 +7283,9 @@ const REPLAN_MUST_FIX_CODES = new Set([
   // third" itself until then; the page plan is where it can be counted, and
   // the re-plan answers it by putting the figure in frame on one page.
   'CENTRAL_FIGURE_ABSENT_THIRD',
+  // A plan line that breaks the CAST block the planner wrote before dividing
+  // (2026-09-25): a deed page, a promised appearance or the ending's cast.
+  'CAST_PROMISE_BROKEN',
   // THE SHOT DISTRIBUTION JOINED 2026-09-20 (owner), the whole block of it:
   // SHOT_MEDIUM_WIDE_EXCESS, SHOT_CLOSEUP_COUNT, SHOT_ULTRAWIDE_COUNT,
   // SHOT_OTS_COUNT and SHOT_NO_CAMERA_POSITION (SHOT_AERIAL_COUNT retired 2026-09-23 with the aerial floor).
@@ -7548,8 +7551,10 @@ function replanKeepPages({ pageCount, wanted = [], actions = [], focalPages = {}
  * @param {number|null} [opts.castFloor] castCoverage().appearances.min — the
  *   pages a commissioned character keeps (the review's `span` floor for the
  *   character list, planCounters.reviewPlanChanges `castFloor`)
+ * @param {Object|null} [opts.castTable] the CAST block the first division wrote
+ *   (castCoverage.parsePlanCastBlock); shown verbatim, and it stands
  */
-function buildReplanSection(pagePlan, findingLines, { pageCount = null, keep = [], refused = [], castFloor = null } = {}) {
+function buildReplanSection(pagePlan, findingLines, { pageCount = null, keep = [], refused = [], castFloor = null, castTable = null } = {}) {
   const items = (Array.isArray(findingLines) ? findingLines : String(findingLines || '').split('\n'))
     .map(f => (f && typeof f === 'object' ? { ...f, line: String(f.line || '').trim() } : { line: String(f || '').trim() }))
     .filter(f => f.line);
@@ -7614,6 +7619,10 @@ function buildReplanSection(pagePlan, findingLines, { pageCount = null, keep = [
     'A finding that names a page names a candidate, not an order. A finding asking the book for a page with no people in frame names the page best suited to give up its cast: empty that one, unless a figure on it is one of the two that stay — then empty another page and say in the declaration why that one could not.',
     'Declare every change you make under ---CHANGES---, with the finding it answers and why. A change you do not declare is undone.',
     '',
+    // THE CAST TABLE STANDS (2026-09-25). The round repairs the plan lines
+    // against the promises the first division made; CAST_PROMISE_BROKEN names
+    // each line that breaks one.
+    ...(castTableBlock(castTable) ? ['## YOUR CAST BLOCK', castTableBlock(castTable), ''] : []),
     '## YOUR PAGE PLAN',
     String(pagePlan || '').trim() || '(none)',
     '',
@@ -8006,7 +8015,9 @@ ${hints}`;
 
 // `centralFigure`: the names the arc's STORY LOGIC gives the commission's
 // central figure (arcReviewReport.centralFigure), null when it named none.
-function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', replan = '', centralFigure = null, mayAddDeeds = false } = {}) {
+// `castTable`: the CAST block the first division wrote (parsePlanCastBlock);
+// a re-plan is told it stands. The first division is asked to write one.
+function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', replan = '', centralFigure = null, mayAddDeeds = false, castTable = null } = {}) {
   const template = PROMPT_TEMPLATES.storyBeats;
   if (!template) {
     log.error('[PROMPT] storyBeats template not loaded — beats planning unavailable');
@@ -8065,6 +8076,12 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // The central figure's sentence rides in the same rule (2026-09-24, d4).
     // `mayAddDeeds`: Test Lab only (castActionRule); production never passes it.
     CAST_COVERAGE: castCoverageRule(castCoverage({ pageCount, castCount: (inputData?.characters || []).filter(c => c && c.name).length }), { centralFigure, mayAddDeeds }),
+    // THE CAST TABLE (owner, 2026-09-25): the first division writes one promise
+    // per commissioned character before its plan lines — its deed page and the
+    // pages it is in frame on, as many as the castCoverage() floor above — and
+    // the last page's cast. A re-plan keeps the table (castCoverage.castTableSpec).
+    CAST_TABLE: castTableSpec(castCoverage({ pageCount, castCount: (inputData?.characters || []).filter(c => c && c.name).length }), pageCount, { replan: !!String(replan || '').trim(), table: castTable }),
+    CAST_FORMAT: castTableFormat(castCoverage({ pageCount, castCount: (inputData?.characters || []).filter(c => c && c.name).length }), pageCount, { replan: !!String(replan || '').trim() }),
     // The output scope follows the mode. A first plan (no replan section)
     // owes every page; a re-plan owes only the pages it changes under RE-DIVIDE
     // — the merge in beatsPipeline restores every other page from the division
@@ -8072,7 +8089,7 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // page the findings did not name into that scope.
     OUTPUT_SCOPE: String(replan || '').trim()
       ? 'One line for each page you change under RE-DIVIDE, and for no other page, then the changes block.'
-      : `One line per page, through page ${pageCount}.`,
+      : `${(inputData?.characters || []).some(c => c && c.name) ? 'The CAST block, then one' : 'One'} line per page, through page ${pageCount}.`,
     // Only a re-plan declares changes; a first division has nothing to declare.
     CHANGES_FORMAT: String(replan || '').trim() ? REPLAN_CHANGES_FORMAT : '',
     READER_LINE: readerLine,
@@ -10220,7 +10237,7 @@ function critiqueMaxSeverity(critique) {
  * here so the signature states the contract: this prompt's inputs are the arc
  * and the page plan, and the counting happens downstream of its answer.
  */
-function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHints = '', centralFigure = null, mayAddDeeds = false } = {}) {
+function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHints = '', centralFigure = null, mayAddDeeds = false, castTable = null } = {}) {
   const template = PROMPT_TEMPLATES.planCheck;
   if (!template) {
     log.error('[PROMPT] planCheck template not loaded — plan check unavailable');
@@ -10258,6 +10275,16 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHi
     // job_1790277448294_5herh01j7 p12 (an ear pressed to what the near figure
     // faced) and the checker, never given it, could not raise it.
     OTS_NO_CONTACT: OTS_NO_CONTACT_RULE,
+    // THE CAST TABLE the planner wrote before its plan lines (2026-09-25). The
+    // checker reads it beside the plan; every answer still comes from the plan
+    // lines, and the counters hold each line to the table (CAST_PROMISE_BROKEN).
+    CAST_TABLE_SECTION: castTableBlock(castTable)
+      ? `# THE CAST BLOCK
+
+What the planner promised before dividing: each character's deed page and the pages they are in frame on, and the last page's cast. Read every answer below from the plan lines, never from this block.
+
+${castTableBlock(castTable)}`
+      : '',
 
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: beats.length,
