@@ -60137,6 +60137,23 @@ rejected retry was lost.
 `tests/unit/plate-qc-severity.test.ts`, `tests/unit/empty-scene-qc-extraction.test.ts`.
 **Status:** ✅ active on staging.
 
+## 2026-09-25 — Every plate call site sends the book's full art style; the stripped "empty-scene" style is deleted
+
+**Context:** The story-run plates (vantage, per-page, trial) send `resolveArtStyle`. The Test Lab
+`empty_scene` stage, the cover plate (`coverIterate.buildCoverReferences`) and the iterate plate
+(`images.renderStoryPagePlate`) sent `resolveArtStyleForEmptyScene`, which drops every sentence naming a
+face, eye, skin, character or expression. For pixar that leaves "Never photographic."; for watercolor it
+drops the sentence that says "watercolor". The Lab therefore tested a plate prompt production never sends,
+and the cover and repair plates were painted without their medium.
+
+**Decision (owner, 2026-09-25):** all three send `resolveArtStyle(style || 'pixar') || ''`, exactly as the
+story-run plates do; `resolveArtStyleForEmptyScene` is deleted (a replaced mechanism is deleted, not kept).
+The plate template's own "no figures" lines already carry what the stripping was for.
+
+**Touched:** `server/lib/testlab.js`, `server/lib/coverIterate.js`, `server/lib/images.js`,
+`server/lib/promptBuilders.js`, `server/lib/storyHelpers.js`, `tests/unit/plate-style-parity.test.ts`.
+**Status:** ✅ active on staging.
+
 ## 2026-09-24 — The plan check is given the over-the-shoulder contact rule
 
 **Context:** Staging job_1790277448294_5herh01j7 planned "Page 12: over-the-shoulder — Kiaan — Kiaan

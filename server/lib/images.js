@@ -4024,12 +4024,12 @@ async function renderStoryPagePlate({
 }) {
   if (!plateDescription) return null;
   try {
-        const { resolveArtStyleForEmptyScene, resolveArtStyle: resolveStyleForEmpty } = getStoryHelpers();
-        const iterBackend = imageModelOverride ? (IMAGE_MODELS[imageModelOverride]?.backend || null) : null;
-        const artStyleDesc = resolveArtStyleForEmptyScene(storyData.artStyle || 'pixar', iterBackend)
-          || resolveArtStyleForEmptyScene('pixar')
-          || resolveStyleForEmpty(storyData.artStyle || 'pixar', iterBackend)
-          || '';
+        // The book's FULL style, as every story-run plate call site sends it
+        // (storyJobPipeline.js vantage / per-page / trial plates). The stripped
+        // "empty-scene" variant collapsed pixar to "Never photographic." and
+        // dropped the word "watercolor" (2026-09-25).
+        const { resolveArtStyle } = getStoryHelpers();
+        const artStyleDesc = resolveArtStyle(storyData.artStyle || 'pixar') || '';
         const textPos = textPosition || sceneMetadata?.textPosition || null;
         const { buildTextZoneInstruction, buildEraGuard } = getStoryHelpers();
         const iterateTextZoneDesc = sceneMetadata?.textZoneDescription || null;

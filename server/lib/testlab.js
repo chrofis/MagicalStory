@@ -760,7 +760,7 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
 async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = {} }) {
   const { loadPromptTemplates, buildEmptyScenePrompt } = require('../services/prompts');
   await loadPromptTemplates();
-  const { buildTextZoneInstruction, buildEraGuard, buildLandmarkFidelityBlock, resolveArtStyleForEmptyScene } = require('./storyHelpers');
+  const { buildTextZoneInstruction, buildEraGuard, buildLandmarkFidelityBlock, resolveArtStyle } = require('./storyHelpers');
   const { generateImageOnly } = require('./images');
   const { getTextAreaMask } = require('./textMasks');
   const { MODEL_DEFAULTS, emptyScenePlateRouting } = require('../config/models');
@@ -790,8 +790,11 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
     ctx.visualBible, ctx.pageNumber, ctx.landmarkPhotos, aboardId, meta.objects || null
   );
 
-  // One style string for the plate prompt and its QC, as in production.
-  const plateStyle = resolveArtStyleForEmptyScene(params.artStyleOverride || ctx.artStyle, null);
+  // One style string for the plate prompt and its QC, and the SAME one
+  // production sends: the book's full style (storyJobPipeline.js plate call
+  // sites use resolveArtStyle). The stripped "empty-scene" variant collapsed
+  // pixar to "Never photographic." and dropped "watercolor" (2026-09-25).
+  const plateStyle = resolveArtStyle(params.artStyleOverride || ctx.artStyle || 'pixar') || '';
   const prompt = buildEmptyScenePrompt({
     template: promptOverride || undefined,
     style: plateStyle,

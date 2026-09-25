@@ -9,7 +9,7 @@
 const { log } = require('../utils/logger');
 const { baseVbId } = require('./vbIdGuard');
 const { MODEL_DEFAULTS, IMAGE_MODELS, emptyScenePlateRouting } = require('../config/models');
-const { resolveArtStyle, resolveArtStyleForEmptyScene } = require('./storyHelpers');
+const { resolveArtStyle } = require('./storyHelpers');
 const { resolveEvalImagePrompt, splitBrief, METADATA_DELIMITER } = require('./sceneMetadata');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { applyStyledAvatars } = require('./styledAvatars');
@@ -1788,7 +1788,7 @@ async function buildCoverReferences({
   if (!['render', 'edit', 'composite'].includes(use)) {
     throw new Error(`buildCoverReferences: unknown use "${use}"`);
   }
-  const { resolveArtStyle, resolveArtStyleForEmptyScene, extractSceneMetadata, getLandmarkPhotosForScene } = getStoryHelpers();
+  const { resolveArtStyle, extractSceneMetadata, getLandmarkPhotosForScene } = getStoryHelpers();
   const { generateImageOnly } = require('./images');
   const { buildVisualBibleGrid, buildEmptySceneVbGrid } = require('./referenceSheets');
   const { getElementReferenceImagesForPage, getElementReferenceImagesByIds } = require('./visualBible');
@@ -1898,9 +1898,9 @@ async function buildCoverReferences({
     log.info(`🎛️ [COVER-REFS] ${label}: singlePassScene=true — skipping empty-scene plate`);
   } else {
     try {
-      const artStyleDesc = resolveArtStyleForEmptyScene(artStyle || 'pixar')
-        || resolveArtStyle(artStyle || 'pixar')
-        || '';
+      // The book's FULL style, as the story-run plate call sites send it — the
+      // stripped "empty-scene" variant lost the medium (2026-09-25).
+      const artStyleDesc = resolveArtStyle(artStyle || 'pixar') || '';
       // The brief's PROSE only: a full-path cover brief ends in a
       // `---METADATA---` block (coverBriefWithObjects) the plate must not see.
       const emptyDescRaw = emptyScenePromptOverride

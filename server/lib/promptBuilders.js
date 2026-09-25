@@ -1735,45 +1735,12 @@ function resolveArtStyle(artStyleId, _backend) {
 }
 
 /**
- * Resolve art style description for EMPTY SCENE generation (no characters present).
- * Strips sentences that describe character anatomy (faces, eyes, skin, proportions),
- * because image generators can't reliably negate "no people" — explicit eye/face
- * details in the style prompt cause stray faces and eyes to appear in empty backgrounds.
- *
- * Keeps: rendering technique, color palette, lighting, texture, medium, composition.
- * Removes: any sentence mentioning face/eyes/skin/character/proportions/nose/mouth/cheek.
- *
- * @param {string} artStyleId - Style key (e.g., 'anime')
- * @param {string} [backend] - Image backend ('grok', 'gemini', 'runware')
- * @returns {string|null} Cleaned style description or null if not found
- */
-function resolveArtStyleForEmptyScene(artStyleId, backend) {
-  const full = resolveArtStyle(artStyleId, backend);
-  if (!full) return null;
-
-  // Pattern matches anatomy-related keywords (whole-word, case-insensitive).
-  // "features" only matches when it's clearly facial (paired with face/eye context),
-  // so we keep it broad and rely on the sentence containing other anatomy cues too.
-  const ANATOMY_RE = /\b(face|faces|facial|eye|eyes|skin|character|characters|proportion|proportions|proportioned|nose|mouth|jawline|cheek|cheeks|expression|expressions|expressive|brow|brows|eyebrow|eyebrows|lips|chin|iris|irises|pore|pores)\b/i;
-
-  // Split on sentence boundaries while preserving the punctuation.
-  // Handles ". ", "! ", "? " — em-dashes mid-sentence are not split.
-  const sentences = full.match(/[^.!?]+[.!?]+|\S[^.!?]*$/g) || [full];
-
-  const kept = sentences
-    .map(s => s.trim())
-    .filter(s => s.length > 0 && !ANATOMY_RE.test(s));
-
-  return kept.join(' ').trim() || null;
-}
-
-/**
  * Resolve art style description for the 2×4 CHARACTER REFERENCE SHEET (Pass-2
  * style transfer). The page-style descriptors bake in scene/environment prose
  * ("rainy streets, chrome surfaces, volumetric fog") because they were authored
  * for full illustrations. On a reference sheet those words make the model paint
  * a whole environment behind the figure, defeating the plain-white background a
- * cutout needs. This is the mirror of resolveArtStyleForEmptyScene: it strips
+ * cutout needs. It strips
  * ENVIRONMENT clauses while keeping the rendering technique, palette, linework,
  * and face description.
  *
@@ -11797,7 +11764,6 @@ module.exports = {
   WORLD_ART_STYLES,
   buildStyleWardrobeBlock,
   resolveArtStyle,
-  resolveArtStyleForEmptyScene,
   resolveArtStyleForSheet,
   LANGUAGE_LEVELS,
   PAGE_PARAGRAPHS,
