@@ -728,6 +728,19 @@
         "server/lib/sceneBriefCheck.js"
       ],
       "severity": "block"
+    },
+    {
+      "id": "topic-promise-readers",
+      "axis": "every stage that reads the topic guide states its binding PROMISE the same way",
+      "reason": "Each adventure guide carries one PROMISE line (owner, 2026-09-25): what a reader of that theme must get — a dragon story has a grown dragon who is a character, present early and at the turn. It binds like the commission, so it is taken OUT of the guide body (which GUIDE_USE_RULE calls material) by stripGuidePromise and stated once by buildTopicPromiseSection, in promptBuilders.js. The readers of the guide are the arc creator and re-teller ({TOPIC_PROMISE} beside {STORY_BRIEF}, from buildStoryContextFields), the panel (its PROMISE lens) and the arc reviewer (story-arc-review.txt), and the idea call (server/routes/storyIdeas.js, beside the ADVENTURE SETTING GUIDE). Lab #1462/#1464 had no dragon character until the hatchling: the guide offered an egg as the centre, and nothing bound the theme. A stage that reads the guide without the promise section reads the promise as material again, or not at all.",
+      "members": [
+        "prompts/arc-create.txt",
+        "prompts/arc-retell.txt",
+        "prompts/arc-panel.txt",
+        "prompts/story-arc-review.txt",
+        "server/routes/storyIdeas.js"
+      ],
+      "severity": "block"
     }
   ],
   "withinFile": [

@@ -1544,6 +1544,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "topic-promise",
+      "title": "Every adventure theme carries a binding topic PROMISE, stated apart from the material guide",
+      "commits": [],
+      "addedAt": "2026-09-25",
+      "claim": "On the dragon commission (staging job_1790277448294_5herh01j7) the create and retell arcs have a grown dragon as a named character present from the first third and at the turning point (baseline Lab #1462/#1464: no dragon character until the hatchling); the critique's Commission honored line and the panel's PROMISE lens flag an arc that breaks the promise, quoting it.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Lab arc_effort stage=pipeline, challengesFromStory, on job_1790277448294_5herh01j7: read arms[create|retell].logic Facts/Motives and .arc for the grown dragon's first sentence and its sentence at the turn; read panel keptFindings for PROMISE findings"
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }

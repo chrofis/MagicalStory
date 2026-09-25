@@ -170,7 +170,8 @@ describe('stripSeedLists — the idea prompt sees the pick, never the menu', () 
   it('the STORY path still gets the lists — only the idea route strips them', () => {
     expect(getAdventureGuide('space')).toContain('Who lives here (pick one):');
     const route = require('fs').readFileSync(path.join(ROOT, 'server/routes/storyIdeas.js'), 'utf-8');
-    expect(route).toContain('stripSeedLists(getAdventureGuide(effectiveTheme))');
+    expect(route).toContain('stripSeedLists(stripGuidePromise(rawAdventureGuide))');
+    expect(route).toContain('const rawAdventureGuide = getAdventureGuide(effectiveTheme);');
   });
 });
 

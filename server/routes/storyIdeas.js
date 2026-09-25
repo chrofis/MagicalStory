@@ -282,7 +282,10 @@ Follow the user's vision closely while keeping the story age-appropriate and eng
   // each (server/lib/promptBuilders.js). The STORY path still reads the guide
   // whole through getTeachingGuide.
   const { getIdeaGuide, getAdventureGuide } = require('../lib/storyHelpers');
-  const teachingGuide = getIdeaGuide(effectiveCategory, storyTopic);
+  const { stripGuidePromise, buildTopicPromiseSection } = require('../lib/promptBuilders');
+  // The guide's PROMISE line binds (owner, 2026-09-25): it leaves both guide
+  // views and is stated once, as its own section, beside the setting guide.
+  const teachingGuide = stripGuidePromise(getIdeaGuide(effectiveCategory, storyTopic));
   // `let`, not `const`: once an angle has been picked out of the guide below,
   // the guide the PROMPT sees drops the angle list (stripAngleList).
   let topicGuideText = teachingGuide
@@ -296,11 +299,14 @@ ${teachingGuide}`
   // pick is what it answered instead. getAdventureGuide itself is untouched, so
   // every story-side builder still reads the guide whole (stripSeedLists lives
   // in server/lib/worldSeeds.js, next to the parser that needs the lists).
-  const adventureGuideContent = stripSeedLists(getAdventureGuide(effectiveTheme));
-  const adventureSettingGuide = adventureGuideContent
-    ? `**ADVENTURE SETTING GUIDE for "${effectiveTheme}":**
-${adventureGuideContent}`
-    : '';
+  const rawAdventureGuide = getAdventureGuide(effectiveTheme);
+  const adventureGuideContent = stripSeedLists(stripGuidePromise(rawAdventureGuide));
+  const topicPromiseSection = buildTopicPromiseSection(rawAdventureGuide);
+  const adventureSettingGuide = [
+    adventureGuideContent ? `**ADVENTURE SETTING GUIDE for "${effectiveTheme}":**
+${adventureGuideContent}` : '',
+    topicPromiseSection,
+  ].filter(Boolean).join('\n\n');
 
   const { buildAgeModeSection } = require('../lib/promptBuilders');
   // The contract switches on the YOUNGEST main character's age — the same person

@@ -6892,6 +6892,37 @@ function characterSourceRule({ master = 'premise' } = {}) {
 // How the TOPIC GUIDE is read — one line under its header (2026-09-23).
 const GUIDE_USE_RULE = 'Its lines are material for you, never sentences for the story: a turn it names is acted out, never stated. Where the commission names the world, that world stands over the guide\'s settings.';
 
+/**
+ * THE TOPIC PROMISE (owner, 2026-09-25). Every adventure guide carries one
+ * "PROMISE:" line — what a reader of that theme must get (a dragon story: a
+ * grown dragon who is a character, present early and at the turn). Lab #1462
+ * and #1464 had no dragon character until the hatchling: the guide's "an egg
+ * found somewhere very ordinary" plus the central-figure rule let an egg carry
+ * the theme. The rest of the guide is material (GUIDE_USE_RULE); the promise
+ * binds like the commission, so it is taken OUT of the guide body and stated in
+ * its own section — to the arc creator, the re-teller, the panel, the arc
+ * reviewer and the idea call (storyIdeas.js), the stages that read the guide.
+ */
+const TOPIC_PROMISE_HEADING = '# TOPIC PROMISE (binding, like the commission)';
+const PROMISE_LINE_RE = /^PROMISE:[ \t]*(.+?)[ \t]*$/m;
+
+function guidePromise(guideText) {
+  const m = String(guideText || '').match(PROMISE_LINE_RE);
+  return m ? m[1] : '';
+}
+
+/** The guide without its PROMISE line — the promise is never "material". */
+function stripGuidePromise(guideText) {
+  if (!guideText) return guideText;
+  return String(guideText).split(/\r?\n/).filter(l => !/^PROMISE:/.test(l)).join('\n');
+}
+
+/** "# TOPIC PROMISE …\n<the line>", or '' for a guide without one. */
+function buildTopicPromiseSection(guideText) {
+  const promise = guidePromise(guideText);
+  return promise ? `${TOPIC_PROMISE_HEADING}\n${promise}` : '';
+}
+
 function buildStoryContextFields(inputData) {
   const language = inputData.language || 'en';
   const brief = buildStoryBriefBody(inputData);
@@ -6927,6 +6958,7 @@ function buildStoryContextFields(inputData) {
     ? (inputData.storyTheme || inputData.storyTopic)
     : (inputData.storyTopic || inputData.storyTheme);
   let guideSection = '';
+  let topicPromise = '';
   try {
     // The accuracy mandate rode on the unified writer's CATEGORY_GUIDELINES,
     // which the beats chain never inherited — the guide arrived as unmarked
@@ -6946,7 +6978,9 @@ function buildStoryContextFields(inputData) {
     // to a world the commission names ("mountain eyries" in a city story). The
     // COSTUME line is an avatar-pipeline field, not story material — costumes
     // reach the story through the wardrobe stages, never through this block.
-    const guideBody = String(guide || '').split('\n').filter(l => !/^COSTUME:/.test(l)).join('\n').trim();
+    // The PROMISE line binds and is stated apart (buildTopicPromiseSection).
+    const guideBody = String(stripGuidePromise(guide) || '').split('\n').filter(l => !/^COSTUME:/.test(l)).join('\n').trim();
+    topicPromise = buildTopicPromiseSection(guide);
     if (guideBody) guideSection = `# TOPIC GUIDE (facts and context for ${guideKey})${factMandate}\n${GUIDE_USE_RULE}\n\n${guideBody}`;
   } catch (err) {
     log.warn(`[PROMPT] topic guide unavailable for ${inputData.storyCategory}/${guideKey}: ${err.message}`);
@@ -6977,6 +7011,7 @@ function buildStoryContextFields(inputData) {
       brief,
     ].join('\n'),
     STORY_GUIDE_SECTION: guideSection,
+    TOPIC_PROMISE: topicPromise,
     CHARACTER_SOURCE_RULE: characterSourceRuleText,
     CHARACTER_DETAILS: characterDetails,
     MAX_CHARACTERS_PER_SCENE: IMAGE_MODELS[imageModelKey]?.maxCharactersPerScene || 3,
@@ -9407,7 +9442,7 @@ function arcCritiqueSpec({ retell = false } = {}) {
   return [
     `"Faults:" then up to 6 numbered faults${remain}, or the single word "none". A fault is one of these: ${ARC_LOGIC_CHECK} Or one of these: ${ARC_PART_CHECK} ${ARC_FINDING_RULE} Tag each [CRITICAL] — the story is broken; [MAJOR] — a real fault repairable inside the existing structure, which an act from no motive line and a main character with no turn always are; or [MINOR] — a blemish. A fault is never a count, a page number or a sourced measurement.`,
     '',
-    '"Commission honored:" one line — "yes", or the commission\'s own words the arc drops or inverts, quoted.',
+    '"Commission honored:" one line — "yes", or the commission\'s own words the arc drops or inverts, quoted; a TOPIC PROMISE, where one is given, counts among the commission\'s words.',
   ].join('\n');
 }
 
@@ -9446,6 +9481,8 @@ function buildArcPanelPrompt(inputData, committedBlock) {
   const ctx = buildStoryContextFields(inputData);
   return fillTemplate(template, {
     STORY_BRIEF: ctx.STORY_BRIEF,
+    // The panel's PROMISE lens reads the same section the creator was given.
+    TOPIC_PROMISE: ctx.TOPIC_PROMISE,
     CHARACTER_DETAILS: ctx.CHARACTER_DETAILS,
     COMMITTED_ARC: String(committedBlock || '').trim(),
     // The lenses a creator rule mirrors read that rule's own string. LOGIC is
@@ -11735,6 +11772,10 @@ module.exports = {
   ARC_PART_CHECK,
   arcExcitingDef,
   GUIDE_USE_RULE,
+  TOPIC_PROMISE_HEADING,
+  guidePromise,
+  stripGuidePromise,
+  buildTopicPromiseSection,
   RISK_FRAMING_RULE,
   ANIMAL_FATE_RULE,
   COUNTING_RULE,

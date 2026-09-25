@@ -60360,3 +60360,41 @@ left unchanged pending an owner call. The trial writer's STORY SHAPE line still 
 (`arc-prompts-v3`), `tasks/BACKLOG.md`, `tests/unit/arc-logic-first.test.ts`,
 `tests/unit/arc-prompt-audit-2026-09-23.test.ts`.
 **Status:** ✅ committed on `staging`, not pushed; Lab validation pending (owner).
+
+## 2026-09-25 — Every adventure theme carries a binding topic PROMISE; topic guides state no sizes
+
+**Context:** Lab #1462 and #1464 (dragon commission, staging `job_1790277448294_5herh01j7`) had no
+dragon character until the hatchling on the last pages. The dragon guide's "Who lives here" list
+offers "An egg found somewhere very ordinary", the central-figure rule accepted an egg, and the whole
+guide reached the arc as material ("Its lines are material for you", `GUIDE_USE_RULE`), so nothing
+bound what a reader of a dragon story is owed.
+
+**Decision (owner, 2026-09-25):**
+1. Every theme in `prompts/adventure-guides.txt` (32) carries one `PROMISE:` line — what the reader
+   must get, generic, no story names. Dragon: a GROWN dragon is a character, named, present from early
+   on and at the turning point, wanting and doing things of its own; an egg, or a hatchling only at the
+   end, does not keep it (a hatchling may be there too). Pirate: a pirate ship with its crew. Unicorn:
+   a unicorn character. Space: the trip into space. And so on for every theme.
+2. The promise binds like the commission, so it leaves the guide body (`stripGuidePromise`, beside the
+   COSTUME filter) and is stated once in its own section, `# TOPIC PROMISE (binding, like the
+   commission)` (`buildTopicPromiseSection`, field `TOPIC_PROMISE` of `buildStoryContextFields`). It
+   reaches every stage that reads the guide: arc create and retell, the panel (a new PROMISE lens: a
+   broken promise quotes the promise and the arc sentence where it should have been kept), the arc
+   reviewer (`story-arc-review.txt`), and the idea call (`storyIdeas.js`, beside the ADVENTURE SETTING
+   GUIDE, both idea views stripped). The critique's "Commission honored" line counts the promise among
+   the commission's words. The planner, the text writers and the trial writer do not read the guide;
+   they get the promise through the arc (and the trial through its idea).
+3. Sizes leave the guides (owner decision 2026-09-23: sizes belong to the Visual Bible and the images):
+   the dragon's "a shoulder-sized small one, a cart-sized young one, a mountain-sized elder" became a
+   manner-only line; "a dragon the size of a cat", "walking among the giants", "slow, huge, patient"
+   and "a tiny fish" lost their size words.
+
+**Size:** the dragon create prompt grows 21,901 → 22,220 chars (the promise section and the longer
+"Commission honored" line); panel fixed text 7,748 → 8,191 (the promise and its lens).
+
+**Touched:** `prompts/adventure-guides.txt`, `prompts/arc-create.txt`, `prompts/arc-retell.txt`,
+`prompts/arc-panel.txt`, `prompts/story-arc-review.txt`, `server/lib/promptBuilders.js`,
+`server/routes/storyIdeas.js`, `scripts/admin/sibling-registry.json` (`topic-promise-readers`),
+`tasks/verify.json` (`topic-promise`), `tests/unit/topic-promise.test.ts`,
+`tests/unit/world-seeds.test.ts`.
+**Status:** ✅ committed on `staging`, not pushed; Lab validation pending.

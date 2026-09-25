@@ -1,10 +1,13 @@
 # Adventure Theme Guides
 # Format: [theme-id] followed by content until next [theme-id]
 # These guides indicate costume requirements and story guidance for adventure themes
+# PROMISE: what a reader of this theme must get — binding, injected apart from the guide (buildTopicPromiseSection)
+# No line states a size: sizes belong to the Visual Bible and the images (owner, 2026-09-23)
 # NOTE: Specific outfit details are NOT defined here - the AI creates distinct costumes per character
 # following the "Distinct Costume Colors" rule in the story generation prompt.
 
 [pirate]
+PROMISE: A pirate ship with its pirate crew is in the story, and the children sail on it or among them; a map, a chest or a costume alone does not keep this promise.
 COSTUME: pirate (mandatory for adventure scenes)
 
 Who lives here (pick one):
@@ -54,6 +57,7 @@ Story guidance:
 
 
 [knight]
+PROMISE: Knights on a quest: the children are knights or ride with them, and a castle, a horse or a knight's challenge is part of the adventure; a costume alone does not keep this promise.
 COSTUME: knight (mandatory for adventure scenes)
 
 Who lives here (pick one):
@@ -101,6 +105,7 @@ Story guidance:
 
 
 [princess]
+PROMISE: A princess is a character, and her castle or kingdom is where the story happens; a crown or a dress alone does not keep this promise.
 COSTUME: princess (mandatory for adventure scenes)
 
 Who lives here (pick one):
@@ -147,6 +152,7 @@ Story guidance:
 
 
 [viking]
+PROMISE: Vikings and their longship are in the story, and the children sail, explore or live with a Viking crew; a helmet or a costume alone does not keep this promise.
 COSTUME: viking (mandatory for adventure scenes)
 
 Who lives here (pick one):
@@ -193,6 +199,7 @@ Story guidance:
 - Avoid: Horned helmets (historically inaccurate), raids, violence
 
 [roman]
+PROMISE: Ancient Rome is the world the story happens in: its people, its places and its daily life, met by the children there.
 COSTUME: roman (mandatory for adventure scenes)
 
 Who lives here (pick one):
@@ -237,6 +244,7 @@ Story guidance:
 - The idea is built on who is there, never on the props.
 
 [detective]
+PROMISE: A mystery is solved by detection: the children find clues, follow them and work out the answer from what they noticed.
 COSTUME: not needed - use standard, summer or winter avatar
 
 Who lives here (pick one):
@@ -280,6 +288,7 @@ Story guidance:
 
 
 [cowboy]
+PROMISE: The Wild West is the world the story happens in: horses ridden, a ranch or a trail, and cowboy work done by the children.
 COSTUME: cowboy (mandatory for adventure scenes)
 
 Who lives here (pick one):
@@ -327,6 +336,7 @@ Story guidance:
 
 
 [egyptian]
+PROMISE: Ancient Egypt is the world the story happens in: the Nile, a temple or a pyramid, and the people of that time, met by the children there.
 COSTUME: egyptian (mandatory for adventure scenes)
 
 Who lives here (pick one):
@@ -373,6 +383,7 @@ Story guidance:
 
 
 [greek]
+PROMISE: Ancient Greece is the world the story happens in: its temples, ships or legends, and the people of that time, met by the children there.
 COSTUME: greek (mandatory for adventure scenes)
 
 Who lives here (pick one):
@@ -419,6 +430,7 @@ Story guidance:
 
 
 [caveman]
+PROMISE: The Stone Age is the world the story happens in: a cave, fire, stone tools and the animals of that time, lived with by the children.
 COSTUME: caveman (mandatory for adventure scenes)
 
 Who lives here (pick one):
@@ -466,6 +478,7 @@ Story guidance:
 
 
 [samurai]
+PROMISE: The children are samurai or travel with one, in old Japan, and a samurai's task and honour are at the heart of the story.
 COSTUME: samurai (mandatory for adventure scenes)
 
 Who lives here (pick one):
@@ -512,6 +525,7 @@ Story guidance:
 
 
 [ninja]
+PROMISE: The children are ninja, and ninja skills — stealth, balance, patience and cleverness — carry the adventure.
 COSTUME: ninja (mandatory for adventure scenes)
 
 Who lives here (pick one):
@@ -558,6 +572,7 @@ Story guidance:
 
 
 [wizard]
+PROMISE: Magic works in the story: a wizard or the children themselves cast it, and a spell, a potion or an enchanted thing turns the plot.
 COSTUME: wizard (mandatory for adventure scenes)
 
 Who lives here (pick one):
@@ -605,6 +620,7 @@ Story guidance:
 
 
 [superhero]
+PROMISE: The children have powers of their own or are superheroes, and a power is used to help someone at the turning point.
 COSTUME: superhero (mandatory for adventure scenes)
 
 Who lives here (pick one):
@@ -652,6 +668,7 @@ Story guidance:
 
 
 [mermaid]
+PROMISE: A mermaid is a character, named, and the story goes under the sea into her world.
 COSTUME: mermaid (mandatory for adventure scenes)
 
 Who lives here (pick one):
@@ -699,6 +716,7 @@ Story guidance:
 
 
 [fireman]
+PROMISE: Firefighters and their work are in the story: the fire engine, the crew and a rescue made the way firefighters make it.
 COSTUME: firefighter (mandatory for adventure scenes)
 
 Who lives here (pick one):
@@ -748,6 +766,7 @@ Story guidance:
 
 
 [doctor]
+PROMISE: Caring for someone who is hurt or ill is at the heart of the story: the children help as doctors, with a doctor's tools, and the patient gets better.
 COSTUME: doctor (mandatory for adventure scenes)
 
 Who lives here (pick one):
@@ -796,6 +815,7 @@ Story guidance:
 
 
 [police]
+PROMISE: Police work carries the story: the children help as police officers, with a police car or station, to find, protect or put something right.
 COSTUME: police officer (mandatory for adventure scenes)
 
 Who lives here (pick one):
@@ -844,13 +864,14 @@ Story guidance:
 
 
 [dragon]
+PROMISE: A grown dragon is a character in the story, named, present from early on and at the turning point, wanting and doing things of its own; an egg, or a hatchling only at the end, does not keep this promise, though a hatchling may be there too.
 COSTUME: not needed - use standard, summer or winter avatar
 
 Who lives here (pick one):
 - An egg found somewhere very ordinary
 - A hatchling who has decided who its family is
 - An old dragon who is losing her fire and pretends otherwise
-- A dragon the size of a cat who cannot fly yet and is hiding it
+- A young dragon who cannot fly yet and is hiding it
 - A dragon who made a promise long ago and has come back to keep it
 - A young dragon who has lost the one thing from the hoard it cared about
 - A dragon who is not allowed to join the others and watches from a ledge
@@ -883,7 +904,7 @@ Story entry points (pick one or combine):
 Story guidance:
 - Set in mountain eyries, valleys of mist, volcanic ridges, cloud-high skies, hoards in deep caves
 - Dragons are characters, not monsters: they have names, moods, families, likes and worries
-- Give each dragon a scale and a manner - a shoulder-sized small one, a cart-sized young one, a mountain-sized elder who speaks slowly
+- Give each dragon a manner of its own - a restless young one, a proud one, an elder who speaks slowly
 - Flight, warmth and smoke are the wonders; scorching, burnt villages and hunting are not
 - Focus on trust between very different creatures, earning a friendship, keeping a promise, being small and brave
 - Fire is shown as warmth, light, a cooked meal or a signal - never as harm
@@ -892,6 +913,7 @@ Story guidance:
 
 
 [unicorn]
+PROMISE: A unicorn is a character in the story, named, present from early on and at the turning point, wanting and doing things of its own; a picture, a toy or a horn alone does not keep this promise.
 COSTUME: not needed - use standard, summer or winter avatar
 
 Who lives here (pick one):
@@ -940,6 +962,7 @@ Story guidance:
 
 
 [dinosaur]
+PROMISE: Living dinosaurs are in the story, and at least one is a character that wants and does things of its own; bones, fossils or toys alone do not keep this promise.
 COSTUME: not needed - use standard, summer or winter avatar
 
 Who lives here (pick one):
@@ -970,7 +993,7 @@ Story entry points (pick one or combine):
 - Full prehistoric adventure from the start
 - A natural history museum whose skeletons stand up
 - A fossil found in the garden or on a beach
-- Dream of walking among the giants
+- Dream of walking among the dinosaurs
 - A school dig or palaeontology club
 - A time machine set far, far back
 - A hatchling that follows them home
@@ -981,13 +1004,14 @@ Story guidance:
 - Use only well-known real dinosaurs, and only what a child already knows of them: Tyrannosaurus rex, Triceratops, Stegosaurus, Brachiosaurus, Velociraptor, Ankylosaurus, with Pteranodon in the air
 - Invent no species, no names, no measurements - if a detail is not commonly known, leave it out
 - Large meat-eaters may be present and impressive but are avoided or outwitted, never fought and never shown hunting
-- Plant-eaters make the best companions: slow, huge, patient, surprisingly gentle
+- Plant-eaters make the best companions: slow, patient, surprisingly gentle
 - Focus on curiosity, careful observation, respect for wild animals, being small in a big world
 - Key props: fossil bone, footprint bigger than a child, nest of eggs, amber, ferns
 - The idea is built on who is there, never on the props.
 
 
 [space]
+PROMISE: The trip into space: the children leave Earth in a rocket or a spaceship, and the adventure happens out there.
 COSTUME: astronaut (mandatory for adventure scenes)
 
 Who lives here (pick one):
@@ -1037,6 +1061,7 @@ Story guidance:
 
 
 [ocean]
+PROMISE: The story goes out on the sea or under it, and a sea creature is a character that wants and does things of its own.
 COSTUME: not needed - use standard, summer or winter avatar
 
 Who lives here (pick one):
@@ -1048,7 +1073,7 @@ Who lives here (pick one):
 - A very old diver making a last dive [grown-up]
 - A crab who came aboard in a bucket and cannot be found
 - A whale who follows the boat and turns away at the same place every time
-- A tiny fish living inside something that is about to be carried away
+- A fish living inside something that is about to be carried away
 - A harbour keeper who knows every boat and every tide [grown-up]
 
 What turns (pick one):
@@ -1085,6 +1110,7 @@ Story guidance:
 
 
 [jungle]
+PROMISE: The story goes into the jungle, and a jungle animal is a character that wants and does things of its own.
 COSTUME: not needed - use standard, summer or winter avatar
 
 Who lives here (pick one):
@@ -1133,6 +1159,7 @@ Story guidance:
 
 
 [farm]
+PROMISE: A farm is the world the story happens in: farm animals are characters, and farm work is part of the adventure.
 COSTUME: not needed - use standard, summer or winter avatar
 
 Who lives here (pick one):
@@ -1181,6 +1208,7 @@ Story guidance:
 
 
 [forest]
+PROMISE: The story goes into the forest, and a forest animal is a character that wants and does things of its own.
 COSTUME: not needed - use standard, summer or winter avatar
 
 Who lives here (pick one):
@@ -1229,6 +1257,7 @@ Story guidance:
 
 
 [christmas]
+PROMISE: Christmas is in the story: the season's customs — the tree, the presents, the night before Christmas — are part of what happens, and the ending is a Christmas one.
 COSTUME: not needed - use standard or winter avatar
 
 Who lives here (pick one):
@@ -1277,6 +1306,7 @@ Story guidance:
 
 
 [newyear]
+PROMISE: New Year is in the story: the last evening of the year, the countdown to midnight or the fireworks are part of what happens.
 COSTUME: not needed - use standard or winter avatar
 
 Who lives here (pick one):
@@ -1325,6 +1355,7 @@ Story guidance:
 
 
 [easter]
+PROMISE: Easter is in the story: Easter eggs, an egg hunt or the Easter Bunny are part of what happens.
 COSTUME: not needed - use standard or summer avatar
 
 Who lives here (pick one):
@@ -1373,6 +1404,7 @@ Story guidance:
 
 
 [halloween]
+PROMISE: Halloween is in the story: costumes, carved pumpkins and the evening of trick-or-treating are part of what happens, playful rather than frightening.
 COSTUME: not needed - use standard, summer or winter avatar; children may also wear costumes they invent within the story
 
 Who lives here (pick one):
@@ -1421,6 +1453,7 @@ Story guidance:
 
 
 [mothers-day]
+PROMISE: Mother's Day is the reason for the story: something is made, done or given for a mother, and she receives it before the end.
 COSTUME: not needed - use standard, summer or winter avatar
 
 Who lives here (pick one):
@@ -1469,6 +1502,7 @@ Story guidance:
 
 
 [fathers-day]
+PROMISE: Father's Day is the reason for the story: something is made, done or given for a father, and he receives it before the end.
 COSTUME: not needed - use standard, summer or winter avatar
 
 Who lives here (pick one):
