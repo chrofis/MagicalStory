@@ -90,7 +90,7 @@ describe('fitPlatePrompt', () => {
     const out = images.fitPlatePrompt(p, p.length - 10, 'T');
     expect(out).not.toContain(note);
     expect(p.length - out.length).toBeLessThanOrEqual(note.length + 4);
-    for (const keep of ['**ART STYLE:**', '**SHOT:** wide', '**IDENTITY (from the photo):**', '**MEDIUM (never from the photo):**', 'Fill the entire frame edge-to-edge']) {
+    for (const keep of ['**ART STYLE:**', '**SHOT:** wide', '**IDENTITY (from the photo):**', '**MEDIUM (never from the photo):**', '**LANDMARK IN THIS SCENE:', '**REFERENCE:**']) {
       expect(out).toContain(keep);
     }
   });
