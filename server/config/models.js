@@ -454,7 +454,10 @@ const MODEL_DEFAULTS = {
   // (`high` on Opus 5). Lab #1375 (create sweep) / #1416 (re-tell at low held
   // within noise of high). The create gets the most thinking; the re-telling is
   // bounded by the committed arc and the panel's solutions.
-  arcCreateEffort: 'max',
+  // v3 arc prompts (2026-09-25): high matched max on dragon (#1466 max 7.81 /
+  // #1467 high 7.46 judges, hand 8.5 vs 8.0) and was strong on pirate (#1469,
+  // 7.58) at $0.45-0.75 vs $1.07 (owner: Opus 5 high is the default).
+  arcCreateEffort: 'high',
   arcRetellEffort: 'medium',
   // The three reviews used to share outlineReviewModel, so switching the BEATS
   // reviewer silently moved the scene and wardrobe reviews too. They are

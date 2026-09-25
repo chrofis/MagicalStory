@@ -102,7 +102,7 @@ async function runArc(panelReply: string) {
 
 describe('arc machine — create and retell effort', () => {
   it('pins the owner decision: create max, retell medium', () => {
-    expect(MODEL_DEFAULTS.arcCreateEffort).toBe('max');
+    expect(MODEL_DEFAULTS.arcCreateEffort).toBe('high');
     expect(MODEL_DEFAULTS.arcRetellEffort).toBe('medium');
   });
 
