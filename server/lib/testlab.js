@@ -8329,7 +8329,7 @@ async function runWriterCompareStage(target, { params = {} }) {
  * production does (parseArcCreate), and scores each committed arc with the
  * same judges arc_rounds uses. Cost and quality land side by side.
  *
- * params: { efforts, model, judgeModels, stage, promptFrom, challengesFromStory, baselineFromStory }
+ * params: { efforts, model, retellModel, judgeModels, stage, promptFrom, challengesFromStory, baselineFromStory }
  *   target: { storyId }
  *
  * params.stage      'create' (default) sweeps params.efforts over the create
@@ -8368,13 +8368,17 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
   // (`high`), so the sweep prices both directions: what medium/low save, and
   // what the top of the range would cost if the arc turns out to want it.
   const efforts = String(params.efforts || 'low,medium,high,xhigh,max').split(',').map(s => s.trim()).filter(Boolean);
-  // The arc CREATOR, not the reviewer — production reads MODEL_DEFAULTS.arcCreatorModel
-  // (beatsPipeline.js:833), and the whole point of this stage is that model's thinking bill.
+  // The arc CREATOR, not the reviewer — production reads MODEL_DEFAULTS.arcCreateModel
+  // (beatsPipeline.js), and the whole point of this stage is that model's thinking bill.
   // 'claude-opus' is the TEXT_MODELS KEY; 'claude-opus-5' is the model id it
   // resolves to and is not addressable here (the arc_amend default got this
   // wrong and burned a run).
-  const model = params.model || MODEL_DEFAULTS.arcCreatorModel || 'claude-opus';
+  const model = params.model || MODEL_DEFAULTS.arcCreateModel;
   if (!TEXT_MODELS[model]) throw new Error(`Unknown model "${model}"`);
+  // Production re-tells on its own key (2026-09-25: create Opus 5.5, re-tell
+  // Opus 5), so the pipeline stage's re-telling arms do too.
+  const retellModel = params.retellModel || MODEL_DEFAULTS.arcRetellModel;
+  if (!TEXT_MODELS[retellModel]) throw new Error(`Unknown retell model "${retellModel}"`);
   const judges = String(params.judgeModels || 'claude-sonnet,grok-4.6')
     .split(',').map(s => s.trim()).filter(Boolean);
   for (const j of judges) if (!TEXT_MODELS[j]) throw new Error(`Unknown judge "${j}"`);
@@ -8461,7 +8465,8 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
   const runArm = async (phase, armPrompt, effort) => {
     const t = Date.now();
     try {
-      const res = await callTextModelStreaming(armPrompt, null, null, model, { usageLabel: phase === 'retell' ? 'testlab_arc_effort_retell' : 'testlab_arc_effort', effort });
+      const armModel = phase === 'retell' ? retellModel : model;
+      const res = await callTextModelStreaming(armPrompt, null, null, armModel, { usageLabel: phase === 'retell' ? 'testlab_arc_effort_retell' : 'testlab_arc_effort', effort });
       const visible = String(res.text || '');
       let commit = null, parseError = null;
       try { commit = phase === 'retell' ? parseArcRetell(visible) : parseArcCreate(visible); } catch (e) { parseError = String(e.message || e); }
@@ -8472,10 +8477,10 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
       const visibleTokens = Math.round(visible.length / 3.5);
       return {
         arm: {
-          phase, effort, ok: true, parseError,
+          phase, model: armModel, effort, ok: true, parseError,
           // The advisory task budget this call carried (models.js
           // taskBudgetAtEffort; Opus 5.5 at max, 2026-09-25), or null.
-          taskBudget: TEXT_MODELS[model].taskBudgetAtEffort?.[effort] ?? null,
+          taskBudget: TEXT_MODELS[armModel].taskBudgetAtEffort?.[effort] ?? null,
           cost: costOf(res), elapsedMs: Date.now() - t,
           inputTokens: res.usage?.input_tokens || 0,
           outputTokens: out,
@@ -9073,14 +9078,10 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
         const pageCount = (storyData.sceneImages || []).length || parseInt(storyData.pages, 10) || 14;
         const retellPrompt = H.buildArcRetellPrompt(storyData, pageCount, arcBlock, gate.text);
         if (!retellPrompt) throw new Error('arc-retell template unavailable');
-        // `arcReviewReport.creatorModel` is the RESOLVED model id the provider
-        // returned ("claude-opus-5"), not the TEXT_MODELS config key the caller
-        // needs ("claude-opus"). Only honour it when it is also a valid key.
-        const retellModel = String(
-          params.retellModel
-          || (TEXT_MODELS[report.creatorModel] ? report.creatorModel : null)
-          || MODEL_DEFAULTS.arcCreatorModel
-        );
+        // Production's re-tell model (MODEL_DEFAULTS.arcRetellModel), never the
+        // stored story's creator: since 2026-09-25 create and re-tell are
+        // separate keys, and the create model is not the one that re-tells.
+        const retellModel = String(params.retellModel || MODEL_DEFAULTS.arcRetellModel);
         if (!TEXT_MODELS[retellModel]) throw new Error(`Unknown model "${retellModel}"`);
         const t = Date.now();
         const res = await callTextModelStreaming(retellPrompt, null, null, retellModel, {

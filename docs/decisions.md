@@ -60492,3 +60492,36 @@ Stored critiques of older stories parse as malformed, so a Lab replay on them ga
 (`arc-generator-vs-critic`, `arc-retell-gate`), `tasks/verify.json` (`arc-three-worst-issues`),
 `tests/unit/arc-logic-first.test.ts`, `tests/unit/arc-creator-effort.test.ts`.
 **Status:** ✅ committed on `staging`, not pushed; Lab validation pending.
+
+## 2026-09-25 — arc_create runs on Opus 5.5 at effort xhigh; the re-telling stays on Opus 5
+
+**Context:** Lab #1473-1476 (staging, pirate commission, `arc_effort` stage `pipeline`, v3 prompts).
+Create arms: Opus 5 xhigh (#1473, $1.26, 48,846 output tokens), Opus 5 max (#1474, $1.54, 60,170),
+Opus 5.5 xhigh (#1475, $0.88, 42,692, no task budget), Opus 5.5 max (#1476, $1.42, 69,543, task budget
+96,000; chain 16 links against a 5-8 range, three world rules against two). The owner read the arcs:
+#1475 was the best arm (hand 8.5); Opus 5 at high/max wrote convoluted arcs on this commission. The
+create and the re-telling shared ONE key, `arcCreatorModel` (default claude-opus), so the model could
+not move for the create alone; 181ffd809 had just set `arcCreateEffort` to `high`.
+
+**Decision (owner, 2026-09-25):** arc_create defaults to Opus 5.5 at effort xhigh.
+- `MODEL_DEFAULTS.arcCreateModel = 'claude-opus-5-5'`, `arcCreateEffort = 'xhigh'`;
+  `arcRetellModel = 'claude-opus'` keeps the re-telling on its current model at `arcRetellEffort`
+  (`medium`) explicitly. `arcCreatorModel` and its `ARC_CREATOR_MODEL` env override are gone
+  (behaviour is code); `modelOverrides.arcCreateModel` / `arcRetellModel` replace the one override.
+- Task budget: none at xhigh. Measured spend 42,692 (#1475) and 62,669 (#1421) output tokens against
+  the 128,000 cap; `taskBudgetAtEffort` stays `{ max: 96000 }` only (12317e634).
+- The empty-text guard applies: the create is an Anthropic streaming call, so `assertAnthropicText`
+  throws on a text-less reply with its stop_reason, and `creatorCall` treats an empty reply as a
+  failed attempt (one retry, then throw).
+- The Lab mirrors follow: `arc_effort` defaults its create arms to `arcCreateModel` and its re-telling
+  arms to `arcRetellModel` (`params.retellModel` overrides); `arc_panel_replay` re-tells on
+  `arcRetellModel`, no longer on the stored story's creator id.
+- Trial: unaffected. The trial never runs the arc machine (one call, `story-trial.txt`; see
+  `resolvePipelineMode`), and no trial path read `arcCreatorModel`.
+
+**Cost:** $0.88 per create on Opus 5.5 xhigh (#1475) against $0.42-0.75 on Opus 5 high — about +$0.15
+to +$0.45 per story.
+
+**Touched:** `server/config/models.js`, `server/lib/beatsPipeline.js`, `server/lib/testlab.js`,
+`tests/unit/arc-creator-effort.test.ts`, `docs/prompt-inventory.md`.
+**Status:** ✅ committed on `staging`, not pushed.

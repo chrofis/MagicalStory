@@ -889,7 +889,10 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   const reviewModel = modelOverrides.outlineReviewModel || MODEL_DEFAULTS.outlineReviewModel;
   // THE ARC MACHINE (owner, 2026-08-30): creator + panel + rounds replace the
   // old arcAuditModel/arcReviewModel/childCriticModel chain here.
-  const arcCreatorModel = modelOverrides.arcCreatorModel || MODEL_DEFAULTS.arcCreatorModel || planModel;
+  // Create and re-tell are separate keys (owner, 2026-09-25: create on Opus
+  // 5.5 at xhigh, re-tell on Opus 5) — models.js arcCreateModel.
+  const arcCreateModel = modelOverrides.arcCreateModel || MODEL_DEFAULTS.arcCreateModel;
+  const arcRetellModel = modelOverrides.arcRetellModel || MODEL_DEFAULTS.arcRetellModel;
   const arcPanelModels = (Array.isArray(MODEL_DEFAULTS.arcPanelModels) ? MODEL_DEFAULTS.arcPanelModels : [])
     .filter(m => TEXT_MODELS[m]);
   // Hard cap at 3 (owner, 2026-08-30): the iteration study peaked at v3 and
@@ -905,9 +908,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   const sceneModel = modelOverrides.sceneDescriptionModel || MODEL_DEFAULTS.sceneDescription;
   const textModel = modelOverrides.textModel || MODEL_DEFAULTS.storyText;
 
-  const meta = { pageCount, models: { planModel, arcCreatorModel, arcPanelModels, arcRounds, planCheckModel: modelOverrides.planCheckModel || MODEL_DEFAULTS.planCheckModel, reviewModel, sceneReviewModel, clothingReviewModel, sceneModel, textModel }, timings: {} };
+  const meta = { pageCount, models: { planModel, arcCreateModel, arcRetellModel, arcPanelModels, arcRounds, planCheckModel: modelOverrides.planCheckModel || MODEL_DEFAULTS.planCheckModel, reviewModel, sceneReviewModel, clothingReviewModel, sceneModel, textModel }, timings: {} };
   const started = Date.now();
-  log.info(`🪜 [BEATS] job=${jobId} pages=${pageCount} plan=${planModel} arcCreator=${arcCreatorModel} arcPanel=${arcPanelModels.join('+')} arcRounds=${arcRounds} planCheck=${modelOverrides.planCheckModel || MODEL_DEFAULTS.planCheckModel} review=${reviewModel} sceneReview=${sceneReviewModel} wardrobeReview=${clothingReviewModel} scenes=${sceneModel} text=${textModel}`);
+  log.info(`🪜 [BEATS] job=${jobId} pages=${pageCount} plan=${planModel} arcCreate=${arcCreateModel} arcRetell=${arcRetellModel} arcPanel=${arcPanelModels.join('+')} arcRounds=${arcRounds} planCheck=${modelOverrides.planCheckModel || MODEL_DEFAULTS.planCheckModel} review=${reviewModel} sceneReview=${sceneReviewModel} wardrobeReview=${clothingReviewModel} scenes=${sceneModel} text=${textModel}`);
 
   // ── Step 0: THE ARC MACHINE — create → panel → re-tell ────────────────────
   // Replaces the arc write → audit → child critic → review → re-audit chain
@@ -988,13 +991,14 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       (temp == null || TEXT_MODELS[model]?.provider === 'anthropic') ? {} : { temperature: temp };
 
     /** Creator-side call: one retry, then throw — the creator is not advisory. */
-    // `effort` is the thinking level for this call (MODEL_DEFAULTS.arcCreateEffort
-    // / arcRetellEffort); null max_tokens = the model's own ceiling.
-    const creatorCall = async (prompt, label, temp, effort) => {
+    // `model` and `effort` are this call's (MODEL_DEFAULTS.arcCreateModel +
+    // arcCreateEffort, or arcRetellModel + arcRetellEffort); null max_tokens =
+    // the model's own ceiling.
+    const creatorCall = async (prompt, label, model, temp, effort) => {
       let lastErr = null;
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
-          const res = await textModels.callTextModelStreaming(prompt, null, onChunk, arcCreatorModel, { usageLabel: label, ...tempFor(arcCreatorModel, temp), ...(effort ? { effort } : {}) });
+          const res = await textModels.callTextModelStreaming(prompt, null, onChunk, model, { usageLabel: label, ...tempFor(model, temp), ...(effort ? { effort } : {}) });
           if (!String(res?.text || '').trim()) throw new Error('empty response');
           // A cut arc parses as a shorter arc (missing critique lines, a short
           // chain) — treat it as a failed attempt, never as the creator's answer.
@@ -1017,7 +1021,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     let createRes = null;
     let commit = null;
     for (let attempt = 1; attempt <= 2 && !commit; attempt++) {
-      createRes = await creatorCall(createPrompt, 'arc_create', null, MODEL_DEFAULTS.arcCreateEffort);
+      createRes = await creatorCall(createPrompt, 'arc_create', arcCreateModel, null, MODEL_DEFAULTS.arcCreateEffort);
       try {
         commit = parseArcCreate(createRes.text);
       } catch (parseErr) {
@@ -1037,8 +1041,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     };
     const createCounts = arcShapeCounts({ sentences: commit.sentences, logic: commit.logic, inputData, pageCount });
     logArcCounts('arc create', 0, createCounts);
-    gl.info('arc_create', `Arc creator ${createRes.modelId || arcCreatorModel} wrote one arc (${commit.sentences} sentences, ${createCounts.chainLinks} chain links, ${commit.logic.invented.length} new figure(s))`, null, {
-      model: createRes.modelId || arcCreatorModel, sentences: commit.sentences, chainLinks: createCounts.chainLinks,
+    gl.info('arc_create', `Arc creator ${createRes.modelId || arcCreateModel} wrote one arc (${commit.sentences} sentences, ${createCounts.chainLinks} chain links, ${commit.logic.invented.length} new figure(s))`, null, {
+      model: createRes.modelId || arcCreateModel, sentences: commit.sentences, chainLinks: createCounts.chainLinks,
       invented: commit.logic.invented, commissioned: commit.logic.commissioned, centralFigure: commit.logic.centralFigure,
     });
     // Defaults if every panel round comes back empty: the committed arc stands,
@@ -1172,7 +1176,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       let retellRes = null;
       let retold = null;
       for (let attempt = 1; attempt <= 2 && !retold; attempt++) {
-        retellRes = await creatorCall(retellPrompt, 'arc_retell', MODEL_DEFAULTS.arcRetellTemperature, MODEL_DEFAULTS.arcRetellEffort);
+        retellRes = await creatorCall(retellPrompt, 'arc_retell', arcRetellModel, MODEL_DEFAULTS.arcRetellTemperature, MODEL_DEFAULTS.arcRetellEffort);
         try {
           retold = parseArcRetell(retellRes.text);
         } catch (parseErr) {
@@ -1245,7 +1249,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         // its "Challenges taken:" head and strip the [C###] tags, so without
         // the raw nothing they were parsed from could be audited.
         retellRaw: retellRes.text,
-        retellModel: retellRes.modelId || arcCreatorModel,
+        retellModel: retellRes.modelId || arcRetellModel,
         logic: retold.logic.text,
         finalArc: retold.finalArc,
         used: retold.used,
@@ -1254,7 +1258,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         critique: retold.critique,
         maxSeverity,
       });
-      gl.info('arc_retell', `Round ${round}: ${retellRes.modelId || arcCreatorModel} re-told the story (used: ${retold.used || 'not stated'}; worst surviving fault: ${maxSeverity || 'none'})`, null, {
+      gl.info('arc_retell', `Round ${round}: ${retellRes.modelId || arcRetellModel} re-told the story (used: ${retold.used || 'not stated'}; worst surviving fault: ${maxSeverity || 'none'})`, null, {
         round, used: retold.used, maxSeverity, critiqueFaults: (retold.critique.match(/^\s*\d+[.)]/gm) || []).length,
       });
       // ADAPTIVE EARLY STOP (owner, 2026-08-30): another round only earns its
@@ -1316,7 +1320,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // debuggability is the point. Text only, no images.
     arcReviewReport = {
       machine: 'create-panel-retell',
-      creatorModel: createRes.modelId || arcCreatorModel,
+      creatorModel: createRes.modelId || arcCreateModel,
       panelModels: arcPanelModels,
       roundsConfigured: arcRounds,
       roundsRun: roundReports.length,
@@ -1346,8 +1350,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       hintsPrompt,
       hintsRaw,
     };
-    gl.info('beats_arc', `Arc machine done: ${roundReports.length}/${arcRounds} round(s)${retellSkipped ? ` (re-telling skipped: ${retellSkipped})` : ''}, final arc by ${arcCreatorModel} (${(meta.timings.arcMs / 1000).toFixed(1)}s)`, null, {
-      rounds: roundReports.length, creatorModel: arcCreatorModel,
+    gl.info('beats_arc', `Arc machine done: ${roundReports.length}/${arcRounds} round(s)${retellSkipped ? ` (re-telling skipped: ${retellSkipped})` : ''}, final arc by ${lastRetold ? arcRetellModel : arcCreateModel} (${(meta.timings.arcMs / 1000).toFixed(1)}s)`, null, {
+      rounds: roundReports.length, createModel: arcCreateModel, retellModel: lastRetold ? arcRetellModel : null,
     });
   } catch (err) {
     // Never block a story on the arc step: without it the planner writes the

@@ -101,9 +101,21 @@ async function runArc(panelReply: string) {
 }
 
 describe('arc machine — create and retell effort', () => {
-  it('pins the owner decision: create max, retell medium', () => {
-    expect(MODEL_DEFAULTS.arcCreateEffort).toBe('high');
+  it('pins the owner decision (2026-09-25): create on Opus 5.5 at xhigh, retell on Opus 5 at medium', () => {
+    expect(MODEL_DEFAULTS.arcCreateModel).toBe('claude-opus-5-5');
+    expect(MODEL_DEFAULTS.arcCreateEffort).toBe('xhigh');
+    expect(MODEL_DEFAULTS.arcRetellModel).toBe('claude-opus');
     expect(MODEL_DEFAULTS.arcRetellEffort).toBe('medium');
+    expect(MODEL_DEFAULTS.arcCreatorModel).toBeUndefined();
+  });
+
+  it('xhigh on Opus 5.5 carries no task budget; the empty-text guard covers the create', () => {
+    const { TEXT_MODELS } = require('../../server/config/models.js');
+    const m = TEXT_MODELS[MODEL_DEFAULTS.arcCreateModel];
+    expect(m.provider).toBe('anthropic');
+    expect(textModels.taskBudgetFor(m, { effort: MODEL_DEFAULTS.arcCreateEffort })).toBeNull();
+    expect(() => textModels.assertAnthropicText({ text: '', stop_reason: 'max_tokens', usage: { output_tokens: 128000 } }, MODEL_DEFAULTS.arcCreateModel))
+      .toThrow(/returned no text: stop_reason=max_tokens/);
   });
 
   it('sends arcCreateEffort on arc_create and arcRetellEffort on arc_retell, uncapped', async () => {
@@ -115,9 +127,9 @@ describe('arc machine — create and retell effort', () => {
     expect(retell.length).toBe(1);
     expect(create[0].opts.effort).toBe(MODEL_DEFAULTS.arcCreateEffort);
     expect(retell[0].opts.effort).toBe(MODEL_DEFAULTS.arcRetellEffort);
-    // Same model for both; neither call is capped below the model ceiling.
-    expect(create[0].model).toBe(MODEL_DEFAULTS.arcCreatorModel);
-    expect(retell[0].model).toBe(MODEL_DEFAULTS.arcCreatorModel);
+    // Each call on its own model key; neither is capped below the model ceiling.
+    expect(create[0].model).toBe(MODEL_DEFAULTS.arcCreateModel);
+    expect(retell[0].model).toBe(MODEL_DEFAULTS.arcRetellModel);
     expect(create[0].maxTokens).toBeNull();
     expect(retell[0].maxTokens).toBeNull();
     // The panel is not a creator call and gets no effort.

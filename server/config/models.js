@@ -36,8 +36,8 @@ const TEXT_MODELS = {
     maxOutputTokens: 128000, // true model cap per Anthropic Models API (max_tokens on /v1/models/claude-opus-5)
     description: 'Claude Opus 5 - Strongest reviewer/critic ($5/$25 per 1M). Used for the split outline review (cross-model: Sonnet writes, Opus reviews).'
   },
-  // Claude Opus 5.5 (released 2026-09-22). Lab-only until the owner decides:
-  // no default names this key. Ceiling from GET /v1/models/claude-opus-5-5 ->
+  // Claude Opus 5.5 (released 2026-09-22). The arc CREATE model since
+  // 2026-09-25 (MODEL_DEFAULTS.arcCreateModel, effort xhigh). Ceiling from GET /v1/models/claude-opus-5-5 ->
   // max_tokens 128000 (read 2026-09-23). Unlike Opus 5, its DEFAULT effort is
   // `medium`, not `high` — a call that sends no effort runs one level lower.
   //
@@ -61,7 +61,7 @@ const TEXT_MODELS = {
     modelId: 'claude-opus-5-5',
     maxOutputTokens: 128000,
     taskBudgetAtEffort: { max: 96000 },
-    description: 'Claude Opus 5.5 - ($4/$20 per 1M). Default effort medium. Lab-only, not routed.'
+    description: 'Claude Opus 5.5 - ($4/$20 per 1M). Default effort medium. Routed: arc_create at xhigh.'
   },
   'claude-haiku': {
     provider: 'anthropic',
@@ -407,7 +407,17 @@ const MODEL_DEFAULTS = {
   // flow3); see docs/decisions.md. arcAuditModel / childCriticModel /
   // arcReviewModel above are no longer called by the production pipeline —
   // Lab stages still use them.
-  arcCreatorModel: process.env.ARC_CREATOR_MODEL || 'claude-opus',
+  //
+  // CREATE AND RE-TELL ARE SEPARATE KEYS (owner, 2026-09-25). The create is
+  // Opus 5.5 at effort xhigh: Lab #1475 (pirate commission) was the best arm —
+  // hand 8.5, $0.88 create, 42,692 output tokens — where Opus 5 at high/max
+  // wrote convoluted arcs on the same commission (#1473 xhigh $1.26, #1474 max
+  // $1.54). The re-telling stays on Opus 5 at arcRetellEffort: only the create
+  // was measured on 5.5 as the owner's pick. Was ONE key, arcCreatorModel,
+  // read by both calls (and by the ARC_CREATOR_MODEL env var, gone: behaviour
+  // is code).
+  arcCreateModel: 'claude-opus-5-5',
+  arcRetellModel: 'claude-opus',
   arcPanelModels: (process.env.ARC_PANEL_MODELS || 'grok-4.6,deepseek-v4-pro,gpt-5.6-luna-pro')
     .split(',').map(s => s.trim()).filter(Boolean),
   // Rounds of panel + re-tell. Round k>1 feeds the previous FINAL ARC + its
@@ -457,7 +467,12 @@ const MODEL_DEFAULTS = {
   // v3 arc prompts (2026-09-25): high matched max on dragon (#1466 max 7.81 /
   // #1467 high 7.46 judges, hand 8.5 vs 8.0) and was strong on pirate (#1469,
   // 7.58) at $0.45-0.75 vs $1.07 (owner: Opus 5 high is the default).
-  arcCreateEffort: 'high',
+  // Opus 5.5 at xhigh (owner, 2026-09-25; Lab #1475, see arcCreateModel).
+  // xhigh needs no task budget: measured 42,692 (#1475) and 62,669 (#1421)
+  // output tokens against the 128,000 cap; only max carries one
+  // (TEXT_MODELS['claude-opus-5-5'].taskBudgetAtEffort). Cost: $0.88 per
+  // create vs $0.42-0.75 for Opus 5 at high.
+  arcCreateEffort: 'xhigh',
   arcRetellEffort: 'medium',
   // The three reviews used to share outlineReviewModel, so switching the BEATS
   // reviewer silently moved the scene and wardrobe reviews too. They are
