@@ -6487,7 +6487,12 @@ const CAUSAL_COHERENCE_RULE =
   + 'Never a prop that is set down and plays no part in what follows, and never an action, a plan, a warning or a promise no later page acts on. '
   + 'No consequence falls while an easier option stands open: every barrier the story leans on has its way around closed on some page.';
 
-function buildStoryShapeSection(inputData, pageCount, { arc = false } = {}) {
+// `challengeLine: false` (the arc creator and re-teller, and the arc judge that
+// reads what they were given): the challenge-count line leaves, because the
+// arc's principles state the ONE event budget (arcEventRange) and a second
+// number beside it disagreed with it — "three or four challenges" against one
+// happening for a toddler book (2026-09-25). The trial writer keeps the line.
+function buildStoryShapeSection(inputData, pageCount, { arc = false, challengeLine = true } = {}) {
   const pages = parseInt(pageCount, 10) || (inputData.sceneImages || []).length || 10;
   const chars = inputData.characters || [];
   const { mains, focus, others } = pickMainCharacters(inputData);
@@ -6671,7 +6676,7 @@ function buildStoryShapeSection(inputData, pageCount, { arc = false } = {}) {
       '# STORY SHAPE',
       '',
       mainLine,
-      `Build the story on ${challengeBudget} challenges.`,
+      challengeLine ? `Build the story on ${challengeBudget} challenges.` : '',
       alongside,
       arcDifficulty,
       CAUSAL_COHERENCE_RULE,
@@ -7020,6 +7025,15 @@ function exclusionGroups(excludeIds) {
     .filter(g => g.length);
 }
 
+// The heading of the drawn section, fixed text. ONE source: the draw writes it
+// and the Lab re-heads a stored draw with it (testlab storedChallengeSection),
+// so a stored draw is compared under today's wording, entries unchanged.
+const CHALLENGE_IDEAS_HEADING = [
+  '# CHALLENGE IDEAS (drawn at random from a catalogue of classic trials)',
+  "Build the story's happenings from these — the ones that fit the commission and its world, only as many as the story's happenings allow, adapted freely. Ignore the rest. A challenge the commission itself sets always stands.",
+  'The [C###] tag is a reference label for naming a choice back. It is never part of the story and never appears in a sentence.',
+];
+
 /**
  * Draw a random, age-filtered, category-spread sample of the challenge
  * catalogue.
@@ -7100,15 +7114,11 @@ function drawChallengeIdeas(inputData, { count = 25, excludeIds = [] } = {}) {
       round++;
     }
     if (!picked.length) return { section: '', ids: [], offeredStories: groups.length, effectiveStories };
-    // Structural budget scales with the book (owner, 2026-08-30): a short book
-    // cannot pay off three challenges, a long one starves on two.
-    const pages = parseInt(inputData?.pages, 10) || 10;
-    const challengeBudget = pages <= 10 ? 'one or two' : pages <= 17 ? 'about three' : 'three or four';
+    // No count here (2026-09-25): the arc's principles state the one event
+    // budget (arcEventRange); a second number in this heading disagreed with it.
     return {
       section: [
-        '# CHALLENGE IDEAS (drawn at random from a catalogue of classic trials)',
-        `Build the story's challenges from ${challengeBudget} of these — the ones that fit the commission and its world, adapted freely. Ignore the rest. A challenge the commission itself sets always stands.`,
-        'The [C###] tag is a reference label for naming a choice back. It is never part of the story and never appears in a sentence.',
+        ...CHALLENGE_IDEAS_HEADING,
         '',
         ...picked.map(x => x.line),
       ].join('\n'),
@@ -8274,15 +8284,17 @@ function arcEventRange(inputData, pageCount) {
 }
 
 /**
- * THE CHAIN IS THE EVENT BUDGET (owner, 2026-09-24, D3). The STORY LOGIC
- * block's chain has one link per event plus the last link, which says why the
- * solution works now: the event range plus one. The journey band at 18 pages
- * gives 5-6, the owner's anchor. ONE source for the number the prompt states
- * and the number `arcShapeCounts` checks; the model counts nothing.
+ * THE CHAIN IS THE EVENT BUDGET (owner, 2026-09-24, D3; tightened 2026-09-25).
+ * One chain link per happening, and the last happening carries why the
+ * solution works now — no extra link. The 2026-09-24 version added that link
+ * on top (+1), and on Lab #1459 (staging job_1790277448294_5herh01j7, 18 pages,
+ * read to a five-year-old) the arc filled six links with ~7 happenings and 20
+ * sentences. The journey band at 18 pages gives 4-5, the owner's anchor for
+ * ages 3-5. ONE source for the number the principles and the chain state and
+ * the number `arcShapeCounts` checks; the model counts nothing.
  */
 function arcChainRange(inputData, pageCount) {
-  const { lo, hi } = arcEventRange(inputData, pageCount);
-  return { lo: lo + 1, hi: hi + 1 };
+  return arcEventRange(inputData, pageCount);
 }
 
 /** "5-6", or "2" when the range is one number. */
@@ -9095,13 +9107,29 @@ const AD_COMPOSITION_RULE = [
 const COMMISSIONED_CAST_DEF = "the character list plus any named figure the premise supplies or a character's saved details name — a sibling, a friend, a pet, a companion";
 
 /**
- * THE LOGIC CHECK — one string, two readers (owner, 2026-09-24): the creator's
- * own critique ("Logic:", arcCritiqueSpec) and the panel's first lens (LOGIC,
- * arc-panel.txt). Both read the numbered sentences against the STORY LOGIC
- * block the creator wrote first. On staging job_1790277448294_5herh01j7 the
- * Opus-max arc carried logic holes its counting critique never looked for.
+ * THE LOGIC CHECK — what a logic fault IS, one string, two readers (owner,
+ * 2026-09-24): the creator's critique ("Faults:", arcCritiqueSpec) and the
+ * panel's first lens (LOGIC, arc-panel.txt).
+ *
+ * Rewritten 2026-09-25 from "read each sentence against the story logic: …" — a
+ * generic sentence-by-sentence self-check, the instruction Anthropic's Opus 5
+ * guidance says to remove — to the shapes the check looks for, each anchored
+ * in a line the STORY LOGIC block holds (a want, a motive line, an ability or
+ * limit, a rule of the world), so SCORE-style explicit state is what the
+ * finding is measured against (arXiv 2503.23512).
  */
-const ARC_LOGIC_CHECK = "Read each sentence against the story logic: a figure who acts against the want, the reason or the ability the logic gives them; a \"why don't they just …?\" the logic leaves open; a fact that contradicts an earlier one; a fact the plot needs that the logic does not carry; a last link that does not say why the solution works now and did not before.";
+const ARC_LOGIC_CHECK = 'an act against the want, motive, ability or limit the story logic gives its figure; an act that no motive line causes; a happening that causes nothing later; a fact that contradicts an earlier one; a "why don\'t they just …?" the logic leaves open.';
+
+/**
+ * HOW A FINDING IS WRITTEN — one string, the creator's critique and the panel
+ * (2026-09-25). A finding quotes the words that conflict, so it can be checked
+ * against the text instead of trusted (ConStory-Bench: a consistency finding
+ * cites both conflicting spans). Unanchored self-correction makes answers worse
+ * (Huang et al., ICLR 2024); a quoted conflict is the anchor. The panel's
+ * findings are also checked in code: filterPanelFindings drops a finding whose
+ * quote is not in the arc it reviews.
+ */
+const ARC_FINDING_RULE = 'Each finding quotes the words that conflict, exactly as they stand: s<N> "<words from that arc sentence>" against "<words from the story-logic line or the earlier sentence it breaks>". A finding about an act no motive line causes, or a happening that causes nothing later, quotes that sentence alone. A finding that quotes nothing is not a finding.';
 
 /**
  * Generator-side twins of three arc-panel lenses (ENTRANCE, ASSUMED, SENSE).
@@ -9195,25 +9223,28 @@ function buildTellingRulesSection(inputData = {}) {
   const lifeSkillStrategy = String(inputData?.storyCategory || '') === 'life-challenge' && !simple;
   // TWO STORYLINES FROM AGE 6 (owner, 2026-09-23: "allow it").
   const noSplit = !twoThreadsAllowed(inputData);
+  // 2026-09-25: "each character's nature causes a problem or solves one" left
+  // (every trait pulled in a scene to prove it — Lab #1459); the Motives lines
+  // of the story logic carry what a figure does and why. "Use the fewest
+  // characters" and "wants something from the start" are arc principles now
+  // (arcPrinciples), stated once.
   return [
     '# RULES OF THE LOGIC',
-    '- Factual register: plain declarative sentences stating what happens and why. No imagery, no metaphors, no inner monologue, no emotional narration, no decorative adjectives.',
-    '- Each character\'s nature causes a problem or solves one.',
-    '- The main character wants something from the start, and their situation is different at the end. One character carries a visible change: early they refuse, fail or need help at something; late they do it themselves.',
-    '- The children resolve it themselves. No adult, rescuer, lucky arrival or accident removes an obstacle; adults may comfort, permit or watch.',
+    '- Factual register: plain declarative sentences stating what happens and why — no imagery, inner monologue or decorative adjectives.',
+    '- One main character carries a visible change: early they refuse, fail or need help at something; late they do it themselves.',
+    '- The children resolve it themselves; adults may comfort, permit or watch. No rescuer, lucky arrival or accident removes an obstacle.',
     ...(lifeSkillStrategy ? ['- One thing the main character does to handle the topic works, and a child listening could do the same thing: it happens on the page, in what they do, never explained, recommended or named as a lesson.'] : []),
     '- Challenges belong to the story, never dealt out one per character in turn; what the youngest does stays within a very young child\'s reach — noticing, holding, fetching, naming, offering, refusing.',
     simple
       ? '- Nothing stands in the way on purpose. What holds the main character up is a thing or a circumstance — out of reach, missing, not working yet — never anyone unwilling, and whoever they meet is friendly.'
-      : '- Whoever or whatever stands in the way wants something of their own, presses on the story to the end and stands in the scene at the turning point; they do not yield on request. A rival\'s thread ends with the rival present — arriving too late, seeing what they lost, paying; a defeat only reported is an open thread.',
-    '- Reasons are grounded, not announced: a sign, an inscription or a rule stated once to license a turn is not a reason — it comes from who someone is, what a place is for, or what someone needs.',
-    '- An obstacle exists for its own reasons: never shaped around a thing a character carries, and never a barrier whose only solution a character already holds. Obstacles come from the story\'s own world — weather, distance, a rival, a broken or missing or guarded thing, a character\'s own flaw; no puzzle door, riddle, trick lock or test set by no one, unless the commission establishes it.',
+      : '- The opposition presses on the story to the end and stands in the scene at the turning point; it does not yield on request. A rival\'s thread ends with the rival present — arriving too late, seeing what they lost, paying.',
+    '- Reasons come from who someone is, what a place is for, or what someone needs; a sign, an inscription or a rule stated once to license a turn is not a reason.',
+    '- An obstacle comes from the story\'s own world — weather, distance, a rival, a broken or missing or guarded thing, a character\'s own flaw — and exists for its own reasons: never shaped around a thing a character carries, never a puzzle door, riddle or test set by no one unless the commission sets it.',
     '- Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level; a refusal, a loss, a delay or a broken promise carries the peril instead. Nobody looks monstrous, no familiar character turns frightening, and anyone separated or lost is reunited.',
     RISK_FRAMING_RULE,
     `- ${ANIMAL_FATE_RULE}`,
     '- The story ends with the children safe and together, one of them feeling something a child can name. A container or reveal the story promises opens before the end, and a story that enters through a doorway, portal or frame returns through it.',
-    '- Close every thread: a question raised is answered, and anything that resolves the conflict has an origin — an earlier setup, an in-world rule, a legend. A character singled out — the only one who can help, waited for, chosen — has a stated reason.',
-    '- Use the fewest characters the story needs: invent no figure an existing character could be, and merge two roles into one where the plot allows.',
+    '- Every question raised is answered, and what resolves the conflict has an origin — an earlier setup or a rule the story logic states. A figure singled out — the only one who can help, waited for, chosen — has a stated reason.',
     noSplit
       ? '- The cast stays together on one path — never two groups going separate ways; where the commission itself splits them, keep them together and justify it in one line.'
       : '- The group stays together unless it has a reason to separate and a reason to meet again.',
@@ -9227,78 +9258,116 @@ function buildTellingRulesSection(inputData = {}) {
   ].join('\n');
 }
 
+/** "4-5 happenings", "1 happening" — the event budget as the prompt states it. */
+function happeningsLabel(inputData, pageCount) {
+  const r = arcEventRange(inputData, pageCount);
+  return `${rangeLabel(r)} happening${r.hi === 1 ? '' : 's'}`;
+}
+
+/**
+ * THE ARC PRINCIPLES — the first section of arc-create and arc-retell, and of
+ * the arc judge's context (owner, 2026-09-25). A few positive principles, each
+ * with a one-clause reason, ahead of everything else: instruction adherence
+ * falls as the instruction count rises and the earlier rules win (IFScale,
+ * arXiv 2507.11538), and Anthropic's Claude prompting guidance prefers a few
+ * principles with their reasons to a list of rules.
+ *
+ * The evidence: Lab #1459 (staging job_1790277448294_5herh01j7, 18 pages, read
+ * to a five-year-old) caught the logic holes but wrote 20 sentences and about
+ * seven happenings — every ability, rule and motive in the STORY LOGIC pulled
+ * in a scene to demonstrate it. Picture-book craft: one problem, one active
+ * hero, few figures, no subplot; a child remembers the events on the causal
+ * chain to the ending and forgets the dead ends (Trabasso & van den Broek).
+ *
+ * The event budget is a NUMBER stated here (arcEventRange, the same one the
+ * chain states and arcShapeCounts checks); nothing asks the model to count it
+ * in a critique.
+ */
+function arcPrinciples(inputData = {}, pageCount = 10) {
+  const pages = Math.max(4, parseInt(pageCount, 10) || 10);
+  return [
+    '# HOW THIS STORY IS BUILT',
+    '- One problem, from the first sentence to the last, and no second storyline: a listening child follows one question.',
+    '- One main character solves it, deciding and doing the deed that turns the story: a child roots for the one who acts.',
+    `- ${happeningsLabel(inputData, pageCount)} a child would retell: the child remembers the happenings on the way to the ending and forgets the rest.`,
+    '- Every happening causes the ending; one that causes nothing is cut, not explained: a dead end costs a page and is forgotten.',
+    `- ${arcLengthRange(pages)} sentences for ${pages} pages: the telling follows the book, about one sentence a page.`,
+    '- Few figures, each carrying the one thing the plot uses: every new figure is a name the child has to hold.',
+  ].join('\n');
+}
+
 /**
  * THE STORY LOGIC SPEC — what the arc writes BEFORE its numbered sentences
  * (owner, 2026-09-24). ONE source, filled as {ARC_LOGIC_SPEC} into arc-create
  * and arc-retell.
  *
+ * CAPPED (owner, 2026-09-25): on Lab #1459 every line of an uncapped block —
+ * four abilities per child, five rules of the world — pulled a scene into the
+ * arc to demonstrate it. Now: one want and stake with a deadline; ONE opposing
+ * force with its motive; per figure the one ability or limit the plot uses; at
+ * most two rules of the world; one motive→act line per figure that acts, so an
+ * act with no motive shows; "Events: N"; one chain link per happening.
+ *
  * PARSER CONTRACT (parseStoryLogic): the labels "Want and stakes:",
- * "Opposition:", "Facts:", "Central figure:" and "Chain:"; a figure line is a
- * dash line whose name is followed by "(commissioned)" or "(new)"; chain links
- * are dash lines, never numbered, so no link can reach arcActSpans or
- * critiqueMaxSeverity.
+ * "Opposition:", "Facts:", "Motives:", "Central figure:", "Events:" and
+ * "Chain:"; a figure line is a dash line whose name is followed by
+ * "(commissioned)" or "(new)"; a motive line is "- <figure>: <motive> → <act>";
+ * chain links are dash lines, never numbered, so no link can reach
+ * arcActSpans or critiqueMaxSeverity.
  *
  * The figure tags replace the "Premise figures:" / "Invented figures:" lists
  * (D1-A): code counts the (new) tags against arcInventedAllowance, and the
  * (commissioned) names outside the character list feed commissionedCast. The
- * chain length is arcChainRange (D3). The model states facts; it counts nothing.
+ * chain length is arcChainRange (D3).
  */
 function arcLogicSpec(inputData = {}, pageCount = 10) {
   const simple = SIMPLE_BANDS.has(resolveAgeBand(inputData));
   const lvl = String(inputData?.languageLevel || 'standard').toLowerCase();
   const links = rangeLabel(arcChainRange(inputData, pageCount));
   const shape = simple
-    ? 'The shape is repetition, not escalation: the same want, the same kind of try, until the last one works. Nothing gets worse, nothing is lost for good, and the goal never looks lost. Pages beyond what the links need are more of the same kind of thing — another place looked in, another try — never another happening.'
-    : 'Each challenge is met at a cost — time, a possession, a plan, help asked for — and each is harder because the last was not clean; no obstacle is removed in the link that introduces it. Near the end one link is the low point, where the goal looks lost.';
+    ? 'The shape is repetition, not escalation: the same want, the same kind of try, until the last one works. Nothing gets worse, nothing is lost for good. Pages beyond what the happenings need are more of the same kind of try, never another happening.'
+    : 'Each happening is met at a cost — time, a possession, a plan, help asked for — and is harder because the last was not clean. Near the end one happening is the low point, where the goal looks lost.';
   const readAloud = lvl === '1st-grade'
     ? ` This book is read aloud to ${readerAgeLabel(inputData, resolvePacingBand(inputData))}: one question open at a time, ${twoThreadsAllowed(inputData) ? 'at most two threads' : 'one thread'}, and every link traceable to something already shown.`
     : '';
   return [
-    '"STORY LOGIC:" first, in labelled lines and dash lines, never numbered:',
-    'Want and stakes: what the main characters want, what is lost if they fail, and the deadline if there is one.',
-    'Opposition: who or what stands in the way, what it wants and why, and what it knows.',
-    `Facts: one dash line per named figure the plot runs on, "- <name> (commissioned) — can …; cannot …" or "- <name> (new) — can …; cannot …". Commissioned is ${COMMISSIONED_CAST_DEF}. New is every other named figure — a person, an animal or a creature, including one on a single page, one who never speaks, and an adult who sets a rule, waits or permits. Not listed: places, vehicles and objects, a group named collectively, and ${UNNAMED_FIGURE_EXEMPT}. A figure the story needs stays listed; taking its name away does not take it off. This book has room for ${arcInventedAllowance(inputData)} new named figures. Then one dash line per rule of the world the plot runs on — what keeps a thing alive, open, warm or hidden — and a size or a look only where the plot turns on it, stated as that fact.`,
+    '"STORY LOGIC:" first — the ledger of facts the arc is told from, holding only what the plot uses, in labelled lines and dash lines, never numbered:',
+    'Want and stakes: one line — what the main character wants, what is lost if they fail, and the deadline.',
+    'Opposition: one line — the one force that stands in the way and the motive that drives it.',
+    `Facts: one dash line per named figure the plot runs on, "- <name> (commissioned) — <the one ability or limit the plot uses>" or "- <name> (new) — …", at most one ability and one limit each. Commissioned is ${COMMISSIONED_CAST_DEF}. New is every other named figure — a person, an animal or a creature, including one on a single page, one who never speaks, and an adult who sets a rule, waits or permits. Not listed: places, vehicles and objects, a group named collectively, and ${UNNAMED_FIGURE_EXEMPT}. A figure the story needs stays listed; taking its name away does not take it off. This book has room for ${arcInventedAllowance(inputData)} new named figures. Then at most two dash lines for the rules of the world the plot runs on — what keeps a thing alive, open, warm or hidden — with a size or a look only where the plot turns on it, stated as that fact.`,
+    'Motives: one dash line per figure that acts, "- <figure>: <motive> → <the act it causes>".',
     `Central figure: ${CENTRAL_FIGURE_DEF}, by the name the story calls it — two names separated by " / " where it changes name (an egg that hatches into a named creature) — or "none" where the idea is about the main character.`,
-    `Chain: ${links} dash lines from the call to the ending, each opening with "because" or "but", never "and then". ${shape}${readAloud} The last link says why the solution works now and did not before.`,
+    `Events: the number of happenings, ${links}.`,
+    `Chain: one dash line per happening, from the call to the ending, each opening with "because" or "but", never "and then". ${shape}${readAloud} The last link says why the solution works now and did not before.`,
   ].join('\n');
 }
 
 /**
  * THE ARC CRITIQUE SPEC — ONE source, both arc templates (owner, 2026-09-19).
  *
- * LOGIC FIRST, NO COUNTING (owner, 2026-09-24, superseding the 2026-09-19
- * "Checks:" block). The critique reads the numbered sentences against the
- * STORY LOGIC block with the same ARC_LOGIC_CHECK the panel's LOGIC lens reads.
- * Every count the old "Checks:" block asked the model to certify is code now
- * (arcShapeCounts: sentences, chain links, invented figures; planCounters
- * CENTRAL_FIGURE_ABSENT_THIRD) or the plan check's (Q12, each child's action).
- * "Commission honored" stays: it is a judgement, not a count.
+ * ONE ANCHORED CHECK (owner, 2026-09-25, superseding the 2026-09-24 "Logic:" /
+ * "Questions:" / fault-archetype shape). The generic sentence-by-sentence
+ * self-check and the five reader questions left: Anthropic's Opus 5 guidance is
+ * to drop generic "verify your work" instructions, and unanchored
+ * self-correction makes answers worse (Huang et al., ICLR 2024). What stays is
+ * one check whose findings quote the conflicting text (ARC_FINDING_RULE) and
+ * name the shape of the fault (ARC_LOGIC_CHECK), and the one-line commission
+ * check, itself quoted. Every count is code's (arcShapeCounts, planCounters).
  *
  * The numbered "Faults:" lines and their [CRITICAL]/[MAJOR]/[MINOR] tags are a
- * PARSER CONTRACT (critiqueMaxSeverity, beatsPipeline.fixingBelowMajor). The
- * "Logic:" lines are dash lines so they never read as faults.
+ * PARSER CONTRACT (critiqueMaxSeverity, beatsPipeline.fixingBelowMajor);
+ * "none" is a valid answer (critiqueMaxSeverity returns null).
  *
  * @param {Object} opts
  *   retell  the arc-retell variant — the same spec against a final arc, whose
  *           faults are the ones that REMAIN after the re-telling.
  */
-function arcCritiqueSpec({ retell = false, inputData = {} } = {}) {
+function arcCritiqueSpec({ retell = false } = {}) {
   const remain = retell ? ' that remain' : '';
-  // The judge persona is the book's own reader (2026-09-23).
-  const reader = readerAgeLabel(inputData, resolvePacingBand(inputData));
   return [
-    `"Logic:" then one dash line per sentence that breaks the story logic, "- s<N>: <what breaks>", or the single word "none". ${ARC_LOGIC_CHECK}`,
+    `"Faults:" then up to 6 numbered faults${remain}, or the single word "none". A fault is one of these: ${ARC_LOGIC_CHECK} ${ARC_FINDING_RULE} Tag each [CRITICAL] — the story is broken; [MAJOR] — a real fault repairable inside the existing structure, which an act from no motive line always is; or [MINOR] — a blemish. A fault is never a count, a page number or a sourced measurement.`,
     '',
-    '"Commission honored:" one line: are the central quest and the named elements delivered as commissioned? A goal inverted, a trigger dropped, a destination replaced is named here, and the next telling fixes it or justifies it in one line.',
-    '',
-    `"Questions:" and these five, numbered 1 to 5, answered as ${reader} reader:`,
-    '1. Where does the story lose them — confusion, boredom, disbelief?',
-    '2. Is there a question they need answered, with the outcome in doubt to the end?',
-    '3. Are the figures people a child likes, roots for, and can tell apart?',
-    '4. Where the commission states a theme, topic or life skill, is the story genuinely rich in its material — introduced where it first matters, not present in name only — does it drive the climax, and does the character who most needs it visibly act on it before the end, acted on and never stated as a moral?',
-    '5. Does every planted object or flaw pay off, and does every payoff trace to a plant — an orphan on either side is cut?',
-    '',
-    `"Faults:" and 3 to 6 numbered story-level faults${remain}, logic faults first; they usually look like: a sentence the story logic contradicts, an event without a cause, a stake that cannot be lost or that never bites (announced but never felt), a cost the world undoes for free — a thing taken, blocked or used up whose replacement is lying all around and nothing closes that way, a turn the characters could plainly avoid — anything a reader would stop at to ask "but why don't they just …?", a removable character, a rival who stops pressing, knowledge nobody could have, a premise the commission forbids, an action that does not accomplish what the sentence claims it accomplishes, a mechanism that runs on rules instead of sight — a contraption needing more than one rule to understand, or a stated rule about what would happen that is never seen happening (a fault whenever a child cannot retell how it works in one sentence, or a single picture cannot show it working), a character who is anyone — nothing they do comes from who they are, an interaction no real person would have — a reaction the plot needs but the person would not give. The last three are MAJOR by default; a main cast of interchangeable figures is CRITICAL. No fault is a count. Numeric precision and sourced measurements and times are not arc faults — later stages fix those; never list one. The arc has no pages: no fault names a page number or a position in pages. Tag every fault [CRITICAL] — the story is broken; [MAJOR] — a real story fault repairable inside the existing structure; or [MINOR] — a blemish.`,
+    '"Commission honored:" one line — "yes", or the commission\'s own words the arc drops or inverts, quoted.',
   ].join('\n');
 }
 
@@ -9312,7 +9381,8 @@ function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null } = 
   return fillTemplate(template, {
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: pageCount,
-    STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true }),
+    ARC_PRINCIPLES: arcPrinciples(inputData, pageCount),
+    STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true, challengeLine: false }),
     // The premise view (premise + mechanics): the band's craft lines belong to
     // the planner and the text writer; the low point they carried is stated in
     // the CHAIN spec (owner, 2026-09-24).
@@ -9321,12 +9391,12 @@ function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null } = 
     TELLING_RULES: buildTellingRulesSection(inputData),
     CHALLENGE_IDEAS: challengeIdeas ?? buildChallengeIdeasSection(inputData),
     ARC_LOGIC_SPEC: arcLogicSpec(inputData, pageCount),
-    ARC_CRITIQUE_SPEC: arcCritiqueSpec({ inputData }),
+    ARC_CRITIQUE_SPEC: arcCritiqueSpec(),
     ARC_LENGTH: arcLengthRange(pageCount),
   });
 }
 
-/** PANEL: one outside voice proposes exactly one solution on the committed arc. */
+/** PANEL: one outside voice reports what the creator missed, each finding quoted, and the smallest repairs. */
 function buildArcPanelPrompt(inputData, committedBlock) {
   const template = PROMPT_TEMPLATES.arcPanel;
   if (!template) {
@@ -9341,7 +9411,10 @@ function buildArcPanelPrompt(inputData, committedBlock) {
     // The lenses a creator rule mirrors read that rule's own string. LOGIC is
     // the creator critique's own check (2026-09-24). The CAST and ACTION lenses
     // left the same day: both were counts, now code's and plan-check Q12's.
+    // A finding is written the way the creator's critique writes one — quoting
+    // the conflict (2026-09-25); filterPanelFindings drops one that does not.
     ARC_LOGIC_CHECK,
+    ARC_FINDING_RULE,
     ARC_ENTRANCE_RULE,
     ARC_GIVEN_RULE,
     ARC_SENSE_RULE,
@@ -9356,7 +9429,7 @@ function buildArcPanelPrompt(inputData, committedBlock) {
   });
 }
 
-/** RE-TELL: the same creator re-tells the story whole from arc + critique + solutions. */
+/** RE-TELL: the same creator repairs the flagged sentences against the story logic, its fact ledger. */
 // `challengeIdeas`: the SAME drawn section the arc creator was given. The
 // re-telling reports which drawn challenges it took, by tag, so the draw is
 // auditable — it can only do that if it can see the tags.
@@ -9370,13 +9443,16 @@ function buildArcRetellPrompt(inputData, pageCount, committedBlock, panelSolutio
     CHALLENGE_IDEAS: challengeIdeas ?? buildChallengeIdeasSection(inputData),
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: pageCount,
-    STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true }),
+    ARC_PRINCIPLES: arcPrinciples(inputData, pageCount),
+    STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true, challengeLine: false }),
     AGE_MODE: buildAgeModeSection(inputData, { bandView: 'premise' }),
     TELLING_RULES: buildTellingRulesSection(inputData),
+    // The event budget the re-telling may not exceed: cut before add.
+    HAPPENINGS: happeningsLabel(inputData, pageCount),
     COMMITTED_ARC: String(committedBlock || '').trim(),
     PANEL_SOLUTIONS: String(panelSolutions || '').trim(),
     ARC_LOGIC_SPEC: arcLogicSpec(inputData, pageCount),
-    ARC_CRITIQUE_SPEC: arcCritiqueSpec({ retell: true, inputData }),
+    ARC_CRITIQUE_SPEC: arcCritiqueSpec({ retell: true }),
     ARC_LENGTH: arcLengthRange(pageCount),
     // A14: same block the creator got (see buildArcPanelPrompt).
     AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote),
@@ -9461,6 +9537,56 @@ function parseArcHints(raw) {
 }
 
 /**
+ * A PANEL FINDING MUST QUOTE THE ARC (owner, 2026-09-25). Each missed issue a
+ * panelist reports quotes the words that conflict (ARC_FINDING_RULE); a
+ * finding whose quote is not in the block it reviewed — or that quotes nothing
+ * — is dropped before the re-telling reads it. ConStory-Bench scores a
+ * consistency finding only with both conflicting spans cited; on Lab #1459
+ * one panelist's unanchored "missed issues" asserted contradictions the arc
+ * did not contain, and the re-telling could not tell them from real ones.
+ *
+ * Mechanical, never a reading of meaning: a quote is a span between double
+ * quotes, guillemets or curly quotes; it counts when a piece of it of three or
+ * more words (split at an ellipsis) appears in the reviewed block, compared
+ * lowercased with punctuation folded to spaces. The findings are every
+ * non-blank line ahead of the "SOLUTION" heading; the solution passes whole —
+ * it is the panelist's repair, not a finding.
+ *
+ * @returns {{ text: string, kept: string[], dropped: string[] }}
+ */
+const PANEL_QUOTE_RE = /["“„«]([^"“”„«»\n]{3,}?)["”“»]/g;
+
+function foldForQuote(t) {
+  return ` ${String(t || '').toLowerCase().replace(/[’‘`]/g, "'").replace(/[^\p{L}\p{N}']+/gu, ' ').trim()} `;
+}
+
+function quoteFoundIn(quote, haystack) {
+  const pieces = String(quote).split(/…|\.\.\./)
+    .map(p => foldForQuote(p).trim())
+    .filter(p => p.split(' ').length >= 3);
+  return pieces.length > 0 && pieces.some(p => haystack.includes(` ${p} `));
+}
+
+function filterPanelFindings(text, reviewedBlock) {
+  const raw = String(text || '');
+  const haystack = foldForQuote(reviewedBlock);
+  const solIdx = raw.search(/^\s*(?:[-*•]\s*)?(?:\*\*|#+\s*)?SOLUTION\b/mi);
+  const head = solIdx >= 0 ? raw.slice(0, solIdx) : raw;
+  const solution = solIdx >= 0 ? raw.slice(solIdx).trim() : '';
+  const kept = [];
+  const dropped = [];
+  for (const line of head.split('\n')) {
+    if (!line.trim()) continue;
+    // A bare heading ("Missed issues:") is layout, not a finding.
+    if (/^[\s*#_-]*[\p{L} ]{1,40}:?[\s*#_]*$/u.test(line) && line.trim().split(/\s+/).length <= 4) continue;
+    const quotes = [...line.matchAll(PANEL_QUOTE_RE)].map(m => m[1]);
+    if (quotes.some(q => quoteFoundIn(q, haystack))) kept.push(line.trim());
+    else dropped.push(line.trim());
+  }
+  return { text: [kept.join('\n'), solution].filter(Boolean).join('\n\n'), kept, dropped };
+}
+
+/**
  * The heading that opens each arc output block. Markdown-tolerant: a model may
  * write "STORY LOGIC:", "**STORY LOGIC:**" or "# STORY LOGIC".
  */
@@ -9488,7 +9614,7 @@ function isNegativeFigureAnswer(name) {
   return head === '' || NEGATIVE_FIGURE_ANSWERS.has(head);
 }
 
-const LOGIC_LABELS = ['Want and stakes', 'Opposition', 'Facts', 'Central figure', 'Chain'];
+const LOGIC_LABELS = ['Want and stakes', 'Opposition', 'Facts', 'Motives', 'Central figure', 'Events', 'Chain'];
 const LOGIC_LABEL_RE = new RegExp(`^\\s*(?:[-*•]\\s*)?(?:\\*\\*|#+\\s*)?(${LOGIC_LABELS.join('|')})(?:\\s*\\*\\*)?\\s*:\\s*(?:\\*\\*)?\\s*(.*)$`, 'i');
 
 /**
@@ -9503,7 +9629,12 @@ const LOGIC_LABEL_RE = new RegExp(`^\\s*(?:[-*•]\\s*)?(?:\\*\\*|#+\\s*)?(${LOG
  * @returns {{ text: string, want: string, opposition: string,
  *   figures: {name: string, tag: 'commissioned'|'new'}[],
  *   commissioned: string[], invented: string[],
- *   centralFigure: string[]|null, facts: string[], chain: string[] }}
+ *   centralFigure: string[]|null, facts: string[],
+ *   motives: {figure: string, motive: string, act: string}[],
+ *   eventsDeclared: number|null, chain: string[] }}
+ *   `facts` are the rules of the world (the Facts dash lines that are not
+ *   figure lines); `eventsDeclared` is the "Events: N" the arc wrote, null
+ *   when absent — code compares it with the chain, the model never counts.
  *   `text` is the block body without its heading; `centralFigure` is the
  *   list of names the figure goes by, or null for "none".
  */
@@ -9551,6 +9682,16 @@ function parseStoryLogic(raw) {
   const chain = dashLines(sections.Chain);
   if (!chain.length) throw new Error('STORY LOGIC has no chain links');
   const facts = dashLines(sections.Facts).filter(l => !/\((?:commissioned|new)\)/i.test(l));
+  // "- <figure>: <motive> → <act>" (2026-09-25). A line without an arrow is
+  // kept with an empty act: the reader sees it, nothing is guessed.
+  const motives = dashLines(sections.Motives).map((l) => {
+    const m = l.match(/^(.+?)\s*:\s*(.+?)\s*(?:→|->|=>)\s*(.+)$/);
+    return m ? { figure: m[1].trim(), motive: m[2].trim(), act: m[3].trim() } : { figure: '', motive: l, act: '' };
+  });
+  const eventsDeclared = (() => {
+    const m = (sections.Events || []).join(' ').match(/\d+/);
+    return m ? parseInt(m[0], 10) : null;
+  })();
   return {
     text,
     want: (sections['Want and stakes'] || []).join(' '),
@@ -9560,6 +9701,8 @@ function parseStoryLogic(raw) {
     invented: figures.filter(f => f.tag === 'new').map(f => f.name),
     centralFigure: centralFigure && centralFigure.length ? centralFigure : null,
     facts,
+    motives,
+    eventsDeclared,
     chain,
   };
 }
@@ -9672,7 +9815,8 @@ function parseArcRetell(raw) {
  * @param {number} args.sentences  the arc's numbered sentences (arcSentenceCount)
  * @param {Object} args.logic      a parseStoryLogic result
  * @returns {{ sentences, sentenceRange, sentencesInRange, chainLinks, chainRange,
- *   chainInRange, invented, inventedAllowance, inventedOver }}
+ *   chainInRange, invented, inventedAllowance, inventedOver, eventsDeclared,
+ *   worldRules, worldRulesOver }}
  */
 function arcShapeCounts({ sentences, logic, inputData, pageCount }) {
   const sentenceRange = arcLengthBounds(pageCount);
@@ -9680,6 +9824,9 @@ function arcShapeCounts({ sentences, logic, inputData, pageCount }) {
   const chainLinks = (logic?.chain || []).length;
   const invented = [...(logic?.invented || [])];
   const inventedAllowance = arcInventedAllowance(inputData);
+  // The block's caps (2026-09-25): at most two rules of the world. Logged,
+  // never enforced — the arc it describes is what the reader gets.
+  const worldRules = (logic?.facts || []).length;
   return {
     sentences,
     sentenceRange,
@@ -9690,8 +9837,14 @@ function arcShapeCounts({ sentences, logic, inputData, pageCount }) {
     invented,
     inventedAllowance,
     inventedOver: invented.length > inventedAllowance,
+    eventsDeclared: logic?.eventsDeclared ?? null,
+    worldRules,
+    worldRulesOver: worldRules > ARC_WORLD_RULES_MAX,
   };
 }
+
+// The cap the STORY LOGIC spec states for rules of the world ("at most two").
+const ARC_WORLD_RULES_MAX = 2;
 
 /**
  * Worst severity among a critique's numbered fault lines: 'CRITICAL' >
@@ -11506,6 +11659,7 @@ module.exports = {
   buildBeatsPrompt,
   buildChallengeIdeasSection,
   drawChallengeIdeas,
+  CHALLENGE_IDEAS_HEADING,
   buildArcCreatePrompt,
   buildArcPanelPrompt,
   buildArcRetellPrompt,
@@ -11523,6 +11677,10 @@ module.exports = {
   characterSourceRule,
   arcCritiqueSpec,
   ARC_LOGIC_CHECK,
+  ARC_FINDING_RULE,
+  arcPrinciples,
+  happeningsLabel,
+  filterPanelFindings,
   COMMISSIONED_CAST_DEF,
   ARC_ENTRANCE_RULE,
   ARC_GIVEN_RULE,

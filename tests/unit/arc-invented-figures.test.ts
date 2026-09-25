@@ -132,7 +132,7 @@ describe('the block must not inflate critiqueMaxSeverity', () => {
   it('the contract says dash lines, never numbered', () => {
     const spec = arcLogicSpec({ characters: [{ name: 'A', age: 7 }] }, 18);
     expect(spec).toMatch(/never numbered/);
-    expect(spec).toContain('"- <name> (new) — can …; cannot …"');
+    expect(spec).toContain('"- <name> (new) — …"');
   });
 });
 

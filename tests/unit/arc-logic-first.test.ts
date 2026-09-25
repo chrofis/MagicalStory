@@ -28,7 +28,11 @@ const LOGIC = [
   '- Nia (commissioned) — Max\'s dog; can track by smell; cannot climb',
   '- Nebla (new) — can fly short hops; cannot hold warmth in the wind',
   '- An egg kept warm hatches; one left in the wind goes quiet.',
+  'Motives:',
+  '- Nebla: she lost the egg this morning → she takes it back',
+  '- Levin: he wants the egg to hatch → he carries it to the leaf heap',
   'Central figure: the egg / Kachel',
+  'Events: 5',
   'Chain:',
   '- because the egg knocks, Levin decides to keep it warm',
   '- but Nebla takes the egg, so the boys follow her breath through the mist',
@@ -46,13 +50,9 @@ const CREATE = [
   '3. The egg hatches in the leaves.',
   '',
   'CRITIQUE:',
-  'Logic:',
-  '- s2: Nebla could simply fly away with it',
-  'Commission honored: yes.',
-  'Questions:',
-  '1. Nowhere.',
   'Faults:',
-  '1. [MAJOR] Nebla has no reason to stay on the bridge.',
+  '1. [MAJOR] s2 "Nebla takes it" against "she lost the egg this morning" — she has no reason to stay on the bridge.',
+  'Commission honored: yes',
 ].join('\n');
 
 const input = (age = 5, extra: any = {}) => ({
@@ -95,10 +95,10 @@ describe('parseArcCreate — one arc', () => {
     const c = PB.parseArcCreate(CREATE);
     expect(c.arc).toBe('1. Levin finds the egg.\n2. Nebla takes it.\n3. The egg hatches in the leaves.');
     expect(c.sentences).toBe(3);
-    expect(c.critique).toMatch(/^Logic:/);
+    expect(c.critique).toMatch(/^Faults:/);
     expect(c.committed).toMatch(/^STORY LOGIC:\n/);
     expect(c.committed).toContain('ARC:\n1. Levin finds the egg.');
-    expect(c.committed).toContain('CRITIQUE:\nLogic:');
+    expect(c.committed).toContain('CRITIQUE:\nFaults:');
     expect(c).not.toHaveProperty('discarded');
     expect(c).not.toHaveProperty('strongerLine');
   });
@@ -107,8 +107,8 @@ describe('parseArcCreate — one arc', () => {
     const c = PB.parseArcCreate(CREATE);
     // Only the arc's own numbered sentences set the acts.
     expect(PB.arcActSpans(c.arc)).toBe('The acts are the story\'s sentences in thirds: setup 1, middle 2, ending 3.');
-    // The Logic lines are dash lines: the one numbered fault sets the severity.
-    expect(PB.critiqueMaxSeverity(c.critique.split('Questions:')[0] + 'Faults:\n1. [MINOR] x')).toBe('MINOR');
+    // The chain's dash lines never set a severity: the one numbered fault does.
+    expect(PB.critiqueMaxSeverity(c.critique)).toBe('MAJOR');
   });
 
   it('throws on a reply with no ARC block or an old two-arc reply', () => {
@@ -117,26 +117,31 @@ describe('parseArcCreate — one arc', () => {
   });
 });
 
-describe('arcChainRange — the chain is the event budget (D3)', () => {
-  it('is the band event range plus the last link, from the one table', () => {
-    // Journey band at 18 pages: events 4-5, chain 5-6 (the owner's anchor).
+describe('arcChainRange — the chain is the event budget (D3, tightened 2026-09-25)', () => {
+  it('is the band event range itself — one link per happening, no extra link', () => {
+    // Journey band at 18 pages: 4-5 happenings, 4-5 links (owner, ages 3-5).
     const journey = input(5);
     expect(PB.arcEventRange(journey, 18)).toEqual({ lo: 4, hi: 5 });
-    expect(PB.arcChainRange(journey, 18)).toEqual({ lo: 5, hi: 6 });
-    // A flat-budget toddler band carries one event, so a two-link chain.
+    expect(PB.arcChainRange(journey, 18)).toEqual({ lo: 4, hi: 5 });
+    // A flat-budget toddler band carries one happening, so one link.
     const toddler = input(1, { characters: [{ id: 'a', name: 'Levin', age: 1 }], mainCharacters: ['a'] });
-    expect(PB.arcChainRange(toddler, 18)).toEqual({ lo: 2, hi: 2 });
+    expect(PB.arcChainRange(toddler, 18)).toEqual({ lo: 1, hi: 1 });
+    expect(PB.happeningsLabel(toddler, 18)).toBe('1 happening');
   });
 
-  it('the number the prompt states is the number code checks', () => {
+  it('the number the principles and the chain state is the number code checks', () => {
     const r = PB.arcChainRange(input(5), 18);
-    expect(PB.arcLogicSpec(input(5), 18)).toContain(`Chain: ${r.lo}-${r.hi} dash lines`);
+    expect(PB.arcLogicSpec(input(5), 18)).toContain(`Events: the number of happenings, ${r.lo}-${r.hi}.`);
+    expect(PB.arcPrinciples(input(5), 18)).toContain(`${r.lo}-${r.hi} happenings a child would retell`);
     const counts = PB.arcShapeCounts({ sentences: 16, logic: PB.parseStoryLogic(CREATE), inputData: input(5), pageCount: 18 });
     expect(counts.chainRange).toEqual(r);
     expect(counts.chainLinks).toBe(5);
     expect(counts.chainInRange).toBe(true);
+    expect(counts.eventsDeclared).toBe(5);
     expect(counts.sentenceRange).toEqual({ lo: 14, hi: 18 });
     expect(counts.sentencesInRange).toBe(true);
+    expect(counts.worldRules).toBe(1);
+    expect(counts.worldRulesOver).toBe(false);
   });
 
   it('reports out-of-range lengths without judging them', () => {
@@ -271,5 +276,107 @@ describe('d4 — the central figure in each third of the page plan', () => {
     // Without a central figure both are byte-identical to the cast rule alone.
     expect(castActionRule(cov)).toBe(castActionRule(cov, { centralFigure: null }));
     expect(castActionRule(cov)).not.toMatch(/central figure/);
+  });
+});
+
+describe('the arc prompts v2 (owner, 2026-09-25)', () => {
+  beforeAll(async () => { await loadPromptTemplates(); });
+  const committed = PB.parseArcCreate(CREATE).committed;
+
+  it('the principles come first in create and retell, and lead the arc judge\'s context', () => {
+    const principles = PB.arcPrinciples(input(5), 18);
+    const create = PB.buildArcCreatePrompt(input(5), 18);
+    const retell = PB.buildArcRetellPrompt(input(5), 18, committed, '## PANELIST A\nx');
+    for (const p of [create, retell]) {
+      const at = p.indexOf(principles);
+      expect(at).toBeGreaterThan(0);
+      expect(at).toBeLessThan(p.indexOf('# THE COMMISSION'));
+    }
+    // Landmarks, guide and the challenge catalogue come after the rules.
+    expect(create.indexOf('# RULES OF THE LOGIC')).toBeLessThan(create.indexOf('# TOPIC GUIDE'));
+    const ctx = sc.buildBriefContext({ ...input(5), pages: 18 }, { arc: true });
+    expect(ctx).toContain(principles);
+  });
+
+  it('one event budget: no second challenge count in the arc, the trial keeps its line', () => {
+    const create = PB.buildArcCreatePrompt(input(5), 18);
+    expect(create).not.toMatch(/Build the story on .* challenges/);
+    expect(create).not.toMatch(/from (?:one or two|about three|three or four) of these/);
+    expect(PB.buildStoryShapeSection(input(5), 18, { arc: true })).toMatch(/Build the story on .* challenges/);
+  });
+
+  it('the logic block is capped: one want, one opposition, one ability or limit, two world rules, motive lines', () => {
+    const spec = PB.arcLogicSpec(input(5), 18);
+    expect(spec).toMatch(/Opposition: one line — the one force/);
+    expect(spec).toMatch(/at most one ability and one limit each/);
+    expect(spec).toMatch(/at most two dash lines for the rules of the world/);
+    expect(spec).toContain('Motives: one dash line per figure that acts, "- <figure>: <motive> → <the act it causes>"');
+  });
+
+  it('the parser reads the motive lines and the declared event count', () => {
+    const l = PB.parseStoryLogic(CREATE);
+    expect(l.motives).toEqual([
+      { figure: 'Nebla', motive: 'she lost the egg this morning', act: 'she takes it back' },
+      { figure: 'Levin', motive: 'he wants the egg to hatch', act: 'he carries it to the leaf heap' },
+    ]);
+    expect(l.eventsDeclared).toBe(5);
+    // Motive lines are not rules of the world, and not figures.
+    expect(l.facts).toEqual(['An egg kept warm hatches; one left in the wind goes quiet.']);
+    expect(l.invented).toEqual(['Nebla']);
+  });
+
+  it('the creator\'s critique and the panel share the finding rule; the generic self-check is gone', () => {
+    const create = PB.buildArcCreatePrompt(input(5), 18);
+    const panel = PB.buildArcPanelPrompt(input(5), committed);
+    expect(create).toContain(PB.ARC_FINDING_RULE);
+    expect(panel).toContain(PB.ARC_FINDING_RULE);
+    expect(create).not.toMatch(/Read each sentence against the story logic|blunt self-critique|"Questions:"/);
+  });
+
+  it('the re-telling edits only the flagged sentences, adds a fact to the ledger first, and cuts before it adds', () => {
+    const retell = PB.buildArcRetellPrompt(input(5), 18, committed, '## PANELIST A\nx');
+    expect(retell).toMatch(/Change only the sentences a fault or a panel finding names; copy every other sentence word for word/);
+    expect(retell).toMatch(/adds it to the story logic first; then read every sentence against the updated logic/);
+    expect(retell).toContain(`The story keeps ${PB.happeningsLabel(input(5), 18)}: a repair that would add a happening cuts one first`);
+    expect(retell).not.toMatch(/may rebuild the story|Never edit or patch the old arc/);
+  });
+
+  it('a panel solution may not invent plot', () => {
+    const panel = PB.buildArcPanelPrompt(input(5), committed);
+    expect(panel).toMatch(/A solution adds no figure, object, happening or rule of the world the arc does not have/);
+    expect(panel).not.toMatch(/at most 8 numbered points/);
+  });
+});
+
+describe('filterPanelFindings — a finding must quote the arc (2026-09-25)', () => {
+  const block = PB.parseArcCreate(CREATE).committed;
+  const reply = [
+    'Missed issues:',
+    '1. ISSUE s2 "Nebla takes it" against "she lost the egg this morning" — LOGIC: why the bridge?',
+    '2. ISSUE s3 "The egg hatches in the leaves" — CAUSE: nothing warmed the leaves.',
+    '3. ISSUE s2 — SENSE: she could fly off.',
+    '4. ISSUE s1 "Levin finds the golden egg" against "the dragon says so" — invented quote.',
+    '',
+    'SOLUTION (answers faults 1 and issues 1-4):',
+    '1. Cut s2.',
+  ].join('\n');
+
+  it('keeps a finding whose quote is in the reviewed block, drops one that quotes nothing or misquotes', () => {
+    const f = PB.filterPanelFindings(reply, block);
+    expect(f.kept).toHaveLength(2);
+    expect(f.kept[0]).toMatch(/^1\. ISSUE s2/);
+    expect(f.kept[1]).toMatch(/^2\. ISSUE s3/);
+    expect(f.dropped.map((d: string) => d.slice(0, 11))).toEqual(['3. ISSUE s2', '4. ISSUE s1']);
+    // The solution passes whole; the heading is layout and is neither.
+    expect(f.text).toContain('SOLUTION (answers faults 1 and issues 1-4):\n1. Cut s2.');
+    expect(f.text).not.toContain('Missed issues:');
+  });
+
+  it('folds case, punctuation, curly quotes and an ellipsis, and needs three words', () => {
+    const kept = PB.filterPanelFindings('ISSUE s2 “nebla TAKES it!” — x', block).kept;
+    expect(kept).toHaveLength(1);
+    expect(PB.filterPanelFindings('ISSUE s1 "Levin finds the egg … Nebla takes" — x', block).kept).toHaveLength(1);
+    expect(PB.filterPanelFindings('ISSUE s1 "Levin finds … the egg" — x', block).kept).toHaveLength(0);
+    expect(PB.filterPanelFindings('ISSUE s2 "takes it" — x', block).kept).toHaveLength(0);
   });
 });

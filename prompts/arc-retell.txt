@@ -1,4 +1,6 @@
-You are the creator of a children's picture-book story plan ({PAGE_COUNT} pages). The goal of the arc is a story full of suspense that stays coherent, carried by figures a child likes, roots for, and can tell apart. Work in ENGLISH. The finished book will be written in {LANGUAGE} — keep names, places and cultural details as they will appear there.
+You are the creator of a children's picture-book story plan ({PAGE_COUNT} pages): full of suspense, coherent, carried by figures a child likes, roots for and can tell apart. Work in ENGLISH. The finished book will be written in {LANGUAGE} — keep names, places and cultural details as they will appear there.
+
+{ARC_PRINCIPLES}
 
 Reading level: {READING_LEVEL}
 
@@ -10,44 +12,45 @@ Reading level: {READING_LEVEL}
 
 {CHARACTER_DETAILS}
 
-{STORY_GUIDE_SECTION}
-
-{AVAILABLE_LANDMARKS_SECTION}
-
 {STORY_SHAPE}
 
 {AGE_MODE}
 
 {TELLING_RULES}
 
+{STORY_GUIDE_SECTION}
+
+{AVAILABLE_LANDMARKS_SECTION}
+
 {CHALLENGE_IDEAS}
 
-# THE COMMITTED ARC, ITS STORY LOGIC AND ITS CRITIQUE
+# THE ARC, ITS STORY LOGIC AND ITS CRITIQUE
 
 {COMMITTED_ARC}
 
-# PANEL SOLUTIONS
+# PANEL FINDINGS
 
 {PANEL_SOLUTIONS}
 
 # YOUR TASK
 
-The arc stands above with its story logic and its critique. A panel proposed solutions. Choose freely — one solution, a combination, or your own better judgment — and RE-TELL the story once: {ARC_LENGTH} numbered sentences, factual register, all the rules above, none of the flagged faults surviving. Never edit or patch the old arc.
-
-Update the story logic first: every fix that adds, removes or changes a fact, a motive or a link does it there, and the sentences are then told from the updated logic. A sentence never carries a fact the logic contradicts.
-
-The size of the change matches the worst fault: a CRITICAL fault may rebuild the story; MAJOR faults are repaired inside the kept structure, except an invented rule, custom, game or mechanism named as itself the fault, which the re-telling cuts outright and replaces with a reason from character, motive or situation; when nothing above MINOR remains, the re-telling reuses the previous telling nearly unchanged, touching only the flagged sentences. A fix that costs suspense is a worse fault than the one it repairs — coherence is repaired inside the tension, never by draining it. A "why" fault is answered from character, motive or situation before any new physical rule; the re-telling never leaves the climax depending on more physical rules than the arc it repairs. The re-telling changes only what Fixing names.
+The story logic is the arc's ledger of facts. Repair the arc once, against that ledger:
+- Change only the sentences a fault or a panel finding names; copy every other sentence word for word. Take the findings you judge right and leave the rest.
+- A repair that needs a new fact adds it to the story logic first; then read every sentence against the updated logic, and a sentence it contradicts is repaired too.
+- The story keeps {HAPPENINGS}: a repair that would add a happening cuts one first, and cutting a dead end is the preferred repair.
+- A "why" fault is answered from a motive the story logic already holds before any new rule of the world; an invented rule, custom, game or mechanism named as the fault is cut and replaced by a motive.
+- A repair that costs suspense is a worse fault than the one it repairs.
 
 Output, in this order:
 - The updated story logic, built exactly like this:
 
 {ARC_LOGIC_SPEC}
 
-- One line "Fixing:" — which faults, by what approach.
-- One line "Keeping:" — the scenes and turns that must survive untouched; landmarks the arc placed inside the commission's world are kept unless Fixing names them; never add a landmark from outside that world or relocate the story to reach one.
+- One line "Fixing:" — which faults and findings, by what repair.
+- One line "Keeping:" — the scenes and turns that survive untouched; landmarks the arc placed inside the commission's world stay unless Fixing names them, and no landmark from outside that world is added.
 - "Challenges taken:" then a numbered list, one line per challenge the arc builds on, a few words each. Each line opens with the [C###] tag of the drawn challenge it builds on, or with [own] where the challenge is the arc's own invention. The tag names the source only; it is never written into a story sentence.
 - One line "Used:" naming which panelists you drew on, by letter ("Panelist A").
-- "FINAL ARC:" then the numbered sentences.
-- "CRITIQUE:" then a fresh blunt self-critique of the final arc, built exactly like this:
+- "FINAL ARC:" then the {ARC_LENGTH} numbered sentences.
+- "CRITIQUE:" then the critique of the final arc, built exactly like this:
 
 {ARC_CRITIQUE_SPEC}

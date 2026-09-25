@@ -277,10 +277,13 @@ function buildBriefContext(d = {}, { arc = false } = {}) {
   // judge is not either. Lazy require: promptBuilders does not require this
   // module, so there is no cycle.
   try {
-    const { buildStoryShapeSection, buildAgeModeSection } = require('./promptBuilders');
+    const { buildStoryShapeSection, buildAgeModeSection, arcPrinciples } = require('./promptBuilders');
     const pages = parseInt(d.pages, 10) || (Array.isArray(d.sceneImages) ? d.sceneImages.length : 0);
     if (pages) {
-      const shape = buildStoryShapeSection(d, pages, arc ? { arc: true } : undefined);
+      // The arc's principles (its event budget among them) lead its prompt
+      // since 2026-09-25, so they lead the judge's context too.
+      if (arc) lines.push(`\n${arcPrinciples(d, pages)}`);
+      const shape = buildStoryShapeSection(d, pages, arc ? { arc: true, challengeLine: false } : undefined);
       if (shape) lines.push(`\n${shape}`);
       if (arc) {
         const ageMode = buildAgeModeSection(d, { bandView: 'premise' });

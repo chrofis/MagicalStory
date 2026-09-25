@@ -98,6 +98,7 @@ const {
   parseArcHints,
   parseArcCreate,
   parseArcRetell,
+  filterPanelFindings,
   arcInventedAllowance,
   arcShapeCounts,
   critiqueMaxSeverity,
@@ -1082,7 +1083,14 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       const panel = [];
       const failedPanelists = [];
       settled.forEach((r, i) => {
-        if (r.status === 'fulfilled') { panel.push(r.value); return; }
+        if (r.status === 'fulfilled') {
+          // A finding that does not quote the arc it reviewed is dropped
+          // before the re-telling reads it (owner, 2026-09-25). The raw reply
+          // stays in the report beside what was kept and dropped.
+          const f = filterPanelFindings(r.value.text, currentBlock);
+          panel.push({ ...r.value, raw: r.value.text, text: f.text, keptFindings: f.kept.length, droppedFindings: f.dropped });
+          return;
+        }
         // Advisory by design: a lost voice narrows the panel, it never blocks.
         failedPanelists.push(arcPanelModels[i]);
         log.warn(`⚠️ [ARC] Panelist ${arcPanelModels[i]} failed (round ${round}): ${r.reason?.message}`);
@@ -1095,8 +1103,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         gl.warn('arc_panel_empty', `Entire panel failed in round ${round} — arc ships without this re-telling round`);
         break;
       }
-      gl.info('arc_panel', `Round ${round}: ${panel.length}/${arcPanelModels.length} panelists proposed one solution each`, null, {
+      gl.info('arc_panel', `Round ${round}: ${panel.length}/${arcPanelModels.length} panelists reported; findings kept ${panel.reduce((n, p) => n + p.keptFindings, 0)}, dropped as unquoted ${panel.reduce((n, p) => n + p.droppedFindings.length, 0)}`, null, {
         round, panelists: panel.map(p => p.model), failed: failedPanelists,
+        kept: panel.map(p => p.keptFindings), dropped: panel.map(p => p.droppedFindings.length),
       });
 
       // RE-TELL: same creator, committed arc + critique + all solutions, told

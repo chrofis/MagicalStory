@@ -27,12 +27,12 @@ describe('the arc critique spec is one source', () => {
    * them: the arc-2 critique on a staging run cites "Page 9", "After page 11",
    * "page 13", "page 18" and "page 6". The division happens two stages later.
    */
-  it('no fault may cite a page number — and both templates are told so', () => {
-    const line = 'The arc has no pages: no fault names a page number or a position in pages.';
-    expect(arcCritiqueSpec()).toContain(line);
-    expect(arcCritiqueSpec({ retell: true })).toContain(line);
-    expect(buildArcCreatePrompt(input(), 18, {})).toContain(line);
-    expect(buildArcRetellPrompt(input(), 18, 'ARC 1: ...', '')).toContain(line);
+  it('no fault may cite a page number or a count — and both templates are told so', () => {
+    for (const spec of [arcCritiqueSpec(), arcCritiqueSpec({ retell: true })]) {
+      expect(spec).toMatch(/never a count, a page number/);
+    }
+    expect(buildArcCreatePrompt(input(), 18, {})).toContain(arcCritiqueSpec());
+    expect(buildArcRetellPrompt(input(), 18, 'ARC 1: ...', '')).toContain(arcCritiqueSpec({ retell: true }));
   });
 
   it('both templates fill from the same builder, with no placeholder left', () => {
@@ -40,41 +40,30 @@ describe('the arc critique spec is one source', () => {
     const retell = buildArcRetellPrompt(input(), 18, 'ARC 1: ...', '');
     expect(create).not.toContain('{ARC_CRITIQUE_SPEC}');
     expect(retell).not.toContain('{ARC_CRITIQUE_SPEC}');
-    expect(create).toContain(arcCritiqueSpec({ inputData: input() }));
-    expect(retell).toContain(arcCritiqueSpec({ retell: true, inputData: input() }));
+    expect(create).toContain(arcCritiqueSpec());
+    expect(retell).toContain(arcCritiqueSpec({ retell: true }));
   });
 
-  it('the questions are numbered and the count is honest', () => {
+  // ONE ANCHORED CHECK (owner, 2026-09-25): the reader questions and the
+  // sentence-by-sentence "Logic:" pass left; each fault quotes the conflict.
+  it('one anchored check: faults name a logic shape and quote the conflict, and nothing is counted', () => {
     const spec = arcCritiqueSpec();
-    const m = spec.match(/numbered 1 to (\d+)/);
-    expect(m).toBeTruthy();
-    const n = Number(m![1]);
-    for (let i = 1; i <= n; i++) expect(spec).toMatch(new RegExp(`^${i}\\. `, 'm'));
-    expect(spec).not.toMatch(new RegExp(`^${n + 1}\\. `, 'm'));
-  });
-
-  // Logic-first (owner, 2026-09-24): the critique checks the sentences against
-  // the STORY LOGIC first and counts nothing. Every count is code's.
-  it('checks logic first, with the one check the panel also reads, and counts nothing', () => {
-    const spec = arcCritiqueSpec();
-    const { ARC_LOGIC_CHECK } = require('../../server/lib/promptBuilders');
-    expect(spec.indexOf('"Logic:"')).toBe(0);
+    const { ARC_LOGIC_CHECK, ARC_FINDING_RULE } = require('../../server/lib/promptBuilders');
+    expect(spec.indexOf('"Faults:"')).toBe(0);
     expect(spec).toContain(ARC_LOGIC_CHECK);
+    expect(spec).toContain(ARC_FINDING_RULE);
     expect(spec).toContain('"Commission honored:"');
-    // No self-certified count survives: no events tally, no figure tally, no
-    // per-third or per-child tally, no Allowed/Written line.
+    expect(spec).not.toContain('"Questions:"');
+    expect(spec).not.toContain('"Logic:"');
     expect(spec).not.toContain('"Checks:"');
-    expect(spec).not.toMatch(/Allowed: <N>/);
-    expect(spec).not.toMatch(/in each third/);
-    expect(spec).not.toMatch(/Invented figures/);
-    expect(spec).toContain('3 to 6 numbered story-level faults');
+    expect(spec).not.toMatch(/Allowed: <N>|in each third|Invented figures/);
   });
 
-  it('the logic lines cannot mint a fault: they are dash lines, the faults are numbered', () => {
+  it('a quoted fault line still carries its severity to the parser; "none" carries none', () => {
     const { critiqueMaxSeverity } = require('../../server/lib/promptBuilders');
-    expect(arcCritiqueSpec()).toContain('"- s<N>: <what breaks>"');
-    const critique = ['Logic:', '- s4: the dog digs where nothing was buried', 'Commission honored: yes', 'Faults:', '1. [MINOR] a blemish.'].join('\n');
+    const critique = ['Faults:', '1. [MINOR] s4 "the dog digs" against "nothing was buried there" — the dig finds nothing.', 'Commission honored: yes'].join('\n');
     expect(critiqueMaxSeverity(critique)).toBe('MINOR');
+    expect(critiqueMaxSeverity('Faults:\nnone\nCommission honored: yes')).toBeNull();
   });
 
   it('the per-page questions are gone — the arc has sentences, not pages', () => {

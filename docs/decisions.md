@@ -60194,3 +60194,73 @@ plan and prose" in its arc reach (R7); the plan and prose halves stay.
 
 **Touched:** `server/lib/promptBuilders.js`, `tests/unit/size-look-rule.test.ts`.
 **Status:** ✅ committed on `staging`, not pushed.
+
+## 2026-09-25 — Arc prompts v2: principles first, a capped fact ledger, one anchored check, quoted findings, a re-telling that edits
+
+**Context:** Lab #1459 (staging `job_1790277448294_5herh01j7`, 18 pages, read to a five-year-old,
+Opus 5 create at `max`) showed the logic-first arc catching its logic holes but overloading: the
+create arc had 18 sentences, the re-told one 20 (range 14-18), six chain links holding about seven
+happenings, and a STORY LOGIC block with four abilities per child and five rules of the world, each
+of which pulled a scene into the arc to demonstrate it (the scale, the jackdaw, the bread trade, the
+chess players, the steps, the dragon's pass). One panelist's "missed issues" quoted nothing and
+asserted contradictions the arc did not contain; the re-telling could not tell them from real ones.
+
+**Decision (owner, 2026-09-25):**
+1. `arcPrinciples()` opens arc-create and arc-retell (and the arc judge's context): six positive
+   principles, each with a one-clause reason — one problem and no second storyline; one main
+   character solves it; an event budget stated as a number ("4-5 happenings a child would retell",
+   `arcEventRange`); every happening causes the ending, a dead end is cut, not explained; the sentence
+   count follows the page count; few figures. The chain IS the event budget: `arcChainRange` no
+   longer adds a "why now" link (+1); the last happening carries it.
+2. The STORY LOGIC block is capped: one want and stake with a deadline; ONE opposing force with its
+   motive; per figure the one ability or limit the plot uses; at most two rules of the world; a new
+   `Motives:` section, one `- <figure>: <motive> → <act>` line per figure that acts; `Events: N`.
+   `parseStoryLogic` reads `motives` and `eventsDeclared`; `arcShapeCounts` logs `eventsDeclared`,
+   `worldRules`, `worldRulesOver` (log only, D4).
+3. The critique's generic sentence-by-sentence "Logic:" pass and the five reader questions are gone.
+   One anchored check remains: numbered, tagged faults, each a shape from `ARC_LOGIC_CHECK`, each
+   quoting the conflicting words (`ARC_FINDING_RULE`: `s<N> "…" against "…"`, or the one sentence for
+   an act with no motive line / a happening that causes nothing); `none` is allowed. "Commission
+   honored" stays, quoted. Severity tags stay (parser contract: `critiqueMaxSeverity`,
+   `fixingBelowMajor`).
+4. The panel writes each finding with the same `ARC_FINDING_RULE`, and code drops a finding whose
+   quote is not in the block it reviewed (`filterPanelFindings`: a quoted span with a piece of three or
+   more words found verbatim after case and punctuation folding — mechanical, never a reading of
+   meaning). Applied in `beatsPipeline` and both Lab mirrors (`arc_effort`, `arc_panel_replay`); the
+   raw reply is stored beside the kept and dropped lines. Solutions name the smallest change and add
+   no figure, object, happening or rule of the world; a needed fact is named as the missing ledger line.
+5. The re-telling treats the logic block as the fact ledger: it changes only the sentences a fault or
+   finding names and copies the rest word for word; a new fact goes into the ledger first and every
+   sentence is re-read against it; it never exceeds the happenings budget — cut before add.
+6. Reordered and trimmed: principles first, then commission, characters, shape, age mode, rules, and
+   the guide, landmarks and challenge catalogue after. The second challenge count ("three or four
+   challenges" in STORY SHAPE and in the draw heading, against one happening for a toddler book) left
+   the arc (`buildStoryShapeSection({ challengeLine: false })`; the trial keeps its line); the draw
+   heading is one constant `CHALLENGE_IDEAS_HEADING`, and the Lab re-heads a stored draw with it.
+   "Each character's nature causes a problem or solves one" left (the motive lines carry it); "fewest
+   characters" and "wants something from the start" became principles. Sizes on the dragon inputs
+   (same draw, no landmark block, as #1459 sent): create 23,022 → 21,267 chars (rule text 13,295 →
+   11,716); re-tell fixed text 24,917 → 22,643; panel fixed text 8,456 → 7,514.
+
+**Sources:** FlawedFictions (arXiv 2504.11900: LLM rewriting adds plot holes → edit only flagged
+sentences); ConStory-Bench (a consistency finding cites both conflicting spans → quoted findings);
+SCORE (arXiv 2503.23512: explicit state tracking → the capped ledger and motive lines); Huang et al.,
+ICLR 2024 (unanchored self-correction hurts → one anchored check); Anthropic's Claude prompting best
+practices (few principles with reasons, positive wording, no emphasis banners, no generic "verify your
+work" on Opus 5); IFScale (arXiv 2507.11538: adherence falls with instruction count, earlier rules win
+→ principles first); picture-book craft (one problem, one active hero, few characters, no subplot,
+rule of three); Trabasso & van den Broek (events on the causal chain are remembered, dead ends
+forgotten → every happening causes the ending).
+
+**Supersedes:** 2026-09-24 "The arc is written logic first" in its critique shape (the "Logic:" line,
+the reader questions) and its chain length (+1 link); 2026-08-30 arc machine "re-tell whole, never
+patch" and "a CRITICAL fault may rebuild the story" — the re-telling now edits flagged sentences only.
+
+**Open:** the forced invented-overcount round (`arcForceRoundOnInventedOvercount`) can still add a
+second panel + re-telling round; the owner's "one round only" is not enforced there.
+
+**Touched:** `prompts/arc-create.txt`, `prompts/arc-retell.txt`, `prompts/arc-panel.txt`,
+`server/lib/promptBuilders.js`, `server/lib/beatsPipeline.js`, `server/lib/testlab.js`,
+`server/lib/storyScorecard.js`, `server/lib/storyHelpers.js`, `scripts/admin/sibling-registry.json`,
+`tasks/verify.json` (`arc-prompts-v2`), tests.
+**Status:** ✅ committed on `staging`, not pushed; Lab validation pending (owner).

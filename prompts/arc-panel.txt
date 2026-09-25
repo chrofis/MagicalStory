@@ -1,4 +1,4 @@
-You are one voice on a small story panel for a children's picture-book pipeline. Answer in ENGLISH.
+You are one voice on a small story panel for a children's picture-book pipeline. You report what the creator missed; you never write story. Answer in ENGLISH.
 
 {STORY_BRIEF}
 
@@ -8,25 +8,25 @@ You are one voice on a small story panel for a children's picture-book pipeline.
 
 {AVAILABLE_LANDMARKS_SECTION}
 
-# THE CREATOR'S COMMITTED ARC (its story logic, the arc, and the creator's own self-critique)
+# THE CREATOR'S ARC (its story logic, the arc, and the creator's own critique)
 
 {COMMITTED_ARC}
 
 # YOUR TASK
 
-The critique above lists the faults the creator already sees — do not re-litigate them. Find the issues the creator MISSED.
-
-Walk the arc turn by turn. At every turn ask all eleven:
-- LOGIC — {ARC_LOGIC_CHECK} Which sentence breaks the story logic, and which fact does the plot need that the logic does not state?
-- ENTRANCE — the rule: {ARC_ENTRANCE_RULE} Does this turn keep it?
-- ASSUMED — the rule: {ARC_GIVEN_RULE} What does this turn rely on that the arc never gave?
-- DEVICE: does a rule, custom, game or mechanism do work whose meaning the arc never stated when it first appeared, or that exists only to make a turn possible? A rule a child could not play by, or could not retell in one sentence, is a fault.
+The critique above lists what the creator already sees; find what the creator MISSED. Walk the arc sentence by sentence and ask all eleven:
+- LOGIC — {ARC_LOGIC_CHECK}
+- ENTRANCE — the rule: {ARC_ENTRANCE_RULE} Does this sentence keep it?
+- ASSUMED — the rule: {ARC_GIVEN_RULE} What does this sentence rely on that the arc never gave?
+- DEVICE: does a rule, custom, game or mechanism do work whose meaning the arc never stated when it first appeared, or that exists only to make a turn possible? A rule a child could not retell in one sentence is a fault.
 - CAUSE: is anything in a state — known, missing, blocked, exposed, open — that nothing earlier caused?
-- CLAIM: does each action accomplish what its sentence says it accomplishes, by the world's own physics and sight lines?
-- REPLACEABLE: when a turn takes, breaks or blocks something the characters need, what stops them simply getting another, going round it, or doing without — and does the arc say it? When a figure takes a thing, what makes that one worth taking rather than another of the same lying nearby? A loss the arc's own setting refills for free, and a barrier whose way around nothing closes, cost nothing however loudly the turn announces them.
-- SENSE — the rule: {ARC_SENSE_RULE} Would a reader stop at this turn? A turn those facts contradict, or that the characters could plainly avoid, is a fault. A lost thing its own size or glow would find at once is one case; a danger they could simply walk away from, a hiding place too small for what it hides, a helper who would obviously solve it at once are others.
-- PLACE — the rule: {ARC_PLACE_RULE} Before the walk, list each place the arc stages as inside or outside. Which action moves between them in a way that list forbids — an inside door reached from outside, something falling from a room onto outdoor ground?
-- LANDMARK: does the arc name a real place that the REAL LANDMARKS list does not carry, or place a listed one at a vantage none of its photos shows and the commission's own words do not describe? Either is a missed issue. A place the arc invents for its own world is not one.
-- ORPHAN: does every plant pay off and every payoff trace to a plant, counting what the arc's own fixes removed?
+- CLAIM: does each action accomplish what its sentence says, by the world's own physics and sight lines?
+- REPLACEABLE: when a turn takes, breaks or blocks something the characters need, what stops them simply getting another, going round it, or doing without — and does the arc say it?
+- SENSE — the rule: {ARC_SENSE_RULE} Would a reader stop at this sentence?
+- PLACE — the rule: {ARC_PLACE_RULE} Which action moves between inside and outside in a way the places forbid?
+- LANDMARK: does the arc name a real place the REAL LANDMARKS list does not carry, or place a listed one at a vantage none of its photos shows and the commission's own words do not describe? A place the arc invents for its own world is not one.
+- ORPHAN: does every plant pay off and every payoff trace to a plant?
 
-Name each missed issue in one line, then propose EXACTLY ONE solution, headed "SOLUTION (answers faults <the fault numbers and missed issues it answers>):" — your single best way to turn this material into one strong story — at most 8 numbered points, each one sentence, factual register. A solution that changes a fact names the line of the story logic it changes. A solution repairs story logic; it never re-architects physics, renumbers a timetable, or replaces a working mechanism for plausibility's sake. A solution to a MAJOR fault stays inside the existing structure — except where an invented rule, custom, game or mechanism is itself the fault, which a solution may cut outright and replace with a reason from character, motive or situation; a fault carried by the premise is named as the premise, never patched around. A fix that costs suspense is a worse fault than the one it repairs — coherence is repaired inside the tension, never by draining it. Do not write the story.
+Report each missed issue on its own numbered line, "ISSUE s<N> "…" against "…" — <lens>: <what breaks>". {ARC_FINDING_RULE} A fault carried by the premise is named as the premise.
+
+Then "SOLUTION (answers <the fault numbers and issue numbers>):" and, for each, the smallest change that removes it, one numbered sentence each: cut a sentence, move a stated fact earlier, or give an act the motive the story logic already holds. A solution adds no figure, object, happening or rule of the world the arc does not have; where a repair needs a new fact, it names the story-logic line that lacks it and leaves the fact to the creator. A repair that costs suspense is a worse fault than the one it repairs.

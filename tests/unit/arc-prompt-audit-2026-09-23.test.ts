@@ -104,13 +104,13 @@ describe('arc prompts after the 2026-09-23 audit', () => {
     expect(PB.CENTRAL_FIGURE_DEF).toMatch(/never the main character/);
   });
 
-  it('the critique persona is the book\'s own reader, not a fixed eight-year-old', () => {
-    const five = PB.arcCritiqueSpec({ inputData: input() });
-    expect(five).toContain('answered as a five-year-old reader');
-    expect(five).not.toContain('eight-year-old');
-    const nine = PB.arcCritiqueSpec({ inputData: input({ characters: [{ id: 'a', name: 'Anna', age: 9 }], mainCharacters: ['a'] }) });
-    expect(nine).toContain('answered as a nine-year-old reader');
-    expect(PB.buildArcCreatePrompt(input(), 18)).toContain('answered as a five-year-old reader');
+  // The reader questions left the critique on 2026-09-25 (one anchored
+  // check); the one reader the arc names is still the book's own.
+  it('the arc names the book\'s own reader, never a fixed eight-year-old', () => {
+    const create = PB.buildArcCreatePrompt(input(), 18);
+    expect(create).toContain('read aloud to a five-year-old');
+    expect(create).not.toContain('eight-year-old');
+    expect(PB.arcCritiqueSpec()).not.toMatch(/year-old reader/);
   });
 
   it('a noSplit book gets one stay-together line, not two that disagree', () => {

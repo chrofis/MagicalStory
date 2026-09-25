@@ -1496,6 +1496,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "arc-prompts-v2",
+      "title": "Arc prompts v2: principles first, capped story logic, one anchored check, quoted panel findings, retell edits only flagged sentences",
+      "commits": [],
+      "addedAt": "2026-09-25",
+      "claim": "On the dragon commission (staging job_1790277448294_5herh01j7, 18 pages, read to a five-year-old) the create arc keeps its STORY LOGIC within the caps (one opposition, one ability or limit per figure, at most two world rules, a motive line per acting figure), its chain holds 4-5 happenings and its arc 14-18 sentences (baseline Lab #1459: 6 links, ~7 happenings, 20 sentences after the retell); every creator fault and every kept panel finding quotes the arc; the re-telling changes only the sentences named by a fault or finding and stays within the happenings budget.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Lab arc_effort stage=pipeline on job_1790277448294_5herh01j7 with challengesFromStory + baselineFromStory: read arms[create].logic/counts (chainLinks, eventsDeclared, worldRules, sentences), the critique faults (each quotes s<N>), panel[].keptFindings/droppedFindings against panel[].raw, and diff the retell FINAL ARC against the create ARC sentence by sentence (unflagged sentences unchanged); judge means vs baselines"
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }

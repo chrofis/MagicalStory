@@ -53,6 +53,11 @@ Last full sweep: **2026-09-06**.
       sentences, a logic-first critique with no model counting, the rulebook cut to logic. D1-D7
       answered; BUILT on staging (not pushed). Open: staging deploy + Lab validation (capped at $8)
       → `tasks/arc-logic-first-2026-09-24.md`
+- [ ] Arc prompts v2 (owner 2026-09-25): principles first, capped STORY LOGIC, one anchored check,
+      quoted panel findings, re-telling edits flagged sentences only. BUILT on staging (not pushed).
+      Open: Lab validation (`tasks/verify.json` `arc-prompts-v2`); the forced invented-overcount round
+      still allows a second re-telling against the owner's "one round only"
+      → `docs/decisions.md` "2026-09-25 — Arc prompts v2"
 
 ## Image quality — unresolved render defects
 

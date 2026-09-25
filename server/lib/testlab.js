@@ -8354,7 +8354,7 @@ async function runWriterCompareStage(target, { params = {} }) {
 async function runArcEffortStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
-  const { buildArcCreatePrompt, buildArcPanelPrompt, buildArcRetellPrompt, parseArcCreate, parseArcRetell, arcShapeCounts, drawChallengeIdeas } = require('./storyHelpers');
+  const { buildArcCreatePrompt, buildArcPanelPrompt, buildArcRetellPrompt, parseArcCreate, parseArcRetell, filterPanelFindings, arcShapeCounts, drawChallengeIdeas } = require('./storyHelpers');
   const { callTextModelStreaming } = require('./textModels');
   const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
   const sc = require('./storyScorecard');
@@ -8534,7 +8534,10 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
       const res = await callTextModelStreaming(panelPrompt, null, null, m, { usageLabel: 'testlab_arc_effort_panel', ...tempFor(m, MODEL_DEFAULTS.arcPanelTemperature) });
       const text = String(res?.text || '').trim();
       if (!text) throw new Error('empty panel response');
-      return { model: res.modelId || m, text, cost: costOf(res) };
+      // Production's filter (beatsPipeline PANEL): an unquoted finding never
+      // reaches the re-telling.
+      const f = filterPanelFindings(text, created.commit.committed);
+      return { model: res.modelId || m, raw: text, text: f.text, keptFindings: f.kept.length, droppedFindings: f.dropped, cost: costOf(res) };
     }));
     panel = settled.map((r, i) => (r.status === 'fulfilled'
       ? { ok: true, ...r.value }
@@ -8580,7 +8583,14 @@ function storedChallengeSection(storyData) {
   if (start < 0) throw new Error('challengesFromStory: the stored create prompt has no # CHALLENGE IDEAS section');
   const rest = prompt.slice(start);
   const next = rest.slice(1).search(/^# /m);
-  return (next >= 0 ? rest.slice(0, next + 1) : rest).trimEnd();
+  const section = (next >= 0 ? rest.slice(0, next + 1) : rest).trimEnd();
+  // The draw is its entries; the heading is template text. A stored heading
+  // may carry a challenge count today's arc no longer states (2026-09-25), so
+  // the entries are re-headed with today's heading — one variable, the arc.
+  const entries = section.split('\n').filter(l => /^\s*-\s*\[C\d+\]/.test(l));
+  if (!entries.length) throw new Error('challengesFromStory: the stored # CHALLENGE IDEAS section lists no [C###] entries');
+  const { CHALLENGE_IDEAS_HEADING } = require('./promptBuilders');
+  return [...CHALLENGE_IDEAS_HEADING, '', ...entries].join('\n');
 }
 
 /**
@@ -8989,12 +8999,18 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
         throw new Error(`panelist ${model} returned an empty response (${outTok} output tokens) — provider failure, not a review`);
       }
       const solutionIdx = text.search(/^\s*[*#]*\s*SOLUTION/im);
+      // Production's filter (beatsPipeline PANEL): the re-telling below reads
+      // only the findings that quote the arc; the raw reply ships beside them.
+      const f = H.filterPanelFindings(text, committed);
       runs.push({
         model, modelId: res.modelId, ok: true,
         elapsedMs: Date.now() - t,
         cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
         usage: res.usage,
-        text,
+        raw: text,
+        text: f.text,
+        keptFindings: f.kept.length,
+        droppedFindings: f.dropped,
         // The half that matters for a checklist change: what the panel FOUND,
         // before its single solution. Split, never truncated — both halves ship.
         issues: solutionIdx > 0 ? text.slice(0, solutionIdx).trim() : text,
