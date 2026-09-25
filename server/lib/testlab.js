@@ -10092,7 +10092,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const {
-    buildBeatsPrompt, buildPlanCheckPrompt, parsePlanCheck, parsePlanCheckRoster,
+    buildBeatsPrompt, buildPlanCheckPrompt, parsePlanCheck, parsePlanCheckRoster, parsePlanCheckCentralPages,
     parsePlanCheckObstacles, buildReplanSection, getHistoricalLocations, getHistoricalObjects,
     parsePlanCheckWanted, parsePlanCheckActions, replanKeepPages, replanRoundRegressed,
     parseStoryLogic, parsePlanResponse, arcInventedAllowance,
@@ -10201,7 +10201,8 @@ async function runBeatsReplanStage(target, { params = {} }) {
     const modelFindings = parsePlanCheck(res.text || '');
     const roster = parsePlanCheckRoster(res.text || '');
     const counters = runPlanCounters({
-      pages, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, roster, centralFigure, ...inventedArgs,
+      pages, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, roster, centralFigure,
+      centralPages: parsePlanCheckCentralPages(res.text || ''), ...inventedArgs,
     });
     return {
       prompt, res, roster, counters,

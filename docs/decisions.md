@@ -60828,3 +60828,26 @@ on −1 (Nebla, ANI002) and `cover_location_repeated` on −2 and −3 (LOC001.2
 **Touched:** server/lib/coverBeats.js, server/lib/beatsPipeline.js, server/lib/sceneBriefCheck.js,
 server/lib/iterateBeat.js, server/lib/testlab.js, tests/unit/covers-as-pages.test.ts,
 tests/unit/iterate-rewrite-checked-like-authored.test.ts.
+
+## 2026-09-25 — The central figure's presence is the plan check's CENTRAL line, never a name match against the roster
+
+**Context.** CENTRAL_FIGURE_ABSENT_THIRD (cf672a0f8) counted the central figure per third by matching the arc's
+STORY LOGIC names, whole-word, against the plan check's ROSTER. On Lab #1488/#1489 (beats_replan on the arc of #1483,
+staging job_1790277448294_5herh01j7) it filed must-fix findings for all three thirds while the egg was staged on most
+pages. Two causes, both in the matching: the logic line named the figure in the book language ("das Ei / Marroni",
+the arc prompts keep names "as they will appear" in the book) against an English roster ("the egg"); and the roster
+reads the who column, which carries PEOPLE, so an egg that lives in the instant reached `things` on pages 15-16 only.
+Renaming the figure in English would have fixed the first cause and left the second (setup and middle still absent).
+
+**Decision.** The plan check, already handed the figure's name in question 12 (castActionRule), answers one extra
+line when a figure is named: `CENTRAL: pages …` — every page whose picture shows it, who column or instant, under any
+of its names. parsePlanCheckCentralPages reads it; the counter does arithmetic on it and no longer touches the roster
+or the name. A named figure with no CENTRAL line files nothing and is logged as an error (stats.centralFigure.unanswered),
+never guessed. The string matcher is deleted — it was the per-consumer name matcher SETTLED forbids.
+
+**Evidence.** The old counter on the #1488 shape (German name, English roster, egg on 15-16) returns all three
+thirds; the new one, given the checker's CENTRAL answer, returns none. Stories since cf672a0f8: 0 on staging, 0 on
+production (none generated); the false findings hit Lab #1488, #1489, #1491 only.
+
+**Touched:** prompts/plan-check.txt, server/lib/promptBuilders.js, server/lib/planCounters.js,
+server/lib/beatsPipeline.js, server/lib/testlab.js, tests/unit/arc-logic-first.test.ts.

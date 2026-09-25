@@ -43,7 +43,7 @@ Answer only these fourteen:
 
 11. Obstacles. Name every page whose instant works against what a character is doing — a way blocked, a place kept, a thing taken or withheld, a refusal. For each, give that page an OBSTACLES line naming that character, and say whether the page's plan line names them. A page whose obstacle is held by a character the plan line does not name is a finding.
 
-12. Each character's own action. {CAST_ACTION} For each commissioned character, and for the central figure when one is named here, give an ACTION line: the sentence where the story gives them an action of their own, and the page whose instant stages it. A character whose action no page stages as its instant is a finding, and so is a central figure that is only carried where it appears.
+12. Each character's own action. {CAST_ACTION} For each commissioned character, and for the central figure when one is named here, give an ACTION line: the sentence where the story gives them an action of their own, and the page whose instant stages it. A character whose action no page stages as its instant is a finding, and so is a central figure that is only carried where it appears. When a central figure is named here, also give a CENTRAL line: every page whose picture shows it, under any of its names — in the who column or in the instant, alone, held or carried; what is true after is not the picture.
 
 13. Order. Name every page whose instant stages a moment the story reaches only in a later sentence, or that needs something a later page first brings about. A change listed under HINTS belongs where its own words place it in the story.
 14. Over-the-shoulder. {OTS_NO_CONTACT} Name every over-the-shoulder page whose instant has the figure nearest the camera touching what they face, and ask for another shot.
@@ -70,6 +70,10 @@ Then one line per commissioned character, and one for the central figure when on
 
 ACTION <name>: sentence <number> — page <number, or none>
 
+Then, only when a central figure is named, one line, and no line when none is:
+
+CENTRAL: pages <numbers, comma separated, or none>
+
 Then the findings: numbered, one line each, nothing before or after. Each line begins with the number of the check it answers, then names the page and what is wrong; several findings may carry the same number. Never propose a rewrite, never write a plan line. When a check finds nothing, write no line for it — a line saying a check found nothing, or naming something the check confirms is right, is itself wrong.
 
-When the roster is complete and nothing is wrong anywhere, write the roster, the obstacle lines, the peopleless line if one is owed, the WANTED and ACTION lines, and then exactly: NONE
+When the roster is complete and nothing is wrong anywhere, write the roster, the obstacle lines, the peopleless line if one is owed, the WANTED and ACTION lines, the CENTRAL line if one is owed, and then exactly: NONE

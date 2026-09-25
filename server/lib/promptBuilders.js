@@ -7908,6 +7908,39 @@ function parsePlanCheckAnchors(raw, label) {
 const parsePlanCheckWanted = raw => parsePlanCheckAnchors(raw, 'WANTED');
 const parsePlanCheckActions = raw => parsePlanCheckAnchors(raw, 'ACTION');
 
+/**
+ * The plan check's CENTRAL line (2026-09-25) — the pages whose picture shows
+ * the central figure, as the checker answers it for the name Q12 gives it.
+ * CENTRAL_FIGURE_ABSENT_THIRD counts thirds on this answer.
+ *
+ * It replaced a whole-word match of the arc's name against the ROSTER, which
+ * failed twice over on job_1790277448294_5herh01j7 (Lab #1488/#1489): the
+ * arc's STORY LOGIC named the figure in the book language ("das Ei") while the
+ * roster is English ("the egg"), and the roster reads the who column, which
+ * carries PEOPLE — an egg lives in the instant, so it reached `things` on two
+ * pages of eighteen. The checker is handed the name and reads the page; the
+ * counter does arithmetic on its answer, never on two free texts.
+ *
+ * "CENTRAL: pages 3, 4, 9" → [3, 4, 9]; "CENTRAL: pages 3-5" → [3, 4, 5];
+ * "CENTRAL: none" → []; no line → null (the checker did not answer).
+ *
+ * @returns {number[]|null}
+ */
+function parsePlanCheckCentralPages(raw) {
+  for (const line of String(raw || '').split('\n')) {
+    const m = line.trim().replace(/\*\*/g, '').match(/^CENTRAL\s*:\s*(.*)$/i);
+    if (!m) continue;
+    const pages = new Set();
+    for (const r of m[1].matchAll(/(\d+)(?:\s*[-–—]\s*(\d+))?/g)) {
+      const a = parseInt(r[1], 10);
+      const b = r[2] ? parseInt(r[2], 10) : a;
+      for (let n = Math.min(a, b); n <= Math.max(a, b); n++) pages.add(n);
+    }
+    return [...pages].sort((x, y) => x - y);
+  }
+  return null;
+}
+
 // A HINT MAY NOT CONTRADICT THE SETTLED ARC (2026-09-19).
 // One constant, injected into BOTH hint headings — the planner's and the text
 // writer's — which form one contract (docs/sibling-paths.md). The hint pass
@@ -12033,6 +12066,7 @@ module.exports = {
   parsePlanCheckRoster,
   parsePlanCheckObstacles,
   parsePlanCheckPeoplelessPick,
+  parsePlanCheckCentralPages,
   buildReplanSection,
   parsePlanChanges,
   REPLAN_CHANGES_FORMAT,

@@ -109,6 +109,7 @@ const {
   parsePlanCheckRoster,
   parsePlanCheckObstacles,
   parsePlanCheckPeoplelessPick,
+  parsePlanCheckCentralPages,
   parsePlanCheckWanted,
   parsePlanCheckActions,
   replanKeepPages,
@@ -1489,6 +1490,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // round must keep, read as DATA like OBSTACLES (2026-09-23).
     let wanted = [];
     let actions = [];
+    // The check's CENTRAL line: the pages whose picture shows the central
+    // figure, answered for the name Q12 gives it (2026-09-25). null = no line.
+    let centralPages = null;
     let checkModelId = null;
     let prompt = null;
     // THE REPLY IS EVIDENCE, NOT A BYPRODUCT (2026-09-19).
@@ -1522,6 +1526,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       peoplelessPick = parsePlanCheckPeoplelessPick(res.text || '');
       wanted = parsePlanCheckWanted(res.text || '');
       actions = parsePlanCheckActions(res.text || '');
+      centralPages = parsePlanCheckCentralPages(res.text || '');
       // The roster AS PARSED, page by page. The raw reply above carries the
       // same lines verbatim; this is the form every counter actually reasons
       // on, so a reader can see what the arithmetic was given — including a
@@ -1540,7 +1545,13 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       log.error(`❌ [BEATS] Plan check (${label}) failed (${err.message}) — NO ROSTER, so the entire plan-counter layer is skipped this round`);
       gl.error(`${label}_failed`, `Plan check failed: ${err.message} — no roster, so every plan counter (cast, invented cast, shot variety, focal pages) is skipped this round`, null, { error: err.message, model: planCheckModel });
     }
-    const counters = runPlanCounters({ pages, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit, roster, peoplelessPick, centralFigure: arcCentralFigure });
+    const counters = runPlanCounters({ pages, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit, roster, peoplelessPick, centralFigure: arcCentralFigure, centralPages });
+    // The central-figure counter counts on the CENTRAL line alone; a check
+    // that named no pages for a named figure leaves it uncounted — loudly.
+    if (counters.stats?.centralFigure?.unanswered) {
+      log.error(`❌ [BEATS] Plan check (${label}) gave no CENTRAL line for the central figure (${arcCentralFigure.join(' / ')}) — CENTRAL_FIGURE_ABSENT_THIRD did not run`);
+      gl.error(`${label}_no_central_line`, 'The plan check named no pages for the central figure (CENTRAL line absent); the per-third presence counter did not run', null, { model: checkModelId || planCheckModel, centralFigure: arcCentralFigure });
+    }
     // NO FALLBACK, NO SYNTHESIS. The finding degrades to its page-less
     // sentence when Q6 nominated nothing; code never picks the page itself.
     // The miss is loud so a checker that stops answering Q6 is visible.

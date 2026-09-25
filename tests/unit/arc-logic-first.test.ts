@@ -229,32 +229,59 @@ describe('the distinctive voice moves to the prose (D6)', () => {
 
 describe('d4 — the central figure in each third of the page plan', () => {
   const pages = Array.from({ length: 9 }, (_, i) => ({ pageNumber: i + 1, planLine: `wide — Levin — Levin walks — step ${i + 1}` }));
-  const rosterWith = (present: number[], name = 'Kachel') => new Map(pages.map(p => [p.pageNumber, {
-    people: present.includes(p.pageNumber) ? ['Levin', name] : ['Levin'], things: [], covers: [],
-  }]));
-  const run = (roster: any, centralFigure: any) => runPlanCounters({ pages, roster, commissionedNames: ['Levin'], placeNames: [], centralFigure });
+  const roster = new Map(pages.map(p => [p.pageNumber, { people: ['Levin'], things: [], covers: [] }]));
+  const run = (centralPages: any, centralFigure: any) => runPlanCounters({ pages, roster, commissionedNames: ['Levin'], placeNames: [], centralFigure, centralPages });
+  const central = (r: any) => r.findings.filter((x: any) => x.code === 'CENTRAL_FIGURE_ABSENT_THIRD');
 
-  it('names each third where no page holds the figure, with that third\'s pages', () => {
-    const r = run(rosterWith([1, 2]), ['the egg', 'Kachel']);
-    const f = r.findings.filter((x: any) => x.code === 'CENTRAL_FIGURE_ABSENT_THIRD');
-    expect(f.map((x: any) => x.pages)).toEqual([[4, 5, 6], [7, 8, 9]]);
-  });
-
-  it('either of the figure\'s names counts, and a thing on the roster counts too', () => {
-    const roster = rosterWith([5]);
-    roster.set(2, { people: ['Levin'], things: ['golden egg'], covers: [] });
-    roster.set(8, { people: ['Levin', 'kachel'], things: [], covers: [] });
-    const r = run(roster, ['the egg', 'Kachel']);
-    expect(r.findings.some((x: any) => x.code === 'CENTRAL_FIGURE_ABSENT_THIRD')).toBe(false);
-  });
-
-  it('a different figure sharing a word does not count ("dragon" is not "dragon egg")', () => {
-    const r = run(rosterWith([1, 2, 3, 4, 5, 6, 7, 8, 9], 'dragon'), ['dragon egg']);
-    expect(r.findings.filter((x: any) => x.code === 'CENTRAL_FIGURE_ABSENT_THIRD')).toHaveLength(3);
+  it("names each third where the CENTRAL line shows the figure on no page, with that third's pages", () => {
+    expect(central(run([1, 2], ['the egg', 'Kachel'])).map((x: any) => x.pages)).toEqual([[4, 5, 6], [7, 8, 9]]);
+    expect(central(run([2, 5, 8], ['the egg', 'Kachel']))).toHaveLength(0);
   });
 
   it('is silent when the arc named no central figure', () => {
-    expect(run(rosterWith([]), null).findings.some((x: any) => x.code === 'CENTRAL_FIGURE_ABSENT_THIRD')).toBe(false);
+    expect(central(run([], null))).toHaveLength(0);
+  });
+
+  it('a named figure without a CENTRAL line files nothing and reports itself unanswered', () => {
+    const r = run(null, ['the egg', 'Kachel']);
+    expect(central(r)).toHaveLength(0);
+    expect(r.stats.centralFigure).toEqual({ names: ['the egg', 'Kachel'], pages: null, unanswered: true });
+  });
+
+  it('parses the CENTRAL line: a list, a range, none, and no line at all', () => {
+    expect(PB.parsePlanCheckCentralPages('ROSTER 1: people = A\nCENTRAL: pages 3, 4, 9\n1. x')).toEqual([3, 4, 9]);
+    expect(PB.parsePlanCheckCentralPages('**CENTRAL:** pages 7–9, 2')).toEqual([2, 7, 8, 9]);
+    expect(PB.parsePlanCheckCentralPages('CENTRAL: none')).toEqual([]);
+    expect(PB.parsePlanCheckCentralPages('ACTION Levin: sentence 6 — page 6')).toBeNull();
+  });
+
+  // Lab #1488 (beats_replan on the arc of #1483, job_1790277448294_5herh01j7):
+  // the arc's STORY LOGIC named the figure in the book language, the roster is
+  // English, and the who column carries people, so the egg reached the roster
+  // on pages 15-16 only. The old name-vs-roster match filed all three thirds.
+  it("#1488 shape: a German central-figure name against an English roster counts from the checker's answer", () => {
+    const p18 = Array.from({ length: 18 }, (_, i) => ({ pageNumber: i + 1, planLine: `medium — Julian, Flamma — Flamma watches — step ${i + 1}` }));
+    const r18 = new Map(p18.map(p => [p.pageNumber, {
+      people: ['Julian', 'Flamma'], things: p.pageNumber >= 15 && p.pageNumber <= 16 ? ['egg'] : [], covers: [],
+    }]));
+    const reply = [
+      ...p18.map(p => `ROSTER ${p.pageNumber}: people = Julian, Flamma; things = ${p.pageNumber >= 15 && p.pageNumber <= 16 ? 'the egg' : 'none'}; covers = none; unlisted = none`),
+      'ACTION the egg / Marroni: sentences 3, 9 and 16 — pages 3, 9 and 16',
+      'CENTRAL: pages 3, 4, 7, 9, 10, 11, 15, 16',
+    ].join('\n');
+    const r = runPlanCounters({
+      pages: p18, roster: r18, commissionedNames: ['Julian'], placeNames: [],
+      centralFigure: ['das Ei', 'Marroni'], centralPages: PB.parsePlanCheckCentralPages(reply),
+    });
+    expect(central(r)).toHaveLength(0);
+    expect(r.stats.centralFigure.pages).toEqual([3, 4, 7, 9, 10, 11, 15, 16]);
+  });
+
+  it("the plan check hands the checker the figure's name and asks for the CENTRAL line", async () => {
+    await loadPromptTemplates();
+    const withFigure = PB.buildPlanCheckPrompt(input(), pages, '1. A story.', 'Page 1: wide — Levin — x — y', { centralFigure: ['das Ei', 'Marroni'] });
+    expect(withFigure).toContain('das Ei / Marroni');
+    expect(withFigure).toMatch(/^CENTRAL: pages/m);
   });
 
   it('is a must-fix finding the re-plan answers by putting the figure in frame', () => {

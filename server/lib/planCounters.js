@@ -568,35 +568,27 @@ function consecutiveRuns(sorted) {
 }
 
 /**
- * The thirds of the book in which no page's roster holds the central figure.
- * Presence is the who column as the check read it — `people`, `things` and
- * `covers` — so an object or an unnamed creature counts too. A name matches a
- * roster entry case-insensitively, whole or as whole words inside it ("egg" is
- * in "golden egg", never the reverse: "dragon" does not match "dragon egg"),
- * after the article is dropped the way the roster drops it.
+ * The thirds of the book in which no page shows the central figure.
+ *
+ * Presence is the plan check's CENTRAL line (parsePlanCheckCentralPages): the
+ * checker is handed the figure's name in Q12 and lists the pages whose picture
+ * shows it, who column or instant. Code never matches the name against the
+ * roster — on job_1790277448294_5herh01j7 (Lab #1488/#1489) the arc named the
+ * figure in the book language ("das Ei") against an English roster, and the
+ * roster's who column carries people, so an egg in the instant was never on it:
+ * three must-fix findings for a figure staged on most pages (2026-09-25).
  *
  * @param {Array<{pageNumber:number}>} rows  the counter rows, in page order
- * @param {Map} roster  parsePlanCheckRoster output
+ * @param {number[]|null} centralPages  the CENTRAL line; null = not answered
  * @param {string[]|null} centralFigure  the arc's names for the figure
- * @returns {Array<{third:string, pages:number[], names:string[]}>}
+ * @returns {{gaps: Array<{third:string, pages:number[], names:string[]}>, unanswered: boolean}}
  */
-function centralFigureAbsentThirds(rows, roster, centralFigure) {
-  const names = (Array.isArray(centralFigure) ? centralFigure : [])
-    .map(n => String(n || '').trim().replace(/^(?:the|a|an)\s+/i, '').toLowerCase())
-    .filter(Boolean);
+function centralFigureAbsentThirds(rows, centralPages, centralFigure) {
+  const names = (Array.isArray(centralFigure) ? centralFigure : []).map(n => String(n || '').trim()).filter(Boolean);
   const n = rows.length;
-  if (!names.length || !roster || n < 3) return [];
-  const escape = t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const matches = (entry) => {
-    const e = String(entry || '').trim().toLowerCase();
-    return names.some(name => e === name
-      || new RegExp(`(^|[^\\p{L}])${escape(name)}([^\\p{L}]|$)`, 'u').test(e));
-  };
-  const present = (pageNumber) => {
-    const r = roster.get(Number(pageNumber));
-    if (!r) return false;
-    return [...(r.people || []), ...(r.things || []), ...(r.covers || [])].some(matches);
-  };
+  if (!names.length || n < 3) return { gaps: [], unanswered: false };
+  if (!Array.isArray(centralPages)) return { gaps: [], unanswered: true };
+  const shown = new Set(centralPages.map(Number));
   const a = Math.round(n / 3);
   const b = Math.round((2 * n) / 3);
   const thirds = [
@@ -604,9 +596,10 @@ function centralFigureAbsentThirds(rows, roster, centralFigure) {
     { third: 'middle', rows: rows.slice(a, b) },
     { third: 'ending', rows: rows.slice(b) },
   ];
-  return thirds
-    .filter(t => t.rows.length && !t.rows.some(r => present(r.pageNumber)))
-    .map(t => ({ third: t.third, pages: t.rows.map(r => r.pageNumber), names: centralFigure }));
+  const gaps = thirds
+    .filter(t => t.rows.length && !t.rows.some(r => shown.has(Number(r.pageNumber))))
+    .map(t => ({ third: t.third, pages: t.rows.map(r => r.pageNumber), names }));
+  return { gaps, unanswered: false };
 }
 
 /**
@@ -627,9 +620,12 @@ function centralFigureAbsentThirds(rows, roster, centralFigure) {
  *   page needs this; without it the counters do not run, because the only alternative was
  *   guessing the cast out of the prose in code, which is what they were doing wrong. `covers`
  *   is the names a page reaches without naming them (`coveredNames`).
+ * @param {string[]|null} [args.centralFigure] the arc's STORY LOGIC names for the central figure
+ * @param {number[]|null} [args.centralPages] the plan check's CENTRAL line
+ *   (`parsePlanCheckCentralPages`); null = the check gave none
  * @returns {{findings: Array, lines: string[], stats: Object, cast: Object|null, skipped?: string}}
  */
-function runPlanCounters({ pages = [], commissionedNames = [], listedNames = null, placeNames = [], maxCharactersPerScene = 3, declaredInvented = null, inventedAllowance = null, roster = null, peoplelessPick = null, centralFigure = null } = {}) {
+function runPlanCounters({ pages = [], commissionedNames = [], listedNames = null, placeNames = [], maxCharactersPerScene = 3, declaredInvented = null, inventedAllowance = null, roster = null, peoplelessPick = null, centralFigure = null, centralPages = null } = {}) {
   const findings = [];
   const add = (code, pageList, detail) => findings.push({ code, pages: pageList, detail });
 
@@ -1028,13 +1024,14 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
   // 8b. THE CENTRAL FIGURE IN EACH THIRD (owner, 2026-09-24, d4). The arc's
   //     critique used to certify "the central figure acts in every third"
   //     itself; the arc now only NAMES the figure in its STORY LOGIC
-  //     ("Central figure:"), and this counts, on the check's roster, whether
-  //     any page of each third holds it. The names are the arc's own (an egg
-  //     and the creature it hatches into are two names for one figure), read
-  //     as data, never found in the prose. The planner and plan-check Q12 are
-  //     told the same rule (castCoverage.centralFigureActionRule); whether it
-  //     ACTS on those pages is Q12's ACTION line, not arithmetic.
-  const centralAbsent = centralFigureAbsentThirds(rows, roster, centralFigure);
+  //     ("Central figure:"), and this counts, on the check's CENTRAL line (the
+  //     pages the checker, handed that name in Q12, says show it), whether any
+  //     page of each third does. The planner and plan-check Q12 are told the
+  //     same rule (castCoverage.centralFigureActionRule); whether it ACTS on
+  //     those pages is Q12's ACTION line, not arithmetic. A named figure with
+  //     no CENTRAL line files nothing and says so in stats.centralFigure.
+  const central = centralFigureAbsentThirds(rows, centralPages, centralFigure);
+  const centralAbsent = central.gaps;
   for (const gap of centralAbsent) {
     add('CENTRAL_FIGURE_ABSENT_THIRD', gap.pages,
       `the central figure (${gap.names.join(' / ')}) is in frame on no page of the ${gap.third} (pages ${gap.pages[0]}-${gap.pages[gap.pages.length - 1]}); stage it on one of them`);
@@ -1075,6 +1072,11 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
       focalPages: focal,
       coveragePages: coverage,
       castCoverage: coverageRule,
+      // Only when the arc named a central figure: the pages the check said
+      // show it, or `unanswered` when it gave no CENTRAL line.
+      ...(Array.isArray(centralFigure) && centralFigure.length
+        ? { centralFigure: { names: centralFigure, pages: Array.isArray(centralPages) ? centralPages : null, unanswered: central.unanswered } }
+        : {}),
     },
   };
 }
