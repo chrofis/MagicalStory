@@ -21,6 +21,41 @@ superseded and link forward.
 
 ---
 
+## 2026-09-25 — Every repair that repaints pixels carries the page's declared light; every repaired version is judged against it
+
+**Context:** Staging job_1790277448294_5herh01j7 p15 declares `timeOfDay: night`, `weather: fog`. v0 was
+night. The round-1 inpaint was sent exactly `Fix these issues in this children's book illustration:\n1. Remove
+the visible street lamp from the background.` (stored `imageVersions[1].prompt`) and returned v1 in golden
+daylight; v1 scored 100 and shipped. The LIGHT line (2026-09-24 entry "A page declares its time of day and
+weather") reached only the page and plate prompts. The pipeline re-eval of v1 DID carry `DECLARED LIGHT:
+night, fog` (replayed from the stored inputs: sceneHint = the version's brief), and the judge read v1 as
+"a forest at night" — a judge miss, not a missing input. Re-judged in Lab exp #1471 with the same input,
+the judge flagged v1 as daytime (MODERATE, semantic 90) and read v0 as night. Two manual routes
+(`/repair/image`, `/repair-workflow/character-repair`) re-evaluated a repaired version quality-only, so
+no judge ever saw the declared light there.
+
+**Decision:** `sceneLight.buildRepairLightLine` (one line, from the brief's fields via
+`declaredLightOfBrief`, which moved here from styleConsistency.js) closes every repair that repaints
+pixels: the page inpaint (`images.buildInpaintInstruction`, which the manual `/repair/image` route now
+also uses), the character repair (`faceRepair.buildPrompt`, every branch), and the scale repair
+(`scaleRepair.buildScaleRepairPrompt`). Iterate and the regenerate fallback re-render from the full page
+prompt, which already carries the page's LIGHT line. The two manual routes now pass the page text and
+the brief, so the semantic judge runs on a repaired version exactly as on a first render; the judge's
+light derivation is one function (`sceneValidator.semanticDeclaredLight`). Registry set
+`repair-keeps-declared-light`.
+
+Deliberately NOT given the line: the user-typed edit routes (`/edit/image`, `/edit/cover`) — the owner's
+own instruction may be "make it daytime", and a light constraint would override it; the grid artifact
+repair (`repairGrid.js`), which repaints small cropped cells and blends them back.
+
+**Open, owner's call:** a light contradiction is MODERATE in image-semantic.txt, so a daylight repair can
+still outscore its night original when the original carries a worse finding (exp #1471: v1 90, v0 70).
+
+**Touched:** server/lib/sceneLight.js, images.js, faceRepair.js, scaleRepair.js, sceneValidator.js,
+styleConsistency.js, server/routes/regeneration.js, scripts/admin/sibling-registry.json,
+tests/unit/scene-light.test.ts, tests/unit/inpaint-preserve-channel.test.ts
+**Status:** ✅ active
+
 ## 2026-09-24 — An outfit description is appearance only, and a repair descriptor names one closed-vocabulary garment, never the outfit sentence
 
 **Context:** Staging job_1790277448294_5herh01j7 (dragon run 7). The wardrobe writer put plot notes in

@@ -2007,6 +2007,18 @@
       "fixedAt": "2026-09-24",
       "fixedIn": "da8aa330d",
       "fix": "repairGarmentPhrase builds colour word + garment noun from closed vocabularies (tracked item worn on the page first, then the outfit by slot), excluding garments the page resolved worn state takes off; log.error when none. buildRepairNameMap/buildPageRepairNameMap/inpaintPage pass the page metadata. Replay on run 7: p2 \"the 3-year-old boy in the blue anorak\", p13 \"the 5-year-old boy in the green jumper, on the far left\"."
+    },
+    {
+      "id": "repair-repaints-declared-light",
+      "title": "A repair that repaints pixels was never told the page's declared light: the p15 inpaint turned a declared foggy night into golden daylight, and the repaired version shipped at 100",
+      "reportedAt": "2026-09-25",
+      "source": "Owner-reported, staging job_1790277448294_5herh01j7 p15 (brief timeOfDay night, weather fog). Stored imageVersions[1].prompt is exactly \"Fix these issues in this children's book illustration:\\n1. Remove the visible street lamp from the background.\" with no light; v1 pixels are warm daylight; v1 finalScore 100 (semantic visible.setting \"A forest at night\").",
+      "rootCause": "The LIGHT line (sceneLight.buildLightLine) reached only the page and plate prompts. inpaintPage, the character repair (faceRepair.buildPrompt), the scale repair and the manual /repair/image route built their prompts without it. The pipeline re-eval did carry DECLARED LIGHT night, fog (replayed from the stored inputs) and the judge missed the daylight on that run; the manual /repair/image and /repair-workflow/character-repair re-evals ran quality-only, so no judge saw the light there.",
+      "impact": "A repair can silently change a page's time of day and weather and still win pick-best.",
+      "status": "fixed",
+      "fixedAt": "2026-09-25",
+      "fixedIn": null,
+      "fix": "sceneLight.buildRepairLightLine closes every repaint prompt (images.buildInpaintInstruction, used by the pipeline, the Lab and the manual route; faceRepair.buildPrompt, every branch; scaleRepair.buildScaleRepairPrompt). The two manual routes pass page text + brief, so the semantic judge runs and judges light as on a first render. Replay of the stored p15 instruction now ends on the night/fog LIGHT line; Lab #1471 re-judged stored v1 against DECLARED LIGHT night, fog and flagged it as daytime (MODERATE)."
     }
   ]
 }

@@ -196,3 +196,78 @@ describe('plate geometry salvages a long sentence instead of dropping it', () =>
     expect(facts.join(' ')).not.toMatch(/stands|leaning/);
   });
 });
+
+// REPAIRS KEEP THE DECLARED LIGHT (staging job_1790277448294_5herh01j7 p15).
+// The page declared night + fog; the round-1 inpaint was sent only "Remove the
+// visible street lamp from the background." and came back in golden daylight.
+// Every repair that repaints pixels now closes on the page's LIGHT line, built
+// from the brief's fields by sceneLight.buildRepairLightLine.
+describe('every repair that repaints pixels carries the declared light', () => {
+  const NIGHT_FOG = brief('The dragon sits by the tree trunk; a lamp glows through the mist.', { timeOfDay: 'night', weather: 'fog' });
+  const UNDECLARED = brief('The dragon sits by the tree trunk.', {});
+  const IMG = require_('../../server/lib/images');
+  const faceRepair = require_('../../server/lib/faceRepair');
+  const { buildScaleRepairPrompt } = require_('../../server/lib/scaleRepair');
+  const { semanticDeclaredLight } = require_('../../server/lib/sceneValidator');
+  const { resolveEvalSceneHint } = require_('../../server/lib/sceneMetadata');
+  const NAMES = require_('../../server/lib/repairLogic').buildRepairNameMap({ characters: [{ name: 'Mira', age: 8, gender: 'female' }] });
+
+  it('the repair line names the light and forbids changing it; empty when undeclared', () => {
+    const line = L.buildRepairLightLine({ timeOfDay: 'night', weather: 'fog' });
+    expect(line.startsWith('**LIGHT:**')).toBe(true);
+    expect(line).toContain('night: a dark sky');
+    expect(line).toContain('fog softening the distance');
+    expect(line).toMatch(/keeps exactly this light, sky and weather/);
+    expect(L.buildRepairLightLine({ timeOfDay: null, weather: null })).toBe('');
+  });
+
+  it('declaredLightOfBrief reads the fields, never the prose', () => {
+    expect(L.declaredLightOfBrief(NIGHT_FOG)).toEqual({ timeOfDay: 'night', weather: 'fog' });
+    expect(L.declaredLightOfBrief(brief('A moonlit night in the rain.', {}))).toEqual({ timeOfDay: null, weather: null });
+  });
+
+  it('the page inpaint instruction ends on the LIGHT line (the p15 instruction, rebuilt)', () => {
+    const sent = IMG.buildInpaintInstruction({
+      editInstruction: '1. Remove the visible street lamp from the background.',
+      sceneDescription: NIGHT_FOG,
+    });
+    expect(sent).toContain('Remove the visible street lamp');
+    expect(sent.endsWith(`\n\n${L.buildRepairLightLine({ timeOfDay: 'night', weather: 'fog' })}`)).toBe(true);
+  });
+
+  it('the page inpaint instruction is unchanged for a brief that declares no light', () => {
+    const sent = IMG.buildInpaintInstruction({ editInstruction: '1. Open the eyes.', sceneDescription: UNDECLARED });
+    expect(sent).toBe("Fix these issues in this children's book illustration:\n1. Open the eyes.");
+  });
+
+  it('every character-repair template branch carries it', async () => {
+    for (const axes of [
+      { treatment: 'blur', regionSource: 'cutout', faceOnly: false },
+      { treatment: 'blur', regionSource: 'cutout', faceOnly: true },
+      { treatment: 'crosshatch', regionSource: 'box', faceOnly: false },
+      { treatment: 'crosshatch', regionSource: 'cutout', faceOnly: false },
+    ]) {
+      const p = await faceRepair.buildPrompt({ ...axes, charName: 'Mira', opts: { sceneDescription: NIGHT_FOG, artStyle: 'watercolor', repairNames: NAMES } });
+      expect(p, JSON.stringify(axes)).toContain('**LIGHT:** night: a dark sky');
+      const none = await faceRepair.buildPrompt({ ...axes, charName: 'Mira', opts: { sceneDescription: UNDECLARED, artStyle: 'watercolor', repairNames: NAMES } });
+      expect(none, JSON.stringify(axes)).not.toContain('**LIGHT:**');
+    }
+  });
+
+  it('the scale repair (whole-frame edit) carries it', () => {
+    const p = buildScaleRepairPrompt({ bgChars: [], fgChars: [], shot: 'wide', interactions: [], light: { timeOfDay: 'night', weather: 'fog' } });
+    expect(p).toContain('**LIGHT:** night: a dark sky');
+    expect(buildScaleRepairPrompt({ bgChars: [], fgChars: [], shot: 'wide', interactions: [] })).not.toContain('**LIGHT:**');
+  });
+
+  it("a repaired version's re-eval is given the page's declared light, not the repair instruction's", () => {
+    // Pipeline re-eval inputs for an inpaint version (repairPipeline.buildEvalInputs):
+    // sceneHint = the version's brief, imagePrompt = the instruction the edit was sent.
+    const hint = resolveEvalSceneHint({ evaluationType: 'scene', entryDescription: NIGHT_FOG, sceneDescription: NIGHT_FOG, outlineExtract: 'PLAN: the dragon hides' });
+    const instruction = IMG.buildInpaintInstruction({ editInstruction: '1. Remove the lamp.', sceneDescription: NIGHT_FOG });
+    expect(semanticDeclaredLight(hint, instruction)).toBe('night, fog');
+    const p = String(buildSemanticPrompt(require_('../../server/services/prompts').PROMPT_TEMPLATES.imageSemantic,
+      { storyText: 't', sceneHint: hint, imagePrompt: instruction, declaredLight: semanticDeclaredLight(hint, instruction) }));
+    expect(p).toMatch(/\*\*DECLARED LIGHT[^\n]*\*\* night, fog/);
+  });
+});

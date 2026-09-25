@@ -1576,6 +1576,23 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "repair-keeps-declared-light",
+      "title": "Every repair that repaints pixels carries the page's declared light",
+      "commits": [],
+      "addedAt": "2026-09-25",
+      "claim": "On a page whose brief declares timeOfDay/weather and that took an inpaint repair, the repaired version's stored prompt ends on the page's **LIGHT:** line (sceneLight.buildRepairLightLine) and its pixels keep the declared time of day; baseline staging job_1790277448294_5herh01j7 p15, where the inpaint sent no light and turned a declared night + fog into daylight.",
+      "runShape": [
+        "full-story",
+        "needs-inpaint"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "For every inpaint-round-N version: read imageVersions[i].prompt (ends on **LIGHT:** matching the brief's timeOfDay/weather) and look at the pixels next to v0 — the hour and the sky are unchanged"
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }

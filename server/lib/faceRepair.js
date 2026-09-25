@@ -674,7 +674,19 @@ function charFixDefectContext(defectTypes) {
   return phrases.length ? `\nDefect to fix: ${phrases.join('; ')}.` : '';
 }
 
-async function buildPrompt({ treatment, regionSource, faceOnly, charName, opts, sceneBuffer, faceBbox, sceneW, sceneH }) {
+// THE PAGE'S DECLARED LIGHT closes every character-repair prompt, whichever
+// branch built it (sceneLight.buildRepairLightLine, from the brief's fields).
+// The repainted figure stands in the page's light; a repair told nothing about
+// it paints the figure in whatever light the reference avatar was drawn in.
+// '' when the page declares no light.
+async function buildPrompt(args) {
+  const core = await buildPromptCore(args);
+  const { buildRepairLightLine, declaredLightOfBrief } = require('./sceneLight');
+  const lightLine = buildRepairLightLine(declaredLightOfBrief(args.opts?.sceneDescription));
+  return lightLine ? `${core}\n\n${lightLine}` : core;
+}
+
+async function buildPromptCore({ treatment, regionSource, faceOnly, charName, opts, sceneBuffer, faceBbox, sceneW, sceneH }) {
   const { PROMPT_TEMPLATES, fillTemplate, repairStyleGuard, isPhotographicArtStyle } = require('../services/prompts');
   // IDENTITY vs REGION. Every "paint <name>" / "match <name>'s clothing" line must
   // name the person we WANT (opts.promptName), while scene-state lookups stay keyed

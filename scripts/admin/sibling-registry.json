@@ -295,6 +295,22 @@
       "severity": "block"
     },
     {
+      "id": "repair-keeps-declared-light",
+      "axis": "first render vs every repair that repaints pixels",
+      "reason": "The page prompt carries the page's LIGHT line; a repair that repaints the frame and is not told the light repaints it at will — staging job_1790277448294_5herh01j7 p15 declared night + fog, the round-1 inpaint was sent only 'remove the street lamp' and came back in golden daylight (2026-09-25). Every repaint builder closes on sceneLight.buildRepairLightLine, read from the brief's fields: the page inpaint (images.js buildInpaintInstruction, also the manual /repair/image route), the character repair (faceRepair.js buildPrompt, every branch) and the scale repair (scaleRepair.js buildScaleRepairPrompt). Iterate and the regenerate fallback re-render from the full page prompt and carry the page's own LIGHT line. A new repaint path joins this set.",
+      "members": [
+        "server/lib/images.js",
+        "server/lib/faceRepair.js",
+        "server/lib/scaleRepair.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "buildRepairLightLine"
+        ]
+      }
+    },
+    {
       "id": "cover-generator-vs-critic",
       "axis": "generator-vs-critic",
       "reason": "cover-evaluation-notes.txt is the cover-only preamble the evaluator is given (viewer gaze, flat title, and the text regime), and cover-composition.txt plus the cover hint assembly in coverIterate.js is what the cover was painted from; a text or gaze rule tightened on one side and not the other scores a cover for a brief it never had. Extracted from evalPipeline.js string literals on 2026-09-15 so this pair can name a path instead of a 5,000-line module. Widened 2026-09-23: a cover is also judged by the semantic judge (image-semantic.txt, via evalPipeline.js's cover branch), consolidated by feedback-consolidator.txt (repairPipeline.js), and its structured {TEXT_RULES} comes from requiredText.js. None of the three carried the baked title, so on staging job_1790100385959_1nitlympp the semantic judge filed the correctly painted title as CRITICAL, the consolidator ordered it removed and the front cover shipped without one (docs/audits/prompt-audit-2026-09-23/09-covers.md C1). The title generator itself is buildCoverPrompt/bakedTitleLine in promptBuilders.js, not listed here because every commit touches that module. Since 2026-09-23 the title is a required-text item (requiredText.coverRequiredTexts) in every judge's {TEXT_RULES}, the consolidator input and the inpaint clause, and the generator's title block is headed REQUIRED TEXT — change the title contract there, on both sides at once. Since 2026-09-24 a FULL-STORY cover is a page (covers-as-pages): what it is painted from is the Art Director's brief of its cover beat, and the beat's cover facts (gaze at the viewer, the copy-space textPosition, the element budget) live in coverBeats.js — a generator of this set. cover-composition.txt and coverIterate.js now paint the TRIAL cover only.",

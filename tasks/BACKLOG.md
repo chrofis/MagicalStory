@@ -361,6 +361,7 @@ them by deleting an emotional or characterising sentence. Text refine alone: 14 
 
 ## Eval + scoring
 
+- [ ] Owner decision: a declared-light contradiction is MODERATE in image-semantic.txt, so a daylight repair can outscore its night original (Lab #1471: v1 90 vs v0 70) → docs/decisions.md:51
 - [x] **The arc judge was briefed with the beats commission, not the arc's** — `buildBriefContext`
       sent the full beats page budget and omitted the age-band file and arc budgets, so judges
       deducted on dimensions the age band forbids and the retell wrote a villain into a

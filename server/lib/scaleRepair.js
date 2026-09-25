@@ -141,7 +141,7 @@ function needsScaleRepair(sceneMetadata, castableCharacters = null) {
  * goal is to tell Grok exactly which figure to leave alone and which to
  * shrink-and-replace. Long prose dilutes the signal.
  */
-function buildScaleRepairPrompt({ bgChars, fgChars, shot, artStyleDescription, interactions = [] }) {
+function buildScaleRepairPrompt({ bgChars, fgChars, shot, artStyleDescription, interactions = [], light = null }) {
   const lines = [];
   // Grok ALWAYS renders the named characters in the input image — usually
   // too large and too close to the camera. Scale-repair's job is to
@@ -207,6 +207,13 @@ function buildScaleRepairPrompt({ bgChars, fgChars, shot, artStyleDescription, i
   if (artStyleDescription) {
     lines.push('');
     lines.push(`ART STYLE: ${artStyleDescription}`);
+  }
+  // The page's declared light (sceneLight.js): a whole-frame edit told only
+  // where figures stand is free to repaint the hour and the sky.
+  const lightLine = require('./sceneLight').buildRepairLightLine(light);
+  if (lightLine) {
+    lines.push('');
+    lines.push(lightLine);
   }
   return lines.join('\n');
 }
@@ -332,7 +339,10 @@ async function runScaleRepair(currentImage, sceneMetadata, options = {}) {
   // action alongside their position. Without this the relocation lost
   // gestures (Emma reaching into the chest, Hans holding the glass).
   const interactions = sceneMetadata?.fullData?.interactions || sceneMetadata?.interactions || [];
-  const prompt = buildScaleRepairPrompt({ bgChars: bgCharsWithDesc, fgChars, shot, artStyleDescription, interactions });
+  const prompt = buildScaleRepairPrompt({
+    bgChars: bgCharsWithDesc, fgChars, shot, artStyleDescription, interactions,
+    light: require('./sceneLight').declaredLight(sceneMetadata),
+  });
   // Combine refs: foreground avatars (identity anchors for the kept figures)
   // first, then any explicit background refs (usually empty — see callsite
   // comment in server.js). Foreground avatars stop Grok from drifting the

@@ -3203,6 +3203,22 @@ async function evaluateImageBatch(images, options = {}) {
  */
 
 /**
+ * The instruction string a page inpaint sends to the editor: the numbered
+ * fixes, the preserve clause, the quiet zone, the required text, and the
+ * page's declared light (sceneLight.buildRepairLightLine, from the brief's
+ * `timeOfDay` / `weather`). The edit repaints the frame; an instruction naming
+ * only the defect repainted a declared night as golden daylight (staging
+ * job_1790277448294_5herh01j7 p15, "remove the street lamp"). The light is read
+ * from the same brief the semantic judge reads its DECLARED LIGHT from.
+ */
+function buildInpaintInstruction({ editInstruction, preserveClause = '', quietZoneSuffix = '', requiredTextClause = '', sceneDescription = '' }) {
+  const { buildRepairLightLine, declaredLightOfBrief } = require('./sceneLight');
+  const lightLine = buildRepairLightLine(declaredLightOfBrief(sceneDescription));
+  const lightClause = lightLine ? `\n\n${lightLine}` : '';
+  return `Fix these issues in this children's book illustration:\n${editInstruction}${preserveClause}${quietZoneSuffix}${requiredTextClause}${lightClause}`;
+}
+
+/**
  * Inpaint a page using Grok text edit. Builds an instruction from quality + semantic issues
  * and applies it via editImageWithPrompt().
  *
@@ -3765,7 +3781,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // Loud: a declared string that cannot be resolved must not be swallowed.
     log.error(`[INPAINT PAGE] Page ${pageNumber}: required-text clause could not be built - ${err.message}`);
   }
-  const fullInstruction = `Fix these issues in this children's book illustration:\n${editInstruction}${preserveClause}${quietZoneSuffix}${requiredTextClause}`;
+  const fullInstruction = buildInpaintInstruction({ editInstruction, preserveClause, quietZoneSuffix, requiredTextClause, sceneDescription });
   log.info(`[INPAINT PAGE] Inpainting (refs: ${referenceImages.length}): ${editInstruction.substring(0, 200)}`);
 
   try {
@@ -6168,6 +6184,7 @@ module.exports = {
 
   // Unified repair pipeline (the only active repair pipeline)
   inpaintPage,
+  buildInpaintInstruction,
 
   // Active repair primitives
   iteratePageCore,

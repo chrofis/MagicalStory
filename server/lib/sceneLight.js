@@ -19,7 +19,9 @@
  * metadata; the scene review keeps them (carryForwardLightInBrief) and checks
  * them. Consumers: the plate grouping and relight derive (storyJobPipeline),
  * the plate prompt and the page prompt (`buildLightLine`, a fixed line in the
- * protected tail), the semantic judge and the visual-flow judge.
+ * protected tail), every repair that repaints pixels (`buildRepairLightLine`:
+ * the page inpaint, the character repair, the scale repair and the manual
+ * repair route), the semantic judge and the visual-flow judge.
  *
  * A brief written before the fields existed declares no light: it gets no
  * LIGHT line, shares its vantage plate as before, and no judge can call its
@@ -79,6 +81,19 @@ function declaredLight(metadata) {
   };
 }
 
+/**
+ * The light a page's brief DECLARED, from its metadata fields. Nothing is
+ * read out of the prose; a brief without the fields declares nothing.
+ * @param {string} brief - prose + ---METADATA--- + JSON
+ * @returns {{timeOfDay: string|null, weather: string|null}}
+ */
+function declaredLightOfBrief(brief) {
+  const text = String(brief || '');
+  if (!text.trim()) return { timeOfDay: null, weather: null };
+  const { extractSceneMetadata } = require('./sceneMetadata');
+  return declaredLight(extractSceneMetadata(text));
+}
+
 /** Grouping key: pages with equal keys can share one plate. `''` = undeclared. */
 function lightKey(light) {
   const l = light || {};
@@ -113,6 +128,20 @@ function buildLightLine(light, { plate = false } = {}) {
   return plate
     ? `**LIGHT:** ${phrase}. Paint the place in this time of day and weather; it wins over any other time or weather named above and over the light of a reference photo.`
     : `**LIGHT:** ${phrase}. This is the page's time of day and weather, and it wins over the light and weather of any reference image.`;
+}
+
+/**
+ * The LIGHT line of every repair that repaints pixels of a finished page (the
+ * inpaint, the character repair, the scale repair, the manual repair route).
+ * An edit told only "remove the lamp" repainted a declared night as golden
+ * daylight (staging job_1790277448294_5herh01j7 p15, inpaint round 1), because
+ * nothing in its prompt said what the light was. '' when the page declares no
+ * light — the edit is then told nothing about it, as before.
+ */
+function buildRepairLightLine(light) {
+  const phrase = lightPhrase(light);
+  if (!phrase) return '';
+  return `**LIGHT:** ${phrase}. This is the page's time of day and weather: the edited image keeps exactly this light, sky and weather, and the edit changes none of them.`;
 }
 
 /**
@@ -198,9 +227,11 @@ module.exports = {
   normaliseTimeOfDay,
   normaliseWeather,
   declaredLight,
+  declaredLightOfBrief,
   lightKey,
   describeLight,
   buildLightLine,
+  buildRepairLightLine,
   buildPlateRelightInstruction,
   relightClause,
   carryForwardLightInBrief,

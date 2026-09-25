@@ -133,6 +133,7 @@ const {
   applyStyleTransfer,
   evaluateImageQuality,
   editImageWithPrompt,
+  buildInpaintInstruction,
   deleteFromImageCache,
   generateImageCacheKey,
   iteratePageCore,
@@ -3757,6 +3758,20 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
     const newRetryEntries = [];
     let allRepairHistory = currentScene.repairHistory || [];
 
+    // The judges' page context, as /evaluate-single resolves it: the page text
+    // and the brief the image was made from. Without them the semantic judge
+    // never ran on this route, so nothing judged a repaired version's light
+    // against the page's declared timeOfDay / weather (sceneLight.js).
+    const repairEvalPageText = isCoverPage(pageNumber) ? null
+      : (getPageText(storyData.storyText || storyData.generatedStory || storyData.story || '', pageNumber) || currentScene.text || null);
+    const repairEvalSceneHint = resolveEvalSceneHint({
+      evaluationType: isCoverPage(pageNumber) ? 'cover' : 'scene',
+      entryDescription: currentScene.description,
+      sceneDescription: currentScene.sceneDescription,
+      outlineExtract: currentScene.outlineExtract,
+      sceneHint: currentScene.sceneHint,
+    });
+
     // Multi-pass repair loop
     for (let pass = 1; pass <= maxPasses; pass++) {
       log.info(`🔧 [REPAIR] Pass ${pass}/${maxPasses} for story ${id}, page ${pageNumber}`);
@@ -3782,7 +3797,11 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
           currentImageData,
           currentScene.prompt || '',
           characterPhotos,
-          'scene'
+          'scene',
+          null,
+          `PAGE ${pageNumber}`,
+          repairEvalPageText,
+          repairEvalSceneHint
         );
 
         if (!preEvalResult || preEvalResult.score === null) {
@@ -3833,7 +3852,12 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
             sceneDescription: currentScene.sceneDescription || currentScene.description || '',
             detectedFigures: currentScene.bboxDetection?.figures || null,
           });
-          const sentInstruction = `Fix these issues in this children's book illustration: ${sanitizeIssueForInpaint(nameRepairText(editInstruction, repairNames))}`;
+          // The same instruction builder as the pipeline inpaint (images.js),
+          // so this edit carries the page's declared light like every other.
+          const sentInstruction = buildInpaintInstruction({
+            editInstruction: sanitizeIssueForInpaint(nameRepairText(editInstruction, repairNames)),
+            sceneDescription: repairEvalSceneHint,
+          });
           const editResult = await editImageWithPrompt(currentImageData, sentInstruction);
           if (editResult?.imageData) {
             repairResult = {
@@ -3886,7 +3910,11 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
         repairResult.imageData,
         currentScene.prompt || '',
         characterPhotos,
-        'scene'
+        'scene',
+        null,
+        `PAGE ${pageNumber}`,
+        repairEvalPageText,
+        repairEvalSceneHint
       );
 
       const postRepairScore = postEvalResult?.score ?? preRepairScore;
@@ -6368,7 +6396,19 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             const evalPrompt = existingImage.description || existingImage.prompt || '';
             const pageLabel = isCover ? `[${coverType}]` : `[Page ${update.pageNumber}]`;
             log.info(`🔍 [CHAR REPAIR] ${pageLabel} Evaluating repaired image (before: ${beforeScore}%)...`);
-            const evalResult = await evaluateImageQuality(update.imageData, evalPrompt, [], evalType, null, pageLabel);
+            // The page text and the brief, as /evaluate-single resolves them, so
+            // the semantic judge runs and judges the repaired version's light
+            // against the declared timeOfDay / weather like a first render.
+            const evalPageText = isCover ? null
+              : (getPageText(storyData.storyText || storyData.generatedStory || storyData.story || '', update.pageNumber) || existingImage.text || null);
+            const evalSceneHint = resolveEvalSceneHint({
+              evaluationType: evalType,
+              entryDescription: existingImage.description,
+              sceneDescription: existingImage.sceneDescription,
+              outlineExtract: existingImage.outlineExtract,
+              sceneHint: existingImage.sceneHint,
+            });
+            const evalResult = await evaluateImageQuality(update.imageData, evalPrompt, [], evalType, null, pageLabel, evalPageText, evalSceneHint);
             if (evalResult) {
               afterScore = evalResult.score ?? evalResult.qualityScore ?? null;
               afterReasoning = evalResult.reasoning || null;
