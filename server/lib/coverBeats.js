@@ -92,9 +92,22 @@ function anyCostumed(names, clothingRequirements) {
  * @param {Object} [opts]
  * @param {Array<string>} opts.coverTypes - cover keys to brief (frontCover / initialPage / backCover)
  * @param {Object} [opts.clothingRequirements] - the wardrobe contract (step 3)
+ * @param {Array<string>|null} [opts.centralFigure] - the arc's STORY LOGIC "Central
+ *   figure:" names (beatsPipeline `arcCentralFigure`), null for "none"
  */
-function buildCoverBeats(inputData = {}, { coverTypes = ['frontCover', 'initialPage', 'backCover'], clothingRequirements = null } = {}) {
+function buildCoverBeats(inputData = {}, { coverTypes = ['frontCover', 'initialPage', 'backCover'], clothingRequirements = null, centralFigure = null } = {}) {
   const casts = coverCasts(inputData);
+  // THE FRONT COVER NAMES THE STORY'S CENTRAL FIGURE (2026-09-25). The beat used
+  // to say "a creature the story centres on appears" — and the Art Director is
+  // bound to stage exactly the cast its plan line NAMES (rule 3; a tracked
+  // animal's entry claims only pages whose plan line names it), so it left the
+  // unnamed creature out (staging job_1790277448294_5herh01j7: the front cover
+  // held the four children and no dragon). The figure comes from the arc's
+  // structured "Central figure:" line; where it changes name (an egg that
+  // hatches into a named creature) the cover shows the last one, the state the
+  // story ends in. "none" (null) → the cast alone.
+  const centralNames = (Array.isArray(centralFigure) ? centralFigure : []).map(n => String(n || '').trim()).filter(Boolean);
+  const central = centralNames.length ? centralNames[centralNames.length - 1] : null;
   const beats = [];
   for (const coverKey of ['frontCover', 'initialPage', 'backCover']) {
     if (!coverTypes.includes(coverKey)) continue;
@@ -103,23 +116,35 @@ function buildCoverBeats(inputData = {}, { coverTypes = ['frontCover', 'initialP
     if (!cast.length) {
       throw new Error(`coverBeats: ${coverKey} has no cast — the story has no characters`);
     }
+    const inFrame = (coverKey === 'frontCover' && central && !cast.includes(central)) ? [...cast, central] : cast;
     const facts = [
       t.label,
       t.instant,
-      'at the story\'s key place: a real landmark from the Visual Bible (`isRealLandmark: true`) that the pages use, a different place from the other covers; with no real landmark in the bible, the most story-defining invented place; a place the cast stand in on solid ground, never under water or in the air',
+      'at the story\'s key place: a real landmark from the Visual Bible (`isRealLandmark: true`) that the pages use; with no real landmark in the bible, the most story-defining invented place; a place the cast stand in on solid ground, never under water or in the air',
+      COVER_OWN_PLACE,
       'every figure looks at the viewer (`looksAt: "viewer"`)',
       anyCostumed(cast, clothingRequirements) ? 'every figure wears their costumed outfit' : null,
-      `any animal, artifact or vehicle from the Visual Bible the picture calls for, at most ${VB_ELEMENT_BUDGET}` + (coverKey === 'frontCover' ? '; a creature the story centres on appears' : ''),
+      `any animal, artifact or vehicle from the Visual Bible the picture calls for, at most ${VB_ELEMENT_BUDGET}`,
       t.space,
     ].filter(Boolean).join('; ');
     beats.push({
       pageNumber: COVER_PAGE_NUMBERS[coverKey],
       coverKey,
-      planLine: `wide — ${cast.join(', ')} — ${facts} — ${t.after}`,
+      planLine: `wide — ${inFrame.join(', ')} — ${facts} — ${t.after}`,
     });
   }
   return beats;
 }
+
+/**
+ * EACH COVER ITS OWN PLACE (2026-09-25). "A different place from the other
+ * covers" left the Art Director free to read one location seen from one spot as
+ * "the key place" three times: all three covers of staging
+ * job_1790277448294_5herh01j7 cited LOC001.2. The rule now names the unit — a
+ * location id, else a vantage id — and `sceneBriefCheck.checkCoverLocations`
+ * holds the briefs to it before the scene review.
+ */
+const COVER_OWN_PLACE = 'its own place: a Visual Bible location no other cover cites while the bible holds one no cover uses yet, otherwise a vantage (`LOC###.N`) of it no other cover cites';
 
 /** True for a cover page number (-1 / -2 / -3). */
 function isCoverPage(pageNumber) {
@@ -151,6 +176,7 @@ function coverIteratePath(storyData, coverKey) {
 }
 
 module.exports = {
+  COVER_OWN_PLACE,
   coverIteratePath,
   buildCoverBeats,
   coverCasts,

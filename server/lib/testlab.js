@@ -4228,8 +4228,14 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     // beats, 2026-09-24). `params.coverBeats: false` measures the story pages alone.
     const { buildCoverBeats } = require('./coverBeats');
     const { coverTypesFor } = require('./coverKeys');
+    // The front cover names the arc's central figure, as in production: the
+    // stored one (arcReviewReport.centralFigure), or `params.centralFigure`
+    // (names array) for a story stored before the arc recorded it.
+    const { resolveReplayCentralFigure } = require('./beatsReplayInputs');
+    const labCentralFigure = Array.isArray(params.centralFigure) ? params.centralFigure : resolveReplayCentralFigure(storyData);
     const labCoverBeats = params.coverBeats === false ? [] : buildCoverBeats(storyData, {
       coverTypes: coverTypesFor(storyData), clothingRequirements: storyData.clothingRequirements || null,
+      centralFigure: labCentralFigure,
     });
     const toExpand = [...finalBeats.slice(0, expandLimit), ...labCoverBeats];
     const lang = storyData.language || 'en';

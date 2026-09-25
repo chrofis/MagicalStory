@@ -2352,7 +2352,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // reach the page text writer or the plan counters — `beats` stays the story.
   const { buildCoverBeats, isCoverPage } = require('./coverBeats');
   const { coverTypesFor } = require('./coverKeys');
-  const coverBeats = buildCoverBeats(inputData, { coverTypes: coverTypesFor(inputData), clothingRequirements });
+  const coverBeats = buildCoverBeats(inputData, { coverTypes: coverTypesFor(inputData), clothingRequirements, centralFigure: arcCentralFigure });
   const briefBeats = [...beats, ...coverBeats];
   const beatPageNumbers = briefBeats.map(b => b.pageNumber);
   let expansions = [];

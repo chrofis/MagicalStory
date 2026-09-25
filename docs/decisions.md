@@ -60465,3 +60465,40 @@ the edit's 7290 (→ 6780, also losing those three). The cut-order docs are rege
 
 **Touched:** server/lib/images.js, docs/image-generation-methods.html, docs/prompt-inventory.md (generated),
 tests/unit/cover-shrink-must-keep.test.ts, tests/unit/prompt-says-each-thing-once.test.ts.
+
+## 2026-09-25 — The front cover names the story's central figure; each cover cites its own place
+
+**Context.** First full story on the covers-as-pages build (staging `job_1790277448294_5herh01j7`). The front cover's
+beat said "a creature the story centres on appears", and the Art Director staged the four children only — no dragon.
+All three covers cited `LOC001.2`, although each beat said "a different place from the other covers". The scene
+review changed no cover page (its BRIEF FAULTS carried no cover finding).
+
+**Diagnosis (the sent AD prompt and the returned briefs).** Not the element budget (worn garments do not count, the
+brief cited no element at all). The beat asked for an UNNAMED figure while the template binds the Art Director to
+the cast the plan line NAMES — rule 3 ("Only characters from the page's plan line … Do not import characters from
+other pages") and the bible rule "a tracked animal's entry claims only pages whose plan line names it". The creature
+rule could not win against them. "A different place" named no unit, so one location seen from one vantage passed
+as "the key place" three times.
+
+**Decision.**
+- The front cover's beat NAMES the central figure in its cast field — from the arc's structured STORY LOGIC
+  "Central figure:" line (`arcCentralFigure`), the last name where it changes (the state the story ends in); "none"
+  → the cast alone. The unnamed "creature the story centres on" clause is gone. Code reads no prose to decide it.
+- Every cover beat states `COVER_OWN_PLACE`: a location no other cover cites while the bible holds one no cover uses,
+  otherwise a vantage of it no other cover cites.
+- Two mechanical brief checks go to the scene review (REVIEWABLE), structured data only:
+  `cover_cast_dropped` (a name in a cover beat's code-written cast field that the brief neither cites in `objects[]`
+  nor lists in `characters[]`), and `cover_location_repeated` (a later cover cites an earlier cover's vantage, or its
+  location while the bible has an unused one). The iterate rewrite is held to `cover_cast_dropped` too; the location
+  check is whole-book, like `vb_state_no_base`. Not an eval or scoring change.
+- The Lab `beats_scenes` stage passes the stored central figure, or `params.centralFigure` for a story stored before
+  the arc recorded it.
+
+**Replay (free, real builders over that story).** With the central figure the arc would name (Nebla — this story
+predates the recorded line), the front plan line reads `wide — Levin, Julian, Max, Kiaan, Nebla — …`, all three beats
+carry the own-place rule in the built AD prompt, and the checks over the STORED briefs return `cover_cast_dropped`
+on −1 (Nebla, ANI002) and `cover_location_repeated` on −2 and −3 (LOC001.2; LOC002 unused).
+
+**Touched:** server/lib/coverBeats.js, server/lib/beatsPipeline.js, server/lib/sceneBriefCheck.js,
+server/lib/iterateBeat.js, server/lib/testlab.js, tests/unit/covers-as-pages.test.ts,
+tests/unit/iterate-rewrite-checked-like-authored.test.ts.
