@@ -592,7 +592,7 @@ export const TESTLAB_STAGES = [
   // visible text. Same prompt each arm, judged by the arc judges.
   // challengesFromStory reuses the story's stored challenge draw with today's
   // template; baselineFromStory scores the stored arcs with the same judges.
-  { id: 'arc_effort', label: 'Arc effort sweep (create or retell; params model, efforts, stage, promptFrom, challengesFromStory, baselineFromStory, arcEveryChildActs — cost vs judged arc quality)', producesImage: false, overridable: true, storyLevel: true },
+  { id: 'arc_effort', label: 'Arc effort sweep (create or retell; params model, efforts, stage, promptFrom, challengesFromStory, baselineFromStory — cost vs judged arc quality)', producesImage: false, overridable: true, storyLevel: true },
   // Re-judge stored rounds with a DIFFERENT judge (params.scoreIds + params.judgeModel).
   // Nothing is rewritten — it measures the judge, so two judges' scores of the
   // identical text sit side by side on the Scores page.

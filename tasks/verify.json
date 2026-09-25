@@ -1663,6 +1663,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "arc-every-child-acts",
+      "title": "Every commissioned child has a deed of their own in the arc (EVERY_CHILD_ACTS_RULE among the arc principles)",
+      "commits": [],
+      "addedAt": "2026-09-25",
+      "claim": "On the next staging full story with three or more commissioned children, the committed arc (arcReviewReport.finalArc) gives every child on the character list a sentence with an action of their own that matters to the plot, and the first plan check's ACTION line for each of them names a sentence (never 'sentence none').",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "stories.data.arcReviewReport.finalArc: one deed sentence per commissioned child; beatsReviewReport plan-check reply: ACTION <name>: sentence N for every child; compare to Lab #1490 (Max, Kiaan deeds inside the main event)"
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }

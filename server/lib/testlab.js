@@ -8395,10 +8395,6 @@ async function runWriterCompareStage(target, { params = {} }) {
  *   create arc and arcReviewReport.finalArc — with the same judges and the same
  *   judge context, as arms `baseline-create` / `baseline-final` (no model call
  *   beyond the judges), so old and new are read with one ruler (2026-09-24).
- * params.arcEveryChildActs  (Lab only, 2026-09-25) EVERY_CHILD_ACTS_RULE back
- *   among the create and re-tell principles (arcPrinciples `everyChildActs`),
- *   so the arc itself gives each child a deed. Off is production exactly.
- *   Exclusive with promptFrom (a verbatim prompt cannot take a new line).
  */
 async function runArcEffortStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
@@ -8441,9 +8437,7 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
   // SAME draw the creator saw (production passes one `challengeIdeas` to both).
   let challengeIdeas;
   const flag = v => v === true || v === 'true';
-  const everyChildActs = flag(params.arcEveryChildActs);
   if (params.promptFrom && flag(params.challengesFromStory)) throw new Error('promptFrom and challengesFromStory are exclusive');
-  if (params.promptFrom && everyChildActs) throw new Error('promptFrom and arcEveryChildActs are exclusive — the verbatim prompt cannot take the rule');
   if (params.promptFrom) {
     if (promptOverride) throw new Error('promptFrom and promptOverride are exclusive');
     const { dbQuery } = require('../services/database');
@@ -8481,7 +8475,7 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
     const { withTemplates } = require('../services/prompts');
     prompt = withTemplates(
       { arcCreate: promptOverride },
-      () => buildArcCreatePrompt(storyData, pageCount, { challengeIdeas, everyChildActs }),
+      () => buildArcCreatePrompt(storyData, pageCount, { challengeIdeas }),
     );
   }
   if (!prompt) throw new Error('arc-create prompt could not be built');
@@ -8614,7 +8608,7 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
     if (!gate.retell) {
       retellSkipped = gate.skipReason;
     } else {
-      const retellPrompt = buildArcRetellPrompt(storyData, pageCount, arcBlock, gate.text, { challengeIdeas, everyChildActs });
+      const retellPrompt = buildArcRetellPrompt(storyData, pageCount, arcBlock, gate.text, { challengeIdeas });
       if (!retellPrompt) throw new Error('arc-retell template unavailable');
       for (const effort of retellEfforts) arms.push((await runArm('retell', retellPrompt, effort)).arm);
     }
@@ -8624,9 +8618,6 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
   const base = arms.find(a => a.phase === 'create' && a.effort === 'high' && a.ok);
   return {
     storyId: target.storyId, model, stage, promptSource, judges, pageCount, promptChars: prompt.length,
-    // The prompt variant this row measured (Lab A/B); the built create and
-    // re-tell prompts ride in the row's sentPrompts.
-    arcEveryChildActs: everyChildActs,
     arms,
     panel,
     retellSkipped,

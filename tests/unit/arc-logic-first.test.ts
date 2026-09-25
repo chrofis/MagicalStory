@@ -572,13 +572,15 @@ describe('the arc prompts v3 (owner, 2026-09-25): a logical AND exciting plot, c
     expect(ctx).toContain(PB.ARC_EXCITING_DEF);
   });
 
-  it('stage split: every character\'s scene is the page plan\'s — the arc, its critique and its panel carry no cast rule', () => {
+  it('every child acts is an arc PRINCIPLE (create, re-tell, judge context), never a critique or panel lens (variant B, 2026-09-25)', () => {
     const b = build(input(5));
     for (const [stage, p] of Object.entries(b)) {
-      expect(p, stage).not.toContain(PB.EVERY_CHILD_ACTS_RULE);
+      const want = stage === 'create' || stage === 'retell' ? 1 : 0;
+      expect(p.split(PB.EVERY_CHILD_ACTS_RULE).length - 1, stage).toBe(want);
       expect(p, stage).not.toMatch(/^- ACTION\b/m);
     }
-    expect(sc.buildBriefContext({ ...input(5), pages: 18 }, { arc: true })).not.toContain(PB.EVERY_CHILD_ACTS_RULE);
+    expect(PB.arcCritiqueSpec({ retell: true })).not.toContain(PB.EVERY_CHILD_ACTS_RULE);
+    expect(sc.buildBriefContext({ ...input(5), pages: 18 }, { arc: true })).toContain(PB.EVERY_CHILD_ACTS_RULE);
     // The trial writer is plot and plan in one: it keeps the rule.
     expect(PB.buildStoryShapeSection(input(5), 18, { arc: true })).toContain(PB.EVERY_CHILD_ACTS_RULE);
   });

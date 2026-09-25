@@ -63,6 +63,9 @@ Last full sweep: **2026-09-06**.
       `arc-prompts-v3`); owner call on the age-3 "three tries" band (`prompts/age-band-tries.txt:6-17`)
       and the trial's "about three" challenge line (`server/lib/promptBuilders.js` buildStoryShapeSection
       `challengeBudget`) → `docs/decisions.md` "2026-09-25 — Arc prompts v3"
+- [ ] Every child acts, in the arc (variant B made the default 2026-09-25, Lab #1490): BUILT on staging
+      (not pushed). Open: validation on the next full story (`tasks/verify.json` `arc-every-child-acts`)
+      → `docs/decisions.md` "2026-09-25 — Every child acts, in the arc"
 - [ ] Stage 2 (page plan) owes what the arc no longer carries (owner 2026-09-25: "who enters when, how
       everyone gets their scene, an exciting start and a happy ending"). Present: entrances
       (`prompts/story-beats.txt:76` / `prompts/plan-check.txt:32` Q2, shared NAMING_DEF). Partial: each

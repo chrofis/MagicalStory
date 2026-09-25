@@ -9226,6 +9226,8 @@ const ARC_PLACE_RULE = 'Every place the story stages is inside or outside, and a
  * arc. The critique's per-child check and the panel's ACTION lens left on
  * 2026-09-24 (a per-child tally is a count): plan-check Q12 asks it of every
  * commissioned character on the pages, from castCoverage.castActionRule.
+ * Since 2026-09-25 (variant B, Lab #1490) arcPrinciples states it to the arc
+ * create and re-tell; no arc critic lens came back with it.
  */
 const EVERY_CHILD_ACTS_RULE = 'Every child on the character list does at least one thing of their own that matters to the plot — never only present. Only where the book is too short for its cast do several children share one action, and no child is left with nothing.';
 
@@ -9243,8 +9245,10 @@ const EVERY_CHILD_ACTS_RULE = 'Every child on the character list does at least o
  * scene, an exciting start and a happy ending." The arc (stage 1) is the plot:
  * logical and exciting, carried by the main characters. Every commissioned
  * character's scene is the page plan's (stage 2: story-beats.txt CAST_COVERAGE,
- * plan-check Q12), so the arc no longer states EVERY_CHILD_ACTS_RULE
- * (buildStoryShapeSection castRule:false) and its panel has no ACTION lens.
+ * plan-check Q12), so STORY SHAPE no longer states EVERY_CHILD_ACTS_RULE to
+ * the arc (buildStoryShapeSection castRule:false) and its panel has no ACTION
+ * lens. The rule came back as a PRINCIPLE the same day (variant B, Lab #1490;
+ * arcPrinciples): the plot gives each child a deed, the page plan stages it.
  *
  * ONE string each, generator and critic: the principles (arcPrinciples —
  * create, retell and the arc judge's context) and the anchored critique
@@ -9378,18 +9382,22 @@ function happeningsLabel(inputData, pageCount) {
 // has a turn of their own. "One main character solves it" left: it made the
 // second main character a passenger (Lab #1464). Each commissioned character's
 // scene is the page plan's job (the stage split above).
-// `everyChildActs` (Test Lab arc_effort only, 2026-09-25; production never
-// passes it): EVERY_CHILD_ACTS_RULE back among the principles, the v2 arc's
-// rule, to A/B "the arc gives each child a deed" against "the planner may add
-// one" (castActionRule `mayAddDeeds`).
-function arcPrinciples(inputData = {}, pageCount = 10, { everyChildActs = false } = {}) {
+// EVERY CHILD ACTS, IN THE ARC (owner, 2026-09-25, variant B made the
+// default): EVERY_CHILD_ACTS_RULE stands among the principles, so the plot
+// itself gives each commissioned child a deed the page plan can stage. Lab
+// #1490 (dragon, create xhigh + retell medium): the arc put Max's and Kiaan's
+// deeds inside the main event, the best dragon arc, judged 7.38 against 7.04
+// for #1483 without it; #1492 (Fiona) already had full coverage and kept it.
+// The generator half only: the critic of "each child acts" is plan-check Q12
+// on the pages (decisions.md 2026-09-25 "Every child acts, in the arc").
+function arcPrinciples(inputData = {}, pageCount = 10) {
   const pages = Math.max(4, parseInt(pageCount, 10) || 10);
   return [
     '# HOW THIS STORY IS BUILT',
     `- Logical and exciting at once, neither traded for the other. Exciting is ${arcExcitingDef(inputData)}: a child keeps listening while the heroes could still lose, and believes an ending that follows from what came before.`,
     '- One problem, from the first sentence to the last, and no second storyline: a listening child follows one question.',
     `- ${ARC_MAIN_TURN_RULE}: every child the book is about sees themselves matter.`,
-    ...(everyChildActs ? [`- ${EVERY_CHILD_ACTS_RULE}`] : []),
+    `- ${EVERY_CHILD_ACTS_RULE}`,
     `- ${happeningsLabel(inputData, pageCount)} a child would retell: the child remembers the happenings on the way to the ending and forgets the rest.`,
     '- Every happening causes the ending; one that causes nothing is cut, not explained: a dead end costs a page and is forgotten.',
     `- ${arcLengthRange(pages)} sentences for ${pages} pages: the telling follows the book, about one sentence a page.`,
@@ -9483,7 +9491,7 @@ function arcCritiqueSpec({ retell = false } = {}) {
 }
 
 /** CREATE: the creator writes ONE arc, its story logic first, then its self-critique. */
-function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null, everyChildActs = false } = {}) {
+function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null } = {}) {
   const template = PROMPT_TEMPLATES.arcCreate;
   if (!template) {
     log.error('[PROMPT] arcCreate template not loaded — arc machine unavailable');
@@ -9492,7 +9500,7 @@ function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null, eve
   return fillTemplate(template, {
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: pageCount,
-    ARC_PRINCIPLES: arcPrinciples(inputData, pageCount, { everyChildActs }),
+    ARC_PRINCIPLES: arcPrinciples(inputData, pageCount),
     STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true, challengeLine: false, castRule: false }),
     // The premise view (premise + mechanics): the band's craft lines belong to
     // the planner and the text writer; the low point they carried is stated in
@@ -9556,7 +9564,7 @@ function buildArcPanelPrompt(inputData, committedBlock) {
 // to repair arrive as `repairFindings`, the MAJOR and CRITICAL findings
 // arcRepairFindings selected (2026-09-25). No findings, no re-telling: the
 // gate decides that before this is built, so an empty list is a caller bug.
-function buildArcRetellPrompt(inputData, pageCount, arcBlock, repairFindings, { challengeIdeas = null, everyChildActs = false } = {}) {
+function buildArcRetellPrompt(inputData, pageCount, arcBlock, repairFindings, { challengeIdeas = null } = {}) {
   const template = PROMPT_TEMPLATES.arcRetell;
   if (!template) {
     log.error('[PROMPT] arcRetell template not loaded — arc re-tell unavailable');
@@ -9570,7 +9578,7 @@ function buildArcRetellPrompt(inputData, pageCount, arcBlock, repairFindings, { 
     CHALLENGE_IDEAS: challengeIdeas ?? buildChallengeIdeasSection(inputData),
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: pageCount,
-    ARC_PRINCIPLES: arcPrinciples(inputData, pageCount, { everyChildActs }),
+    ARC_PRINCIPLES: arcPrinciples(inputData, pageCount),
     STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true, challengeLine: false, castRule: false }),
     AGE_MODE: buildAgeModeSection(inputData, { bandView: 'premise' }),
     TELLING_RULES: buildTellingRulesSection(inputData),

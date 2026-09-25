@@ -60851,3 +60851,28 @@ production (none generated); the false findings hit Lab #1488, #1489, #1491 only
 
 **Touched:** prompts/plan-check.txt, server/lib/promptBuilders.js, server/lib/planCounters.js,
 server/lib/beatsPipeline.js, server/lib/testlab.js, tests/unit/arc-logic-first.test.ts.
+
+## 2026-09-25 — Every child acts, in the arc: EVERY_CHILD_ACTS_RULE is an arc principle again (variant B)
+
+**Context.** Arc prompts v3 moved "every commissioned child does something of their own" out of the arc and into the
+page plan (stage split, entry above). The Lab then A/B'd two ways of getting each child a deed: (A) the planner may
+add one small deed inside an existing event (`castCoverage.ADDED_DEED_RULE`, Lab param `plannerMayAddDeeds`), and
+(B) the rule back among the arc's create and re-tell principles (Lab param `arcEveryChildActs`, a70254c79).
+
+**Decision (owner, 2026-09-25).** B is the default. `arcPrinciples` states `EVERY_CHILD_ACTS_RULE` for the arc create,
+the re-tell and the arc judges' context (storyScorecard reads the same principles). The Lab switch
+`arcEveryChildActs` and the builders' `everyChildActs` option are deleted — one path. No arc critic lens came back:
+the critique's and the panel's formats are unchanged. Reasons: the variant the Lab measured had no lens; a lens files
+[MAJOR] findings, which buy a re-telling round the measurement did not include; and the rule's critic already exists
+where the deed has to land — plan-check Q12 (each commissioned character's ACTION line), which the re-plan must fix.
+`plannerMayAddDeeds` (A) stays a Lab-only variant.
+
+**Evidence.** Lab #1490 (dragon, staging job_1790277448294_5herh01j7, create xhigh + retell medium, Opus 5.5): the
+arc put Max's and Kiaan's deeds inside the main event; judged 7.38 (create and retell) against 7.04 for the
+retell of #1483 (same story, same draw, without the rule) — the best dragon arc so far. Lab #1492 (Fiona,
+job_1789207854566_l43qgl34w): coverage was already full without the rule, so it proves no gain there; its arms
+scored 6.69 / 6.88 against the stored final arc's 7.65 (the same judges).
+
+**Touched:** server/lib/promptBuilders.js, server/lib/testlab.js, client/src/services/testlabService.ts,
+scripts/admin/sibling-registry.json (arc-generator-vs-critic reason), tests/unit/arc-logic-first.test.ts,
+tests/unit/arc-prompt-audit-2026-09-23.test.ts, tests/unit/testlab-arc-from-experiment.test.ts.

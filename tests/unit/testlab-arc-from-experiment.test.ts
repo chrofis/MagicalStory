@@ -4,9 +4,9 @@
  * "every commissioned character gets their scene":
  *   (A) `plannerMayAddDeeds` — the planner may add one small deed; the plan
  *       check reads the same sentence (castCoverage.ADDED_DEED_RULE);
- *   (B) `arcEveryChildActs` — EVERY_CHILD_ACTS_RULE back among the arc's
- *       create and re-tell principles.
- * Off must equal production exactly; on carries the line once.
+ *   (B) EVERY_CHILD_ACTS_RULE among the arc's create and re-tell principles —
+ *       production since 2026-09-25 (Lab #1490), no longer a switch.
+ * (A) off must equal production exactly; on carries the line once.
  *
  * Offline and free: no model, no database.
  */
@@ -123,20 +123,15 @@ describe('(A) plannerMayAddDeeds — planner and plan check, one sentence', () =
   });
 });
 
-describe('(B) arcEveryChildActs — the arc create and re-tell principles', () => {
+describe('(B) every child acts — the arc create and re-tell principles, production since 2026-09-25', () => {
   beforeAll(async () => { await loadPromptTemplates(); });
   const committed = '1. An arc.';
   const opts = { challengeIdeas: '# CHALLENGE IDEAS\n- one' };
 
-  it('off is production exactly', () => {
+  it('carries the rule once, in create and in re-tell, with no switch to turn it off', () => {
+    expect(count(PB.buildArcCreatePrompt(input(), 12, opts), PB.EVERY_CHILD_ACTS_RULE)).toBe(1);
+    expect(count(PB.buildArcRetellPrompt(input(), 12, committed, '1. fix', opts), PB.EVERY_CHILD_ACTS_RULE)).toBe(1);
+    // The Lab-only switch is gone: passing it changes nothing.
     expect(PB.buildArcCreatePrompt(input(), 12, { ...opts, everyChildActs: false })).toBe(PB.buildArcCreatePrompt(input(), 12, opts));
-    expect(PB.buildArcRetellPrompt(input(), 12, committed, '1. fix', { ...opts, everyChildActs: false }))
-      .toBe(PB.buildArcRetellPrompt(input(), 12, committed, '1. fix', opts));
-    expect(PB.buildArcCreatePrompt(input(), 12, opts)).not.toContain(PB.EVERY_CHILD_ACTS_RULE);
-  });
-
-  it('on carries the rule once, in create and in re-tell', () => {
-    expect(count(PB.buildArcCreatePrompt(input(), 12, { ...opts, everyChildActs: true }), PB.EVERY_CHILD_ACTS_RULE)).toBe(1);
-    expect(count(PB.buildArcRetellPrompt(input(), 12, committed, '1. fix', { ...opts, everyChildActs: true }), PB.EVERY_CHILD_ACTS_RULE)).toBe(1);
   });
 });
