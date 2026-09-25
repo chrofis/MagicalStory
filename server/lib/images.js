@@ -4220,6 +4220,24 @@ async function resolveIteratePlate({
 }
 
 /**
+ * The scene an iterate rewrites: `{ pageNumber, description, outlineExtract }`.
+ * A story page's row comes from `storyData.sceneDescriptions[]`, whose brief
+ * is `description` (sceneMetadata.sceneDescriptionRecord — the stored story
+ * and the in-generation repair pipeline's story data are both that shape). A
+ * full-story cover's brief lives on its coverImages record (covers are pages,
+ * 2026-09-24). No brief throws: an iterate with nothing to rewrite is refused.
+ */
+function resolveIterateScene(storyData, pageNumber, coverRecord = null) {
+  const currentScene = coverRecord
+    ? { pageNumber, description: coverRecord.sceneDescription, outlineExtract: coverRecord.outlineExtract }
+    : (storyData.sceneDescriptions || []).find(s => s.pageNumber === pageNumber);
+  if (!currentScene || !currentScene.description) {
+    throw new Error(`No scene description found for page ${pageNumber}`);
+  }
+  return currentScene;
+}
+
+/**
  * Core iterate function — shared by the pipeline (executeIterateAction) and the
  * UI route (POST /:id/iterate/:pageNum).  Analyzes the current image, re-expands
  * the scene description with Claude's 17-check prompt, then regenerates.
@@ -4338,13 +4356,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     throw new Error(`Page ${pageNumber} text not found`);
   }
 
-  // Get current scene description — a cover's brief lives on its own record.
-  const currentScene = coverKey
-    ? { pageNumber, description: coverRecord.sceneDescription, outlineExtract: coverRecord.outlineExtract }
-    : sceneDescriptions.find(s => s.pageNumber === pageNumber);
-  if (!currentScene || !currentScene.description) {
-    throw new Error(`No scene description found for page ${pageNumber}`);
-  }
+  const currentScene = resolveIterateScene(storyData, pageNumber, coverRecord);
 
   // The page's textPosition is locked at first generation — iterate must NOT
   // re-pick it (would break the spread rule and shift the calm zone). Pull the
@@ -4393,7 +4405,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       // decides which one this is.
       const metaNames = (() => {
         try {
-          const m = extractSceneMetadata(currentScene.description || currentScene.sceneDescription || '');
+          const m = extractSceneMetadata(currentScene.description);
           const cs = m?.characters;
           return Array.isArray(cs) ? cs.map(c => String(c?.name || c || '').trim()).filter(Boolean) : [];
         } catch { return []; }
@@ -4497,8 +4509,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   const availableAvatars = buildAvailableAvatarsForPrompt(characters, clothingRequirements);
 
   // Extract short scene description from current scene
-  // Handle both field names: 'description' (saved stories) and 'sceneDescription' (pipeline)
-  const sceneDescText = currentScene.description || currentScene.sceneDescription || '';
+  const sceneDescText = currentScene.description;
   let shortSceneDesc = '';
   const sceneMetadata = extractSceneMetadata(sceneDescText);
   // THE PARENT BRIEF'S METADATA -- ONE RESOLVER (2026-09-17, staging
@@ -6330,6 +6341,7 @@ module.exports = {
 
   // Active repair primitives
   iteratePageCore,
+  resolveIterateScene,
   iteratePage,
   repairCharacterMismatch,
 

@@ -3537,27 +3537,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const { prompts: scenePromptTable, refByPage: scenePromptRefs } =
       rollUpScenePrompts(expandedScenes);
 
-    // Create allSceneDescriptions array for storage compatibility
-    const allSceneDescriptions = expandedScenes.map(scene => {
-      // Extract translatedSummary and imageSummary for edit modal display
-      const sceneMetadata = extractSceneMetadata(scene.sceneDescription);
-      return {
-        pageNumber: scene.pageNumber,
-        description: scene.sceneDescription,
-        characterClothing: scene.characterClothing || {},
-        outlineExtract: scene.outlineExtract || scene.sceneHint || '',
-        // Dev mode: Art Director prompt and model used. The prompt itself is
-        // stored once in sceneExpansionReport.prompts[]; this is the index.
-        // Read it with storyShape.resolveScenePrompt(storyData, pageNumber).
-        scenePromptRef: scenePromptRefs.has(scene.pageNumber)
-          ? scenePromptRefs.get(scene.pageNumber)
-          : null,
-        textModelId: scene.sceneDescriptionModelId,
-        // Pre-extracted summaries for edit modal (avoids JSON parsing on frontend)
-        translatedSummary: sceneMetadata?.translatedSummary || null,
-        imageSummary: sceneMetadata?.imageSummary || null
-      };
-    });
+    // The stored `sceneDescriptions[]` shape (brief under `description`) —
+    // one projection, also used for the repair pipeline's story data below.
+    const { sceneDescriptionRecord } = require('./server/lib/sceneMetadata');
+    const allSceneDescriptions = expandedScenes.map(scene => sceneDescriptionRecord(scene, scenePromptRefs));
 
     // WARDROBE-STATE AVATAR VARIANTS (owner ruling 2026-09-19) and OUTFIT
     // VERSIONS (owner ruling 2026-09-24).
@@ -6741,7 +6724,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // skips and Grok receives the full sheet as a reference — the model
           // then tries to recompose all 8 cells into the page.
           characterAvatars: storyCharacterAvatars,
-          sceneDescriptions: expandedScenes,
+          // The stored record shape (brief under `description`), projected NOW
+          // from expandedScenes: a spread-side mirror rewrites a scene's brief
+          // after allSceneDescriptions was built, and iterate must rewrite the
+          // brief the page was rendered from.
+          sceneDescriptions: expandedScenes.map(scene => sceneDescriptionRecord(scene, scenePromptRefs)),
           story: fullStoryText,
           storyText: fullStoryText,
           writerText, // frozen draft — carried on the checkpoint too, or a

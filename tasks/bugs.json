@@ -2043,6 +2043,18 @@
       "fixedAt": "2026-09-25",
       "fixedIn": "4730d4799",
       "fix": "plateEditForPage (server/lib/platePlan.js) derives a camera move only when the page class differs from plateClass(vantageShot), a re-light only when the light differs; the derive names the base's real shot. Replay on the stored run: old logic reproduces all 18 stored plateDerivedFor values; new logic 4 derives instead of 6, p10 and p14 share their base."
+    },
+    {
+      "id": "in-generation-iterate-no-scene-description",
+      "title": "Every in-generation iterate repair on a story page failed with \"No scene description found for page N\"",
+      "reportedAt": "2026-09-25",
+      "source": "Stored evidence, staging job_1790277448294_5herh01j7: finalChecksReport.repairRounds holds the p7 and p14 iterate rounds with error \"No scene description found for page N\" and no image, while stories.data.sceneDescriptions carries both briefs under `description`. Replay of the iterate scene lookup over the stored briefs in the generation shape: throws for p7 and p14.",
+      "rootCause": "storyJobPipeline.js handed the repair pipeline `sceneDescriptions: expandedScenes`, whose brief field is `sceneDescription`; iteratePageCore (like every reader of storyData.sceneDescriptions) reads `description`. It used to paper over the mismatch with `description || sceneDescription`; covers-as-pages (6fbd2b599) made a missing `description` a throw, so every in-generation page iterate failed.",
+      "impact": "No story page could be repaired by iterate during generation since 2026-09-24; pages shipped at their pre-iterate score. Entity consistency's worn-item and cast lookups read the same field.",
+      "status": "fixed",
+      "fixedAt": "2026-09-25",
+      "fixedIn": "",
+      "fix": "One projection, sceneMetadata.sceneDescriptionRecord, builds the stored sceneDescriptions record (brief under `description`) for the stored story AND for the repair pipeline's story data (projected at repair time, so a side-mirrored brief is the one iterated). iteratePageCore's lookup is resolveIterateScene; the `|| sceneDescription` aliases in images.js and entityConsistency.js are gone. Replay over the stored p7/p14 briefs: old input throws, fixed input resolves the stored brief."
     }
   ]
 }

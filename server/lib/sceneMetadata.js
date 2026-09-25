@@ -2742,6 +2742,41 @@ function forbiddenSharedGrips(interactions) {
   return out;
 }
 
+/**
+ * THE `storyData.sceneDescriptions[]` RECORD of one Art Director scene.
+ *
+ * A generation-time scene (`expandedScenes[]`, beats or unified) carries its
+ * brief as `sceneDescription`; every reader of `storyData.sceneDescriptions`
+ * (iteratePageCore, entity consistency, the style check, the Lab, the manual
+ * routes) reads `description`. One projection, used for the stored story AND
+ * for the in-memory story data the in-generation repair pipeline iterates
+ * from — handing it the raw scenes made every in-generation iterate throw
+ * "No scene description found" (staging job_1790277448294_5herh01j7, p7/p14).
+ *
+ * @param {Object} scene - an expandedScenes[] entry
+ * @param {Map<number, number>} [scenePromptRefs] - page -> index into
+ *   sceneExpansionReport.prompts[] (rollUpScenePrompts)
+ */
+function sceneDescriptionRecord(scene, scenePromptRefs = null) {
+  const sceneMetadata = extractSceneMetadata(scene.sceneDescription);
+  return {
+    pageNumber: scene.pageNumber,
+    description: scene.sceneDescription,
+    characterClothing: scene.characterClothing || {},
+    outlineExtract: scene.outlineExtract || scene.sceneHint || '',
+    // Dev mode: the Art Director prompt is stored once in
+    // sceneExpansionReport.prompts[]; this is the index. Read it with
+    // storyShape.resolveScenePrompt(storyData, pageNumber).
+    scenePromptRef: scenePromptRefs && scenePromptRefs.has(scene.pageNumber)
+      ? scenePromptRefs.get(scene.pageNumber)
+      : null,
+    textModelId: scene.sceneDescriptionModelId,
+    // Pre-extracted summaries for the edit modal (no JSON parsing on the client)
+    translatedSummary: sceneMetadata?.translatedSummary || null,
+    imageSummary: sceneMetadata?.imageSummary || null
+  };
+}
+
 module.exports = {
   SHARED_GRIP_RULE,
   forbiddenSharedGrips,
@@ -2764,6 +2799,7 @@ module.exports = {
   enforceSpreadTextPosition,
   mirrorLeftRight,
   extractSceneMetadata,
+  sceneDescriptionRecord,
   describeDegradedSceneMetadata,
   resolveEvalSceneHint,
   resolveEvalImagePrompt,

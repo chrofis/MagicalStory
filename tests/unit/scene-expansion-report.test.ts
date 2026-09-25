@@ -58,7 +58,12 @@ describe('the scene stage keeps the prompt that wrote the briefs', () => {
   it('no page carries an inline copy of the prompt — only the index', () => {
     // 18 copies of a ~112 KB prompt was 2.06 MB per story, twice over
     // (sceneDescriptions AND sceneImages) — 47% of a measured 8.7 MB row.
-    expect(pipeline).toMatch(/scenePromptRef:/);
+    // The stored sceneDescriptions record is built by one projection
+    // (sceneMetadata.sceneDescriptionRecord), handed the page -> index map.
+    expect(pipeline).toMatch(/sceneDescriptionRecord\(scene, scenePromptRefs\)/);
+    const sceneMetadataSrc = lf(readFileSync(join(__dirname, '../..', 'server', 'lib', 'sceneMetadata.js'), 'utf-8'));
+    expect(sceneMetadataSrc).toMatch(/scenePromptRef:/);
+    expect(sceneMetadataSrc).not.toMatch(/sceneDescriptionPrompt/);
     expect(pipeline).not.toMatch(/scenePrompt:\s*scene\.sceneDescriptionPrompt/);
     expect(pipeline).not.toMatch(/sceneDescriptionPrompt:\s*img\.scene\?\.sceneDescriptionPrompt/);
   });
