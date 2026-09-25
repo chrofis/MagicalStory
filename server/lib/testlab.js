@@ -856,7 +856,7 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
       landmarkPhoto: ctx.landmarkPhotos?.[0] || null,
       light: require('./sceneLight').declaredLight(meta),
     });
-    qc = { pass: qcRes.pass, issues: qcRes.issues || [], visionFeedback: qcRes.visionFeedback || null };
+    qc = { pass: qcRes.pass, issues: qcRes.issues || [], findings: qcRes.findings || [], visionFeedback: qcRes.visionFeedback || null };
   } catch (err) {
     log.warn(`[TESTLAB] empty-scene QC failed: ${err.message}`);
     qc = { error: err.message };

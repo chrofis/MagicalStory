@@ -9,7 +9,7 @@ Check:
 - Foreground space: is there visible open space in the foreground where main characters could be placed later? (FAIL if the entire foreground is filled with objects or walls)
 - Wrong text: does the image contain a caption, title, label box or watermark laid over the picture, a misspelled word, or words on something that would not carry them (words across a wall, a tree or the sky)? (FAIL — name where the text appears. Correctly spelled writing an object of that kind carries in the real world — a shop name on its sign, a street name on a street sign — is OK, and so are distant painted banners with no readable text.){STYLE_CHECK}{CAMERA_CHECK}{LIGHT_CHECK}{ERA_CHECK}{PLACEMENTS_CHECK}{GEOMETRY_CHECK}
 
-Reply JSON only: {"pass": true/false, "issues": ["short issue"], "feedback": "one sentence naming WHAT to remove or fix — e.g. 'remove the pub sign at upper-left and the parked car at lower-right'. Be specific enough that a regeneration prompt can target the named elements."}
+Reply JSON only: {"pass": true/false, "issues": [{"check": "<key>", "issue": "short issue"}], "feedback": "one sentence naming WHAT to remove or fix — e.g. 'remove the pub sign at upper-left and the parked car at lower-right'. Be specific enough that a regeneration prompt can target the named elements."} Each issue's "check" is the one key of the check it fails, from this list: {CHECK_KEYS}.
 
 ### STYLE_CHECK
 - Medium: the ART STYLE is: {ART_STYLE} Is the plate painted in it? (FAIL if it reads as a photograph or as a different medium — name what gives it away.)

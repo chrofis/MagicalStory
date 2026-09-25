@@ -502,6 +502,9 @@ function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, chara
 
 ${fillTemplate(qc.LANDMARK_CHECK, { LANDMARK_NAME: landmark, LANDMARK_PHOTO_AUTHORITY: require('./promptBuilders').LANDMARK_PHOTO_AUTHORITY })}` : '';
   return fillTemplate(qc.BODY, {
+    // The closed list of checks an issue is filed under (plateQc.js) — what a
+    // double QC failure is decided on, so it is one constant, never prose.
+    CHECK_KEYS: require('./plateQc').checkKeysForPrompt(),
     SCENE_CTX: sceneCtx,
     STYLE_CHECK: styleCheck,
     CAMERA_CHECK: cameraCheck,
@@ -544,7 +547,7 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
     const BLOCK = 16;
     const rows = Math.floor(height / BLOCK);
     const cols = Math.floor(width / BLOCK);
-    if (rows < 4 || cols < 4) return { pass: true, issues: [], calmnessScore: 0.5 };
+    if (rows < 4 || cols < 4) return { pass: true, issues: [], findings: [], calmnessScore: 0.5 };
 
     // Compute per-block brightness and variance
     const blockBrightness = new Float32Array(rows * cols);
@@ -577,6 +580,11 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
     if (vMax === 0) vMax = 1;
 
     const issues = [];
+    // Each issue with the check it fails (plateQc.js) — what a double QC
+    // failure is decided on. `issues` stays the plain text every reader shows.
+    const findings = [];
+    const { PIXEL_CHECK_KEYS, normaliseJudgeIssue, UNCLASSIFIED } = require('./plateQc');
+    const addIssue = (check, issue) => { issues.push(issue); findings.push({ check, issue }); };
 
     // Check 1: uniform-patch artifact detection — a flat white OR a flat
     // black rectangle is an AI glitch regardless of the expected tone. Flag
@@ -594,17 +602,17 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
     const whiteBoxPct = largestInteriorUniformFraction(whiteMask, rows, cols);
     const blackBoxPct = largestInteriorUniformFraction(blackMask, rows, cols);
     if (whiteBoxPct > 0.08) {
-      issues.push(`white box artifact: ${(whiteBoxPct * 100).toFixed(0)}% of image is uniform white`);
+      addIssue(PIXEL_CHECK_KEYS.box, `white box artifact: ${(whiteBoxPct * 100).toFixed(0)}% of image is uniform white`);
     }
     if (blackBoxPct > 0.08) {
-      issues.push(`black box artifact: ${(blackBoxPct * 100).toFixed(0)}% of image is uniform black`);
+      addIssue(PIXEL_CHECK_KEYS.box, `black box artifact: ${(blackBoxPct * 100).toFixed(0)}% of image is uniform black`);
     }
 
     // Check 2: overall too dark — darker scenes are now expected (white text on
     // dark backdrop), so the floor drops to 8%. Below that the frame is blank
     // or broken, not an artistic choice.
     if (avgBrightness < 0.08) {
-      issues.push(`too dark: average brightness ${(avgBrightness * 100).toFixed(0)}%`);
+      addIssue(PIXEL_CHECK_KEYS.dark, `too dark: average brightness ${(avgBrightness * 100).toFixed(0)}%`);
     }
 
     // Check 3: text area calmness — smooth (low-variance) zone for text placement.
@@ -635,7 +643,7 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
     // edges/detail lands ~0.3-0.5, a calm surface ~0.6-0.9. (Previous 0.15
     // threshold was for the dark-rewarding formula and is too lax here.)
     if (calmnessScore < 0.55 && textPosition) {
-      issues.push(`text area too busy: calmness ${(calmnessScore * 100).toFixed(0)}% at ${textPosition}`);
+      addIssue(PIXEL_CHECK_KEYS.textArea, `text area too busy: calmness ${(calmnessScore * 100).toFixed(0)}% at ${textPosition}`);
     }
 
     // ── Phase 2: Gemini Flash-lite vision check ──
@@ -693,16 +701,23 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
             try {
               const visionResult = JSON.parse(visionText);
               if (visionResult.pass === false) {
-                issues.push(...(visionResult.issues || ['vision check failed']));
+                const judged = (Array.isArray(visionResult.issues) && visionResult.issues.length ? visionResult.issues : ['vision check failed'])
+                  .map(normaliseJudgeIssue);
+                const unclassified = judged.filter(f => f.check === UNCLASSIFIED);
+                if (unclassified.length) {
+                  log.error(`❌ [EMPTY-SCENE-QC] ${pageContext} judge named no known check for ${unclassified.length} issue(s) — counted as hard: ${unclassified.map(f => f.issue).join(' | ')}`);
+                }
+                for (const f of judged) addIssue(f.check, f.issue);
                 visionFeedback = visionResult.feedback || null;
-                log.warn(`❌ [EMPTY-SCENE-QC] ${pageContext} Vision FAILED: ${(visionResult.issues || []).join(', ')}${visionFeedback ? ` — fix: ${visionFeedback}` : ''}`);
+                log.warn(`❌ [EMPTY-SCENE-QC] ${pageContext} Vision FAILED: ${judged.map(f => `[${f.check}] ${f.issue}`).join(', ')}${visionFeedback ? ` — fix: ${visionFeedback}` : ''}`);
               } else {
                 log.debug(`✅ [EMPTY-SCENE-QC] ${pageContext} Vision passed`);
               }
             } catch {
               // Unparseable — check for keywords
               if (visionText.toLowerCase().includes('"pass": false') || visionText.toLowerCase().includes('"pass":false')) {
-                issues.push('vision check failed (unparseable)');
+                log.error(`❌ [EMPTY-SCENE-QC] ${pageContext} judge reply unparseable — counted as a hard, unclassified failure`);
+                addIssue(UNCLASSIFIED, 'vision check failed (unparseable)');
                 visionFeedback = visionText.substring(0, 200);
               }
             }
@@ -720,10 +735,10 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
       log.debug(`✅ [EMPTY-SCENE-QC] ${pageContext} passed (brightness ${(avgBrightness * 100).toFixed(0)}%, text calmness ${(calmnessScore * 100).toFixed(0)}%, white ${(whiteBoxPct * 100).toFixed(0)}%, black ${(blackBoxPct * 100).toFixed(0)}%)`);
     }
 
-    return { pass, issues, calmnessScore, visionFeedback };
+    return { pass, issues, findings, calmnessScore, visionFeedback };
   } catch (err) {
     log.warn(`⚠️ [EMPTY-SCENE-QC] ${pageContext} Error: ${err.message} — skipping check`);
-    return { pass: true, issues: [], calmnessScore: 0.5, visionFeedback: null };
+    return { pass: true, issues: [], findings: [], calmnessScore: 0.5, visionFeedback: null };
   }
 }
 

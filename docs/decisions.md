@@ -60099,6 +60099,44 @@ p14 share their base, the four re-lights (p3, p13, p15-17, p18) are unchanged.
 `tests/unit/plate-plan.test.ts`.
 **Status:** ✅ active on staging.
 
+## 2026-09-25 — A plate that fails QC twice keeps the less SEVERE attempt; hard defects are named by check, never read from text
+
+**Context:** Every plate retry site (vantage base, derived, per-page) kept the retry only when it listed
+fewer issues. Staging job_1790277448294_5herh01j7: the p10 ultra-wide derive kept its first attempt ("a
+large glowing white rectangular frame") over a re-derive whose only fault was the setting, 1 issue vs 1;
+the LOC001.1 base plate failed on its medium, then on a signature, and shipped with nothing saying so. The
+stored QC history (`v1ImageData`) was the shipped plate itself whenever the first attempt was kept, so the
+rejected retry was lost.
+
+**Decision (owner, 2026-09-25):**
+1. **Severity is structural.** The judge files each issue under one key of a closed list
+   (`PLATE_QC_CHECKS`, `server/lib/plateQc.js`, filled into `empty-scene-qc.txt` as `{CHECK_KEYS}`); the
+   pixel checks file theirs in code. HARD = `artefact` (box, panel, border, frame, mat), `medium`
+   (photograph / wrong medium), `text` (lettering, signature, watermark). Everything else is soft. An
+   issue under no known key is `unclassified`, logged as an error and counted HARD. No issue text is read.
+2. **The pick** (`decidePlateAfterRetry`): the retry wins when it passes, has fewer hard defects, or as
+   many hard and fewer soft ones; otherwise the first attempt stays.
+3. **A derived plate hard twice falls back to its base plate** (owner: a wrong camera on the right place
+   beats no plate). **A base or per-page plate hard twice ships**, with a `plate_shipped_failed_qc` warn
+   event carrying the defects (gates are guidelines).
+4. **Both attempts are stored**: `emptySceneQc` gains `retryImageData`, `retryIssues`, `keptAttempt`,
+   `shippedWithHardDefects`; `v1ImageData` is always the first attempt. One builder (`plateQcRecord`) and
+   one whitelist copy (`emptySceneQcOf`) replace the four hand-kept copies.
+5. **No retry into a deterministic failure**: a retry whose prompt cannot fit (`PromptFitError`, already
+   logged as `prompt_fit_failed`) counts as "no image" and is not sent; the per-page retry's usage is now
+   booked (it was not).
+
+**Evidence:** the new judge prompt run on two stored plates of the run (rung 2, 2 Gemini-flash calls,
+~$0.002): p10's derived v1 → `[artefact] a large glowing white rectangular frame…`, `[text] a signature…`
+(2 hard); p13's derived v1 → `[landmark] …generic European city scene…` (1 soft). Unit:
+`tests/unit/plate-qc-severity.test.ts`.
+
+**Touched:** `server/lib/plateQc.js` (new), `server/lib/evalPipeline.js`, `prompts/empty-scene-qc.txt`,
+`storyJobPipeline.js`, `server/lib/testlab.js`, `client/src/types/story.ts`,
+`client/src/components/generation/story/ReferencePhotosDisplay.tsx`,
+`tests/unit/plate-qc-severity.test.ts`, `tests/unit/empty-scene-qc-extraction.test.ts`.
+**Status:** ✅ active on staging.
+
 ## 2026-09-24 — The plan check is given the over-the-shoulder contact rule
 
 **Context:** Staging job_1790277448294_5herh01j7 planned "Page 12: over-the-shoulder — Kiaan — Kiaan

@@ -4861,6 +4861,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // derived plates not at all (2026-09-23, dragon run 6).
               let plateQcOpts = { artStyle: artStyleDesc, shot: plateClass(vantageShot), pageNumber: repPageNum, landmarkPhoto: landmarkPhotos[0] || null, light: baseLight };
               const { validateEmptyScene } = require('./server/lib/images');
+              const { decidePlateAfterRetry, plateQcRecord: buildPlateQcRecord, logPlateOutcome, nullOnPromptFit } = require('./server/lib/plateQc');
               try {
                 const seenPlacement = new Set();
                 const placements = [];
@@ -4920,7 +4921,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     pageNumber: repPageNum,
                     skipCache: true,
                     pageContext: `vantage-${vantageId}-retry`,
-                  });
+                  }).catch(nullOnPromptFit);
                   if (retryResult?.usage) {
                     const isRunware = retryResult.modelId?.startsWith('runware:');
                     const isGrok = retryResult.modelId?.startsWith('grok-imagine');
@@ -4928,23 +4929,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     addUsage(provider, retryResult.usage, 'page_images', retryResult.modelId);
                   }
                   imageGenHeartbeat();
-                  if (retryResult?.imageData) {
-                    // The retry is judged exactly as the first plate was: a
-                    // pixel-only verdict "passed" a retry that fixed nothing the
-                    // vision check had failed.
-                    const retryQc = await validateEmptyScene(retryResult.imageData, null, `vantage-${vantageId}-retry`, plateQcOpts);
-                    if (retryQc.pass || retryQc.issues.length < qc.issues.length) {
-                      plateQcRecord = { v1ImageData: plateImage, v1Issues: qc.issues, visionFeedback: qc.visionFeedback || null, retryPrompt };
-                      plateImage = retryResult.imageData;
-                      platePrompt = retryPrompt;
-                      plateRefs = retryResult.grokRefImages || null;
-                      genLog.info('vantage_plate_qc_retry', `Vantage plate ${vantageId} retry ${retryQc.pass ? 'passed QC' : `still has ${retryQc.issues.length} issue(s) — fewer than v1's ${qc.issues.length}, keeping retry`}`);
-                    } else {
-                      genLog.warn('vantage_plate_qc_retry', `Vantage plate ${vantageId} retry did not improve (${retryQc.issues.join(', ')}) — keeping the first plate`);
-                    }
-                  } else {
-                    genLog.warn('vantage_plate_qc_retry', `Vantage plate ${vantageId} retry produced no image — keeping the first plate`);
+                  // The retry is judged exactly as the first plate was: a
+                  // pixel-only verdict "passed" a retry that fixed nothing the
+                  // vision check had failed. The keeper is picked by SEVERITY
+                  // (plateQc.js); a base plate has no plate behind it, so it
+                  // ships even with a hard defect — visibly.
+                  const retryQc = retryResult?.imageData
+                    ? await validateEmptyScene(retryResult.imageData, null, `vantage-${vantageId}-retry`, plateQcOpts)
+                    : null;
+                  const outcome = decidePlateAfterRetry({ firstQc: qc, retryQc, derived: false });
+                  plateQcRecord = buildPlateQcRecord({ firstImage: plateImage, firstQc: qc, retryImage: retryResult?.imageData, retryQc, retryPrompt, outcome });
+                  if (outcome.keep === 'retry') {
+                    plateImage = retryResult.imageData;
+                    platePrompt = retryPrompt;
+                    plateRefs = retryResult.grokRefImages || null;
                   }
+                  logPlateOutcome(genLog, { event: 'vantage_plate_qc_retry', label: `Vantage plate ${vantageId}`, pages: group.pageNumbers, outcome, firstQc: qc, retryQc });
                 } else {
                   genLog.info('vantage_plate_qc', `Vantage plate ${vantageId} (pages ${group.pageNumbers.join(',')}) passed QC`);
                 }
@@ -5030,13 +5030,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                       const rqc = retryImage
                         ? await validateEmptyScene(retryImage, null, `vantage-${vantageId}-${cls}-retry`, derivedQcOpts)
                         : null;
-                      derivedQcRecord = { v1ImageData: derivedImage, v1Issues: dqc.issues, visionFeedback: dqc.visionFeedback || null, retryPrompt: retryInstruction };
-                      if (rqc && (rqc.pass || rqc.issues.length < dqc.issues.length)) {
+                      // Picked by SEVERITY (plateQc.js). Both attempts broken as
+                      // a picture → the pages keep the base plate: a wrong camera
+                      // on the right place beats a broken plate (owner).
+                      const outcome = decidePlateAfterRetry({ firstQc: dqc, retryQc: rqc, derived: true });
+                      derivedQcRecord = buildPlateQcRecord({ firstImage: derivedImage, firstQc: dqc, retryImage, retryQc: rqc, retryPrompt: retryInstruction, outcome });
+                      logPlateOutcome(genLog, { event: 'vantage_plate_qc_retry', label: `Derived ${deriveLabel} plate for ${vantageId}`, pages: group.pageNumbers.filter(p => plateKeyOf(p).key === key), outcome, firstQc: dqc, retryQc: rqc });
+                      if (outcome.keep === 'retry') {
                         derivedImage = retryImage;
                         derivedPrompt = retryInstruction;
-                        genLog.info('vantage_plate_qc_retry', `Derived ${deriveLabel} plate for ${vantageId}: re-derive ${rqc.pass ? 'passed QC' : `has ${rqc.issues.length} issue(s), fewer than ${dqc.issues.length} — kept`}`);
-                      } else {
-                        genLog.warn('vantage_plate_qc_retry', `Derived ${deriveLabel} plate for ${vantageId}: re-derive did not improve${rqc ? ` (${rqc.issues.join(', ')})` : ' (no image)'} — keeping the first derive`);
+                      } else if (outcome.keep === 'base') {
+                        derivedImage = null;
                       }
                     }
                   }
@@ -5044,7 +5048,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     derivedPlates.set(key, { imageData: derivedImage, prompt: derivedPrompt, qcRecord: derivedQcRecord, label: deriveLabel, light: relit ? pageLight : baseLight });
                     log.info(`🏛️ [VANTAGE] ${vantageId}: derived a ${deriveLabel} plate from the ${vantageShot || 'base'}${baseLightKey ? ` ${describeLight(baseLight)}` : ''} one`);
                   } else {
-                    log.error(`❌ [VANTAGE] ${vantageId}: ${deriveLabel} plate derive returned no image — those pages keep the base plate, drawn for a camera or a light that is not theirs`);
+                    log.error(`❌ [VANTAGE] ${vantageId}: ${deriveLabel} plate derive ${derivedQcRecord?.keptAttempt === 'base' ? 'failed QC hard twice' : 'returned no image'} — those pages keep the base plate, drawn for a camera or a light that is not theirs`);
                   }
                 } catch (deriveErr) {
                   log.error(`❌ [VANTAGE] ${vantageId}: ${deriveLabel} plate derive failed (${deriveErr.message}) — those pages keep the base plate`);
@@ -5301,6 +5305,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // checks don't apply, and we save the vision call cost on those pages.
               if (result?.imageData && layoutTextInImage) {
                 const { validateEmptyScene } = require('./server/lib/images');
+                const { decidePlateAfterRetry, plateQcRecord: buildPlateQcRecord, logPlateOutcome, nullOnPromptFit } = require('./server/lib/plateQc');
                 const textPos = enforceSpreadTextPosition(sceneMetadata?.textPosition || null, pageData.pageNumber);
                 // Pass the outline's declared character positions so the vision check
                 // can verify each has usable flat ground in the rendered empty scene.
@@ -5371,20 +5376,27 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     landmarkPhotos: pageData.landmarkPhotos,
                     textAreaMask,
                     pageContext: `empty-P${pageData.pageNumber}-retry`,
-                  });
-                  if (retryResult?.imageData) {
-                    // Judged exactly as the first attempt was (vision included).
-                    const retryQc = await validateEmptyScene(retryResult.imageData, textPos, `P${pageData.pageNumber}-retry`, pageQcOpts);
-                    if (retryQc.pass) {
-                      log.info(`✅ [EMPTY SCENE] P${pageData.pageNumber} retry passed QC`);
-                      // Return both versions so they can be compared in dev mode
-                      return { pageNumber: pageData.pageNumber, imageData: retryResult.imageData, prompt: retryPrompt, grokRefImages: retryResult.grokRefImages || null, v1ImageData: result.imageData, v1Issues: qc.issues, visionFeedback: qc.visionFeedback, retryPrompt, textAreaMask, emptySceneVbGrid: emptySceneVbGridDataUrl };
-                    }
-                    log.warn(`⚠️ [EMPTY SCENE] P${pageData.pageNumber} retry also failed QC — picking best of v1/v2`);
-                    // Pick whichever version has fewer issues
-                    const bestImage = retryQc.issues.length < qc.issues.length ? retryResult.imageData : result.imageData;
-                    return { pageNumber: pageData.pageNumber, imageData: bestImage, prompt: retryPrompt, grokRefImages: (retryQc.issues.length < qc.issues.length ? retryResult.grokRefImages : result.grokRefImages) || null, v1ImageData: result.imageData, v1Issues: qc.issues, visionFeedback: qc.visionFeedback, retryPrompt, textAreaMask, emptySceneVbGrid: emptySceneVbGridDataUrl };
+                  }).catch(nullOnPromptFit);
+                  if (retryResult?.usage) {
+                    const isRunware = retryResult.modelId?.startsWith('runware:');
+                    const isGrok = retryResult.modelId?.startsWith('grok-imagine');
+                    addUsage(isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image', retryResult.usage, 'page_images', retryResult.modelId);
                   }
+                  // Judged exactly as the first attempt was (vision included),
+                  // and the keeper picked by SEVERITY (plateQc.js) — the same
+                  // rule as the vantage base plate. Both attempts are stored.
+                  const retryQc = retryResult?.imageData
+                    ? await validateEmptyScene(retryResult.imageData, textPos, `P${pageData.pageNumber}-retry`, pageQcOpts)
+                    : null;
+                  const outcome = decidePlateAfterRetry({ firstQc: qc, retryQc, derived: false });
+                  logPlateOutcome(genLog, { event: 'empty_scene_qc_retry', label: `Page ${pageData.pageNumber} plate`, pages: [pageData.pageNumber], outcome, firstQc: qc, retryQc });
+                  const kept = outcome.keep === 'retry'
+                    ? { imageData: retryResult.imageData, prompt: retryPrompt, grokRefImages: retryResult.grokRefImages || null }
+                    : { imageData: result.imageData, prompt: emptyPrompt, grokRefImages: result.grokRefImages || null };
+                  return {
+                    pageNumber: pageData.pageNumber, ...kept, textAreaMask, emptySceneVbGrid: emptySceneVbGridDataUrl,
+                    ...buildPlateQcRecord({ firstImage: result.imageData, firstQc: qc, retryImage: retryResult?.imageData, retryQc, retryPrompt, outcome }),
+                  };
                 }
               }
 
@@ -5413,13 +5425,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           grokRefImages: bg.grokRefImages || null,
           textAreaMask: bg.textAreaMask || null,
           emptySceneVbGrid: bg.emptySceneVbGrid || null,
-          // Store QC data for dev mode comparison (v1 failed, v2 retry)
-          ...(bg.v1ImageData ? {
-            v1ImageData: bg.v1ImageData,
-            v1Issues: bg.v1Issues,
-            visionFeedback: bg.visionFeedback || null,
-            retryPrompt: bg.retryPrompt || null,
-          } : {}),
+          // QC history of a retried plate: both attempts and which one shipped.
+          ...(require('./server/lib/plateQc').emptySceneQcOf(bg) || {}),
         };
         return true;
       };
@@ -6074,12 +6081,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               plateDerivedFor: emptySceneData?.plateDerivedFor || null,
               textAreaMask: emptySceneData?.textAreaMask || null,
               emptySceneVbGrid: emptySceneData?.emptySceneVbGrid || null,
-              emptySceneQc: emptySceneData?.v1Issues ? {
-                v1ImageData: emptySceneData.v1ImageData,
-                v1Issues: emptySceneData.v1Issues,
-                visionFeedback: emptySceneData.visionFeedback || null,
-                retryPrompt: emptySceneData.retryPrompt || null,
-              } : null,
+              emptySceneQc: require('./server/lib/plateQc').emptySceneQcOf(emptySceneData),
               sceneDescription: pageData.scene.sceneDescription,
               text: pageData.scene.text,
               sceneCharacters: pageData.sceneCharacters,
@@ -6559,12 +6561,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           emptySceneGrokRefImages: img.emptySceneGrokRefImages || sceneBackgrounds[img.pageNumber]?.grokRefImages || null,
           vantageId: img.vantageId || sceneBackgrounds[img.pageNumber]?.vantageId || null,
           plateDerivedFor: img.plateDerivedFor || sceneBackgrounds[img.pageNumber]?.plateDerivedFor || null,
-          emptySceneQc: img.emptySceneQc || (sceneBackgrounds[img.pageNumber]?.v1Issues ? {
-            v1ImageData: sceneBackgrounds[img.pageNumber]?.v1ImageData || null,
-            v1Issues: sceneBackgrounds[img.pageNumber]?.v1Issues || null,
-            visionFeedback: sceneBackgrounds[img.pageNumber]?.visionFeedback || null,
-            retryPrompt: sceneBackgrounds[img.pageNumber]?.retryPrompt || null,
-          } : null),
+          emptySceneQc: img.emptySceneQc || require('./server/lib/plateQc').emptySceneQcOf(sceneBackgrounds[img.pageNumber]),
           emptySceneVbGrid: img.emptySceneVbGrid || sceneBackgrounds[img.pageNumber]?.emptySceneVbGrid || null,
           // Mask sent to Grok during empty-scene generation (Pass 1). Persisted so the
           // dev-mode references panel can show the thumbnail of what was actually sent.
@@ -7011,12 +7008,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           emptySceneGrokRefImages: img.emptySceneGrokRefImages || sceneBackgrounds[img.pageNumber]?.grokRefImages || null,
           vantageId: img.vantageId || sceneBackgrounds[img.pageNumber]?.vantageId || null,
           plateDerivedFor: img.plateDerivedFor || sceneBackgrounds[img.pageNumber]?.plateDerivedFor || null,
-          emptySceneQc: img.emptySceneQc || (sceneBackgrounds[img.pageNumber]?.v1Issues ? {
-            v1ImageData: sceneBackgrounds[img.pageNumber]?.v1ImageData || null,
-            v1Issues: sceneBackgrounds[img.pageNumber]?.v1Issues || null,
-            visionFeedback: sceneBackgrounds[img.pageNumber]?.visionFeedback || null,
-            retryPrompt: sceneBackgrounds[img.pageNumber]?.retryPrompt || null,
-          } : null),
+          emptySceneQc: img.emptySceneQc || require('./server/lib/plateQc').emptySceneQcOf(sceneBackgrounds[img.pageNumber]),
           emptySceneVbGrid: img.emptySceneVbGrid || sceneBackgrounds[img.pageNumber]?.emptySceneVbGrid || null,
           // Mask sent to Grok during empty-scene generation (Pass 1). Persisted so the
           // dev-mode references panel can show the thumbnail of what was actually sent.
