@@ -771,13 +771,16 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
   // regenerating the whole story. Otherwise the plate text production uses
   // (resolvePagePlate: outline, then the vantage's own plate, then the brief's)
   // under the page's SHOT line, as the per-page plate path builds it. It used
-  // to fall back to the page's full scene description — cast, action and all —
-  // which production never sends to a plate: on a beats story (the plate is the
-  // vantage's) that was every page, and staging job_1790277448294_5herh01j7 p1
-  // built an 11,684-char plate prompt (Lab 1478, refused by the plate fit).
+  // to take the stored page's `emptyScenePrompt` and then its full scene
+  // description, neither of which is plate text; staging
+  // job_1790277448294_5herh01j7 p1 built an 11,684-char plate prompt (Lab 1478,
+  // refused by the plate fit — before the fit it would have gone to Gemini).
+  // No outline plate: ctx.scene is the STORED page record, whose
+  // `emptyScenePrompt` is the fully BUILT plate prompt of the run, not plate
+  // text — wrapping it in the template again doubled it (Lab 1482: 11,761 chars).
   const { resolvePagePlate } = require('./storyHelpers');
   const pagePlateText = resolvePagePlate({
-    pageNumber: ctx.pageNumber, sceneMetadata: meta, visualBible: ctx.visualBible, outlinePlate: ctx.scene.emptyScenePrompt || '',
+    pageNumber: ctx.pageNumber, sceneMetadata: meta, visualBible: ctx.visualBible, outlinePlate: '',
   }).text;
   const pageShot = String(meta.fullData?.shot || '').trim();
   const description = params.descriptionOverride

@@ -30,6 +30,12 @@ describe('plate art style', () => {
     expect(SRC('storyJobPipeline.js')).toContain("const artStyleDesc = resolveArtStyle(inputData.artStyle || 'pixar', repPageData.pageImageBackend) || '';");
   });
 
+  it('the Lab plate text is plate text: resolvePagePlate, never the stored built prompt or the scene description', () => {
+    const src = SRC('server/lib/testlab.js');
+    expect(src).toContain("pageNumber: ctx.pageNumber, sceneMetadata: meta, visualBible: ctx.visualBible, outlinePlate: '',");
+    expect(src).not.toContain('meta.emptyScenePrompt || ctx.scene.emptyScenePrompt || ctx.scene.sceneDescription');
+  });
+
   it('the cover and iterate plates send the full style', () => {
     expect(SRC('server/lib/coverIterate.js')).toContain("const artStyleDesc = resolveArtStyle(artStyle || 'pixar') || '';");
     expect(SRC('server/lib/images.js')).toContain("const artStyleDesc = resolveArtStyle(storyData.artStyle || 'pixar') || '';");
