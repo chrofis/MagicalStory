@@ -2017,7 +2017,7 @@
       "impact": "A repair can silently change a page's time of day and weather and still win pick-best.",
       "status": "fixed",
       "fixedAt": "2026-09-25",
-      "fixedIn": null,
+      "fixedIn": "5e73037a0",
       "fix": "sceneLight.buildRepairLightLine closes every repaint prompt (images.buildInpaintInstruction, used by the pipeline, the Lab and the manual route; faceRepair.buildPrompt, every branch; scaleRepair.buildScaleRepairPrompt). The two manual routes pass page text + brief, so the semantic judge runs and judges light as on a first render. Replay of the stored p15 instruction now ends on the night/fog LIGHT line; Lab #1471 re-judged stored v1 against DECLARED LIGHT night, fog and flagged it as daytime (MODERATE)."
     }
   ]
