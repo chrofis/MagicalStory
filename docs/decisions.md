@@ -48,10 +48,20 @@ Deliberately NOT given the line: the user-typed edit routes (`/edit/image`, `/ed
 own instruction may be "make it daytime", and a light constraint would override it; the grid artifact
 repair (`repairGrid.js`), which repaints small cropped cells and blends them back.
 
-**Open, owner's call:** a light contradiction is MODERATE in image-semantic.txt, so a daylight repair can
-still outscore its night original when the original carries a worse finding (exp #1471: v1 90, v0 70).
+**Severity (owner ruling, 2026-09-25): a contradiction of the DECLARED LIGHT is MAJOR** (was MODERATE),
+set on the check's own line in image-semantic.txt, the way every other semantic check carries its
+severity. Not a `MIN_SEVERITY_TYPES` floor: the judge files the finding as `setting`, a type that also
+carries wrong-place findings at MAJOR/CRITICAL, so a floor would need a new dedicated type (a type is
+classification, which belongs to the prompt, plus five scoring sites), and the floor mechanism is kept
+for the case where escalating the prompt suppresses detection (composite_seam). The consolidator and
+the visual-flow judge restate no light severity (the consolidator keeps the highest merged severity;
+visual-flow emits a boolean mismatch), and the generator side has no severity to sync. Free replay on
+p15 with the stored deductions: stored v0 85 vs v1 with the #1471 light finding 95 at MODERATE, 85 at
+MAJOR, and the pipeline's earliest tie-break then ships v0 (night). Against #1471's own v0 result, which
+carries a CRITICAL "turns away" finding (75), v1 still wins at 85: MAJOR puts the daylight repair level
+with a MAJOR-flawed original, not below a CRITICAL-flawed one.
 
-**Touched:** server/lib/sceneLight.js, images.js, faceRepair.js, scaleRepair.js, sceneValidator.js,
+**Touched:** prompts/image-semantic.txt, server/lib/sceneLight.js, images.js, faceRepair.js, scaleRepair.js, sceneValidator.js,
 styleConsistency.js, server/routes/regeneration.js, scripts/admin/sibling-registry.json,
 tests/unit/scene-light.test.ts, tests/unit/inpaint-preserve-channel.test.ts
 **Status:** ✅ active

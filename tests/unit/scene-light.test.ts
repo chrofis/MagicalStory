@@ -166,6 +166,25 @@ describe('the semantic judge judges light against the declared fields', () => {
     expect(p).not.toContain('{DECLARED_LIGHT}');
     expect(p).toMatch(/against DECLARED LIGHT only/);
   });
+
+  // Owner ruling 2026-09-25: an image that contradicts the page's DECLARED LIGHT
+  // is MAJOR. Staging job_1790277448294_5herh01j7 p15: at MODERATE the daylight
+  // inpaint (95) still beat its night original (85, one MAJOR finding).
+  it('a contradiction of the declared light is MAJOR, and a daylight repair no longer beats its night original', () => {
+    const p = String(buildSemanticPrompt(require_('../../server/services/prompts').PROMPT_TEMPLATES.imageSemantic,
+      { storyText: 't', sceneHint: 'h', imagePrompt: 'p', declaredLight: 'night, fog' }));
+    const check = p.split('\n').find(l => l.includes('against DECLARED LIGHT only'));
+    expect(check).toMatch(/\*\*\[MAJOR\]\*\*\s*$/);
+
+    const S = require_('../../server/lib/scoring');
+    const none = { quality: [], semantic: [], compliance: [], entity: [] };
+    const original = { ...none, consolidated: [{ type: 'object_presence', severity: 'major', source: 'consolidated', description: 'a lamp the brief keeps unseen is visible' }] };
+    const repair = { ...none, consolidated: [{ type: 'setting', severity: 'MAJOR', source: 'consolidated', description: 'the page is declared night; the image is daytime' }] };
+    const v0 = { source: 'original', deductions: original, finalScore: S.computeMathFinalScore(original) };
+    const v1 = { source: 'inpaint-round-1', deductions: repair, finalScore: S.computeMathFinalScore(repair) };
+    expect(v1.finalScore).toBe(v0.finalScore);
+    expect(S.pickBestVersionIndex([v0, v1], { tieBreak: 'earliest' })).toBe(0);
+  });
 });
 
 describe('neighbouring hours are not a contradiction', () => {
