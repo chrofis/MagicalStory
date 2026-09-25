@@ -7944,7 +7944,7 @@ ${hints}`;
 
 // `centralFigure`: the names the arc's STORY LOGIC gives the commission's
 // central figure (arcReviewReport.centralFigure), null when it named none.
-function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', replan = '', centralFigure = null } = {}) {
+function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', replan = '', centralFigure = null, mayAddDeeds = false } = {}) {
   const template = PROMPT_TEMPLATES.storyBeats;
   if (!template) {
     log.error('[PROMPT] storyBeats template not loaded — beats planning unavailable');
@@ -8001,7 +8001,8 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // frame scaled down as the cast grows. The SAME castCoverage() object the
     // plan counters measure NO_FOCAL_PAGE and UNDER_COVERED_CHARACTER against.
     // The central figure's sentence rides in the same rule (2026-09-24, d4).
-    CAST_COVERAGE: castCoverageRule(castCoverage({ pageCount, castCount: (inputData?.characters || []).filter(c => c && c.name).length }), { centralFigure }),
+    // `mayAddDeeds`: Test Lab only (castActionRule); production never passes it.
+    CAST_COVERAGE: castCoverageRule(castCoverage({ pageCount, castCount: (inputData?.characters || []).filter(c => c && c.name).length }), { centralFigure, mayAddDeeds }),
     // The output scope follows the mode. A first plan (no replan section)
     // owes every page; a re-plan owes only the pages it changes under RE-DIVIDE
     // — the merge in beatsPipeline restores every other page from the division
@@ -9338,13 +9339,18 @@ function happeningsLabel(inputData, pageCount) {
 // has a turn of their own. "One main character solves it" left: it made the
 // second main character a passenger (Lab #1464). Each commissioned character's
 // scene is the page plan's job (the stage split above).
-function arcPrinciples(inputData = {}, pageCount = 10) {
+// `everyChildActs` (Test Lab arc_effort only, 2026-09-25; production never
+// passes it): EVERY_CHILD_ACTS_RULE back among the principles, the v2 arc's
+// rule, to A/B "the arc gives each child a deed" against "the planner may add
+// one" (castActionRule `mayAddDeeds`).
+function arcPrinciples(inputData = {}, pageCount = 10, { everyChildActs = false } = {}) {
   const pages = Math.max(4, parseInt(pageCount, 10) || 10);
   return [
     '# HOW THIS STORY IS BUILT',
     `- Logical and exciting at once, neither traded for the other. Exciting is ${arcExcitingDef(inputData)}: a child keeps listening while the heroes could still lose, and believes an ending that follows from what came before.`,
     '- One problem, from the first sentence to the last, and no second storyline: a listening child follows one question.',
     `- ${ARC_MAIN_TURN_RULE}: every child the book is about sees themselves matter.`,
+    ...(everyChildActs ? [`- ${EVERY_CHILD_ACTS_RULE}`] : []),
     `- ${happeningsLabel(inputData, pageCount)} a child would retell: the child remembers the happenings on the way to the ending and forgets the rest.`,
     '- Every happening causes the ending; one that causes nothing is cut, not explained: a dead end costs a page and is forgotten.',
     `- ${arcLengthRange(pages)} sentences for ${pages} pages: the telling follows the book, about one sentence a page.`,
@@ -9438,7 +9444,7 @@ function arcCritiqueSpec({ retell = false } = {}) {
 }
 
 /** CREATE: the creator writes ONE arc, its story logic first, then its self-critique. */
-function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null } = {}) {
+function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null, everyChildActs = false } = {}) {
   const template = PROMPT_TEMPLATES.arcCreate;
   if (!template) {
     log.error('[PROMPT] arcCreate template not loaded — arc machine unavailable');
@@ -9447,7 +9453,7 @@ function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null } = 
   return fillTemplate(template, {
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: pageCount,
-    ARC_PRINCIPLES: arcPrinciples(inputData, pageCount),
+    ARC_PRINCIPLES: arcPrinciples(inputData, pageCount, { everyChildActs }),
     STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true, challengeLine: false, castRule: false }),
     // The premise view (premise + mechanics): the band's craft lines belong to
     // the planner and the text writer; the low point they carried is stated in
@@ -9511,7 +9517,7 @@ function buildArcPanelPrompt(inputData, committedBlock) {
 // to repair arrive as `repairFindings`, the MAJOR and CRITICAL findings
 // arcRepairFindings selected (2026-09-25). No findings, no re-telling: the
 // gate decides that before this is built, so an empty list is a caller bug.
-function buildArcRetellPrompt(inputData, pageCount, arcBlock, repairFindings, { challengeIdeas = null } = {}) {
+function buildArcRetellPrompt(inputData, pageCount, arcBlock, repairFindings, { challengeIdeas = null, everyChildActs = false } = {}) {
   const template = PROMPT_TEMPLATES.arcRetell;
   if (!template) {
     log.error('[PROMPT] arcRetell template not loaded — arc re-tell unavailable');
@@ -9525,7 +9531,7 @@ function buildArcRetellPrompt(inputData, pageCount, arcBlock, repairFindings, { 
     CHALLENGE_IDEAS: challengeIdeas ?? buildChallengeIdeasSection(inputData),
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: pageCount,
-    ARC_PRINCIPLES: arcPrinciples(inputData, pageCount),
+    ARC_PRINCIPLES: arcPrinciples(inputData, pageCount, { everyChildActs }),
     STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true, challengeLine: false, castRule: false }),
     AGE_MODE: buildAgeModeSection(inputData, { bandView: 'premise' }),
     TELLING_RULES: buildTellingRulesSection(inputData),
@@ -10131,7 +10137,7 @@ function critiqueMaxSeverity(critique) {
  * here so the signature states the contract: this prompt's inputs are the arc
  * and the page plan, and the counting happens downstream of its answer.
  */
-function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHints = '', centralFigure = null } = {}) {
+function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHints = '', centralFigure = null, mayAddDeeds = false } = {}) {
   const template = PROMPT_TEMPLATES.planCheck;
   if (!template) {
     log.error('[PROMPT] planCheck template not loaded — plan check unavailable');
@@ -10153,7 +10159,7 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHi
     // checker read the range as a cap and faulted every child above it.
     // With the central figure's sentence when the arc named one — the same
     // string the planner's {CAST_COVERAGE} carries (2026-09-24, d4).
-    CAST_ACTION: castActionRule(castCoverage({ pageCount: beats.length, castCount: (inputData?.characters || []).filter(c => c && c.name).length }), { centralFigure }),
+    CAST_ACTION: castActionRule(castCoverage({ pageCount: beats.length, castCount: (inputData?.characters || []).filter(c => c && c.name).length }), { centralFigure, mayAddDeeds }),
     // THE HINTS THE DIVISION WAS ASKED TO APPLY (2026-09-23). The planner gets
     // them under FIX WHILE DIVIDING; the checker never saw them, so a hint put
     // on the wrong page could not be judged — on job_1790100385959_1nitlympp a

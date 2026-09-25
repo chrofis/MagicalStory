@@ -178,7 +178,67 @@ function buildReplaySceneOptions(storyData, { availableAvatars = '', maxCharacte
   return resolved;
 }
 
+/**
+ * AN ARC FROM AN arc_effort EXPERIMENT, in place of the story's stored arc
+ * (2026-09-25). The question it answers: does the page plan still give every
+ * commissioned character its page when the arc was written by a different arc
+ * call (a new effort, a new prompt) than the one the story shipped with?
+ *
+ * Reads the experiment ROW (`{ stage, results }`), never the database, so it is
+ * testable offline. Throws on anything that would make the run measure a
+ * different story or a different arm than the one asked for:
+ *   - the row is not an arc_effort experiment;
+ *   - no result carries the target story (the experiment's storyId must equal
+ *     the target — an arc for another cast is not a replay);
+ *   - no OK arm of the phase (default: `retell` when the result has one, else
+ *     `create`), or several and no `arcEffort` to pick one;
+ *   - the arm stored no arc, or no STORY LOGIC block to read the central figure
+ *     from.
+ *
+ * `arcHints` is null by construction: arc_effort does not run the hints call,
+ * so the Lab arc carries none — the caller records that, it never borrows the
+ * story's own hints (they answer a different arc).
+ *
+ * @param {{stage: string, results: Array}} row
+ * @param {{ expId: number, storyId: string, arcPhase?: string, arcEffort?: string }} want
+ * @param {{ parseStoryLogic: Function }} helpers — promptBuilders.parseStoryLogic, injected
+ */
+function resolveArcFromExperiment(row, { expId, storyId, arcPhase, arcEffort } = {}, { parseStoryLogic } = {}) {
+  const tag = `arcFromExperiment ${expId}`;
+  if (!row) throw new Error(`${tag}: not found`);
+  if (row.stage !== 'arc_effort') throw new Error(`${tag}: stage is ${row.stage}, not arc_effort`);
+  const results = Array.isArray(row.results) ? row.results : [];
+  const out = results.find(r => r && r.storyId === storyId);
+  if (!out) {
+    const others = [...new Set(results.map(r => r && r.storyId).filter(Boolean))];
+    throw new Error(`${tag}: no result for story ${storyId} (the experiment ran on ${others.join(', ') || 'no story'})`);
+  }
+  const arms = (out.arms || []).filter(a => a && a.ok && (a.phase === 'create' || a.phase === 'retell'));
+  const phase = arcPhase || (arms.some(a => a.phase === 'retell') ? 'retell' : 'create');
+  if (phase !== 'create' && phase !== 'retell') throw new Error(`${tag}: arcPhase must be 'retell' or 'create', not "${phase}"`);
+  let pick = arms.filter(a => a.phase === phase);
+  if (arcEffort) pick = pick.filter(a => a.effort === arcEffort);
+  if (pick.length === 0) throw new Error(`${tag}: no successful ${phase} arm${arcEffort ? ` at effort ${arcEffort}` : ''}`);
+  if (pick.length > 1) throw new Error(`${tag}: ${pick.length} ${phase} arms (efforts ${pick.map(a => a.effort).join(', ')}) — pass arcEffort to pick one`);
+  const arm = pick[0];
+  if (arm.parseError) throw new Error(`${tag}: the ${phase} ${arm.effort} arm did not commit (${arm.parseError})`);
+  const arc = String(arm.arc || '').trim();
+  if (!arc) throw new Error(`${tag}: the ${phase} ${arm.effort} arm stored no arc`);
+  if (!String(arm.logic || '').trim()) throw new Error(`${tag}: the ${phase} ${arm.effort} arm stored no STORY LOGIC block`);
+  // `arm.logic` is the block body without its heading (parseStoryLogic().text).
+  const logic = parseStoryLogic(`STORY LOGIC:\n${arm.logic}`);
+  return {
+    arc,
+    arcHints: null,
+    logic,
+    centralFigure: logic.centralFigure,
+    pageCount: Number(out.pageCount) || null,
+    source: { experimentId: Number(expId), phase, effort: arm.effort, model: arm.model || null, arcHints: 'none — arc_effort runs no hints call' },
+  };
+}
+
 module.exports = {
+  resolveArcFromExperiment,
   resolveReplayArc,
   resolveReplayArcHints,
   resolveReplayCentralFigure,

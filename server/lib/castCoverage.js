@@ -82,18 +82,26 @@ const pagesWord = n => `${n} page${n === 1 ? '' : 's'}`;
  * itself; the per-third presence is now the counter CENTRAL_FIGURE_ABSENT_THIRD
  * and "acts, never carried" is judged on the pages by Q12's ACTION line.
  *
+ * `mayAddDeeds` (Test Lab only, 2026-09-25; production never passes it): the
+ * planner may give a character the arc left without a deed one small deed
+ * inside an existing event (ADDED_DEED_RULE). One string, planner and checker,
+ * so the checker accepts what the planner was allowed.
+ *
  * @param {ReturnType<typeof castCoverage>} cov
- * @param {{ centralFigure?: string[]|null }} [opts] the names the arc gave the figure
+ * @param {{ centralFigure?: string[]|null, mayAddDeeds?: boolean }} [opts] the names the arc gave the figure
  * @returns {string} '' when there is no cast rule and no central figure
  */
-function castActionRule(cov, { centralFigure = null } = {}) {
+function castActionRule(cov, { centralFigure = null, mayAddDeeds = false } = {}) {
   const cast = !cov || cov.castCount === 1
     ? ''
     : cov.focalEach
       ? 'Every commissioned character gets a focal page of their own whose instant is the action the story gives them.'
       : 'This cast is too large for a focal page each: the characters share group moments, and each character\'s own action from the story is the instant of some page.';
-  return [cast, centralFigureActionRule(centralFigure)].filter(Boolean).join(' ');
+  return [cast, cast && mayAddDeeds ? ADDED_DEED_RULE : '', centralFigureActionRule(centralFigure)].filter(Boolean).join(' ');
 }
+
+/** The Lab A/B sentence of castActionRule (`mayAddDeeds`). */
+const ADDED_DEED_RULE = 'A commissioned character the story gives no action of their own may be given one small action inside an existing event — one that serves that event and changes nothing in the plot, the order of events or the outcome.';
 
 /** The central-figure sentence of castActionRule; '' when the arc named none. */
 function centralFigureActionRule(centralFigure) {
@@ -111,11 +119,11 @@ function centralFigureActionRule(centralFigure) {
  * @param {ReturnType<typeof castCoverage>} cov
  * @returns {string}
  */
-function castCoverageRule(cov, { centralFigure = null } = {}) {
+function castCoverageRule(cov, { centralFigure = null, mayAddDeeds = false } = {}) {
   const floor = cov && cov.castCount !== 1
     ? `Every commissioned character is in frame on at least ${pagesWord(cov.appearances.min)}.`
     : '';
-  return [castActionRule(cov, { centralFigure }), floor].filter(Boolean).join(' ');
+  return [castActionRule(cov, { centralFigure, mayAddDeeds }), floor].filter(Boolean).join(' ');
 }
 
 /**
@@ -156,6 +164,7 @@ module.exports = {
   commissionedCast,
   castCoverage,
   castActionRule,
+  ADDED_DEED_RULE,
   centralFigureActionRule,
   castCoverageRule,
   PAGE_CAST_TYPICAL,

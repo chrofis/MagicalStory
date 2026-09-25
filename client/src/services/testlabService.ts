@@ -543,7 +543,10 @@ export const TESTLAB_STAGES = [
   // the plumbing verdict: does the planner emit a parseable ---CHANGES--- block
   // and the checker its OBSTACLES lines? A round whose changes are all
   // undeclared is restored page by page and ships nothing.
-  { id: 'beats_replan', label: 'Beats re-plan (does it declare its changes? would the round be a no-op?)', producesImage: false, overridable: false, storyLevel: true },
+  // params.arcFromExperiment (an arc_effort id on this story; arcPhase, arcEffort)
+  // plans a fresh first division from that arc, then check + one re-plan as
+  // production; params.plannerMayAddDeeds is the Lab-only added-deed variant.
+  { id: 'beats_replan', label: 'Beats re-plan (does it declare its changes? would the round be a no-op?; params arcFromExperiment, arcPhase, arcEffort, plannerMayAddDeeds)', producesImage: false, overridable: false, storyLevel: true },
   // Replays the scene review over a story's STORED briefs, so a reviewer-prompt
   // change is measurable: the clothing findings are deterministic, and the
   // briefs are frozen, so the only variable is the prompt (or the model).
@@ -589,7 +592,7 @@ export const TESTLAB_STAGES = [
   // visible text. Same prompt each arm, judged by the arc judges.
   // challengesFromStory reuses the story's stored challenge draw with today's
   // template; baselineFromStory scores the stored arcs with the same judges.
-  { id: 'arc_effort', label: 'Arc effort sweep (create or retell; params model, efforts, stage, promptFrom, challengesFromStory, baselineFromStory — cost vs judged arc quality)', producesImage: false, overridable: true, storyLevel: true },
+  { id: 'arc_effort', label: 'Arc effort sweep (create or retell; params model, efforts, stage, promptFrom, challengesFromStory, baselineFromStory, arcEveryChildActs — cost vs judged arc quality)', producesImage: false, overridable: true, storyLevel: true },
   // Re-judge stored rounds with a DIFFERENT judge (params.scoreIds + params.judgeModel).
   // Nothing is rewritten — it measures the judge, so two judges' scores of the
   // identical text sit side by side on the Scores page.
