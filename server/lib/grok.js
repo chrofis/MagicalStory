@@ -211,6 +211,18 @@ function buildMagentaExtensionPrefix(pad) {
 }
 
 /**
+ * The longest prefix buildMagentaExtensionPrefix can return. Only the shorter
+ * axis is padded, so one pair of sides carries numbers; 99999 px bounds every
+ * input. A plate prompt is fitted against the cap minus this (images.js
+ * _dispatchImageGeneration), because it cannot be refitted once the prefix is
+ * known (owner, 2026-09-25).
+ */
+const MAX_MAGENTA_EXTENSION_PREFIX_LENGTH = Math.max(
+  buildMagentaExtensionPrefix({ top: 99999, bottom: 99999, left: 0, right: 0 }).length,
+  buildMagentaExtensionPrefix({ top: 0, bottom: 0, left: 99999, right: 99999 }).length,
+);
+
+/**
  * Fit `prefix + body` into the prompt budget of the Grok tier being called.
  *
  * The caller (`generateImageOnly` / `_dispatchImageGeneration`) already fits the
@@ -2102,6 +2114,7 @@ module.exports = {
   // the part that broke in production, and reaching it through editWithGrok
   // would mean a live xAI call.
   fitGrokPromptWithPrefix,
+  MAX_MAGENTA_EXTENSION_PREFIX_LENGTH,
   buildMagentaExtensionPrefix,
   GROK_MODELS,
 };

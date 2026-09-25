@@ -650,6 +650,10 @@ page took is auditable from the run log.</p>
 </ul>
 <!-- END prompt-cut-order -->
 
+<h3>Plate prompts have their own cut order, and a prompt that cannot fit is our bug (owner, 2026-09-25)</h3>
+<p>A plate prompt (<code>prompts/empty-scene.txt</code>, every call routed by <code>emptyScenePlateRouting()</code>, i.e. <code>landmarkScene: 'plate'</code>) opens with <code>**ART STYLE:**</code>, a must-keep marker of the page prompt, so the page shrink above reads it as all tail and cannot cut it. <code>_dispatchImageGeneration</code> fits it with <code>fitPlatePrompt</code> instead, against <code>cap − MAX_MAGENTA_EXTENSION_PREFIX_LENGTH</code> (616 chars, <code>grok.js</code>) whenever slot 0 is a scene plate, because <code>editWithGrok</code> prepends that prefix after the fit. <code>PLATE_CUT_ORDER</code> drops only (1) the generic landmark-photo note, when the named IDENTITY / MEDIUM / CONDITIONS block is present, and (2) the over-the-shoulder line on a plate that is not over-the-shoulder. Nothing else is cut: a plate still over the cap throws <code>PromptFitError</code>.</p>
+<p><code>PromptFitError</code> (<code>server/lib/promptFitError.js</code>) is raised before any request is sent, so it is never a provider failure: every provider-fallback catch calls <code>rethrowLocalFault</code> first, which logs a <code>prompt_fit_failed</code> error event and rethrows. The Grok→Gemini fallback stays only for real provider errors. <code>docs/decisions.md</code> 2026-09-25 "A prompt that does not fit is our bug".</p>
+
 <h3>Repetition removed from every image prompt (owner, 2026-09-24)</h3>
 <p>Measured on staging <code>job_1790100385959_1nitlympp</code>'s front cover (four children). Shared builders, so pages and covers stay identical. <code>docs/decisions.md</code> 2026-09-24 "Image prompts say each thing once".</p>
 <table>

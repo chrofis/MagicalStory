@@ -4761,9 +4761,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // sanitizeVbIdsInPrompt; docs/decisions.md 2026-07-31).
             const { englishLocationRef } = require('./server/lib/visualBible');
             const locationRef = englishLocationRef(v.location) || v.locationName || '';
+            // The vantage's own plate IS its description since 2026-09-17 (the
+            // Art Director writes one text per vantage), so it went out twice:
+            // here and again as FRAMING — ~500 chars that pushed staging
+            // job_1790277448294_5herh01j7's p1/p11 plates over the Grok cap. A
+            // description the FRAMING paragraph already carries is not repeated.
+            const vantageDescription = String(v.description || '').trim();
             const emptySceneDesc = [
               `${shotPrefix}**LOCATION:** ${locationRef}\n**VANTAGE:** ${v.name || ''}`,
-              v.description || '',
+              vantageDescription && vantageDescription !== String(adEmptyPrompt || '').trim() ? vantageDescription : '',
               adEmptyPrompt
                 ? `**FRAMING:** ${adEmptyPrompt}\n\n${vantageShot ? 'The SHOT line decides the camera: its height, angle and distance. The FRAMING paragraph decides the composition and what fills the foreground; a camera it names gives way to the SHOT line.' : 'The FRAMING paragraph decides the camera, the composition and what fills the foreground.'} The LOCATION and VANTAGE lines are setting context — use them for what the place looks like, not for how it is framed.`
                 : '',

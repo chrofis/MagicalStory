@@ -1595,6 +1595,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "plates-fit-derive-and-qc-pick",
+      "title": "Landmark plates render on Grok and fit; a page whose base plate is already in its class is not derived again; a double QC failure picks by severity",
+      "commits": [],
+      "addedAt": "2026-09-25",
+      "claim": "On the next staging full story with real-landmark vantages: no plate call logs image_provider_fallback or prompt_fit_failed and every plate modelId is a grok-imagine tier; a single-page vantage whose page is ultra-wide / high-angle / low-angle / aerial gets no derived plate (plateDerivedFor null unless its light differs); a plate whose two attempts both fail QC keeps the attempt with fewer HARD defects, a derived plate with hard defects on both attempts falls back to its base plate, and a base plate with hard defects on both ships with a plate_shipped_failed_qc warn event naming the defect; emptySceneQc stores both attempts (v1ImageData and retryImageData).",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "stories.data.generationLog: events image_provider_fallback / prompt_fit_failed / plate_shipped_failed_qc / vantage_plate_qc_retry; sceneImages[].emptySceneModelId|plateDerivedFor|emptySceneQc; compare to staging job_1790277448294_5herh01j7 (p1/p11 plates on Gemini, p10/p14 derived twice)"
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }

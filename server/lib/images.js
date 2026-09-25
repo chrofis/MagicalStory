@@ -15,7 +15,8 @@ const { PROMPT_TEMPLATES, fillTemplate, guardPromptString, assertPromptFilled } 
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
 const { buildCastIndex, resolveEntity } = require('./castResolver');
 const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./runware');
-const { generateWithGrok, editWithGrok, isGrokConfigured, packReferences, cropToFrontColumn } = require('./grok');
+const { generateWithGrok, editWithGrok, isGrokConfigured, packReferences, cropToFrontColumn, MAX_MAGENTA_EXTENSION_PREFIX_LENGTH } = require('./grok');
+const { PromptFitError } = require('./promptFitError');
 const { MODEL_PRICING } = require('../config/models');
 const { getCurrentLogger } = require('./generationLogger');
 const r2Lib = require('./r2');
@@ -844,7 +845,7 @@ function templateParagraph(prefix) {
   const tpl = PROMPT_TEMPLATES.imageGeneration || IMAGE_GENERATION_TEMPLATE_ON_DISK;
   const para = tpl.split(/\n{2,}/).map(x => x.trim()).find(x => x.startsWith(prefix));
   if (!para) {
-    throw new Error(`prompt-shrink: prompts/image-generation.txt has no paragraph starting "${prefix}" — the cut order is stale`);
+    throw new PromptFitError(`prompt-shrink: prompts/image-generation.txt has no paragraph starting "${prefix}" — the cut order is stale`);
   }
   return para;
 }
@@ -1016,7 +1017,7 @@ function cutBlocks() {
     let probe = `${tpl}\n\n${anchor}`;
     for (const unit of units) probe = unit.apply(probe).text;
     if (!probe.includes(anchor)) {
-      throw new Error(`prompt-shrink: a cut step removes ${keep.label} — it is on the never-cut list`);
+      throw new PromptFitError(`prompt-shrink: a cut step removes ${keep.label} — it is on the never-cut list`);
     }
   }
   CUT_BLOCKS = units;
@@ -1059,7 +1060,7 @@ function sectionAwareCut(prompt, maxLen, logLabel) {
       // impossible today; this makes it impossible to bring back, and it throws
       // rather than degrades: a prompt that does not state the page is not a
       // cheaper prompt, it is the wrong picture (CLAUDE.md — no fallbacks).
-      throw new Error(`prompt-shrink: dropping "${block.label}" removed ${removed} chars but that block is only ${entitled} — the cut reached past it into the page's own facts`);
+      throw new PromptFitError(`prompt-shrink: dropping "${block.label}" removed ${removed} chars but that block is only ${entitled} — the cut reached past it into the page's own facts`);
     }
     if (removed > 0) {
       dropped.push(block.label);
@@ -1089,7 +1090,7 @@ function sectionAwareCut(prompt, maxLen, logLabel) {
       // the end off, ART STYLE first). Fail the render instead (owner,
       // 2026-09-23: must-keep sections are never cut; if it cannot fit, fail
       // loudly).
-      throw new Error(`prompt-shrink [${logLabel}]: ${out.length} chars after every drop, cap ${maxLen}; the must-keep sections alone are ${tail.length} chars — refusing to cut them`);
+      throw new PromptFitError(`prompt-shrink [${logLabel}]: ${out.length} chars after every drop, cap ${maxLen}; the must-keep sections alone are ${tail.length} chars — refusing to cut them`);
     }
     let head = out.slice(0, tailStart);
     const keep = head.slice(0, headBudget);
@@ -1186,6 +1187,95 @@ async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName
     cap: maxPromptLength, dropped: cut.dropped, droppedSteps: cut.droppedSteps, proseCut: cut.proseCut });
   if (meta) meta.compressedScene = sceneHeadOf(cut.text) || undefined;
   return cut.text;
+}
+
+/**
+ * THE PLATE PROMPT HAS ITS OWN CUT ORDER (owner, 2026-09-25).
+ *
+ * A plate prompt (prompts/empty-scene.txt) opens with `**ART STYLE:**`, which is
+ * a must-keep marker of the PAGE prompt's protected tail. sectionAwareCut
+ * therefore read the whole plate prompt as tail, dropped nothing and refused to
+ * cut: staging job_1790277448294_5herh01j7 p1 and p11 (7,552 / 7,463 chars)
+ * went over the cap once the magenta-extension prefix was added. The plate is
+ * fitted here instead, against its own list, and nothing else in it is cut.
+ *
+ * A step is dropped only when `applies` says what it says is carried elsewhere
+ * in the prompt or does not bind this plate. The text is read from the loaded
+ * template, so a reworded paragraph fails loudly here instead of never firing.
+ */
+const EMPTY_SCENE_TEMPLATE_ON_DISK = fs.readFileSync(path.join(LOCAL_PROMPTS_DIR, 'empty-scene.txt'), 'utf-8');
+
+/**
+ * The PROMPT's own paragraph (or line) that opens with `prefix`, or null. The
+ * template is checked first: a prefix the loaded template no longer has means
+ * the cut order is stale, and that fails loudly instead of silently never
+ * firing. The text is then taken from the prompt, so a plate built from an
+ * older wording of the same paragraph is still found.
+ */
+function platePromptPiece(prompt, prefix, { line = false } = {}) {
+  const tpl = PROMPT_TEMPLATES.emptyScene || EMPTY_SCENE_TEMPLATE_ON_DISK;
+  const split = (t) => (line ? t.split('\n') : t.split(/\n{2,}/)).map(x => x.trim());
+  if (!split(tpl).some(x => x.startsWith(prefix))) {
+    throw new PromptFitError(`plate-fit: prompts/empty-scene.txt has no ${line ? 'line' : 'paragraph'} starting "${prefix}" — the plate cut order is stale`);
+  }
+  return split(prompt).find(x => x.startsWith(prefix)) || null;
+}
+
+const PLATE_CUT_ORDER = [
+  {
+    label: 'landmark photo note',
+    why: 'the named landmark block (IDENTITY / MEDIUM / CONDITIONS) states the same rules for the attached photo',
+    applies: (p) => p.includes('**IDENTITY (from the photo):**') && p.includes('**MEDIUM (never from the photo):**') && p.includes('**CONDITIONS (from the scene):**'),
+    piece: (p) => platePromptPiece(p, '**ABOUT THE LANDMARK REFERENCE PHOTO'),
+  },
+  {
+    label: 'over-the-shoulder line',
+    why: 'binds only a plate whose SHOT is over-the-shoulder',
+    applies: (p) => !/\*\*SHOT:\*\*[ \t]*over-the-shoulder/i.test(p),
+    piece: (p) => platePromptPiece(p, 'For `over-the-shoulder` framing', { line: true }),
+  },
+];
+
+/**
+ * Fit a plate prompt into `maxLen`, dropping only PLATE_CUT_ORDER steps.
+ * Throws PromptFitError when it still does not fit — never cuts anything else.
+ */
+function fitPlatePrompt(prompt, maxLen, logLabel, modelName = null) {
+  if (!prompt || prompt.length <= maxLen) return prompt;
+  let out = prompt;
+  const dropped = [];
+  const droppedSteps = [];
+  PLATE_CUT_ORDER.forEach((step, i) => {
+    if (out.length <= maxLen || !step.applies(out)) return;
+    const text = step.piece(out);
+    if (!text) return;
+    const before = out.length;
+    out = out.split(text).join('').replace(/\n{3,}/g, '\n\n');
+    dropped.push(step.label);
+    droppedSteps.push({ step: i + 1, label: step.label, chars: before - out.length });
+  });
+  if (out.length > maxLen) {
+    throw new PromptFitError(`plate-fit [${logLabel}]: ${out.length} chars after every allowed cut${dropped.length ? ` (${dropped.join(', ')})` : ''}, cap ${maxLen}; the rest of a plate prompt must stay — refusing to cut it`);
+  }
+  log.warn(`✂️ [${logLabel}] Plate prompt ${prompt.length}→${out.length} chars (cap ${maxLen}), cut in order: ${describeCutSteps(droppedSteps)}`);
+  recordPromptShrink({ logLabel, modelName, branch: 'plate-cut', before: prompt.length, after: out.length,
+    cap: maxLen, dropped, droppedSteps, proseCut: 0 });
+  return out;
+}
+
+/**
+ * A local fault is rethrown, never treated as a provider failure (owner,
+ * 2026-09-25). Called first in every provider-fallback catch: a prompt that does
+ * not fit (PromptFitError) is raised here before any request is sent, so falling
+ * back to Gemini would hide our bug behind another provider's picture.
+ */
+function rethrowLocalFault(err, { logLabel, pageLabel = '', provider }) {
+  if (!(err instanceof PromptFitError)) return;
+  const page = pageLabel ? ` page ${pageLabel}` : '';
+  log.error(`❌ [${logLabel}]${page} prompt does not fit ${provider}'s cap — failing, no provider fallback: ${err.message}`);
+  getCurrentLogger()?.error('prompt_fit_failed', `${logLabel}${page}: ${err.message}`, null,
+    { label: logLabel, page: pageLabel || null, provider, message: err.message });
+  throw err;
 }
 
 /**
@@ -1340,6 +1430,22 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
   // Whether slot-0 scene plates get magenta-extension padding (gen-only only).
   const slot0IsScenePlate = usePadExtension && !!(sceneBackground || (Array.isArray(landmarkPhotos) && landmarkPhotos.length) || previousImage);
 
+  // A PLATE call (emptyScenePlateRouting marks it landmarkScene 'plate') is
+  // fitted by its own cut order, with the worst-case magenta-extension prefix
+  // reserved up front: editWithGrok prepends that prefix after this fit, and a
+  // plate prompt cannot be refitted there (owner, 2026-09-25). Every other
+  // prompt keeps the page shrink and editWithGrok's exact-prefix refit.
+  const fitPrompt = async (p, cap, model, meta) => {
+    try {
+      return landmarkScene === 'plate'
+        ? fitPlatePrompt(p, cap - (slot0IsScenePlate ? MAX_MAGENTA_EXTENSION_PREFIX_LENGTH : 0), logLabel, model)
+        : await shrinkPromptForModel(p, cap, logLabel, model, meta);
+    } catch (fitErr) {
+      rethrowLocalFault(fitErr, { logLabel, pageLabel, provider: model || 'the image model' });
+      throw fitErr;
+    }
+  };
+
   // Priority: explicit backend override > the overridden model's OWN backend >
   // CONFIG_DEFAULTS > 'gemini'. Deriving the backend from imageModelOverride is
   // what makes a model-key override actually switch providers: passing
@@ -1372,6 +1478,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
       }
       return { provider: 'runware-primary', imageData: result.imageData, modelId: result.modelId, usage: result.usage, packedRefs: referenceImages, promptSent: prompt };
     } catch (runwareError) {
+      rethrowLocalFault(runwareError, { logLabel, pageLabel, provider: 'runware' });
       log.error(verbose
         ? `❌ [RUNWARE] Generation failed, falling back to Gemini: ${runwareError.message}`
         : `❌ [${logLabel}] Runware failed, falling back to Gemini: ${runwareError.message}`);
@@ -1395,7 +1502,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
 
     // Truncate to Grok's prompt-length cap BEFORE the API call.
     const grokMaxPrompt = IMAGE_MODELS[grokTier.key]?.maxPromptLength || 7500;
-    const grokPrompt = await shrinkPromptForModel(prompt, grokMaxPrompt, logLabel, grokModel, promptMeta);
+    const grokPrompt = await fitPrompt(prompt, grokMaxPrompt, grokModel, promptMeta);
 
     try {
       const refImages = await packReferences(
@@ -1417,6 +1524,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
 
       return { provider: 'grok-primary', imageData: result.imageData, modelId: result.modelId, usage: result.usage, packedRefs: refImages, promptSent: grokPrompt };
     } catch (grokError) {
+      rethrowLocalFault(grokError, { logLabel, pageLabel, provider: 'grok' });
       log.error(verbose
         ? `❌ [GROK] Generation failed, falling back to Gemini: ${grokError.message}`
         : `❌ [${logLabel}] Grok failed, falling back to Gemini: ${grokError.message}`);
@@ -1595,7 +1703,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
 
   const modelConfig = IMAGE_MODELS[modelId];
   const maxPromptLength = modelConfig?.maxPromptLength || 30000;
-  const effectivePrompt = await shrinkPromptForModel(prompt, maxPromptLength, logLabel, verbose ? modelId : null, promptMeta);
+  const effectivePrompt = await fitPrompt(prompt, maxPromptLength, verbose ? modelId : null, promptMeta);
   if (effectivePrompt !== prompt) {
     parts[0] = { text: effectivePrompt };
   }
@@ -1662,6 +1770,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
 
       return { provider: 'grok-routed', imageData: result.imageData, modelId: result.modelId, usage: result.usage, packedRefs: refImages, promptSent: effectivePrompt };
     } catch (grokError) {
+      rethrowLocalFault(grokError, { logLabel, pageLabel, provider: 'grok' });
       log.error(`❌ [${logLabel}] Grok generation failed (model-routed), falling back to Gemini: ${grokError.message}`);
       upstreamErrors.push(recordProviderFallback({ logLabel, provider: 'grok', route: 'model-routed', model: modelId, pageLabel, error: grokError }));
       // Fall through to Gemini below
@@ -5753,6 +5862,7 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
         usage: { model: modelId, cost: grokResult.usage?.cost, direct_cost: grokResult.usage?.direct_cost ?? grokResult.usage?.cost }
       };
     } catch (grokErr) {
+      rethrowLocalFault(grokErr, { logLabel: 'IMAGE EDIT', provider: 'grok' });
       // Content moderation block — sanitize prompt and retry, then fall back to Gemini
       if (grokErr.message?.includes('content moderation') || grokErr.message?.includes('400')) {
         log.warn(`⚠️ [IMAGE EDIT] Grok blocked by content moderation, sanitizing prompt and retrying...`);
@@ -5790,6 +5900,7 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
               usage: { model: modelId, cost: retryResult.usage?.cost, direct_cost: retryResult.usage?.direct_cost ?? retryResult.usage?.cost }
             };
           } catch (retryErr) {
+            rethrowLocalFault(retryErr, { logLabel: 'IMAGE EDIT', provider: 'grok' });
             log.warn(`⚠️ [IMAGE EDIT] Sanitized retry also blocked, falling back to Gemini`);
             grokFailure = recordProviderFallback({ logLabel: 'IMAGE EDIT', provider: 'grok', route: 'edit-sanitized-retry', model: modelConfig.modelId, pageLabel: '', error: retryErr });
           }
@@ -6263,6 +6374,8 @@ module.exports = {
   resolveOutputAspect,
   truncatePromptForModel,
   shrinkPromptForModel,
+  fitPlatePrompt,
+  PLATE_CUT_ORDER,
   PROMPT_CUT_ORDER,
   PROMPT_NEVER_CUT,
   extractDataImageUrls

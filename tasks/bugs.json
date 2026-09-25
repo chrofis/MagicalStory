@@ -2019,6 +2019,18 @@
       "fixedAt": "2026-09-25",
       "fixedIn": "5e73037a0",
       "fix": "sceneLight.buildRepairLightLine closes every repaint prompt (images.buildInpaintInstruction, used by the pipeline, the Lab and the manual route; faceRepair.buildPrompt, every branch; scaleRepair.buildScaleRepairPrompt). The two manual routes pass page text + brief, so the semantic judge runs and judges light as on a first render. Replay of the stored p15 instruction now ends on the night/fog LIGHT line; Lab #1471 re-judged stored v1 against DECLARED LIGHT night, fog and flagged it as daytime (MODERATE)."
+    },
+    {
+      "id": "plate-prompt-overflow-falls-back-to-gemini",
+      "title": "A landmark plate prompt over the Grok cap (once the magenta prefix was added) was refused by the local shrink, caught as a Grok failure, and painted by Gemini as a photograph",
+      "reportedAt": "2026-09-25",
+      "source": "Stored evidence, staging job_1790277448294_5herh01j7: the p1 and p11 landmark plate prompts are 7,552 and 7,463 chars; the plates came back from gemini-2.5-flash-image photographic, with signatures and paper mats, and the covers were refused (IMAGE_OTHER). Replay of shrinkPromptForModel(prompt, 7900 - 612) on both: throws \"refusing to cut them\".",
+      "rootCause": "editWithGrok prepends the 612-char magenta-extension prefix and refits the body via fitGrokPromptWithPrefix -> sectionAwareCut. A plate prompt opens with **ART STYLE:**, a must-keep marker of the PAGE prompt, so the whole plate read as protected tail and the cut threw. The dispatcher's Grok catch treated that local throw as a Grok failure and fell back to Gemini. Vantage plate prompts also carried the Art Director prose twice (v.description equals the vantage plate, emitted again as FRAMING).",
+      "impact": "Landmark plates on Gemini (photographic, lettering, paper mats) and lost covers, with the real cause hidden behind a provider fallback.",
+      "status": "fixed",
+      "fixedAt": "2026-09-25",
+      "fixedIn": "",
+      "fix": "AD prose emitted once; plate calls fitted by fitPlatePrompt (own cut order: landmark photo note, over-the-shoulder line; nothing else cut) against cap minus the worst-case magenta prefix (616); PromptFitError is rethrown by every provider-fallback catch (rethrowLocalFault, prompt_fit_failed error event) instead of falling back. Replay over 134 stored plate prompts (both DBs, 14 days): 134/134 fit, none cut, largest landmark plate 7,267 + 616 = 7,883."
     }
   ]
 }

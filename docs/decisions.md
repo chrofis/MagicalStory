@@ -60031,6 +60031,49 @@ Gemini fallback then fails, the thrown error names the upstream failure(s) first
 combined message, so callers that classify refusals by message substring are unaffected.
 
 **Touched:** `server/lib/images.js`, `tests/unit/grok-fallback-logged.test.ts`.
+**Status:** ✅ active on staging — narrowed 2026-09-25 (next entry): a prompt that does not fit is not a
+Grok failure and never falls back.
+
+## 2026-09-25 — A prompt that does not fit is our bug: it fails loudly and never falls back; a plate prompt has its own cut order (narrows "The plate fallback stays")
+
+**Context:** Staging job_1790277448294_5herh01j7. The p1 and p11 landmark plate prompts were 7,552 and
+7,463 chars. `editWithGrok` prepends the 612-char magenta-extension prefix, and `fitGrokPromptWithPrefix`
+refitted the body into 7,288 through `sectionAwareCut`. A plate prompt opens with `**ART STYLE:**`, a
+must-keep marker of the PAGE prompt, so the whole plate read as protected tail and the cut threw
+"refusing to cut them". The dispatcher's Grok catch took that local throw for a Grok failure and fell back
+to gemini-2.5-flash-image, which painted photographic plates with signatures and paper mats and refused the
+covers (IMAGE_OTHER). On top, vantage plate prompts carried the Art Director prose twice: `v.description`
+is the vantage's own plate since 2026-09-17, and it went out both as the description and as FRAMING.
+
+**Decision (owner, 2026-09-25):**
+1. The vantage plate states its AD prose once: a vantage description FRAMING already carries is dropped
+   (`storyJobPipeline.js`).
+2. A plate call (`landmarkScene: 'plate'`, set by `emptyScenePlateRouting()`) is fitted by
+   `fitPlatePrompt` against the cap minus `MAX_MAGENTA_EXTENSION_PREFIX_LENGTH` (the longest prefix
+   `buildMagentaExtensionPrefix` can return, 616) whenever slot 0 is a scene plate, so the prefix never
+   pushes it over after the fit. `PLATE_CUT_ORDER` drops only the generic landmark-photo note (when the
+   named IDENTITY / MEDIUM / CONDITIONS block carries its rules) and the over-the-shoulder line (on a plate
+   that is not over-the-shoulder). Nothing else in a plate prompt is cut.
+3. **A local prompt-fit failure is OUR bug, not the provider's.** `PromptFitError`
+   (`server/lib/promptFitError.js`) is what `sectionAwareCut` and `fitPlatePrompt` throw. Every
+   provider-fallback catch in `images.js` (dispatcher primary Runware / primary Grok / model-routed Grok,
+   `editImageWithPrompt` and its sanitized retry) calls `rethrowLocalFault` first: a `prompt_fit_failed`
+   error event and a rethrow. That plate fails (plate or fail); no Gemini picture stands in for it.
+   **The Grok→Gemini fallback of 2026-09-24 stays for real provider errors only.**
+
+**Rationale:** a fallback that also catches our own bugs hides them behind another provider's picture —
+that is how a prompt-length bug shipped as "Gemini paints photographs". Reserving the worst-case prefix
+up front means the prompt that is fitted is the prompt that is sent.
+
+**Evidence (rung 1, free):** all 134 stored plate-template prompts, staging + production, last 14 days
+(92 landmark plates). Before: 2 landmark plates over cap − prefix (5herh01j7 p1 7,552, p11 7,463). After
+(AD prose once + worst-case reserve + plate cut order): 134/134 fit with no cut, largest landmark plate
+7,267 + 616 = 7,883 ≤ 7,900; with the cap artificially lowered by 600 chars, 134/134 still fit and 22 are
+fitted by the plate cut order alone. Unit tests: `tests/unit/plate-prompt-fit.test.ts` (red without
+`rethrowLocalFault`: 3 of 11 fail).
+
+**Touched:** `server/lib/promptFitError.js` (new), `server/lib/images.js`, `server/lib/grok.js`,
+`storyJobPipeline.js`, `docs/image-generation-methods.html`, `tests/unit/plate-prompt-fit.test.ts`.
 **Status:** ✅ active on staging.
 
 ## 2026-09-24 — The plan check is given the over-the-shoulder contact rule
