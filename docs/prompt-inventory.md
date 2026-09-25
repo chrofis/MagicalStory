@@ -96,13 +96,14 @@ left alone. (`docs/decisions.md`, 2026-09-21.)
 
 | Template | Consumer | Stage |
 |---|---|---|
-| empty-scene.txt | prompts.js `buildEmptyScenePrompt` (→ images.js, server.js, coverIterate.js) | Background-only scene generation |
+| empty-scene.txt | prompts.js `buildEmptyScenePrompt` (→ images.js, server.js, coverIterate.js) | Background-only scene generation. `{PLATE_EDGE}` = shotVocabulary `PLATE_EDGE_RULE` (edge to edge, no signature/monogram, no margin/mat/border; 2026-09-25) |
 | image-generation.txt | storyHelpers.js `buildImagePrompt`; testlab.js | Page illustration prompt (single unified template). Every character face text in it and in the cover's CHARACTERS IN THIS IMAGE line comes from ONE builder, `buildFaceDescription` (2026-09-24: midpoint descriptors dropped, same on pages, covers, detector and repair) |
 | image-system-instruction.txt | images.js (~212) | System instruction for image calls |
 | art-styles.txt | styledAvatars.js `loadArtStylePrompts`; avatars.js | Art-style descriptor per style. ⚠ duplicated hardcoded copies exist in sceneComposite.js (~893) and character2x4Sheet.js (~395) — keep aligned |
 | iterative-placement-pass1.txt | images.js `generateWithIterativePlacement` (LOCAL_PROMPTS) | Iterative placement pass 1 (dev/test-models path) |
 | iterative-placement-pass2.txt | images.js `generateWithIterativePlacement` | Iterative placement pass 2 |
-| illustration-edit.txt | images.js `editImageWithPrompt` | Targeted illustration edit |
+| illustration-edit.txt | images.js `editImageWithPrompt` | Targeted illustration edit (never a plate derive) |
+| plate-derive.txt | prompts.js `buildPlateDerivePrompt` ← images.js `editImageWithPrompt(..., { plateDerive: true })` (storyJobPipeline.js derive step, testlab.js `edit_image` plate modes) | Camera-move / re-light edit of a vantage's base plate (2026-09-25): `{EDIT_INSTRUCTION}` (shotVocabulary `buildPlateDeriveInstruction` / sceneLight `buildPlateRelightInstruction`), `{ART_STYLE}`, `{PLATE_EDGE}` (`PLATE_EDGE_RULE`, shared with empty-scene.txt). No "keep identical / do not resize" |
 
 ### Image prompt length: the Grok cap and the cut order
 
@@ -116,17 +117,17 @@ Grok image cap: **7,900 characters** (`server/config/models.js` `maxPromptLength
 3. **Composition: facing** (~367 chars) — the "faces the target, not the camera" bullet. *Why here:* yields to every declared facing, and EXACT POSES / EXPRESSIONS AND EYES declare one per figure; never built on a cover.
 4. **DEPTH AND SIZE** (~647 chars) — the foreground / midground / background definitions. *Why here:* defines the brief's depth words; the prose still places every figure.
 5. **Composition: ground** (~600 chars) — the feet-on-the-ground bullet (the header goes with it). *Why here:* the one feet-on-the-ground rule for pages and covers; kept longer than the generic rules above.
-6. **REQUIRED CAST** (~500 chars) — every named character in frame, exactly one of each, nobody added. *Why here:* the generator half of D-03 / D-04b; the prose and the character lines still name the cast, so it is the last generic rule to go.
-7. **HEIGHT ORDER** (~140 chars) — the shortest-to-tallest line. *Why here:* a page fact: the relative size the height judge compares.
-8. **AGE & PROPORTIONS** (~485 chars) — the per-age head-count proportions. *Why here:* a page fact: without it an infant is drawn as a preschooler.
-9. **reference-photo rule** (~512 chars) — which attached photo is a place and which is a person. *Why here:* a page fact: the plate-vs-identity binding of the attached images.
-10. **single-illustration rule** (~503 chars) — one full-bleed picture, no lettering, ids are not painted. *Why here:* the frame rule; the very last block the cut may spend.
+6. **HEIGHT ORDER** (~140 chars) — the shortest-to-tallest line. *Why here:* a page fact: the relative size the height judge compares.
+7. **AGE & PROPORTIONS** (~485 chars) — the per-age head-count proportions. *Why here:* a page fact: without it an infant is drawn as a preschooler.
+8. **reference-photo rule** (~512 chars) — which attached photo is a place and which is a person. *Why here:* a page fact: the plate-vs-identity binding of the attached images.
+9. **single-illustration rule** (~503 chars) — one full-bleed picture, no lettering, ids are not painted. *Why here:* the frame rule; the very last block the cut may spend.
 
 **Never cut. Once every step has run, only the text before the protected tail (from the first of REQUIRED OBJECTS / SEASON / LIGHT / COMPOSITION GUIDELINES / ART STYLE) is trimmed, at a sentence boundary; if the tail alone leaves no room, the render fails loudly.**
 
 - **NO MARKS** — generator half of D-24 (sibling-registry page-image-generator-vs-critics parity anchor)
 - **HANDS** — generator half of D-16b (same parity anchor set)
 - **REQUIRED TEXT** — the baked cover title and any lettering a Visual Bible element must carry (SETTLED: baked title)
+- **REQUIRED CAST** — the generator half of D-03 / D-04b: every named character in frame, exactly one of each, nobody added
 - **REQUIRED OBJECTS** — the commissioned elements of the page
 - **SEASON** — the book-wide season, even against a reference photo from another season
 - **LIGHT** — the page's declared time of day and weather, which wins over the plate's light (sceneLight.js)
@@ -186,7 +187,7 @@ Sizes measured 2026-08-09.
 | image-prompt-compliance.txt | 15,268 | 155 | images.js `evaluateThreeStage` | Three-stage eval: prompt compliance (never sees the image) |
 | image-inventory-unified.txt | 6,644 | 81 | evalPipeline.js `runVisualInventory` (:98; image only, blind by design) | Per-figure inventory the blind compliance judge consumes; its `emotion` / `gaze` / `lettering` also feed the code checks (emotionCheck.js, gazeCheck.js, letteringCheck.js). `{EMOTION_ENUM}` filled at load |
 | cover-evaluation-notes.txt | 1,353 | 17 | evalPipeline.js `evaluateImageQuality` (cover path, :2319-2364) | Cover-only preamble: COVER_NOTE / TEXT_NOTE_APP_OVERLAY / COVER_TEXT. Extracted from JS string literals 2026-09-15. Since the 2026-09-23 fix (decisions.md, "A painted cover title is REQUIRED TEXT on every side"), the title STRING is no longer in this file: it is a required-text item (`requiredText.coverRequiredTexts`) in every judge's structured `{TEXT_RULES}`, the consolidator input (`result.requiredTexts`) and the inpaint clause. COVER_TEXT (what that string is; missing/misspelled = `required_text` CATASTROPHIC) is prepended to the quality USER_PROMPT and appended to the semantic judge's cover reference. |
-| empty-scene-qc.txt | 3,473 | 24 | evalPipeline.js `buildEmptySceneQcPrompt` | Plate judge: BODY / STYLE_CHECK / CAMERA_CHECK / LIGHT_CHECK (2026-09-24, the plate's declared time of day and weather) / ERA_CHECK / PLACEMENTS_CHECK / LANDMARK_CHECK. Extracted from JS string literals 2026-09-15; figure rule aligned with the generator and medium + camera checks added 2026-09-23; LANDMARK_CHECK (2026-09-23) judges a real landmark against its attached photo, never the written description, from the same `LANDMARK_PHOTO_AUTHORITY` sentence the author's fidelity block carries |
+| empty-scene-qc.txt | 3,473 | 24 | evalPipeline.js `buildEmptySceneQcPrompt` | Plate judge: BODY / STYLE_CHECK / CAMERA_CHECK / LIGHT_CHECK (2026-09-24, the plate's declared time of day and weather) / ERA_CHECK / PLACEMENTS_CHECK / LANDMARK_CHECK. Extracted from JS string literals 2026-09-15; figure rule aligned with the generator and medium + camera checks added 2026-09-23; LANDMARK_CHECK (2026-09-23) judges a real landmark against its attached photo, never the written description, from the same `LANDMARK_PHOTO_AUTHORITY` sentence the author's fidelity block carries. Since 2026-09-25 BODY's Wrong text check fails a `{PLATE_MARKS}` item and a Frame edge check fails a `{PLATE_SURROUNDS}` item (shotVocabulary.js, the lists the generator's `PLATE_EDGE_RULE` names) |
 | image-visual-inventory.txt | 5,377 | 138 | regeneration.js (admin route: shown as `prompt` only, the call it makes sends image-inventory-unified.txt); testlab.js `split_p1` arm | **Not the production inventory** (corrected 2026-09-23): `runVisualInventory` (evalPipeline.js:98) loads image-inventory-unified.txt |
 | image-inspection.txt | 2,457 | 52 | images.js `inspectImageForErrors` | Image error inspection |
 | generated-image-analysis.txt | 1,106 | 39 | sceneValidator.js `analyzeGeneratedImage` | Generated-image analysis |

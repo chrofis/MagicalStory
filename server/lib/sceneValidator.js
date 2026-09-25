@@ -815,6 +815,24 @@ function buildSemanticPrompt(template, { storyText, sceneHint, imagePrompt, inte
   });
 }
 
+/**
+ * The DECLARED LIGHT line the semantic judge is given ("night, fog"; '' when
+ * the page declares none). The brief carries the fields; the built image
+ * prompt does not — and a repaired version's image prompt is the repair
+ * instruction. Read the hint first for that reason, the prompt when the hint
+ * has no metadata. First renders and repaired versions go through this one
+ * derivation (sceneLight.js).
+ */
+function semanticDeclaredLight(sceneHint, imagePrompt) {
+  const { extractSceneMetadata: getSceneMetadata } = require('./storyHelpers');
+  const light = require('./sceneLight');
+  const fromHint = light.declaredLight(sceneHint ? getSceneMetadata(sceneHint) : null);
+  const lit = (fromHint.timeOfDay || fromHint.weather)
+    ? fromHint
+    : light.declaredLight(getSceneMetadata(imagePrompt || sceneHint || ''));
+  return light.describeLight(lit);
+}
+
 async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, sceneHint = null, templateOverride = null, evalContext = {}) {
   // evalContext.artStyle / .clothingContract: the same resolved values every
   // other evaluator gets — commissioned style and per-character outfits are
@@ -866,12 +884,7 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
     const objects = sceneMeta?.objects
       || (Array.isArray(sceneMeta?.fullData?.objects) ? sceneMeta.fullData.objects : null);
     elementsBlock = guard.formatElementsBlock(objects, evalContext.visualBible || null);
-    // The brief carries the fields; the built image prompt does not. Read the
-    // hint first for that reason, the prompt when the hint has no metadata.
-    const light = require('./sceneLight');
-    const fromHint = light.declaredLight(sceneHint ? getSceneMetadata(sceneHint) : null);
-    const lit = (fromHint.timeOfDay || fromHint.weather) ? fromHint : light.declaredLight(sceneMeta);
-    declaredLightLine = light.describeLight(lit);
+    declaredLightLine = semanticDeclaredLight(sceneHint, imagePrompt);
   } catch { /* silent fallback */ }
 
   // Convert image to base64 if needed
@@ -1024,5 +1037,6 @@ module.exports = {
   generatePreviewFeedback,
   buildSimplePreviewPrompt,
   evaluateSemanticFidelity,
-  buildSemanticPrompt
+  buildSemanticPrompt,
+  semanticDeclaredLight
 };

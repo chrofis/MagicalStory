@@ -916,10 +916,14 @@ export interface SceneImage {
   emptyScenePrompt?: string;  // Prompt used for empty scene generation
   hasEmptySceneImage?: boolean;  // Flag when emptySceneImage is stripped (for lazy loading)
   emptySceneQc?: {  // QC data when empty scene was retried (dev mode)
-    v1ImageData?: string;
+    v1ImageData?: string;  // the FIRST attempt, whichever one shipped
     v1Issues?: string[];
     visionFeedback?: string;
     retryPrompt?: string;
+    retryImageData?: string | null;  // the retry (absent on records before 2026-09-25)
+    retryIssues?: string[] | null;
+    keptAttempt?: 'first' | 'retry' | 'base' | null;  // 'base' = a derived plate dropped for its base plate
+    shippedWithHardDefects?: { check: string; issue: string }[] | null;
   } | null;
   textAreaMask?: string | null;  // Base64 data URL — B/W mask sent to Grok marking the text zone (black ~20% = text zone, white ~80% = rest of scene)
   emptySceneVbGrid?: string | null;  // Base64 data URL — filtered VB grid (vehicles + non-landmark locations) actually sent to the empty-scene call

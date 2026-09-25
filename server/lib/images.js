@@ -15,7 +15,8 @@ const { PROMPT_TEMPLATES, fillTemplate, guardPromptString, assertPromptFilled } 
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
 const { buildCastIndex, resolveEntity } = require('./castResolver');
 const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./runware');
-const { generateWithGrok, editWithGrok, isGrokConfigured, packReferences, cropToFrontColumn } = require('./grok');
+const { generateWithGrok, editWithGrok, isGrokConfigured, packReferences, cropToFrontColumn, MAX_MAGENTA_EXTENSION_PREFIX_LENGTH } = require('./grok');
+const { PromptFitError } = require('./promptFitError');
 const { MODEL_PRICING } = require('../config/models');
 const { getCurrentLogger } = require('./generationLogger');
 const r2Lib = require('./r2');
@@ -844,7 +845,7 @@ function templateParagraph(prefix) {
   const tpl = PROMPT_TEMPLATES.imageGeneration || IMAGE_GENERATION_TEMPLATE_ON_DISK;
   const para = tpl.split(/\n{2,}/).map(x => x.trim()).find(x => x.startsWith(prefix));
   if (!para) {
-    throw new Error(`prompt-shrink: prompts/image-generation.txt has no paragraph starting "${prefix}" — the cut order is stale`);
+    throw new PromptFitError(`prompt-shrink: prompts/image-generation.txt has no paragraph starting "${prefix}" — the cut order is stale`);
   }
   return para;
 }
@@ -945,13 +946,6 @@ const PROMPT_CUT_ORDER = [
     approxChars: 600,
     unit: () => compositionBulletUnit(COMPOSITION_GROUND_BULLET),
   },
-  {
-    label: 'REQUIRED CAST',
-    what: 'every named character in frame, exactly one of each, nobody added',
-    why: 'the generator half of D-03 / D-04b; the prose and the character lines still name the cast, so it is the last generic rule to go',
-    approxChars: 500,
-    unit: () => exactTextUnit(templateParagraph('**REQUIRED CAST:**')),
-  },
   // Page facts. Last to go.
   {
     label: 'HEIGHT ORDER',
@@ -996,6 +990,12 @@ const PROMPT_NEVER_CUT = [
   { label: 'NO MARKS', why: 'generator half of D-24 (sibling-registry page-image-generator-vs-critics parity anchor)', text: () => NO_CHARACTER_MARKING_RULE },
   { label: 'HANDS', why: 'generator half of D-16b (same parity anchor set)', text: () => HANDS_HOLD_ONLY_NAMED_RULE },
   { label: 'REQUIRED TEXT', why: 'the baked cover title and any lettering a Visual Bible element must carry (SETTLED: baked title)', text: () => '**REQUIRED TEXT:**' },
+  // REQUIRED CAST left the cut order on 2026-09-25 (owner): cut on four prompts of
+  // staging job_1790277448294_5herh01j7 (p3, p10, p14 and the back cover's Grok
+  // edit, 7388 -> 6886 against 7290), and on p14 a character then wore a coat
+  // that should have lain on the heap. It sits after ART STYLE, inside the
+  // protected tail, so no prose trim reaches it either.
+  { label: 'REQUIRED CAST', why: 'the generator half of D-03 / D-04b: every named character in frame, exactly one of each, nobody added', text: () => '**REQUIRED CAST:**' },
   { label: 'REQUIRED OBJECTS', why: 'the commissioned elements of the page', marker: '**REQUIRED OBJECTS' },
   { label: 'SEASON', why: 'the book-wide season, even against a reference photo from another season', marker: '**SEASON:**' },
   { label: 'LIGHT', why: "the page's declared time of day and weather, which wins over the plate's light (sceneLight.js)", marker: '**LIGHT:**' },
@@ -1017,7 +1017,7 @@ function cutBlocks() {
     let probe = `${tpl}\n\n${anchor}`;
     for (const unit of units) probe = unit.apply(probe).text;
     if (!probe.includes(anchor)) {
-      throw new Error(`prompt-shrink: a cut step removes ${keep.label} — it is on the never-cut list`);
+      throw new PromptFitError(`prompt-shrink: a cut step removes ${keep.label} — it is on the never-cut list`);
     }
   }
   CUT_BLOCKS = units;
@@ -1060,7 +1060,7 @@ function sectionAwareCut(prompt, maxLen, logLabel) {
       // impossible today; this makes it impossible to bring back, and it throws
       // rather than degrades: a prompt that does not state the page is not a
       // cheaper prompt, it is the wrong picture (CLAUDE.md — no fallbacks).
-      throw new Error(`prompt-shrink: dropping "${block.label}" removed ${removed} chars but that block is only ${entitled} — the cut reached past it into the page's own facts`);
+      throw new PromptFitError(`prompt-shrink: dropping "${block.label}" removed ${removed} chars but that block is only ${entitled} — the cut reached past it into the page's own facts`);
     }
     if (removed > 0) {
       dropped.push(block.label);
@@ -1090,7 +1090,7 @@ function sectionAwareCut(prompt, maxLen, logLabel) {
       // the end off, ART STYLE first). Fail the render instead (owner,
       // 2026-09-23: must-keep sections are never cut; if it cannot fit, fail
       // loudly).
-      throw new Error(`prompt-shrink [${logLabel}]: ${out.length} chars after every drop, cap ${maxLen}; the must-keep sections alone are ${tail.length} chars — refusing to cut them`);
+      throw new PromptFitError(`prompt-shrink [${logLabel}]: ${out.length} chars after every drop, cap ${maxLen}; the must-keep sections alone are ${tail.length} chars — refusing to cut them`);
     }
     let head = out.slice(0, tailStart);
     const keep = head.slice(0, headBudget);
@@ -1187,6 +1187,95 @@ async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName
     cap: maxPromptLength, dropped: cut.dropped, droppedSteps: cut.droppedSteps, proseCut: cut.proseCut });
   if (meta) meta.compressedScene = sceneHeadOf(cut.text) || undefined;
   return cut.text;
+}
+
+/**
+ * THE PLATE PROMPT HAS ITS OWN CUT ORDER (owner, 2026-09-25).
+ *
+ * A plate prompt (prompts/empty-scene.txt) opens with `**ART STYLE:**`, which is
+ * a must-keep marker of the PAGE prompt's protected tail. sectionAwareCut
+ * therefore read the whole plate prompt as tail, dropped nothing and refused to
+ * cut: staging job_1790277448294_5herh01j7 p1 and p11 (7,552 / 7,463 chars)
+ * went over the cap once the magenta-extension prefix was added. The plate is
+ * fitted here instead, against its own list, and nothing else in it is cut.
+ *
+ * A step is dropped only when `applies` says what it says is carried elsewhere
+ * in the prompt or does not bind this plate. The text is read from the loaded
+ * template, so a reworded paragraph fails loudly here instead of never firing.
+ */
+const EMPTY_SCENE_TEMPLATE_ON_DISK = fs.readFileSync(path.join(LOCAL_PROMPTS_DIR, 'empty-scene.txt'), 'utf-8');
+
+/**
+ * The PROMPT's own paragraph (or line) that opens with `prefix`, or null. The
+ * template is checked first: a prefix the loaded template no longer has means
+ * the cut order is stale, and that fails loudly instead of silently never
+ * firing. The text is then taken from the prompt, so a plate built from an
+ * older wording of the same paragraph is still found.
+ */
+function platePromptPiece(prompt, prefix, { line = false } = {}) {
+  const tpl = PROMPT_TEMPLATES.emptyScene || EMPTY_SCENE_TEMPLATE_ON_DISK;
+  const split = (t) => (line ? t.split('\n') : t.split(/\n{2,}/)).map(x => x.trim());
+  if (!split(tpl).some(x => x.startsWith(prefix))) {
+    throw new PromptFitError(`plate-fit: prompts/empty-scene.txt has no ${line ? 'line' : 'paragraph'} starting "${prefix}" — the plate cut order is stale`);
+  }
+  return split(prompt).find(x => x.startsWith(prefix)) || null;
+}
+
+const PLATE_CUT_ORDER = [
+  {
+    label: 'landmark photo note',
+    why: 'the named landmark block (IDENTITY / MEDIUM / CONDITIONS) states the same rules for the attached photo',
+    applies: (p) => p.includes('**IDENTITY (from the photo):**') && p.includes('**MEDIUM (never from the photo):**') && p.includes('**CONDITIONS (from the scene):**'),
+    piece: (p) => platePromptPiece(p, '**ABOUT THE LANDMARK REFERENCE PHOTO'),
+  },
+  {
+    label: 'over-the-shoulder line',
+    why: 'binds only a plate whose SHOT is over-the-shoulder',
+    applies: (p) => !/\*\*SHOT:\*\*[ \t]*over-the-shoulder/i.test(p),
+    piece: (p) => platePromptPiece(p, 'For `over-the-shoulder` framing', { line: true }),
+  },
+];
+
+/**
+ * Fit a plate prompt into `maxLen`, dropping only PLATE_CUT_ORDER steps.
+ * Throws PromptFitError when it still does not fit — never cuts anything else.
+ */
+function fitPlatePrompt(prompt, maxLen, logLabel, modelName = null) {
+  if (!prompt || prompt.length <= maxLen) return prompt;
+  let out = prompt;
+  const dropped = [];
+  const droppedSteps = [];
+  PLATE_CUT_ORDER.forEach((step, i) => {
+    if (out.length <= maxLen || !step.applies(out)) return;
+    const text = step.piece(out);
+    if (!text) return;
+    const before = out.length;
+    out = out.split(text).join('').replace(/\n{3,}/g, '\n\n');
+    dropped.push(step.label);
+    droppedSteps.push({ step: i + 1, label: step.label, chars: before - out.length });
+  });
+  if (out.length > maxLen) {
+    throw new PromptFitError(`plate-fit [${logLabel}]: ${out.length} chars after every allowed cut${dropped.length ? ` (${dropped.join(', ')})` : ''}, cap ${maxLen}; the rest of a plate prompt must stay — refusing to cut it`);
+  }
+  log.warn(`✂️ [${logLabel}] Plate prompt ${prompt.length}→${out.length} chars (cap ${maxLen}), cut in order: ${describeCutSteps(droppedSteps)}`);
+  recordPromptShrink({ logLabel, modelName, branch: 'plate-cut', before: prompt.length, after: out.length,
+    cap: maxLen, dropped, droppedSteps, proseCut: 0 });
+  return out;
+}
+
+/**
+ * A local fault is rethrown, never treated as a provider failure (owner,
+ * 2026-09-25). Called first in every provider-fallback catch: a prompt that does
+ * not fit (PromptFitError) is raised here before any request is sent, so falling
+ * back to Gemini would hide our bug behind another provider's picture.
+ */
+function rethrowLocalFault(err, { logLabel, pageLabel = '', provider }) {
+  if (!(err instanceof PromptFitError)) return;
+  const page = pageLabel ? ` page ${pageLabel}` : '';
+  log.error(`❌ [${logLabel}]${page} prompt does not fit ${provider}'s cap — failing, no provider fallback: ${err.message}`);
+  getCurrentLogger()?.error('prompt_fit_failed', `${logLabel}${page}: ${err.message}`, null,
+    { label: logLabel, page: pageLabel || null, provider, message: err.message });
+  throw err;
 }
 
 /**
@@ -1341,6 +1430,22 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
   // Whether slot-0 scene plates get magenta-extension padding (gen-only only).
   const slot0IsScenePlate = usePadExtension && !!(sceneBackground || (Array.isArray(landmarkPhotos) && landmarkPhotos.length) || previousImage);
 
+  // A PLATE call (emptyScenePlateRouting marks it landmarkScene 'plate') is
+  // fitted by its own cut order, with the worst-case magenta-extension prefix
+  // reserved up front: editWithGrok prepends that prefix after this fit, and a
+  // plate prompt cannot be refitted there (owner, 2026-09-25). Every other
+  // prompt keeps the page shrink and editWithGrok's exact-prefix refit.
+  const fitPrompt = async (p, cap, model, meta) => {
+    try {
+      return landmarkScene === 'plate'
+        ? fitPlatePrompt(p, cap - (slot0IsScenePlate ? MAX_MAGENTA_EXTENSION_PREFIX_LENGTH : 0), logLabel, model)
+        : await shrinkPromptForModel(p, cap, logLabel, model, meta);
+    } catch (fitErr) {
+      rethrowLocalFault(fitErr, { logLabel, pageLabel, provider: model || 'the image model' });
+      throw fitErr;
+    }
+  };
+
   // Priority: explicit backend override > the overridden model's OWN backend >
   // CONFIG_DEFAULTS > 'gemini'. Deriving the backend from imageModelOverride is
   // what makes a model-key override actually switch providers: passing
@@ -1373,6 +1478,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
       }
       return { provider: 'runware-primary', imageData: result.imageData, modelId: result.modelId, usage: result.usage, packedRefs: referenceImages, promptSent: prompt };
     } catch (runwareError) {
+      rethrowLocalFault(runwareError, { logLabel, pageLabel, provider: 'runware' });
       log.error(verbose
         ? `❌ [RUNWARE] Generation failed, falling back to Gemini: ${runwareError.message}`
         : `❌ [${logLabel}] Runware failed, falling back to Gemini: ${runwareError.message}`);
@@ -1396,7 +1502,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
 
     // Truncate to Grok's prompt-length cap BEFORE the API call.
     const grokMaxPrompt = IMAGE_MODELS[grokTier.key]?.maxPromptLength || 7500;
-    const grokPrompt = await shrinkPromptForModel(prompt, grokMaxPrompt, logLabel, grokModel, promptMeta);
+    const grokPrompt = await fitPrompt(prompt, grokMaxPrompt, grokModel, promptMeta);
 
     try {
       const refImages = await packReferences(
@@ -1418,6 +1524,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
 
       return { provider: 'grok-primary', imageData: result.imageData, modelId: result.modelId, usage: result.usage, packedRefs: refImages, promptSent: grokPrompt };
     } catch (grokError) {
+      rethrowLocalFault(grokError, { logLabel, pageLabel, provider: 'grok' });
       log.error(verbose
         ? `❌ [GROK] Generation failed, falling back to Gemini: ${grokError.message}`
         : `❌ [${logLabel}] Grok failed, falling back to Gemini: ${grokError.message}`);
@@ -1596,7 +1703,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
 
   const modelConfig = IMAGE_MODELS[modelId];
   const maxPromptLength = modelConfig?.maxPromptLength || 30000;
-  const effectivePrompt = await shrinkPromptForModel(prompt, maxPromptLength, logLabel, verbose ? modelId : null, promptMeta);
+  const effectivePrompt = await fitPrompt(prompt, maxPromptLength, verbose ? modelId : null, promptMeta);
   if (effectivePrompt !== prompt) {
     parts[0] = { text: effectivePrompt };
   }
@@ -1663,6 +1770,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
 
       return { provider: 'grok-routed', imageData: result.imageData, modelId: result.modelId, usage: result.usage, packedRefs: refImages, promptSent: effectivePrompt };
     } catch (grokError) {
+      rethrowLocalFault(grokError, { logLabel, pageLabel, provider: 'grok' });
       log.error(`❌ [${logLabel}] Grok generation failed (model-routed), falling back to Gemini: ${grokError.message}`);
       upstreamErrors.push(recordProviderFallback({ logLabel, provider: 'grok', route: 'model-routed', model: modelId, pageLabel, error: grokError }));
       // Fall through to Gemini below
@@ -3204,6 +3312,22 @@ async function evaluateImageBatch(images, options = {}) {
  */
 
 /**
+ * The instruction string a page inpaint sends to the editor: the numbered
+ * fixes, the preserve clause, the quiet zone, the required text, and the
+ * page's declared light (sceneLight.buildRepairLightLine, from the brief's
+ * `timeOfDay` / `weather`). The edit repaints the frame; an instruction naming
+ * only the defect repainted a declared night as golden daylight (staging
+ * job_1790277448294_5herh01j7 p15, "remove the street lamp"). The light is read
+ * from the same brief the semantic judge reads its DECLARED LIGHT from.
+ */
+function buildInpaintInstruction({ editInstruction, preserveClause = '', quietZoneSuffix = '', requiredTextClause = '', sceneDescription = '' }) {
+  const { buildRepairLightLine, declaredLightOfBrief } = require('./sceneLight');
+  const lightLine = buildRepairLightLine(declaredLightOfBrief(sceneDescription));
+  const lightClause = lightLine ? `\n\n${lightLine}` : '';
+  return `Fix these issues in this children's book illustration:\n${editInstruction}${preserveClause}${quietZoneSuffix}${requiredTextClause}${lightClause}`;
+}
+
+/**
  * Inpaint a page using Grok text edit. Builds an instruction from quality + semantic issues
  * and applies it via editImageWithPrompt().
  *
@@ -3766,7 +3890,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // Loud: a declared string that cannot be resolved must not be swallowed.
     log.error(`[INPAINT PAGE] Page ${pageNumber}: required-text clause could not be built - ${err.message}`);
   }
-  const fullInstruction = `Fix these issues in this children's book illustration:\n${editInstruction}${preserveClause}${quietZoneSuffix}${requiredTextClause}`;
+  const fullInstruction = buildInpaintInstruction({ editInstruction, preserveClause, quietZoneSuffix, requiredTextClause, sceneDescription });
   log.info(`[INPAINT PAGE] Inpainting (refs: ${referenceImages.length}): ${editInstruction.substring(0, 200)}`);
 
   try {
@@ -3900,12 +4024,12 @@ async function renderStoryPagePlate({
 }) {
   if (!plateDescription) return null;
   try {
-        const { resolveArtStyleForEmptyScene, resolveArtStyle: resolveStyleForEmpty } = getStoryHelpers();
-        const iterBackend = imageModelOverride ? (IMAGE_MODELS[imageModelOverride]?.backend || null) : null;
-        const artStyleDesc = resolveArtStyleForEmptyScene(storyData.artStyle || 'pixar', iterBackend)
-          || resolveArtStyleForEmptyScene('pixar')
-          || resolveStyleForEmpty(storyData.artStyle || 'pixar', iterBackend)
-          || '';
+        // The book's FULL style, as every story-run plate call site sends it
+        // (storyJobPipeline.js vantage / per-page / trial plates). The stripped
+        // "empty-scene" variant collapsed pixar to "Never photographic." and
+        // dropped the word "watercolor" (2026-09-25).
+        const { resolveArtStyle } = getStoryHelpers();
+        const artStyleDesc = resolveArtStyle(storyData.artStyle || 'pixar') || '';
         const textPos = textPosition || sceneMetadata?.textPosition || null;
         const { buildTextZoneInstruction, buildEraGuard } = getStoryHelpers();
         const iterateTextZoneDesc = sceneMetadata?.textZoneDescription || null;
@@ -5651,7 +5775,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
  * @param {string} editInstruction - What the user wants to change
  * @returns {Promise<{imageData: string}|null>}
  */
-async function editImageWithPrompt(imageData, editInstruction, model, referenceImages = [], artStyle = null, aspectRatioOverride = null) {
+async function editImageWithPrompt(imageData, editInstruction, model, referenceImages = [], artStyle = null, aspectRatioOverride = null, { plateDerive = false } = {}) {
   editInstruction = guardPromptString(editInstruction, 'images.editImageWithPrompt');
   const modelId = model || MODEL_DEFAULTS.pageImage;
   const modelConfig = IMAGE_MODELS[modelId];
@@ -5713,11 +5837,16 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
     ? (resolveArtStyle(artStyle, backend) || '')
     : '';
 
-  // Build the editing prompt from template
-  const editPrompt = fillTemplate(PROMPT_TEMPLATES.illustrationEdit, {
-    EDIT_INSTRUCTION: editInstruction,
-    ART_STYLE: styleText || 'Match the source image\'s artistic style.',
-  });
+  // Build the editing prompt from template. A plate derive (camera move or
+  // re-light of a backdrop plate) takes its own template: illustration-edit's
+  // "keep everything identical / do not resize" shrank a pull-back into a
+  // picture-in-a-picture (2026-09-25).
+  const editPrompt = plateDerive
+    ? require('../services/prompts').buildPlateDerivePrompt(editInstruction, styleText)
+    : fillTemplate(PROMPT_TEMPLATES.illustrationEdit, {
+      EDIT_INSTRUCTION: editInstruction,
+      ART_STYLE: styleText || 'Match the source image\'s artistic style.',
+    });
   log.debug(`✏️  [IMAGE EDIT] Full prompt: "${editPrompt}"`);
 
   // The Grok failure that sent this edit to Gemini (recorded in the
@@ -5738,6 +5867,7 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
         usage: { model: modelId, cost: grokResult.usage?.cost, direct_cost: grokResult.usage?.direct_cost ?? grokResult.usage?.cost }
       };
     } catch (grokErr) {
+      rethrowLocalFault(grokErr, { logLabel: 'IMAGE EDIT', provider: 'grok' });
       // Content moderation block — sanitize prompt and retry, then fall back to Gemini
       if (grokErr.message?.includes('content moderation') || grokErr.message?.includes('400')) {
         log.warn(`⚠️ [IMAGE EDIT] Grok blocked by content moderation, sanitizing prompt and retrying...`);
@@ -5775,6 +5905,7 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
               usage: { model: modelId, cost: retryResult.usage?.cost, direct_cost: retryResult.usage?.direct_cost ?? retryResult.usage?.cost }
             };
           } catch (retryErr) {
+            rethrowLocalFault(retryErr, { logLabel: 'IMAGE EDIT', provider: 'grok' });
             log.warn(`⚠️ [IMAGE EDIT] Sanitized retry also blocked, falling back to Gemini`);
             grokFailure = recordProviderFallback({ logLabel: 'IMAGE EDIT', provider: 'grok', route: 'edit-sanitized-retry', model: modelConfig.modelId, pageLabel: '', error: retryErr });
           }
@@ -5853,7 +5984,7 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
     const inputTokens = data.usageMetadata?.promptTokenCount || 0;
     const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
     const thinkingTokens = data.usageMetadata?.thoughtsTokenCount || 0;
-    log.debug(`📊 [IMAGE EDIT] Token usage - input: ${inputTokens}, output: ${outputTokens}${thinkingTokens ? `, thinking: ${thinkingTokens}` : ''}, model: ${modelId}`);
+    log.debug(`📊 [IMAGE EDIT] Token usage - input: ${inputTokens}, output: ${outputTokens}${thinkingTokens ? `, thinking: ${thinkingTokens}` : ''}, model: ${geminiModelId}`);
 
     // Extract thinking text
     const thinkingText = extractThinkingFromParts(data.candidates?.[0]?.content?.parts, 'IMAGE EDIT');
@@ -5870,13 +6001,13 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
           const respMimeType = inlineData.mimeType || inlineData.mime_type || 'image/png';
           const editedImageData = `data:${respMimeType};base64,${inlineData.data}`;
           log.info(`✅ [IMAGE EDIT] Successfully edited image`);
-          return { imageData: editedImageData, thinkingText, usage: { inputTokens, outputTokens, thinkingTokens, model: modelId } };
+          return { imageData: editedImageData, thinkingText, usage: { inputTokens, outputTokens, thinkingTokens, model: geminiModelId } };
         }
       }
     }
 
     log.warn('⚠️  [IMAGE EDIT] No edited image in response');
-    return { imageData: null, usage: { inputTokens, outputTokens, model: modelId } };
+    return { imageData: null, usage: { inputTokens, outputTokens, model: geminiModelId } };
   } catch (error) {
     log.error('❌ [IMAGE EDIT] Error editing image:', error);
     throw withUpstreamErrors(error, grokFailure ? [grokFailure] : []);
@@ -6169,6 +6300,7 @@ module.exports = {
 
   // Unified repair pipeline (the only active repair pipeline)
   inpaintPage,
+  buildInpaintInstruction,
 
   // Active repair primitives
   iteratePageCore,
@@ -6247,6 +6379,8 @@ module.exports = {
   resolveOutputAspect,
   truncatePromptForModel,
   shrinkPromptForModel,
+  fitPlatePrompt,
+  PLATE_CUT_ORDER,
   PROMPT_CUT_ORDER,
   PROMPT_NEVER_CUT,
   extractDataImageUrls

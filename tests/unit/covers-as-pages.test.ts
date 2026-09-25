@@ -76,6 +76,43 @@ describe('cover beats — what code knows about a cover, written as the beat', (
   });
 });
 
+describe('the front cover names the central figure; each cover its own place (2026-09-25)', () => {
+  const vb = {
+    animals: [{ id: 'ANI001', name: 'Creature1' }],
+    locations: [{ id: 'LOC001', vantages: [{ id: 'LOC001.1' }, { id: 'LOC001.2' }] }, { id: 'LOC002' }],
+  };
+  const brief = (objects: string[], chars = ['Child1']) =>
+    `prose\n---METADATA---\n${JSON.stringify({ characters: chars.map(n => ({ name: n, looksAt: 'viewer' })), objects })}`;
+  it('the arc central figure joins the FRONT cover cast only; its last name wins; none → the cast alone', () => {
+    const beats = CB.buildCoverBeats(cast(2, [1]), { centralFigure: ['the egg', 'Creature1'] });
+    expect(beats[0].planLine).toMatch(/^wide — Child1, Creature1 — /);
+    expect(beats[1].planLine).not.toContain('Creature1');
+    expect(CB.buildCoverBeats(cast(2, [1]), { centralFigure: null })[0].planLine).toMatch(/^wide — Child1 — /);
+    for (const b of beats) expect(b.planLine).toContain(CB.COVER_OWN_PLACE);
+  });
+  it('a named figure the cover brief does not cite is cover_cast_dropped; cited is clean', () => {
+    const planLine = CB.buildCoverBeats(cast(1, [1]), { centralFigure: ['Creature1'] })[0].planLine;
+    const bad = SBC.checkCoverCast({ pageNumber: -1, planLine }, require_('../../server/lib/sceneMetadata').extractSceneMetadata(brief(['LOC001'])), vb);
+    expect(bad.map((f: any) => f.type)).toEqual(['cover_cast_dropped']);
+    const ok = SBC.checkCoverCast({ pageNumber: -1, planLine }, require_('../../server/lib/sceneMetadata').extractSceneMetadata(brief(['LOC001', 'ANI001'])), vb);
+    expect(ok).toEqual([]);
+  });
+  it('a repeated vantage, or a repeated location while another is unused, is cover_location_repeated on the later cover', () => {
+    const same = SBC.checkCoverLocations([
+      { pageNumber: -1, brief: brief(['LOC001.2']) }, { pageNumber: -2, brief: brief(['LOC001.2']) }, { pageNumber: -3, brief: brief(['LOC002']) },
+    ], vb);
+    expect(same.map((f: any) => [f.pageNumber, f.type])).toEqual([[-2, 'cover_location_repeated']]);
+    const own = SBC.checkCoverLocations([
+      { pageNumber: -1, brief: brief(['LOC001.1']) }, { pageNumber: -2, brief: brief(['LOC002']) }, { pageNumber: -3, brief: brief(['LOC001.2']) },
+    ], vb);
+    expect(own).toEqual([]);
+  });
+  it('both reach the scene review', () => {
+    expect(SBC.REVIEWABLE.has('cover_cast_dropped')).toBe(true);
+    expect(SBC.REVIEWABLE.has('cover_location_repeated')).toBe(true);
+  });
+});
+
 describe('the mechanical cover checks on a brief', () => {
   const meta = (looksAt: string, textPosition: string) => ({
     characters: [{ name: 'Child1', looksAt }], textPosition,

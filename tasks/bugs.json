@@ -2007,6 +2007,42 @@
       "fixedAt": "2026-09-24",
       "fixedIn": "da8aa330d",
       "fix": "repairGarmentPhrase builds colour word + garment noun from closed vocabularies (tracked item worn on the page first, then the outfit by slot), excluding garments the page resolved worn state takes off; log.error when none. buildRepairNameMap/buildPageRepairNameMap/inpaintPage pass the page metadata. Replay on run 7: p2 \"the 3-year-old boy in the blue anorak\", p13 \"the 5-year-old boy in the green jumper, on the far left\"."
+    },
+    {
+      "id": "repair-repaints-declared-light",
+      "title": "A repair that repaints pixels was never told the page's declared light: the p15 inpaint turned a declared foggy night into golden daylight, and the repaired version shipped at 100",
+      "reportedAt": "2026-09-25",
+      "source": "Owner-reported, staging job_1790277448294_5herh01j7 p15 (brief timeOfDay night, weather fog). Stored imageVersions[1].prompt is exactly \"Fix these issues in this children's book illustration:\\n1. Remove the visible street lamp from the background.\" with no light; v1 pixels are warm daylight; v1 finalScore 100 (semantic visible.setting \"A forest at night\").",
+      "rootCause": "The LIGHT line (sceneLight.buildLightLine) reached only the page and plate prompts. inpaintPage, the character repair (faceRepair.buildPrompt), the scale repair and the manual /repair/image route built their prompts without it. The pipeline re-eval did carry DECLARED LIGHT night, fog (replayed from the stored inputs) and the judge missed the daylight on that run; the manual /repair/image and /repair-workflow/character-repair re-evals ran quality-only, so no judge saw the light there.",
+      "impact": "A repair can silently change a page's time of day and weather and still win pick-best.",
+      "status": "fixed",
+      "fixedAt": "2026-09-25",
+      "fixedIn": "5e73037a0",
+      "fix": "sceneLight.buildRepairLightLine closes every repaint prompt (images.buildInpaintInstruction, used by the pipeline, the Lab and the manual route; faceRepair.buildPrompt, every branch; scaleRepair.buildScaleRepairPrompt). The two manual routes pass page text + brief, so the semantic judge runs and judges light as on a first render. Replay of the stored p15 instruction now ends on the night/fog LIGHT line; Lab #1471 re-judged stored v1 against DECLARED LIGHT night, fog and flagged it as daytime (MODERATE)."
+    },
+    {
+      "id": "plate-prompt-overflow-falls-back-to-gemini",
+      "title": "A landmark plate prompt over the Grok cap (once the magenta prefix was added) was refused by the local shrink, caught as a Grok failure, and painted by Gemini as a photograph",
+      "reportedAt": "2026-09-25",
+      "source": "Stored evidence, staging job_1790277448294_5herh01j7: the p1 and p11 landmark plate prompts are 7,552 and 7,463 chars; the plates came back from gemini-2.5-flash-image photographic, with signatures and paper mats, and the covers were refused (IMAGE_OTHER). Replay of shrinkPromptForModel(prompt, 7900 - 612) on both: throws \"refusing to cut them\".",
+      "rootCause": "editWithGrok prepends the 612-char magenta-extension prefix and refits the body via fitGrokPromptWithPrefix -> sectionAwareCut. A plate prompt opens with **ART STYLE:**, a must-keep marker of the PAGE prompt, so the whole plate read as protected tail and the cut threw. The dispatcher's Grok catch treated that local throw as a Grok failure and fell back to Gemini. Vantage plate prompts also carried the Art Director prose twice (v.description equals the vantage plate, emitted again as FRAMING).",
+      "impact": "Landmark plates on Gemini (photographic, lettering, paper mats) and lost covers, with the real cause hidden behind a provider fallback.",
+      "status": "fixed",
+      "fixedAt": "2026-09-25",
+      "fixedIn": "aa31762b3",
+      "fix": "AD prose emitted once; plate calls fitted by fitPlatePrompt (own cut order: landmark photo note, over-the-shoulder line; nothing else cut) against cap minus the worst-case magenta prefix (616); PromptFitError is rethrown by every provider-fallback catch (rethrowLocalFault, prompt_fit_failed error event) instead of falling back. Replay over 134 stored plate prompts (both DBs, 14 days): 134/134 fit, none cut, largest landmark plate 7,267 + 616 = 7,883."
+    },
+    {
+      "id": "plate-derived-into-its-own-camera",
+      "title": "An angled page whose vantage base plate was already painted in its camera got a second, needless camera derive",
+      "reportedAt": "2026-09-25",
+      "source": "Stored evidence, staging job_1790277448294_5herh01j7: p10 (LOC002.1, ultra-wide, alone on its vantage) and p14 (LOC001.4, high-angle, alone) carry plateDerivedFor ultra-wide / high-angle although their base plates were painted from those same pages' shots.",
+      "rootCause": "The derive loop (storyJobPipeline.js vantage plates) compared the page's plate class with PLATE_BASE_CLASS ('eye-level') only, not with the class the base was actually painted in; a vantage with no eye-level page paints its base from its angled page.",
+      "impact": "An extra paid Grok edit per such page that can only drift the place away from its base; the derive instruction also claimed the base was painted at eye level.",
+      "status": "fixed",
+      "fixedAt": "2026-09-25",
+      "fixedIn": "4730d4799",
+      "fix": "plateEditForPage (server/lib/platePlan.js) derives a camera move only when the page class differs from plateClass(vantageShot), a re-light only when the light differs; the derive names the base's real shot. Replay on the stored run: old logic reproduces all 18 stored plateDerivedFor values; new logic 4 derives instead of 6, p10 and p14 share their base."
     }
   ]
 }

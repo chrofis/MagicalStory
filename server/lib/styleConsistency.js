@@ -63,24 +63,12 @@ const CONFIRMATION_FLAG_RATIO = 0.2;
 // contradict their briefs before anyone decides what to do about it.
 // ─────────────────────────────────────────────────────────────────────
 
-const { TIMES_OF_DAY, WEATHERS, declaredLight, timeContradicts } = require('./sceneLight');
+const { TIMES_OF_DAY, WEATHERS, declaredLightOfBrief, timeContradicts } = require('./sceneLight');
 // The judge's vocabularies: the declared enums, plus the answer for a cell
 // whose light cannot be read. `none` (an interior) is the declared value; the
 // judge names what it sees, `indoor`.
 const TIME_BUCKETS = [...TIMES_OF_DAY, 'unclear'].join('|');
 const WEATHER_BUCKETS = [...WEATHERS.filter(w => w !== 'none'), 'indoor', 'unclear'].join('|');
-
-/**
- * The light a page's brief DECLARED, from its metadata fields. Nothing is
- * read out of the prose; a brief without the fields declares nothing.
- * @returns {{timeOfDay: string|null, weather: string|null}}
- */
-function declaredLightOfBrief(brief) {
-  const text = String(brief || '');
-  if (!text.trim()) return { timeOfDay: null, weather: null };
-  const { extractSceneMetadata } = require('./sceneMetadata');
-  return declaredLight(extractSceneMetadata(text));
-}
 
 // ───────────────────────────────────────────────────
 // SEASON — declared-vs-rendered, and place-vs-place, on the same grid pass.

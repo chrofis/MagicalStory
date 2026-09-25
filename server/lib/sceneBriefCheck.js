@@ -145,6 +145,94 @@ function checkTextZoneCollision(page, metadata) {
 }
 
 /**
+ * A COVER STAGES THE CAST ITS BEAT NAMES (2026-09-25). A cover's plan line is
+ * code-written (coverBeats.js), so its cast field is an exact comma list — no
+ * prose is read. A name there that is a Visual Bible figure (animal, secondary
+ * character) or element must be cited in the brief's `objects[]`; a roster name
+ * must have a `characters[]` row. Staging job_1790277448294_5herh01j7's front
+ * cover dropped the story's creature.
+ */
+function checkCoverCast(page, metadata, visualBible) {
+  const { isCoverPage } = require('./coverBeats');
+  if (!page || !isCoverPage(page.pageNumber)) return [];
+  const castField = planSegments(String(page.planLine || '').replace(/^\s*PLAN:\s*/i, ''))[1] || '';
+  const named = castField.split(',').map(s => s.trim()).filter(Boolean);
+  if (named.length === 0) return [];
+  const vb = visualBible || {};
+  const pool = [];
+  for (const key of ['animals', 'secondaryCharacters', 'artifacts', 'vehicles']) {
+    const list = Array.isArray(vb[key]) ? vb[key] : Object.values(vb[key] || {});
+    for (const e of list) if (e && e.id) pool.push(e);
+  }
+  const norm = (s) => String(s || '').trim().toLowerCase();
+  const md = (metadata && metadata.fullData) || metadata || {};
+  const cited = new Set((Array.isArray(md.objects) ? md.objects : []).map(o => String(o || '').split('.')[0].toUpperCase()));
+  const rows = new Set((Array.isArray(md.characters) ? md.characters : []).map(c => norm(typeof c === 'string' ? c : c && c.name)));
+  const missing = [];
+  for (const name of named) {
+    const entry = pool.find(e => norm(e.name) === norm(name) || norm(e.label) === norm(name));
+    if (entry) {
+      if (!cited.has(String(entry.id).toUpperCase())) missing.push(`${name} (${entry.id}) is not cited in \`objects[]\``);
+    } else if (!rows.has(norm(name))) {
+      missing.push(`${name} has no \`characters[]\` row`);
+    }
+  }
+  if (missing.length === 0) return [];
+  return [{
+    pageNumber: page.pageNumber,
+    type: 'cover_cast_dropped',
+    detail: `This cover's plan line names who is in frame, and the brief drops ${missing.length === 1 ? 'one of them' : 'some of them'}: ${missing.join('; ')}. Stage every named figure in the picture, cite it, and describe it in the prose.`,
+  }];
+}
+
+/**
+ * EACH COVER ITS OWN PLACE (2026-09-25; coverBeats.COVER_OWN_PLACE is the rule
+ * the beat states). Structured only: the first location id each cover brief
+ * cites in `objects[]`. A cover repeats a place when an EARLIER cover cites the
+ * same vantage id, or the same location while the bible holds a location no
+ * cover cites. Reported on the repeating cover, so the scene review can rewrite
+ * it; staging job_1790277448294_5herh01j7 cited LOC001.2 on all three.
+ */
+function checkCoverLocations(pages = [], visualBible = null) {
+  const { isCoverPage } = require('./coverBeats');
+  const covers = (pages || [])
+    .filter(p => p && isCoverPage(p.pageNumber))
+    .sort((a, b) => b.pageNumber - a.pageNumber) // -1, -2, -3
+    .map((p) => {
+      const meta = p.metadata || extractSceneMetadata(String(p.brief || ''));
+      const md = (meta && meta.fullData) || meta || {};
+      const loc = (Array.isArray(md.objects) ? md.objects : []).map(String).find(o => /^LOC\d+/i.test(o)) || null;
+      return { pageNumber: p.pageNumber, loc: loc ? loc.toUpperCase() : null };
+    })
+    .filter(c => c.loc);
+  if (covers.length < 2) return [];
+  const vbLocs = (Array.isArray(visualBible && visualBible.locations) ? visualBible.locations : [])
+    .map(l => String(l && l.id || '').toUpperCase()).filter(Boolean);
+  const base = (id) => id.split('.')[0];
+  const citedBases = new Set(covers.map(c => base(c.loc)));
+  const unused = vbLocs.filter(id => !citedBases.has(id));
+  const out = [];
+  for (let i = 1; i < covers.length; i++) {
+    const c = covers[i];
+    const earlier = covers.slice(0, i);
+    const sameVantage = earlier.find(e => e.loc === c.loc);
+    const sameBase = earlier.find(e => base(e.loc) === base(c.loc));
+    if (sameVantage || (sameBase && unused.length > 0)) {
+      const other = sameVantage || sameBase;
+      out.push({
+        pageNumber: c.pageNumber,
+        type: 'cover_location_repeated',
+        detail: `This cover cites ${c.loc}, the place the cover on page ${other.pageNumber} already uses (${other.loc}). `
+          + (unused.length > 0
+            ? `Set it at a location no cover uses yet (${unused.join(', ')}).`
+            : `Set it at a vantage of ${base(c.loc)} no other cover cites (add one to the location's \`vantages[]\` if needed).`),
+      });
+    }
+  }
+  return out;
+}
+
+/**
  * A COVER PAGE'S TWO BEAT FACTS (owner, 2026-09-24). A cover is a page the Art
  * Director briefs from its beat (coverBeats.js); two facts of that beat are
  * mechanical, so they are checked here and handed to the scene review like any
@@ -686,6 +774,7 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
   if (!brief.trim()) return findings;
   const metadata = (page && page.metadata) || extractSceneMetadata(brief);
   findings.push(...checkCoverBrief(page, metadata));
+  findings.push(...checkCoverCast(page, metadata, visualBible));
 
   // A — cast the prose describes, `characters[]` omits. Possessive-aware by
   // construction: `Hans's attic` and `Daniel's phone torch` name a place and a
@@ -997,6 +1086,11 @@ function checkScenes(pages, castNames = [], visualBible = null, opts = {}) {
   } catch (err) {
     log.warn(`[BRIEF-CHECK] object state base: ${err.message}`);
   }
+  try {
+    all.push(...checkCoverLocations(pages, visualBible));
+  } catch (err) {
+    log.warn(`[BRIEF-CHECK] cover locations: ${err.message}`);
+  }
   if (opts && opts.textZoneRules) {
     try {
       all.push(...checkTextZoneDistribution(pages));
@@ -1142,7 +1236,7 @@ function checkScenes(pages, castNames = [], visualBible = null, opts = {}) {
 //     never produces it, so the iterate path cannot see it.
 //   - the `textzone_*` family is not run there: `opts.textZoneRules` is off on
 //     that call, and a repaired page usually has its text position locked.
-const REVIEWABLE = new Set(['cast_unlisted', 'cast_id_unresolved', 'interaction_multiple_actions', 'interaction_object_shared_hands', 'interaction_actor_unknown',
+const REVIEWABLE = new Set(['cover_cast_dropped', 'cover_location_repeated', 'cast_unlisted', 'cast_id_unresolved', 'interaction_multiple_actions', 'interaction_object_shared_hands', 'interaction_actor_unknown',
   'vb_element_overflow', 'vb_state_contradicted', 'vb_state_no_base',
   'vb_page_uncited', 'vb_cite_offpage',
   // The scene review already has the brief and the plan line in front of it and
@@ -1199,7 +1293,7 @@ module.exports = {
   checkPage, checkScenes, renderFindingsBlock, knownIds, REVIEWABLE,
   checkObjectStateContradiction, checkObjectStateBase, statedEntries,
   checkBiblePageTable, bibleEntries, citedBaseIds, CITABLE_POOLS,
-  checkTextZoneDistribution, checkTextZoneCollision, parseTextPosition, checkCoverBrief,
+  checkTextZoneDistribution, checkTextZoneCollision, parseTextPosition, checkCoverBrief, checkCoverCast, checkCoverLocations,
   checkPopulationContradiction,
   checkShotOffPlate,
   checkLightDeclared,

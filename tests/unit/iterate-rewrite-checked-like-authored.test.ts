@@ -137,6 +137,8 @@ describe('which sceneBriefCheck types reach a rewrite', () => {
       // A cover's copy space is locked to its beat's zone on iterate (images.js
       // lockedTextPosition = COVER_TEXT_POSITION), like the text-zone family.
       'cover_text_zone_mismatch',
+      // Whole-book (compares the covers with each other), like vb_state_no_base.
+      'cover_location_repeated',
       'textzone_character_collision', 'textzone_fullwidth_floor', 'textzone_top_floor',
       'textzone_bottom_floor', 'textzone_half_streak'];
     for (const t of SBC.REVIEWABLE) {

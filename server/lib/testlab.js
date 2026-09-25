@@ -760,7 +760,7 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
 async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = {} }) {
   const { loadPromptTemplates, buildEmptyScenePrompt } = require('../services/prompts');
   await loadPromptTemplates();
-  const { buildTextZoneInstruction, buildEraGuard, buildLandmarkFidelityBlock, resolveArtStyleForEmptyScene } = require('./storyHelpers');
+  const { buildTextZoneInstruction, buildEraGuard, buildLandmarkFidelityBlock, resolveArtStyle } = require('./storyHelpers');
   const { generateImageOnly } = require('./images');
   const { getTextAreaMask } = require('./textMasks');
   const { MODEL_DEFAULTS, emptyScenePlateRouting } = require('../config/models');
@@ -768,9 +768,24 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
   const meta = ctx.scene.sceneMetadata || {};
   // descriptionOverride: test a corrected empty-scene brief (e.g. fixing a
   // contradictory exterior/interior description, or a stair-direction) without
-  // regenerating the whole story. Falls back to the stored per-page description.
-  const description = params.descriptionOverride || meta.emptyScenePrompt || ctx.scene.emptyScenePrompt || ctx.scene.sceneDescription;
-  if (!description) throw new Error('No empty-scene description available for this page');
+  // regenerating the whole story. Otherwise the plate text production uses
+  // (resolvePagePlate: outline, then the vantage's own plate, then the brief's)
+  // under the page's SHOT line, as the per-page plate path builds it. It used
+  // to take the stored page's `emptyScenePrompt` and then its full scene
+  // description, neither of which is plate text; staging
+  // job_1790277448294_5herh01j7 p1 built an 11,684-char plate prompt (Lab 1478,
+  // refused by the plate fit — before the fit it would have gone to Gemini).
+  // No outline plate: ctx.scene is the STORED page record, whose
+  // `emptyScenePrompt` is the fully BUILT plate prompt of the run, not plate
+  // text — wrapping it in the template again doubled it (Lab 1482: 11,761 chars).
+  const { resolvePagePlate } = require('./storyHelpers');
+  const pagePlateText = resolvePagePlate({
+    pageNumber: ctx.pageNumber, sceneMetadata: meta, visualBible: ctx.visualBible, outlinePlate: '',
+  }).text;
+  const pageShot = String(meta.fullData?.shot || '').trim();
+  const description = params.descriptionOverride
+    || (pagePlateText ? `${pageShot ? `**SHOT:** ${pageShot}\n\n` : ''}${pagePlateText}` : '');
+  if (!description) throw new Error('No plate text for this page: the vantage and the brief carry no emptyScenePrompt (pass params.descriptionOverride)');
 
   // Text zone only when this story overlays text on the image AND the scene
   // has a position — production omits it for text-below layouts.
@@ -790,8 +805,11 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
     ctx.visualBible, ctx.pageNumber, ctx.landmarkPhotos, aboardId, meta.objects || null
   );
 
-  // One style string for the plate prompt and its QC, as in production.
-  const plateStyle = resolveArtStyleForEmptyScene(params.artStyleOverride || ctx.artStyle, null);
+  // One style string for the plate prompt and its QC, and the SAME one
+  // production sends: the book's full style (storyJobPipeline.js plate call
+  // sites use resolveArtStyle). The stripped "empty-scene" variant collapsed
+  // pixar to "Never photographic." and dropped "watercolor" (2026-09-25).
+  const plateStyle = resolveArtStyle(params.artStyleOverride || ctx.artStyle || 'pixar') || '';
   const prompt = buildEmptyScenePrompt({
     template: promptOverride || undefined,
     style: plateStyle,
@@ -856,7 +874,7 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
       landmarkPhoto: ctx.landmarkPhotos?.[0] || null,
       light: require('./sceneLight').declaredLight(meta),
     });
-    qc = { pass: qcRes.pass, issues: qcRes.issues || [], visionFeedback: qcRes.visionFeedback || null };
+    qc = { pass: qcRes.pass, issues: qcRes.issues || [], findings: qcRes.findings || [], visionFeedback: qcRes.visionFeedback || null };
   } catch (err) {
     log.warn(`[TESTLAB] empty-scene QC failed: ${err.message}`);
     qc = { error: err.message };
@@ -4228,8 +4246,14 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     // beats, 2026-09-24). `params.coverBeats: false` measures the story pages alone.
     const { buildCoverBeats } = require('./coverBeats');
     const { coverTypesFor } = require('./coverKeys');
+    // The front cover names the arc's central figure, as in production: the
+    // stored one (arcReviewReport.centralFigure), or `params.centralFigure`
+    // (names array) for a story stored before the arc recorded it.
+    const { resolveReplayCentralFigure } = require('./beatsReplayInputs');
+    const labCentralFigure = Array.isArray(params.centralFigure) ? params.centralFigure : resolveReplayCentralFigure(storyData);
     const labCoverBeats = params.coverBeats === false ? [] : buildCoverBeats(storyData, {
       coverTypes: coverTypesFor(storyData), clothingRequirements: storyData.clothingRequirements || null,
+      centralFigure: labCentralFigure,
     });
     const toExpand = [...finalBeats.slice(0, expandLimit), ...labCoverBeats];
     const lang = storyData.language || 'en';
@@ -5574,15 +5598,27 @@ async function runEditImageStage(ctx, { experimentId, promptOverride, params = {
   // exactly as the plate-derive step does in production (storyJobPipeline.js,
   // "AN ANGLED PAGE TAKES A PLATE DERIVED FROM THIS ONE"): the plate model and
   // the book's art style (since 2026-09-23). Pick the page that carries the vantage's BASE plate.
-  const onPlate = params.source === 'empty_scene';
-  const imageData = onPlate
-    ? await loadEmptyScene(ctx.storyId, ctx.pageNumber)
-    : await loadActivePageImage(ctx.storyId, ctx.pageNumber);
-  if (!imageData) throw new Error(`no ${onPlate ? 'empty_scene plate' : 'page image'} for p${ctx.pageNumber}`);
+  // params.source='derive_base' edits the BASE plate a derived page's plate
+  // was edited from (its one stored plate reference), so a production derive
+  // is replayed on the exact input it had. Only a page with a derived plate
+  // has one.
+  const onDeriveBase = params.source === 'derive_base';
+  const onPlate = params.source === 'empty_scene' || onDeriveBase;
+  let imageData;
+  if (onDeriveBase) {
+    const baseRef = ctx.scene?.plateDerivedFor ? (ctx.scene.emptySceneGrokRefImages || [])[0] : null;
+    if (!baseRef) throw new Error(`p${ctx.pageNumber} has no derived plate, so no base plate to edit (source=derive_base)`);
+    imageData = await bytesFor(typeof baseRef === 'string' ? { imageUrl: /^data:/.test(baseRef) ? null : baseRef, imageData: /^data:/.test(baseRef) ? baseRef : null } : baseRef);
+  } else {
+    imageData = onPlate
+      ? await loadEmptyScene(ctx.storyId, ctx.pageNumber)
+      : await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+  }
+  if (!imageData) throw new Error(`no ${onDeriveBase ? 'derive base plate' : onPlate ? 'empty_scene plate' : 'page image'} for p${ctx.pageNumber}`);
 
   const t0 = Date.now();
   const result = onPlate
-    ? await editImageWithPrompt(imageData, instruction, MODEL_DEFAULTS.emptyScenePlateModel, [], ctx.artStyle)
+    ? await editImageWithPrompt(imageData, instruction, MODEL_DEFAULTS.emptyScenePlateModel, [], ctx.artStyle, null, { plateDerive: true })
     : await editImageWithPrompt(imageData, instruction, null, [], ctx.artStyle);
   const elapsedMs = Date.now() - t0;
   const edited = result?.imageData || null;

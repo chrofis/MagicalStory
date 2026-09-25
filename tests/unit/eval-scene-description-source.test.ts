@@ -83,7 +83,10 @@ describe('wiring: the compressed scene block is produced, carried and consumed',
   });
 
   it('both shrink call sites feed the out-param', () => {
-    expect((images.match(/shrinkPromptForModel\([^)]*promptMeta\)/g) || []).length).toBe(2);
+    // Both dispatcher call sites go through fitPrompt, which hands the meta to
+    // shrinkPromptForModel (a plate prompt carries no scene block to record).
+    expect((images.match(/fitPrompt\([^)]*promptMeta\)/g) || []).length).toBe(2);
+    expect(images).toContain(': await shrinkPromptForModel(p, cap, logLabel, model, meta);');
   });
 
   it('the batch eval resolves through the shared accessor, not an inline chain', () => {

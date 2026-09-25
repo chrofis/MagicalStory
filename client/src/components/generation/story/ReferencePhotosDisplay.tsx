@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { ReferencePhoto } from '@/types/story';
+import type { ReferencePhoto, SceneImage } from '@/types/story';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
 import storyService from '@/services/storyService';
 
@@ -27,7 +27,7 @@ interface ReferencePhotosDisplayProps {
   hasEmptySceneImage?: boolean;  // Flag when emptySceneImage is stripped (for lazy loading)
   hasCompositeStages?: boolean;  // Flag when scene-composite intermediates exist (lazy load)
   compositeBboxes?: Record<string, { x: number; y: number; width: number; height: number }> | null;  // Per-character bbox metadata from blocking pass
-  emptySceneQc?: { v1ImageData?: string; v1Issues?: string[]; visionFeedback?: string; retryPrompt?: string } | null;
+  emptySceneQc?: SceneImage['emptySceneQc'];
   textAreaMask?: string | null;  // Black/white mask sent to Grok marking the text-overlay calm zone
   emptySceneVbGrid?: string | null;  // Filtered VB grid (vehicles + non-landmark locations) sent to the empty-scene call — the main-scene visualBibleGrid is different
   textCoverageReport?: {
@@ -336,7 +336,7 @@ export function ReferencePhotosDisplay({
                 {/* V1 failed image */}
                 {emptySceneQc.v1ImageData && (
                   <div>
-                    <div className="text-sm font-medium text-gray-700 mb-1">V1 (failed)</div>
+                    <div className="text-sm font-medium text-gray-700 mb-1">V1 {emptySceneQc.keptAttempt === 'first' ? '(failed QC — in use)' : '(failed QC)'}</div>
                     <img
                       src={emptySceneQc.v1ImageData}
                       alt="Empty scene V1 (failed)"
@@ -370,17 +370,38 @@ export function ReferencePhotosDisplay({
                     <pre className="mt-2 text-xs whitespace-pre-wrap break-words font-mono max-h-64 overflow-y-auto text-gray-700 bg-gray-50 p-2 rounded">{emptySceneQc.retryPrompt}</pre>
                   </details>
                 )}
-                {/* V2 image (current, in use) */}
+                {/* Hard defects the shipped plate still carries (plate_shipped_failed_qc) */}
+                {(emptySceneQc.shippedWithHardDefects?.length ?? 0) > 0 && (
+                  <div className="text-sm text-red-700">
+                    {language === 'de' ? 'Ausgeliefert mit hartem Fehler: ' : 'Shipped with a hard defect: '}
+                    {emptySceneQc.shippedWithHardDefects!.map(f => `[${f.check}] ${f.issue}`).join('; ')}
+                  </div>
+                )}
+                {/* V2 = the retry. Records before 2026-09-25 carry no retryImageData;
+                    there the retry was the plate in use. */}
                 <div>
                   <div className="text-sm font-medium text-gray-700 mb-1 flex items-center gap-1.5">
-                    V2 (retry — in use)
-                    <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">active</span>
+                    {emptySceneQc.keptAttempt === 'first'
+                      ? 'V2 (retry — rejected)'
+                      : emptySceneQc.keptAttempt === 'base'
+                        ? 'V2 (retry — rejected, the page uses the base plate)'
+                        : 'V2 (retry — in use)'}
+                    {(!emptySceneQc.keptAttempt || emptySceneQc.keptAttempt === 'retry') && (
+                      <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">active</span>
+                    )}
                   </div>
+                  {(emptySceneQc.retryIssues?.length ?? 0) > 0 && (
+                    <ul className="text-sm text-red-700 list-disc pl-5 space-y-0.5 mb-1">
+                      {emptySceneQc.retryIssues!.map((issue: string, i: number) => (
+                        <li key={i}>{issue}</li>
+                      ))}
+                    </ul>
+                  )}
                   <img
-                    src={displayEmptySceneImage}
+                    src={emptySceneQc.retryImageData || displayEmptySceneImage}
                     alt="Empty scene V2 (retry)"
                     className="max-h-48 rounded border border-green-300 cursor-pointer hover:opacity-80 transition-opacity"
-                    onClick={() => setLightboxImage(displayEmptySceneImage)}
+                    onClick={() => setLightboxImage(emptySceneQc.retryImageData || displayEmptySceneImage)}
                   />
                 </div>
               </div>

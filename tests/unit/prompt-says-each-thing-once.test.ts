@@ -136,7 +136,8 @@ describe('the cut order is ONE list, and the log names each step it cut', () => 
   it('PROMPT_CUT_ORDER is the order the shrinker spends', () => {
     expect(PROMPT_CUT_ORDER.map((s: any) => s.label)).toEqual([
       'COUNTS', 'Composition: size', 'Composition: facing', 'DEPTH AND SIZE', 'Composition: ground',
-      'REQUIRED CAST', 'HEIGHT ORDER', 'AGE & PROPORTIONS', 'reference-photo rule', 'single-illustration rule',
+      // REQUIRED CAST is never cut since 2026-09-25 (owner) — PROMPT_NEVER_CUT.
+      'HEIGHT ORDER', 'AGE & PROPORTIONS', 'reference-photo rule', 'single-illustration rule',
     ]);
     for (const s of PROMPT_CUT_ORDER) {
       expect(s.what && s.why && s.approxChars > 0, s.label).toBeTruthy();

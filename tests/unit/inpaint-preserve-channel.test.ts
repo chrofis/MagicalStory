@@ -92,9 +92,18 @@ describe('images.js inpaintPage wiring', () => {
     expect(src).toContain('buildPreserveClause');
   });
 
-  it('interpolates the clause into the instruction the image model receives', () => {
-    const line = src.split(String.fromCharCode(10)).find(l => l.includes('const fullInstruction ='));
-    expect(line).toBeDefined();
-    expect(line).toContain('${preserveClause}');
+  it('passes the clause to the instruction builder the image model receives', () => {
+    expect(src).toContain('buildInpaintInstruction({ editInstruction, preserveClause,');
+  });
+
+  it('the builder interpolates the clause after the numbered actions', async () => {
+    const { createRequire } = await import('node:module');
+    const { buildInpaintInstruction } = createRequire(import.meta.url)('../../server/lib/images.js');
+    const full = buildInpaintInstruction({
+      editInstruction: "1. Resize the dragon egg to the size of a child's head.",
+      preserveClause: buildPreserveClause(["the four boys' hands rest on the shell"]),
+    });
+    expect(full).toContain("the four boys' hands rest on the shell");
+    expect(full.indexOf('Resize')).toBeLessThan(full.indexOf('Still true'));
   });
 });

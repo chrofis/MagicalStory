@@ -270,9 +270,10 @@
     {
       "id": "empty-scene-generator-vs-critic",
       "axis": "generator-vs-critic",
-      "reason": "empty-scene-qc.txt is validateEmptyScene's judge of the plate empty-scene.txt paints; a check the judge applies that the plate author was never given is a blind grade, which is exactly how the reserved-corner and geometry findings arose. The shared half stays shared: GEOMETRY_DIMENSIONS (sceneGeometry.js) writes the author's geometry block and the judge's {GEOMETRY_CHECK} from one source. Extracted from evalPipeline.js string literals on 2026-09-15.",
+      "reason": "empty-scene-qc.txt is validateEmptyScene's judge of the plate empty-scene.txt paints; a check the judge applies that the plate author was never given is a blind grade, which is exactly how the reserved-corner and geometry findings arose. The shared half stays shared: GEOMETRY_DIMENSIONS (sceneGeometry.js) writes the author's geometry block and the judge's {GEOMETRY_CHECK} from one source. Extracted from evalPipeline.js string literals on 2026-09-15. Since 2026-09-25 plate-derive.txt (the camera-move / re-light edit of a vantage's base plate, prompts.js buildPlateDerivePrompt) is a generator of the same judge, and the edge-to-edge / no signature / no mat rule is one source: shotVocabulary.PLATE_EDGE_RULE fills {PLATE_EDGE} in both generators, and its PLATE_MARKS / PLATE_SURROUNDS fill the judge's Wrong text and Frame edge checks.",
       "generators": [
-        "prompts/empty-scene.txt"
+        "prompts/empty-scene.txt",
+        "prompts/plate-derive.txt"
       ],
       "critics": [
         "prompts/empty-scene-qc.txt"
@@ -293,6 +294,22 @@
         "server/lib/styleConsistency.js"
       ],
       "severity": "block"
+    },
+    {
+      "id": "repair-keeps-declared-light",
+      "axis": "first render vs every repair that repaints pixels",
+      "reason": "The page prompt carries the page's LIGHT line; a repair that repaints the frame and is not told the light repaints it at will — staging job_1790277448294_5herh01j7 p15 declared night + fog, the round-1 inpaint was sent only 'remove the street lamp' and came back in golden daylight (2026-09-25). Every repaint builder closes on sceneLight.buildRepairLightLine, read from the brief's fields: the page inpaint (images.js buildInpaintInstruction, also the manual /repair/image route), the character repair (faceRepair.js buildPrompt, every branch) and the scale repair (scaleRepair.js buildScaleRepairPrompt). Iterate and the regenerate fallback re-render from the full page prompt and carry the page's own LIGHT line. A new repaint path joins this set.",
+      "members": [
+        "server/lib/images.js",
+        "server/lib/faceRepair.js",
+        "server/lib/scaleRepair.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "buildRepairLightLine"
+        ]
+      }
     },
     {
       "id": "cover-generator-vs-critic",

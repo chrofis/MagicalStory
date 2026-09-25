@@ -72,6 +72,18 @@ describe('cover shrink — the must-keep sections survive', () => {
     await expect(shrinkPromptForModel(prompt, 7000, 'TEST cover', null)).rejects.toThrow(/must-keep/);
   });
 
+  // REQUIRED CAST is never cut (owner, 2026-09-25; staging
+  // job_1790277448294_5herh01j7 lost it on p3, p10, p14 and the back cover).
+  it('REQUIRED CAST survives every shrink, the drops go to other blocks', async () => {
+    const out: string = await shrinkPromptForModel(coverPrompt(100), 7000, 'TEST cover', null);
+    expect(out).toContain(para('**REQUIRED CAST:**'));
+  });
+  it('REQUIRED CAST is on the never-cut list and no longer a cut step', async () => {
+    const images = await import('../../server/lib/images.js');
+    expect(images.PROMPT_NEVER_CUT.map((k: any) => k.label)).toContain('REQUIRED CAST');
+    expect(images.PROMPT_CUT_ORDER.map((k: any) => k.label)).not.toContain('REQUIRED CAST');
+  });
+
   it('with no REQUIRED OBJECTS block, SEASON still opens the protected tail', async () => {
     const prompt = coverPrompt(100).replace(/\*\*REQUIRED OBJECTS[^\n]*\n\* \*\*SENTINEL_ELEMENT_LINE[^\n]*\n/, '');
     expect(prompt).not.toContain('REQUIRED OBJECTS');

@@ -604,14 +604,40 @@ function plateClass(shot) {
  * Positive and structural: it names what must stay, never what must not change.
  */
 /**
- * A camera move the shot's definition alone does not produce in an edit.
- * ultra-wide: the plain definition pulled back ~15% on dragon run 6 p2
- * (job_1790100385959_1nitlympp); a pull-back given a SIZE ("the current
- * picture fills the middle third") halved the buildings in Lab 1413.
+ * The camera move for each derived shot, worded as a move through the same
+ * place, never as a size for the current picture. A pull-back given a SIZE
+ * ("everything in the current picture shrinks to fill only the middle third")
+ * made the edit shrink the whole sheet, paper mat included, into the middle of
+ * a new frame, and the mat became a picture-in-a-picture (staging
+ * job_1790277448294_5herh01j7 p10, 2026-09-25). ultra-wide: the plain
+ * definition pulled back only ~15% on dragon run 6 p2, so the move names what
+ * the new view takes in. The shot definitions speak of figures and subjects;
+ * a plate has none, so the moves name the place's own parts.
  */
 const DERIVE_CAMERA_MOVE = {
-  'ultra-wide': 'Pull the camera far back to an ultra-wide view. Everything in the current picture shrinks to fill only the middle third of the new frame, and the new frame shows much more around it: more open ground in front, more of the surrounding place on both sides, more sky above.',
+  'ultra-wide': 'Move the camera far back from the place to an ultra-wide view: the new picture takes in the whole setting from a distance, with open ground in front of it, the surroundings on both sides and the sky above, and its buildings and trees stand small within it.',
+  'high-angle': 'Raise the camera above head height and tilt it down onto the place: the new picture looks down on its ground, paths and surfaces, with little or no sky.',
+  'low-angle': 'Lower the camera close to the ground and tilt it up: the new picture looks up at the place, its buildings, walls and trees rising against the sky or the ceiling.',
+  'aerial': "Lift the camera high above the place and point it straight down: the new picture is a bird's-eye view of the whole place, its roofs, paths and open ground seen from above.",
 };
+
+if ([...PLATE_DERIVED_SHOTS].some(id => !DERIVE_CAMERA_MOVE[id])) {
+  throw new Error('shotVocabulary: a PLATE_DERIVED_SHOTS shot has no DERIVE_CAMERA_MOVE');
+}
+
+/**
+ * A plate is painted edge to edge, with no maker's mark (owner, 2026-09-25).
+ * Staging job_1790277448294_5herh01j7: plates came back signed (p11, p13,
+ * LOC001.1 retry) and on a cream paper mat (LOC002.1), and the mat survived
+ * into the derived p10 plate as a glowing frame. One source for both sides:
+ * the plate author (empty-scene.txt) and the derive edit (plate-derive.txt)
+ * get PLATE_EDGE_RULE; the plate QC (empty-scene-qc.txt) fails a PLATE_MARKS
+ * item in its "Wrong text" check and a PLATE_SURROUNDS item in its
+ * "Frame edge" check.
+ */
+const PLATE_MARKS = 'signature, monogram or initials';
+const PLATE_SURROUNDS = 'paper margin, mat, border, keyline or frame around the picture';
+const PLATE_EDGE_RULE = `The painting fills the frame edge to edge, the scene itself reaching all four sides; it carries no ${PLATE_MARKS} and no ${PLATE_SURROUNDS}.`;
 
 /*
  * What stays is the place's STRUCTURE, never an object's "position": in an
@@ -623,7 +649,8 @@ function buildPlateDeriveInstruction(baseShot, targetShot, { relight = '' } = {}
   if (!target) return null;
   const from = String(baseShot || '').trim();
   const fromPhrase = from ? `painted as a ${from} shot` : 'painted at eye level';
-  const move = DERIVE_CAMERA_MOVE[target.id] || `Re-paint the same place as a ${target.id} shot. ${target.definition}`;
+  const move = DERIVE_CAMERA_MOVE[target.id];
+  if (!move) return null;
   // `relight`: sceneLight.relightClause — the page this plate serves declares
   // a different time of day or weather than the base plate was painted in, so
   // the one edit moves the camera AND re-lights (2026-09-24).
@@ -648,6 +675,9 @@ module.exports = {
   VANTAGE_SHOT_RULE,
   plateClass,
   buildPlateDeriveInstruction,
+  PLATE_MARKS,
+  PLATE_SURROUNDS,
+  PLATE_EDGE_RULE,
   DISTANCE_SHOTS,
   POSITION_SHOTS,
   SHOT_PATTERNS,

@@ -267,6 +267,11 @@ async function loadPromptTemplates() {
     ['styledCostumedAvatar', 'styled-costumed-avatar.txt'],
     ['visualBibleAnalysis', 'visual-bible-analysis.txt'],
     ['illustrationEdit', 'illustration-edit.txt'],
+    // The plate derive edit (camera move and/or re-light of a vantage's base
+    // plate). Not illustration-edit.txt: its "keep everything else identical"
+    // and "do not crop or resize" turned a pull-back into a picture-in-a-picture
+    // (2026-09-25). Built only through buildPlateDerivePrompt.
+    ['plateDerive', 'plate-derive.txt'],
     ['imageInspection', 'image-inspection.txt'],
     ['inpainting', 'inpainting.txt'],
     ['characterRepairBlended', 'character-repair-blended.txt'],
@@ -775,6 +780,9 @@ function buildEmptyScenePrompt(opts = {}) {
     // the same three facts it is judged on and none of the cast.
     SCENE_GEOMETRY: geometryBlock,
     LANDMARK_FIDELITY: opts.landmarkFidelity || '',
+    // Edge to edge, no maker's mark, no mat: the same constant the derive
+    // edit carries and the plate QC's "Wrong text" / "Frame edge" checks read.
+    PLATE_EDGE: require('../lib/shotVocabulary').PLATE_EDGE_RULE,
     // The time of day and weather this plate is painted in — the declared
     // light of the page(s) it serves (sceneLight.js). '' when undeclared.
     LIGHT_NOTE: opts.light ? require('../lib/sceneLight').buildLightLine(opts.light, { plate: true }) : '',
@@ -801,6 +809,24 @@ function buildEmptyScenePrompt(opts = {}) {
   // shipping an id to the image model.
   require('../lib/vbIdGuard').warnIfVbIds(sanitised, 'empty-scene/plate prompt', { kind: 'image' });
   return sanitised;
+}
+
+/**
+ * The prompt of a plate derive edit (plate-derive.txt): the vantage's base
+ * plate re-painted for another camera and/or another light
+ * (shotVocabulary.buildPlateDeriveInstruction, sceneLight.buildPlateRelightInstruction).
+ *
+ * @param {string} instruction - the derive instruction
+ * @param {string} styleText - the book's resolved art-style description ('' when none)
+ * @returns {string}
+ */
+function buildPlateDerivePrompt(instruction, styleText = '') {
+  if (!PROMPT_TEMPLATES.plateDerive) throw new Error('buildPlateDerivePrompt: plate-derive template not loaded');
+  return fillTemplate(PROMPT_TEMPLATES.plateDerive, {
+    EDIT_INSTRUCTION: instruction,
+    ART_STYLE: styleText || 'Match the source image\'s artistic style.',
+    PLATE_EDGE: require('../lib/shotVocabulary').PLATE_EDGE_RULE,
+  });
 }
 
 /**
@@ -929,6 +955,7 @@ module.exports = {
   fillTemplate,
   promptSections,
   buildEmptyScenePrompt,
+  buildPlateDerivePrompt,
   buildEvaluationPrompt,
   extractArtStyle,
   resolveEvalArtStyle,

@@ -21,6 +21,112 @@ superseded and link forward.
 
 ---
 
+## 2026-09-25 — Every repair that repaints pixels carries the page's declared light; every repaired version is judged against it
+
+**Context:** Staging job_1790277448294_5herh01j7 p15 declares `timeOfDay: night`, `weather: fog`. v0 was
+night. The round-1 inpaint was sent exactly `Fix these issues in this children's book illustration:\n1. Remove
+the visible street lamp from the background.` (stored `imageVersions[1].prompt`) and returned v1 in golden
+daylight; v1 scored 100 and shipped. The LIGHT line (2026-09-24 entry "A page declares its time of day and
+weather") reached only the page and plate prompts. The pipeline re-eval of v1 DID carry `DECLARED LIGHT:
+night, fog` (replayed from the stored inputs: sceneHint = the version's brief), and the judge read v1 as
+"a forest at night" — a judge miss, not a missing input. Re-judged in Lab exp #1471 with the same input,
+the judge flagged v1 as daytime (MODERATE, semantic 90) and read v0 as night. Two manual routes
+(`/repair/image`, `/repair-workflow/character-repair`) re-evaluated a repaired version quality-only, so
+no judge ever saw the declared light there.
+
+**Decision:** `sceneLight.buildRepairLightLine` (one line, from the brief's fields via
+`declaredLightOfBrief`, which moved here from styleConsistency.js) closes every repair that repaints
+pixels: the page inpaint (`images.buildInpaintInstruction`, which the manual `/repair/image` route now
+also uses), the character repair (`faceRepair.buildPrompt`, every branch), and the scale repair
+(`scaleRepair.buildScaleRepairPrompt`). Iterate and the regenerate fallback re-render from the full page
+prompt, which already carries the page's LIGHT line. The two manual routes now pass the page text and
+the brief, so the semantic judge runs on a repaired version exactly as on a first render; the judge's
+light derivation is one function (`sceneValidator.semanticDeclaredLight`). Registry set
+`repair-keeps-declared-light`.
+
+Deliberately NOT given the line: the user-typed edit routes (`/edit/image`, `/edit/cover`) — the owner's
+own instruction may be "make it daytime", and a light constraint would override it; the grid artifact
+repair (`repairGrid.js`), which repaints small cropped cells and blends them back.
+
+**Severity (owner ruling, 2026-09-25): a contradiction of the DECLARED LIGHT is MAJOR** (was MODERATE),
+set on the check's own line in image-semantic.txt, the way every other semantic check carries its
+severity. Not a `MIN_SEVERITY_TYPES` floor: the judge files the finding as `setting`, a type that also
+carries wrong-place findings at MAJOR/CRITICAL, so a floor would need a new dedicated type (a type is
+classification, which belongs to the prompt, plus five scoring sites), and the floor mechanism is kept
+for the case where escalating the prompt suppresses detection (composite_seam). The consolidator and
+the visual-flow judge restate no light severity (the consolidator keeps the highest merged severity;
+visual-flow emits a boolean mismatch), and the generator side has no severity to sync. Free replay on
+p15 with the stored deductions: stored v0 85 vs v1 with the #1471 light finding 95 at MODERATE, 85 at
+MAJOR, and the pipeline's earliest tie-break then ships v0 (night). Against #1471's own v0 result, which
+carries a CRITICAL "turns away" finding (75), v1 still wins at 85: MAJOR puts the daylight repair level
+with a MAJOR-flawed original, not below a CRITICAL-flawed one.
+
+**Touched:** prompts/image-semantic.txt, server/lib/sceneLight.js, images.js, faceRepair.js, scaleRepair.js, sceneValidator.js,
+styleConsistency.js, server/routes/regeneration.js, scripts/admin/sibling-registry.json,
+tests/unit/scene-light.test.ts, tests/unit/inpaint-preserve-channel.test.ts
+**Status:** ✅ active
+
+## 2026-09-25 — A plate derive is its own edit, worded as a camera move; every plate is painted edge to edge with no signature, monogram or mat, and the plate QC fails one
+
+**Context:** Staging job_1790277448294_5herh01j7 (dragon run 7). (1) The p10 ultra-wide plate, derived from the
+LOC002.1 base plate, came back as a picture-in-a-picture: the base sheet, its cream paper mat included, shrunk into
+the middle of a new frame, the mat reading as a glowing white rectangle. The ultra-wide move said "everything in the
+current picture shrinks to fill only the middle third of the new frame" (b2751c799, Lab 1413), and it was wrapped in
+illustration-edit.txt, which says "Keep everything else identical" and "Do not crop or resize the image". Shrinking
+the whole sheet, mat and all, satisfies both. (2) Plates came back signed (p11 LOC002.2 base, p13 its relit derive,
+the LOC001.1 retry) and matted (LOC002.1). empty-scene.txt asked for "no borders" but named no signature, monogram or
+paper mat, and the plate QC checked neither: LOC002.1 and LOC002.2 passed it on that run.
+
+**Decision:**
+- Every plate derive (camera move, re-light, or both in one edit) is built from `prompts/plate-derive.txt` through
+  `buildPlateDerivePrompt` (prompts.js): `editImageWithPrompt(..., { plateDerive: true })`, used by the pipeline's
+  derive step and the Lab's `edit_image` plate modes. It carries the instruction, the book's art style and the edge
+  rule, and none of illustration-edit's "keep identical / do not crop or resize". illustration-edit.txt is unchanged
+  for its other callers.
+- Every derived shot (ultra-wide, high-angle, low-angle, aerial) has its own camera move in `DERIVE_CAMERA_MOVE`
+  (shotVocabulary.js), worded as the camera moving through the same place, naming the place's parts; no frame
+  fraction and no size for the current picture. The shot definitions (which speak of figures and subjects) are no
+  longer the derive's text; a derived shot without a move throws at module load. The kept-structure sentence, the
+  "same light unless relit" clause (17f6f533e `relight`) and "the camera moves; the place stays as it is" are unchanged.
+- One rule for both sides: `PLATE_EDGE_RULE` (shotVocabulary.js) fills `{PLATE_EDGE}` in empty-scene.txt and
+  plate-derive.txt: the painting fills the frame edge to edge, no signature, monogram or initials (`PLATE_MARKS`) and no
+  paper margin, mat, border, keyline or frame (`PLATE_SURROUNDS`). The plate QC (empty-scene-qc.txt) fails a
+  `PLATE_MARKS` item in its **Wrong text** check and a `PLATE_SURROUNDS` item, or a smaller picture inside the frame,
+  in a new **Frame edge** check.
+- Severity (the double-failure policy, 91c85ab66, `server/lib/plateQc.js`): a signature, monogram or initials files
+  under the check key `text`, and a margin, mat, border, keyline or inner picture under `artefact`. Both keys are
+  HARD in `PLATE_QC_CHECKS`, and their `what` lists already name these defects, so plateQc.js is unchanged.
+- The Lab's `edit_image` gains `params.source: 'derive_base'`: the base plate a derived page's plate was edited from
+  (its stored `emptySceneGrokRefImages[0]`), so a production derive is replayed on its exact input.
+
+**QC replay (rung 1, gemini-2.5-flash, stored plates, twice):** before the check-key reply format landed: LOC002.1 base
+FAIL (white border + signature), p11 FAIL (signature), p13 FAIL (signature), clean p4, p14, p8 PASS. On the merged
+prompt (check keys): LOC002.1 FAIL `text` (signature; the mat was not named this time), p11 FAIL `text`, p13 FAIL
+`text`, p4, p14, p8 PASS. The mat is named in one of two runs; a signature in every run. The LOC001.1 retry is not
+stored (the run kept the first plate), so it could not be replayed.
+
+**Lab (rung 2, staging 7c297239c, `edit_image`, grok-imagine, sent prompt read from the experiment: plate-derive.txt,
+no "identical / resize"):**
+- **1479** ultra-wide, `source: derive_base` on p10 = the matted, signed LOC002.1 base: no inner frame, no mat, no
+  signature; a real pull-back (the two flanking houses whole, the bridge, river and spire in the middle, open
+  cobbles and grass in front, a large sky). The street canyon opened into a wider square, so the flanking houses
+  now stand free. A trace of torn-paper edge at the top-left corner. Plate QC: PASS.
+- **1480** ultra-wide on the clean p4 base (tree roots close-up): a real pull-back (the whole tree, more trees, sky),
+  no signature, no inner frame, but an irregular cream deckle edge along the top and sides. Plate QC: PASS (the
+  judge did not count a deckle edge as a margin).
+- **1481** aerial on the same p4 base: edge to edge, no mark, truly top-down, but a radially symmetric composition
+  (four invented houses around a bare tree seen from above). The aerial move is not proven to keep the place.
+- Open: the watercolor style text asks for "rough cold-press paper texture throughout, edges dissolving into the
+  paper", a candidate source of the deckle edge and the mat. Not changed here (style text is outside this fix).
+
+
+**Touched:** prompts/plate-derive.txt (new), prompts/empty-scene.txt, prompts/empty-scene-qc.txt,
+server/lib/shotVocabulary.js, server/services/prompts.js, server/lib/images.js, server/lib/evalPipeline.js,
+server/lib/testlab.js, storyJobPipeline.js, scripts/admin/sibling-registry.json,
+tests/unit/plate-edge-and-derive-template.test.ts, tests/unit/plate-derive-for-angle.test.ts,
+tests/unit/empty-scene-qc-extraction.test.ts, docs/prompt-inventory.md, docs/image-routing.md.
+**Status:** ✅ active on staging.
+
 ## 2026-09-24 — An outfit description is appearance only, and a repair descriptor names one closed-vocabulary garment, never the outfit sentence
 
 **Context:** Staging job_1790277448294_5herh01j7 (dragon run 7). The wardrobe writer put plot notes in
@@ -59996,6 +60102,127 @@ Gemini fallback then fails, the thrown error names the upstream failure(s) first
 combined message, so callers that classify refusals by message substring are unaffected.
 
 **Touched:** `server/lib/images.js`, `tests/unit/grok-fallback-logged.test.ts`.
+**Status:** ✅ active on staging — narrowed 2026-09-25 (next entry): a prompt that does not fit is not a
+Grok failure and never falls back.
+
+## 2026-09-25 — A prompt that does not fit is our bug: it fails loudly and never falls back; a plate prompt has its own cut order (narrows "The plate fallback stays")
+
+**Context:** Staging job_1790277448294_5herh01j7. The p1 and p11 landmark plate prompts were 7,552 and
+7,463 chars. `editWithGrok` prepends the 612-char magenta-extension prefix, and `fitGrokPromptWithPrefix`
+refitted the body into 7,288 through `sectionAwareCut`. A plate prompt opens with `**ART STYLE:**`, a
+must-keep marker of the PAGE prompt, so the whole plate read as protected tail and the cut threw
+"refusing to cut them". The dispatcher's Grok catch took that local throw for a Grok failure and fell back
+to gemini-2.5-flash-image, which painted photographic plates with signatures and paper mats and refused the
+covers (IMAGE_OTHER). On top, vantage plate prompts carried the Art Director prose twice: `v.description`
+is the vantage's own plate since 2026-09-17, and it went out both as the description and as FRAMING.
+
+**Decision (owner, 2026-09-25):**
+1. The vantage plate states its AD prose once: a vantage description FRAMING already carries is dropped
+   (`storyJobPipeline.js`).
+2. A plate call (`landmarkScene: 'plate'`, set by `emptyScenePlateRouting()`) is fitted by
+   `fitPlatePrompt` against the cap minus `MAX_MAGENTA_EXTENSION_PREFIX_LENGTH` (the longest prefix
+   `buildMagentaExtensionPrefix` can return, 616) whenever slot 0 is a scene plate, so the prefix never
+   pushes it over after the fit. `PLATE_CUT_ORDER` drops only the generic landmark-photo note (when the
+   named IDENTITY / MEDIUM / CONDITIONS block carries its rules) and the over-the-shoulder line (on a plate
+   that is not over-the-shoulder). Nothing else in a plate prompt is cut.
+3. **A local prompt-fit failure is OUR bug, not the provider's.** `PromptFitError`
+   (`server/lib/promptFitError.js`) is what `sectionAwareCut` and `fitPlatePrompt` throw. Every
+   provider-fallback catch in `images.js` (dispatcher primary Runware / primary Grok / model-routed Grok,
+   `editImageWithPrompt` and its sanitized retry) calls `rethrowLocalFault` first: a `prompt_fit_failed`
+   error event and a rethrow. That plate fails (plate or fail); no Gemini picture stands in for it.
+   **The Grok→Gemini fallback of 2026-09-24 stays for real provider errors only.**
+
+**Rationale:** a fallback that also catches our own bugs hides them behind another provider's picture —
+that is how a prompt-length bug shipped as "Gemini paints photographs". Reserving the worst-case prefix
+up front means the prompt that is fitted is the prompt that is sent.
+
+**Evidence (rung 1, free):** all 134 stored plate-template prompts, staging + production, last 14 days
+(92 landmark plates). Before: 2 landmark plates over cap − prefix (5herh01j7 p1 7,552, p11 7,463). After
+(AD prose once + worst-case reserve + plate cut order): 134/134 fit with no cut, largest landmark plate
+7,267 + 616 = 7,883 ≤ 7,900; with the cap artificially lowered by 600 chars, 134/134 still fit and 22 are
+fitted by the plate cut order alone. Unit tests: `tests/unit/plate-prompt-fit.test.ts` (red without
+`rethrowLocalFault`: 3 of 11 fail).
+
+**Touched:** `server/lib/promptFitError.js` (new), `server/lib/images.js`, `server/lib/grok.js`,
+`storyJobPipeline.js`, `docs/image-generation-methods.html`, `tests/unit/plate-prompt-fit.test.ts`.
+**Status:** ✅ active on staging.
+
+## 2026-09-25 — A page is derived from its base plate only for what the base lacks (amends 2026-09-21 "An angled page takes a plate DERIVED")
+
+**Context:** The derive loop compared a page's plate class with `PLATE_BASE_CLASS` ('eye-level') only. A
+vantage with no eye-level page paints its base from its angled page, and that page was then "derived" into
+the camera it already had: staging job_1790277448294_5herh01j7 p10 (ultra-wide from an ultra-wide base) and
+p14 (high-angle from a high-angle base) each took a second camera move — an extra paid edit that can only
+drift the place.
+
+**Decision (owner, 2026-09-25):** `plateEditForPage` (`server/lib/platePlan.js`) compares the page's class
+with the class the base was actually painted in (`plateClass(vantageShot)`): a camera move only when they
+differ, a re-light only when the declared light differs, neither → the page shares the base. A camera
+derive names the base's real shot ("painted as a ultra-wide shot"), not "eye level". The derive is booked
+under the provider that ran it (`grok` for the plate model; `editImageWithPrompt`'s Gemini fallback now
+reports the Gemini model it called).
+
+**Evidence (rung 1, free):** replay of the old and new key logic over the stored run: the old logic
+reproduces the stored `plateDerivedFor` on all 18 pages; the new one derives 4 plates instead of 6 — p10 and
+p14 share their base, the four re-lights (p3, p13, p15-17, p18) are unchanged.
+
+**Touched:** `server/lib/platePlan.js` (new), `storyJobPipeline.js`, `server/lib/images.js`,
+`tests/unit/plate-plan.test.ts`.
+**Status:** ✅ active on staging.
+
+## 2026-09-25 — A plate that fails QC twice keeps the less SEVERE attempt; hard defects are named by check, never read from text
+
+**Context:** Every plate retry site (vantage base, derived, per-page) kept the retry only when it listed
+fewer issues. Staging job_1790277448294_5herh01j7: the p10 ultra-wide derive kept its first attempt ("a
+large glowing white rectangular frame") over a re-derive whose only fault was the setting, 1 issue vs 1;
+the LOC001.1 base plate failed on its medium, then on a signature, and shipped with nothing saying so. The
+stored QC history (`v1ImageData`) was the shipped plate itself whenever the first attempt was kept, so the
+rejected retry was lost.
+
+**Decision (owner, 2026-09-25):**
+1. **Severity is structural.** The judge files each issue under one key of a closed list
+   (`PLATE_QC_CHECKS`, `server/lib/plateQc.js`, filled into `empty-scene-qc.txt` as `{CHECK_KEYS}`); the
+   pixel checks file theirs in code. HARD = `artefact` (box, panel, border, frame, mat), `medium`
+   (photograph / wrong medium), `text` (lettering, signature, watermark). Everything else is soft. An
+   issue under no known key is `unclassified`, logged as an error and counted HARD. No issue text is read.
+2. **The pick** (`decidePlateAfterRetry`): the retry wins when it passes, has fewer hard defects, or as
+   many hard and fewer soft ones; otherwise the first attempt stays.
+3. **A derived plate hard twice falls back to its base plate** (owner: a wrong camera on the right place
+   beats no plate). **A base or per-page plate hard twice ships**, with a `plate_shipped_failed_qc` warn
+   event carrying the defects (gates are guidelines).
+4. **Both attempts are stored**: `emptySceneQc` gains `retryImageData`, `retryIssues`, `keptAttempt`,
+   `shippedWithHardDefects`; `v1ImageData` is always the first attempt. One builder (`plateQcRecord`) and
+   one whitelist copy (`emptySceneQcOf`) replace the four hand-kept copies.
+5. **No retry into a deterministic failure**: a retry whose prompt cannot fit (`PromptFitError`, already
+   logged as `prompt_fit_failed`) counts as "no image" and is not sent; the per-page retry's usage is now
+   booked (it was not).
+
+**Evidence:** the new judge prompt run on two stored plates of the run (rung 2, 2 Gemini-flash calls,
+~$0.002): p10's derived v1 → `[artefact] a large glowing white rectangular frame…`, `[text] a signature…`
+(2 hard); p13's derived v1 → `[landmark] …generic European city scene…` (1 soft). Unit:
+`tests/unit/plate-qc-severity.test.ts`.
+
+**Touched:** `server/lib/plateQc.js` (new), `server/lib/evalPipeline.js`, `prompts/empty-scene-qc.txt`,
+`storyJobPipeline.js`, `server/lib/testlab.js`, `client/src/types/story.ts`,
+`client/src/components/generation/story/ReferencePhotosDisplay.tsx`,
+`tests/unit/plate-qc-severity.test.ts`, `tests/unit/empty-scene-qc-extraction.test.ts`.
+**Status:** ✅ active on staging.
+
+## 2026-09-25 — Every plate call site sends the book's full art style; the stripped "empty-scene" style is deleted
+
+**Context:** The story-run plates (vantage, per-page, trial) send `resolveArtStyle`. The Test Lab
+`empty_scene` stage, the cover plate (`coverIterate.buildCoverReferences`) and the iterate plate
+(`images.renderStoryPagePlate`) sent `resolveArtStyleForEmptyScene`, which drops every sentence naming a
+face, eye, skin, character or expression. For pixar that leaves "Never photographic."; for watercolor it
+drops the sentence that says "watercolor". The Lab therefore tested a plate prompt production never sends,
+and the cover and repair plates were painted without their medium.
+
+**Decision (owner, 2026-09-25):** all three send `resolveArtStyle(style || 'pixar') || ''`, exactly as the
+story-run plates do; `resolveArtStyleForEmptyScene` is deleted (a replaced mechanism is deleted, not kept).
+The plate template's own "no figures" lines already carry what the stripping was for.
+
+**Touched:** `server/lib/testlab.js`, `server/lib/coverIterate.js`, `server/lib/images.js`,
+`server/lib/promptBuilders.js`, `server/lib/storyHelpers.js`, `tests/unit/plate-style-parity.test.ts`.
 **Status:** ✅ active on staging.
 
 ## 2026-09-24 — The plan check is given the over-the-shoulder contact rule
@@ -60525,3 +60752,59 @@ to +$0.45 per story.
 **Touched:** `server/config/models.js`, `server/lib/beatsPipeline.js`, `server/lib/testlab.js`,
 `tests/unit/arc-creator-effort.test.ts`, `docs/prompt-inventory.md`.
 **Status:** ✅ committed on `staging`, not pushed.
+
+## 2026-09-25 — REQUIRED CAST is never cut by the prompt shrink
+
+**Context.** On staging `job_1790277448294_5herh01j7` (covers-as-pages build, commit 30e5d33c) the shrink cut
+REQUIRED CAST on p3, p10 and p14 (step #6 of the cut order) and on the back cover's Grok edit (7388 → 6886 against a
+7290 cap); on p14 a character then wore a coat that should have lain on the heap.
+
+**Decision (owner, 2026-09-25).** REQUIRED CAST leaves `PROMPT_CUT_ORDER` and joins `PROMPT_NEVER_CUT` (an exact-text
+entry). It already sits after ART STYLE, inside the protected tail, so no prose trim reaches it; `cutBlocks()` now
+throws at load if any step would remove it, and a prompt the tail alone cannot fit still fails loudly. One list, so
+every path that shrinks an image prompt — pages, covers, the Grok edit — gets it.
+
+**Consequence (measured, free replay of the real builder over that story).** The same caps are met by cutting the page
+facts further down the order instead: p3 / p10 / p14 now lose HEIGHT ORDER, AGE & PROPORTIONS and the reference-photo
+rule (10660 → 7703, 10637 → 7680, 10496 → 7539 at 7900); the back cover keeps REQUIRED CAST at both 7900 (→ 7584) and
+the edit's 7290 (→ 6780, also losing those three). The cut-order docs are regenerated from the code.
+
+**Touched:** server/lib/images.js, docs/image-generation-methods.html, docs/prompt-inventory.md (generated),
+tests/unit/cover-shrink-must-keep.test.ts, tests/unit/prompt-says-each-thing-once.test.ts.
+
+## 2026-09-25 — The front cover names the story's central figure; each cover cites its own place
+
+**Context.** First full story on the covers-as-pages build (staging `job_1790277448294_5herh01j7`). The front cover's
+beat said "a creature the story centres on appears", and the Art Director staged the four children only — no dragon.
+All three covers cited `LOC001.2`, although each beat said "a different place from the other covers". The scene
+review changed no cover page (its BRIEF FAULTS carried no cover finding).
+
+**Diagnosis (the sent AD prompt and the returned briefs).** Not the element budget (worn garments do not count, the
+brief cited no element at all). The beat asked for an UNNAMED figure while the template binds the Art Director to
+the cast the plan line NAMES — rule 3 ("Only characters from the page's plan line … Do not import characters from
+other pages") and the bible rule "a tracked animal's entry claims only pages whose plan line names it". The creature
+rule could not win against them. "A different place" named no unit, so one location seen from one vantage passed
+as "the key place" three times.
+
+**Decision.**
+- The front cover's beat NAMES the central figure in its cast field — from the arc's structured STORY LOGIC
+  "Central figure:" line (`arcCentralFigure`), the last name where it changes (the state the story ends in); "none"
+  → the cast alone. The unnamed "creature the story centres on" clause is gone. Code reads no prose to decide it.
+- Every cover beat states `COVER_OWN_PLACE`: a location no other cover cites while the bible holds one no cover uses,
+  otherwise a vantage of it no other cover cites.
+- Two mechanical brief checks go to the scene review (REVIEWABLE), structured data only:
+  `cover_cast_dropped` (a name in a cover beat's code-written cast field that the brief neither cites in `objects[]`
+  nor lists in `characters[]`), and `cover_location_repeated` (a later cover cites an earlier cover's vantage, or its
+  location while the bible has an unused one). The iterate rewrite is held to `cover_cast_dropped` too; the location
+  check is whole-book, like `vb_state_no_base`. Not an eval or scoring change.
+- The Lab `beats_scenes` stage passes the stored central figure, or `params.centralFigure` for a story stored before
+  the arc recorded it.
+
+**Replay (free, real builders over that story).** With the central figure the arc would name (Nebla — this story
+predates the recorded line), the front plan line reads `wide — Levin, Julian, Max, Kiaan, Nebla — …`, all three beats
+carry the own-place rule in the built AD prompt, and the checks over the STORED briefs return `cover_cast_dropped`
+on −1 (Nebla, ANI002) and `cover_location_repeated` on −2 and −3 (LOC001.2; LOC002 unused).
+
+**Touched:** server/lib/coverBeats.js, server/lib/beatsPipeline.js, server/lib/sceneBriefCheck.js,
+server/lib/iterateBeat.js, server/lib/testlab.js, tests/unit/covers-as-pages.test.ts,
+tests/unit/iterate-rewrite-checked-like-authored.test.ts.
