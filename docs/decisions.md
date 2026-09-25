@@ -95,7 +95,20 @@ prompt (check keys): LOC002.1 FAIL `text` (signature; the mat was not named this
 `text`, p4, p14, p8 PASS. The mat is named in one of two runs; a signature in every run. The LOC001.1 retry is not
 stored (the run kept the first plate), so it could not be replayed.
 
-**Lab:** pending (run after the staging deploy; recorded here when done).
+**Lab (rung 2, staging 7c297239c, `edit_image`, grok-imagine, sent prompt read from the experiment: plate-derive.txt,
+no "identical / resize"):**
+- **1479** ultra-wide, `source: derive_base` on p10 = the matted, signed LOC002.1 base: no inner frame, no mat, no
+  signature; a real pull-back (the two flanking houses whole, the bridge, river and spire in the middle, open
+  cobbles and grass in front, a large sky). The street canyon opened into a wider square, so the flanking houses
+  now stand free. A trace of torn-paper edge at the top-left corner. Plate QC: PASS.
+- **1480** ultra-wide on the clean p4 base (tree roots close-up): a real pull-back (the whole tree, more trees, sky),
+  no signature, no inner frame, but an irregular cream deckle edge along the top and sides. Plate QC: PASS (the
+  judge did not count a deckle edge as a margin).
+- **1481** aerial on the same p4 base: edge to edge, no mark, truly top-down, but a radially symmetric composition
+  (four invented houses around a bare tree seen from above). The aerial move is not proven to keep the place.
+- Open: the watercolor style text asks for "rough cold-press paper texture throughout, edges dissolving into the
+  paper", a candidate source of the deckle edge and the mat. Not changed here (style text is outside this fix).
+
 
 **Touched:** prompts/plate-derive.txt (new), prompts/empty-scene.txt, prompts/empty-scene-qc.txt,
 server/lib/shotVocabulary.js, server/services/prompts.js, server/lib/images.js, server/lib/evalPipeline.js,
