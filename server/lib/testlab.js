@@ -8608,10 +8608,17 @@ function storedChallengeSection(storyData) {
   // The draw is its entries; the heading is template text. A stored heading
   // may carry a challenge count today's arc no longer states (2026-09-25), so
   // the entries are re-headed with today's heading — one variable, the arc.
-  const entries = section.split('\n').filter(l => /^\s*-\s*\[C\d+\]/.test(l));
-  if (!entries.length) throw new Error('challengesFromStory: the stored # CHALLENGE IDEAS section lists no [C###] entries');
   const { CHALLENGE_IDEAS_HEADING } = require('./promptBuilders');
-  return [...CHALLENGE_IDEAS_HEADING, '', ...entries].join('\n');
+  const lines = section.split('\n');
+  const entries = lines.filter(l => /^\s*-\s*\[C\d+\]/.test(l));
+  if (entries.length) return [...CHALLENGE_IDEAS_HEADING, '', ...entries].join('\n');
+  // READ-COMPAT: stories drawn before the [C###] ids (2026-09-20) list their
+  // challenges as bare "- <challenge>" lines (Lab #1468 failed on
+  // job_1789420511893_zly5rcdej). They are the same draw, reused as they
+  // stand; the heading's tag line is left out, since these entries carry none.
+  const legacy = lines.filter(l => /^\s*-\s+\S/.test(l));
+  if (!legacy.length) throw new Error('challengesFromStory: the stored # CHALLENGE IDEAS section lists no challenge entries');
+  return [...CHALLENGE_IDEAS_HEADING.filter(l => !l.includes('[C###]')), '', ...legacy].join('\n');
 }
 
 /**
@@ -10392,4 +10399,7 @@ module.exports = {
   // resolution and rubric as a stored scorecard, instead of a second copy of
   // the judge wiring drifting alongside it.
   scoreArtifactsWithJudge,
+  // The stored challenge draw a create prompt carried, both stored shapes
+  // (tests/unit/testlab-stored-challenge-section.test.ts).
+  storedChallengeSection,
 };
