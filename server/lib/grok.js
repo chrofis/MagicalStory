@@ -198,29 +198,46 @@ async function generateWithGrok(prompt, options = {}) {
  * Names the exact pixel counts so Grok has unambiguous anchors. Without this
  * prefix the magenta survives into the output as visible bars.
  *
+ * Two variants of the sentence about the photographed centre:
+ *  - 'default': the centre stays pixel-faithful in composition and geometry.
+ *    Every production call uses it.
+ *  - 'structure_only': the whole frame is repainted in the art style and the
+ *    photo gives structure only. A Test Lab arm (params.plateExtensionPrefix)
+ *    for landmark plates, where the pixel-faithful clause copies the photo's
+ *    strangers and signs into the plate (RC5, 2026-09-25).
+ *
  * @param {{top:number,bottom:number,left:number,right:number}} pad
+ * @param {'default'|'structure_only'} [variant='default']
  * @returns {string}
  */
-function buildMagentaExtensionPrefix(pad) {
+const MAGENTA_EXTENSION_CENTRE_CLAUSE = {
+  default: 'The non-magenta center region must remain pixel-faithful in composition and geometry.',
+  structure_only: 'Repaint the whole frame in the ART STYLE; the photo gives structure only.',
+};
+function buildMagentaExtensionPrefix(pad, variant = 'default') {
+  const centreClause = MAGENTA_EXTENSION_CENTRE_CLAUSE[variant];
+  if (!centreClause) throw new Error(`[GROK] unknown magenta-extension prefix variant "${variant}"`);
   const parts = [];
   if (pad.top > 0) parts.push(`${pad.top}px at the TOP`);
   if (pad.bottom > 0) parts.push(`${pad.bottom}px at the BOTTOM`);
   if (pad.left > 0) parts.push(`${pad.left}px on the LEFT`);
   if (pad.right > 0) parts.push(`${pad.right}px on the RIGHT`);
-  return `The first input image has SOLID BRIGHT MAGENTA (pure #FF00FF) placeholder padding: ${parts.join(', ')}. Extend the existing scene content INTO these magenta regions so the output is a continuous illustration filling the entire canvas — paint matching sky above, matching ground/foreground below, matching scene continuation on the sides. The non-magenta center region must remain pixel-faithful in composition and geometry. DO NOT preserve any magenta. DO NOT add a magenta/pink/purple border, frame, or vignette. The final output must have NO visible magenta and NO visible padding boundary.\n\n`;
+  return `The first input image has SOLID BRIGHT MAGENTA (pure #FF00FF) placeholder padding: ${parts.join(', ')}. Extend the existing scene content INTO these magenta regions so the output is a continuous illustration filling the entire canvas — paint matching sky above, matching ground/foreground below, matching scene continuation on the sides. ${centreClause} DO NOT preserve any magenta. DO NOT add a magenta/pink/purple border, frame, or vignette. The final output must have NO visible magenta and NO visible padding boundary.\n\n`;
 }
 
+const MAGENTA_EXTENSION_PREFIX_VARIANTS = Object.keys(MAGENTA_EXTENSION_CENTRE_CLAUSE);
+
 /**
- * The longest prefix buildMagentaExtensionPrefix can return. Only the shorter
- * axis is padded, so one pair of sides carries numbers; 99999 px bounds every
- * input. A plate prompt is fitted against the cap minus this (images.js
- * _dispatchImageGeneration), because it cannot be refitted once the prefix is
- * known (owner, 2026-09-25).
+ * The longest prefix buildMagentaExtensionPrefix can return, over every
+ * variant. Only the shorter axis is padded, so one pair of sides carries
+ * numbers; 99999 px bounds every input. A plate prompt is fitted against the
+ * cap minus this (images.js _dispatchImageGeneration), because it cannot be
+ * refitted once the prefix is known (owner, 2026-09-25).
  */
-const MAX_MAGENTA_EXTENSION_PREFIX_LENGTH = Math.max(
-  buildMagentaExtensionPrefix({ top: 99999, bottom: 99999, left: 0, right: 0 }).length,
-  buildMagentaExtensionPrefix({ top: 0, bottom: 0, left: 99999, right: 99999 }).length,
-);
+const MAX_MAGENTA_EXTENSION_PREFIX_LENGTH = Math.max(...MAGENTA_EXTENSION_PREFIX_VARIANTS.flatMap(v => [
+  buildMagentaExtensionPrefix({ top: 99999, bottom: 99999, left: 0, right: 0 }, v).length,
+  buildMagentaExtensionPrefix({ top: 0, bottom: 0, left: 99999, right: 99999 }, v).length,
+]));
 
 /**
  * Fit `prefix + body` into the prompt budget of the Grok tier being called.
@@ -325,6 +342,9 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
                               // portrait manga B&W with sky + river extended cleanly.
                               // Slots 1+ (avatars, VB grids) keep their existing padInput
                               // behavior — only slot 0 gets the magenta treatment.
+    extensionPrefix = 'default', // buildMagentaExtensionPrefix variant for that pad.
+                              // Production: 'default'. Test Lab landmark-plate arm:
+                              // 'structure_only' (params.plateExtensionPrefix).
     maxRefs = 3,              // xAI docs (re-verified 2026-09-02) now say up to 5 source
                               // images per edit — up from the 3 verified 2026-08-30. Default
                               // stays 3 (production/packReferences budget); Test Lab passes
@@ -443,8 +463,8 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
   // the exact pixel counts so Grok has unambiguous anchors. Without this
   // prefix the magenta would survive into the output as visible bars.
   if (slot0Pad && (slot0Pad.top + slot0Pad.bottom + slot0Pad.left + slot0Pad.right) > 0) {
-    prompt = await fitGrokPromptWithPrefix(buildMagentaExtensionPrefix(slot0Pad), prompt, model);
-    log.info(`🎨 [GROK] Magenta-extension active on slot 0: pad top=${slot0Pad.top} bottom=${slot0Pad.bottom} left=${slot0Pad.left} right=${slot0Pad.right}`);
+    prompt = await fitGrokPromptWithPrefix(buildMagentaExtensionPrefix(slot0Pad, extensionPrefix), prompt, model);
+    log.info(`🎨 [GROK] Magenta-extension active on slot 0 (prefix: ${extensionPrefix}): pad top=${slot0Pad.top} bottom=${slot0Pad.bottom} left=${slot0Pad.left} right=${slot0Pad.right}`);
   }
 
   // Capture AFTER the prompt is final (magenta-extension prefix + budget fit
@@ -1235,8 +1255,22 @@ async function packReferences(refs = {}, options = {}) {
     maxSlots = 3,
     // TEST LAB ONLY: see composeCharWithVbRow's columnMaxFraction.
     vbColumnFraction = null,
+    // How the landmark photo of a PLATE call (landmarkScene 'plate') is fitted
+    // to the target aspect. 'pad' (production): the photo keeps its native
+    // aspect for editWithGrok's magenta extension. 'crop' (Test Lab arm,
+    // params.plateRefFit): centre-cropped to the target aspect here, so no pad
+    // and no extension prefix reach Grok (RC5, 2026-09-25).
+    plateSourceFit = 'pad',
   } = options;
   const tag = pageLabel ? `[GROK P${pageLabel}]` : '[GROK]';
+  if (plateSourceFit !== 'pad' && plateSourceFit !== 'crop') {
+    throw new Error(`${tag} unknown plateSourceFit "${plateSourceFit}"`);
+  }
+  if (plateSourceFit === 'crop' && (landmarkScene !== 'plate' || padInputWithExtension)) {
+    throw new Error(`${tag} plateSourceFit 'crop' needs a plate call (landmarkScene 'plate') without magenta extension`);
+  }
+  // Index (in `slots`) of the landmark photo a plate call renders from.
+  let plateSourceSlot = -1;
 
   // Extract character photo buffers as raw data — the layout function decides
   // how to crop/compose based on character count and aspect ratio.
@@ -1349,8 +1383,12 @@ async function packReferences(refs = {}, options = {}) {
         .jpeg({ quality: 92 })
         .toBuffer();
       slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
+      if (landmarkScene === 'plate') plateSourceSlot = slots.length - 1;
       log.info(`🎨 ${tag} Slot ${slots.length}: landmark photo (${landmarkScene === 'plate' ? 'plate source' : landmarkScene === 'castless' ? 'cast-0 page scene' : 'composite route'})`);
     }
+  }
+  if (plateSourceFit === 'crop' && plateSourceSlot < 0) {
+    throw new Error(`${tag} plateSourceFit 'crop' but no landmark photo was packed as the plate source`);
   }
 
   // Layout strategy (all char groups go through buildCharacterGroupSlot which
@@ -1604,6 +1642,17 @@ async function packReferences(refs = {}, options = {}) {
     if (padInputWithExtension && i === 0) {
       paddedSlots.push(slot);
       log.debug(`🎨 ${tag} Slot 1: native ${w}x${h} kept for editWithGrok magenta-extension`);
+      continue;
+    }
+
+    // Plate source with plateSourceFit 'crop': centre-crop the longer axis to
+    // the target aspect. The edges of the photo are lost; nothing is padded.
+    if (plateSourceFit === 'crop' && i === plateSourceSlot) {
+      const cropW = currentRatio > targetRatio ? Math.round(h * targetRatio) : w;
+      const cropH = currentRatio > targetRatio ? h : Math.round(w / targetRatio);
+      const cropped = await sharp(buf).resize(cropW, cropH, { fit: 'cover', position: 'centre' }).jpeg({ quality: 92 }).toBuffer();
+      paddedSlots.push(`data:image/jpeg;base64,${cropped.toString('base64')}`);
+      log.info(`🎨 ${tag} Slot ${i + 1}: plate source centre-cropped ${w}x${h} → ${cropW}x${cropH}`);
       continue;
     }
 
