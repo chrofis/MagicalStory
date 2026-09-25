@@ -1699,7 +1699,9 @@
     {
       "id": "planner-cast-table",
       "title": "The planner writes a CAST block before its plan lines and the plan lines keep it; CAST_PROMISE_BROKEN holds each line to it",
-      "commits": [],
+      "commits": [
+        "04c769b09"
+      ],
       "addedAt": "2026-09-25",
       "claim": "On beats_replan Lab reruns of #1495 (dragon, arcFromExperiment 1490) and #1496 (Fiona, arcFromExperiment 1492): report.castTable is present with one line per commissioned child and an ending line; every child meets the floor (3) and has a focal deed page in the shipped division (castSummary, or recheckCastSummary when a round was kept); the last page carries every child the ending line names; no CAST_PROMISE_BROKEN survives the recheck; and #1496 files no MAIN_UNDER_HALF against Sarah (the declared main is Fiona).",
       "runShape": [

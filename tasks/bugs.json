@@ -2077,7 +2077,7 @@
       "impact": "A must-fix finding against the wrong child on every story whose declared main is not first on the list; the re-plan then casts that child onto more pages.",
       "status": "fixed",
       "fixedAt": "2026-09-25",
-      "fixedIn": "the feat(plan) CAST-table commit of 2026-09-25 (hash filled in the follow-up chore commit)",
+      "fixedIn": "04c769b09",
       "fix": "runPlanCounters takes mainName; beatsPipeline and the Lab beats_replan stage pass pickMainCharacters(inputData).focus.name. No mainName, no MAIN_UNDER_HALF. Test: plan-cast-table.test.ts (Fiona declared fourth), and the csjcyp1q9 real-plan test no longer expects MAIN_UNDER_HALF for Sarah."
     }
   ]
