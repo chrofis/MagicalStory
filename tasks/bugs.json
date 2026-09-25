@@ -2053,7 +2053,7 @@
       "impact": "No story page could be repaired by iterate during generation since 2026-09-24; pages shipped at their pre-iterate score. Entity consistency's worn-item and cast lookups read the same field.",
       "status": "fixed",
       "fixedAt": "2026-09-25",
-      "fixedIn": "",
+      "fixedIn": "49ae547ec",
       "fix": "One projection, sceneMetadata.sceneDescriptionRecord, builds the stored sceneDescriptions record (brief under `description`) for the stored story AND for the repair pipeline's story data (projected at repair time, so a side-mirrored brief is the one iterated). iteratePageCore's lookup is resolveIterateScene; the `|| sceneDescription` aliases in images.js and entityConsistency.js are gone. Replay over the stored p7/p14 briefs: old input throws, fixed input resolves the stored brief."
     }
   ]
