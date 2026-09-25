@@ -2029,7 +2029,7 @@
       "impact": "Landmark plates on Gemini (photographic, lettering, paper mats) and lost covers, with the real cause hidden behind a provider fallback.",
       "status": "fixed",
       "fixedAt": "2026-09-25",
-      "fixedIn": "",
+      "fixedIn": "aa31762b3",
       "fix": "AD prose emitted once; plate calls fitted by fitPlatePrompt (own cut order: landmark photo note, over-the-shoulder line; nothing else cut) against cap minus the worst-case magenta prefix (616); PromptFitError is rethrown by every provider-fallback catch (rethrowLocalFault, prompt_fit_failed error event) instead of falling back. Replay over 134 stored plate prompts (both DBs, 14 days): 134/134 fit, none cut, largest landmark plate 7,267 + 616 = 7,883."
     },
     {
@@ -2041,7 +2041,7 @@
       "impact": "An extra paid Grok edit per such page that can only drift the place away from its base; the derive instruction also claimed the base was painted at eye level.",
       "status": "fixed",
       "fixedAt": "2026-09-25",
-      "fixedIn": "",
+      "fixedIn": "4730d4799",
       "fix": "plateEditForPage (server/lib/platePlan.js) derives a camera move only when the page class differs from plateClass(vantageShot), a re-light only when the light differs; the derive names the base's real shot. Replay on the stored run: old logic reproduces all 18 stored plateDerivedFor values; new logic 4 derives instead of 6, p10 and p14 share their base."
     }
   ]
