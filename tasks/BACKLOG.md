@@ -66,7 +66,13 @@ Last full sweep: **2026-09-06**.
 - [ ] Every child acts, in the arc (variant B made the default 2026-09-25, Lab #1490): BUILT on staging
       (not pushed). Open: validation on the next full story (`tasks/verify.json` `arc-every-child-acts`)
       → `docs/decisions.md` "2026-09-25 — Every child acts, in the arc"
-- [ ] Stage 2 (page plan) owes what the arc no longer carries (owner 2026-09-25: "who enters when, how
+- [x] Stage 2 (page plan) owes what the arc no longer carries — BUILT 2026-09-25 on staging (not pushed):
+      the exciting start and the happy ending are shared constants (EXCITING_START_DEF, HAPPY_ENDING_DEF,
+      plan-check Q15/Q16, must-fix); a cast finding carries its fix, the review holds the character list to
+      the book's floor, kept pages take a child a cast finding asks for (Lab #1494). The deed itself comes
+      from the arc again (variant B). Open: paid validation, `tasks/verify.json` `stage2-cast-coverage`
+      → `docs/decisions.md` "2026-09-25 — Stage 2: a cast finding is answered by casting the child in".
+      Original item: (owner 2026-09-25: "who enters when, how
       everyone gets their scene, an exciting start and a happy ending"). Present: entrances
       (`prompts/story-beats.txt:76` / `prompts/plan-check.txt:32` Q2, shared NAMING_DEF). Partial: each
       character's scene — `castActionRule` stages "the action the story gives them", and since v3 the arc

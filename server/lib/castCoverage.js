@@ -127,6 +127,26 @@ function castCoverageRule(cov, { centralFigure = null, mayAddDeeds = false } = {
 }
 
 /**
+ * HOW A CAST FINDING IS ANSWERED (owner, 2026-09-25, on Lab #1494). The
+ * counters' UNDER_COVERED_CHARACTER and NO_FOCAL_PAGE lines used to state the
+ * count and nothing else; the re-plan of #1494 (dragon, 18 pages, four boys)
+ * answered them by pouring the main character into every page that asked for
+ * a commissioned character (Levin 8 -> 14 pages), took a page from Max (3 -> 2)
+ * to give Kiaan a focal page, and left Kiaan on 2. The finding now carries the
+ * fix: the character is cast IN — their own action on a page of its own, or a
+ * neighbouring moment the group shares — and never at the cost of another
+ * commissioned character's floor. The same floor is the review's `span` rule
+ * for the commissioned cast (planCounters.reviewPlanChanges `castFloor`).
+ */
+function underCoveredFix(name, floor) {
+  return `Answer it by casting ${name} in — on a page of their own whose instant is their own action, or in a neighbouring moment the group shares — never by casting out another commissioned character who would fall below ${pagesWord(floor)}.`;
+}
+
+function noFocalFix(name) {
+  return `Answer it with a page whose instant is ${name}'s own action, ${name} alone or with one companion: move that action onto a page of its own, or out of a shared moment onto a neighbouring page — never by taking another character's only focal page.`;
+}
+
+/**
  * WHO THE COMMISSION SUPPLIED — the one definition the plan counters and the
  * arc's counting rule share (2026-09-23).
  *
@@ -167,6 +187,8 @@ module.exports = {
   ADDED_DEED_RULE,
   centralFigureActionRule,
   castCoverageRule,
+  underCoveredFix,
+  noFocalFix,
   PAGE_CAST_TYPICAL,
   APPEARANCES_TARGET_MAX,
   APPEARANCES_TARGET_MIN,

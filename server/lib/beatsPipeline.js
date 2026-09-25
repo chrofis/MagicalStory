@@ -1664,7 +1664,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
           finalArc: approvedArc,
           arcHints,
           centralFigure: arcCentralFigure,
-          replan: buildReplanSection(pagePlan, pendingCheck.findings, { pageCount: beats.length, keep, refused: lastRefusals }),
+          replan: buildReplanSection(pagePlan, pendingCheck.findings, { pageCount: beats.length, keep, refused: lastRefusals, castFloor: coverageRule ? coverageRule.appearances.min : null }),
         });
         if (!replanPrompt) throw new Error('story-beats template unavailable');
         const rpRes = await textModels.callTextModelStreaming(replanPrompt, null, onChunk, planModel, { usageLabel: 'beats_replan' });
@@ -1801,6 +1801,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
             protectedPages: new Map(keep.map(k => [Number(k.page), k.why])),
             actions: pendingCheck.actions,
             rankOf: replanRank,
+            // The commissioned span floor the re-plan was told (2026-09-25).
+            castFloor: coverageRule ? { names: commission.listed, min: coverageRule.appearances.min } : null,
           });
           reviewRefusals = review.refusals;
           lastRefusals = review.refusals;

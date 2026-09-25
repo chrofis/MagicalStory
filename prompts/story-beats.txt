@@ -75,7 +75,9 @@ Requirements:
 - The stake the arc has a character say aloud lands on an early page, spoken.
 - A character's first page stages their {NAMING_DEF} A character in frame before anyone says who they are is unplaced.
 - A prop, pet or skill that solves a problem appears on an earlier page with its owner before it does the work, and nothing a page plants is left without a later page that pays it off.
+- {EXCITING_START_DEF}
 - {ENDING_EVENT_DEF}
+- {HAPPY_ENDING_DEF}
 - Stage a page with two people rather than three when two carry it.
 - No plan line states what anyone learned, realised or now understands.
 

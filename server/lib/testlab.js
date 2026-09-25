@@ -9892,7 +9892,7 @@ function rawObstacleLines(text) {
 function analyzeReplanCompliance({
   replanText = '', checkText = '', standing = [], findings = [],
   castNames = [], aliases = {}, maxCast = 3,
-  focalNames = [], keep = [],
+  focalNames = [], keep = [], castFloor = null,
 } = {}) {
   const { parsePlanResponse, parsePlanChanges, parsePlanCheckObstacles, parsePlanCheckActions, findingPages, replanRank } = require('./promptBuilders');
   const { reviewPlanChanges, castLostByReplan } = require('./planCounters');
@@ -9940,6 +9940,7 @@ function analyzeReplanCompliance({
     protectedPages: new Map((keep || []).map(k => [Number(k.page), k.why])),
     actions: parsePlanCheckActions(String(checkText || '')),
     rankOf: replanRank,
+    castFloor,
   });
   restore(review.refusals.map(r => r.pageNumber));
   const lost = castLostByReplan(standing, merged, castNames, aliases, review.declaredOut);
@@ -10266,7 +10267,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
     focalPages: (counters.stats && counters.stats.focalPages) || {},
   });
   const coverageRule = require('./castCoverage').castCoverage({ pageCount, castCount: commission.listed.length });
-  const replanSection = buildReplanSection(pagePlan, findings, { pageCount, keep });
+  const replanSection = buildReplanSection(pagePlan, findings, { pageCount, keep, castFloor: coverageRule ? coverageRule.appearances.min : null });
   const replanPrompt = buildBeatsPrompt(storyData, pageCount, { finalArc: approvedArc, arcHints, centralFigure, replan: replanSection, mayAddDeeds });
   if (!replanPrompt) throw new Error('story-beats template unavailable');
   t = Date.now();
@@ -10284,6 +10285,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
     maxCast,
     focalNames: coverageRule && coverageRule.focalEach ? commission.listed : [],
     keep,
+    castFloor: coverageRule ? { names: commission.listed, min: coverageRule.appearances.min } : null,
   });
 
   // ── the recheck and the round guard, as beatsPipeline runs them ───────────

@@ -1,4 +1,4 @@
-Check how a finished story was divided into {PAGE_COUNT} pages. The story itself is settled — never judge, repair or rewrite it. Only the division is in question, and only on the fourteen points below.
+Check how a finished story was divided into {PAGE_COUNT} pages. The story itself is settled — never judge, repair or rewrite it. Only the division is in question, and only on the sixteen points below.
 
 Commissioned characters: {CHARACTER_NAMES}
 
@@ -26,7 +26,7 @@ Under UNLISTED, and only there, read the instant as well: write every character 
 
 # YOUR TASK
 
-Answer only these fourteen:
+Answer only these sixteen:
 
 1. Emotional highlights. Name every page the plan stages as one character showing a strong feeling, and say whether that page is truly one person's felt moment. A page holding a second actor, an event, or a feeling nobody shows is a finding.
 2. Entrances. Name the page each character first appears on. That page stages an {NAMING_DEF} A character already in frame before anyone says who they are is a finding.
@@ -47,6 +47,8 @@ Answer only these fourteen:
 
 13. Order. Name every page whose instant stages a moment the story reaches only in a later sentence, or that needs something a later page first brings about. A change listed under HINTS belongs where its own words place it in the story.
 14. Over-the-shoulder. {OTS_NO_CONTACT} Name every over-the-shoulder page whose instant has the figure nearest the camera touching what they face, and ask for another shot.
+15. The opening. {EXCITING_START_DEF} Say whether it does. A page 1 whose instant is a pose, a look at the place or someone waiting is a finding, and so is a character whose first page shows them doing nothing.
+16. The ending's cast. {HAPPY_ENDING_DEF} Say whether it does. A commissioned character missing from the last page's who column while the story keeps them with the others is a finding.
 
 # OUTPUT FORMAT
 

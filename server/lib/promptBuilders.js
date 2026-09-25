@@ -7203,7 +7203,11 @@ function buildChallengeIdeasSection(inputData, count = 25) {
 // Q14 (over-the-shoulder page on a contact beat, owner 2026-09-24) joined as
 // must-fix: it asks only for another shot word on the named page, never for a
 // page to be spent or moved.
-const REPLAN_MUST_FIX_CHECKS = new Set([4, 8, 12, 14]);
+//
+// Q15 (the exciting start) and Q16 (the ending's cast safe and together)
+// joined as must-fix (owner, 2026-09-25): each names a picture the book owes,
+// page 1 and the last page, the same kind of finding as Q4 and Q8.
+const REPLAN_MUST_FIX_CHECKS = new Set([4, 8, 12, 14, 15, 16]);
 
 /**
  * THE SHOT-DISTRIBUTION BLOCK, declared ONCE (2026-09-20).
@@ -7541,13 +7545,23 @@ function replanKeepPages({ pageCount, wanted = [], actions = [], focalPages = {}
  *   ACTION pages, a character's only focal page (2026-09-23)
  * @param {Array<{pageNumber:number, rule:string, detail:string, line:string}>} [opts.refused]
  *   the previous round's declared changes the review refused and undid
+ * @param {number|null} [opts.castFloor] castCoverage().appearances.min — the
+ *   pages a commissioned character keeps (the review's `span` floor for the
+ *   character list, planCounters.reviewPlanChanges `castFloor`)
  */
-function buildReplanSection(pagePlan, findingLines, { pageCount = null, keep = [], refused = [] } = {}) {
+function buildReplanSection(pagePlan, findingLines, { pageCount = null, keep = [], refused = [], castFloor = null } = {}) {
   const items = (Array.isArray(findingLines) ? findingLines : String(findingLines || '').split('\n'))
     .map(f => (f && typeof f === 'object' ? { ...f, line: String(f.line || '').trim() } : { line: String(f || '').trim() }))
     .filter(f => f.line);
   if (items.length === 0) return '';
-  const must = items.filter(f => replanRank(f) === 'must').map(f => f.line);
+  // CAST AND PICTURE FINDINGS FIRST (2026-09-25). The must-fix list ran in
+  // counter order, shot counts first; on Lab #1494 the round answered the shot
+  // and main-character lines and left Kiaan under the floor. The findings
+  // that cost the book a picture (countsTowardConvergence) lead; the cheap
+  // relabels follow, each half in its own order.
+  const mustItems = items.filter(f => replanRank(f) === 'must');
+  const must = [...mustItems.filter(countsTowardConvergence), ...mustItems.filter(f => !countsTowardConvergence(f))].map(f => f.line);
+  const floor = Number(castFloor) || 0;
   const also = items.filter(f => replanRank(f) !== 'must').map(f => f.line);
   // Derived from the plan when the caller gives no count, and never smaller
   // than the highest page number the plan shows: a span that contradicts the
@@ -7585,8 +7599,17 @@ function buildReplanSection(pagePlan, findingLines, { pageCount = null, keep = [
     'You divided this story once. Your plan and the findings against it follow. Return a line for every page you change, in the same format, and for no other page — a page you leave out stands exactly as it is. Where a must-fix finding and a noted one pull opposite ways, the must-fix wins.',
     `The book keeps ${span}. No number is added and none is retired. A moment that earns a picture of its own takes an existing number: that page's material joins a neighbouring page, and the freed number stages the moment. Return both pages.`,
     'A finding is answered by adding or by removing, whichever that finding asks for. A page holding none of the commissioned characters gains one. A page past the cast ceiling loses one, or a page holding more than one action keeps the first alone and what follows from it goes to "what is true after" or to a page of its own. A name, an action or a page goes only where a finding asks for less in frame, never where one asks for more.',
-    'Two figures stay wherever they are: the character whose action a page\'s instant works against, and a character the division would leave with fewer than two pages in the book.',
-    ...(keepList.length ? [`These pages keep their instant and their cast, and change only for a must-fix finding that names them: ${keepList}.`] : []),
+    `Two figures stay wherever they are: the character whose action a page's instant works against, and a character the division would leave with fewer than two pages in the book${floor > 2 ? ` — for a commissioned character, fewer than ${floor}` : ''}.`,
+    // WHO A PAGE GAINS (2026-09-25). On Lab #1494 every page that asked for a
+    // commissioned character gained the main character (Levin 8 -> 14) while
+    // Kiaan stayed under the floor.
+    'A page that gains a commissioned character gains one a cast finding names — under the floor or without a focal page — before anyone else.',
+    // A KEPT PAGE TAKES A CHARACTER A CAST FINDING ASKS FOR (2026-09-25). A cast
+    // finding names the pages the character is already on, never the page the
+    // fix belongs on, so "only for a must-fix finding that names them" shut the
+    // ending's page and every WANTED and ACTION page to the under-covered child
+    // — stricter than the review, which lets any must-fix finding change them.
+    ...(keepList.length ? [`These pages keep their instant and their cast, and change only for a must-fix finding that names them — except that a commissioned character a cast finding asks for may join one: ${keepList}.`] : []),
     'A noted finding is answered only where the answer removes nothing the story\'s sentences stage.',
     'A finding that names a page names a candidate, not an order. A finding asking the book for a page with no people in frame names the page best suited to give up its cast: empty that one, unless a figure on it is one of the two that stay — then empty another page and say in the declaration why that one could not.',
     'Declare every change you make under ---CHANGES---, with the finding it answers and why. A change you do not declare is undone.',
@@ -8057,6 +8080,8 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     TWO_HEIGHTS_DEF,
     NAMING_DEF,
     ENDING_EVENT_DEF,
+    EXCITING_START_DEF,
+    HAPPY_ENDING_DEF,
     // The same act spans the checker's question 4 is given (arcActSpans).
     ACT_SPANS: arcActSpans(finalArc),
     FINAL_ARC: String(finalArc || '').trim() || '(no final arc was recorded — divide the story the idea below describes)',
@@ -8479,6 +8504,17 @@ const TWO_HEIGHTS_DEF = 'two named characters at different heights — deck and 
 // No leading article: the planner says "stages THEIR arrival", the checker "stages AN arrival", and both wordings are pinned by tests.
 const NAMING_DEF = 'arrival or a naming by someone present; a badge, a garment, a title or an epithet is not a naming.';
 const ENDING_EVENT_DEF = "When the story's ending has an event of its own, the last page stages that event as its instant.";
+/**
+ * THE START AND THE END OF THE PAGE PLAN (owner, 2026-09-25, the stage split:
+ * "who enters when, how everyone gets their scene, an exciting start and a
+ * happy ending"). ONE sentence each, the planner's imperative in
+ * story-beats.txt and the plan check's question (15, 16) in plan-check.txt.
+ * Both questions are must-fix (REPLAN_MUST_FIX_CHECKS): each names a picture
+ * the book owes, like Q4 and Q8. On Lab #1494 page 18 showed Levin and Julian
+ * only; Max and Kiaan were never back.
+ */
+const EXCITING_START_DEF = 'Page 1 opens on an action already under way, and each character is introduced through what they do.';
+const HAPPY_ENDING_DEF = 'The last page shows the commissioned characters safe and together, unless the story itself separates them.';
 /**
  * THE ACTS BY SENTENCE NUMBER (2026-09-23). Q4 asks for the most wanted picture
  * of each act, and the acts were never defined: on staging
@@ -10197,6 +10233,8 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHi
     TWO_HEIGHTS_DEF,
     NAMING_DEF,
     ENDING_EVENT_DEF,
+    EXCITING_START_DEF,
+    HAPPY_ENDING_DEF,
     WANTED_PICTURE_DEF,
     // Question 4's acts, by sentence number — the planner's question 6 gets the same line.
     ACT_SPANS: arcActSpans(arc),
@@ -12016,6 +12054,8 @@ module.exports = {
   HINT_ANCHOR_RULE,
   NAMING_DEF,
   ENDING_EVENT_DEF,
+  EXCITING_START_DEF,
+  HAPPY_ENDING_DEF,
   WANTED_PICTURE_DEF,
   MULTI_PICTURE_PROP_RULE,
   CONCEALED_OBJECT_RULE,

@@ -1679,6 +1679,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "stage2-cast-coverage",
+      "title": "The re-plan answers cast findings by casting the under-covered child in; page 1 opens on action; the last page holds the whole commissioned cast",
+      "commits": [],
+      "addedAt": "2026-09-25",
+      "claim": "On a beats_replan Lab run on the dragon story (arcFromExperiment 1490) and the next staging full story whose first plan check raises UNDER_COVERED_CHARACTER or NO_FOCAL_PAGE: the kept round's recheck raises neither for that child and mints no UNDER_COVERED_CHARACTER for another commissioned child; no commissioned child ends below the floor; page 1's instant is an action under way; the last page's who column carries every commissioned child unless the story separates them (no surviving CHECK[15] or CHECK[16]).",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Lab beats_replan report.castSummary vs recheckCastSummary (inFrameCount per child >= floor, focalPages non-empty), report.refusals (span), recheckFindings for UNDER_COVERED_CHARACTER / NO_FOCAL_PAGE / CHECK[15] / CHECK[16]; on a full story the same from stories.data.beatsReviewReport; baseline Lab #1494 (Kiaan 2, Max 3→2, Levin 14, p18 Levin+Julian only)"
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }

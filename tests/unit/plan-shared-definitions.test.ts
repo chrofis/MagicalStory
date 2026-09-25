@@ -22,7 +22,7 @@ const checker = () => pb.buildPlanCheckPrompt(
 describe('planner and checker share one definition, not two copies', () => {
   beforeAll(async () => { await loadPromptTemplates(); });
 
-  for (const name of ['DEED_AND_EFFECT_DEF', 'TWO_HEIGHTS_DEF', 'NAMING_DEF', 'ENDING_EVENT_DEF']) {
+  for (const name of ['DEED_AND_EFFECT_DEF', 'TWO_HEIGHTS_DEF', 'NAMING_DEF', 'ENDING_EVENT_DEF', 'EXCITING_START_DEF', 'HAPPY_ENDING_DEF']) {
     it(`${name} reaches BOTH prompts, verbatim`, () => {
       const def = pb[name];
       expect(def, `${name} is not exported`).toBeTruthy();

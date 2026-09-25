@@ -60876,3 +60876,55 @@ scored 6.69 / 6.88 against the stored final arc's 7.65 (the same judges).
 **Touched:** server/lib/promptBuilders.js, server/lib/testlab.js, client/src/services/testlabService.ts,
 scripts/admin/sibling-registry.json (arc-generator-vs-critic reason), tests/unit/arc-logic-first.test.ts,
 tests/unit/arc-prompt-audit-2026-09-23.test.ts, tests/unit/testlab-arc-from-experiment.test.ts.
+
+## 2026-09-25 — Stage 2: a cast finding is answered by casting the child in; the book opens on action and ends with everyone together
+
+**Context.** Lab #1494 (beats_replan on the variant-B arc of #1490, dragon, staging job_1790277448294_5herh01j7,
+18 pages, four boys, floor 3 pages each). The plan check correctly filed UNDER_COVERED_CHARACTER (Kiaan 2 < 3) and
+NO_FOCAL_PAGE (Kiaan). The re-plan ignored the coverage: afterwards Levin was on 14 pages, Max dropped 3 → 2, Kiaan
+stayed on 2, and page 18 showed only Levin and Julian. The owner's stage-2 rules (arc v3 stage split): who enters
+when; every commissioned character gets their scene (a focal page whose instant is their own deed, plus the
+appearance floor); an exciting start; a happy ending with the children safe and together.
+
+**Why the re-plan ignored the cast findings.** Both codes were already in REPLAN_MUST_FIX_CODES; the mandate was not
+the gap. Four things were, all read off the stored #1494 row:
+1. The floor disagreed. The re-plan's "two figures stay" rule and the review's `span` rule
+   (planCounters.reviewPlanChanges) held every figure to two pages, while UNDER_COVERED_CHARACTER counts the
+   character list against castCoverage appearances.min (3 here). So "Page 12: cast out Max — PLAN[NO_FOCAL_PAGE]"
+   passed the prompt and the review, and minted UNDER_COVERED Max.
+2. The finding said nothing about the fix. The lines stated a count. The same round answered four
+   NO_COMMISSIONED_ON_PAGE pages and MAIN_UNDER_HALF by casting in Levin every time.
+3. The keep list contradicted the fix. "These pages … change only for a must-fix finding that names them", but a cast
+   finding names the pages the child is already on (Kiaan: 1, 12). So the ending's page and every WANTED and ACTION
+   page were closed to him in the prompt, although the review lets any must-fix finding change them.
+4. The MUST FIX list ran in counter order, so the shot counts came first.
+
+**Decision.**
+- The review holds each character on the list to the book's floor (`castFloor` = {listed names, appearances.min}):
+  it refuses a `cast out` that leaves them below that floor and lower than before. Invented figures keep the two-page
+  rule. The re-plan states the same number ("for a commissioned character, fewer than N").
+- UNDER_COVERED_CHARACTER and NO_FOCAL_PAGE carry their fix in the finding line (castCoverage `underCoveredFix`,
+  `noFocalFix`): cast the child in, with their own action on a page of its own or in a neighbouring moment the group
+  shares. The fix may never cast out another commissioned character below the floor, and may never take another
+  character's only focal page. RE-DIVIDE adds: "A page that gains a commissioned character gains one a cast finding
+  names … before anyone else."
+- A kept page may take a commissioned character that a cast finding asks for.
+- MUST FIX lists the picture-costing findings (countsTowardConvergence) first and the shot relabels after them.
+- Two shared constants, the planner imperative and the check question, each the same sentence:
+  `EXCITING_START_DEF` ("Page 1 opens on an action already under way, and each character is introduced through what
+  they do.") and `HAPPY_ENDING_DEF` ("The last page shows the commissioned characters safe and together, unless the
+  story itself separates them."). They are plan-check Q15 and Q16, both must-fix (REPLAN_MUST_FIX_CHECKS), like Q8.
+- The Lab mirror (runBeatsReplanStage / analyzeReplanCompliance) passes the same castFloor. New sibling set
+  `replan-prod-vs-lab`.
+
+**Evidence (rung 1, free).** #1494's re-plan prompt was rebuilt from its stored inputs (standingPlan,
+checkRawResponse → roster → today's counters, the #1490 retell arc). The finding set is identical to the stored one
+(19 heads). The rebuilt MUST FIX now lists NO_FOCAL_PAGE and UNDER_COVERED_CHARACTER for Kiaan above the shot counts,
+each with its fix sentence, and RE-DIVIDE states the floor of 3. The stored re-plan reply, run through today's
+review, has "cast out Max" on page 12 refused (`span`: Max 3→2, 3 pages is this book's floor). Whether the
+planner now answers the cast findings needs a paid beats_replan run (verify `stage2-cast-coverage`).
+
+**Touched:** server/lib/castCoverage.js, server/lib/planCounters.js, server/lib/promptBuilders.js,
+server/lib/beatsPipeline.js, server/lib/testlab.js, prompts/story-beats.txt, prompts/plan-check.txt,
+scripts/admin/sibling-registry.json, docs/prompt-inventory.md, tests/unit/stage2-cast-coverage.test.ts,
+tests/unit/plan-check-question-count.test.ts, tests/unit/plan-shared-definitions.test.ts.

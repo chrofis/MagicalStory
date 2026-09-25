@@ -35,7 +35,7 @@ const {
   SHOT_PATTERNS, SHOT_AXIS, POSITION_SHOTS, MID_DISTANCE_SHOTS, SHOT_FLOOR_CODE,
   shotFloors, MAX_MEDIUM_WIDE_SHARE, closeUpBelowWaistVerbs, PEOPLELESS_SHARED_SHOT,
 } = require('./shotVocabulary');
-const { castCoverage } = require('./castCoverage');
+const { castCoverage, underCoveredFix, noFocalFix } = require('./castCoverage');
 
 /** Words that look like names but never are, in the who-column's grammar. */
 const NAME_STOPWORDS = new Set([
@@ -1003,7 +1003,7 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
   for (const name of listed) {
     focal[name] = focalOf(name);
     if (coverageRule && coverageRule.focalEach && focal[name].length === 0) {
-      add('NO_FOCAL_PAGE', [], `${name} never has a focal page — never in frame with at most one companion, never the subject of a close-up`);
+      add('NO_FOCAL_PAGE', [], `${name} never has a focal page — never in frame with at most one companion, never the subject of a close-up. ${noFocalFix(name)}`);
     }
   }
 
@@ -1017,7 +1017,7 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
     coverage[name] = rows.filter(r => r.present.includes(name)).map(r => r.pageNumber);
     if (coverage[name].length < floor) {
       add('UNDER_COVERED_CHARACTER', coverage[name],
-        `${name} is in frame on ${coverage[name].length} page(s) — this book puts every commissioned character in frame on at least ${floor}`);
+        `${name} is in frame on ${coverage[name].length} page(s) — this book puts every commissioned character in frame on at least ${floor}. ${underCoveredFix(name, floor)}`);
     }
   }
 
@@ -1274,9 +1274,14 @@ function replanChangeDirection(tag) {
  *             leaves a picture of nothing happening to nobody.
  *   span      a `cast out` that leaves the figure in frame on fewer than two
  *             pages of the returned division while the standing one gave them
- *             two or more. Two pages is the floor `UNDER_COVERED_CHARACTER`
- *             already holds the commissioned cast to; three stories lost an
- *             invented figure from every page (Pfiff, Silberkrabbe, Krümel).
+ *             two or more; three stories lost an invented figure from every
+ *             page (Pfiff, Silberkrabbe, Krümel). A commissioned character on
+ *             the character list is held to the book's own floor instead
+ *             (`castFloor`, castCoverage appearances.min — the number
+ *             UNDER_COVERED_CHARACTER counts against): a `cast out` that
+ *             leaves them below it, and lower than they stood, is refused.
+ *             On Lab #1494 the review let a round take Max 3 -> 2 on an
+ *             18-page book whose floor is 3 (2026-09-25).
  *   direction a `cast out` answering a finding that asks for MORE in frame,
  *             on a page the standing division left under the cast ceiling —
  *             and its mirror, a `cast in` answering a finding that asks for
@@ -1315,10 +1320,12 @@ function replanChangeDirection(tag) {
  * @param {Map<number,string>} [args.protectedPages] page → why it stays
  * @param {Array<{key:string,page:number|null}>} [args.actions] the check's ACTION lines
  * @param {function(Object):string} [args.rankOf] a finding tag → 'must' | 'also'
+ * @param {{names:string[], min:number}|null} [args.castFloor] the character
+ *   list and castCoverage().appearances.min — the commissioned span floor
  * @returns {{refusals: Array<{pageNumber:number, rule:string, detail:string, line:string}>,
  *            declaredOut: Map<number,string[]>, notes: string[]}}
  */
-function reviewPlanChanges({ changes = [], standing = [], returned = [], castNames = [], aliases = {}, maxCast = 3, obstacles = null, focalNames = [], protectedPages = null, actions = [], rankOf = null } = {}) {
+function reviewPlanChanges({ changes = [], standing = [], returned = [], castNames = [], aliases = {}, maxCast = 3, obstacles = null, focalNames = [], protectedPages = null, actions = [], rankOf = null, castFloor = null } = {}) {
   const names = (Array.isArray(castNames) ? castNames : []).map(n => String(n || '').trim()).filter(Boolean);
   const refusals = [];
   const notes = [];
@@ -1354,6 +1361,11 @@ function reviewPlanChanges({ changes = [], standing = [], returned = [], castNam
     if (!a || a.page == null || !(Number(a.page) > 0)) continue;
     for (const n of namesIn(String(a.key || ''), names, aliases)) actionPageOf.set(n, Number(a.page));
   }
+  // The commissioned span floor: the character list at castCoverage's
+  // appearances.min, never below the two pages every figure keeps.
+  const commissionedFloor = Math.max(2, Number(castFloor && castFloor.min) || 0);
+  const floorSet = new Set(((castFloor && Array.isArray(castFloor.names)) ? castFloor.names : [])
+    .flatMap(n => namesIn(String(n || ''), names, aliases)));
   const isProtected = page => protectedPages instanceof Map && protectedPages.has(Number(page));
   const isMust = tag => !!(tag && typeof rankOf === 'function' && rankOf(tag) === 'must');
   const refuse = (pageNumber, rule, detail, line) => {
@@ -1401,9 +1413,14 @@ function reviewPlanChanges({ changes = [], standing = [], returned = [], castNam
         refuse(page, 'focal', `${lastFocal.join(', ')} would be left with no focal page`, c.line);
         continue;
       }
-      const stranded = hit.filter(n => (beforeSpan.get(n) || 0) >= 2 && (afterSpan.get(n) || 0) < 2);
+      const stranded = hit.filter((n) => {
+        const before = beforeSpan.get(n) || 0;
+        const after = afterSpan.get(n) || 0;
+        if (floorSet.has(n)) return after < commissionedFloor && after < before;
+        return before >= 2 && after < 2;
+      });
       if (stranded.length) {
-        refuse(page, 'span', `${stranded.map(n => `${n} ${beforeSpan.get(n) || 0}→${afterSpan.get(n) || 0} page(s)`).join(', ')} — two pages is the floor`, c.line);
+        refuse(page, 'span', stranded.map(n => `${n} ${beforeSpan.get(n) || 0}→${afterSpan.get(n) || 0} page(s) — ${floorSet.has(n) ? `${commissionedFloor} pages is this book's floor for a commissioned character` : 'two pages is the floor'}`).join('; '), c.line);
         continue;
       }
       if (dir === 'more' && (beforeWho.get(page) || []).length < Number(maxCast)) {
