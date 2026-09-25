@@ -5775,7 +5775,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
  * @param {string} editInstruction - What the user wants to change
  * @returns {Promise<{imageData: string}|null>}
  */
-async function editImageWithPrompt(imageData, editInstruction, model, referenceImages = [], artStyle = null, aspectRatioOverride = null) {
+async function editImageWithPrompt(imageData, editInstruction, model, referenceImages = [], artStyle = null, aspectRatioOverride = null, { plateDerive = false } = {}) {
   editInstruction = guardPromptString(editInstruction, 'images.editImageWithPrompt');
   const modelId = model || MODEL_DEFAULTS.pageImage;
   const modelConfig = IMAGE_MODELS[modelId];
@@ -5837,11 +5837,16 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
     ? (resolveArtStyle(artStyle, backend) || '')
     : '';
 
-  // Build the editing prompt from template
-  const editPrompt = fillTemplate(PROMPT_TEMPLATES.illustrationEdit, {
-    EDIT_INSTRUCTION: editInstruction,
-    ART_STYLE: styleText || 'Match the source image\'s artistic style.',
-  });
+  // Build the editing prompt from template. A plate derive (camera move or
+  // re-light of a backdrop plate) takes its own template: illustration-edit's
+  // "keep everything identical / do not resize" shrank a pull-back into a
+  // picture-in-a-picture (2026-09-25).
+  const editPrompt = plateDerive
+    ? require('../services/prompts').buildPlateDerivePrompt(editInstruction, styleText)
+    : fillTemplate(PROMPT_TEMPLATES.illustrationEdit, {
+      EDIT_INSTRUCTION: editInstruction,
+      ART_STYLE: styleText || 'Match the source image\'s artistic style.',
+    });
   log.debug(`✏️  [IMAGE EDIT] Full prompt: "${editPrompt}"`);
 
   // The Grok failure that sent this edit to Gemini (recorded in the

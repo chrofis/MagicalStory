@@ -56,6 +56,54 @@ styleConsistency.js, server/routes/regeneration.js, scripts/admin/sibling-regist
 tests/unit/scene-light.test.ts, tests/unit/inpaint-preserve-channel.test.ts
 **Status:** ✅ active
 
+## 2026-09-25 — A plate derive is its own edit, worded as a camera move; every plate is painted edge to edge with no signature, monogram or mat, and the plate QC fails one
+
+**Context:** Staging job_1790277448294_5herh01j7 (dragon run 7). (1) The p10 ultra-wide plate, derived from the
+LOC002.1 base plate, came back as a picture-in-a-picture: the base sheet, its cream paper mat included, shrunk into
+the middle of a new frame, the mat reading as a glowing white rectangle. The ultra-wide move said "everything in the
+current picture shrinks to fill only the middle third of the new frame" (b2751c799, Lab 1413), and it was wrapped in
+illustration-edit.txt, which says "Keep everything else identical" and "Do not crop or resize the image". Shrinking
+the whole sheet, mat and all, satisfies both. (2) Plates came back signed (p11 LOC002.2 base, p13 its relit derive,
+the LOC001.1 retry) and matted (LOC002.1). empty-scene.txt asked for "no borders" but named no signature, monogram or
+paper mat, and the plate QC checked neither: LOC002.1 and LOC002.2 passed it on that run.
+
+**Decision:**
+- Every plate derive (camera move, re-light, or both in one edit) is built from `prompts/plate-derive.txt` through
+  `buildPlateDerivePrompt` (prompts.js): `editImageWithPrompt(..., { plateDerive: true })`, used by the pipeline's
+  derive step and the Lab's `edit_image` plate modes. It carries the instruction, the book's art style and the edge
+  rule, and none of illustration-edit's "keep identical / do not crop or resize". illustration-edit.txt is unchanged
+  for its other callers.
+- Every derived shot (ultra-wide, high-angle, low-angle, aerial) has its own camera move in `DERIVE_CAMERA_MOVE`
+  (shotVocabulary.js), worded as the camera moving through the same place, naming the place's parts; no frame
+  fraction and no size for the current picture. The shot definitions (which speak of figures and subjects) are no
+  longer the derive's text; a derived shot without a move throws at module load. The kept-structure sentence, the
+  "same light unless relit" clause (17f6f533e `relight`) and "the camera moves; the place stays as it is" are unchanged.
+- One rule for both sides: `PLATE_EDGE_RULE` (shotVocabulary.js) fills `{PLATE_EDGE}` in empty-scene.txt and
+  plate-derive.txt: the painting fills the frame edge to edge, no signature, monogram or initials (`PLATE_MARKS`) and no
+  paper margin, mat, border, keyline or frame (`PLATE_SURROUNDS`). The plate QC (empty-scene-qc.txt) fails a
+  `PLATE_MARKS` item in its **Wrong text** check and a `PLATE_SURROUNDS` item, or a smaller picture inside the frame,
+  in a new **Frame edge** check.
+- Severity (the double-failure policy, 91c85ab66, `server/lib/plateQc.js`): a signature, monogram or initials files
+  under the check key `text`, and a margin, mat, border, keyline or inner picture under `artefact`. Both keys are
+  HARD in `PLATE_QC_CHECKS`, and their `what` lists already name these defects, so plateQc.js is unchanged.
+- The Lab's `edit_image` gains `params.source: 'derive_base'`: the base plate a derived page's plate was edited from
+  (its stored `emptySceneGrokRefImages[0]`), so a production derive is replayed on its exact input.
+
+**QC replay (rung 1, gemini-2.5-flash, stored plates, twice):** before the check-key reply format landed: LOC002.1 base
+FAIL (white border + signature), p11 FAIL (signature), p13 FAIL (signature), clean p4, p14, p8 PASS. On the merged
+prompt (check keys): LOC002.1 FAIL `text` (signature; the mat was not named this time), p11 FAIL `text`, p13 FAIL
+`text`, p4, p14, p8 PASS. The mat is named in one of two runs; a signature in every run. The LOC001.1 retry is not
+stored (the run kept the first plate), so it could not be replayed.
+
+**Lab:** pending (run after the staging deploy; recorded here when done).
+
+**Touched:** prompts/plate-derive.txt (new), prompts/empty-scene.txt, prompts/empty-scene-qc.txt,
+server/lib/shotVocabulary.js, server/services/prompts.js, server/lib/images.js, server/lib/evalPipeline.js,
+server/lib/testlab.js, storyJobPipeline.js, scripts/admin/sibling-registry.json,
+tests/unit/plate-edge-and-derive-template.test.ts, tests/unit/plate-derive-for-angle.test.ts,
+tests/unit/empty-scene-qc-extraction.test.ts, docs/prompt-inventory.md, docs/image-routing.md.
+**Status:** ✅ active on staging.
+
 ## 2026-09-24 — An outfit description is appearance only, and a repair descriptor names one closed-vocabulary garment, never the outfit sentence
 
 **Context:** Staging job_1790277448294_5herh01j7 (dragon run 7). The wardrobe writer put plot notes in

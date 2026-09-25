@@ -270,9 +270,10 @@
     {
       "id": "empty-scene-generator-vs-critic",
       "axis": "generator-vs-critic",
-      "reason": "empty-scene-qc.txt is validateEmptyScene's judge of the plate empty-scene.txt paints; a check the judge applies that the plate author was never given is a blind grade, which is exactly how the reserved-corner and geometry findings arose. The shared half stays shared: GEOMETRY_DIMENSIONS (sceneGeometry.js) writes the author's geometry block and the judge's {GEOMETRY_CHECK} from one source. Extracted from evalPipeline.js string literals on 2026-09-15.",
+      "reason": "empty-scene-qc.txt is validateEmptyScene's judge of the plate empty-scene.txt paints; a check the judge applies that the plate author was never given is a blind grade, which is exactly how the reserved-corner and geometry findings arose. The shared half stays shared: GEOMETRY_DIMENSIONS (sceneGeometry.js) writes the author's geometry block and the judge's {GEOMETRY_CHECK} from one source. Extracted from evalPipeline.js string literals on 2026-09-15. Since 2026-09-25 plate-derive.txt (the camera-move / re-light edit of a vantage's base plate, prompts.js buildPlateDerivePrompt) is a generator of the same judge, and the edge-to-edge / no signature / no mat rule is one source: shotVocabulary.PLATE_EDGE_RULE fills {PLATE_EDGE} in both generators, and its PLATE_MARKS / PLATE_SURROUNDS fill the judge's Wrong text and Frame edge checks.",
       "generators": [
-        "prompts/empty-scene.txt"
+        "prompts/empty-scene.txt",
+        "prompts/plate-derive.txt"
       ],
       "critics": [
         "prompts/empty-scene-qc.txt"

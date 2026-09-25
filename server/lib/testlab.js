@@ -5583,15 +5583,27 @@ async function runEditImageStage(ctx, { experimentId, promptOverride, params = {
   // exactly as the plate-derive step does in production (storyJobPipeline.js,
   // "AN ANGLED PAGE TAKES A PLATE DERIVED FROM THIS ONE"): the plate model and
   // the book's art style (since 2026-09-23). Pick the page that carries the vantage's BASE plate.
-  const onPlate = params.source === 'empty_scene';
-  const imageData = onPlate
-    ? await loadEmptyScene(ctx.storyId, ctx.pageNumber)
-    : await loadActivePageImage(ctx.storyId, ctx.pageNumber);
-  if (!imageData) throw new Error(`no ${onPlate ? 'empty_scene plate' : 'page image'} for p${ctx.pageNumber}`);
+  // params.source='derive_base' edits the BASE plate a derived page's plate
+  // was edited from (its one stored plate reference), so a production derive
+  // is replayed on the exact input it had. Only a page with a derived plate
+  // has one.
+  const onDeriveBase = params.source === 'derive_base';
+  const onPlate = params.source === 'empty_scene' || onDeriveBase;
+  let imageData;
+  if (onDeriveBase) {
+    const baseRef = ctx.scene?.plateDerivedFor ? (ctx.scene.emptySceneGrokRefImages || [])[0] : null;
+    if (!baseRef) throw new Error(`p${ctx.pageNumber} has no derived plate, so no base plate to edit (source=derive_base)`);
+    imageData = await bytesFor(typeof baseRef === 'string' ? { imageUrl: /^data:/.test(baseRef) ? null : baseRef, imageData: /^data:/.test(baseRef) ? baseRef : null } : baseRef);
+  } else {
+    imageData = onPlate
+      ? await loadEmptyScene(ctx.storyId, ctx.pageNumber)
+      : await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+  }
+  if (!imageData) throw new Error(`no ${onDeriveBase ? 'derive base plate' : onPlate ? 'empty_scene plate' : 'page image'} for p${ctx.pageNumber}`);
 
   const t0 = Date.now();
   const result = onPlate
-    ? await editImageWithPrompt(imageData, instruction, MODEL_DEFAULTS.emptyScenePlateModel, [], ctx.artStyle)
+    ? await editImageWithPrompt(imageData, instruction, MODEL_DEFAULTS.emptyScenePlateModel, [], ctx.artStyle, null, { plateDerive: true })
     : await editImageWithPrompt(imageData, instruction, null, [], ctx.artStyle);
   const elapsedMs = Date.now() - t0;
   const edited = result?.imageData || null;

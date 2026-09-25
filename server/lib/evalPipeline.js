@@ -516,6 +516,9 @@ ${fillTemplate(qc.LANDMARK_CHECK, { LANDMARK_NAME: landmark, LANDMARK_PHOTO_AUTH
     PLACEMENTS_CHECK: placementsCheck,
     GEOMETRY_CHECK: geometryCheck,
     LANDMARK_CHECK: landmarkCheck,
+    // The same lists the plate author's PLATE_EDGE_RULE names.
+    PLATE_MARKS: require('./shotVocabulary').PLATE_MARKS,
+    PLATE_SURROUNDS: require('./shotVocabulary').PLATE_SURROUNDS,
   });
 }
 

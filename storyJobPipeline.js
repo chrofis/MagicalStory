@@ -4997,7 +4997,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   // same QC, its own camera, one re-derive with the feedback.
                   const derive = async (instruction) => {
                     const r = await editImageWithPrompt(
-                      plateImage, instruction, MODEL_DEFAULTS.emptyScenePlateModel, [], inputData.artStyle || null, layoutAspect);
+                      plateImage, instruction, MODEL_DEFAULTS.emptyScenePlateModel, [], inputData.artStyle || null, layoutAspect, { plateDerive: true });
                     if (r?.usage) addUsage(String(r.usage.model || '').startsWith('grok-imagine') ? 'grok' : 'gemini_image', r.usage, 'page_images', r.usage.model || MODEL_DEFAULTS.emptyScenePlateModel);
                     return r?.imageData || null;
                   };

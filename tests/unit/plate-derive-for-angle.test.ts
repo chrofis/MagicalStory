@@ -78,10 +78,24 @@ describe('which shots may share a backdrop plate', () => {
 });
 
 describe('the derived plate is edited from the base, not generated fresh', () => {
-  it('carries the target shot\'s own definition, from the one vocabulary', () => {
-    const target = SHOTS.find((s: { id: string }) => s.id === 'high-angle');
-    const instruction = buildPlateDeriveInstruction('medium', 'high-angle');
-    expect(instruction).toContain(target.definition);
+  // 2026-09-25 (staging job_1790277448294_5herh01j7 p10): the shot
+  // definitions speak of figures and subjects, and a SIZE for the current
+  // picture ("shrinks to fill only the middle third") framed the old sheet,
+  // mat included, as a picture-in-a-picture. Every derived shot has its own
+  // camera move, and none sizes the current picture.
+  it('gives every derived shot its own camera move, distinct from the others', () => {
+    const moves = [...PLATE_DERIVED_SHOTS].map(id => buildPlateDeriveInstruction('medium', id));
+    expect(new Set(moves).size).toBe(PLATE_DERIVED_SHOTS.size);
+    for (const id of PLATE_DERIVED_SHOTS) {
+      const target = SHOTS.find((s: { id: string }) => s.id === id);
+      expect(buildPlateDeriveInstruction('medium', id), id).not.toContain(target.definition);
+    }
+  });
+
+  it('never gives the current picture a size in the new frame', () => {
+    for (const id of PLATE_DERIVED_SHOTS) {
+      expect(buildPlateDeriveInstruction('medium', id), id).not.toMatch(/\b(?:third|half|quarter|shrinks?)\b/i);
+    }
   });
 
   it('names the base shot it is coming from', () => {
@@ -105,10 +119,6 @@ describe('the derived plate is edited from the base, not generated fresh', () =>
     for (const shot of ['ultra-wide', 'high-angle', 'low-angle', 'aerial']) {
       expect(buildPlateDeriveInstruction('medium', shot), shot).not.toMatch(/\bposition\b/i);
     }
-  });
-
-  it('ultra-wide gives the pull-back a size (Lab 1413), not only the definition', () => {
-    expect(buildPlateDeriveInstruction('medium', 'ultra-wide')).toMatch(/middle third/);
   });
 
   it('returns null for a shot it does not know', () => {
@@ -136,6 +146,10 @@ describe('the pipeline honours it', () => {
   // result was never judged; the base plate's retry was judged on pixels only.
   it('the derive carries the book art style', () => {
     expect(src).toMatch(/plateImage, instruction, MODEL_DEFAULTS\.emptyScenePlateModel, \[\], inputData\.artStyle/);
+  });
+  it('the derive is sent with the plate-derive template, not illustration-edit', () => {
+    expect(src).toMatch(/plateImage, instruction, MODEL_DEFAULTS\.emptyScenePlateModel, \[\], inputData\.artStyle \|\| null, layoutAspect, \{ plateDerive: true \}\)/);
+    expect(SRC('server/lib/testlab.js')).toMatch(/MODEL_DEFAULTS\.emptyScenePlateModel, \[\], ctx\.artStyle, null, \{ plateDerive: true \}\)/);
   });
   it('a derived plate is QC-judged at its own camera', () => {
     expect(src).toMatch(/validateEmptyScene\(derivedImage, null, `vantage-\$\{vantageId\}-\$\{cls\}`, derivedQcOpts\)/);
