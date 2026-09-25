@@ -60446,3 +60446,49 @@ tags or quotes. Not yet validated on a live panel: `tasks/verify.json` `arc-rete
 `tests/unit/arc-creator-effort.test.ts`, `tests/unit/arc-logic-first.test.ts` (+ three retell-builder
 call sites in tests).
 **Status:** ✅ committed on `staging`, not pushed; Lab validation pending.
+
+## 2026-09-25 — Each arc panelist reports its three worst issues; an issue is a story problem, not a sentence
+
+**Context:** Lab #1473-1476 (staging `testlab_experiments`, pirate commission; `results[0].gate`,
+`.panel[].raw`), the first runs of the re-tell gate above. The panel still walked the arc sentence by
+sentence and wrote one `ISSUE [<severity>] s<N> …` line per flagged sentence: 8-18 kept findings per
+arc were tagged MAJOR/CRITICAL (DeepSeek up to 16 on one arc), so `gate.repair` was 8-18 and the gate
+never skipped — the re-telling rewrote good arcs again, the failure the gate was built to stop.
+
+**Decision (owner, 2026-09-25):** "Ask each panel to output the three worst issues. Tagging a sentence
+is no good; an issue can be spread over many sentences."
+1. Each panelist returns its THREE worst issues, ranked (fewer only when it finds fewer), each tagged
+   with `ARC_SEVERITY_DEF`. The lenses stay as a checklist of what to look for; the "walk the arc
+   sentence by sentence and ask all twelve" instruction and the per-lens per-sentence questions left.
+2. An issue is a story problem: one numbered line, `<rank>. [<severity>] (s<N>, s<N>-<M>) <LENS>: <the
+   problem> — "<words>" … "<words>"`, citing every sentence it concerns and quoting the words that show
+   it — from several sentences, or the STORY LOGIC line it breaks. `ARC_ISSUE_RULE`, `arcIssueLine`,
+   `ARC_FINDING_RULE` and `ARC_ISSUE_MAX` (3) are ONE set of constants in the panel and in the
+   creator's/re-teller's critique (`arcCritiqueSpec`: "Faults:" now lists the arc's three worst in the
+   same line, without a lens) — generator and critic stay in sync.
+3. ONE parser, `parseArcIssues` (panel via `filterPanelFindings`, critique via `filterCritiqueFaults`):
+   every quote is checked against the reviewed block; an issue is dropped only when NONE verifies (a
+   quote of the TOPIC PROMISE or the landmark list no longer sinks an issue that also quotes the arc).
+   Quotes after "Smallest change:" are not evidence. Every loss is a `log.warn` and a report field:
+   `malformed` (not the issue shape — the retired `ISSUE … s<N>` line lands here), `dropped` (no quote
+   verifies), `overflow` (past the third). Pipeline events: `arc_panel_malformed`,
+   `arc_panel_unquoted`, `arc_panel_overflow`, `arc_critique_dropped`.
+4. The gate is unchanged in rule (re-tell only on a quoted MAJOR/CRITICAL) and now merges duplicates:
+   two panelists citing the same sentences under the same lens hand the re-telling ONE issue, marked
+   "(Panelist C named the same issue.)". Nothing subtler. The re-telling repairs the ISSUE, touching
+   only the sentences its repair needs, and copies all others word for word (`# ISSUES TO REPAIR`).
+
+**Evidence (rung 1, free):** the new parser replayed over the stored #1473-1476 panel replies keeps none
+of the 86 findings the old filter kept and reports all 88 issue-like lines as malformed (loud;
+nothing silently kept), and the stored
+critiques' 12 old-format faults likewise; a hand-written new-format reply against the #1475 arc parses
+a multi-sentence issue (s2, s7-8; two verified quotes), drops an invented-quote CRITICAL, and a second
+panelist naming the same issue merges into one. Whether live panelists follow the shape and whether
+the gate now skips on a good arc needs a Lab run: `tasks/verify.json` `arc-three-worst-issues`.
+Stored critiques of older stories parse as malformed, so a Lab replay on them gates on the panel alone.
+
+**Touched:** `server/lib/promptBuilders.js`, `server/lib/beatsPipeline.js`, `server/lib/testlab.js`,
+`prompts/arc-panel.txt`, `prompts/arc-retell.txt`, `scripts/admin/sibling-registry.json`
+(`arc-generator-vs-critic`, `arc-retell-gate`), `tasks/verify.json` (`arc-three-worst-issues`),
+`tests/unit/arc-logic-first.test.ts`, `tests/unit/arc-creator-effort.test.ts`.
+**Status:** ✅ committed on `staging`, not pushed; Lab validation pending.

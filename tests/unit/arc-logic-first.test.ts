@@ -51,7 +51,7 @@ const CREATE = [
   '',
   'CRITIQUE:',
   'Faults:',
-  '1. [MAJOR] s2 "Nebla takes it" against "she lost the egg this morning" — she has no reason to stay on the bridge.',
+  '1. [MAJOR] (s2) she has no reason to stay on the bridge — "Nebla takes it" against "she lost the egg this morning"',
   'Commission honored: yes',
 ].join('\n');
 
@@ -335,7 +335,7 @@ describe('the arc prompts v2 (owner, 2026-09-25)', () => {
 
   it('the re-telling edits only the flagged sentences, adds a fact to the ledger first, and cuts before it adds', () => {
     const retell = PB.buildArcRetellPrompt(input(5), 18, committed, '## PANELIST A\nx');
-    expect(retell).toMatch(/Change only the sentences a finding names; copy every other sentence word for word/);
+    expect(retell).toMatch(/Repair the issue, touching only the sentences its repair needs; copy every other sentence word for word/);
     // A repaired sentence grows no longer than its edit (2026-09-25: re-tellings
     // grew the text 13-34% at the same sentence count).
     expect(retell).toMatch(/grows no longer than that edit/);
@@ -347,57 +347,96 @@ describe('the arc prompts v2 (owner, 2026-09-25)', () => {
   it('a panel repair may not invent plot, and only a MAJOR or CRITICAL finding names one', () => {
     const panel = PB.buildArcPanelPrompt(input(5), committed);
     expect(panel).toMatch(/It adds no figure, object, happening or rule of the world the arc does not have/);
-    expect(panel).toMatch(/A \[MINOR\] finding names no change/);
+    expect(panel).toMatch(/A \[MINOR\] issue names no change/);
     // No SOLUTION block answering every fault and issue (2026-09-25).
     expect(panel).not.toMatch(/SOLUTION \(answers/);
     expect(panel).not.toMatch(/at most 8 numbered points/);
   });
 });
 
-describe('filterPanelFindings — a finding must quote the arc (2026-09-25)', () => {
+describe('parseArcIssues — the three worst issues, each quoting the arc (owner, 2026-09-25)', () => {
   const block = PB.parseArcCreate(CREATE).committed;
   const reply = [
     'Missed issues:',
-    '1. ISSUE [MAJOR] s2 "Nebla takes it" against "she lost the egg this morning" — LOGIC: why the bridge? Smallest change: cut s2.',
-    '2. ISSUE [MINOR] s3 "The egg hatches in the leaves" — CAUSE: nothing warmed the leaves.',
-    '3. ISSUE [MAJOR] s2 — SENSE: she could fly off.',
-    '4. ISSUE [CRITICAL] s1 "Levin finds the golden egg" against "the dragon says so" — invented quote.',
-    '5. ISSUE s1 "Levin finds the egg" — LOGIC: no tag.',
+    '1. [MAJOR] (s2) LOGIC: why the bridge? — "Nebla takes it" against "she lost the egg this morning" Smallest change: cut s2.',
+    '2. [MINOR] (s3) CAUSE: nothing warmed the leaves — "The egg hatches in the leaves"',
+    '3. [MAJOR] (s2) SENSE: she could fly off.',
+    '4. [CRITICAL] (s1) LOGIC: invented quote — "Levin finds the golden egg" against "the dragon says so"',
+    '5. (s1) LOGIC: no tag — "Levin finds the egg"',
     'none',
   ].join('\n');
 
-  it('keeps a tagged finding whose quote is in the reviewed block, drops one that quotes nothing or misquotes', () => {
+  it('keeps a tagged issue with a verified quote; drops one that quotes nothing or only misquotes', () => {
     const f = PB.filterPanelFindings(reply, block);
     expect(f.kept).toHaveLength(2);
-    expect(f.kept[0]).toMatch(/^1\. ISSUE \[MAJOR\] s2/);
-    expect(f.kept[1]).toMatch(/^2\. ISSUE \[MINOR\] s3/);
+    expect(f.kept[0]).toMatch(/^1\. \[MAJOR\] \(s2\)/);
+    expect(f.kept[1]).toMatch(/^2\. \[MINOR\] \(s3\)/);
     expect(f.findings.map((x: any) => x.severity)).toEqual(['MAJOR', 'MINOR']);
-    expect(f.dropped.map((d: string) => d.slice(0, 11))).toEqual(['3. ISSUE [M', '4. ISSUE [C']);
-    // The heading and "none" are layout and are neither.
+    expect(f.findings.map((x: any) => x.lens)).toEqual(['LOGIC', 'CAUSE']);
+    expect(f.dropped.map((d: string) => d.slice(0, 2))).toEqual(['3.', '4.']);
     expect(f.text).not.toContain('Missed issues:');
     expect(f.text).not.toMatch(/^none$/m);
   });
 
-  it('a finding without a severity tag is a parse error: dropped and reported, never defaulted', () => {
+  it('a line without a tag or a (s<N>) citation is a parse error: dropped and reported, never defaulted', () => {
     const f = PB.filterPanelFindings(reply, block);
-    expect(f.untagged).toEqual(['5. ISSUE s1 "Levin finds the egg" — LOGIC: no tag.']);
-    expect(f.kept.join('\n')).not.toContain('no tag');
-    expect(f.dropped.join('\n')).not.toContain('no tag');
+    expect(f.malformed).toEqual(['5. (s1) LOGIC: no tag — "Levin finds the egg"']);
+    expect(PB.filterPanelFindings('1. [MAJOR] LOGIC: no citation — "Levin finds the egg"', block).malformed).toHaveLength(1);
+  });
+
+  it('the retired per-sentence "ISSUE [MAJOR] s<N>" shape fails loudly, numbered or not', () => {
+    const f = PB.filterPanelFindings('1. ISSUE [MAJOR] s2 "Nebla takes it" — LOGIC: x\nISSUE [CRITICAL] s1 "Levin finds the egg" — y', block);
+    expect(f.kept).toHaveLength(0);
+    expect(f.malformed).toHaveLength(2);
+  });
+
+  it('an issue spanning several sentences: every cited sentence is parsed, ranges expanded', () => {
+    const f = PB.filterPanelFindings('1. [MAJOR] (s1, s2-3) ORPHAN: the egg is found and taken but never sought — "Levin finds the egg" … "Nebla takes it"', block);
+    expect(f.findings[0].sentences).toEqual([1, 2, 3]);
+  });
+
+  it('verifies every quote; drops the issue only when none verifies, and reports the unverified ones', () => {
+    const one = PB.filterPanelFindings('1. [MAJOR] (s1, s3) CAUSE: x — "Levin finds the egg" and "the egg glows bright blue" and "under the old stone bridge"', block);
+    expect(one.kept).toHaveLength(1);
+    expect(one.findings[0].verified).toEqual(['Levin finds the egg']);
+    expect(one.findings[0].unverified).toEqual(['the egg glows bright blue', 'under the old stone bridge']);
+    // A story-logic line counts as the arc it quotes.
+    expect(PB.filterPanelFindings('1. [MAJOR] (s2) LOGIC: x — "she lost the egg this morning"', block).kept).toHaveLength(1);
+    const none = PB.filterPanelFindings('1. [MAJOR] (s1) CAUSE: x — "the egg glows bright blue"', block);
+    expect(none.kept).toHaveLength(0);
+    expect(none.dropped).toHaveLength(1);
+    // A quote inside the proposed repair is not evidence.
+    expect(PB.filterPanelFindings('1. [MAJOR] (s2) LOGIC: x Smallest change: move "Nebla takes it" later.', block).dropped).toHaveLength(1);
+  });
+
+  it('three issues at most per panelist: the fourth and later are overflow', () => {
+    const four = [1, 2, 3, 4].map(n => `${n}. [MAJOR] (s${n > 3 ? 3 : n}) CAUSE: x — "Levin finds the egg"`).join('\n');
+    const f = PB.filterPanelFindings(four, block);
+    expect(PB.ARC_ISSUE_MAX).toBe(3);
+    expect(f.kept).toHaveLength(3);
+    expect(f.overflow).toEqual(['4. [MAJOR] (s3) CAUSE: x — "Levin finds the egg"']);
   });
 
   it('folds case, punctuation, curly quotes and an ellipsis, and needs three words', () => {
-    const kept = PB.filterPanelFindings('ISSUE [MAJOR] s2 “nebla TAKES it!” — x', block).kept;
-    expect(kept).toHaveLength(1);
-    expect(PB.filterPanelFindings('ISSUE [MAJOR] s1 "Levin finds the egg … Nebla takes" — x', block).kept).toHaveLength(1);
-    expect(PB.filterPanelFindings('ISSUE [MAJOR] s1 "Levin finds … the egg" — x', block).kept).toHaveLength(0);
-    expect(PB.filterPanelFindings('ISSUE [MAJOR] s2 "takes it" — x', block).kept).toHaveLength(0);
+    expect(PB.filterPanelFindings('1. [MAJOR] (s2) LOGIC: x — “nebla TAKES it!”', block).kept).toHaveLength(1);
+    expect(PB.filterPanelFindings('1. [MAJOR] (s1) LOGIC: x — "Levin finds the egg … Nebla takes"', block).kept).toHaveLength(1);
+    expect(PB.filterPanelFindings('1. [MAJOR] (s1) LOGIC: x — "Levin finds … the egg"', block).kept).toHaveLength(0);
+    expect(PB.filterPanelFindings('1. [MAJOR] (s2) LOGIC: x — "takes it"', block).kept).toHaveLength(0);
   });
 
-  it('the panel tags by the creator critique\'s own severity scale — one constant', async () => {
+  it('the panel reports three worst, by the creator critique\'s own issue rule, line and severity scale', async () => {
     await loadPromptTemplates();
-    expect(PB.buildArcPanelPrompt(input(5), block)).toContain(PB.ARC_SEVERITY_DEF);
-    expect(PB.arcCritiqueSpec()).toContain(PB.ARC_SEVERITY_DEF);
-    expect(PB.arcCritiqueSpec({ retell: true })).toContain(PB.ARC_SEVERITY_DEF);
+    const panel = PB.buildArcPanelPrompt(input(5), block);
+    expect(panel).toContain(PB.ARC_SEVERITY_DEF);
+    expect(panel).toContain(PB.ARC_ISSUE_RULE);
+    expect(panel).toContain(PB.arcIssueLine({ lens: true }));
+    for (const spec of [PB.arcCritiqueSpec(), PB.arcCritiqueSpec({ retell: true })]) {
+      expect(spec).toContain(PB.ARC_SEVERITY_DEF);
+      expect(spec).toContain(PB.ARC_ISSUE_RULE);
+      expect(spec).toContain(PB.arcIssueLine());
+    }
+    // No per-sentence walk, no per-sentence line shape.
+    expect(panel).not.toMatch(/sentence by sentence|ISSUE \[<severity>\] s<N>/);
   });
 });
 
@@ -413,42 +452,63 @@ describe('arcRepairFindings — the re-tell gate (owner, 2026-09-25)', () => {
     expect(critique).toMatch(/^Faults:\n1\. \[MAJOR\]/);
   });
 
-  it('no quoted MAJOR or CRITICAL anywhere: no re-telling, and says why', () => {
-    const g = PB.arcRepairFindings({ critique: minorCritique, reviewedArc: arcBlock, panel: [{ letter: 'A', findings: f('1. ISSUE [MINOR] s3 "The egg hatches in the leaves" — x') }] });
+  it('gate off: no quoted MAJOR or CRITICAL anywhere — no re-telling, and says why', () => {
+    const g = PB.arcRepairFindings({ critique: minorCritique, reviewedArc: arcBlock, panel: [{ letter: 'A', findings: f('1. [MINOR] (s3) CAUSE: x — "The egg hatches in the leaves"') }] });
     expect(g.retell).toBe(false);
     expect(g.skipReason).toBe('no MAJOR');
     expect(g.text).toBe('');
   });
 
   it('a MAJOR that does not quote the arc does not open the gate', () => {
-    const g = PB.arcRepairFindings({ critique: '1. [MAJOR] "the dragon never sleeps at all" — x', reviewedArc: arcBlock, panel: [] });
+    const g = PB.arcRepairFindings({ critique: '1. [MAJOR] (s1) x — "the dragon never sleeps at all"', reviewedArc: arcBlock, panel: [] });
     expect(g.retell).toBe(false);
     expect(g.critique.dropped).toHaveLength(1);
   });
 
-  it('a quoted MAJOR opens it, and the re-telling is handed the MAJOR/CRITICAL findings only', () => {
+  it('gate on: a quoted MAJOR opens it, and the re-telling is handed the MAJOR/CRITICAL issues only', () => {
     const g = PB.arcRepairFindings({
       critique: minorCritique,
       reviewedArc: arcBlock,
       panel: [
-        { letter: 'A', findings: f('1. ISSUE [MINOR] s3 "The egg hatches in the leaves" — x') },
-        { letter: 'B', findings: f('1. ISSUE [MAJOR] s1 "Levin finds the egg" — CAUSE: why there?\n2. ISSUE [MINOR] s2 "Nebla takes it" — y') },
+        { letter: 'A', findings: f('1. [MINOR] (s3) CAUSE: x — "The egg hatches in the leaves"') },
+        { letter: 'B', findings: f('1. [MAJOR] (s1) CAUSE: why there? — "Levin finds the egg"\n2. [MINOR] (s2) SENSE: y — "Nebla takes it"') },
       ],
     });
     expect(g.retell).toBe(true);
     expect(g.count).toBe(1);
-    expect(g.text).toBe('## PANELIST B\n1. ISSUE [MAJOR] s1 "Levin finds the egg" — CAUSE: why there?');
+    expect(g.text).toBe('## PANELIST B\n1. [MAJOR] (s1) CAUSE: why there? — "Levin finds the egg"');
   });
 
-  it('the critique\'s own quoted MAJOR opens it too; an untagged critique line is a parse error', () => {
+  it('two panelists naming the same sentences under the same lens hand over ONE issue, marked', () => {
+    const g = PB.arcRepairFindings({
+      critique: minorCritique,
+      reviewedArc: arcBlock,
+      panel: [
+        { letter: 'A', findings: f('1. [MAJOR] (s1, s2) CAUSE: why there? — "Levin finds the egg"') },
+        { letter: 'B', findings: f('1. [CRITICAL] (s2, s1) CAUSE: nothing put it there — "Nebla takes it"\n2. [MAJOR] (s1, s2) SENSE: other — "Nebla takes it"') },
+        { letter: 'C', findings: f('1. [MAJOR] (s1-2) CAUSE: same — "Levin finds the egg"') },
+      ],
+    });
+    expect(g.count).toBe(2);
+    expect(g.duplicates).toBe(2);
+    expect(g.text).toBe([
+      '## PANELIST A',
+      '1. [MAJOR] (s1, s2) CAUSE: why there? — "Levin finds the egg" (Panelist B and Panelist C named the same issue.)',
+      '',
+      '## PANELIST B',
+      '2. [MAJOR] (s1, s2) SENSE: other — "Nebla takes it"',
+    ].join('\n'));
+  });
+
+  it('the critique\'s own quoted MAJOR opens it too; a malformed critique line is a parse error', () => {
     const g = PB.arcRepairFindings({ critique: `${critique}\n2. s1 "Levin finds the egg" — untagged`, reviewedArc: arcBlock, panel: [] });
     expect(g.retell).toBe(true);
     expect(g.critiqueRepair).toHaveLength(1);
-    expect(g.text).toMatch(/^## THE CREATOR'S CRITIQUE\n1\. \[MAJOR\] s2 "Nebla takes it"/);
-    expect(g.critique.untagged).toEqual(['2. s1 "Levin finds the egg" — untagged']);
+    expect(g.text).toMatch(/^## THE CREATOR'S CRITIQUE\n1\. \[MAJOR\] \(s2\)/);
+    expect(g.critique.malformed).toEqual(['2. s1 "Levin finds the egg" — untagged']);
   });
 
-  it('the re-tell prompt refuses to build without a finding to repair', async () => {
+  it('the re-tell prompt refuses to build without an issue to repair', async () => {
     await loadPromptTemplates();
     expect(PB.buildArcRetellPrompt(input(5), 18, arcBlock, '')).toBeNull();
   });
@@ -499,7 +559,7 @@ describe('the arc prompts v3 (owner, 2026-09-25): a logical AND exciting plot, c
   it('a no-turn finding quotes the sentence, and the code filter keeps it', () => {
     expect(PB.ARC_FINDING_RULE).toMatch(/names that figure and quotes the sentence where they only watch or wait/);
     const block = '# ARC\n1. Levin finds the egg.\n2. Julian stands and watches the egg roll away.';
-    expect(PB.filterPanelFindings('ISSUE [MAJOR] s2 "Julian stands and watches" — LOGIC: Julian has no turn', block).kept).toHaveLength(1);
+    expect(PB.filterPanelFindings('1. [MAJOR] (s2) LOGIC: Julian has no turn — "Julian stands and watches"', block).kept).toHaveLength(1);
   });
 
   it('the arc judge: no entrances dimension (the page plan is where that lives), and a change the arc names outright is not deducted', async () => {

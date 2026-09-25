@@ -9159,15 +9159,29 @@ const COMMISSIONED_CAST_DEF = "the character list plus any named figure the prem
 const ARC_LOGIC_CHECK = 'an act against the want, motive, ability or limit the story logic gives its figure; an act that no motive line causes; a happening that causes nothing later; a fact that contradicts an earlier one; a "why don\'t they just …?" the logic leaves open.';
 
 /**
- * HOW A FINDING IS WRITTEN — one string, the creator's critique and the panel
- * (2026-09-25). A finding quotes the words that conflict, so it can be checked
- * against the text instead of trusted (ConStory-Bench: a consistency finding
- * cites both conflicting spans). Unanchored self-correction makes answers worse
- * (Huang et al., ICLR 2024); a quoted conflict is the anchor. The panel's
- * findings are also checked in code: filterPanelFindings drops a finding whose
- * quote is not in the arc it reviews.
+ * HOW AN ISSUE IS WRITTEN — one set of strings, the creator's critique and the
+ * panel (2026-09-25). An issue quotes the words that show it, so it can be
+ * checked against the text instead of trusted (ConStory-Bench: a consistency
+ * finding cites both conflicting spans). Unanchored self-correction makes
+ * answers worse (Huang et al., ICLR 2024); a quote is the anchor. Code checks
+ * the quotes: parseArcIssues drops an issue none of whose quotes is in the arc
+ * or its story logic.
+ *
+ * THE THREE WORST ISSUES (owner, 2026-09-25, on Lab #1473-1476, where the panel
+ * tagged 8-18 findings per arc MAJOR/CRITICAL — DeepSeek up to 15 — so the
+ * re-tell gate never skipped): "Ask each panel to output the three worst
+ * issues. Tagging a sentence is no good; an issue can be spread over many
+ * sentences." An issue is a story problem, cited by every sentence it
+ * concerns; each reader reports its three worst, ranked (ARC_ISSUE_MAX).
  */
-const ARC_FINDING_RULE = 'Each finding quotes the words that conflict, exactly as they stand: s<N> "<words from that arc sentence>" against "<words from the story-logic line or the earlier sentence it breaks>". A finding about an act no motive line causes, or a happening that causes nothing later, quotes that sentence alone. A finding about a main character with no turn, or an opposition that never acts, names that figure and quotes the sentence where they only watch or wait. A finding that quotes nothing is not a finding.';
+const ARC_ISSUE_MAX = 3;
+const ARC_ISSUE_RULE = 'An issue is a story problem, not a sentence: one problem that runs across several sentences is one issue. Only the three worst are reported, ranked worst first — fewer only where there are fewer, never a list of everything.';
+const ARC_FINDING_RULE = 'Each issue cites in parentheses every arc sentence it concerns — (s4) or (s4, s9-10) — and quotes the words that show it, exactly as they stand: from one of those sentences or several, or the STORY LOGIC line it breaks. An issue about a main character with no turn, or an opposition that never acts, names that figure and quotes the sentence where they only watch or wait. An issue that quotes nothing is not an issue.';
+
+/** The one line an issue is written on — the panel names its lens, the critique does not. */
+function arcIssueLine({ lens = false } = {}) {
+  return `<rank>. [<severity>] (s<N>, s<N>) ${lens ? '<LENS>: ' : ''}<the problem, in one sentence> — "<words>" … "<words>"`;
+}
 
 /**
  * Generator-side twins of three arc-panel lenses (ENTRANCE, ASSUMED, SENSE).
@@ -9450,7 +9464,7 @@ const ARC_SEVERITY_DEF = '[CRITICAL] — the story is broken; [MAJOR] — a real
 function arcCritiqueSpec({ retell = false } = {}) {
   const remain = retell ? ' that remain' : '';
   return [
-    `"Faults:" then up to 6 numbered faults${remain}, or the single word "none". A fault is one of these: ${ARC_LOGIC_CHECK} Or one of these: ${ARC_PART_CHECK} ${ARC_FINDING_RULE} Tag each ${ARC_SEVERITY_DEF} A fault is never a count, a page number or a sourced measurement.`,
+    `"Faults:" then the arc's three worst faults${remain}, one per numbered line, or the single word "none". ${ARC_ISSUE_RULE} A fault is one of these: ${ARC_LOGIC_CHECK} Or one of these: ${ARC_PART_CHECK} Each line: ${arcIssueLine()} ${ARC_FINDING_RULE} Tag each ${ARC_SEVERITY_DEF} A fault is never a count, a page number or a sourced measurement.`,
     '',
     '"Commission honored:" one line — "yes", or the commission\'s own words the arc drops or inverts, quoted; a TOPIC PROMISE, where one is given, counts among the commission\'s words.',
   ].join('\n');
@@ -9498,9 +9512,12 @@ function buildArcPanelPrompt(inputData, committedBlock) {
     // The lenses a creator rule mirrors read that rule's own string. LOGIC is
     // the creator critique's own check (2026-09-24). The CAST and ACTION lenses
     // left the same day: both were counts, now code's and plan-check Q12's.
-    // A finding is written the way the creator's critique writes one — quoting
-    // the conflict (2026-09-25); filterPanelFindings drops one that does not.
+    // An issue is written the way the creator's critique writes a fault — its
+    // three worst, each citing its sentences and quoting them (2026-09-25);
+    // parseArcIssues drops one whose quotes are not in the arc.
     ARC_LOGIC_CHECK,
+    ARC_ISSUE_RULE,
+    ARC_ISSUE_LINE: arcIssueLine({ lens: true }),
     ARC_FINDING_RULE,
     // The creator critique's own severity scale (2026-09-25): the tag decides
     // whether the re-telling runs and what it is handed (arcRepairFindings).
@@ -9635,30 +9652,43 @@ function parseArcHints(raw) {
 }
 
 /**
- * A PANEL FINDING MUST QUOTE THE ARC (owner, 2026-09-25). Each missed issue a
- * panelist reports quotes the words that conflict (ARC_FINDING_RULE); a
- * finding whose quote is not in the block it reviewed — or that quotes nothing
- * — is dropped before the re-telling reads it. ConStory-Bench scores a
- * consistency finding only with both conflicting spans cited; on Lab #1459
- * one panelist's unanchored "missed issues" asserted contradictions the arc
- * did not contain, and the re-telling could not tell them from real ones.
+ * AN ARC ISSUE MUST QUOTE THE ARC (owner, 2026-09-25). ONE parser for the
+ * panel's issues and the critique's faults (the line arcIssueLine describes):
+ *
+ *   <rank>. [<severity>] (s<N>, s<N>-<M>) <LENS>: <the problem> — "<words>" … "<words>"
+ *
+ * An issue is a story problem, not a sentence (ARC_ISSUE_RULE): it cites every
+ * sentence it concerns and quotes the words that show it, from one sentence or
+ * several, or the STORY LOGIC line it breaks. Each of its quotes is checked
+ * against the block it reviewed; the issue is dropped only when NONE verifies
+ * (a quote from the TOPIC PROMISE or the landmark list is not in the block,
+ * and must not sink an issue that also quotes the arc). ConStory-Bench scores
+ * a consistency finding only with its spans cited; on Lab #1459 unanchored
+ * findings asserted contradictions the arc did not contain.
  *
  * Mechanical, never a reading of meaning: a quote is a span between double
- * quotes, guillemets or curly quotes; it counts when a piece of it of three or
- * more words (split at an ellipsis) appears in the reviewed block, compared
- * lowercased with punctuation folded to spaces. Every non-blank line that is
- * not a bare heading or the word "none" is a finding.
+ * quotes, guillemets or curly quotes; it verifies when a piece of it of three
+ * or more words (split at an ellipsis) appears in the reviewed block, compared
+ * lowercased with punctuation folded to spaces. Quotes inside "Smallest
+ * change: …" are the proposed repair, not evidence, and are not read.
  *
- * AND IT MUST CARRY ITS SEVERITY (owner, 2026-09-25): [CRITICAL], [MAJOR] or
- * [MINOR], defined by ARC_SEVERITY_DEF. A finding without a tag is a parse
- * error for that finding — logged and dropped, never given a default.
+ * Every failure is loud (log.warn) and reported, never defaulted:
+ *   malformed  a numbered line, or a line carrying a severity tag, that is not
+ *              an issue line — no tag, no "(s<N>)" citation. The retired
+ *              per-sentence "ISSUE [MAJOR] s<N> …" shape lands here.
+ *   dropped    an issue none of whose quotes is in the reviewed block.
+ *   overflow   a well-formed issue past the ARC_ISSUE_MAX-th — each reader
+ *              reports its three worst, ranked, so the first three are kept.
  *
- * @returns {{ text: string, findings: {text: string, severity: string}[],
- *   kept: string[], dropped: string[], untagged: string[] }}
- *   `dropped` = tagged but unquoted; `untagged` = the parse errors.
+ * @returns {{ issues: ArcIssue[], dropped: string[], malformed: string[], overflow: string[] }}
+ *   ArcIssue = { text, severity, rank, sentences: number[], lens: string|null,
+ *                quotes: string[], verified: string[], unverified: string[] }
  */
 const PANEL_QUOTE_RE = /["“„«]([^"“”„«»\n]{3,}?)["”“»]/g;
 const ARC_SEVERITY_TAG_RE = /\[(CRITICAL|MAJOR|MINOR)\]/i;
+const ARC_ISSUE_CANDIDATE_RE = /^\s*(?:[-*]\s+)?(?:\*\*)?\d+[.)]/;
+const ARC_ISSUE_LINE_RE = /^\s*(?:[-*]\s+)?(?:\*\*)?(\d+)[.)](?:\*\*)?\s*(?:\*\*)?\[(CRITICAL|MAJOR|MINOR)\](?:\*\*)?\s*\(([^)]*)\)\s*(.*)$/i;
+const ARC_ISSUE_LENS_RE = /^(?:\*\*)?([A-Z]{3,})(?:\*\*)?\s*:/;
 // The severities the re-telling repairs; a MINOR is never handed to it.
 const ARC_REPAIR_SEVERITIES = new Set(['CRITICAL', 'MAJOR']);
 
@@ -9673,70 +9703,96 @@ function quoteFoundIn(quote, haystack) {
   return pieces.length > 0 && pieces.some(p => haystack.includes(` ${p} `));
 }
 
-/** True when a line quotes a span found in the folded haystack. */
-function lineQuotesBlock(line, haystack) {
-  return [...line.matchAll(PANEL_QUOTE_RE)].some(m => quoteFoundIn(m[1], haystack));
+/** "(s4, s9-10)" → [4, 9, 10]; sorted, unique. */
+function citedSentences(group) {
+  const out = new Set();
+  for (const m of String(group || '').matchAll(/s\s*(\d+)(?:\s*[-–—]\s*s?\s*(\d+))?/gi)) {
+    const a = parseInt(m[1], 10);
+    const b = m[2] ? parseInt(m[2], 10) : a;
+    const lo = Math.min(a, b);
+    for (let n = lo; n <= Math.max(a, b) && n - lo < 60; n++) out.add(n);
+  }
+  return [...out].sort((x, y) => x - y);
 }
 
-function filterPanelFindings(text, reviewedBlock) {
+function parseArcIssues(text, reviewedBlock, { source = 'panel' } = {}) {
   const haystack = foldForQuote(reviewedBlock);
-  const findings = [];
+  const issues = [];
   const dropped = [];
-  const untagged = [];
-  for (const line of String(text || '').split('\n')) {
-    if (!line.trim()) continue;
-    // A bare heading ("Missed issues:") is layout, not a finding.
-    if (/^[\s*#_-]*[\p{L} ]{1,40}:?[\s*#_]*$/u.test(line) && line.trim().split(/\s+/).length <= 4) continue;
-    // "none" — the panelist found nothing the creator missed.
-    if (/^[\W_]*none[\W_]*$/i.test(line)) continue;
-    const tag = line.match(ARC_SEVERITY_TAG_RE);
-    if (!tag) {
-      untagged.push(line.trim());
-      log.warn(`⚠️ [ARC] panel finding has no [CRITICAL]/[MAJOR]/[MINOR] tag — dropped as a parse error: ${line.trim().slice(0, 200)}`);
+  const malformed = [];
+  const overflow = [];
+  for (const raw of String(text || '').split('\n')) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (!ARC_ISSUE_CANDIDATE_RE.test(line) && !ARC_SEVERITY_TAG_RE.test(line)) continue;
+    const m = line.match(ARC_ISSUE_LINE_RE);
+    const sentences = m ? citedSentences(m[3]) : [];
+    if (!m || !sentences.length) {
+      malformed.push(line);
+      log.warn(`⚠️ [ARC] ${source} issue is not "<n>. [SEVERITY] (s<N>, …) …" — dropped as a parse error: ${line.slice(0, 200)}`);
       continue;
     }
-    if (lineQuotesBlock(line, haystack)) findings.push({ text: line.trim(), severity: tag[1].toUpperCase() });
-    else dropped.push(line.trim());
+    const body = m[4].split(/smallest change\s*:/i)[0];
+    const quotes = [...body.matchAll(PANEL_QUOTE_RE)].map(q => q[1]);
+    const verified = quotes.filter(q => quoteFoundIn(q, haystack));
+    const unverified = quotes.filter(q => !verified.includes(q));
+    if (!verified.length) {
+      dropped.push(line);
+      log.warn(`⚠️ [ARC] ${source} issue DROPPED — ${quotes.length ? `none of its ${quotes.length} quote(s) is in the arc` : 'it quotes nothing'}: ${line.slice(0, 200)}`);
+      continue;
+    }
+    if (issues.length >= ARC_ISSUE_MAX) {
+      overflow.push(line);
+      log.warn(`⚠️ [ARC] ${source} reported more than ${ARC_ISSUE_MAX} issues — dropped as overflow: ${line.slice(0, 200)}`);
+      continue;
+    }
+    if (unverified.length) {
+      log.warn(`⚠️ [ARC] ${source} issue kept on ${verified.length} verified quote(s); ${unverified.length} quote(s) not in the arc: ${unverified.map(q => `"${q.slice(0, 60)}"`).join(', ')}`);
+    }
+    const lens = m[4].trim().match(ARC_ISSUE_LENS_RE);
+    issues.push({
+      text: line, severity: m[2].toUpperCase(), rank: parseInt(m[1], 10),
+      sentences, lens: lens ? lens[1] : null, quotes, verified, unverified,
+    });
   }
-  const kept = findings.map(f => f.text);
-  return { text: kept.join('\n'), findings, kept, dropped, untagged };
+  return { issues, dropped, malformed, overflow };
 }
 
 /**
- * The faults of a critique the re-telling may be handed: its numbered lines,
- * each tagged and quoting the arc it critiques (`reviewedArc` = the story logic
- * and the arc, never the critique itself, or every quote would find itself).
- * Same two rules as a panel finding (filterPanelFindings).
- *
- * @returns {{ findings: {text, severity}[], dropped: string[], untagged: string[] }}
+ * One panelist's reply → its issues (parseArcIssues against the committed
+ * block it reviewed). `findings` are the issue objects the gate reads; `text`
+ * is their lines.
+ */
+function filterPanelFindings(text, reviewedBlock) {
+  const r = parseArcIssues(text, reviewedBlock, { source: 'panel' });
+  const kept = r.issues.map(f => f.text);
+  return { text: kept.join('\n'), findings: r.issues, kept, dropped: r.dropped, malformed: r.malformed, overflow: r.overflow };
+}
+
+/**
+ * The faults of a critique the re-telling may be handed — the same issue lines
+ * as a panelist's, checked against the arc it critiques (`reviewedArc` = the
+ * story logic and the arc, never the critique itself, or every quote would
+ * find itself).
  */
 function filterCritiqueFaults(critique, reviewedArc) {
-  const haystack = foldForQuote(reviewedArc);
-  const findings = [];
-  const dropped = [];
-  const untagged = [];
-  for (const line of String(critique || '').split('\n')) {
-    if (!/^\s*\d+[.)]/.test(line)) continue;
-    const tag = line.match(ARC_SEVERITY_TAG_RE);
-    if (!tag) {
-      untagged.push(line.trim());
-      log.warn(`⚠️ [ARC] critique fault has no [CRITICAL]/[MAJOR]/[MINOR] tag — dropped as a parse error: ${line.trim().slice(0, 200)}`);
-      continue;
-    }
-    if (lineQuotesBlock(line, haystack)) findings.push({ text: line.trim(), severity: tag[1].toUpperCase() });
-    else dropped.push(line.trim());
-  }
-  return { findings, dropped, untagged };
+  const r = parseArcIssues(critique, reviewedArc, { source: 'critique' });
+  return { findings: r.issues, dropped: r.dropped, malformed: r.malformed, overflow: r.overflow };
 }
 
 /**
  * THE RE-TELL GATE (owner, 2026-09-25). The re-telling runs only when at
- * least one quoted MAJOR or CRITICAL finding survives — from the critique the
- * arc carries or from the panel — and it is handed those findings and nothing
- * else. Measured on Lab #1459-1467: judges scored every re-told arc lower than
- * its create (fit −1.17, 11/12 draws down), and the split was the worst create
- * fault: every MAJOR run improved with the re-telling (3/3), every MINOR run
- * got worse or stayed flat (docs/decisions.md 2026-09-25).
+ * least one quoted MAJOR or CRITICAL issue survives — from the critique the
+ * arc carries or from the panel's three-worst lists — and it is handed those
+ * issues and nothing else. Measured on Lab #1459-1467: judges scored every
+ * re-told arc lower than its create (fit −1.17, 11/12 draws down), and the
+ * split was the worst create fault: every MAJOR run improved with the
+ * re-telling (3/3), every MINOR run got worse or stayed flat.
+ *
+ * DUPLICATES: two panelists naming the same problem — the same cited sentences
+ * under the same lens — hand the re-telling ONE issue, under the first
+ * panelist, marked with every other panelist who named it. Nothing subtler:
+ * a near-duplicate stays two issues.
  *
  * ONE implementation for production (beatsPipeline) and the Lab mirrors
  * (testlab.js arc_effort, arc_panel_replay) — sibling set arc-retell-gate.
@@ -9744,26 +9800,46 @@ function filterCritiqueFaults(critique, reviewedArc) {
  * @param {Object} args
  * @param {string} args.critique     the critique the reviewed arc carries
  * @param {string} args.reviewedArc  that arc's story logic + arc, no critique
- * @param {{letter: string, findings: {text, severity}[]}[]} args.panel
+ * @param {{letter: string, findings: ArcIssue[]}[]} args.panel
  *   each voice's filterPanelFindings().findings, with its prompt letter
  * @returns {{ retell: boolean, skipReason: string|null, count: number,
  *   text: string, critique: object, critiqueRepair: string[],
- *   panelRepair: {letter: string, findings: string[]}[] }}
+ *   panelRepair: {letter: string, findings: string[]}[], duplicates: number }}
  *   `text` is the REPAIR_FINDINGS section of the re-tell prompt.
  */
 function arcRepairFindings({ critique, reviewedArc, panel = [] }) {
   const crit = filterCritiqueFaults(critique, reviewedArc);
   const repair = f => ARC_REPAIR_SEVERITIES.has(f.severity);
   const critiqueRepair = crit.findings.filter(repair).map(f => f.text);
-  const panelRepair = panel
-    .map(p => ({ letter: p.letter, findings: (p.findings || []).filter(repair).map(f => f.text) }))
-    .filter(p => p.findings.length);
+  const seen = new Map();
+  let duplicates = 0;
+  const sections = panel.map(p => ({ letter: p.letter, items: [] }));
+  panel.forEach((p, i) => {
+    for (const f of (p.findings || []).filter(repair)) {
+      const key = f.lens && f.sentences?.length ? `${f.lens}|${f.sentences.join(',')}` : null;
+      if (key && seen.has(key)) {
+        const first = seen.get(key);
+        if (first.letter !== p.letter && !first.alsoBy.includes(p.letter)) first.alsoBy.push(p.letter);
+        duplicates++;
+        continue;
+      }
+      const item = { letter: p.letter, text: f.text, alsoBy: [] };
+      sections[i].items.push(item);
+      if (key) seen.set(key, item);
+    }
+  });
+  const lineOf = it => (it.alsoBy.length
+    ? `${it.text} (Panelist ${it.alsoBy.join(' and Panelist ')} named the same issue.)`
+    : it.text);
+  const panelRepair = sections
+    .filter(s => s.items.length)
+    .map(s => ({ letter: s.letter, findings: s.items.map(lineOf) }));
   const count = critiqueRepair.length + panelRepair.reduce((n, p) => n + p.findings.length, 0);
   const text = [
     critiqueRepair.length ? `## THE CREATOR'S CRITIQUE\n${critiqueRepair.join('\n')}` : '',
     ...panelRepair.map(p => `## PANELIST ${p.letter}\n${p.findings.join('\n')}`),
   ].filter(Boolean).join('\n\n');
-  return { retell: count > 0, skipReason: count > 0 ? null : 'no MAJOR', count, text, critique: crit, critiqueRepair, panelRepair };
+  return { retell: count > 0, skipReason: count > 0 ? null : 'no MAJOR', count, text, critique: crit, critiqueRepair, panelRepair, duplicates };
 }
 
 /**
@@ -11875,6 +11951,10 @@ module.exports = {
   arcCritiqueSpec,
   ARC_LOGIC_CHECK,
   ARC_FINDING_RULE,
+  ARC_ISSUE_RULE,
+  ARC_ISSUE_MAX,
+  arcIssueLine,
+  parseArcIssues,
   arcPrinciples,
   happeningsLabel,
   filterPanelFindings,

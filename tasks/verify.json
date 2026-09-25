@@ -1576,6 +1576,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "arc-three-worst-issues",
+      "title": "Each arc panelist reports its three worst issues; the re-telling runs only on a quoted MAJOR/CRITICAL one",
+      "commits": [],
+      "addedAt": "2026-09-25",
+      "claim": "On the Lab #1473-1476 commission (arc_effort stage=pipeline, challengesFromStory + baselineFromStory) every panelist returns at most three ranked issues in the \"<n>. [SEVERITY] (s<N>, …) <LENS>: … — \"…\"\" shape (malformedFindings empty or near-empty, overflowFindings empty), the create critique lists at most three faults the same way, gate.repair falls from 8-18 to at most 3 per panelist plus the critique, and on at least one of the four arms the gate skips the re-telling (retellSkipped: no MAJOR); where it runs, the re-telling touches only the sentences its issues need.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Lab arc_effort stage=pipeline on the #1473-1476 story: read panel[].raw beside findings/malformedFindings/droppedFindings/overflowFindings, gate (repair, duplicates, panelRepair) and retellSkipped; where a re-telling ran, diff arms[retell].arc against arms[create].arc sentence by sentence"
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }

@@ -55,6 +55,6 @@ describe('arc machine: landmark list reaches create, panel and retell', () => {
   });
 
   it('the panel probes the arc against the list', () => {
-    expect(build(inputData).panel).toContain('- LANDMARK:');
+    expect(build(inputData).panel).toMatch(/^- LANDMARK — /m);
   });
 });

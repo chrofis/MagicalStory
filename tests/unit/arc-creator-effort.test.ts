@@ -42,7 +42,7 @@ const CREATE = [
   'Logic:',
   '- none',
   'Faults:',
-  '1. [MINOR] the ending is quiet.',
+  '1. [MINOR] (s2) the ending is quiet — "The child returns it"',
 ].join('\n');
 
 const RETELL = [
@@ -54,15 +54,15 @@ const RETELL = [
   '1. The child finds a lost egg.',
   '2. The child returns it to its mother.',
   'CRITIQUE:',
-  '1. [MINOR] the ending is quiet.',
+  '1. [MINOR] (s2) the ending is quiet — "The child returns it"',
 ].join('\n');
 
 // A quoted MAJOR (s2 of CREATE) and a quoted MINOR, one panel reply.
 const PANEL_MAJOR = [
-  '1. ISSUE [MAJOR] s2 "The child returns it" — CAUSE: nothing says where the nest is. Smallest change: move the nest fact earlier.',
-  '2. ISSUE [MINOR] s1 "The child finds a lost egg" — SENSE: a blemish.',
+  '1. [MAJOR] (s1, s2) CAUSE: nothing says where the nest is — "The child returns it" Smallest change: move the nest fact earlier.',
+  '2. [MINOR] (s1) SENSE: a blemish — "The child finds a lost egg"',
 ].join('\n');
-const PANEL_MINOR = '1. ISSUE [MINOR] s1 "The child finds a lost egg" — SENSE: a blemish.';
+const PANEL_MINOR = '1. [MINOR] (s1) SENSE: a blemish — "The child finds a lost egg"';
 
 /** Run the arc machine with every model call mocked; stop at the beats plan. */
 async function runArc(panelReply: string) {
@@ -144,19 +144,25 @@ describe('arc machine — the re-tell gate (owner, 2026-09-25)', () => {
     const { calls, prompts } = await runArc(PANEL_MAJOR);
     expect(calls.filter(c => c.label === 'arc_retell')).toHaveLength(1);
     const retell = prompts.arc_retell;
-    expect(retell).toContain('ISSUE [MAJOR] s2 "The child returns it"');
-    expect(retell).not.toContain('ISSUE [MINOR]');
+    expect(retell).toContain('[MAJOR] (s1, s2) CAUSE: nothing says where the nest is — "The child returns it"');
+    expect(retell).not.toContain('[MINOR] (s1) SENSE');
     // The create critique's MINOR fault is not handed over either.
     expect(retell).not.toContain('the ending is quiet');
     // The arc arrives without its critique.
     expect(retell).toContain('2. The child returns it.');
   }, 30000);
 
-  it('a panel finding without a severity tag is dropped as a parse error and logged', async () => {
-    const { calls, events } = await runArc('1. ISSUE s2 "The child returns it" — CAUSE: untagged.');
+  it('the retired per-sentence ISSUE line is a parse error: dropped, logged, and it opens no gate', async () => {
+    const { calls, events } = await runArc('1. ISSUE [MAJOR] s2 "The child returns it" — CAUSE: old shape.');
     expect(calls.filter(c => c.label === 'arc_retell')).toHaveLength(0);
-    const w = events.find(e => e.key === 'arc_panel_untagged');
+    const w = events.find(e => e.key === 'arc_panel_malformed');
     expect(w?.level).toBe('warn');
-    expect(w?.data?.untagged).toEqual(['1. ISSUE s2 "The child returns it" — CAUSE: untagged.']);
+    expect(w?.data?.malformed).toEqual(['1. ISSUE [MAJOR] s2 "The child returns it" — CAUSE: old shape.']);
+  }, 30000);
+
+  it('an issue that quotes nothing in the arc is dropped and logged loudly', async () => {
+    const { calls, events } = await runArc('1. [MAJOR] (s2) CAUSE: x — "the nest is on the moon"');
+    expect(calls.filter(c => c.label === 'arc_retell')).toHaveLength(0);
+    expect(events.find(e => e.key === 'arc_panel_unquoted')?.level).toBe('warn');
   }, 30000);
 });

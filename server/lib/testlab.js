@@ -8544,10 +8544,10 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
       const res = await callTextModelStreaming(panelPrompt, null, null, m, { usageLabel: 'testlab_arc_effort_panel', ...tempFor(m, MODEL_DEFAULTS.arcPanelTemperature) });
       const text = String(res?.text || '').trim();
       if (!text) throw new Error('empty panel response');
-      // Production's filter (beatsPipeline PANEL): an unquoted or untagged
-      // finding never reaches the re-telling.
+      // Production's filter (beatsPipeline PANEL): a malformed or unquoted
+      // issue, or one past the three worst, never reaches the re-telling.
       const f = filterPanelFindings(text, created.commit.committed);
-      return { model: res.modelId || m, raw: text, text: f.text, findings: f.findings, keptFindings: f.kept.length, droppedFindings: f.dropped, untaggedFindings: f.untagged, cost: costOf(res) };
+      return { model: res.modelId || m, raw: text, text: f.text, findings: f.findings, keptFindings: f.kept.length, droppedFindings: f.dropped, malformedFindings: f.malformed, overflowFindings: f.overflow, cost: costOf(res) };
     }));
     panel = settled.map((r, i) => (r.status === 'fulfilled'
       ? { ok: true, ...r.value }
@@ -8574,7 +8574,7 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
     arms,
     panel,
     retellSkipped,
-    gate: gate && { repair: gate.count, critiqueRepair: gate.critiqueRepair, panelRepair: gate.panelRepair, critiqueDropped: gate.critique.dropped, critiqueUntagged: gate.critique.untagged },
+    gate: gate && { repair: gate.count, duplicates: gate.duplicates, critiqueRepair: gate.critiqueRepair, panelRepair: gate.panelRepair, critiqueDropped: gate.critique.dropped, critiqueMalformed: gate.critique.malformed },
     totalCost: Number((arms.reduce((s, a) => s + (a.cost || 0) + (a.judgeCost || 0), 0) + panelCost).toFixed(4)),
     summary: [
       ...arms.map(a => (a.ok && a.phase.startsWith('baseline')
@@ -9030,7 +9030,7 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
         throw new Error(`panelist ${model} returned an empty response (${outTok} output tokens) — provider failure, not a review`);
       }
       // Production's filter (beatsPipeline PANEL): the re-telling below reads
-      // only the tagged findings that quote the arc; the raw reply ships beside them.
+      // only each panelist's three worst issues that quote the arc; the raw reply ships beside them.
       const f = H.filterPanelFindings(text, committed);
       runs.push({
         model, modelId: res.modelId, ok: true,
@@ -9042,7 +9042,8 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
         findings: f.findings,
         keptFindings: f.kept.length,
         droppedFindings: f.dropped,
-        untaggedFindings: f.untagged,
+        malformedFindings: f.malformed,
+        overflowFindings: f.overflow,
       });
     } catch (err) {
       log.warn(`⚠️ [arc panel replay] arm ${model} failed: ${err.message}`);
@@ -9065,7 +9066,7 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
       // no quoted MAJOR or CRITICAL finding, no re-telling.
       const { arcBlock, critique } = H.splitCommittedBlock(committed);
       const gate = H.arcRepairFindings({ critique, reviewedArc: arcBlock, panel });
-      const gateReport = { repair: gate.count, critiqueRepair: gate.critiqueRepair, panelRepair: gate.panelRepair, critiqueDropped: gate.critique.dropped, critiqueUntagged: gate.critique.untagged };
+      const gateReport = { repair: gate.count, duplicates: gate.duplicates, critiqueRepair: gate.critiqueRepair, panelRepair: gate.panelRepair, critiqueDropped: gate.critique.dropped, critiqueMalformed: gate.critique.malformed };
       if (!gate.retell) {
         retell = { ok: true, skipped: gate.skipReason, gate: gateReport };
       } else {

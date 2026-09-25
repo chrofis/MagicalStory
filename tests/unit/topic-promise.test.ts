@@ -65,7 +65,7 @@ describe('the topic promise', () => {
       expect(p, stage).not.toMatch(/\{[A-Z][A-Z_]+\}/);
     }
     expect(PB.arcCritiqueSpec()).toMatch(/a TOPIC PROMISE, where one is given, counts among the commission's words/);
-    expect(panel).toMatch(/^- PROMISE: where a TOPIC PROMISE is given, does the arc keep it\?/m);
+    expect(panel).toMatch(/^- PROMISE — where a TOPIC PROMISE is given, the arc breaks it/m);
   });
 
   it('a guide without a promise gives no section, and the strip leaves the rest of the guide intact', () => {

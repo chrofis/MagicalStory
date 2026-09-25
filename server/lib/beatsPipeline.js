@@ -1090,15 +1090,22 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       const failedPanelists = [];
       settled.forEach((r, i) => {
         if (r.status === 'fulfilled') {
-          // A finding that does not quote the arc it reviewed, or carries no
-          // severity tag, is dropped before the re-telling reads it (owner,
-          // 2026-09-25). The raw reply stays in the report beside what was
-          // kept and dropped.
+          // Each panelist reports its three worst issues (owner, 2026-09-25).
+          // An issue none of whose quotes is in the arc, a line that is not an
+          // issue line, and an issue past the third are dropped before the
+          // re-telling reads them — each loudly. The raw reply stays in the
+          // report beside what was kept and dropped.
           const f = filterPanelFindings(r.value.text, currentBlock);
-          if (f.untagged.length) {
-            gl.warn('arc_panel_untagged', `Panelist ${r.value.model} (round ${round}): ${f.untagged.length} finding(s) without a [CRITICAL]/[MAJOR]/[MINOR] tag dropped as parse errors`, null, { round, model: r.value.model, untagged: f.untagged });
+          if (f.malformed.length) {
+            gl.warn('arc_panel_malformed', `Panelist ${r.value.model} (round ${round}): ${f.malformed.length} line(s) not in the "<n>. [SEVERITY] (s<N>, …) …" issue shape dropped as parse errors`, null, { round, model: r.value.model, malformed: f.malformed });
           }
-          panel.push({ ...r.value, raw: r.value.text, text: f.text, findings: f.findings, keptFindings: f.kept.length, droppedFindings: f.dropped, untaggedFindings: f.untagged });
+          if (f.dropped.length) {
+            gl.warn('arc_panel_unquoted', `Panelist ${r.value.model} (round ${round}): ${f.dropped.length} issue(s) dropped — none of their quotes is in the arc`, null, { round, model: r.value.model, dropped: f.dropped });
+          }
+          if (f.overflow.length) {
+            gl.warn('arc_panel_overflow', `Panelist ${r.value.model} (round ${round}): ${f.overflow.length} issue(s) past the three worst dropped`, null, { round, model: r.value.model, overflow: f.overflow });
+          }
+          panel.push({ ...r.value, raw: r.value.text, text: f.text, findings: f.findings, keptFindings: f.kept.length, droppedFindings: f.dropped, malformedFindings: f.malformed, overflowFindings: f.overflow });
           return;
         }
         // Advisory by design: a lost voice narrows the panel, it never blocks.
@@ -1132,12 +1139,12 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // (testlab.js arc_effort / arc_panel_replay, sibling set arc-retell-gate).
       const { arcBlock, critique: roundCritique } = splitCommittedBlock(currentBlock);
       const gate = arcRepairFindings({ critique: roundCritique, reviewedArc: arcBlock, panel });
-      if (gate.critique.untagged.length) {
-        gl.warn('arc_critique_untagged', `Round ${round}: ${gate.critique.untagged.length} critique fault(s) without a severity tag dropped as parse errors`, null, { round, untagged: gate.critique.untagged });
+      if (gate.critique.malformed.length || gate.critique.dropped.length) {
+        gl.warn('arc_critique_dropped', `Round ${round}: critique faults dropped — ${gate.critique.malformed.length} not in the issue shape, ${gate.critique.dropped.length} quoting nothing in the arc`, null, { round, malformed: gate.critique.malformed, dropped: gate.critique.dropped });
       }
       const gateReport = {
-        repair: gate.count, critiqueRepair: gate.critiqueRepair, panelRepair: gate.panelRepair,
-        critiqueDropped: gate.critique.dropped, critiqueUntagged: gate.critique.untagged,
+        repair: gate.count, duplicates: gate.duplicates, critiqueRepair: gate.critiqueRepair, panelRepair: gate.panelRepair,
+        critiqueDropped: gate.critique.dropped, critiqueMalformed: gate.critique.malformed,
       };
       if (!gate.retell) {
         retellSkipped = gate.skipReason;
