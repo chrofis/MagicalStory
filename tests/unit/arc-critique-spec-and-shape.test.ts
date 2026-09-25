@@ -32,12 +32,12 @@ describe('the arc critique spec is one source', () => {
       expect(spec).toMatch(/never a count, a page number/);
     }
     expect(buildArcCreatePrompt(input(), 18, {})).toContain(arcCritiqueSpec());
-    expect(buildArcRetellPrompt(input(), 18, 'ARC 1: ...', '')).toContain(arcCritiqueSpec({ retell: true }));
+    expect(buildArcRetellPrompt(input(), 18, 'ARC 1: ...', '## PANELIST A\n1. ISSUE [MAJOR] x')).toContain(arcCritiqueSpec({ retell: true }));
   });
 
   it('both templates fill from the same builder, with no placeholder left', () => {
     const create = buildArcCreatePrompt(input(), 18, {});
-    const retell = buildArcRetellPrompt(input(), 18, 'ARC 1: ...', '');
+    const retell = buildArcRetellPrompt(input(), 18, 'ARC 1: ...', '## PANELIST A\n1. ISSUE [MAJOR] x');
     expect(create).not.toContain('{ARC_CRITIQUE_SPEC}');
     expect(retell).not.toContain('{ARC_CRITIQUE_SPEC}');
     expect(create).toContain(arcCritiqueSpec());

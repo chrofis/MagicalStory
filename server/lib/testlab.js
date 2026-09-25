@@ -8334,9 +8334,12 @@ async function runWriterCompareStage(target, { params = {} }) {
  *
  * params.stage      'create' (default) sweeps params.efforts over the create
  *   call. 'pipeline' runs production's arc machine once: create at
- *   params.createEffort, production's panel on THAT committed arc, then one
- *   re-telling per params.retellEfforts against the identical panel output,
- *   each committed arc (created and re-told) scored by the same judges.
+ *   params.createEffort, production's panel on THAT committed arc, then
+ *   production's re-tell gate (arcRepairFindings, 2026-09-25): with no quoted
+ *   MAJOR or CRITICAL finding no re-telling runs and the result carries
+ *   `retellSkipped: 'no MAJOR'`; otherwise one re-telling per
+ *   params.retellEfforts against the identical MAJOR/CRITICAL findings, each
+ *   committed arc (created and re-told) scored by the same judges.
  * params.promptFrom a Lab experiment id: reuse the create prompt that run
  *   SENT (its sentPrompts) instead of building a fresh one. A fresh build draws
  *   the challenge ideas anew, so this is the only way a later model's arms see
@@ -8354,7 +8357,7 @@ async function runWriterCompareStage(target, { params = {} }) {
 async function runArcEffortStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
-  const { buildArcCreatePrompt, buildArcPanelPrompt, buildArcRetellPrompt, parseArcCreate, parseArcRetell, filterPanelFindings, arcShapeCounts, drawChallengeIdeas } = require('./storyHelpers');
+  const { buildArcCreatePrompt, buildArcPanelPrompt, buildArcRetellPrompt, parseArcCreate, parseArcRetell, filterPanelFindings, arcRepairFindings, splitCommittedBlock, arcShapeCounts, drawChallengeIdeas } = require('./storyHelpers');
   const { callTextModelStreaming } = require('./textModels');
   const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
   const sc = require('./storyScorecard');
@@ -8499,6 +8502,10 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
   // Serial: these are large Opus calls and the point is a clean per-arm cost.
   const arms = [];
   let panel = null;
+  // The re-tell gate's verdict (pipeline stage only): what it passed, or why
+  // no re-telling ran.
+  let gate = null;
+  let retellSkipped = null;
   if (flag(params.baselineFromStory)) {
     const report = storyData.arcReviewReport || {};
     const baselines = [
@@ -8537,10 +8544,10 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
       const res = await callTextModelStreaming(panelPrompt, null, null, m, { usageLabel: 'testlab_arc_effort_panel', ...tempFor(m, MODEL_DEFAULTS.arcPanelTemperature) });
       const text = String(res?.text || '').trim();
       if (!text) throw new Error('empty panel response');
-      // Production's filter (beatsPipeline PANEL): an unquoted finding never
-      // reaches the re-telling.
+      // Production's filter (beatsPipeline PANEL): an unquoted or untagged
+      // finding never reaches the re-telling.
       const f = filterPanelFindings(text, created.commit.committed);
-      return { model: res.modelId || m, raw: text, text: f.text, keptFindings: f.kept.length, droppedFindings: f.dropped, cost: costOf(res) };
+      return { model: res.modelId || m, raw: text, text: f.text, findings: f.findings, keptFindings: f.kept.length, droppedFindings: f.dropped, untaggedFindings: f.untagged, cost: costOf(res) };
     }));
     panel = settled.map((r, i) => (r.status === 'fulfilled'
       ? { ok: true, ...r.value }
@@ -8548,10 +8555,16 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
     const voices = panel.filter(p => p.ok);
     if (!voices.length) throw new Error('every panelist failed — nothing to re-tell against');
     voices.forEach((p, i) => { p.letter = String.fromCharCode(65 + i); });
-    const solutionsText = voices.map(p => `## PANELIST ${p.letter}\n${p.text}`).join('\n\n');
-    const retellPrompt = buildArcRetellPrompt(storyData, pageCount, created.commit.committed, solutionsText, { challengeIdeas });
-    if (!retellPrompt) throw new Error('arc-retell template unavailable');
-    for (const effort of retellEfforts) arms.push((await runArm('retell', retellPrompt, effort)).arm);
+    // Production's re-tell gate (beatsPipeline, sibling set arc-retell-gate).
+    const { arcBlock, critique } = splitCommittedBlock(created.commit.committed);
+    gate = arcRepairFindings({ critique, reviewedArc: arcBlock, panel: voices });
+    if (!gate.retell) {
+      retellSkipped = gate.skipReason;
+    } else {
+      const retellPrompt = buildArcRetellPrompt(storyData, pageCount, arcBlock, gate.text, { challengeIdeas });
+      if (!retellPrompt) throw new Error('arc-retell template unavailable');
+      for (const effort of retellEfforts) arms.push((await runArm('retell', retellPrompt, effort)).arm);
+    }
   }
 
   const panelCost = (panel || []).reduce((s, p) => s + (p.cost || 0), 0);
@@ -8560,6 +8573,8 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
     storyId: target.storyId, model, stage, promptSource, judges, pageCount, promptChars: prompt.length,
     arms,
     panel,
+    retellSkipped,
+    gate: gate && { repair: gate.count, critiqueRepair: gate.critiqueRepair, panelRepair: gate.panelRepair, critiqueDropped: gate.critique.dropped, critiqueUntagged: gate.critique.untagged },
     totalCost: Number((arms.reduce((s, a) => s + (a.cost || 0) + (a.judgeCost || 0), 0) + panelCost).toFixed(4)),
     summary: [
       ...arms.map(a => (a.ok && a.phase.startsWith('baseline')
@@ -8570,6 +8585,9 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
           + (a.parseError ? ` | PARSE FAILED: ${a.parseError}` : '')
         : `${a.phase} ${a.effort}: FAILED ${a.error}`)),
       ...(panel ? [`panel: ${panel.filter(p => p.ok).length}/${panel.length} voices, $${panelCost.toFixed(4)}`] : []),
+      ...(gate ? [retellSkipped
+        ? `re-telling skipped: ${retellSkipped} (no quoted MAJOR/CRITICAL finding) — the created arc is final`
+        : `re-tell gate: ${gate.count} MAJOR/CRITICAL finding(s) passed`] : []),
     ],
   };
 }
@@ -8950,7 +8968,10 @@ async function runArcRoundsStage(target, { params = {}, promptOverride = null })
  * params.panelModels — comma-separated override of the panel (default: the
  *                      production arcPanelModels)
  * params.retell      — also run the re-telling on the new panel output, so the
- *                      question is answered end to end and not just at the panel
+ *                      question is answered end to end and not just at the panel.
+ *                      Production's re-tell gate applies (arcRepairFindings,
+ *                      2026-09-25): with no quoted MAJOR or CRITICAL finding
+ *                      the re-telling is not run and `retell.skipped` says why.
  * promptOverride     — full replacement arc-panel template, the usual Lab lever
  */
 async function runArcPanelReplayStage(target, { params = {}, promptOverride = null }) {
@@ -9001,9 +9022,8 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
       if (!text || outTok === 0) {
         throw new Error(`panelist ${model} returned an empty response (${outTok} output tokens) — provider failure, not a review`);
       }
-      const solutionIdx = text.search(/^\s*[*#]*\s*SOLUTION/im);
       // Production's filter (beatsPipeline PANEL): the re-telling below reads
-      // only the findings that quote the arc; the raw reply ships beside them.
+      // only the tagged findings that quote the arc; the raw reply ships beside them.
       const f = H.filterPanelFindings(text, committed);
       runs.push({
         model, modelId: res.modelId, ok: true,
@@ -9012,12 +9032,10 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
         usage: res.usage,
         raw: text,
         text: f.text,
+        findings: f.findings,
         keptFindings: f.kept.length,
         droppedFindings: f.dropped,
-        // The half that matters for a checklist change: what the panel FOUND,
-        // before its single solution. Split, never truncated — both halves ship.
-        issues: solutionIdx > 0 ? text.slice(0, solutionIdx).trim() : text,
-        solution: solutionIdx > 0 ? text.slice(solutionIdx).trim() : null,
+        untaggedFindings: f.untagged,
       });
     } catch (err) {
       log.warn(`⚠️ [arc panel replay] arm ${model} failed: ${err.message}`);
@@ -9036,36 +9054,45 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
       const panel = runs.filter(r => r.ok);
       if (!panel.length) throw new Error('every panelist failed — nothing to re-tell against');
       panel.forEach((p, i) => { p.letter = String.fromCharCode(65 + i); });
-      const solutionsText = panel.map(p => `## PANELIST ${p.letter}\n${p.text}`).join('\n\n');
-      const pageCount = (storyData.sceneImages || []).length || parseInt(storyData.pages, 10) || 14;
-      const retellPrompt = H.buildArcRetellPrompt(storyData, pageCount, committed, solutionsText);
-      if (!retellPrompt) throw new Error('arc-retell template unavailable');
-      // `arcReviewReport.creatorModel` is the RESOLVED model id the provider
-      // returned ("claude-opus-5"), not the TEXT_MODELS config key the caller
-      // needs ("claude-opus"). Only honour it when it is also a valid key.
-      const retellModel = String(
-        params.retellModel
-        || (TEXT_MODELS[report.creatorModel] ? report.creatorModel : null)
-        || MODEL_DEFAULTS.arcCreatorModel
-      );
-      if (!TEXT_MODELS[retellModel]) throw new Error(`Unknown model "${retellModel}"`);
-      const t = Date.now();
-      const res = await callTextModelStreaming(retellPrompt, null, null, retellModel, {
-        usageLabel: 'testlab_arc_retell_replay', ...tempFor(retellModel, MODEL_DEFAULTS.arcRetellTemperature),
-        // Production's re-tell effort, so the replay reproduces the shipped call.
-        ...(MODEL_DEFAULTS.arcRetellEffort ? { effort: MODEL_DEFAULTS.arcRetellEffort } : {}),
-      });
-      const parsed = H.parseArcRetell(res.text || '');
-      retell = {
-        ok: true,
-        model: retellModel, modelId: res.modelId,
-        elapsedMs: Date.now() - t,
-        cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
-        fixing: parsed.fixing, keeping: parsed.keeping, used: parsed.used,
-        logic: parsed.logic.text,
-        finalArc: parsed.finalArc, critique: parsed.critique,
-        maxSeverity: H.critiqueMaxSeverity(parsed.critique),
-      };
+      // Production's re-tell gate (beatsPipeline, sibling set arc-retell-gate):
+      // no quoted MAJOR or CRITICAL finding, no re-telling.
+      const { arcBlock, critique } = H.splitCommittedBlock(committed);
+      const gate = H.arcRepairFindings({ critique, reviewedArc: arcBlock, panel });
+      const gateReport = { repair: gate.count, critiqueRepair: gate.critiqueRepair, panelRepair: gate.panelRepair, critiqueDropped: gate.critique.dropped, critiqueUntagged: gate.critique.untagged };
+      if (!gate.retell) {
+        retell = { ok: true, skipped: gate.skipReason, gate: gateReport };
+      } else {
+        const pageCount = (storyData.sceneImages || []).length || parseInt(storyData.pages, 10) || 14;
+        const retellPrompt = H.buildArcRetellPrompt(storyData, pageCount, arcBlock, gate.text);
+        if (!retellPrompt) throw new Error('arc-retell template unavailable');
+        // `arcReviewReport.creatorModel` is the RESOLVED model id the provider
+        // returned ("claude-opus-5"), not the TEXT_MODELS config key the caller
+        // needs ("claude-opus"). Only honour it when it is also a valid key.
+        const retellModel = String(
+          params.retellModel
+          || (TEXT_MODELS[report.creatorModel] ? report.creatorModel : null)
+          || MODEL_DEFAULTS.arcCreatorModel
+        );
+        if (!TEXT_MODELS[retellModel]) throw new Error(`Unknown model "${retellModel}"`);
+        const t = Date.now();
+        const res = await callTextModelStreaming(retellPrompt, null, null, retellModel, {
+          usageLabel: 'testlab_arc_retell_replay', ...tempFor(retellModel, MODEL_DEFAULTS.arcRetellTemperature),
+          // Production's re-tell effort, so the replay reproduces the shipped call.
+          ...(MODEL_DEFAULTS.arcRetellEffort ? { effort: MODEL_DEFAULTS.arcRetellEffort } : {}),
+        });
+        const parsed = H.parseArcRetell(res.text || '');
+        retell = {
+          ok: true,
+          model: retellModel, modelId: res.modelId,
+          elapsedMs: Date.now() - t,
+          cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
+          fixing: parsed.fixing, keeping: parsed.keeping, used: parsed.used,
+          logic: parsed.logic.text,
+          finalArc: parsed.finalArc, critique: parsed.critique,
+          maxSeverity: H.critiqueMaxSeverity(parsed.critique),
+          gate: gateReport,
+        };
+      }
     } catch (err) {
       log.warn(`⚠️ [arc panel replay] re-tell failed: ${err.message} — panel output stands`);
       retell = { ok: false, error: err.message };

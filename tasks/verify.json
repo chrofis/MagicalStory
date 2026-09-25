@@ -1560,6 +1560,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "arc-retell-gated",
+      "title": "The arc re-telling runs only on a quoted MAJOR or CRITICAL finding and repairs only those",
+      "commits": [],
+      "addedAt": "2026-09-25",
+      "claim": "On the dragon commission (staging job_1790277448294_5herh01j7) every panelist tags its findings [CRITICAL]/[MAJOR]/[MINOR] (untaggedFindings empty or near-empty), gate.repair counts only quoted MAJOR/CRITICAL findings, and either the re-telling is skipped (retellSkipped: no MAJOR, the created arc is final) or it runs on those findings alone and keeps every sentence no finding names word for word, with the text growing no more than the edits; judged against the create arm, the re-told arm no longer scores lower on fit (baseline Lab #1462-1467: fit -1.17, 11/12 draws down).",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Lab arc_effort stage=pipeline, challengesFromStory + baselineFromStory, on job_1790277448294_5herh01j7: read panel[].findings/untaggedFindings, gate (repair, critiqueRepair, panelRepair) and retellSkipped; where a re-telling ran, diff arms[retell].arc against arms[create].arc sentence by sentence and compare the judge means"
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }

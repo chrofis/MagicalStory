@@ -41,7 +41,7 @@ describe('the character-source rule reaches every stage that claims one', () => 
   it('the arc stages answer to the PREMISE', () => {
     for (const p of [
       buildArcCreatePrompt(input(), 18, {}),
-      buildArcRetellPrompt(input(), 18, 'ARC 1: ...', ''),
+      buildArcRetellPrompt(input(), 18, 'ARC 1: ...', '## PANELIST A\n1. ISSUE [MAJOR] x'),
       buildArcReviewPrompt(input(), 18, '1. They meet as strangers.'),
     ]) {
       expect(p).toBeTruthy();

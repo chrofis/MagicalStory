@@ -9418,6 +9418,16 @@ function arcLogicSpec(inputData = {}, pageCount = 10) {
 }
 
 /**
+ * THE SEVERITY OF AN ARC FINDING — ONE string, the creator's critique
+ * (arcCritiqueSpec) and the panel (arc-panel.txt {ARC_SEVERITY_DEF}), owner
+ * 2026-09-25. The tag decides whether the re-telling runs at all and what it
+ * is handed (arcRepairFindings): only [CRITICAL] and [MAJOR] findings are
+ * repaired. A panel finding without a tag is dropped as a parse error
+ * (filterPanelFindings), never read as one severity or another.
+ */
+const ARC_SEVERITY_DEF = '[CRITICAL] — the story is broken; [MAJOR] — a real fault repairable inside the existing structure, which an act from no motive line and a main character with no turn always are; or [MINOR] — a blemish.';
+
+/**
  * THE ARC CRITIQUE SPEC — ONE source, both arc templates (owner, 2026-09-19).
  *
  * ONE ANCHORED CHECK (owner, 2026-09-25, superseding the 2026-09-24 "Logic:" /
@@ -9440,7 +9450,7 @@ function arcLogicSpec(inputData = {}, pageCount = 10) {
 function arcCritiqueSpec({ retell = false } = {}) {
   const remain = retell ? ' that remain' : '';
   return [
-    `"Faults:" then up to 6 numbered faults${remain}, or the single word "none". A fault is one of these: ${ARC_LOGIC_CHECK} Or one of these: ${ARC_PART_CHECK} ${ARC_FINDING_RULE} Tag each [CRITICAL] — the story is broken; [MAJOR] — a real fault repairable inside the existing structure, which an act from no motive line and a main character with no turn always are; or [MINOR] — a blemish. A fault is never a count, a page number or a sourced measurement.`,
+    `"Faults:" then up to 6 numbered faults${remain}, or the single word "none". A fault is one of these: ${ARC_LOGIC_CHECK} Or one of these: ${ARC_PART_CHECK} ${ARC_FINDING_RULE} Tag each ${ARC_SEVERITY_DEF} A fault is never a count, a page number or a sourced measurement.`,
     '',
     '"Commission honored:" one line — "yes", or the commission\'s own words the arc drops or inverts, quoted; a TOPIC PROMISE, where one is given, counts among the commission\'s words.',
   ].join('\n');
@@ -9471,7 +9481,7 @@ function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null } = 
   });
 }
 
-/** PANEL: one outside voice reports what the creator missed, each finding quoted, and the smallest repairs. */
+/** PANEL: one outside voice reports what the creator missed, each finding quoted and tagged by severity. */
 function buildArcPanelPrompt(inputData, committedBlock) {
   const template = PROMPT_TEMPLATES.arcPanel;
   if (!template) {
@@ -9492,6 +9502,9 @@ function buildArcPanelPrompt(inputData, committedBlock) {
     // the conflict (2026-09-25); filterPanelFindings drops one that does not.
     ARC_LOGIC_CHECK,
     ARC_FINDING_RULE,
+    // The creator critique's own severity scale (2026-09-25): the tag decides
+    // whether the re-telling runs and what it is handed (arcRepairFindings).
+    ARC_SEVERITY_DEF,
     ARC_ENTRANCE_RULE,
     ARC_GIVEN_RULE,
     ARC_SENSE_RULE,
@@ -9510,10 +9523,18 @@ function buildArcPanelPrompt(inputData, committedBlock) {
 // `challengeIdeas`: the SAME drawn section the arc creator was given. The
 // re-telling reports which drawn challenges it took, by tag, so the draw is
 // auditable — it can only do that if it can see the tags.
-function buildArcRetellPrompt(inputData, pageCount, committedBlock, panelSolutions, { challengeIdeas = null } = {}) {
+// `arcBlock`: the story logic and the arc, WITHOUT their critique; the faults
+// to repair arrive as `repairFindings`, the MAJOR and CRITICAL findings
+// arcRepairFindings selected (2026-09-25). No findings, no re-telling: the
+// gate decides that before this is built, so an empty list is a caller bug.
+function buildArcRetellPrompt(inputData, pageCount, arcBlock, repairFindings, { challengeIdeas = null } = {}) {
   const template = PROMPT_TEMPLATES.arcRetell;
   if (!template) {
     log.error('[PROMPT] arcRetell template not loaded — arc re-tell unavailable');
+    return null;
+  }
+  if (!String(repairFindings || '').trim()) {
+    log.error('[PROMPT] arcRetell: no MAJOR or CRITICAL finding to repair — the re-telling must not run (arcRepairFindings gate)');
     return null;
   }
   return fillTemplate(template, {
@@ -9526,8 +9547,8 @@ function buildArcRetellPrompt(inputData, pageCount, committedBlock, panelSolutio
     TELLING_RULES: buildTellingRulesSection(inputData),
     // The event budget the re-telling may not exceed: cut before add.
     HAPPENINGS: happeningsLabel(inputData, pageCount),
-    COMMITTED_ARC: String(committedBlock || '').trim(),
-    PANEL_SOLUTIONS: String(panelSolutions || '').trim(),
+    ARC_TO_REPAIR: String(arcBlock || '').trim(),
+    REPAIR_FINDINGS: String(repairFindings).trim(),
     ARC_LOGIC_SPEC: arcLogicSpec(inputData, pageCount),
     ARC_CRITIQUE_SPEC: arcCritiqueSpec({ retell: true }),
     ARC_LENGTH: arcLengthRange(pageCount),
@@ -9625,13 +9646,21 @@ function parseArcHints(raw) {
  * Mechanical, never a reading of meaning: a quote is a span between double
  * quotes, guillemets or curly quotes; it counts when a piece of it of three or
  * more words (split at an ellipsis) appears in the reviewed block, compared
- * lowercased with punctuation folded to spaces. The findings are every
- * non-blank line ahead of the "SOLUTION" heading; the solution passes whole —
- * it is the panelist's repair, not a finding.
+ * lowercased with punctuation folded to spaces. Every non-blank line that is
+ * not a bare heading or the word "none" is a finding.
  *
- * @returns {{ text: string, kept: string[], dropped: string[] }}
+ * AND IT MUST CARRY ITS SEVERITY (owner, 2026-09-25): [CRITICAL], [MAJOR] or
+ * [MINOR], defined by ARC_SEVERITY_DEF. A finding without a tag is a parse
+ * error for that finding — logged and dropped, never given a default.
+ *
+ * @returns {{ text: string, findings: {text: string, severity: string}[],
+ *   kept: string[], dropped: string[], untagged: string[] }}
+ *   `dropped` = tagged but unquoted; `untagged` = the parse errors.
  */
 const PANEL_QUOTE_RE = /["“„«]([^"“”„«»\n]{3,}?)["”“»]/g;
+const ARC_SEVERITY_TAG_RE = /\[(CRITICAL|MAJOR|MINOR)\]/i;
+// The severities the re-telling repairs; a MINOR is never handed to it.
+const ARC_REPAIR_SEVERITIES = new Set(['CRITICAL', 'MAJOR']);
 
 function foldForQuote(t) {
   return ` ${String(t || '').toLowerCase().replace(/[’‘`]/g, "'").replace(/[^\p{L}\p{N}']+/gu, ' ').trim()} `;
@@ -9644,23 +9673,114 @@ function quoteFoundIn(quote, haystack) {
   return pieces.length > 0 && pieces.some(p => haystack.includes(` ${p} `));
 }
 
+/** True when a line quotes a span found in the folded haystack. */
+function lineQuotesBlock(line, haystack) {
+  return [...line.matchAll(PANEL_QUOTE_RE)].some(m => quoteFoundIn(m[1], haystack));
+}
+
 function filterPanelFindings(text, reviewedBlock) {
-  const raw = String(text || '');
   const haystack = foldForQuote(reviewedBlock);
-  const solIdx = raw.search(/^\s*(?:[-*•]\s*)?(?:\*\*|#+\s*)?SOLUTION\b/mi);
-  const head = solIdx >= 0 ? raw.slice(0, solIdx) : raw;
-  const solution = solIdx >= 0 ? raw.slice(solIdx).trim() : '';
-  const kept = [];
+  const findings = [];
   const dropped = [];
-  for (const line of head.split('\n')) {
+  const untagged = [];
+  for (const line of String(text || '').split('\n')) {
     if (!line.trim()) continue;
     // A bare heading ("Missed issues:") is layout, not a finding.
     if (/^[\s*#_-]*[\p{L} ]{1,40}:?[\s*#_]*$/u.test(line) && line.trim().split(/\s+/).length <= 4) continue;
-    const quotes = [...line.matchAll(PANEL_QUOTE_RE)].map(m => m[1]);
-    if (quotes.some(q => quoteFoundIn(q, haystack))) kept.push(line.trim());
+    // "none" — the panelist found nothing the creator missed.
+    if (/^[\W_]*none[\W_]*$/i.test(line)) continue;
+    const tag = line.match(ARC_SEVERITY_TAG_RE);
+    if (!tag) {
+      untagged.push(line.trim());
+      log.warn(`⚠️ [ARC] panel finding has no [CRITICAL]/[MAJOR]/[MINOR] tag — dropped as a parse error: ${line.trim().slice(0, 200)}`);
+      continue;
+    }
+    if (lineQuotesBlock(line, haystack)) findings.push({ text: line.trim(), severity: tag[1].toUpperCase() });
     else dropped.push(line.trim());
   }
-  return { text: [kept.join('\n'), solution].filter(Boolean).join('\n\n'), kept, dropped };
+  const kept = findings.map(f => f.text);
+  return { text: kept.join('\n'), findings, kept, dropped, untagged };
+}
+
+/**
+ * The faults of a critique the re-telling may be handed: its numbered lines,
+ * each tagged and quoting the arc it critiques (`reviewedArc` = the story logic
+ * and the arc, never the critique itself, or every quote would find itself).
+ * Same two rules as a panel finding (filterPanelFindings).
+ *
+ * @returns {{ findings: {text, severity}[], dropped: string[], untagged: string[] }}
+ */
+function filterCritiqueFaults(critique, reviewedArc) {
+  const haystack = foldForQuote(reviewedArc);
+  const findings = [];
+  const dropped = [];
+  const untagged = [];
+  for (const line of String(critique || '').split('\n')) {
+    if (!/^\s*\d+[.)]/.test(line)) continue;
+    const tag = line.match(ARC_SEVERITY_TAG_RE);
+    if (!tag) {
+      untagged.push(line.trim());
+      log.warn(`⚠️ [ARC] critique fault has no [CRITICAL]/[MAJOR]/[MINOR] tag — dropped as a parse error: ${line.trim().slice(0, 200)}`);
+      continue;
+    }
+    if (lineQuotesBlock(line, haystack)) findings.push({ text: line.trim(), severity: tag[1].toUpperCase() });
+    else dropped.push(line.trim());
+  }
+  return { findings, dropped, untagged };
+}
+
+/**
+ * THE RE-TELL GATE (owner, 2026-09-25). The re-telling runs only when at
+ * least one quoted MAJOR or CRITICAL finding survives — from the critique the
+ * arc carries or from the panel — and it is handed those findings and nothing
+ * else. Measured on Lab #1459-1467: judges scored every re-told arc lower than
+ * its create (fit −1.17, 11/12 draws down), and the split was the worst create
+ * fault: every MAJOR run improved with the re-telling (3/3), every MINOR run
+ * got worse or stayed flat (docs/decisions.md 2026-09-25).
+ *
+ * ONE implementation for production (beatsPipeline) and the Lab mirrors
+ * (testlab.js arc_effort, arc_panel_replay) — sibling set arc-retell-gate.
+ *
+ * @param {Object} args
+ * @param {string} args.critique     the critique the reviewed arc carries
+ * @param {string} args.reviewedArc  that arc's story logic + arc, no critique
+ * @param {{letter: string, findings: {text, severity}[]}[]} args.panel
+ *   each voice's filterPanelFindings().findings, with its prompt letter
+ * @returns {{ retell: boolean, skipReason: string|null, count: number,
+ *   text: string, critique: object, critiqueRepair: string[],
+ *   panelRepair: {letter: string, findings: string[]}[] }}
+ *   `text` is the REPAIR_FINDINGS section of the re-tell prompt.
+ */
+function arcRepairFindings({ critique, reviewedArc, panel = [] }) {
+  const crit = filterCritiqueFaults(critique, reviewedArc);
+  const repair = f => ARC_REPAIR_SEVERITIES.has(f.severity);
+  const critiqueRepair = crit.findings.filter(repair).map(f => f.text);
+  const panelRepair = panel
+    .map(p => ({ letter: p.letter, findings: (p.findings || []).filter(repair).map(f => f.text) }))
+    .filter(p => p.findings.length);
+  const count = critiqueRepair.length + panelRepair.reduce((n, p) => n + p.findings.length, 0);
+  const text = [
+    critiqueRepair.length ? `## THE CREATOR'S CRITIQUE\n${critiqueRepair.join('\n')}` : '',
+    ...panelRepair.map(p => `## PANELIST ${p.letter}\n${p.findings.join('\n')}`),
+  ].filter(Boolean).join('\n\n');
+  return { retell: count > 0, skipReason: count > 0 ? null : 'no MAJOR', count, text, critique: crit, critiqueRepair, panelRepair };
+}
+
+/**
+ * A stored committed block split into the arc (its story logic and numbered
+ * sentences) and its critique — what the re-telling and the gate read apart.
+ * Reads both stored shapes: "STORY LOGIC:" + "ARC:" + "CRITIQUE:" (since
+ * 2026-09-24) and the older two-arc block, whose critique also opens at a
+ * "CRITIQUE" heading. Data at rest, never a second live format.
+ */
+function splitCommittedBlock(committed) {
+  const full = String(committed || '').trim();
+  const idx = full.search(/^\s*(?:\*\*|#+\s*)?CRITIQUE\s*:?/mi);
+  if (idx < 0) return { arcBlock: full, critique: '' };
+  return {
+    arcBlock: full.slice(0, idx).trim(),
+    critique: full.slice(idx).replace(/^\s*(?:\*\*|#+\s*)?CRITIQUE\s*:?\**\s*/i, '').trim(),
+  };
 }
 
 /**
@@ -11758,6 +11878,10 @@ module.exports = {
   arcPrinciples,
   happeningsLabel,
   filterPanelFindings,
+  filterCritiqueFaults,
+  arcRepairFindings,
+  splitCommittedBlock,
+  ARC_SEVERITY_DEF,
   COMMISSIONED_CAST_DEF,
   ARC_ENTRANCE_RULE,
   ARC_GIVEN_RULE,

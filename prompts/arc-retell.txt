@@ -26,18 +26,19 @@ Reading level: {READING_LEVEL}
 
 {CHALLENGE_IDEAS}
 
-# THE ARC, ITS STORY LOGIC AND ITS CRITIQUE
+# THE ARC AND ITS STORY LOGIC
 
-{COMMITTED_ARC}
+{ARC_TO_REPAIR}
 
-# PANEL FINDINGS
+# FINDINGS TO REPAIR
 
-{PANEL_SOLUTIONS}
+{REPAIR_FINDINGS}
 
 # YOUR TASK
 
-The story logic is the arc's ledger of facts. Repair the arc once, against that ledger:
-- Change only the sentences a fault or a panel finding names; copy every other sentence word for word. Take the findings you judge right and leave the rest.
+The story logic is the arc's ledger of facts. Repair the arc once, against that ledger, for the findings above and nothing else:
+- Change only the sentences a finding names; copy every other sentence word for word, under its own number. Take the findings you judge right and leave the rest.
+- A repaired sentence changes only the words its repair needs and grows no longer than that edit: no added reason, explanation or mechanism beyond it.
 - A repair that needs a new fact adds it to the story logic first; then read every sentence against the updated logic, and a sentence it contradicts is repaired too.
 - The story keeps {HAPPENINGS}: a repair that would add a happening cuts one first, and cutting a dead end is the preferred repair.
 - A "why" fault is answered from a motive the story logic already holds before any new rule of the world; an invented rule, custom, game or mechanism named as the fault is cut and replaced by a motive.

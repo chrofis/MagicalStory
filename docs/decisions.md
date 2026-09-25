@@ -60398,3 +60398,51 @@ bound what a reader of a dragon story is owed.
 `tasks/verify.json` (`topic-promise`), `tests/unit/topic-promise.test.ts`,
 `tests/unit/world-seeds.test.ts`.
 **Status:** ✅ committed on `staging`, not pushed; Lab validation pending.
+
+## 2026-09-25 — The arc re-telling runs only on a quoted MAJOR or CRITICAL finding, and repairs only those
+
+**Context:** Lab #1459-1467 (staging, dragon and wizard commissions). Under arc prompts v2/v3 the
+judges scored every arc lower after the re-telling than at create: create → retell fit −1.17 (11 of 12
+judge draws down), attempts −0.67. The re-telling kept only 0-4 of 18 sentences word for word, grew the
+text +13-34% at the same sentence count, and added announced reasons and new mechanisms. The panel
+supplied 18-28 findings per run and the quote filter dropped only 2 in total; DeepSeek alone gave 10-16,
+mostly trivial, because the panel prompt demanded a SOLUTION for every fault and issue. The early stops
+(`arc_rounds_early_stop`, `fixingBelowMajor`) act only BETWEEN rounds, and `arcRounds` is 1, so round
+1's panel and re-telling always ran (the Lab mirror did the same). The worst create severity split the
+outcome: every run whose create critique's worst fault was MAJOR improved with the re-telling (3/3,
+v1); every MINOR run got worse or stayed flat (5+1 of 6). The create self-critique does miss real
+faults the panel catches (#1467: an egg the size of a football entering a gap narrower than a hand; a
+cap whose location contradicts itself), so the panel stays.
+
+**Decision (owner, 2026-09-25):**
+1. The panel tags every finding `[CRITICAL]`/`[MAJOR]`/`[MINOR]` with the creator critique's own scale —
+   ONE constant, `ARC_SEVERITY_DEF` (promptBuilders.js), filled into `arcCritiqueSpec` and
+   `arc-panel.txt`. A finding without a tag is a parse error for that finding: `filterPanelFindings`
+   logs and drops it (`arc_panel_untagged`), never defaults it. The same holds for a numbered critique
+   fault the gate reads (`arc_critique_untagged`).
+2. The gate, `arcRepairFindings`: after a round's panel the re-telling runs only when at least one
+   QUOTED MAJOR or CRITICAL finding survives, from the panel or from the critique the arc carries
+   (critique faults are quote-checked against the story logic + arc, never against the critique).
+   Otherwise the arc as it stands is final: `arcReviewReport.retellSkipped = 'no MAJOR'`, log
+   `arc_retell_skipped`; an invented-figure overcount on that arc is warned, no round is forced for it.
+   Same gate in the Lab mirrors (`arc_effort` stage `pipeline`, `arc_panel_replay` `retell`);
+   sibling set `arc-retell-gate`.
+3. The re-telling receives the story logic and the arc WITHOUT the critique, and under `# FINDINGS TO
+   REPAIR` only the MAJOR/CRITICAL findings (`{ARC_TO_REPAIR}`, `{REPAIR_FINDINGS}`). It keeps the
+   ledger-first rule, copies every sentence no finding names word for word, and a repaired sentence
+   grows no longer than its edit. The panel no longer writes a SOLUTION for every finding; a MAJOR or
+   CRITICAL finding may end with "Smallest change: …", a MINOR names none.
+4. The quote filter stays.
+
+**Evidence (rung 1, stored create critiques of #1459-1467, free):** on the six v2/v3 runs (#1462-1467)
+the create critique's quoted faults are all MINOR, so the gate opens there only if the panel tags a
+quoted MAJOR — which needs a Lab run (the stored panel output predates the tags; all of it parses as
+untagged). The v1 runs (#1459-1461) store the old "Questions:" critique, whose numbered lines carry no
+tags or quotes. Not yet validated on a live panel: `tasks/verify.json` `arc-retell-gated`.
+
+**Touched:** `server/lib/promptBuilders.js`, `server/lib/storyHelpers.js`, `server/lib/beatsPipeline.js`,
+`server/lib/testlab.js`, `prompts/arc-panel.txt`, `prompts/arc-retell.txt`,
+`scripts/admin/sibling-registry.json` (`arc-retell-gate`), `tasks/verify.json` (`arc-retell-gated`),
+`tests/unit/arc-creator-effort.test.ts`, `tests/unit/arc-logic-first.test.ts` (+ three retell-builder
+call sites in tests).
+**Status:** ✅ committed on `staging`, not pushed; Lab validation pending.

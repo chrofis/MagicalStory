@@ -32,14 +32,14 @@ describe('the commission owns the situation, the profile owns the person', () =>
   });
 
   it('states the SAME precedence in the re-tell prompt', () => {
-    const p = buildArcRetellPrompt(input(), 18, 'ARC 1: ...', '');
+    const p = buildArcRetellPrompt(input(), 18, 'ARC 1: ...', '## PANELIST A\n1. ISSUE [MAJOR] x');
     expect(p).toContain('the premise stands');
     expect(p).toContain('who knows whom here');
   });
 
   it('is one constant, so the two prompts cannot drift apart', () => {
     const create = buildArcCreatePrompt(input(), 18, {});
-    const retell = buildArcRetellPrompt(input(), 18, 'ARC 1: ...', '');
+    const retell = buildArcRetellPrompt(input(), 18, 'ARC 1: ...', '## PANELIST A\n1. ISSUE [MAJOR] x');
     const rule = (p: string) => p.slice(p.indexOf('# CHARACTER DETAILS'), p.indexOf('**Levin**'));
     expect(rule(create)).toBe(rule(retell));
   });
@@ -53,6 +53,6 @@ describe('the commission owns the situation, the profile owns the person', () =>
 
   it('leaves no unfilled placeholder', () => {
     expect(buildArcCreatePrompt(input(), 18, {})).not.toContain('{CHARACTER_SOURCE_RULE}');
-    expect(buildArcRetellPrompt(input(), 18, 'ARC 1: ...', '')).not.toContain('{CHARACTER_SOURCE_RULE}');
+    expect(buildArcRetellPrompt(input(), 18, 'ARC 1: ...', '## PANELIST A\n1. ISSUE [MAJOR] x')).not.toContain('{CHARACTER_SOURCE_RULE}');
   });
 });

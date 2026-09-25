@@ -99,6 +99,8 @@ const {
   parseArcCreate,
   parseArcRetell,
   filterPanelFindings,
+  arcRepairFindings,
+  splitCommittedBlock,
   arcInventedAllowance,
   arcShapeCounts,
   critiqueMaxSeverity,
@@ -919,7 +921,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // SAME creator re-tells the story whole, from the beginning, and critiques
   // the result again. Rounds are configurable (arcRounds); the final critique
   // rides into the beats prompt as known weak points instead of being "fixed"
-  // out of existence.
+  // out of existence. Since 2026-09-25 the re-telling runs only when a quoted
+  // MAJOR or CRITICAL finding survives, and repairs only those (the gate in
+  // the round loop; arcRepairFindings).
   await checkCancellation();
   // The random catalogue draw is an INPUT like any other — drawn ONCE, given to
   // the arc creator AND the beats planner, and persisted so "which challenges
@@ -1053,6 +1057,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // critique for round 1, then each round's fresh critique.
     let prevCritique = commit.critique;
     const roundReports = [];
+    // Why the re-telling did not run, or null (the gate below, 2026-09-25).
+    let retellSkipped = null;
     // The invented-figure allowance this commission carries, and the list the
     // arc declares against it. Code re-counts the DECLARED LIST only — never
     // the arc prose (planCounters.js:227 documents why a regex cast extraction
@@ -1084,11 +1090,15 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       const failedPanelists = [];
       settled.forEach((r, i) => {
         if (r.status === 'fulfilled') {
-          // A finding that does not quote the arc it reviewed is dropped
-          // before the re-telling reads it (owner, 2026-09-25). The raw reply
-          // stays in the report beside what was kept and dropped.
+          // A finding that does not quote the arc it reviewed, or carries no
+          // severity tag, is dropped before the re-telling reads it (owner,
+          // 2026-09-25). The raw reply stays in the report beside what was
+          // kept and dropped.
           const f = filterPanelFindings(r.value.text, currentBlock);
-          panel.push({ ...r.value, raw: r.value.text, text: f.text, keptFindings: f.kept.length, droppedFindings: f.dropped });
+          if (f.untagged.length) {
+            gl.warn('arc_panel_untagged', `Panelist ${r.value.model} (round ${round}): ${f.untagged.length} finding(s) without a [CRITICAL]/[MAJOR]/[MINOR] tag dropped as parse errors`, null, { round, model: r.value.model, untagged: f.untagged });
+          }
+          panel.push({ ...r.value, raw: r.value.text, text: f.text, findings: f.findings, keptFindings: f.kept.length, droppedFindings: f.dropped, untaggedFindings: f.untagged });
           return;
         }
         // Advisory by design: a lost voice narrows the panel, it never blocks.
@@ -1108,16 +1118,49 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         kept: panel.map(p => p.keptFindings), dropped: panel.map(p => p.droppedFindings.length),
       });
 
-      // RE-TELL: same creator, committed arc + critique + all solutions, told
-      // again from the beginning. Never a patch. A parse miss (no FINAL ARC)
-      // gets one more telling, then throws.
-      await stage(2, 'Re-telling the story arc...', { next: 3, ms: 90000 });
       // No model names in prompts (owner, 2026-08-31): panelists appear as
       // letters, stable in arcPanelModels order. The letter→model mapping
       // stays in the trail via each panel entry's `letter` + `model`.
       panel.forEach((p, i) => { p.letter = String.fromCharCode(65 + i); });
-      const solutionsText = panel.map(p => `## PANELIST ${p.letter}\n${p.text}`).join('\n\n');
-      const retellPrompt = buildArcRetellPrompt(inputData, pageCount, currentBlock, solutionsText, { challengeIdeas });
+
+      // THE RE-TELL GATE (owner, 2026-09-25; docs/decisions.md). A re-telling
+      // answering MINOR findings made every judged arc worse (Lab #1459-1467),
+      // and the early stops below only act BETWEEN rounds, so with one round
+      // the re-telling always ran. It runs now only while a quoted MAJOR or
+      // CRITICAL finding survives — the arc's own critique or the panel's —
+      // and it is handed those findings alone. Same gate as the Lab mirrors
+      // (testlab.js arc_effort / arc_panel_replay, sibling set arc-retell-gate).
+      const { arcBlock, critique: roundCritique } = splitCommittedBlock(currentBlock);
+      const gate = arcRepairFindings({ critique: roundCritique, reviewedArc: arcBlock, panel });
+      if (gate.critique.untagged.length) {
+        gl.warn('arc_critique_untagged', `Round ${round}: ${gate.critique.untagged.length} critique fault(s) without a severity tag dropped as parse errors`, null, { round, untagged: gate.critique.untagged });
+      }
+      const gateReport = {
+        repair: gate.count, critiqueRepair: gate.critiqueRepair, panelRepair: gate.panelRepair,
+        critiqueDropped: gate.critique.dropped, critiqueUntagged: gate.critique.untagged,
+      };
+      if (!gate.retell) {
+        retellSkipped = gate.skipReason;
+        roundReports.push({ round, panel, failedPanelists, panelPrompt, retellSkipped, gate: gateReport });
+        gl.info('arc_retell_skipped', `Round ${round}: no quoted MAJOR or CRITICAL finding from the critique or the panel — the ${round === 1 ? 'created' : 'current'} arc is final`, null, {
+          round, reason: retellSkipped, ...gateReport,
+        });
+        // The invented-figure count still applies to the arc that ships; no
+        // round is forced for it here, because the re-telling it would force
+        // has no MAJOR finding to repair.
+        const shipping = round === 1 ? commit.logic.invented : currentLogic.invented;
+        if (shipping.length > inventedAllowance) {
+          gl.warn('arc_invented_overcount', `Round ${round}: ${shipping.length} invented figures (${shipping.join(', ')}) against an allowance of ${inventedAllowance} — no re-telling runs, the arc ships with the overrun`, null, { round, names: shipping, counted: shipping.length, allowance: inventedAllowance });
+        }
+        break;
+      }
+      gl.info('arc_retell_gate', `Round ${round}: ${gate.count} quoted MAJOR/CRITICAL finding(s) go to the re-telling (critique ${gate.critiqueRepair.length}, panel ${gate.count - gate.critiqueRepair.length})`, null, { round, ...gateReport });
+
+      // RE-TELL: same creator, the arc + its story logic + the MAJOR and
+      // CRITICAL findings, repaired sentence by sentence. A parse miss (no
+      // FINAL ARC) gets one more telling, then throws.
+      await stage(2, 'Re-telling the story arc...', { next: 3, ms: 90000 });
+      const retellPrompt = buildArcRetellPrompt(inputData, pageCount, arcBlock, gate.text, { challengeIdeas });
       if (!retellPrompt) throw new Error('arc-retell template unavailable');
       let retellRes = null;
       let retold = null;
@@ -1182,6 +1225,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         round,
         panel,
         failedPanelists,
+        retellSkipped: null,
+        gate: gateReport,
         // The prompts each round actually sent (2026-09-11). The report already
         // keeps every OUTPUT verbatim; without the inputs a dev-mode reader can
         // see what the panel said but not what it was asked, which is where a
@@ -1258,6 +1303,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     }
 
     meta.timings.arcMs = Date.now() - t;
+    // The last round that re-told (a skipped round carries a panel only).
+    const lastRetold = roundReports.filter(r => !r.retellSkipped).at(-1) || null;
     // Everything the machine produced, verbatim — storage is cheap,
     // debuggability is the point. Text only, no images.
     arcReviewReport = {
@@ -1266,6 +1313,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       panelModels: arcPanelModels,
       roundsConfigured: arcRounds,
       roundsRun: roundReports.length,
+      // 'no MAJOR' when the gate kept the arc as it stood (2026-09-25), else null.
+      retellSkipped,
       durationMs: meta.timings.arcMs,
       create: createRes.text,
       createPrompt,
@@ -1281,16 +1330,16 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       counts: countsTrail,
       rounds: roundReports,
       finalArc: approvedArc,
-      fixing: roundReports.length ? roundReports[roundReports.length - 1].fixing : '',
-      keeping: roundReports.length ? roundReports[roundReports.length - 1].keeping : '',
-      maxSeverity: roundReports.length ? roundReports[roundReports.length - 1].maxSeverity : null,
-      critique: roundReports.length ? roundReports[roundReports.length - 1].critique : arcWeakPoints,
+      fixing: lastRetold ? lastRetold.fixing : '',
+      keeping: lastRetold ? lastRetold.keeping : '',
+      maxSeverity: lastRetold ? lastRetold.maxSeverity : critiqueMaxSeverity(commit.critique),
+      critique: lastRetold ? lastRetold.critique : arcWeakPoints,
       arcHints,
       hintsModel,
       hintsPrompt,
       hintsRaw,
     };
-    gl.info('beats_arc', `Arc machine done: ${roundReports.length}/${arcRounds} round(s), final arc by ${arcCreatorModel} (${(meta.timings.arcMs / 1000).toFixed(1)}s)`, null, {
+    gl.info('beats_arc', `Arc machine done: ${roundReports.length}/${arcRounds} round(s)${retellSkipped ? ` (re-telling skipped: ${retellSkipped})` : ''}, final arc by ${arcCreatorModel} (${(meta.timings.arcMs / 1000).toFixed(1)}s)`, null, {
       rounds: roundReports.length, creatorModel: arcCreatorModel,
     });
   } catch (err) {
