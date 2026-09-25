@@ -768,9 +768,21 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
   const meta = ctx.scene.sceneMetadata || {};
   // descriptionOverride: test a corrected empty-scene brief (e.g. fixing a
   // contradictory exterior/interior description, or a stair-direction) without
-  // regenerating the whole story. Falls back to the stored per-page description.
-  const description = params.descriptionOverride || meta.emptyScenePrompt || ctx.scene.emptyScenePrompt || ctx.scene.sceneDescription;
-  if (!description) throw new Error('No empty-scene description available for this page');
+  // regenerating the whole story. Otherwise the plate text production uses
+  // (resolvePagePlate: outline, then the vantage's own plate, then the brief's)
+  // under the page's SHOT line, as the per-page plate path builds it. It used
+  // to fall back to the page's full scene description — cast, action and all —
+  // which production never sends to a plate: on a beats story (the plate is the
+  // vantage's) that was every page, and staging job_1790277448294_5herh01j7 p1
+  // built an 11,684-char plate prompt (Lab 1478, refused by the plate fit).
+  const { resolvePagePlate } = require('./storyHelpers');
+  const pagePlateText = resolvePagePlate({
+    pageNumber: ctx.pageNumber, sceneMetadata: meta, visualBible: ctx.visualBible, outlinePlate: ctx.scene.emptyScenePrompt || '',
+  }).text;
+  const pageShot = String(meta.fullData?.shot || '').trim();
+  const description = params.descriptionOverride
+    || (pagePlateText ? `${pageShot ? `**SHOT:** ${pageShot}\n\n` : ''}${pagePlateText}` : '');
+  if (!description) throw new Error('No plate text for this page: the vantage and the brief carry no emptyScenePrompt (pass params.descriptionOverride)');
 
   // Text zone only when this story overlays text on the image AND the scene
   // has a position — production omits it for text-below layouts.
