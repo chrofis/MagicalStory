@@ -1627,6 +1627,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "in-generation-iterate-resolves-brief",
+      "title": "An in-generation iterate repair resolves the page's brief and renders, instead of failing with \"No scene description found\"",
+      "commits": [
+        "49ae547ec"
+      ],
+      "addedAt": "2026-09-25",
+      "claim": "On the next staging full story whose repair loop routes a story page to iterate: no finalChecksReport.repairRounds entry carries the error \"No scene description found for page N\", and each iterate round on a story page has an after score and an iterate-round version in that page's imageVersions.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "stories.data.finalChecksReport.repairRounds (method iterate: error null, after set) and sceneImages[].imageVersions[].source ^iterate; compare to staging job_1790277448294_5herh01j7 (p7, p14 iterate errored)"
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }
