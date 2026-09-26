@@ -5644,10 +5644,9 @@ function buildExactPosesBlock(interactions, sceneCharacters = [], visualBible = 
   // An element that was scale-noted on this block already — the rider is stated
   // ONCE per element, on the first pose line that names it.
   const scaledElements = new Set();
-  // Even with zero declared interactions, we may still emit fill lines for
-  // uncovered fg/mg characters — so don't early-return on an empty list.
+  // Even with zero declared interactions every fg/mg character still gets an
+  // EXPRESSIONS AND EYES line — so don't early-return on an empty list.
   const lines = [];
-  const coveredNames = new Set();
   // Sort essentials before normal/low so the most important poses lead the
   // block. Image models weight prompt-tail content heavily — but within the
   // EXACT POSES section, the first lines also carry stronger signal because
@@ -5733,27 +5732,7 @@ function buildExactPosesBlock(interactions, sceneCharacters = [], visualBible = 
         lineWhere += scaleRider;
       }
       lines.push(`- ${label}: ${lineWhere}`);
-      coveredNames.add(label.toLowerCase());
-      coveredNames.add(target.toLowerCase());   // so the fill below skips it either way
     }
-  }
-
-  // Fill: every foreground/midground scene character without a declared
-  // interaction gets a low-priority default line. Goal isn't a specific gaze
-  // direction — it's to break the model's default "look at the camera"
-  // portrait pose. Background characters skipped (tiny anyway).
-  for (const c of (sceneCharacters || [])) {
-    if (!c || typeof c !== 'object') continue;
-    const name = (c.name || '').trim();
-    if (!name) continue;
-    if (coveredNames.has(name.toLowerCase())) continue;
-    const depth = String(c.depth || '').toLowerCase();
-    if (depth === 'background') continue;
-    // A figure the brief sends to the viewer (a cover portrait, 2026-09-24)
-    // keeps that gaze: its EYES line below says so, and a fill line saying
-    // "not at the viewer" would contradict it.
-    if (looksAtPhrase(c.looksAt, visualBible) === 'eyes on the viewer') continue;
-    lines.push(`- ${name}: looking off into the scene, not at the viewer`);
   }
 
   // Re-anchor per-character expressions at the tail, same reason as the poses:
@@ -5761,18 +5740,34 @@ function buildExactPosesBlock(interactions, sceneCharacters = [], visualBible = 
   // pulled tight") is buried mid-prose and Grok defaults every face to a mild
   // pleasant smile — a stubborn/scared/angry story beat renders as smiling.
   // Background faces skipped (unreadable at frame size).
+  //
+  // THE VIEWER RULE RIDES EVERY FIGURE'S EYES LINE (2026-09-26). A story page
+  // never sends a gaze to the viewer (LOOKS_AT_FIELD_RULE; covers excepted),
+  // and this used to be said only by a pose FILL line written for a figure with
+  // no interaction row — so a figure that had one got no viewer line at all,
+  // and an expression like "wide open laughing mouth" was shown by turning the
+  // face to the camera. Staging job_1790446348343_z3fw660ie p16: five figures
+  // briefed to look at a ship in the background, one of them with an
+  // interaction row and no viewer line, rendered as a row facing the viewer.
+  // Every foreground/midground figure's line now carries its gaze and the face
+  // turned with it, from the brief's `looksAt` alone; a figure the brief sends
+  // to the viewer (a cover) keeps exactly that. The fill line is deleted — this
+  // line replaces it.
   const exprLines = [];
   for (const c of (sceneCharacters || [])) {
     if (!c || typeof c !== 'object') continue;
     const name = (c.name || '').trim();
+    if (!name) continue;
+    if (String(c.depth || '').toLowerCase() === 'background') continue;
     const expr = typeof c.expression === 'string' ? c.expression.trim() : '';
     const gaze = looksAtPhrase(c.looksAt, visualBible);
-    if (!name || (!expr && !gaze)) continue;
-    if (String(c.depth || '').toLowerCase() === 'background') continue;
-    exprLines.push(`- ${name}: ${[expr, gaze].filter(Boolean).join('; ')}`);
+    const eyes = gaze === 'eyes on the viewer'
+      ? gaze
+      : `${gaze || 'eyes off into the scene'}, face turned the same way, never to the viewer`;
+    exprLines.push(`- ${name}: ${[expr, eyes].filter(Boolean).join('; ')}`);
   }
   const exprBlock = exprLines.length > 0
-    ? `EXPRESSIONS AND EYES (each face shows exactly this — no default smiles; each pair of eyes on exactly what is named):\n${exprLines.join('\n')}`
+    ? `EXPRESSIONS AND EYES (each face shows exactly this — no default smiles; each pair of eyes on exactly what is named, and a face turned away shows its expression in profile or three-quarter view, never by turning to the viewer):\n${exprLines.join('\n')}`
     : '';
 
   if (lines.length === 0 && !exprBlock) return '';
@@ -8447,6 +8442,7 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     READER_LINE: readerLine,
     DEED_AND_EFFECT_DEF,
     TWO_HEIGHTS_DEF,
+    WHOLE_CAST_DEF,
     NAMING_DEF,
     ENDING_EVENT_DEF,
     EXCITING_START_DEF,
@@ -8895,6 +8891,22 @@ const PAGE_CHANGE_DEF = 'What is true after is a change in the story’s state, 
 // The unnamed-figure exemption, stated once for the arc budget and applied by
 // planCounters (ARC_INVENTED_*): no name, and on a single page.
 const UNNAMED_FIGURE_EXEMPT = 'a figure given no name, referred to only by what it is, on a single page';
+
+/**
+ * THE WHOLE-CAST PAGE, one definition for the planner (story-beats.txt, the
+ * one-moment list) and the plan check (plan-check.txt question 17), 2026-09-26.
+ *
+ * The planner had this rule twice in its own words and the checker had it not
+ * at all: question 5 lists "stands, together" as a presence-only instant, but
+ * on staging job_1790446348343_z3fw660ie p16 ("the six stand together on the
+ * landing as the ship fades into the fog behind them, one of them laughing")
+ * the check filed Q1 and Q3 and no Q5, and the page rendered as a row facing
+ * the viewer. A feeling on one face read as the page's action. Question 17
+ * makes the checker enumerate every whole-cast page and name the one action it
+ * gives all of them, so the fault is a counted answer, not a keyword it may
+ * miss. Advisory like Q5 (REPLAN_MUST_FIX_CHECKS does not carry it).
+ */
+const WHOLE_CAST_DEF = 'A page that gathers the whole cast is wide or distant, all of them sharing one simple action — boarding, hauling one line together, all turned toward one thing ahead of them — or seen from behind moving off. Standing or gathering together while a feeling shows, or while the event happens behind them, is everyone present doing nothing — never a row of figures facing the viewer.';
 
 const TWO_HEIGHTS_DEF = 'two named characters at different heights — deck and water, ledge and ground, roof and street. A whole cast carried together on one back or one boat is one level.';
 // No leading article: the planner says "stages THEIR arrival", the checker "stages AN arrival", and both wordings are pinned by tests.
@@ -10698,6 +10710,7 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHi
     // The fourth field's contract, shared with the planner that writes it.
     PAGE_CHANGE: PAGE_CHANGE_DEF,
     TWO_HEIGHTS_DEF,
+    WHOLE_CAST_DEF,
     NAMING_DEF,
     ENDING_EVENT_DEF,
     EXCITING_START_DEF,
@@ -12602,6 +12615,7 @@ module.exports = {
   // `beats-planner-vs-plan-check`).
   DEED_AND_EFFECT_DEF,
   TWO_HEIGHTS_DEF,
+  WHOLE_CAST_DEF,
   HINT_VS_ARC_RULE,
   HINT_ANCHOR_RULE,
   NAMING_DEF,
