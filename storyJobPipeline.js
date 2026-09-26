@@ -4748,21 +4748,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // the vantage's generic one.
             const vantageShot = (repPageData.sceneMetadata?.fullData?.shot || v.shot || '').trim();
             const shotPrefix = vantageShot ? `**SHOT:** ${vantageShot}\n\n` : '';
-            // English-only empty-scene reference: the bare VB location name is
-            // story-language and carries no visual info — emit it with the
-            // entry's English visual fields inlined (same rule as covers /
-            // sanitizeVbIdsInPrompt; docs/decisions.md 2026-07-31).
-            const { englishLocationRef } = require('./server/lib/visualBible');
-            const locationRef = englishLocationRef(v.location) || v.locationName || '';
-            // The vantage's own plate IS its description since 2026-09-17 (the
-            // Art Director writes one text per vantage), so it went out twice:
-            // here and again as FRAMING — ~500 chars that pushed staging
-            // job_1790277448294_5herh01j7's p1/p11 plates over the Grok cap. A
-            // description the FRAMING paragraph already carries is not repeated.
-            const vantageDescription = String(v.description || '').trim();
+            // The LOCATION / VANTAGE lines and the vantage's description
+            // (sceneMetadata.vantageSettingText). The vantage's own plate IS its
+            // description since 2026-09-17 (the Art Director writes one text per
+            // vantage), so it went out twice: here and again as FRAMING — ~500
+            // chars that pushed staging job_1790277448294_5herh01j7's p1/p11
+            // plates over the Grok cap. A description the FRAMING paragraph
+            // already carries is not repeated. The plate QC reads this same
+            // setting text as its EXPECTED SCENE and the FRAMING as its own field.
+            const { vantageSettingText } = require('./server/lib/storyHelpers');
+            const vantageSetting = vantageSettingText(v, adEmptyPrompt);
             const emptySceneDesc = [
-              `${shotPrefix}**LOCATION:** ${locationRef}\n**VANTAGE:** ${v.name || ''}`,
-              vantageDescription && vantageDescription !== String(adEmptyPrompt || '').trim() ? vantageDescription : '',
+              `${shotPrefix}${vantageSetting}`,
               adEmptyPrompt
                 ? `**FRAMING:** ${adEmptyPrompt}\n\n${vantageShot ? 'The SHOT line decides the camera: its height, angle and distance. The FRAMING paragraph decides the composition and what fills the foreground; a camera it names gives way to the SHOT line.' : 'The FRAMING paragraph decides the camera, the composition and what fills the foreground.'} The LOCATION and VANTAGE lines are setting context — use them for what the place looks like, not for how it is framed.`
                 : '',
@@ -4863,7 +4860,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // ONE set of QC options for the plate, its retry and every plate
               // derived from it — the retry was judged on pixels only and the
               // derived plates not at all (2026-09-23, dragon run 6).
-              let plateQcOpts = { artStyle: artStyleDesc, shot: plateClass(vantageShot), pageNumber: repPageNum, landmarkPhoto: landmarkPhotos[0] || null, light: baseLight };
+              // The STRUCTURES text and the Visual Bible grid the plate call
+              // carried — the same builder and the same grid (2026-09-26).
+              let plateQcOpts = {
+                artStyle: artStyleDesc, shot: plateClass(vantageShot), pageNumber: repPageNum, landmarkPhoto: landmarkPhotos[0] || null, light: baseLight,
+                structures: require('./server/services/prompts').buildPlateStructuresText({ visualBible, pageNumber: repPageData.pageNumber, aboardId: repAboardId, sceneObjects: repSceneObjects }),
+                structureGrid: emptySceneVbGrid || null,
+              };
               const { validateEmptyScene } = require('./server/lib/images');
               const { decidePlateAfterRetry, plateQcRecord: buildPlateQcRecord, logPlateOutcome, nullOnPromptFit } = require('./server/lib/plateQc');
               try {
@@ -4881,7 +4884,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 }
                 plateQcOpts = {
                   ...plateQcOpts,
-                  sceneDescription: emptySceneDesc,
+                  // The setting text above the FRAMING paragraph, whole; the
+                  // FRAMING rides as its own field, so it is not said twice.
+                  sceneDescription: `${shotPrefix}${vantageSetting}`,
                   // The FRAMING paragraph this plate was painted from, uncut.
                   framing: adEmptyPrompt || null,
                   characterPlacements: placements.length > 0 ? placements : null,
@@ -5004,10 +5009,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   // the place. Not the base's SHOT line, and not the page's
                   // geometry facts or placements, which the edit never saw.
                   const derivedQcOpts = {
-                    sceneDescription: shotPrefix && emptySceneDesc.startsWith(shotPrefix) ? emptySceneDesc.slice(shotPrefix.length) : emptySceneDesc,
+                    // The base's setting text without its SHOT line. No FRAMING:
+                    // the derive moves the base plate's camera, so the side and
+                    // height the base's FRAMING names are not its own.
+                    sceneDescription: vantageSetting,
                     era: plateQcOpts.era || null,
-                    // No FRAMING: the derive moves the base plate's camera, so
-                    // the side and height the base's FRAMING names are not its own.
+                    // The derive keeps the base plate's structures, which were
+                    // painted from this text and grid — judged against them, as
+                    // its landmark is against the base's photo below.
+                    structures: plateQcOpts.structures,
+                    structureGrid: plateQcOpts.structureGrid,
                     artStyle: artStyleDesc,
                     shot: cls,
                     // Judged on the light the derive was told to paint.
@@ -5268,9 +5279,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   .filter(c => c?.name && c?.position)
                   .map(c => ({ name: c.name, position: c.position, depth: c.depth }));
                 const pageQcOpts = {
-                  sceneDescription: emptySceneDesc,
+                  // The author's description without the plate text, which rides
+                  // whole as FRAMING: the SHOT line, or the setting fields when
+                  // the page has no plate text.
+                  sceneDescription: expandedEmptyPrompt ? shotPrefix.trim() : emptySceneDesc,
                   // The plate text this plate was painted from, uncut.
                   framing: expandedEmptyPrompt || null,
+                  // The STRUCTURES text and the Visual Bible grid the plate call
+                  // carried — the same builder and the same grid (2026-09-26).
+                  structures: require('./server/services/prompts').buildPlateStructuresText({ visualBible, pageNumber: pageData.pageNumber, aboardId: pageAboardId, sceneObjects: pageSceneObjects }),
+                  structureGrid: emptySceneVbGrid || null,
                   characterPlacements: placements.length > 0 ? placements : null,
                   mainScenePrompt: pageData.scene?.sceneDescription || null,
                   // The era this plate's author was given (eraGuard above),
@@ -5953,10 +5971,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // Set ONLY when the built prompt went over the image model's
               // character cap and shrinkPromptForModel changed the scene prose
               // (compressed, deduped or cut): the description the model
-              // actually received. The batch
-              // eval judges the render against it instead of the pre-shrink
-              // `scene.sceneDescription`, which can name clauses the compressor
-              // removed (sceneMetadata.resolveEvalSceneDescription). Undefined
+              // actually received. A record only: the batch eval judges the
+              // render against the whole `scene.sceneDescription` (owner,
+              // 2026-09-26, sceneMetadata.resolveEvalSceneDescription). Undefined
               // on every under-cap page, so nothing extra is stored there.
               compressedScene: genResult.compressedScene || null,
               characterPhotos: pageData.characterPhotos,
@@ -6243,8 +6260,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // pipeline's version builder resolves a version's own
               // `compressedScene` and falls back to the page's — so without
               // this the original cover version (v0) resolves to null even
-              // when the render was shrunk, and every judge scores it against
-              // the pre-shrink build.
+              // when the render was shrunk (a record only: the judges read the
+              // whole brief since 2026-09-26).
               compressedScene: coverData.compressedScene || null,
               characterPhotos: coverData.referencePhotos || [],
               // Carry the original render's references onto the pipeline img so

@@ -5,8 +5,10 @@
  *   (buildEraGuard). A present-day story whose cast dresses up as pirates was
  *   judged "pirate era" on every plate by the deleted costume derivation
  *   (staging job_1790446348343_z3fw660ie).
- * - FRAMING: the author's FRAMING paragraph rides whole, with a framing check;
- *   EXPECTED SCENE keeps its 300-character cap.
+ * - FRAMING: the author's FRAMING paragraph rides whole, with a framing check.
+ *   Since the second change the same day, EXPECTED SCENE (the setting text,
+ *   passed apart from the FRAMING) and MAIN SCENE PROSE ride whole too, and the
+ *   QC gets the STRUCTURES text and the Visual Bible grid the author got.
  * - LIGHT: a declared covered sky and fog have failure cases of their own.
  * - DETAIL VIEWS: labelled crops of the plate follow it, so small things can
  *   be seen.
@@ -62,10 +64,17 @@ describe('era: the brief era through the author\'s era guard', () => {
 
 describe('framing: the whole FRAMING paragraph and a framing check', () => {
   const framing = 'From a low landing looking sharply up at a massive stone wall towering overhead. '.repeat(6).trim();
-  it('rides uncut beside a still-capped EXPECTED SCENE', () => {
-    const p = build({ sceneDescription: framing, framing });
+  it('rides uncut beside an uncut EXPECTED SCENE and MAIN SCENE PROSE (2026-09-26: no cap)', () => {
+    const setting = '**LOCATION:** An old harbour town on a river. '.repeat(12).trim();
+    const prose = 'The children climb the worn steps toward the wall, lanterns in hand. '.repeat(20).trim();
+    expect(setting.length).toBeGreaterThan(300);
+    expect(prose.length).toBeGreaterThan(800);
+    const p = build({ sceneDescription: setting, framing, mainScenePrompt: prose });
     expect(p).toContain(`FRAMING (what the plate's author was told the frame holds): "${framing}"`);
-    expect(p).toContain(`EXPECTED SCENE: "${framing.substring(0, 300)}"`);
+    expect(p).toContain(`EXPECTED SCENE: "${setting}"`);
+    expect(p).toContain(`"${prose}"`);
+    // Callers pass the setting and the FRAMING apart: the paragraph appears once.
+    expect(p.split(framing).length - 1).toBe(1);
     expect(p).toContain('- Framing:');
     expect(p).toContain('framing (the structure or view the FRAMING puts in the frame)');
   });
@@ -145,6 +154,45 @@ describe('detail views: labelled crops of the plate', () => {
     expect(prompt).toContain('FRAMING (what the plate\'s author was told the frame holds): "Looking up at a wall."');
     expect(prompt).not.toContain('STORY ERA');
     expect(prompt).toContain('The landmark index records this photograph as: "[whole, green, day] A stone wall. Photo judge: a mossy wall above a river."');
+  });
+});
+
+describe('structures: the QC gets the STRUCTURES text and the grid the plate author got', () => {
+  const visualBible = {
+    vehicles: [{ id: 'VEH001', name: 'Blue boat', description: 'A blue single-mast sailing boat with a red stripe.', appearsInPages: [4] }],
+    artifacts: [],
+  };
+  it('one builder: the plate prompt\'s STRUCTURES block and the QC\'s input are the same text', () => {
+    const prompts = require_('../../server/services/prompts.js');
+    const text = prompts.buildPlateStructuresText({ visualBible, pageNumber: 4, aboardId: null, sceneObjects: ['VEH001'] });
+    expect(text).toContain('A blue single-mast sailing boat with a red stripe.');
+    const platePrompt = prompts.buildEmptyScenePrompt({ style: 'watercolor', description: '**SHOT:** wide\n\nA quay.', visualBible, pageNumber: 4, sceneObjects: ['VEH001'] });
+    expect(platePrompt).toContain(`**STRUCTURES:** ${text}`);
+    const p = build({ sceneDescription: '**SHOT:** wide', framing: 'A quay.', structures: text });
+    expect(p).toContain(text);
+    expect(p).not.toContain('STRUCTURE REFERENCE');
+    // Not staged by the brief: neither side gets it.
+    expect(prompts.buildPlateStructuresText({ visualBible, pageNumber: 4, sceneObjects: [] })).toBe('');
+    expect(build({ sceneDescription: 'A quay.' })).not.toContain('STRUCTURES');
+  });
+  it('validateEmptyScene attaches the grid, labelled, and the prompt names it', async () => {
+    const plate = await noiseJpeg(512, 512, 9);
+    const gridUrl = await noiseJpeg(64, 64, 4);
+    const grid = Buffer.from(gridUrl.split(',')[1], 'base64');
+    const bodies: any[] = [];
+    vi.stubEnv('GEMINI_API_KEY', 'test-key');
+    vi.stubGlobal('fetch', vi.fn(async (_u: string, init: any) => {
+      bodies.push(JSON.parse(init.body));
+      return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: '{"pass": true, "issues": []}' }] } }] }) };
+    }));
+    await ev.validateEmptyScene(plate, null, 'unit', { sceneDescription: 'A quay.', structures: 'Any vessel … - Blue boat: blue.', structureGrid: grid });
+    const parts = bodies[0].contents[0].parts;
+    const i = parts.findIndex((x: any) => x.text === '[Visual Bible reference]:');
+    expect(i).toBeGreaterThan(0);
+    expect(parts[i + 1].inline_data.data).toBe(grid.toString('base64'));
+    const prompt = parts[parts.length - 1].text;
+    expect(prompt).toContain('STRUCTURES (what the plate\'s author was told');
+    expect(prompt).toContain('STRUCTURE REFERENCE: the image labelled [Visual Bible reference]');
   });
 });
 

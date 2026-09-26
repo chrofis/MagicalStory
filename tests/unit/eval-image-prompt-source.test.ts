@@ -3,79 +3,45 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const fs = require('node:fs');
-const { resolveEvalImagePrompt } = require('../../server/lib/sceneMetadata.js');
+const sceneMetadata = require('../../server/lib/sceneMetadata.js');
 
-// BEHAVIOUR PINNED: an image judge scores a render against THE STRING THE IMAGE
-// MODEL ACTUALLY RECEIVED.
-//
-// Every evaluator prompt calls IMAGE_PROMPT "the expanded scene sent to the
-// image model". A prompt over the model's character cap does not arrive as
-// written: shrinkPromptForModel (images.js) LLM-compresses the HEAD, holding
-// back only the REQUIRED OBJECTS / ART STYLE tail, the reference-card colour
-// map and the static rendering rules. The scene prose is rewritten shorter and
-// clauses go missing — so judging the PRE-shrink text files full-severity
-// "X is missing" findings against instructions the generator never got.
-//
-// Measured on staging 2026-09-13, job_1789301291267_ueh8h145m: page 1 stores a
-// 7,939-char prompt and page 4 v0 an 8,317-char one, both rendered by
-// grok-imagine-image-2.0 (cap 7,900). Assert the RULE, not any prompt wording.
+// BEHAVIOUR PINNED (owner, 2026-09-26; supersedes the 2026-09-13 "judge the
+// string the image model actually received"): an image judge scores a render
+// against the prompt AS BUILT, before shrinkPromptForModel fits it into one
+// image model's character cap. The standing rule is "every critic judges the
+// source the generator was given, uncut" (docs/decisions.md). The post-shrink
+// string stays the RECORD of what was sent (`prompt` on the result), never the
+// contract. Assert the rule, not any prompt wording.
 
-const CAP = 7900;
-const SENT = 'A rainy quay. The girl kneels beside the overturned rowing boat.'; // post-shrink
-const ORIGINAL = `${SENT} She reaches for the mooring rope coiled on the stones.`; // pre-shrink
-
-describe('resolveEvalImagePrompt — judge prompt == generator prompt', () => {
-  it('the judge gets the post-shrink string whenever the shrinker fired', () => {
-    expect(resolveEvalImagePrompt({ promptSent: SENT, originalPrompt: ORIGINAL })).toBe(SENT);
-  });
-
-  it('an unshrunk prompt is unchanged — the two strings are the same object', () => {
-    expect(resolveEvalImagePrompt({ promptSent: ORIGINAL, originalPrompt: ORIGINAL })).toBe(ORIGINAL);
-  });
-
-  it('a provider that returns no sent string falls back to the built prompt', () => {
-    expect(resolveEvalImagePrompt({ promptSent: null, originalPrompt: ORIGINAL })).toBe(ORIGINAL);
-    expect(resolveEvalImagePrompt({ promptSent: '   ', originalPrompt: ORIGINAL })).toBe(ORIGINAL);
-  });
-
-  it('nothing at all resolves to null rather than an empty string', () => {
-    expect(resolveEvalImagePrompt({})).toBeNull();
-    expect(resolveEvalImagePrompt()).toBeNull();
-  });
-
-  it('the resolved prompt never exceeds the cap the sent string was fitted to', () => {
-    const sent = 'x'.repeat(CAP);
-    const original = 'x'.repeat(CAP + 39); // the p1 shape: 7,939 against a 7,900 cap
-    expect(resolveEvalImagePrompt({ promptSent: sent, originalPrompt: original }).length)
-      .toBeLessThanOrEqual(CAP);
-  });
-});
-
-describe('the generation paths record the prompt they SENT', () => {
+describe('the judges read the prompt as built, before the shrink', () => {
   const images = fs.readFileSync(new URL('../../server/lib/images.js', import.meta.url), 'utf8');
   const cover = fs.readFileSync(new URL('../../server/lib/coverIterate.js', import.meta.url), 'utf8');
 
-  it('every provider branch of generateImageOnly stamps raw.promptSent', () => {
-    // grok-primary is the DEFAULT page path and was the one branch stamping the
-    // pre-shrink `prompt` — which is why a 7,939-char string is stored against a
-    // 7,900 cap. Its three siblings already did it right.
+  it('every provider branch of generateImageOnly still records what it SENT', () => {
+    // The record of what reached the model is kept: grok-primary is the DEFAULT
+    // page path and stamps the post-shrink string, as its siblings do.
     const branch = images.slice(images.indexOf("if (raw.provider === 'grok-primary') {", images.indexOf('async function generateImageOnly')));
     expect(branch.slice(0, 900)).toContain('prompt: raw.promptSent');
     expect(branch.slice(0, 900)).not.toMatch(/\n\s+prompt,\n/);
   });
 
-  it('the eval-path call sites resolve IMAGE_PROMPT through the shared accessor', () => {
-    expect(images).toContain("require('./sceneMetadata')");
-    // Three sites in images.js: the shared runEval, the Gemini fallback, iterate.
-    expect((images.match(/resolveEvalImagePrompt\(\{/g) || []).length).toBeGreaterThanOrEqual(3);
-    // The regressed expressions: the raw pre-shrink prompt handed straight in.
-    expect(images).not.toMatch(/evaluateImageQuality\(\s*raw\.imageData,\s*prompt,/);
-    expect(images).not.toMatch(/evaluateImageQuality\(compressedImageData,\s*prompt,/);
-    expect(images).not.toMatch(/genResult\.imageData,\s*imagePrompt,/);
+  it('the post-shrink accessor is deleted, not demoted', () => {
+    expect(sceneMetadata.resolveEvalImagePrompt).toBeUndefined();
+    expect(images).not.toContain('resolveEvalImagePrompt');
+    expect(cover).not.toContain('resolveEvalImagePrompt');
   });
 
-  it('the direct cover render is judged against the prompt it sent', () => {
-    expect(cover).toContain('resolveEvalImagePrompt({ promptSent: genResult.prompt');
-    expect(cover).not.toMatch(/genResult\.imageData,\s*coverPrompt,/);
+  it('the eval-path call sites hand the judge the pre-shrink build', () => {
+    // The shared runEval, the Gemini branch and iterate.
+    expect(images).toMatch(/evaluateImageQuality\(\s*raw\.imageData,\s*prompt,/);
+    expect(images).toMatch(/evaluateImageQuality\(compressedImageData,\s*prompt,/);
+    expect(images).toMatch(/genResult\.imageData,\s*imagePrompt,/);
+    // Never the sent string.
+    expect(images).not.toMatch(/evaluateImageQuality\([^)]*promptSent/);
+    expect(images).not.toMatch(/evaluateImageQuality\(compressedImageData,\s*parts\[0\]/);
+  });
+
+  it('the direct cover render is judged against the cover prompt as built', () => {
+    expect(cover).toMatch(/genResult\.imageData,\s*coverPrompt,/);
   });
 });

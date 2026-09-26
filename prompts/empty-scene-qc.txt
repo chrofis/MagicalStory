@@ -1,8 +1,8 @@
 ### BODY
-This is a background plate for a children's book illustration: the place a page's characters are painted into later.{SCENE_CTX}{FRAMING_BLOCK}{ERA_BLOCK}{PLACEMENTS_BLOCK}{MAIN_SCENE_BLOCK}{LANDMARK_CHECK}{DETAIL_VIEWS}
+This is a background plate for a children's book illustration: the place a page's characters are painted into later.{SCENE_CTX}{FRAMING_BLOCK}{STRUCTURES_BLOCK}{STRUCTURE_REFERENCE}{ERA_BLOCK}{PLACEMENTS_BLOCK}{MAIN_SCENE_BLOCK}{LANDMARK_CHECK}{DETAIL_VIEWS}
 
 Check:
-- Setting / location: does it roughly match the expected scene? (FAIL if completely wrong location — e.g. expected a forest but got a city)
+- Setting / location: does it roughly match the expected scene (the EXPECTED SCENE and FRAMING above)? (FAIL if completely wrong location — e.g. expected a forest but got a city)
 - Naturalness: does the image look like a natural, plausible illustration of the scene? Or are there strange artefacts, geometry that doesn't make sense, doubled props, melted shapes, surfaces that change material mid-stroke, perspective lines that contradict each other, or anything that looks "off" for a competent painter? (FAIL — describe what looks unnatural)
 - Geometric artefact patches: are there large artificial-looking patches — white or near-white **rectangles, triangles, diagonals, wedges, or any solid geometric shape**, monochrome panels, blank patches, or obvious AI glitches that cover a meaningful portion of the frame? Pay special attention to bright triangular or diagonal cutouts that don't belong to the scene's geometry. (FAIL — name the shape and where it is)
 - Frame edge: does the painted scene reach all four sides of the frame? (FAIL for a {PLATE_SURROUNDS}, or a smaller picture set inside the frame — name it and where it is.)
@@ -23,6 +23,12 @@ Reply JSON only: {"pass": true/false, "issues": [{"check": "<key>", "issue": "sh
 
 ### FRAMING_CHECK
 - Framing: the FRAMING above names the structure or view that fills the frame and the side and height it is seen from. Is that structure or view the main subject of the plate, seen that way? (FAIL if the frame is filled by another structure or view — a different building, another side of the place, the wider town where one feature is asked, a far view where the FRAMING stands close — and name what fills it instead. Only the main subject is judged here: a prop or detail the FRAMING names or does not name, the light and the exact composition are never a framing fault.)
+
+### STRUCTURES
+STRUCTURES (what the plate's author was told about the vessels, vehicles and built structures of this backdrop): "{STRUCTURES_TEXT}"
+
+### STRUCTURE_REFERENCE
+STRUCTURE REFERENCE: the image labelled [Visual Bible reference] is the reference render of the vessel or structure the plate's author was given, told to render the part of it the camera sees. It is not the plate: every check judges the plate, the first image.
 
 ### LIGHT_CHECK
 - Light: the plate is painted in {LIGHT}. Does its light show that time of day and that weather? (FAIL only if it clearly shows another — daylight where night is asked, a dry clear sky where rain is asked — and name what it shows instead.)

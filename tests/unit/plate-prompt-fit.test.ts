@@ -184,8 +184,12 @@ describe('a prompt that does not fit fails loudly and never reaches Gemini', () 
 
 describe('the vantage plate states its Art Director prose once', () => {
   it('drops the vantage description when FRAMING carries the same text', () => {
+    // One builder since 2026-09-26 (the plate prompt and its QC's EXPECTED SCENE).
     const src = fs.readFileSync(path.join(__dirname, '..', '..', 'storyJobPipeline.js'), 'utf8');
-    expect(src).toContain("vantageDescription && vantageDescription !== String(adEmptyPrompt || '').trim() ? vantageDescription : ''");
-    expect(src).not.toMatch(/\*\*VANTAGE:\*\* \$\{v\.name \|\| ''\}`,\s*\n\s*v\.description \|\| '',/);
+    expect(src).toContain('const vantageSetting = vantageSettingText(v, adEmptyPrompt);');
+    const { vantageSettingText } = require_('../../server/lib/sceneMetadata');
+    const v = { locationName: 'Quay', name: 'low landing', description: 'Looking up at the wall.' };
+    expect(vantageSettingText(v, 'Looking up at the wall.')).toBe('**LOCATION:** Quay\n**VANTAGE:** low landing');
+    expect(vantageSettingText(v, 'Another plate.')).toContain('Looking up at the wall.');
   });
 });

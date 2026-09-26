@@ -10,7 +10,7 @@ const { log } = require('../utils/logger');
 const { baseVbId } = require('./vbIdGuard');
 const { MODEL_DEFAULTS, IMAGE_MODELS, emptyScenePlateRouting } = require('../config/models');
 const { resolveArtStyle } = require('./storyHelpers');
-const { resolveEvalImagePrompt, splitBrief, METADATA_DELIMITER } = require('./sceneMetadata');
+const { splitBrief, METADATA_DELIMITER } = require('./sceneMetadata');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { applyStyledAvatars } = require('./styledAvatars');
 const { coverKeyToType, coverLabel, COVER_PAGE_NUMBERS } = require('./coverKeys');
@@ -1438,13 +1438,13 @@ async function iterateCover(coverKey, storyData, options = {}) {
         // bible, and the cover text contract. See the composite call below —
         // same three, same reasons.
         const qualityResult = await evaluateImageQuality(
-          // IMAGE_PROMPT = what the model got. Covers carry the longest
-          // prompts in the system, so the shrinker fires here most of all;
-          // genResult.prompt is the post-shrink string generateImageOnly sent
-          // (the same value stamped at `prompt:` a few lines below). SCENE_HINT
-          // stays the cover brief — unchanged.
+          // IMAGE_PROMPT = the cover prompt as BUILT, before any shrink (owner,
+          // 2026-09-26: a judge reads the source the generator was given,
+          // uncut). Covers carry the longest prompts in the system, so the
+          // shrinker fires here most of all; what it cut to fit one model's
+          // cap is not a smaller contract. SCENE_HINT stays the cover brief.
           genResult.imageData,
-          resolveEvalImagePrompt({ promptSent: genResult.prompt, originalPrompt: coverPrompt }),
+          coverPrompt,
           // DEDUPED, like the prompt. applyCoverWornHeldDedupe resolves the
           // "same item is both worn clothing and a held artifact" contradiction
           // by deleting the WORN phrasing; the generator's prompt was built

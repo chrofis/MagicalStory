@@ -182,7 +182,7 @@ const bboxDetectionModule = require('./bboxDetection');
 const { findBadPages, selectCharRepairTasks } = require('./repairLogic');
 // IMAGE_PROMPT for the judges = the string the model actually received.
 // Sibling of resolveEvalSceneHint; see its comment in sceneMetadata.js.
-const { resolveEvalImagePrompt, resolveEvalSceneDescription, castOfRewrittenBrief } = require('./sceneMetadata');
+const { resolveEvalSceneDescription, castOfRewrittenBrief } = require('./sceneMetadata');
 // storyHelpers functions (lazy-loaded to avoid circular dependencies)
 let storyHelpersModule = null;
 function getStoryHelpers() {
@@ -1164,8 +1164,8 @@ function sceneHeadOf(prompt) {
  *   field null on the one over-cap page of staging job_1789348171785_9oxos7dwv
  *   (p7, 8,002 chars against grok-imagine-image-2.0's 7,900 cap): dedupe alone
  *   brought it to 7,242, so nothing recorded that the sent prose differed from
- *   the built prose at all. The batch image eval judges the render against that
- *   description rather than the pre-shrink one
+ *   the built prose at all. It is a RECORD of what was sent: since 2026-09-26
+ *   no judge reads it — the judges read the whole brief
  *   (sceneMetadata.resolveEvalSceneDescription). It is the head ALONE: taken
  *   from strictly before the `**REQUIRED OBJECTS` / `**ART STYLE` tail split,
  *   so it carries no ART STYLE block, and it is not a second copy of the whole
@@ -1416,8 +1416,8 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
                                           // (xAI's edit cap is 5). null = production default.
     // Out-param: receives `compressedScene` when the prompt went over the
     // model's cap and shrinkPromptForModel LLM-compressed the scene prose.
-    // Callers stamp it onto the page record so the batch eval judges the render
-    // against the description that was actually sent.
+    // Callers stamp it onto the page record as the record of what was sent
+    // (no judge reads it since 2026-09-26: judges read the whole brief).
     promptMeta = null,
   } = opts;
 
@@ -1865,13 +1865,13 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   });
 
   // Same 9-arg quality eval every non-avatar branch ran inline before.
-  // IMAGE_PROMPT = the string the provider actually received. `prompt` is the
-  // PRE-shrink text; over the model's cap _dispatchImageGeneration compresses
-  // it and returns the sent string as `raw.promptSent`. See
-  // sceneMetadata.resolveEvalImagePrompt for why judging the pre-shrink text
-  // manufactures "missing X" findings against instructions never given.
+  // IMAGE_PROMPT = `prompt` as BUILT, before any shrink (owner, 2026-09-26:
+  // a judge reads the source the generator was given, uncut). Over the model's
+  // cap _dispatchImageGeneration cuts it and returns the sent string as
+  // `raw.promptSent`, which stays the record of what was sent, never the
+  // contract (sceneMetadata.resolveEvalSceneDescription).
   const runEval = () => evaluateImageQuality(
-    raw.imageData, resolveEvalImagePrompt({ promptSent: raw.promptSent, originalPrompt: prompt }),
+    raw.imageData, prompt,
     characterPhotos, evaluationType,
     qualityModelOverride, pageContext, storyText, sceneHint, sceneCharacters
   );
@@ -2142,10 +2142,9 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   
           // Evaluate image quality with prompt and reference images
           log.debug(`📊 [EVAL] Evaluating image quality (${evaluationType})...${qualityModelOverride ? ` [model: ${qualityModelOverride}]` : ''}`);
-          // Same rule as the runEval above: judge against what Gemini received.
-          // parts[0].text is the post-shrink text (it is also what this branch
-          // stamps as the result's `prompt`, a few lines down).
-          const qualityResult = await evaluateImageQuality(compressedImageData, resolveEvalImagePrompt({ promptSent: parts[0]?.text, originalPrompt: prompt }), characterPhotos, evaluationType, qualityModelOverride, pageContext, storyText, sceneHint, sceneCharacters);
+          // Same rule as the runEval above: judge against the prompt as built,
+          // before any shrink (parts[0].text is the post-shrink text sent).
+          const qualityResult = await evaluateImageQuality(compressedImageData, prompt, characterPhotos, evaluationType, qualityModelOverride, pageContext, storyText, sceneHint, sceneCharacters);
   
           // Extract score, reasoning, and text error info from quality result
           const score = qualityResult ? qualityResult.score : null;
@@ -2312,8 +2311,8 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
   // Over-cap prompts are LLM-compressed before they are sent. `shrinkMeta`
   // collects the COMPRESSED SCENE BLOCK so it can be stamped onto the result
-  // (and from there onto the page record) — the batch image eval scores the
-  // render against that description, not the pre-shrink one. Empty on the
+  // (and from there onto the page record) as the record of what was sent; the
+  // judges read the whole brief (decisions.md 2026-09-26). Empty on the
   // overwhelmingly common under-cap path, and the field is then omitted
   // entirely, so unshrunk pages carry exactly what they carried before.
   const shrinkMeta = {};
@@ -2904,18 +2903,10 @@ async function evaluateImageBatch(images, options = {}) {
       // DESCRIPTION, and the resolveEvalArtStyle call below depends on that —
       // ORIGINAL_PROMPT here must carry no ART STYLE block.
       //
-      // But when the page's built prompt went over the model cap,
-      // shrinkPromptForModel COMPRESSED the scene prose before sending it, and
-      // the description stored on the page still names clauses the model never
-      // received. The shrink path now hands its compressed scene block back
-      // (`compressedScene`), so that is what the judge scores against when it
-      // exists. No shrink → the exact chain this site always used. The resolver
-      // also re-checks the ART STYLE invariant on the compressed string, since
-      // that head is LLM-rewritten. See
-      // sceneMetadata.resolveEvalSceneDescription (sibling of
-      // resolveEvalImagePrompt, which closed the six prompt-side sites).
+      // The WHOLE brief, shrunk page or not (owner, 2026-09-26): the post-shrink
+      // `compressedScene` is a record of what was sent, never the judge's input.
+      // See sceneMetadata.resolveEvalSceneDescription.
       const sceneDescWithClothing = resolveEvalSceneDescription({
-        compressedScene: img.compressedScene,
         sceneDescription: img.sceneDescription,
         prompt: img.prompt,
       });
@@ -5525,9 +5516,9 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       }
       try {
         iterQuality = await evaluateImageQuality(
-          // genResult.prompt is the string generateImageOnly actually sent
-          // (post-shrink); imagePrompt is the pre-shrink build.
-          genResult.imageData, resolveEvalImagePrompt({ promptSent: genResult.prompt, originalPrompt: imagePrompt }),
+          // imagePrompt is the build, before any shrink: the judge reads the
+          // prompt the page was given whole (sceneMetadata.resolveEvalSceneDescription).
+          genResult.imageData, imagePrompt,
           refApplied.characterPhotos, coverOpts ? 'cover' : 'scene', null,
           iterLabel, null, null, sceneCharacters, {
             // A cover's text contract (baked title / app-side typography),

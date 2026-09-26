@@ -70,7 +70,9 @@ describe('empty_scene stage runs the plate QC on a text-below story', () => {
   it('sends the per-page plate QC option set', async () => {
     await runEmptySceneStage(ctx(), { experimentId: 1, params: {} });
     const o = qcCalls[0].opts;
-    expect(o.sceneDescription).toBe('**SHOT:** wide\n\nA cobbled courtyard with a stone gate at the back.');
+    // EXPECTED SCENE is what the author got besides the plate text, which
+    // rides whole as FRAMING (decisions.md 2026-09-26): nothing said twice.
+    expect(o.sceneDescription).toBe('**SHOT:** wide');
     expect(o.characterPlacements).toEqual([{ name: 'Hero', position: 'left', depth: 'midground' }]);
     expect(o.mainScenePrompt).toBe('The hero crosses the courtyard toward the gate.');
     // The brief's era, as its plate author's era guard reads it — never the
@@ -83,6 +85,29 @@ describe('empty_scene stage runs the plate QC on a text-below story', () => {
     expect(o.shot).toBe('wide');
     expect(o.pageNumber).toBe(3);
     expect(o.landmarkPhoto).toBeNull();
+    // No bible, no staged structure, no grid.
+    expect(o.structures).toBe('');
+    expect(o.structureGrid).toBeNull();
+  });
+
+  it('hands the QC the STRUCTURES text and the grid the plate call carried', async () => {
+    const grid = Buffer.from('grid-bytes');
+    const saved = referenceSheets.buildEmptySceneVbGrid;
+    referenceSheets.buildEmptySceneVbGrid = async () => grid;
+    try {
+      const visualBible = { vehicles: [{ id: 'VEH001', name: 'Red cart', description: 'A red wooden hand cart with two iron-rimmed wheels.', referenceImageData: PX }] };
+      const c = ctx({ visualBible });
+      c.scene.sceneMetadata = { ...c.scene.sceneMetadata, objects: ['VEH001'] };
+      await runEmptySceneStage(c, { experimentId: 1, params: {} });
+      const o = qcCalls[0].opts;
+      expect(o.structures).toContain('A red wooden hand cart with two iron-rimmed wheels.');
+      // The same builder the plate prompt's STRUCTURES block comes from.
+      const { buildPlateStructuresText } = require_('../../server/services/prompts');
+      expect(o.structures).toBe(buildPlateStructuresText({ visualBible, pageNumber: 3, aboardId: null, sceneObjects: ['VEH001'] }));
+      expect(o.structureGrid).toBe(grid);
+    } finally {
+      referenceSheets.buildEmptySceneVbGrid = saved;
+    }
   });
 
   it('an overlay story is judged on its text zone', async () => {
@@ -98,7 +123,9 @@ describe('edit_image on a plate runs the derived-plate QC', () => {
     expect(qcCalls).toHaveLength(1);
     expect(qcCalls[0].textPosition).toBeNull();
     const o = qcCalls[0].opts;
-    expect(o.sceneDescription).toBe('A cobbled courtyard with a stone gate at the back.');
+    // No vantage: a per-page plate's author gets no setting text besides its
+    // plate text, which is not a derive's FRAMING either.
+    expect(o.sceneDescription).toBe('');
     expect(o.shot).toBe('aerial');
     expect(o.characterPlacements).toBeNull();
     expect(o.mainScenePrompt).toBeNull();

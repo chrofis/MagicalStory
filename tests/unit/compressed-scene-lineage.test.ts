@@ -86,11 +86,11 @@ describe('the shrinker records the exact head it sent', () => {
     expect(meta.compressedScene).toBe(headOf(sent));
     // …and it is the head ALONE, never a second copy of the whole prompt.
     expect(meta.compressedScene).not.toContain('**ART STYLE');
-    // The judge reads it in preference to the stored (pre-shrink) brief.
+    // A record only: the judge reads the whole brief (owner, 2026-09-26).
     expect(resolveEvalSceneDescription({
       compressedScene: meta.compressedScene,
       sceneDescription: 'the PRE-shrink brief',
-    })).toBe(meta.compressedScene);
+    } as any)).toBe('the PRE-shrink brief');
   }, 30000);
 
   it('under the cap: the prompt is untouched and nothing is recorded', async () => {
@@ -103,7 +103,6 @@ describe('the shrinker records the exact head it sent', () => {
     // No fallback masking: a page that was never shrunk is judged against its
     // stored brief, exactly as before.
     expect(resolveEvalSceneDescription({
-      compressedScene: meta.compressedScene ?? null,
       sceneDescription: 'the stored brief',
     })).toBe('the stored brief');
   }, 30000);

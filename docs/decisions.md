@@ -21,6 +21,91 @@ superseded and link forward.
 
 ---
 
+## 2026-09-26 — The judges read what the generator was given, whole: the plate QC reads its inputs uncut plus the STRUCTURES and grid; the quality and semantic judges read the brief, never the shrunk text (SUPERSEDES the same day's "EXPECTED SCENE keeps its 300 cap" and the 2026-09-13 "judge the string the model actually received")
+
+**Context.** The standing rule of the same day ("Every critic judges against the source the generator was
+given, uncut", below) left three input defects as owner decisions. The owner approved all three (2026-09-26):
+1. **Plate QC cuts.** EXPECTED SCENE was cut at 300 characters and MAIN SCENE PROSE at 800. 2eeb3e0da kept the
+   300 cap on one Lab 1506 call; the audit's replay of 10 stored `job_1790277448294_5herh01j7` plates with both
+   inputs whole removed p3's false `landmark` fail, and 50 of 59 stored staging plate_qc prompts were cut at 300.
+2. **Plate QC blind to STRUCTURES and the grid.** The plate author gets a **STRUCTURES:** block (the Visual Bible
+   description of every staged vessel, vehicle and large built structure) and the Visual Bible reference grid
+   (`buildEmptySceneVbGrid`); the judge got neither.
+3. **Quality/semantic judges on the shrunk text.** When `shrinkPromptForModel` fired, the batch eval's
+   ORIGINAL_PROMPT (the quality judge's IMAGE_PROMPT, the semantic judge's image prompt) was `compressedScene` —
+   the HEAD of the BUILT prompt after the cut — and the direct/iterate/cover paths read the SENT prompt
+   (`resolveEvalImagePrompt`), while unshrunk pages were judged against the brief and the consolidator always read
+   the whole brief. Measured on staging (the 11 stories with pages created in the 12 days to 2026-09-26): **130 of 186 page renders were shrunk**, so
+   most pages were judged against a different kind of string than the rest. The shrink's generation-log events of
+   the four newest stories (82 shrinks) show what it cuts: COUNTS, the Composition bullets, DEPTH AND SIZE, HEIGHT
+   ORDER, AGE & PROPORTIONS, the reference-photo rule, REQUIRED CAST — generic built guidance, NOT the brief — and
+   the brief's prose only once (`proseCut` > 0 on 1 of 82).
+
+**Decision.**
+1. `buildEmptySceneQcPrompt` cuts nothing: EXPECTED SCENE whole, MAIN SCENE PROSE whole (the brief's prose via
+   `splitBrief`, its metadata JSON is not prose). FRAMING stays its own field; the callers pass EXPECTED SCENE as
+   the author's setting text WITHOUT the FRAMING paragraph, so nothing is said twice: vantage = SHOT +
+   `sceneMetadata.vantageSettingText` (the LOCATION/VANTAGE lines + vantage description — one builder, the plate
+   prompt uses it too); per-page = the SHOT line; derived = the setting lines (no SHOT, no FRAMING, as before). The
+   Setting check reads "the EXPECTED SCENE and FRAMING above".
+2. `prompts.buildPlateStructuresText` (extracted from `buildEmptyScenePrompt`, VB ids resolved) is the one source of
+   the author's STRUCTURES block and the judge's `structures` input; `validateEmptyScene` attaches the plate call's
+   grid (`structureGrid`) labelled `[Visual Bible reference]` after the detail views. Template sections STRUCTURES
+   and STRUCTURE_REFERENCE present them as what the author was given. **Input only: no check key, no rule.** Whether
+   a structure that does not match its description should fail is a classification question for the owner.
+   A derived plate is judged against its base's structures and grid (it keeps the base's structures, as it keeps
+   the base's landmark photo). Every story-run site (vantage base + retry, derived, per-page + retry) and the Lab
+   (`labPlateQcOptions` + `labPlateStructureInputs`, empty_scene, edit_image, judge_fixture) pass them.
+3. The quality and semantic judges read the brief (batch eval: `resolveEvalSceneDescription` without
+   `compressedScene`) or the prompt as BUILT (direct `runEval`, the Gemini branch, iterate, the direct cover
+   render). `resolveEvalImagePrompt` is DELETED. `compressedScene` and the stored `prompt` stay as the RECORD of
+   what was sent; no judge reads them. **Deliberately not part of the contract:** the generic blocks the shrink cuts
+   are not in the brief, and the judges get their facts as their own inputs (EXPECTED CAST, REQUIRED OBJECTS,
+   CLOTHING CONTRACT, TEXT_RULES, ART_STYLE). The REQUIRED OBJECTS / ART STYLE inputs are still parsed from the
+   stored (sent) prompt: they sit in the protected tail, which the shrink never cuts.
+
+**Validation.**
+- Rung 1 (free), `job_1790446348343_z3fw660ie` (Fiona, 19 shrinks): all 39 shrunk render records (16 pages + 3
+  covers, root + versions) — the judge's ORIGINAL_PROMPT was the 2,766-4,937-char built head (THIS IMAGE DEPICTS +
+  the lettering, reference-photo and AGE & PROPORTIONS rules + the rewritten scene) and is now the brief (612-2,048
+  chars, whole). No brief sentence was missing from the head on this story (no prose cut); on 18 of 130 shrunk
+  renders across 11 stories at least one brief sentence is not in the head verbatim (builder rewrites and prose
+  cuts, not separated).
+- Rung 2 (paid, gemini-2.5-flash, one sample per arm), plate QC on the 16-plate set, before = origin/staging
+  b71683911, after = this change, the Lab option sets:
+
+| defect class (bad plates) | before | after |
+|---|---|---|
+| figures (5 plates with people) | 5/5 | 5/5 |
+| text / signature (3) | 3/3 (p13 `unclassified`) | 3/3 (p13 `unclassified`) |
+| framing (2) | 1/2 | 1/2 |
+| light, covered sky / fog (4) | 1/4 | 2/4 (+ z3 p8 derived: crisp far building under fog) |
+| medium, photograph (4) | 0/4 | 0/4 |
+| era false fails | 0 | 0 |
+| any fail on the 9 bad plates | 7/9 | 8/9 (lab1503 now `figures`; not confirmed at viewing scale) |
+| fails on the 7 clean plates | 1 (5herh p15 moon under fog — a real defect per 2eeb3e0da) | 1 (same) |
+
+  The audit agent's single samples (p1 caught as `medium`, p13 signature as `text`) did not reproduce here: p1
+  passes and p13 files `unclassified` in both arms. Only LOC005.1 and its p8 derive carry a STRUCTURES text in this
+  set (an on-board cutter, name-only); none carries a grid (all are landmark plates). Cost $0.162.
+- Rung 2 (paid), quality + semantic on 4 shrunk Fiona pages, the Lab `quality_eval` stage (production's option set),
+  only IMAGE_PROMPT differing (before = the stored `compressedScene`): p3 100/100/100 → 100/95/90 (semantic: the
+  clothing contract's scissors on the sash not visible); p6 q20 s40 f-40 (5 findings) → q0 s20 f-80 (9: the brief's
+  boots-in-hand as `action_interaction` CRITICAL, three skirts-for-breeches, two extras, two hair); p9 100/100/100 both;
+  p12 q15 f15 (7) → q0 f0 (9: the brief's rope material, rusted ring and crumbling mortar as MAJOR/MODERATE). Judged
+  against the whole brief, the judges hold the page to more of its brief's details; single samples, and the judge has
+  no temperature knob. Cost $0.116. **Total spend $0.278 (≈ CHF 0.22), cap CHF 0.30.**
+
+**Touched:** `server/lib/evalPipeline.js`, `prompts/empty-scene-qc.txt`, `server/services/prompts.js`,
+`server/lib/sceneMetadata.js`, `server/lib/storyHelpers.js`, `storyJobPipeline.js`, `server/lib/testlab.js`,
+`server/lib/images.js`, `server/lib/coverIterate.js`, `server/lib/repairLogic.js` (comments),
+`tests/unit/{plate-qc-era-framing-photo,plate-qc-per-page,lab-plate-qc-always,empty-scene-qc-extraction,
+eval-image-prompt-source,eval-scene-description-source,compressed-scene-lineage,plate-prompt-fit}.test.ts`,
+`docs/prompt-inventory.md`, `tasks/BACKLOG.md`.
+**Status:** 🟡 active on staging.
+
+---
+
 ## 2026-09-26 — A cover is judged on its textless art layer, never on the stamped served image; no judge excuses the app's strings any more (amends 2026-09-26 "Covers briefed as pages get the undeclared-lettering check", item 1)
 
 **Context:** Owner, 2026-09-26: "the app texts (magicalstory.ch, dedication, composited title) should not be part of the evaluated image — evaluate first, then add the text." The story run judges a cover before the post-persist stamp, but every eval of a STORED cover read the served bytes, which carry the app's title / dedication / "magicalstory.ch": Test Lab eval stages (Lab 1521 on the back cover of staging job_1790446348343_z3fw660ie reported "magicalstory.ch"), admin re-evaluate and evaluate-single, the cover edit's eval of its restamped output, the entity / style / book checks on a stored book (admin and Lab), and the full-story cover iterate, whose image analysis and reference render took the stamped cover. 6e3170843 papered over it by excusing the app strings (`resolveCoverTextContract().appTexts`) in the lettering check, next to TEXT_NOTE_APP_OVERLAY's "never flag them present". Checking the data also found the post-persist bake writing the active version's textless layer to `${key}Art` v0 whatever version was active; its non-active loop then overwrote v0 with v0's own pixels, so the active version's art was lost (staging: 54 covers / 38 stories, prod: 16 covers / 12 stories).
@@ -37,6 +122,8 @@ superseded and link forward.
 **Evidence:** free replay on staging job_1790446348343 back cover: served sha1 fea52a4549cc (caption + "magicalstory.ch"), resolver / Lab loader / whole-book view all return the art v0 sha1 beb789dde3bb (caption, no stamp). Lab quality_eval re-run on staging (#1533, same target as #1521, deploy d55bbde0): the stage loaded "backCover v0 textless art layer"; the caption "THE FIVE FRIENDS STAND TOGETHER" is still a CRITICAL rendered_text (lettering check), and no judge output mentions magicalstory.ch (#1521 filed it as unrequested text). Repair replay (free, staging job_1790446348343): the back cover's art (beb789dde3bb) restamped by the new repair path reproduces the served image byte for byte (fea52a4549cc); job_1789759147125 backCover (active v1, art only at v0) is refused NO_ART_LAYER. Tests: tests/unit/cover-eval-layer.test.ts, cover-lettering-check.test.ts, cover-eval-inputs.test.ts, cover-eval-notes-extraction.test.ts.
 **Touched:** server/lib/coverEvalLayer.js, server/lib/coverTypography.js, server/lib/coverRender.js, server/lib/testlab.js, server/routes/regeneration.js, server/lib/evalPipeline.js, server/lib/evalReplayInputs.js, server/lib/images.js, server/lib/repairPipeline.js, storyJobPipeline.js, prompts/cover-evaluation-notes.txt, tests/unit/*
 **Status:** ✅ active
+
+---
 
 ## 2026-09-26 — Judge regression fixtures: judge recall and precision are measured on stored inputs, one Lab set per judge
 **Context:** No judge's recall had ever been measured. The eval-gap analysis of 24 problems (the
@@ -178,7 +265,8 @@ staging plate_qc prompts cut at 300 and 27 of 59 at 800, and replayed 10 stored 
 `landmark` on the brief's own towers went away, p1's photograph was caught as `medium` and p13's signature
 as `text` (both missed with the cut), and no `figures` finding was lost (p1/p3/p8/p18 in both arms). That
 is evidence against the 1506 result, whose stored brief still asked for "a few distant passers-by" from
-before the no-people rule; the owner decides.
+before the no-people rule; the owner decides. → Decided and built: "The judges read what the generator was given,
+whole" (top of this file), which also builds the STRUCTURES/grid and the compressedScene items listed below.
 
 **Not built — owner decisions** (inputs a critic lacks where adding them could change what it faults, or a
 settled contract): the quality/semantic judges read `compressedScene` (the shrunk prose) while the
@@ -502,6 +590,8 @@ LOC004.2 retry that became a photo copy).**
    300-char cap. New soft check key `framing` (plateQc.js) and FRAMING_CHECK: is the structure or view the FRAMING
    names the main subject, seen from that side and height; a prop or detail is never a framing fault. A DERIVED plate
    gets no framing (the derive moves the camera the FRAMING's height/side describe).
+   → The 300-char cap is SUPERSEDED the same day (owner): decisions.md "The judges read what the generator was
+   given, whole" (top of this file).
 3. **The photo is the authority on LOOKS only.** `LANDMARK_PHOTO_AUTHORITY` (one constant: the author's fidelity block
    and the judge) now says the photo "never decides which structure or view fills the frame"; LANDMARK_CHECK's PASS
    sentence is scoped to shape/material/colour and hands the frame to the FRAMING check.

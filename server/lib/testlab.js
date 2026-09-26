@@ -811,12 +811,14 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
 /**
  * validateEmptyScene options for a Lab plate — the per-page plate QC's option
  * set (storyJobPipeline.js `pageQcOpts`), field for field: the page's declared
- * placements, the scene prose the geometry is graded on, the plate text as its
- * FRAMING, the brief's `era` (the one its plate author's era guard was built
- * from; the QC classifies it with the same buildEraGuard), the full art style,
- * the shot, the landmark photo, the light.
+ * placements, the scene prose the geometry is graded on, the setting text and
+ * the plate text as its FRAMING (two fields, each whole), the brief's `era`
+ * (the one its plate author's era guard was built from; the QC classifies it
+ * with the same buildEraGuard), the full art style, the shot, the landmark
+ * photo, the light, and the STRUCTURES text and Visual Bible grid the plate
+ * call carried (labPlateStructureInputs).
  */
-function labPlateQcOptions(ctx, { sceneDescription, framing = null, shot, artStyle }) {
+function labPlateQcOptions(ctx, { sceneDescription, framing = null, shot, artStyle, structures = '', structureGrid = null }) {
   const meta = ctx.scene.sceneMetadata || {};
   const placements = (meta.fullData?.characters || [])
     .filter(c => c?.name && c?.position)
@@ -832,7 +834,27 @@ function labPlateQcOptions(ctx, { sceneDescription, framing = null, shot, artSty
     pageNumber: ctx.pageNumber,
     landmarkPhoto: ctx.landmarkPhotos?.[0] || null,
     light: require('./sceneLight').declaredLight(meta),
+    structures: structures || '',
+    structureGrid: structureGrid || null,
   };
+}
+
+/**
+ * The STRUCTURES text and the Visual Bible grid a plate of this page is
+ * painted with — the same builders the story run's plate calls use
+ * (prompts.buildPlateStructuresText, referenceSheets.buildEmptySceneVbGrid),
+ * with the same aboard and objects[] gates. `grid` passes a grid the caller
+ * already built for the plate call, so the Lab judges the one it sent.
+ */
+async function labPlateStructureInputs(ctx, { aboardId = undefined, grid = undefined } = {}) {
+  const meta = ctx.scene.sceneMetadata || {};
+  const aboard = aboardId !== undefined ? aboardId : (meta.aboard ?? null);
+  const structureGrid = grid !== undefined ? grid
+    : await require('./referenceSheets').buildEmptySceneVbGrid(ctx.visualBible, ctx.pageNumber, ctx.landmarkPhotos || [], aboard, meta.objects || null);
+  const structures = require('../services/prompts').buildPlateStructuresText({
+    visualBible: ctx.visualBible, pageNumber: ctx.pageNumber ?? null, aboardId: aboard, sceneObjects: meta.objects || null,
+  });
+  return { structures, structureGrid: structureGrid || null };
 }
 
 /**
@@ -840,6 +862,8 @@ function labPlateQcOptions(ctx, { sceneDescription, framing = null, shot, artSty
  * production resolves (resolvePagePlate) under the page's SHOT line. One
  * helper for the empty_scene stage (the text it renders from) and the
  * judge_fixture plate replay (the text a stored plate is judged against).
+ * `shotLine` is what the QC reads as EXPECTED SCENE beside the plate text as
+ * FRAMING (storyJobPipeline.js `pageQcOpts`).
  */
 function labPagePlateText(ctx) {
   const meta = ctx.scene.sceneMetadata || {};
@@ -848,24 +872,31 @@ function labPagePlateText(ctx) {
     pageNumber: ctx.pageNumber, sceneMetadata: meta, visualBible: ctx.visualBible, outlinePlate: '',
   });
   const pageShot = String(meta.fullData?.shot || '').trim();
-  const description = pagePlate.text ? `${pageShot ? `**SHOT:** ${pageShot}\n\n` : ''}${pagePlate.text}` : '';
-  return { pagePlate, pageShot, description };
+  const shotLine = pageShot ? `**SHOT:** ${pageShot}` : '';
+  const description = pagePlate.text ? `${shotLine ? `${shotLine}\n\n` : ''}${pagePlate.text}` : '';
+  return { pagePlate, pageShot, shotLine, description };
 }
 
 /**
  * validateEmptyScene options for a DERIVED plate — the story run's
  * `derivedQcOpts` (storyJobPipeline.js): no text zone, its own camera class,
- * the medium, the place; not the page's geometry facts or placements, which the
+ * the medium, the place (the vantage's setting text, no FRAMING), the base
+ * plate's structures; not the page's geometry facts or placements, which the
  * derive edit never saw. Shared by edit_image (a replayed derive) and the
  * judge_fixture plate replay (a stored derived plate).
  */
-function labDerivedPlateQcOptions(ctx) {
-  const { resolvePagePlate, resolveArtStyle } = require('./storyHelpers');
+async function labDerivedPlateQcOptions(ctx) {
+  const { resolvePagePlate, resolveArtStyle, getPrimaryVantageForPage, vantageSettingText } = require('./storyHelpers');
   const meta = ctx.scene.sceneMetadata || {};
+  const vantage = getPrimaryVantageForPage(meta, ctx.visualBible, { pageNumber: ctx.pageNumber, emptyScenePrompt: meta.emptyScenePrompt || '' });
+  const plateText = resolvePagePlate({ pageNumber: ctx.pageNumber, sceneMetadata: meta, visualBible: ctx.visualBible, outlinePlate: '' }).text;
   const opts = labPlateQcOptions(ctx, {
-    sceneDescription: resolvePagePlate({ pageNumber: ctx.pageNumber, sceneMetadata: meta, visualBible: ctx.visualBible, outlinePlate: '' }).text || null,
+    // A page with no vantage has a per-page plate, whose author gets no setting
+    // text besides its plate text (which is not this plate's FRAMING either).
+    sceneDescription: vantage ? vantageSettingText(vantage, plateText) : '',
     shot: require('./shotVocabulary').plateClass(String(meta.fullData?.shot || '').trim()),
     artStyle: resolveArtStyle(ctx.artStyle || 'pixar') || '',
+    ...(await labPlateStructureInputs(ctx)),
   });
   return { ...opts, characterPlacements: null, mainScenePrompt: null };
 }
@@ -892,7 +923,7 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
   // No outline plate: ctx.scene is the STORED page record, whose
   // `emptyScenePrompt` is the fully BUILT plate prompt of the run, not plate
   // text — wrapping it in the template again doubled it (Lab 1482: 11,761 chars).
-  const { pagePlate, pageShot, description: storedDescription } = labPagePlateText(ctx);
+  const { pagePlate, pageShot, shotLine, description: storedDescription } = labPagePlateText(ctx);
   const description = params.descriptionOverride || storedDescription;
   if (!description) throw new Error('No plate text for this page: the vantage and the brief carry no emptyScenePrompt (pass params.descriptionOverride)');
 
@@ -985,7 +1016,14 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
     const { validateEmptyScene } = require('./images');
     const qcTextPos = require('./plateQc').plateQcTextPosition(wantsTextZone, ctx.textPosition);
     const qcRes = await validateEmptyScene(result.imageData, qcTextPos, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
-      labPlateQcOptions(ctx, { sceneDescription: description, framing: params.descriptionOverride || pagePlate.text, shot: pageShot || meta.setting?.camera || 'wide shot', artStyle: plateStyle }));
+      labPlateQcOptions(ctx, {
+        // The plate text rides whole as FRAMING; EXPECTED SCENE is what the
+        // author got besides it (the SHOT line), as in the story run.
+        sceneDescription: params.descriptionOverride ? null : shotLine,
+        framing: params.descriptionOverride || pagePlate.text,
+        shot: pageShot || meta.setting?.camera || 'wide shot', artStyle: plateStyle,
+        ...(await labPlateStructureInputs(ctx, { aboardId, grid: emptySceneVbGrid })),
+      }));
     qc = { pass: qcRes.pass, issues: qcRes.issues || [], findings: qcRes.findings || [], visionFeedback: qcRes.visionFeedback || null, textPosition: qcTextPos };
   } catch (err) {
     log.warn(`[TESTLAB] empty-scene QC failed: ${err.message}`);
@@ -5822,7 +5860,7 @@ async function runEditImageStage(ctx, { experimentId, promptOverride, params = {
     try {
       const { validateEmptyScene } = require('./images');
       const qcRes = await validateEmptyScene(edited, null, `testlab-exp${experimentId}-P${ctx.pageNumber}-edit`,
-        labDerivedPlateQcOptions(ctx));
+        await labDerivedPlateQcOptions(ctx));
       qc = { pass: qcRes.pass, issues: qcRes.issues || [], findings: qcRes.findings || [], visionFeedback: qcRes.visionFeedback || null, textPosition: null };
     } catch (err) {
       log.warn(`[TESTLAB] edited-plate QC failed: ${err.message}`);
@@ -10669,15 +10707,16 @@ async function runJudgeFixtureStage(target, { experimentId, params = {} }) {
       const derived = !!ctx.scene.plateDerivedFor;
       let opts, textPos = null;
       if (derived) {
-        opts = labDerivedPlateQcOptions(ctx);
+        opts = await labDerivedPlateQcOptions(ctx);
       } else {
-        const { pagePlate, pageShot, description } = labPagePlateText(ctx);
+        const { pagePlate, pageShot, shotLine } = labPagePlateText(ctx);
         const meta = ctx.scene.sceneMetadata || {};
         const wantsTextZone = ctx.layout?.textInImage !== false && !!ctx.textPosition;
         textPos = require('./plateQc').plateQcTextPosition(wantsTextZone, ctx.textPosition);
         opts = labPlateQcOptions(ctx, {
-          sceneDescription: description,
+          sceneDescription: shotLine,
           framing: pagePlate.text,
+          ...(await labPlateStructureInputs(ctx)),
           shot: pageShot || meta.setting?.camera || 'wide shot',
           artStyle: require('./storyHelpers').resolveArtStyle(ctx.artStyle || 'pixar') || '',
         });
@@ -10937,6 +10976,10 @@ module.exports = {
   // every plate the way the story run does" is pinned by running them with the
   // network and DB stubbed (tests/unit/lab-plate-qc-always.test.ts).
   labPlateQcOptions,
+  labPlateStructureInputs,
+  labPagePlateText,
+  labDerivedPlateQcOptions,
+  runQualityEvalStage,
   runEmptySceneStage,
   runEditImageStage,
   // Judge regression fixtures — the dispatch and its scoring, pinned with the

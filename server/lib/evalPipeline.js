@@ -457,19 +457,25 @@ async function plateDetailViewParts(buf) {
  * asserted without a paid vision call, and so the plate generator/critic pair
  * names two file paths instead of this module.
  */
-function buildEmptySceneQcPrompt({ sceneDescription = '', era = null, framing = '', characterPlacements = null, mainScenePrompt = '', artStyle = '', shot = '', landmarkName = '', landmarkPhotoText = '', light = null, detailViews = [] } = {}) {
-  const sceneCtx = sceneDescription
-    ? `\nEXPECTED SCENE: "${sceneDescription.substring(0, 300)}"`
-    : '';
-  // THE FRAMING PARAGRAPH, WHOLE (2026-09-26). EXPECTED SCENE stops at 300
-  // characters, and on a vantage plate the FRAMING paragraph sits after the
-  // SHOT/LOCATION/VANTAGE lines, so the judge saw half of it or none: a plate
-  // that painted the building across the river where its author was told to
-  // look up at the wall beside the camera passed. It rides as its own field,
-  // uncut, and the framing check reads it. The cap on EXPECTED SCENE stays
-  // (raising it lost the figures check on Lab 1506, decisions.md 2026-09-26).
+function buildEmptySceneQcPrompt({ sceneDescription = '', era = null, framing = '', characterPlacements = null, mainScenePrompt = '', artStyle = '', shot = '', landmarkName = '', landmarkPhotoText = '', light = null, detailViews = [], structures = '', structureReference = false } = {}) {
+  // EVERY INPUT WHOLE (owner, 2026-09-26, reversing the same day's "EXPECTED
+  // SCENE keeps its 300-char cap"): the judge reads the text the plate's author
+  // was given, uncut. The cut at 300 hid the brief's own towers from the
+  // landmark check (a false `landmark` fail) and left a photograph and a
+  // signature unjudged (replay, decisions.md 2026-09-26 "The plate QC reads its
+  // inputs whole"). EXPECTED SCENE is the author's setting text WITHOUT the
+  // FRAMING paragraph — callers pass the two apart, so nothing is said twice.
+  const sceneText = String(sceneDescription || '').trim();
+  const sceneCtx = sceneText ? `\nEXPECTED SCENE: "${sceneText}"` : '';
+  // THE FRAMING PARAGRAPH, WHOLE (2026-09-26): its own field, and the framing
+  // check reads it.
   const framingText = String(framing || '').trim();
   const framingBlock = framingText ? `\n\nFRAMING (what the plate's author was told the frame holds): "${framingText}"` : '';
+  // THE STRUCTURES THE AUTHOR WAS GIVEN (2026-09-26): the same text the plate
+  // prompt's **STRUCTURES:** block carries (prompts.buildPlateStructuresText),
+  // and, when the plate call attached one, the Visual Bible reference render
+  // of those vessels or structures (validateEmptyScene attaches it, labelled).
+  const structuresText = String(structures || '').trim();
   // THE ERA THE PLATE'S AUTHOR WAS GIVEN (2026-09-26): the brief's `era`,
   // classified by the one era classifier the author's STORY ERA guard uses
   // (promptBuilders.buildEraGuard). A present-day or absent era gets no guard
@@ -497,6 +503,9 @@ function buildEmptySceneQcPrompt({ sceneDescription = '', era = null, framing = 
   // Loud, not empty: as a string literal a missing prompt was impossible; as a
   // file it would hand the judge a blank page and every plate would "pass".
   if (!qc.BODY) throw new Error('buildEmptySceneQcPrompt: empty-scene-qc template not loaded');
+  const structuresBlock = structuresText
+    ? `\n\n${fillTemplate(qc.STRUCTURES, { STRUCTURES_TEXT: structuresText })}` : '';
+  const structureRefBlock = structureReference ? `\n\n${qc.STRUCTURE_REFERENCE}` : '';
   const placementsCheck = placementsBlock ? `\n${qc.PLACEMENTS_CHECK}` : '';
   // Composition geometry fidelity — the main scene will composite
   // characters and aim lines onto this empty scene. If the path
@@ -514,7 +523,9 @@ function buildEmptySceneQcPrompt({ sceneDescription = '', era = null, framing = 
   // the plate is graded on facts it was given. Adding a check here
   // that is not derivable into that block re-creates the blind grade.
   const mainSceneBlock = mainScenePrompt
-    ? `\n\nMAIN SCENE PROSE (what will be composited onto this empty scene):\n"${mainScenePrompt.substring(0, 800)}"`
+    // The brief's PROSE, whole (2026-09-26: the 800-char cut is gone). Its
+    // metadata JSON is not prose: splitBrief, the one split every reader uses.
+    ? `\n\nMAIN SCENE PROSE (what will be composited onto this empty scene):\n"${require('./sceneMetadata').splitBrief(mainScenePrompt).prose}"`
     : '';
   // The judge's three geometry questions come from the SAME constant
   // that writes the plate author's geometry block
@@ -605,6 +616,8 @@ ${fillTemplate(qc.LANDMARK_CHECK, {
     CHECK_KEYS: require('./plateQc').checkKeysForPrompt(),
     SCENE_CTX: sceneCtx,
     FRAMING_BLOCK: framingBlock,
+    STRUCTURES_BLOCK: structuresBlock,
+    STRUCTURE_REFERENCE: structureRefBlock,
     DETAIL_VIEWS: detailBlock,
     STYLE_CHECK: styleCheck,
     CAMERA_CHECK: cameraCheck,
@@ -635,8 +648,10 @@ ${fillTemplate(qc.LANDMARK_CHECK, {
  * @param {string} textPosition - e.g. 'top-right'
  * @param {string} pageContext - logging context
  * @param {object} [options]
- * @param {string} [options.sceneDescription] - expected scene description
+ * @param {string} [options.sceneDescription] - the author's setting text WITHOUT the FRAMING paragraph (uncut)
  * @param {string} [options.framing] - the FRAMING paragraph the plate's author was given (uncut)
+ * @param {string} [options.structures] - the STRUCTURES text the author was given (prompts.buildPlateStructuresText)
+ * @param {Buffer} [options.structureGrid] - the Visual Bible reference grid the plate call carried (buildEmptySceneVbGrid)
  * @param {string} [options.era] - the brief's `era` the plate's author was given (buildEraGuard classifies it)
  * @param {{name: string, photoUrl?: string, photoData?: string, description?: string, judgedView?: string}} [options.landmarkPhoto] - the landmark
  *        reference photo the plate was painted from; attached as the judge's last image, and the
@@ -645,7 +660,7 @@ ${fillTemplate(qc.LANDMARK_CHECK, {
  * @returns {{ pass: boolean, issues: string[], calmnessScore: number, visionFeedback: string|null }}
  */
 async function validateEmptyScene(imageData, textPosition, pageContext = '', options = {}) {
-  const { sceneDescription = null, skipVision = false, characterPlacements = null, mainScenePrompt = null, era = null, framing = null, artStyle = null, shot = null, landmarkPhoto = null, light = null } = options;
+  const { sceneDescription = null, skipVision = false, characterPlacements = null, mainScenePrompt = null, era = null, framing = null, artStyle = null, shot = null, landmarkPhoto = null, light = null, structures = null, structureGrid = null } = options;
   try {
     const base64 = r2Lib.stripDataUriPrefix(imageData);
     const buf = Buffer.from(base64, 'base64');
@@ -781,8 +796,14 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
           }
           const { landmarkPhotoText } = require('./promptBuilders');
           const detailParts = await plateDetailViewParts(buf);
+          // The Visual Bible reference grid the plate call carried
+          // (buildEmptySceneVbGrid: the vessels and large structures the plate
+          // holds; null whenever a landmark photo rode instead).
+          const structurePart = Buffer.isBuffer(structureGrid) && structureGrid.length
+            ? { inline_data: { mime_type: 'image/jpeg', data: structureGrid.toString('base64') } } : null;
           const qcPrompt = buildEmptySceneQcPrompt({
             sceneDescription, era, framing, characterPlacements, mainScenePrompt, artStyle, shot, light,
+            structures, structureReference: !!structurePart,
             landmarkName: landmarkPart ? landmarkPhoto.name : '',
             landmarkPhotoText: landmarkPart ? landmarkPhotoText(landmarkPhoto) : '',
             detailViews: detailParts.length ? PLATE_DETAIL_VIEWS.map(v => v.label) : [],
@@ -799,6 +820,7 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
                 { text: '[Background plate to judge]:' },
                 { inline_data: { mime_type: mimeType, data: base64ForVision } },
                 ...detailParts,
+                ...(structurePart ? [{ text: '[Visual Bible reference]:' }, structurePart] : []),
                 ...(landmarkPart ? [{ text: `[Landmark reference photo: ${landmarkPhoto.name}]:` }, landmarkPart] : []),
                 { text: guardPromptString(qcPrompt, 'validateEmptyScene') }
               ]}],
