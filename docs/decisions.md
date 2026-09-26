@@ -144,6 +144,39 @@ tests/unit/book-audit-brief-and-type.test.ts, docs/prompt-inventory.md.
 **Status:** ✅ active on staging.
 
 ---
+## 2026-09-26 — Plan-check Q17 (the whole-cast page) is must-fix; the rejected Q5 ranking stays rejected (amends the entry below)
+
+**Context:** Q17 shipped advisory the same day (entry below) and the decision was left to the owner, because
+ranking the whole of Q5 must-fix was measured and rejected on 2026-09-09 ("Plan-check Q9 … stays advisory" and
+"A deed and its effect are two pages"): Q5 bundles presence-only and after-state instants on ANY page, so as a
+must-fix it put 12-16 pages a book under the mandate, re-wrote the whole division twice and cost the book its Q4
+wanted pictures and its Q8 ending.
+
+**Decision:** Q17 joins `REPLAN_MUST_FIX_CHECKS` (`{4, 8, 12, 14, 15, 16, 17}`). Owner-approved 2026-09-26.
+Q5 stays advisory, unchanged.
+
+**Rationale:** Q17 is narrower than Q5 on both axes that made Q5 destructive. (1) Scope: it names only a page
+whose ROSTER holds every commissioned character — 1-3 pages a book, not 12-16. (2) Answer: it asks for one
+shared action on the SAME page (boarding, hauling one line, all turned toward one thing, or seen from behind
+moving off) — a relabel of that page's instant, never a page spent, moved or deleted, so it cannot take a Q4 or
+Q8 picture with it. It is the same kind of finding as Q14 (another shot word on the named page). The protected
+last page may change for it because the change review lets a must-fix finding through `protected`; Q16 (the
+ending's cast together) and Q17 do not conflict — Q17 keeps everyone and gives them one thing to do.
+
+**Measured (cents):** the plan check rebuilt with the real builder on the two stored staging divisions,
+gpt-5.6-luna-pro at temperature 0, $0.062 total, then run through the real re-plan trigger (`parsePlanCheck` →
+`replanRank` → `findingPages` → `buildReplanSection`): job_1790446348343_z3fw660ie → one Q17 finding, p16
+("only shows them standing together while the event happens behind them"), ranked must, page [16], inside the
+MUST FIX block; job_1790373080139_vnx5l8iy7 → three Q17 findings, p18 ("only standing together"), p7 ("standing
+rigid") and p1 ("the boys and Mama different actions"), all must, all inside MUST FIX. p1 was not flagged in the
+6bf12ea9f replay of the same division — the check varies at the margin on "each a different thing to do", which
+the question itself names as a finding. The re-plan loop needs no code change: it ranks by `check` number
+(`beatsPipeline.js` MUST FIX section, round-2 `stillMustFix`, convergence count), and the Lab `beats_replan`
+stage imports the same `replanRank`.
+
+**Touched:** server/lib/promptBuilders.js (`REPLAN_MUST_FIX_CHECKS` + its header, `WHOLE_CAST_DEF` comment),
+tests/unit/plan-replan-ranking.test.ts
+**Status:** ✅ active (staging)
 
 ## 2026-09-26 — The whole-cast page is a counted plan-check question; every figure's EYES line carries the viewer rule; a garment element's description is that garment only
 

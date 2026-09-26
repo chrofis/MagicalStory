@@ -7561,7 +7561,15 @@ function buildChallengeIdeasSection(inputData, count = 25) {
 // Q15 (the exciting start) and Q16 (the ending's cast safe and together)
 // joined as must-fix (owner, 2026-09-25): each names a picture the book owes,
 // page 1 and the last page, the same kind of finding as Q4 and Q8.
-const REPLAN_MUST_FIX_CHECKS = new Set([4, 8, 12, 14, 15, 16]);
+//
+// Q17 (the whole-cast page names one shared action) joined as must-fix
+// (owner, 2026-09-26). It is NOT the rejected Q5: Q5 covers every
+// presence-only or after-state instant on any page (12-16 findings a book);
+// Q17 names only a page whose roster holds every commissioned character, and
+// asks for one shared action on that same page — a relabel of the instant,
+// never a page spent or moved. On staging job_1790446348343_z3fw660ie p16 the
+// advisory reading let a posed row facing the viewer ship.
+const REPLAN_MUST_FIX_CHECKS = new Set([4, 8, 12, 14, 15, 16, 17]);
 
 /**
  * THE SHOT-DISTRIBUTION BLOCK, declared ONCE (2026-09-20).
@@ -8911,7 +8919,7 @@ const UNNAMED_FIGURE_EXEMPT = 'a figure given no name, referred to only by what 
  * the viewer. A feeling on one face read as the page's action. Question 17
  * makes the checker enumerate every whole-cast page and name the one action it
  * gives all of them, so the fault is a counted answer, not a keyword it may
- * miss. Advisory like Q5 (REPLAN_MUST_FIX_CHECKS does not carry it).
+ * miss. Must-fix since 2026-09-26 (owner): REPLAN_MUST_FIX_CHECKS carries it.
  */
 const WHOLE_CAST_DEF = 'A page that gathers the whole cast is wide or distant, all of them sharing one simple action — boarding, hauling one line together, all turned toward one thing ahead of them — or seen from behind moving off. Standing or gathering together while a feeling shows, or while the event happens behind them, is everyone present doing nothing — never a row of figures facing the viewer.';
 
