@@ -1025,6 +1025,10 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // "none", or no arc). The planner, plan-check Q12 and the
   // CENTRAL_FIGURE_ABSENT_THIRD counter read it (owner, 2026-09-24, d4).
   let arcCentralFigure = null;
+  // The final arc's STORY LOGIC block body (parseStoryLogic().text): the facts
+  // it was told from. The planner, the re-plan and plan-check Q18 read it
+  // (owner, 2026-09-26); '' when the arc machine failed.
+  let arcStoryLogic = '';
   // The machine's full trail. Kept under the arcReviewReport key so the
   // storyJobPipeline persistence and the dev-mode wiring stay untouched.
   let arcReviewReport = null;
@@ -1340,6 +1344,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // Prompt and raw reply are kept whether or not the pass parses (2026-09-23):
     // the prompt was built and sent but never stored, so a hint could not be
     // traced to what the pass was shown.
+    arcStoryLogic = currentLogic.text;
     let hintsPrompt = null;
     let hintsRaw = null;
     const hintsModel = MODEL_DEFAULTS.arcHintsModel || 'grok-4.6';
@@ -1408,6 +1413,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     approvedArc = '';
     arcWeakPoints = '';
     arcHints = '';
+    arcStoryLogic = '';
   }
 
   // ── Step 1: beats plan ────────────────────────────────────────────────────
@@ -1419,7 +1425,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // 2026-09-02 the stage emits ONE thing per page: the plan line. The beat
   // prose it used to write measured as the lossiest step in the chain
   // (Lab #973) and is gone — see docs/decisions.md.
-  const planPrompt = buildBeatsPrompt(inputData, pageCount, { finalArc: approvedArc, arcHints, centralFigure: arcCentralFigure });
+  const planPrompt = buildBeatsPrompt(inputData, pageCount, { finalArc: approvedArc, arcHints, storyLogic: arcStoryLogic, centralFigure: arcCentralFigure });
   if (!planPrompt) throw new Error('story-beats template unavailable — beats pipeline cannot run');
 
   /**
@@ -1578,7 +1584,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     try {
       // No counter findings ride in: they do not exist yet. See the builder's
       // header — the counters read this call's ROSTER, so they run below.
-      prompt = buildPlanCheckPrompt(inputData, pages, approvedArc, planText, { arcHints, centralFigure: arcCentralFigure, castTable });
+      prompt = buildPlanCheckPrompt(inputData, pages, approvedArc, planText, { arcHints, storyLogic: arcStoryLogic, centralFigure: arcCentralFigure, castTable });
       if (!prompt) throw new Error('plan-check template unavailable');
       const res = await textModels.callTextModelStreaming(prompt, null, onChunk, planCheckModel, {
         usageLabel: label,
@@ -1730,6 +1736,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         const replanPrompt = buildBeatsPrompt(inputData, pageCount, {
           finalArc: approvedArc,
           arcHints,
+          storyLogic: arcStoryLogic,
           centralFigure: arcCentralFigure,
           castTable,
           replan: buildReplanSection(pagePlan, pendingCheck.findings, { pageCount: beats.length, keep, refused: lastRefusals, castFloor: coverageRule ? coverageRule.appearances.min : null, castTable }),

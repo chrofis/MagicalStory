@@ -23,7 +23,7 @@ const { assessSceneReview, assertReviewedArtifactUsable, pickReviewedBrief } = r
 // Production's arguments for the beats writer/Art-Director calls, resolved from
 // a stored story. Every replay stage builds its inputs through these so a
 // divergent, thinner expression cannot be written a fourth time.
-const { buildReplayTextArgs, buildReplaySceneOptions, resolveReplayArc, resolveReplayArcHints, resolveReplayCentralFigure, resolveArcFromExperiment } = require('./beatsReplayInputs');
+const { buildReplayTextArgs, buildReplaySceneOptions, resolveReplayArc, resolveReplayArcHints, resolveReplayCentralFigure, resolveReplayStoryLogic, resolveArcFromExperiment } = require('./beatsReplayInputs');
 // Production's evalOptions for evaluateImageQuality, resolved from a stored
 // story. Same rule as above: every eval stage builds its options through this
 // so a thinner, silently-check-disabling expression cannot be written again.
@@ -4401,6 +4401,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       finalArc: resolveReplayArc(storyData, { parseBeats }),
       arcHints: resolveReplayArcHints(storyData),
       centralFigure: resolveReplayCentralFigure(storyData),
+      storyLogic: resolveReplayStoryLogic(storyData),
     });
     if (!plannerPrompt) throw new Error('story-beats template unavailable');
     if (promptOverride) plannerPrompt = promptOverride;
@@ -8556,7 +8557,7 @@ async function runWriterCompareStage(target, { params = {} }) {
         if (stage === 'plan') {
           // Production: buildBeatsPrompt(inputData, pageCount, { finalArc: approvedArc, arcHints })
           // — beatsPipeline.js:935. arcHints was missing here.
-          const r = await call(SH.buildBeatsPrompt(storyData, expectedPages, { finalArc: textArgs.arc, arcHints: textArgs.arcHints, centralFigure: textArgs.centralFigure }), model, 'plan');
+          const r = await call(SH.buildBeatsPrompt(storyData, expectedPages, { finalArc: textArgs.arc, arcHints: textArgs.arcHints, storyLogic: textArgs.storyLogic, centralFigure: textArgs.centralFigure }), model, 'plan');
           const parsed = SH.parsePlanResponse(r.text, []);
           arm.stages.plan = { ...WC.scorePlan(parsed.pages || [], expectedPages), cost: r.cost, elapsedMs: r.elapsedMs, outTok: r.usage?.output_tokens };
         } else if (stage === 'bible') {
@@ -10382,7 +10383,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
   // `mayAddDeeds`) — the same sentence reaches the plan check.
   const mayAddDeeds = params.plannerMayAddDeeds === true || params.plannerMayAddDeeds === 'true';
 
-  let standing, pagePlan, pageCount, approvedArc, arcHints, centralFigure;
+  let standing, pagePlan, pageCount, approvedArc, arcHints, centralFigure, storyLogic;
   // Set only on the arcFromExperiment path: the arc's own logic, and the
   // division this stage planned from it.
   let expArc = null;
@@ -10406,12 +10407,13 @@ async function runBeatsReplanStage(target, { params = {} }) {
     approvedArc = expArc.arc;
     arcHints = expArc.arcHints;
     centralFigure = expArc.centralFigure;
+    storyLogic = expArc.logic.text;
     // The page count the arc was written for.
     pageCount = expArc.pageCount || (storyData.sceneImages || []).length || storyData.pages;
     if (!pageCount) throw new Error(`arcFromExperiment ${expId}: no page count on the experiment or the story`);
     // PRODUCTION'S FIRST DIVISION (beatsPipeline Step 1): the same builder,
     // the same arguments, the same parse.
-    const planPrompt = buildBeatsPrompt(storyData, pageCount, { finalArc: approvedArc, arcHints, centralFigure, mayAddDeeds });
+    const planPrompt = buildBeatsPrompt(storyData, pageCount, { finalArc: approvedArc, arcHints, storyLogic, centralFigure, mayAddDeeds });
     if (!planPrompt) throw new Error('story-beats template unavailable');
     const t0 = Date.now();
     planRes = await callTextModelStreaming(planPrompt, null, null, planModel, { usageLabel: 'testlab_beats_replan_plan' });
@@ -10445,6 +10447,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
     approvedArc = resolveReplayArc(storyData, { parseBeats });
     arcHints = resolveReplayArcHints(storyData);
     centralFigure = resolveReplayCentralFigure(storyData);
+    storyLogic = resolveReplayStoryLogic(storyData);
     castTableNote = 'the stored division predates the CAST block; no plan line is held to one';
   }
   // The focus character, as production passes it (MAIN_UNDER_HALF, 2026-09-25).
@@ -10472,7 +10475,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
   // runCheck: the model call, its roster, the counters on that roster, and the
   // findings structured the way the re-plan and the round guard read them.
   const runCheckOn = async (pages, planText, usageLabel) => {
-    const prompt = buildPlanCheckPrompt(storyData, pages, approvedArc, planText, { arcHints, centralFigure, mayAddDeeds, castTable });
+    const prompt = buildPlanCheckPrompt(storyData, pages, approvedArc, planText, { arcHints, storyLogic, centralFigure, mayAddDeeds, castTable });
     if (!prompt) throw new Error('plan-check template unavailable');
     const res = await callTextModelStreaming(prompt, null, null, checkModel, {
       usageLabel,
@@ -10558,7 +10561,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
   });
   const coverageRule = require('./castCoverage').castCoverage({ pageCount, castCount: commission.listed.length });
   const replanSection = buildReplanSection(pagePlan, findings, { pageCount, keep, castFloor: coverageRule ? coverageRule.appearances.min : null, castTable });
-  const replanPrompt = buildBeatsPrompt(storyData, pageCount, { finalArc: approvedArc, arcHints, centralFigure, replan: replanSection, mayAddDeeds, castTable });
+  const replanPrompt = buildBeatsPrompt(storyData, pageCount, { finalArc: approvedArc, arcHints, storyLogic, centralFigure, replan: replanSection, mayAddDeeds, castTable });
   if (!replanPrompt) throw new Error('story-beats template unavailable');
   t = Date.now();
   const rpRes = await callTextModelStreaming(replanPrompt, null, null, planModel, { usageLabel: 'testlab_beats_replan' });

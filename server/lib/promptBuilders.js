@@ -8422,11 +8422,44 @@ ${HINT_ANCHOR_RULE}
 ${hints}`;
 }
 
+// WHAT BREAKING A STATED FACT MEANS, for the planner and its checker
+// (owner, 2026-09-26). One constant: the planner is told to keep every page to
+// the facts, plan-check question 18 names a page that does not, and both read
+// this sentence inside the same section (buildStoryLogicSection).
+const STORY_LOGIC_FACT_RULE = 'A page breaks a fact when its who, its instant or its change uses a thing, a material, an ability or a limit against what the story logic states of it. A hint that names a fact it changes replaces that fact; every other fact holds on every page.';
+
+/**
+ * THE STORY LOGIC as the page planner and the plan check read it (owner,
+ * 2026-09-26). Until then only the hint pass (arc-hints.txt) saw the block the
+ * arc was told from; the planner got the FINAL ARC plus the hints, and the
+ * check neither. The facts the sentences only imply were lost at the division:
+ * on staging job_1790446348343_z3fw660ie the logic said the costumes are thin
+ * cotton that tears and only the doubled sash would bind a rope, a hint dropped
+ * the second half, and nothing downstream still knew the first.
+ *
+ * ONE builder, filled into story-beats.txt (first division and re-plan) and
+ * plan-check.txt as {STORY_LOGIC_SECTION}; question 18 is the checker's half.
+ *
+ * @param {string} storyLogic the final STORY LOGIC block body (parseStoryLogic().text,
+ *   stored as arcReviewReport.logic)
+ * @returns {string} '' when there is none — no arc, or a story told before the
+ *   logic-first arc; the planner and the checker then work from the arc alone
+ */
+function buildStoryLogicSection(storyLogic = '') {
+  const body = String(storyLogic || '').trim();
+  if (!body) return '';
+  return `# THE STORY LOGIC — the facts the story above was told from
+
+Every page keeps to these facts. ${STORY_LOGIC_FACT_RULE}
+
+${body}`;
+}
+
 // `centralFigure`: the names the arc's STORY LOGIC gives the commission's
 // central figure (arcReviewReport.centralFigure), null when it named none.
 // `castTable`: the CAST block the first division wrote (parsePlanCastBlock);
 // a re-plan is told it stands. The first division is asked to write one.
-function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', replan = '', centralFigure = null, mayAddDeeds = false, castTable = null } = {}) {
+function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', storyLogic = '', replan = '', centralFigure = null, mayAddDeeds = false, castTable = null } = {}) {
   const template = PROMPT_TEMPLATES.storyBeats;
   if (!template) {
     log.error('[PROMPT] storyBeats template not loaded — beats planning unavailable');
@@ -8542,6 +8575,9 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
         String(arcHints).trim(),
       ].join('\n')
       : '',
+    // The facts the arc was told from (owner, 2026-09-26) — the same section
+    // plan-check.txt reads for its question 18.
+    STORY_LOGIC_SECTION: buildStoryLogicSection(storyLogic),
     REPLAN_SECTION: String(replan || '').trim(),
     // NAMES AND WORLD ONLY — the header is now true (2026-09-19).
     //
@@ -10765,7 +10801,7 @@ function critiqueMaxSeverity(critique) {
  * here so the signature states the contract: this prompt's inputs are the arc
  * and the page plan, and the counting happens downstream of its answer.
  */
-function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHints = '', centralFigure = null, mayAddDeeds = false, castTable = null } = {}) {
+function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHints = '', storyLogic = '', centralFigure = null, mayAddDeeds = false, castTable = null } = {}) {
   const template = PROMPT_TEMPLATES.planCheck;
   if (!template) {
     log.error('[PROMPT] planCheck template not loaded — plan check unavailable');
@@ -10799,6 +10835,10 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHi
     // rule the text critics read (buildCriticArcHintsSection); question 13
     // checks where each landed.
     ARC_HINTS: buildCriticArcHintsSection(arcHints),
+    // Question 18: the STORY LOGIC the planner divided against, from the same
+    // builder (owner, 2026-09-26). A page that breaks a stated fact could not
+    // be judged by a checker never shown the facts.
+    STORY_LOGIC_SECTION: buildStoryLogicSection(storyLogic),
     // Question 14: the planner's over-the-shoulder contact rule (story-beats.txt
     // {OTS_NO_CONTACT}), the same constant. The planner ignored it on
     // job_1790277448294_5herh01j7 p12 (an ear pressed to what the near figure
@@ -12719,6 +12759,8 @@ module.exports = {
   TWO_HEIGHTS_DEF,
   WHOLE_CAST_DEF,
   HINT_VS_ARC_RULE,
+  STORY_LOGIC_FACT_RULE,
+  buildStoryLogicSection,
   HINT_ANCHOR_RULE,
   NAMING_DEF,
   ENDING_EVENT_DEF,

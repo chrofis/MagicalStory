@@ -73,7 +73,11 @@ const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(
   // (or the story predates the hint pass).
   const arcHints = d.arcReviewReport?.arcHints || '';
 
-  const filled = SH.buildBeatsPrompt(d, pageCount, { finalArc, arcHints, replan: '' });
+  // STORY_LOGIC_SECTION: the final arc's logic block (2026-09-26); empty on a
+  // story told before the logic-first arc.
+  const storyLogic = d.arcReviewReport?.logic || '';
+
+  const filled = SH.buildBeatsPrompt(d, pageCount, { finalArc, arcHints, storyLogic, replan: '' });
   if (!filled) { console.error('builder returned null — template not loaded'); process.exit(1); }
 
   const tplPath = path.join(__dirname, '../../prompts/story-beats.txt');
@@ -109,7 +113,7 @@ storyType ${esc(d.storyType || '')} · run ${esc(runDate)} · rebuilt at HEAD <c
 
 <div class="note ok"><b>This is the real prompt text, every placeholder resolved</b>
 (${filled.length.toLocaleString()} chars). Rebuilt by calling the production builder
-<code>buildBeatsPrompt(inputData, ${pageCount}, { finalArc, arcHints, replan: '' })</code>
+<code>buildBeatsPrompt(inputData, ${pageCount}, { finalArc, arcHints, storyLogic, replan: '' })</code>
 with this story's own stored data — the prompt itself is never persisted, so this is a
 faithful reconstruction, not a capture.
 <br><br>

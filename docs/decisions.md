@@ -134,6 +134,77 @@ contract; the shrink fixtures of `cover-shrink-must-keep`, `generator-critic-rul
 
 ---
 
+## 2026-09-27 — The page planner and the plan check read the arc's STORY LOGIC; the plate QC fails a structure that does not match its description (soft)
+
+**Context.** Two items the owner approved on 2026-09-26, both deferred from the entry "Critic inputs,
+round two" below. (1) Only arc-hints.txt read `{STORY_LOGIC}`. The planner got the FINAL ARC and the
+hints; the plan check got neither the logic nor the facts. On staging `job_1790446348343_z3fw660ie` the
+logic said the costumes are thin cotton that tears, so only the doubled sash would bind a rope. A hint
+dropped the second half of that fact, and no stage after it still knew the first half. That is where
+the coat-rope contradiction came from. (2) The plate QC has received the author's STRUCTURES text and
+the Visual Bible grid since 2026-09-26 (input only, no check key). It could not fail a plate that drew
+the wrong vessel. On the same story, the p6 and p10 plates show a three-masted ship. The description's
+own signature is "single tall thick wooden mast", and both plates passed.
+
+**Decision.**
+1. **One section, three prompts.** `buildStoryLogicSection(storyLogic)` in promptBuilders.js returns
+   `# THE STORY LOGIC — the facts the story above was told from`, then "Every page keeps to these
+   facts." plus `STORY_LOGIC_FACT_RULE`, then the logic block body (`arcReviewReport.logic`,
+   `parseStoryLogic().text`). The rule says a page breaks a fact when its who, instant or change uses a
+   thing, material, ability or limit against what the logic states. It also says a hint that names a
+   fact it changes replaces that fact, which is the arc-hints contract. The section is filled as
+   `{STORY_LOGIC_SECTION}` into story-beats.txt (first division and re-plan) and plan-check.txt. The
+   check's new **question 18** names a page that breaks a stated fact. With no logic (the arc machine
+   failed, or the story predates the logic-first arc) the section is empty.
+   beatsPipeline.js keeps `arcStoryLogic` and passes it at all three call sites. The Lab passes the
+   same value: `resolveReplayStoryLogic` / `buildReplayTextArgs.storyLogic` on stored stories, and
+   `expArc.logic.text` on `arcFromExperiment` runs.
+2. **Q18 is advisory.** It is not in `REPLAN_MUST_FIX_CHECKS` and has no `REPLAN_FINDING_DIRECTION`,
+   because it moves the cast neither way. A finding still triggers the re-plan and is listed as "also
+   noted". Making it must-fix is the owner's call and needs evidence that it fires correctly.
+3. **Plate QC `structures` check.** STRUCTURE_CHECK in empty-scene-qc.txt applies only when the author
+   was given STRUCTURES. It fails when a described vessel, vehicle or structure that the EXPECTED SCENE
+   or FRAMING puts in view is missing, or when one on the plate is clearly another kind or shape. Only
+   the part the camera sees is judged, so a deck-only aboard view is not missing, and colour and small
+   fittings never fail. The check quotes the two rules the author's STRUCTURES block is built from,
+   `PLATE_STRUCTURE_MATCH_RULE` and `PLATE_STRUCTURE_PART_RULE`. Both are now constants in prompts.js
+   and are used by `buildPlateStructuresText` and the judge. The key is `structures` in plateQc.js,
+   and it is **soft**.
+
+**Rationale.** One builder on both sides means the planner and its checker read the same facts. That is
+the standing generator↔critic rule. Q18 is advisory because Q9 and Q5 were both measured as
+must-fix and reverted: a forced repair destroyed pages the check had merely named. The `structures`
+key is soft for three reasons. A wrong vessel is the plate differing from its brief, the same class as
+`framing` and `landmark`. A hard key would drop a derived plate to its base whenever both attempts
+carried it. The judgement it rests on (which part of a structure the camera sees, and aboard pages
+that show a deck and no hull) is one the check cannot be certain of.
+
+**Measured.**
+- Prompt size, rebuilt from stored rows (free). The planner grows +3,985 to +4,733 chars (+16.6 to
+  +19.2%) and the check grows by the same amount (+18.6 to +21.3%). The logic blocks are 3.6k and 4.4k
+  chars. Stories: `job_1790446348343_z3fw660ie` and `job_1790373080139_vnx5l8iy7`, the only two staging
+  stories from the last four days that store a logic block. No unfilled placeholders.
+- Plan-check replay on those two stored first divisions, production model gpt-5.6-luna-pro at
+  temperature 0, two runs per arm. Without the logic: 21/29 and 22/17 findings. With it: 17/21 and
+  26/16. Q18 findings: 0 in all four runs with the logic. On z3fw the coat-rope pages (p11, p12, p14)
+  are what the logic's own chain states ("cuts her own coat into a rope, trusting her doubled seams"),
+  so no Q18 finding there is defensible. The replay therefore shows no false Q18 alarms and a
+  finding count within run-to-run noise. It does **not** show that Q18 catches a real break: neither
+  stored plan had an unambiguous one. Spend $0.225.
+- Plate QC fixtures (`judge-fixtures.js run --judge=plate_qc`). Four new fixtures come from z3fw:
+  p7 (deck with one central mast, pass), p9 (aboard bow view, pass), p6 and p10 (three masts against
+  a single-mast signature, flag). Before, on staging without the check (Lab #1547): 9 TP, 5 FN, 7 TN,
+  1 FP. The two structure flags were FN. After: see the follow-up line added once the deploy ran.
+
+**Touched:** server/lib/promptBuilders.js, server/lib/beatsPipeline.js, server/lib/beatsReplayInputs.js,
+server/lib/testlab.js, prompts/story-beats.txt, prompts/plan-check.txt, scripts/analysis/dump-beats-prompt.js,
+server/services/prompts.js, server/lib/evalPipeline.js, server/lib/plateQc.js, prompts/empty-scene-qc.txt,
+tests/judge-fixtures/fixtures.json, scripts/admin/sibling-registry.json, tests (story-logic-planner-check,
+plate-qc-structures-check, built-prompt-values, beats-replay-inputs, plan-check-question-count,
+empty-scene-qc-extraction).
+
+**Status:** ✅ active (staging)
+
 ## 2026-09-26 — The judges read what the generator was given, whole: the plate QC reads its inputs uncut plus the STRUCTURES and grid; the quality and semantic judges read the brief, never the shrunk text (SUPERSEDES the same day's "EXPECTED SCENE keeps its 300 cap" and the 2026-09-13 "judge the string the model actually received")
 
 **Context.** The standing rule of the same day ("Every critic judges against the source the generator was

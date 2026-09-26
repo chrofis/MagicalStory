@@ -103,6 +103,19 @@ function resolveReplayCentralFigure(storyData) {
 }
 
 /**
+ * The STORY LOGIC production passes to the planner and the plan check
+ * (`{ storyLogic }`, 2026-09-26): the final arc's logic block body, stored on
+ * arcReviewReport.logic. '' for a story written before the logic-first arc —
+ * production passed nothing then, so nothing is passed.
+ *
+ * @param {Object} storyData
+ * @returns {string}
+ */
+function resolveReplayStoryLogic(storyData) {
+  return String(storyData?.arcReviewReport?.logic || '').trim();
+}
+
+/**
  * The locked scene briefs production hands the text writer (`finalExpansions`).
  *
  * On a stored story the final, post-review brief for a page IS
@@ -146,6 +159,7 @@ function buildReplayTextArgs(storyData, beats, { parseBeats, overrides = {} } = 
     arc: resolveReplayArc(storyData, { parseBeats }),
     arcHints: resolveReplayArcHints(storyData),
     centralFigure: resolveReplayCentralFigure(storyData),
+    storyLogic: resolveReplayStoryLogic(storyData),
   };
   for (const key of Object.keys(overrides)) {
     if (overrides[key] !== undefined) resolved[key] = overrides[key];
@@ -242,6 +256,7 @@ module.exports = {
   resolveReplayArc,
   resolveReplayArcHints,
   resolveReplayCentralFigure,
+  resolveReplayStoryLogic,
   resolveReplayExpansions,
   buildReplayTextArgs,
   buildReplaySceneOptions,
