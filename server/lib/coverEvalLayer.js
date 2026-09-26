@@ -134,4 +134,40 @@ async function applyCoverEvalView(storyId, storyData) {
   return { notEvaluated, servedByKey };
 }
 
-module.exports = { resolveCoverEvalImage, applyCoverEvalView, isCoverStamped, COVER_KEYS };
+/**
+ * A cover REPAIR starts from the same layer a judge reads (owner, 2026-09-26:
+ * "repair art, then restamp"). Puts the textless art of the active version on
+ * the in-memory cover record the repair methods read (`cover.imageData`), with
+ * a clone of its detection re-pointed at those bytes (the stamp moves no
+ * figure). Only for a record that is never persisted as-is: a stored story's
+ * top-level cover bytes are not written back (saveStoryData writes versions).
+ *
+ * @returns {Promise<{restamp: boolean, versionIndex: number}>} `restamp` — the
+ *   repaired art must get the app's text back (the cover was stamped).
+ * @throws {Error} code NO_ART_LAYER — a stamped cover without its art layer.
+ */
+async function loadCoverArtForRepair(storyId, coverKey, cover) {
+  const layer = await resolveCoverEvalImage(storyId, coverKey, null);
+  cover.imageData = layer.imageData;
+  if (cover.bboxDetection) {
+    cover.bboxDetection = require('./bboxDetection').restampDetectionForCoverText({ ...cover.bboxDetection }, layer.imageData);
+  }
+  return { restamp: layer.layer === 'art', versionIndex: layer.versionIndex };
+}
+
+/**
+ * The version a cover repair produces: its served bytes (the repaired art with
+ * the title / dedication / brand line restamped, coverTypography.restampCover)
+ * and its `${coverKey}Art` row (the repaired art). A cover the app never
+ * stamped serves the repaired art and stores no art row.
+ *
+ * @returns {Promise<{servedImageData: string, artImageData: string|null}>}
+ */
+async function restampRepairedCover(storyData, coverKey, repairedArt, { restamp, figures = [] } = {}) {
+  if (!restamp) return { servedImageData: repairedArt, artImageData: null };
+  const { restampCover } = require('./coverTypography');
+  const stamped = await restampCover(storyData, coverKey, repairedArt, { seed: storyData?.title, figures });
+  return { servedImageData: stamped.titledData, artImageData: stamped.textlessData };
+}
+
+module.exports = { resolveCoverEvalImage, applyCoverEvalView, isCoverStamped, loadCoverArtForRepair, restampRepairedCover, COVER_KEYS };

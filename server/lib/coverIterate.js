@@ -1193,37 +1193,21 @@ async function iterateCover(coverKey, storyData, options = {}) {
   deleteFromImageCache(cacheKey);
 
   // --- Build reference images ---
-  // Rehydrate imageData on demand only for the two branches that actually
-  // need the bytes. After R2 migration `existingCover.imageData` is usually
-  // null; the active version's bytes live in story_images. Without this,
-  // blackoutIssueRegions / useOriginalAsReference passed null and downstream
-  // sharp operations threw "Input buffer contains unsupported image format".
+  // The current cover, for the two branches that send it to the model (the
+  // blackout reference and useOriginalAsReference): the TEXTLESS art of its
+  // active version (coverEvalLayer.resolveCoverEvalImage), never the served
+  // bytes with the app's title / dedication / "magicalstory.ch" stamped on —
+  // the model copies lettering it is shown. A stamped cover with no art layer
+  // throws: the iterate does not run on the stamp.
   let previousImage = null;
   const needsImageBytes = blackoutIssues || useOriginalAsReference;
-  let rehydratedCoverBytes = existingCover.imageData;
-  if (needsImageBytes && !rehydratedCoverBytes) {
-    try {
-      const { getActiveVersion, getStoryImage } = require('../services/database');
-      const storyId = storyData.id || storyData.storyId;
-      if (storyId) {
-        const activeIdx = await getActiveVersion(storyId, coverKey);
-        const row = await getStoryImage(storyId, coverKey, null, activeIdx);
-        // R2-1: post-migration rows have image_data NULL and bytes at imageUrl —
-        // resolve from either source (inline first, else fetch the R2 URL).
-        if (row?.imageData) {
-          rehydratedCoverBytes = row.imageData;
-        } else if (row?.imageUrl) {
-          const { bytesFromAnyImage } = require('./r2');
-          const buf = await bytesFromAnyImage(row.imageUrl);
-          if (buf) rehydratedCoverBytes = buf.toString('base64');
-        }
-        if (rehydratedCoverBytes) {
-          log.info(`🔄 [COVER-ITERATE] ${coverKey}: Rehydrated active version bytes from story_images (v${activeIdx})`);
-        }
-      }
-    } catch (rehydrateErr) {
-      log.warn(`🔄 [COVER-ITERATE] ${coverKey}: Rehydrate failed: ${rehydrateErr.message}`);
-    }
+  let rehydratedCoverBytes = null;
+  if (needsImageBytes) {
+    const storyId = storyData.id || storyData.storyId;
+    if (!storyId) throw new Error(`[COVER-ITERATE] ${coverKey}: no story id — cannot resolve the cover's textless art`);
+    const layer = await require('./coverEvalLayer').resolveCoverEvalImage(storyId, coverKey, null);
+    rehydratedCoverBytes = layer.imageData;
+    log.info(`🔄 [COVER-ITERATE] ${coverKey}: reference is v${layer.versionIndex} ${layer.layer === 'art' ? 'textless art layer' : 'unstamped render'}`);
   }
   if (blackoutIssues) {
     const fixTargets = existingCover.fixTargets || [];

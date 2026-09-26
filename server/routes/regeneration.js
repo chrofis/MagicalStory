@@ -165,7 +165,7 @@ const { hasPhotos: hasCharacterPhotos, getStandardAvatar } = require('../lib/cha
 const { isGrokConfigured } = require('../lib/grok');
 const { coverKeyToType, coverTypeToKey, coverLabel, COVER_PAGE_NUMBERS } = require('../lib/coverKeys');
 const { buildStoryEvalOptions } = require('../lib/evalReplayInputs');
-const { resolveCoverEvalImage, applyCoverEvalView, isCoverStamped } = require('../lib/coverEvalLayer');
+const { resolveCoverEvalImage, applyCoverEvalView, loadCoverArtForRepair, restampRepairedCover } = require('../lib/coverEvalLayer');
 const r2 = require('../lib/r2');
 
 // Cover type ↔ virtual page number mapping
@@ -5656,6 +5656,33 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
     const multiCharPages = [...tasksByPage.values()].filter(t => t.length > 1).length;
     log.info(`🔧 [REPAIR-WORKFLOW] Running ${repairTasks.length} repair tasks across ${tasksByPage.size} pages (${multiCharPages} pages with multiple characters — sequential within page)...`);
 
+    // A COVER IS REPAIRED ON ITS TEXTLESS ART, THEN RESTAMPED (owner,
+    // 2026-09-26). The served cover carries the app's title / dedication /
+    // "magicalstory.ch"; repairing those pixels bakes the stamp into a version
+    // that then gets no art row and no restamp. Every repair method below reads
+    // the cover through findSceneOrCover, so the in-memory cover takes the art
+    // of its active version here (the top-level bytes of a stored story are
+    // never persisted, and Phase 2 re-reads the story anyway). Its detection is
+    // re-pointed at the art on a clone (the stamp moves no figure). A stamped
+    // cover without its art layer is refused.
+    const coverRepair = new Map();   // coverKey -> { restamp }
+    const coverRefused = new Map();  // pageNumber -> reason
+    for (const pageNumber of tasksByPage.keys()) {
+      if (pageNumber >= 0) continue;
+      const coverKey = getCoverType(pageNumber);
+      const cover = storyData.coverImages?.[coverKey];
+      if (!cover) continue;
+      try {
+        const prep = await loadCoverArtForRepair(id, coverKey, cover);
+        coverRepair.set(coverKey, prep);
+        log.info(`🅰️ [CHAR REPAIR] ${coverKey}: repairing v${prep.versionIndex} ${prep.restamp ? 'textless art layer (restamped after)' : 'unstamped render'}`);
+      } catch (layerErr) {
+        if (layerErr.code !== 'NO_ART_LAYER') throw layerErr;
+        log.error(`❌ [CHAR REPAIR] ${layerErr.message}`);
+        coverRefused.set(pageNumber, layerErr.message);
+      }
+    }
+
     const repairLimit = pLimit(50);
     // Each "unit" is one page — characters on that page run sequentially
     const apiResults = (await Promise.all([...tasksByPage.entries()].map(([pageNumber, pageTasks]) => repairLimit(async () => {
@@ -5679,6 +5706,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
         }
         const result = await (async () => {
       const { characterName, character, pageNumber, charIssues } = task;
+      if (coverRefused.has(pageNumber)) {
+        return { task, error: true, failReason: coverRefused.get(pageNumber), rejectedReason: 'no_art_layer' };
+      }
       try {
         log.info(`🔧 [REPAIR-WORKFLOW] Repairing ${characterName} on page ${pageNumber} with ${repairMethod}`);
 
@@ -6408,11 +6438,34 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             }];
           }
 
+          // A cover was repaired on its textless art (above): that art is this
+          // version's `${coverType}Art` row, and the served bytes get the app's
+          // text restamped on it (coverTypography.restampCover). The new
+          // version takes the next free DB index, so its art row pairs with it.
+          let servedImageData = update.imageData;
+          let coverArtData = null;
+          let coverVersionIndex = null;
+          if (isCover) {
+            coverVersionIndex = await getNextVersionIndex(id, coverType, null);
+            if (coverRepair.get(coverType)?.restamp) {
+              try {
+                ({ servedImageData, artImageData: coverArtData } = await restampRepairedCover(storyData, coverType, update.imageData, {
+                  restamp: true, figures: carryForwardBbox?.figures || [],
+                }));
+              } catch (stampErr) {
+                log.error(`❌ [CHAR REPAIR] ${coverType}: restamp failed (${stampErr.message}) — repair not saved`);
+                charResult.pagesFailed.push({ pageNumber: update.pageNumber, reason: `restamp failed: ${stampErr.message}` });
+                continue;
+              }
+            }
+          }
+
           const isMagicApiMethod = repairResult.method === 'magicapi';
           const isGrokMethod = repairResult.method?.startsWith('grok_');
           const repairModelId = isMagicApiMethod ? 'magicapi-faceswap-hair' : isGrokMethod ? `grok-imagine (${repairResult.method})` : 'gemini-2.0-flash-preview-image-generation';
           existingImage.imageVersions.push({
-            imageData: update.imageData,
+            imageData: servedImageData,
+            ...(coverVersionIndex !== null ? { dbVersionIndex: coverVersionIndex } : {}),
             description: existingImage.description,
             prompt: existingImage.prompt,
             modelId: repairModelId,
@@ -6422,7 +6475,11 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             qualityScore: null,
             entityRepairedFor: characterName,
             clothingCategory: repairResult.clothingCategory,
-            bboxDetection: carryForwardBbox,
+            // The stamp moves no figure: a restamped cover's boxes are re-pointed
+            // at its served bytes (restampDetectionForCoverText), on a clone.
+            bboxDetection: coverArtData && carryForwardBbox
+              ? require('../lib/bboxDetection').restampDetectionForCoverText({ ...carryForwardBbox }, servedImageData)
+              : carryForwardBbox,
             // Per-version char-repair pipeline artifacts — dev panel uses these
             // to show what Grok was given, what it returned BEFORE feathering,
             // and the soft-edge blend mask used to composite back. Without
@@ -6446,12 +6503,8 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             const evalType = isCover ? 'cover' : 'scene';
             const evalPrompt = existingImage.description || existingImage.prompt || '';
             const pageLabel = isCover ? `[${coverType}]` : `[Page ${update.pageNumber}]`;
-            // This repair ran on the served cover; on a cover the app has
-            // stamped, the result carries the stamp and has no textless art
-            // layer, so it is not judged (coverEvalLayer.js).
-            if (isCover && await isCoverStamped(id, coverType)) {
-              throw Object.assign(new Error(`${coverType}: repaired from the stamped image, no textless art layer — refusing to judge the stamped image`), { code: 'NO_ART_LAYER' });
-            }
+            // update.imageData is the repair output BEFORE any restamp — a cover
+            // is judged on its textless art (coverEvalLayer.js).
             log.info(`🔍 [CHAR REPAIR] ${pageLabel} Evaluating repaired image (before: ${beforeScore}%)...`);
             // The page text and the brief, as /evaluate-single resolves them, so
             // the semantic judge runs and judges the repaired version's light
@@ -6491,8 +6544,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               log.info(`🔍 [CHAR REPAIR] ${pageLabel} After: ${afterScore}% (before: ${beforeScore}%, delta: ${delta != null ? (delta >= 0 ? '+' : '') + delta : 'n/a'})`);
             }
           } catch (evalErr) {
-            if (evalErr.code === 'NO_ART_LAYER') log.error(`❌ [CHAR REPAIR] Evaluation refused for page ${update.pageNumber}: ${evalErr.message}`);
-            else log.warn(`⚠️ [CHAR REPAIR] Evaluation failed for page ${update.pageNumber}: ${evalErr.message}`);
+            log.warn(`⚠️ [CHAR REPAIR] Evaluation failed for page ${update.pageNumber}: ${evalErr.message}`);
           }
 
           delete existingImage.imageData;
@@ -6506,6 +6558,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           if (!isCover) {
             storyData.sceneImages = sceneImages;
           }
+          if (coverArtData) {
+            await saveStoryImage(id, `${coverType}Art`, null, coverArtData, { versionIndex: coverVersionIndex });
+          }
           await saveStoryData(id, storyData);
           // Active version is picked by recomputeAllActiveVersions inside
           // saveStoryData. Char-repair's new version has a qualityScore from
@@ -6515,7 +6570,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           const comparison = repairResult.comparison || null;
           charResult.pagesRepaired.push({
             pageNumber: update.pageNumber,
-            imageData: update.imageData,
+            imageData: servedImageData,
             versionIndex: newDbVersionIndex,
             comparison,
             verification: repairResult.verification || null,
@@ -6770,32 +6825,23 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
     const previousReasoning = prevVersionEntry?.qualityReasoning ?? (typeof existingCover === 'object' ? existingCover.qualityReasoning || null : null);
     log.debug(`✏️ [COVER EDIT] Capturing previous image (score: ${previousScore})`);
 
-    // Edit the TEXTLESS art layer, not the titled served image — Grok re-renders
-    // the raster and mangles/drops the baked title/dedication/branding. Load the
-    // ${coverKey}Art for the active version; fall back to the titled image only
-    // for legacy covers with no Art row. The text is re-composited after editing.
-    const { dbQuery } = require('../services/database');
-    let editBaseSrc = currentImageData;   // fallback: titled served image
-    let editedTextless = false;
+    // Edit the TEXTLESS art layer of the ACTIVE version, never the titled
+    // served image — Grok re-renders the raster and mangles/drops the stamped
+    // title/dedication/branding; the text is re-composited after editing
+    // (coverEvalLayer.resolveCoverEvalImage). A cover the app never stamped
+    // (baked title, pre-typography story) is its own art and gets no restamp. A
+    // stamped cover whose active version has no art row is refused: it used to
+    // fall back to the LATEST art row, i.e. edit a different render.
+    let editBaseSrc;
+    let editedTextless;
     try {
-      const meta = (await dbQuery('SELECT image_version_meta FROM stories WHERE id=$1', [id]))[0]?.image_version_meta || {};
-      const activeIdx = meta[coverKey]?.activeVersion ?? 0;
-      // Prefer the textless art for the ACTIVE version; fall back to the latest
-      // ${key}Art (legacy versions repainted before this fix have no lockstep
-      // art row), then to the titled image for truly legacy covers.
-      let artRows = await dbQuery(
-        "SELECT image_url, image_data FROM story_images WHERE story_id=$1 AND image_type=$2 AND version_index=$3 AND NOT is_test LIMIT 1",
-        [id, `${coverKey}Art`, activeIdx]);
-      if (!artRows.length) {
-        artRows = await dbQuery(
-          "SELECT image_url, image_data FROM story_images WHERE story_id=$1 AND image_type=$2 AND NOT is_test ORDER BY version_index DESC LIMIT 1",
-          [id, `${coverKey}Art`]);
-      }
-      const artRow = artRows[0];
-      const artSrc = artRow ? (artRow.image_url || (artRow.image_data ? 'data:image/jpeg;base64,' + artRow.image_data.toString('base64') : null)) : null;
-      if (artSrc) { editBaseSrc = artSrc; editedTextless = true; }
-    } catch (e) {
-      log.warn(`✏️ [COVER EDIT] could not load ${coverKey}Art (${e.message}) — editing the titled image`);
+      const layer = await resolveCoverEvalImage(id, coverKey, null);
+      editBaseSrc = layer.imageData;
+      editedTextless = layer.layer === 'art';
+    } catch (layerErr) {
+      if (layerErr.code !== 'NO_ART_LAYER') throw layerErr;
+      log.error(`❌ [COVER EDIT] ${layerErr.message}`);
+      return res.status(409).json({ error: layerErr.message });
     }
 
     // Edit the cover image (pure text/instruction based - no character photos to avoid regeneration artifacts)
@@ -6843,12 +6889,6 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
       // scored by a judge holding almost none of the generator's spec. Same
       // resolvers as every other cover eval site.
       const coverPageNumber = COVER_PAGE_NUMBERS[coverKey];
-      // Edited from the served image (no art layer) on a cover the app has
-      // stamped: the output carries the stamp and has no textless twin, so it
-      // is not judged.
-      if (!editedTextless && await isCoverStamped(id, coverKey)) {
-        throw Object.assign(new Error(`${coverKey}: edited from the stamped image (no textless art layer) — refusing to judge the stamped image`), { code: 'NO_ART_LAYER' });
-      }
       const evaluation = await evaluateImageQuality(
         editedUnstamped,
         coverPrompt,

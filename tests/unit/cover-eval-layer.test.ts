@@ -13,7 +13,10 @@
  *    a cover that has none;
  *  - the Lab loader hands every stage the art of a cover;
  *  - the post-persist bake stores the active version's art at the ACTIVE
- *    index (it wrote v0, and the non-active loop then overwrote it).
+ *    index (it wrote v0, and the non-active loop then overwrote it);
+ *  - a cover REPAIR starts from that art and restamps after (owner,
+ *    2026-09-26 "repair art, then restamp"): the served version carries the
+ *    text, the art row is the repaired art, an unstamped cover gets neither.
  *
  * Only the DB boundary is stubbed. No paid call is made.
  */
@@ -48,7 +51,7 @@ database.dbQuery = async (sql: string, params: any[]) => {
   throw new Error(`unexpected query: ${sql}`);
 };
 
-const { resolveCoverEvalImage, applyCoverEvalView } = require_('../../server/lib/coverEvalLayer');
+const { resolveCoverEvalImage, applyCoverEvalView, loadCoverArtForRepair, restampRepairedCover } = require_('../../server/lib/coverEvalLayer');
 
 beforeEach(() => { rows = []; active = {}; typography = {}; saved = []; });
 
@@ -153,5 +156,44 @@ describe('the post-persist bake keeps the ACTIVE version\'s art', () => {
     const artOf = (v: number) => Buffer.from(art.find(a => a.v === v).data.split(',')[1], 'base64');
     expect(artOf(1).equals(v1)).toBe(true);
     expect(artOf(0).equals(v0)).toBe(true);
+  });
+});
+
+describe('a cover repair: art in, restamped version out', () => {
+  const jpeg = async (r: number) => 'data:image/jpeg;base64,' + (await sharp({ create: { width: 400, height: 560, channels: 3, background: { r, g: 120, b: 160 } } }).jpeg().toBuffer()).toString('base64');
+  const decode = (d: string) => Buffer.from(d.split(',')[1], 'base64');
+
+  it('the repair reads the art of the active version, with a detection re-pointed at it', async () => {
+    rows = [{ type: 'backCover', v: 1, tag: 'STAMPED' }, { type: 'backCoverArt', v: 1, tag: 'ART1' }];
+    active = { backCover: 1 };
+    const det = { figures: [{ name: 'A' }], sourceImageFp: bbox.imageFingerprint(uri('STAMPED')) };
+    const cover: any = { imageData: uri('STAMPED'), bboxDetection: det };
+    expect(await loadCoverArtForRepair('job_x', 'backCover', cover)).toEqual({ restamp: true, versionIndex: 1 });
+    expect(cover.imageData).toBe(uri('ART1'));
+    expect(bbox.bboxPairsWith(cover.bboxDetection, uri('ART1'))).toBe(true);
+    expect(det.sourceImageFp).toBe(bbox.imageFingerprint(uri('STAMPED')));
+  });
+
+  it('a stamped cover without its art is not repaired', async () => {
+    rows = [{ type: 'backCover', v: 1, tag: 'STAMPED' }, { type: 'backCoverArt', v: 0, tag: 'ART0' }];
+    active = { backCover: 1 };
+    await expect(loadCoverArtForRepair('job_x', 'backCover', { imageData: uri('STAMPED') })).rejects.toMatchObject({ code: 'NO_ART_LAYER' });
+  });
+
+  it('an unstamped cover (baked title) is repaired as-is and gets no restamp', async () => {
+    rows = [{ type: 'frontCover', v: 0, tag: 'BAKED' }];
+    const cover: any = { imageData: uri('BAKED') };
+    expect((await loadCoverArtForRepair('job_x', 'frontCover', cover)).restamp).toBe(false);
+    const art = await jpeg(60);
+    expect(await restampRepairedCover({ title: 'T' }, 'frontCover', art, { restamp: false })).toEqual({ servedImageData: art, artImageData: null });
+  });
+
+  it('the repaired art is the version art row, and its served bytes carry the restamped text', async () => {
+    const art = await jpeg(60);
+    const out = await restampRepairedCover({ title: 'The Lantern Keeper' }, 'backCover', art, { restamp: true, figures: [] });
+    expect(decode(out.artImageData).equals(decode(art))).toBe(true);
+    expect(decode(out.servedImageData).equals(decode(art))).toBe(false);
+    const [a, s] = await Promise.all([sharp(decode(art)).metadata(), sharp(decode(out.servedImageData)).metadata()]);
+    expect([s.width, s.height]).toEqual([a.width, a.height]);
   });
 });

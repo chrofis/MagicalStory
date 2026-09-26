@@ -2307,6 +2307,18 @@
       "fixedAt": "2026-09-26",
       "fixedIn": "caf53e092",
       "fix": "The art row takes the active version's index. Stored stories are not repaired (the lost layer is not recoverable). Test: tests/unit/cover-eval-layer.test.ts (the bake keeps the ACTIVE version's art)."
+    },
+    {
+      "id": "cover-char-repair-on-stamped-image",
+      "title": "The admin character repair of a cover repainted the STAMPED served image, restamped nothing and stored no art row",
+      "reportedAt": "2026-09-26",
+      "source": "Stored evidence: staging job_1786743927715_kcx0p939w backCover v1 and job_1787689073034_1v6ew0y1kae initialPage v3/v4 are entity-repair versions with no `${key}Art` row. Owner ruling 2026-09-26: \"repair art, then restamp\".",
+      "rootCause": "regeneration.js repair-workflow/character-repair read the cover through findSceneOrCover on the rehydrated story, i.e. the served bytes with the title / dedication / \"magicalstory.ch\" stamped on, pushed the repaired bytes as a version without a DB index, and never restamped or saved an art row. Sibling gaps: the cover edit fell back to the LATEST art row when the active version had none (edited another render), and the trial cover iterate sent the stamped cover as its reference.",
+      "impact": "Grok repainted over the app's text (mangled or doubled lettering); the version could never be re-titled or judged without its stamp, and its array-index version number could collide with an existing row.",
+      "status": "fixed",
+      "fixedAt": "2026-09-26",
+      "fixedIn": "pending",
+      "fix": "coverEvalLayer.loadCoverArtForRepair puts the active version's art on the repaired cover (stamped cover without art: refused); the repaired art is judged, restamped (restampRepairedCover -> coverTypography.restampCover) and saved at the next DB index with its own art row. Cover edit refuses (409) without the active version's art; trial iterate references the art. Stored versions above are not recoverable. Test: tests/unit/cover-eval-layer.test.ts."
     }
   ]
 }
