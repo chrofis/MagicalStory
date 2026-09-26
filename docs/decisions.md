@@ -60,6 +60,91 @@ superseded and link forward.
 **Touched:** server/lib/promptBuilders.js, prompts/story-bible-from-beats.txt, prompts/clothing-review.txt, server/lib/storyAvatars.js, scripts/admin/sibling-registry.json, tests/unit/garment-one-outfit.test.ts, tests/unit/face-away-cell-pose.test.ts
 **Status:** ✅ active
 
+
+## 2026-09-26 — A plate holds no people: the setting's passers-by and crowds are drawn in each PAGE render, from the brief's `population` (supersedes the plate-extras design and "The page's population is READ OFF THE PLATE")
+
+**Context:** The all-pages Art Director was told to people the plate: "describe those anonymous extras
+here … so the backdrop already feels populated" (scene-expansion-all.txt, the vantage `emptyScenePrompt`
+rules; the iterate templates said the same). Three other texts said the opposite — empty-scene.txt
+"do not add people … that the description does not mention" (so a description that mentions them
+licenses them), the SCENE GEOMETRY suffix "paint the place empty", and the vantage note "No figures,
+no animals" — and the plate QC passed "a crowd or passers-by the scene names". The model painted 6-10
+people on such plates. Because one vantage plate serves every page on it, the SAME passers-by repeat
+on each of those pages: staging job_1789506283204_3kxqshifx carries the same six people on 17 pages
+(investigation sheets in the 2026-09-26 session scratchpad, `plate-people/`). The 2026-09-19 entry below
+("The page's population is READ OFF THE PLATE") then ran a GroundingDINO person pass per plate and let
+the plate RAISE a brief's `population`, so the plate's people also decided the eval's SETTING
+POPULATION line and the presence arithmetic.
+
+A separate clear bug on the per-page plate path (registered as `plate-band-note-names-figures` in
+tasks/bugs.json): its band note read "1 character in the foreground (1 on the left) and 1 character in
+the midground (1 on the right) will be composited into this scene later", and the plate model painted
+exactly those figures — staging job_1789348171785_9oxos7dwv p8 and p16 (viewed: a child walking on the
+left, a second child on the right in the midground, on the PLATE), job_1789343124794_z2c779f7i p18.
+
+**Decision (owner sign-off 2026-09-26):**
+1. **A plate never contains people.** One constant, `shotVocabulary.PLATE_NO_PEOPLE_RULE` ("no person,
+   passer-by, crowd, rider, or silhouette of a person anywhere in the frame, however small or distant,
+   even where such a place is normally busy or the description mentions people"), fills `{PLATE_NO_PEOPLE}`
+   in empty-scene.txt (every plate: vantage, per-page, iterate/regenerate, covers, trial, Lab — they all
+   build through `buildEmptyScenePrompt`) and in plate-derive.txt (derive and re-light). The plate QC's
+   Figures check fails any `PLATE_PEOPLE` item, even one the expected scene names (a statue or carving is
+   not a person); the check stays SOFT in `plateQc.js` (severity unchanged — the owner's call).
+2. **The Art Director writes no people into a plate.** scene-expansion-all.txt's plate rule now says the
+   plate holds none and the setting's people go into each page's prose under that page's `population`;
+   both AD templates' `population` rule says background people are written in the page prose, never in
+   a plate; both iterate templates' `emptyScenePrompt` field excludes every person.
+3. **The page render draws them, from `population`.** image-generation.txt's REQUIRED CAST line is
+   `{REQUIRED_CAST}`, built by `promptBuilders.buildRequiredCastRule(population)`: `cast_only` adds
+   nobody; `ambient` paints a few passers-by where the brief places them, far behind the cast, each much
+   smaller than any listed character, faces indistinct, none sharing a listed character's hair, build or
+   outfit; `crowd` paints the unnamed people the brief places, as it places them, with the same
+   look-alike guard. It stays in the never-cut tail (`PROMPT_NEVER_CUT`), and the three lines are no
+   the ambient line is five characters longer than the single line they replace, the other two shorter.
+4. **Population is the brief's declared field, nothing else.** Phase 5a-pre-pop, `detectPlatePopulation`,
+   `platePopulationFromFigures`, `PLATE_CROWD_MIN`, `sceneMetadata.resolvePopulation` and the
+   `platePopulation` carry-forward are DELETED; `buildExpectedCastBlock` reads `normalisePopulation(
+   population, crowdExpected)` from the brief. N-09, the SETTING POPULATION line and the ambient geometry
+   filter in `derivePresenceFinding` are unchanged and now read the same value the illustrator is given.
+5. **Leak fix.** `shotVocabulary.buildPlateSurfaceNote(characters, shot)` is the one band note: it names
+   the bands that need footing and whether both sides stay open, never a character and never a count.
+   The vantage note (`characters = null`), the per-page note, the iterate/regenerate plate
+   (`renderStoryPagePlate`, which sent none) and the Lab `empty_scene` stage (which read a
+   `meta.characterSpace` no brief carries) all use it. The cover plate's ground line lost "where the
+   characters will stand firmly".
+
+**Rationale:** a person on a shared plate is a stamp, not a population — it cannot vary, it repeats on
+every page of the vantage, and it is never the right size for a page with a different camera. The page
+render sees each page's own camera and cast, so it can place people at background scale; and the
+judge's excuse (SETTING POPULATION, the ambient geometry filter: ≤2.5% of frame and ≤¼ of the smallest
+cast figure) now describes exactly what the illustrator was asked for. The 2026-09-19 plate reading
+existed only because plates carried people; with none on a plate it reads nothing, so it is deleted,
+not kept as a second source. The 2026-09-19 measurement (the AD under-declares public places) still
+stands and is answered on the generator side: the AD rule says choose `ambient` for any place the public
+can walk into, and scene-review's `[population_contradicted]` catches a `cast_only` brief whose prose
+stages people. An under-declared page now renders without extras rather than with plate people billed
+as a CRITICAL.
+
+**Constraint (stored data):** stories generated before this change still hold plates with people and
+pages drawn on them. A re-evaluation of such a page no longer gets the plate-raised population, so on
+a `cast_only` brief those plate people count against the cast as before 2026-09-19. Not migrated.
+
+**Validation:** free replay of the plate and page builds on stored briefs (5herh01j7 p1/p3/p8, 9oxos7dwv
+p16) and Test Lab renders on staging — recorded in the session report and the verify entry.
+
+**Touched:** server/lib/shotVocabulary.js (`PLATE_PEOPLE`, `PLATE_NO_PEOPLE_RULE`,
+`buildPlateSurfaceNote`), server/services/prompts.js, prompts/empty-scene.txt, prompts/plate-derive.txt,
+prompts/empty-scene-qc.txt, server/lib/evalPipeline.js, server/lib/plateQc.js,
+server/lib/promptBuilders.js (`buildRequiredCastRule`), prompts/image-generation.txt,
+prompts/scene-expansion.txt, prompts/scene-expansion-all.txt, prompts/scene-iteration.txt,
+prompts/scene-iteration-free.txt, storyJobPipeline.js, server/lib/images.js, server/lib/testlab.js,
+server/lib/coverIterate.js, server/lib/bboxDetection.js, server/lib/sceneMetadata.js,
+tests/unit/plate-no-people.test.ts (replaces plate-population.test.ts)
+**Status:** ✅ active. Supersedes the plate-extras rule of the all-pages Art Director and 🗄 the
+2026-09-19 entry "The page's population is READ OFF THE PLATE".
+
+---
+
 ## 2026-09-25 — `storyData.sceneDescriptions[]` has one shape everywhere: the brief is `description`, built by `sceneDescriptionRecord`
 
 **Context:** Staging job_1790277448294_5herh01j7: every in-generation page iterate failed with "No scene
@@ -2924,7 +3009,7 @@ now a named constant shared by both readers.
 log), `server/lib/images.js` (carry-forward through `iteratePageCore`, which a rewrite must not
 re-decide), `storyJobPipeline.js` (Phase 5a-pre-pop), `tests/unit/plate-population.test.ts`.
 
-**Status:** ✅ active. No prompt changed — the `SETTING POPULATION` line's wording is untouched;
+**Status:** 🗄 superseded 2026-09-26 by "A plate holds no people" (top of this file): plates carry no people, so the plate reading and the merge are deleted. Was: ✅ active. No prompt changed — the `SETTING POPULATION` line's wording is untouched;
 only the value fed into it is now evidence-backed, so the generator↔critic pair does not move.
 
 ---

@@ -15,7 +15,7 @@ import path from 'path';
 // @ts-expect-error - JS module without types
 import { shrinkPromptForModel } from '../../server/lib/images.js';
 // @ts-expect-error - JS module without types
-import { COUNTS_RULE, buildCompositionBlock } from '../../server/lib/promptBuilders.js';
+import { COUNTS_RULE, buildCompositionBlock, buildRequiredCastRule } from '../../server/lib/promptBuilders.js';
 
 const TEMPLATE = fs.readFileSync(path.join(process.cwd(), 'prompts', 'image-generation.txt'), 'utf-8');
 const para = (prefix: string) => {
@@ -46,7 +46,7 @@ const coverPrompt = (proseRepeat: number, styleRepeat = 20) => [
   '',
   '**ART STYLE:** ' + 'A painterly style with visible brushwork. '.repeat(styleRepeat),
   '',
-  para('**REQUIRED CAST:**'),
+  buildRequiredCastRule('ambient'),
   '',
   para('**DEPTH AND SIZE:**'),
   '',
@@ -76,7 +76,7 @@ describe('cover shrink — the must-keep sections survive', () => {
   // job_1790277448294_5herh01j7 lost it on p3, p10, p14 and the back cover).
   it('REQUIRED CAST survives every shrink, the drops go to other blocks', async () => {
     const out: string = await shrinkPromptForModel(coverPrompt(100), 7000, 'TEST cover', null);
-    expect(out).toContain(para('**REQUIRED CAST:**'));
+    expect(out).toContain(buildRequiredCastRule('ambient'));
   });
   it('REQUIRED CAST is on the never-cut list and no longer a cut step', async () => {
     const images = await import('../../server/lib/images.js');

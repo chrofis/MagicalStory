@@ -26,7 +26,7 @@ When the FIRST reference photo shows a real location (architecture, landscape, n
 
 **ART STYLE:** {STYLE_DESCRIPTION}
 
-**REQUIRED CAST:** Every named character is in the frame, exactly one of each, and no one else is added — except the background people the scene description itself places. Where it describes a public setting's own passers-by, onlookers or crowd, draw them: distant, small, unnamed, faces indistinct, never sharing a listed character's hair, build or outfit. A character the scene description gives no action to is still drawn, placed where the moment puts them and doing something consistent with it.
+{REQUIRED_CAST}
 
 **DEPTH AND SIZE:** Depth is distance from the camera, not size: `foreground` is nearest and most prominent, low in the frame; `midground` sits in the middle band, further back; `background` is furthest and smallest. The same element is drawn larger in the foreground than it would be deeper in the frame — but a size stated for an element always wins over its depth: a small object in the foreground is drawn close and sharp at its true size against the figures near it, never enlarged to fill the lower half. An element with no stated size that is genuinely large — a vessel, a building, a vehicle, a big animal — does dominate the foreground.
 

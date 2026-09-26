@@ -2,3 +2,4 @@ Repaint this backdrop from a children's storybook: {EDIT_INSTRUCTION}
 
 - {ART_STYLE} The whole new picture is painted in this style, never as a photograph.
 - {PLATE_EDGE}
+- {PLATE_NO_PEOPLE}

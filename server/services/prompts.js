@@ -783,6 +783,9 @@ function buildEmptyScenePrompt(opts = {}) {
     // Edge to edge, no maker's mark, no mat: the same constant the derive
     // edit carries and the plate QC's "Wrong text" / "Frame edge" checks read.
     PLATE_EDGE: require('../lib/shotVocabulary').PLATE_EDGE_RULE,
+    // No people on a plate, however busy the place (2026-09-26): the same
+    // constant the derive edit carries and the plate QC's "Figures" check reads.
+    PLATE_NO_PEOPLE: require('../lib/shotVocabulary').PLATE_NO_PEOPLE_RULE,
     // The time of day and weather this plate is painted in — the declared
     // light of the page(s) it serves (sceneLight.js). '' when undeclared.
     LIGHT_NOTE: opts.light ? require('../lib/sceneLight').buildLightLine(opts.light, { plate: true }) : '',
@@ -826,6 +829,7 @@ function buildPlateDerivePrompt(instruction, styleText = '') {
     EDIT_INSTRUCTION: instruction,
     ART_STYLE: styleText || 'Match the source image\'s artistic style.',
     PLATE_EDGE: require('../lib/shotVocabulary').PLATE_EDGE_RULE,
+    PLATE_NO_PEOPLE: require('../lib/shotVocabulary').PLATE_NO_PEOPLE_RULE,
   });
 }
 

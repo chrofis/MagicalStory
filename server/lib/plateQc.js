@@ -24,7 +24,7 @@ const PLATE_QC_CHECKS = [
   { key: 'setting', hard: false, what: 'the setting or location' },
   { key: 'naturalness', hard: false, what: 'unnatural shapes, doubled props, contradicting perspective' },
   { key: 'artefact', hard: true, what: 'a white, black or monochrome box, panel or patch, or a border, frame, mat or margin around the picture' },
-  { key: 'figures', hard: false, what: 'people, animals or figures the scene does not name' },
+  { key: 'figures', hard: false, what: 'any person, or an animal the scene does not name' },
   { key: 'foreground', hard: false, what: 'no open foreground' },
   { key: 'text', hard: true, what: 'any caption, label, lettering, signature or watermark' },
   { key: 'medium', hard: true, what: 'a photograph, or a medium other than the art style' },

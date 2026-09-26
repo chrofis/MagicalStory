@@ -62,12 +62,12 @@ describe('empty-scene plate prompt carries the geometry it is graded on', () => 
     expect(p).not.toContain('Tomas');
     expect(p).not.toContain('soldiers');
     expect(p).toMatch(/background environment/i);
-    expect(p).toMatch(/do not add people, crowds, or figures/i);
+    expect(p).toContain(require_('../../server/lib/shotVocabulary').PLATE_NO_PEOPLE_RULE);
   });
 
   it('every built plate prompt keeps the people-free rule and leaves no placeholder behind', () => {
     for (const p of [build(), build({ mainScenePrompt: null })]) {
-      expect(p).toMatch(/none of them appear here/i);
+      expect(p).toContain(require_('../../server/lib/shotVocabulary').PLATE_NO_PEOPLE_RULE);
       expect(p).not.toContain('{SCENE_GEOMETRY}');
       expect(p).not.toContain('{EMPTY_SCENE_DESCRIPTION}');
     }

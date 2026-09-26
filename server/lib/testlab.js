@@ -764,6 +764,7 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
   const { generateImageOnly } = require('./images');
   const { getTextAreaMask } = require('./textMasks');
   const { MODEL_DEFAULTS, emptyScenePlateRouting } = require('../config/models');
+  const { buildPlateSurfaceNote } = require('./shotVocabulary');
 
   const meta = ctx.scene.sceneMetadata || {};
   // descriptionOverride: test a corrected empty-scene brief (e.g. fixing a
@@ -779,9 +780,10 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
   // `emptyScenePrompt` is the fully BUILT plate prompt of the run, not plate
   // text — wrapping it in the template again doubled it (Lab 1482: 11,761 chars).
   const { resolvePagePlate } = require('./storyHelpers');
-  const pagePlateText = resolvePagePlate({
+  const pagePlate = resolvePagePlate({
     pageNumber: ctx.pageNumber, sceneMetadata: meta, visualBible: ctx.visualBible, outlinePlate: '',
-  }).text;
+  });
+  const pagePlateText = pagePlate.text;
   const pageShot = String(meta.fullData?.shot || '').trim();
   const description = params.descriptionOverride
     || (pagePlateText ? `${pageShot ? `**SHOT:** ${pageShot}\n\n` : ''}${pagePlateText}` : '');
@@ -814,7 +816,13 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
     template: promptOverride || undefined,
     style: plateStyle,
     description,
-    characterSpace: meta.characterSpace || '',
+    // The band note production sends (shotVocabulary.buildPlateSurfaceNote):
+    // a vantage's plate gets the shared all-bands note, a page's own plate the
+    // bands its characters stand in — surfaces only, never a character. The
+    // Lab read a `meta.characterSpace` no brief carries, so it sent none.
+    characterSpace: pagePlate.source === 'vantage'
+      ? buildPlateSurfaceNote(null)
+      : buildPlateSurfaceNote(meta.fullData?.characters || [], pageShot),
     textAreaInstruction: wantsTextZone
       ? buildTextZoneInstruction(ctx.textPosition, meta.textZoneDescription || null, 'a quarter of the frame', { isEmptyScene: true })
       : '',

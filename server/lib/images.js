@@ -4106,6 +4106,12 @@ async function renderStoryPagePlate({
         const emptyPrompt = buildEmptyScenePrompt({
           style: artStyleDesc,
           description: plateDescription,
+          // The same band note the story run's per-page plate carries
+          // (shotVocabulary.buildPlateSurfaceNote): surfaces only.
+          characterSpace: require('./shotVocabulary').buildPlateSurfaceNote(
+            sceneMetadata?.fullData?.characters || sceneMetadata?.characters || [],
+            sceneMetadata?.fullData?.shot || sceneMetadata?.shot || '',
+          ),
           textAreaInstruction: textPos ? buildTextZoneInstruction(textPos, iterateTextZoneDesc, (storyData?.languageLevel === '1st-grade' ? '10%' : storyData?.languageLevel === 'advanced' ? '40%' : '30%'), { isEmptyScene: true }) : '',
           eraGuard: buildEraGuard(iterateEra),
           landmarkFidelity: buildLandmarkFidelityBlock(landmarkPhotos?.[0], { era: iterateEra }),
@@ -5261,12 +5267,6 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     })(),
     crowdExpected: newSceneMetadata?.crowdExpected === true
       || savedMeta.crowdExpected === true || savedMeta.fullData?.crowdExpected === true,
-    // MEASURED, NOT DECLARED — and never re-decidable by a rewrite. The
-    // plate-derived population is a reading of the page's own empty-scene
-    // plate (2026-09-19); scene-iteration.txt neither sees a plate nor emits
-    // the field, so it carries forward verbatim or the repaired page loses the
-    // evidence and its background extras come back as an extra_character.
-    platePopulation: savedMeta.platePopulation || savedMeta.fullData?.platePopulation || null,
     // Same class again: scene-iteration.txt does not emit `wornItems`, and the
     // metadata parser turns an absent field into `[]`. An undeclared row makes
     // resolveWornItemsForPage default the item to `worn`, so an iterated page

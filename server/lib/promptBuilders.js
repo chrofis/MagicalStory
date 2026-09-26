@@ -33,7 +33,7 @@ const { frameColorForName } = require('./characterFrames');
 const { getLanguageNote, getLanguageInstruction, getLanguageNameEnglish } = require('./languages');
 const { getEventById } = require('./historicalEvents');
 const { getSwissStoryResearch, getSwissCityById } = require('./swissStories');
-const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata, resolveTextStagePictureSpec, buildTextStagePictureSpecs, SHARED_GRIP_RULE } = require('./sceneMetadata');
+const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata, resolveTextStagePictureSpec, buildTextStagePictureSpecs, SHARED_GRIP_RULE, normalisePopulation } = require('./sceneMetadata');
 const { resolveClothingForPage, buildUsedClothingText, buildAvailableAvatarsForPrompt } = require('./clothingResolve');
 const { seasonLabel, buildSeasonNote, buildSeasonInstruction } = require('./season');
 const { SCENE_LIGHT_FIELD_RULE, buildLightLine, declaredLight, TIME_OF_DAY_ENUM, WEATHER_ENUM } = require('./sceneLight');
@@ -5081,6 +5081,13 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       // viewer) nor COUNTS (its prose states no number) — see the constants.
       COMPOSITION: buildCompositionBlock({ cover: isCoverRender }),
       COUNTS: isCoverRender ? '' : COUNTS_RULE,
+      // The page's own background people, from the brief's `population`
+      // (2026-09-26): the plate holds none, so this line is where they come
+      // from. A brief with no field reads as cast_only, as the judges read it.
+      REQUIRED_CAST: buildRequiredCastRule(normalisePopulation(
+        metadata?.population || metadata?.fullData?.population || null,
+        metadata?.crowdExpected === true || metadata?.fullData?.crowdExpected === true,
+      )),
       // REQUIRED TEXT. In the protected tail, beside the other two rule
       // constants: shrinkPromptForModel drops head blocks first, and a page
       // over the Grok cap losing the only statement of what its signpost has
@@ -8618,6 +8625,33 @@ const COMPOSITION_HEADER = '**Composition:**';
 const COMPOSITION_FACING_BULLET = '- Each character does a specific action (reaches, holds, walks toward, gazes at) and faces that target — not the camera — unless the scene declares a facing for them, which always wins. When the target is in the background and no facing is declared, the character faces away, back or side visible. Companions sharing a movement or destination all face the same way.';
 const COMPOSITION_GROUND_BULLET = '- A standing character stands on visible standable ground — never on or over water, and never in the air — unless the scene description has them swim, float, or fly, and then no ground is invented under them. Outside a close-up and the near figure of an over-the-shoulder shot, each standing figure is drawn complete down to both feet, placed on the surface the scene names for that figure — where several surfaces are named, a ledge above and a floor below, each figure stands on its own. A lower body may be hidden by an object in front of the figure, never by the figure ending.';
 const COMPOSITION_SIZE_BULLET = "- A vessel, building or vehicle keeps its true size against the figures near it: a person reaches about to a boat's rail, a doorway lintel or a wheel hub — never eye-level with a masthead, a rooftop or a chimney. A held or carried object keeps the size stated for it against the hand or body holding it.";
+/**
+ * REQUIRED CAST, by the page's population (owner, 2026-09-26).
+ *
+ * The plate holds no people (shotVocabulary.PLATE_NO_PEOPLE_RULE), so the PAGE
+ * render is the only place a setting's own people can come from. They follow
+ * the brief's `population` — the same field the judges read (evalPipeline
+ * buildExpectedCastBlock's SETTING POPULATION line, N-09, and the presence
+ * arithmetic's ambient filter) — so the illustrator draws exactly what the
+ * critic excuses. `ambient` asks for a few small, distant passers-by, the
+ * scale the arithmetic reads as background; `crowd` draws the people the
+ * brief's prose places; `cast_only` adds nobody. None of them may share a
+ * listed character's hair, build or outfit (D-03b duplicate_identity).
+ */
+const REQUIRED_CAST_LEAD = '**REQUIRED CAST:** Every named character is in the frame, exactly one of each';
+const REQUIRED_CAST_UNACTED = 'A character the scene description gives no action to is still drawn, placed where the moment puts them and doing something consistent with it.';
+const REQUIRED_CAST_BACKGROUND = {
+  cast_only: ', and no one else is added.',
+  ambient: ". This place has a few people of its own: paint a few passers-by far behind the cast, where the scene description places them if it does, each much smaller than any listed character, unnamed, faces indistinct, none sharing a listed character's hair, build or outfit. No one else is added.",
+  crowd: ". Paint the unnamed people the scene description places, as it places them: faces indistinct, varied hair and garment colours and shapes, none sharing a listed character's hair, build or outfit. No one else is added.",
+};
+
+/** The REQUIRED CAST line for a page of this `population` (normalised). */
+function buildRequiredCastRule(population) {
+  const tail = REQUIRED_CAST_BACKGROUND[population] || REQUIRED_CAST_BACKGROUND.cast_only;
+  return `${REQUIRED_CAST_LEAD}${tail} ${REQUIRED_CAST_UNACTED}`;
+}
+
 const COUNTS_RULE = '**COUNTS:** An exact number the scene states for a group of like things is three or fewer, and exactly that many are drawn. A group given as more than three, a cluster, a row, a few or several is drawn with no countable exact number.';
 
 /** The Composition block of an image prompt. A cover omits the facing bullet. */
@@ -12312,6 +12346,7 @@ module.exports = {
   TRUE_RELATIVE_SIZE_RULE,
   NO_CHARACTER_MARKING_RULE,
   HANDS_HOLD_ONLY_NAMED_RULE,
+  buildRequiredCastRule,
   COMPOSITION_HEADER,
   COMPOSITION_FACING_BULLET,
   COMPOSITION_GROUND_BULLET,

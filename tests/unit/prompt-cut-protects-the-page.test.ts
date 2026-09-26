@@ -30,7 +30,7 @@ import path from 'path';
 // @ts-expect-error - JS module without types
 import { shrinkPromptForModel } from '../../server/lib/images.js';
 // @ts-expect-error - JS module without types
-import { COUNTS_RULE, buildCompositionBlock } from '../../server/lib/promptBuilders.js';
+import { COUNTS_RULE, buildCompositionBlock, buildRequiredCastRule } from '../../server/lib/promptBuilders.js';
 
 const TEMPLATE = fs.readFileSync(
   path.join(process.cwd(), 'prompts', 'image-generation.txt'),
@@ -79,7 +79,7 @@ const TAIL = [
   '',
   '**ART STYLE:** ' + 'A painterly style with visible brushwork. '.repeat(70),
   '',
-  templateParagraph('**REQUIRED CAST:**'),
+  buildRequiredCastRule('ambient'),
   '',
   templateParagraph('**DEPTH AND SIZE:**'),
   '',
@@ -173,7 +173,7 @@ describe('shrinkPromptForModel — a drop is confined to the block it names', ()
     const units = [
       COUNTS_RULE,
       templateParagraph('**DEPTH AND SIZE:**'),
-      templateParagraph('**REQUIRED CAST:**'),
+      buildRequiredCastRule('ambient'),
       ...composition.slice(1),
     ];
     const spent = units.filter((u) => !out.includes(u));
