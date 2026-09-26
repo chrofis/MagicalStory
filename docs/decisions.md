@@ -153,6 +153,98 @@ scripts/admin/sibling-registry.json, tasks/bugs.json.
 **Evidence:** replay of the stored p9 version through the new code: collectCriticalFindings [], findBadPages [], findSafeRepairableFinding null, decideRepairMethod skip. The guard on the stored semantic record keeps 0 findings and suppresses the CRITICAL; the score stays 100. Tests: tests/unit/critical-check-reads-scored-list.test.ts, tests/unit/cover-lettering-check.test.ts (merge guard through the real evaluator), tests/unit/critical-severity-agreement.test.ts (empty-list case reversed).
 **Touched:** server/lib/evalPipeline.js, server/lib/landmarkProtection.js, server/lib/repairLogic.js, server/lib/scoring.js, server/lib/images.js, server/lib/repairPipeline.js, tests/unit/critical-check-reads-scored-list.test.ts, tests/unit/critical-severity-agreement.test.ts, tests/unit/eval-evidence-whitelist.test.ts
 **Status:** ✅ active
+## 2026-09-26 — The plate QC judges the era, the framing and the landmark photo its author was given; it sees the plate's details (SUPERSEDES the same day's "one story-era derivation for every plate QC")
+
+**Context.** Staging `job_1790446348343_z3fw660ie` (Fiona re-run). All 19 briefs declare `era: present day`; the cast
+dresses up as pirates. Every plate QC was told `STORY ERA: pirate (pirate / pirate)` — `plateQc.plateStoryEra` derived
+the era from the cast's COSTUME type — so the LOC004.2 plate was failed `era` for "modern cars, streetlights, and blue
+boat tarps". Its retry feedback ("remove the modern cars…") produced a near-copy of the reference photo, signed at the
+bottom right, with the wrong view and a clear sky under declared fog; that retry PASSED and shipped on pages 11-16.
+Further, from the stored prompts/replies and plates (investigation `fiona-rerun/inv-ab`, `inv-ef`):
+- the Art Director cited Lindenhof **photo 3** for "a low riverside landing looking sharply up at a massive retaining
+  wall" because photo 3 was described `[whole, green, day] Waterfront promenade … Fraumünster … along water`. Viewed: it
+  shows the Zunfthaus zur Meisen and the Münsterbrücke across the Limmat; the Lindenhof is at most a sliver. The photo
+  judge's own `reason` ("hill and old houses seen across the river with moored boats") never reached any prompt;
+- the scene review's 10ab lumped every citation as correct;
+- the QC saw the FRAMING paragraph cut at 300 characters (after SHOT/LOCATION/VANTAGE lines, so often none of it), and
+  its LANDMARK_CHECK said "a landmark that matches the photograph and not the words is a PASS" with no scope;
+- LOC005.1 (fog) passed with a sunlit, hazy-blue sky; the judge sees the plate as one 258-token tile, so a signature or
+  a distant walker is a few pixels.
+
+**Decision (owner-approved task, 2026-09-26; reverses the same day's "one story-era derivation" — evidence: every plate
+of `job_1790446348343_z3fw660ie` judged "pirate era" against 19 present-day briefs, and the false era fail triggered the
+LOC004.2 retry that became a photo copy).**
+1. **Era from the brief.** `validateEmptyScene` / `buildEmptySceneQcPrompt` take `era` — the brief's `era`, the one the
+   plate author's `eraGuard` was built from — and classify it with the same `buildEraGuard`: a present-day or absent era
+   gets no STORY ERA block and no anachronism check. `plateQc.plateStoryEra` is DELETED (both story-run QCs and the Lab
+   `labPlateQcOptions`). Vantage plate: the representative page's `era`; per-page plate: the page's; derived plate: the
+   base's.
+2. **The QC sees the framing.** New `framing` input: the FRAMING paragraph the plate was painted from, uncut (vantage:
+   the vantage's plate text; per-page: the page's plate text; Lab: the resolved plate text). EXPECTED SCENE keeps its
+   300-char cap. New soft check key `framing` (plateQc.js) and FRAMING_CHECK: is the structure or view the FRAMING
+   names the main subject, seen from that side and height; a prop or detail is never a framing fault. A DERIVED plate
+   gets no framing (the derive moves the camera the FRAMING's height/side describe).
+3. **The photo is the authority on LOOKS only.** `LANDMARK_PHOTO_AUTHORITY` (one constant: the author's fidelity block
+   and the judge) now says the photo "never decides which structure or view fills the frame"; LANDMARK_CHECK's PASS
+   sentence is scoped to shape/material/colour and hands the frame to the FRAMING check.
+4. **Covered sky and fog.** When the declared `weather` owns the sky (`sceneLight.weatherOwnsSky`: overcast, rain,
+   snow, fog, storm — read from the field via `normaliseWeather`), LIGHT_CHECK adds: a sun or moon disc, a clear
+   cloudless sky, or direct-sun shadows FAIL; under fog, a far distance as crisp as the near ground FAILS. These sit on
+   top of the entry above ("Weather owns the sky"), which landed concurrently and gives the judge the author's sky
+   phrase through `describeLightForJudge`; `sceneLight.js` is not edited here.
+5. **Detail views (an INPUT change).** `validateEmptyScene` sends seven labelled crops after the plate
+   (`PLATE_DETAIL_VIEWS`: four quarters, the centre, the two bottom corners; each fitted to 768 px), and the prompt says
+   they are closer looks at the same plate whose cut sides are not its edges. Every image is now labelled; the landmark
+   photo comes last. Timeout 15 → 30 s.
+6. **Truer photo descriptions, one source.** `landmark_photo_scores.reason` is read with score and framing
+   (`PHOTO_SCORES_SQL` → `photo_reasons`, `bestPhotoSlots` → `reasons`) into every variant as `judgedView`.
+   `promptBuilders.landmarkPhotoText(v)` = description + `Photo judge: <reason>.` feeds the Art Director's numbered
+   PHOTOS, the scene review (both via `landmarkPhotoListLines`) and the plate QC (`{LANDMARK_PHOTO_RECORD}`; the served
+   landmark photo entry now carries `description` + `judgedView`). Scene review 10ab: per citing vantage, the analysis
+   line states what the photo shows against what the plate frames, `→ match | mismatch`; a lumped "all correct" is not
+   an answer. **Data:** Lindenhof (Zürcher Hügelzug) slot 3 description corrected in both DBs (staging id 210, prod 248;
+   parameterised UPDATE guarded on id + slot URL + old text): `[distant, bare, day] The baroque Zunfthaus zur Meisen guild
+   hall and the Münsterbrücke with its bronze rider statue, seen across the Limmat with boats under blue covers moored in
+   front. The Lindenhof shows at most as a sliver of hillside houses at the upper right.` NOT applied (proposal): the
+   documented "doesn't show the named subject" path is a discard through `merge-landmark-descriptions.js
+   --apply-discards` (owner approves removals) or a `photo_score` below 40; `photo_type_3` stays `exterior`.
+
+**Replay (rung 1-2: the real `validateEmptyScene`, gemini-2.5-flash, the Lab option set, 16 stored plates; before =
+origin/staging 13506e0b4, after = this change; one sample each).**
+
+| plate | defect (viewed) | before | after |
+|---|---|---|---|
+| z3 LOC004.2 v1 | people on the bridge; blue sky under dusk fog; guild hall fills the frame | figures, **era (false)** | figures |
+| z3 LOC004.2 retry (shipped) | photo copy, signature, people, wrong view, clear sky | **pass** | figures, text, framing |
+| z3 p1 LOC001.1 | near-photographic | pass | pass |
+| z3 LOC005.1 base | people, sunlit sky under fog | figures, **era (false)** | figures |
+| z3 p8 derived | tiny people, sunlit under fog | figures, **era (false)** | figures |
+| Lab 1503 | filtered photograph | pass | pass |
+| Lab 1505 | filtered photograph + ghost person | pass | figures |
+| 5herh p11 | signature | text | text |
+| 5herh p13 | signature; moon disc under fog | text (unclassified), landmark | text, light |
+| 5herh p2, p15; 622wecmhj p3, p10; z3 p4 | clean | pass | pass |
+| 5herh p14 | clean of people/medium/text | light | pass |
+| z3 p2 | clean (suits of armour) | figures, placements | pass |
+
+Per defect class (bad plates): era false fails 3 → **0**; people 3/5 → **5/5**; signature 2/3 → **3/3**; framing –
+→ 1/2; light (covered sky/fog) 0/5 → 1/5; medium (photograph) 0/4 → 0/4. Any-fail on the 9 bad plates 5 → 7; false
+fails on the 7 clean plates 2 → 0. Between tuning runs (3 more samples of subsets) the judge was unstable on light (5herh
+p15's moon under fog failed in 1 of 3 samples) and once filed an unmentioned prop as `framing` on z3 p2 before the
+"never a framing fault" sentence. Open: the medium and covered-sky misses (BACKLOG). Cost ≈ 72 flash calls ≈ CHF 0.25.
+
+**AD photo list after the data fix** (rebuilt for the stored story, free): Lindenhof Photo 3 now reads the corrected
+description plus `Photo judge: hill and old houses seen across the river with moored boats.`
+
+**Touched:** `server/lib/plateQc.js`, `server/lib/evalPipeline.js`, `prompts/empty-scene-qc.txt`,
+`prompts/scene-review.txt`, `server/lib/promptBuilders.js`, `server/lib/landmarkPhotos.js`, `server/lib/storyHelpers.js`,
+`server/lib/testlab.js`, `storyJobPipeline.js`, `tests/unit/plate-qc-era-framing-photo.test.ts` (new),
+`tests/unit/lab-plate-qc-always.test.ts`, `tests/unit/empty-scene-qc-extraction.test.ts`,
+`tests/unit/landmark-photo-authority.test.ts`, `docs/prompt-inventory.md`, `docs/landmark-database.md`,
+`tasks/bugs.json`, `tasks/BACKLOG.md`.
+**Status:** 🟡 active on staging.
+
+---
 
 ## 2026-09-26 — The Art Director cites the landmark photo: `landmarkPhoto: <n> | "none"` per plate, and code serves exactly that slot (supersedes 2026-09-24 "`landmarkView` picks the kind" and "the page's shot picks the framing")
 
@@ -399,7 +491,7 @@ owner question.
 "Every per-page plate is judged").
 **Touched:** `server/lib/testlab.js`, `server/lib/plateQc.js`, `storyJobPipeline.js`,
 `tests/unit/lab-plate-qc-always.test.ts`
-**Status:** ✅ active
+**Status:** 🗄 era half superseded the same day by "The plate QC judges the era, the framing and the landmark photo its author was given" (the costume-derived era judged a present-day story "pirate era"); the Lab-judges-every-plate half stays ✅ active
 
 ## 2026-09-26 — A large creature is measured against the people in frame; drawn too small, it is a D-34 finding and a page redo
 

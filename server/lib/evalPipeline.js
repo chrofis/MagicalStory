@@ -404,21 +404,84 @@ function largestInteriorUniformFraction(mask, rows, cols) {
 }
 
 /**
+ * THE PLATE'S DETAIL VIEWS (2026-09-26). The judge receives the plate as one
+ * image, which gemini-2.5-flash reads as a single 258-token tile
+ * (mediaResolution HIGH changed nothing, measured): a signature, a paper edge
+ * or a distant walker is a few pixels there. validateEmptyScene attaches these
+ * crops after the plate, each fitted to PLATE_DETAIL_VIEW_PX so every crop is
+ * read at a larger scale than the whole plate. Fractions of the plate's
+ * width/height. The four quarters cover every edge and corner; the centre
+ * covers the quarters' seams; the two bottom corners, enlarged further, are
+ * where a signature sits (staging job_1790446348343_z3fw660ie LOC004.2 retry:
+ * a faint scrawl at the bottom right passed at quarter scale).
+ */
+const PLATE_DETAIL_VIEWS = [
+  { label: 'top-left quarter', left: 0, top: 0, width: 0.5, height: 0.5 },
+  { label: 'top-right quarter', left: 0.5, top: 0, width: 0.5, height: 0.5 },
+  { label: 'bottom-left quarter', left: 0, top: 0.5, width: 0.5, height: 0.5 },
+  { label: 'bottom-right quarter', left: 0.5, top: 0.5, width: 0.5, height: 0.5 },
+  { label: 'centre', left: 0.25, top: 0.25, width: 0.5, height: 0.5 },
+  { label: 'bottom-left corner', left: 0, top: 0.75, width: 0.25, height: 0.25 },
+  { label: 'bottom-right corner', left: 0.75, top: 0.75, width: 0.25, height: 0.25 },
+];
+const PLATE_DETAIL_VIEW_PX = 768;
+
+/**
+ * The detail-view crops of one plate, as Gemini inline parts with their labels.
+ * An image too small to crop returns [] (the plate is judged whole, as before).
+ */
+async function plateDetailViewParts(buf) {
+  const meta = await sharp(buf).metadata();
+  const W = meta.width || 0;
+  const H = meta.height || 0;
+  if (W < 256 || H < 256) return [];
+  const parts = [];
+  for (const v of PLATE_DETAIL_VIEWS) {
+    const region = {
+      left: Math.round(v.left * W), top: Math.round(v.top * H),
+      width: Math.round(v.width * W), height: Math.round(v.height * H),
+    };
+    const crop = await sharp(buf).extract(region)
+      .resize(PLATE_DETAIL_VIEW_PX, PLATE_DETAIL_VIEW_PX, { fit: 'inside' })
+      .jpeg({ quality: 90 }).toBuffer();
+    parts.push({ text: `[Detail view of the plate — ${v.label}, enlarged]:` });
+    parts.push({ inline_data: { mime_type: 'image/jpeg', data: crop.toString('base64') } });
+  }
+  return parts;
+}
+
+/**
  * Build the empty-scene QC prompt (prompts/empty-scene-qc.txt).
  *
  * Extracted from validateEmptyScene 2026-09-15 so the built prompt can be
  * asserted without a paid vision call, and so the plate generator/critic pair
  * names two file paths instead of this module.
  */
-function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, characterPlacements = null, mainScenePrompt = '', artStyle = '', shot = '', landmarkName = '', light = null } = {}) {
+function buildEmptySceneQcPrompt({ sceneDescription = '', era = null, framing = '', characterPlacements = null, mainScenePrompt = '', artStyle = '', shot = '', landmarkName = '', landmarkPhotoText = '', light = null, detailViews = [] } = {}) {
   const sceneCtx = sceneDescription
     ? `\nEXPECTED SCENE: "${sceneDescription.substring(0, 300)}"`
     : '';
-  // Era context — explicit period so the vision model doesn't have to
-  // infer it. Caller derives this from storyType + costumed clothing.
-  // "present-day" (or null) disables the anachronism check.
-  const eraBlock = storyEra
-    ? `\n\nSTORY ERA: ${storyEra} — render accordingly. Landmark reference photos are present-day; modern things around the landmark in the photo must NOT appear in the output — the landmark itself stays as the photo shows it.`
+  // THE FRAMING PARAGRAPH, WHOLE (2026-09-26). EXPECTED SCENE stops at 300
+  // characters, and on a vantage plate the FRAMING paragraph sits after the
+  // SHOT/LOCATION/VANTAGE lines, so the judge saw half of it or none: a plate
+  // that painted the building across the river where its author was told to
+  // look up at the wall beside the camera passed. It rides as its own field,
+  // uncut, and the framing check reads it. The cap on EXPECTED SCENE stays
+  // (raising it lost the figures check on Lab 1506, decisions.md 2026-09-26).
+  const framingText = String(framing || '').trim();
+  const framingBlock = framingText ? `\n\nFRAMING (what the plate's author was told the frame holds): "${framingText}"` : '';
+  // THE ERA THE PLATE'S AUTHOR WAS GIVEN (2026-09-26): the brief's `era`,
+  // classified by the one era classifier the author's STORY ERA guard uses
+  // (promptBuilders.buildEraGuard). A present-day or absent era gets no guard
+  // on the author's side, so no era block and no anachronism check here. It
+  // used to be derived from the cast's COSTUMES (plateStoryEra, deleted): a
+  // present-day story whose children dress up as pirates was judged "pirate
+  // era" on every plate (staging job_1790446348343_z3fw660ie — all 19 briefs
+  // say present day), and the false era fail's retry feedback ("remove the
+  // modern cars, streetlights and boat tarps") produced a photo copy.
+  const eraText = require('./promptBuilders').buildEraGuard(era) ? String(era).trim() : null;
+  const eraBlock = eraText
+    ? `\n\nSTORY ERA: ${eraText} — render accordingly. Landmark reference photos are present-day; modern things around the landmark in the photo must NOT appear in the output — the landmark itself stays as the photo shows it.`
     : '';
   // If the outline already declared where each character will land, ask
   // the vision model to verify the empty scene has flat usable space at
@@ -494,10 +557,28 @@ function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, chara
   // weather it was told to paint and on nothing read out of prose.
   // A weather that owns the sky adds the sky phrase the author was given
   // (describeLightForJudge, 2026-09-26), so a sun in a fog plate is judged.
-  const { describeLightForJudge } = require('./sceneLight');
+  const { describeLightForJudge, weatherOwnsSky, normaliseWeather } = require('./sceneLight');
   const lightWords = describeLightForJudge(light);
+  // A covered sky has failure cases of its own (2026-09-26): LOC005.1 of
+  // staging job_1790446348343_z3fw660ie declared fog and passed with a sunny
+  // sky and a crisp far bank, because "does its light show that weather" left
+  // the judge to decide what fog looks like. The weather value is read from the
+  // declared field, and the set of sky-owning weathers is sceneLight's own.
+  const weather = normaliseWeather(light?.weather);
+  const coveredSky = lightWords && weatherOwnsSky(weather)
+    ? `\n${fillTemplate(qc.LIGHT_COVERED_SKY, { WEATHER: weather })}` : '';
+  const fogCheck = lightWords && weather === 'fog' ? `\n${qc.LIGHT_FOG}` : '';
   const lightCheck = lightWords
-    ? `\n${fillTemplate(qc.LIGHT_CHECK, { LIGHT: lightWords })}` : '';
+    ? `\n${fillTemplate(qc.LIGHT_CHECK, { LIGHT: lightWords })}${coveredSky}${fogCheck}` : '';
+  // THE FRAMING CHECK (2026-09-26): the plate is held to the structure or view
+  // its FRAMING puts in the frame — the paragraph its author painted from.
+  const framingCheck = framingText ? `\n${qc.FRAMING_CHECK}` : '';
+  // The detail views validateEmptyScene attaches after the plate (enlarged
+  // parts of it): the judge sees the plate as one small tile, where a
+  // signature, a paper edge or a distant walker is a few pixels.
+  const views = Array.isArray(detailViews) ? detailViews.filter(Boolean) : [];
+  const detailBlock = views.length
+    ? `\n\n${fillTemplate(qc.DETAIL_VIEWS, { DETAIL_VIEW_LIST: views.join(', ') })}` : '';
   // THE PHOTO WINS OVER THE WORDS (owner, 2026-09-23). Emitted only when the
   // caller attached the landmark photo as the second image — the check names
   // that image. The authority sentence is the same constant the plate author's
@@ -513,19 +594,26 @@ ${fillTemplate(qc.LANDMARK_CHECK, {
     // The REFERENCE line the plate author was given, verbatim: the plate shows
     // the part of the place its camera sees, and is judged on that part.
     PLATE_LANDMARK_REFERENCE: require('./shotVocabulary').PLATE_LANDMARK_REFERENCE,
+    // What the landmark index records the photograph shows — the SAME line
+    // the Art Director cited it from (promptBuilders.landmarkPhotoText).
+    LANDMARK_PHOTO_RECORD: String(landmarkPhotoText || '').trim()
+      ? ` The landmark index records this photograph as: "${String(landmarkPhotoText).trim()}".` : '',
   })}` : '';
   return fillTemplate(qc.BODY, {
     // The closed list of checks an issue is filed under (plateQc.js) — what a
     // double QC failure is decided on, so it is one constant, never prose.
     CHECK_KEYS: require('./plateQc').checkKeysForPrompt(),
     SCENE_CTX: sceneCtx,
+    FRAMING_BLOCK: framingBlock,
+    DETAIL_VIEWS: detailBlock,
     STYLE_CHECK: styleCheck,
     CAMERA_CHECK: cameraCheck,
+    FRAMING_CHECK: framingCheck,
     LIGHT_CHECK: lightCheck,
     ERA_BLOCK: eraBlock,
     PLACEMENTS_BLOCK: placementsBlock,
     MAIN_SCENE_BLOCK: mainSceneBlock,
-    ERA_CHECK: storyEra ? `\n${qc.ERA_CHECK}` : '',
+    ERA_CHECK: eraText ? `\n${qc.ERA_CHECK}` : '',
     PLACEMENTS_CHECK: placementsCheck,
     GEOMETRY_CHECK: geometryCheck,
     LANDMARK_CHECK: landmarkCheck,
@@ -548,14 +636,16 @@ ${fillTemplate(qc.LANDMARK_CHECK, {
  * @param {string} pageContext - logging context
  * @param {object} [options]
  * @param {string} [options.sceneDescription] - expected scene description
- * @param {{name: string, photoUrl?: string, photoData?: string}} [options.landmarkPhoto] - the landmark
- *        reference photo the plate was painted from; attached as the judge's second image, and the
+ * @param {string} [options.framing] - the FRAMING paragraph the plate's author was given (uncut)
+ * @param {string} [options.era] - the brief's `era` the plate's author was given (buildEraGuard classifies it)
+ * @param {{name: string, photoUrl?: string, photoData?: string, description?: string, judgedView?: string}} [options.landmarkPhoto] - the landmark
+ *        reference photo the plate was painted from; attached as the judge's last image, and the
  *        landmark is judged against it instead of the written description
  * @param {boolean} [options.skipVision=false] - skip the Gemini vision check (pixel only)
  * @returns {{ pass: boolean, issues: string[], calmnessScore: number, visionFeedback: string|null }}
  */
 async function validateEmptyScene(imageData, textPosition, pageContext = '', options = {}) {
-  const { sceneDescription = null, skipVision = false, characterPlacements = null, mainScenePrompt = null, storyEra = null, artStyle = null, shot = null, landmarkPhoto = null, light = null } = options;
+  const { sceneDescription = null, skipVision = false, characterPlacements = null, mainScenePrompt = null, era = null, framing = null, artStyle = null, shot = null, landmarkPhoto = null, light = null } = options;
   try {
     const base64 = r2Lib.stripDataUriPrefix(imageData);
     const buf = Buffer.from(base64, 'base64');
@@ -689,7 +779,14 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
             }
             if (!landmarkPart) log.error(`❌ [EMPTY-SCENE-QC] ${pageContext} landmark photo for "${landmarkPhoto.name}" could not be loaded — the plate is judged without it`);
           }
-          const qcPrompt = buildEmptySceneQcPrompt({ sceneDescription, storyEra, characterPlacements, mainScenePrompt, artStyle, shot, landmarkName: landmarkPart ? landmarkPhoto.name : '', light });
+          const { landmarkPhotoText } = require('./promptBuilders');
+          const detailParts = await plateDetailViewParts(buf);
+          const qcPrompt = buildEmptySceneQcPrompt({
+            sceneDescription, era, framing, characterPlacements, mainScenePrompt, artStyle, shot, light,
+            landmarkName: landmarkPart ? landmarkPhoto.name : '',
+            landmarkPhotoText: landmarkPart ? landmarkPhotoText(landmarkPhoto) : '',
+            detailViews: detailParts.length ? PLATE_DETAIL_VIEWS.map(v => v.label) : [],
+          });
 
           const visionUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
           const visionResp = await fetch(visionUrl, {
@@ -697,17 +794,19 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               contents: [{ parts: [
-                // With a landmark photo the two images are labelled, as the
-                // plate generator labels its landmark reference.
-                ...(landmarkPart ? [{ text: '[Background plate to judge]:' }] : []),
+                // Every image is labelled, as the plate generator labels its
+                // landmark reference: the plate, its detail views, the photo.
+                { text: '[Background plate to judge]:' },
                 { inline_data: { mime_type: mimeType, data: base64ForVision } },
+                ...detailParts,
                 ...(landmarkPart ? [{ text: `[Landmark reference photo: ${landmarkPhoto.name}]:` }, landmarkPart] : []),
                 { text: guardPromptString(qcPrompt, 'validateEmptyScene') }
               ]}],
               generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
               safetySettings: require('./images').GEMINI_SAFETY_SETTINGS
             }),
-            signal: AbortSignal.timeout(15000),
+            // Seven images instead of two since 2026-09-26 (detail views).
+            signal: AbortSignal.timeout(30000),
           });
 
           if (visionResp.ok) {
@@ -3867,6 +3966,8 @@ module.exports = {
   runVisualInventory,
   validateEmptyScene,
   buildEmptySceneQcPrompt,
+  plateDetailViewParts,
+  PLATE_DETAIL_VIEWS,
   styleGateEchoedFields,
   largestInteriorUniformFraction,
   capComplianceIdentitySeverity,

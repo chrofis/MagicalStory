@@ -148,8 +148,6 @@ async function loadSceneContext(storyId, pageNumber) {
     language: rows[0].language || 'de',
     languageLevel: rows[0].language_level || 'standard',
     storyType: rows[0].story_type || null,
-    // With storyType and clothingRequirements, what plateQc.plateStoryEra
-    // derives the plate QC's era from — as the story run does.
     storyTheme: rows[0].story_theme || null,
     storyTopic: rows[0].story_topic || null,
     title: rows[0].title || null,
@@ -775,11 +773,12 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
 /**
  * validateEmptyScene options for a Lab plate — the per-page plate QC's option
  * set (storyJobPipeline.js `pageQcOpts`), field for field: the page's declared
- * placements, the scene prose the geometry is graded on, the era the story run
- * derives (plateQc.plateStoryEra — NOT the brief's `era`, which the run never
- * hands the judge), the full art style, the shot, the landmark photo, the light.
+ * placements, the scene prose the geometry is graded on, the plate text as its
+ * FRAMING, the brief's `era` (the one its plate author's era guard was built
+ * from; the QC classifies it with the same buildEraGuard), the full art style,
+ * the shot, the landmark photo, the light.
  */
-function labPlateQcOptions(ctx, { sceneDescription, shot, artStyle }) {
+function labPlateQcOptions(ctx, { sceneDescription, framing = null, shot, artStyle }) {
   const meta = ctx.scene.sceneMetadata || {};
   const placements = (meta.fullData?.characters || [])
     .filter(c => c?.name && c?.position)
@@ -788,7 +787,8 @@ function labPlateQcOptions(ctx, { sceneDescription, shot, artStyle }) {
     sceneDescription,
     characterPlacements: placements.length > 0 ? placements : null,
     mainScenePrompt: ctx.scene.sceneDescription || null,
-    storyEra: require('./plateQc').plateStoryEra(ctx.clothingRequirements, ctx),
+    framing: String(framing || '').trim() || null,
+    era: meta.era || null,
     artStyle,
     shot: String(shot || '').trim() || null,
     pageNumber: ctx.pageNumber,
@@ -918,7 +918,7 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
     const { validateEmptyScene } = require('./images');
     const qcTextPos = require('./plateQc').plateQcTextPosition(wantsTextZone, ctx.textPosition);
     const qcRes = await validateEmptyScene(result.imageData, qcTextPos, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
-      labPlateQcOptions(ctx, { sceneDescription: description, shot: pageShot || meta.setting?.camera || 'wide shot', artStyle: plateStyle }));
+      labPlateQcOptions(ctx, { sceneDescription: description, framing: params.descriptionOverride || pagePlateText, shot: pageShot || meta.setting?.camera || 'wide shot', artStyle: plateStyle }));
     qc = { pass: qcRes.pass, issues: qcRes.issues || [], findings: qcRes.findings || [], visionFeedback: qcRes.visionFeedback || null, textPosition: qcTextPos };
   } catch (err) {
     log.warn(`[TESTLAB] empty-scene QC failed: ${err.message}`);

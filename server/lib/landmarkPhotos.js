@@ -2615,13 +2615,14 @@ async function bestPhotoSlots(ids) {
     // so the numbered PHOTOS list the Art Director cites from is exactly the
     // set a citation is answered from (docs/decisions.md 2026-09-26).
     const { rows } = await getPool().query(
-      `SELECT landmark_id, slot, framing, photo_score, ${FRAMING_RANK_SQL} rank
+      `SELECT landmark_id, slot, framing, photo_score, reason, ${FRAMING_RANK_SQL} rank
          FROM landmark_photo_scores
         WHERE landmark_id = ANY($1)`, [clean]);
     for (const r of rows) {
-      const e = map.get(r.landmark_id) || { primary: null, byFraming: [], scores: {}, framings: {} };
+      const e = map.get(r.landmark_id) || { primary: null, byFraming: [], scores: {}, framings: {}, reasons: {} };
       e.scores[String(r.slot)] = r.photo_score;
       if (r.framing) e.framings[String(r.slot)] = r.framing;
+      if (r.reason) e.reasons[String(r.slot)] = r.reason;
       map.set(r.landmark_id, e);
       if (!(r.photo_score >= MIN_USABLE_PHOTO)) continue;
       // Best usable slot per framing (unframed reads as medium).
@@ -2806,11 +2807,14 @@ const JUDGED_USABLE_SQL = `(story_score IS NULL OR story_score >= ${MIN_USABLE_P
 // Each slot's judged photo_score and framing as {slot: value}, selected beside
 // the slot columns so variantsFromIndexRow can hand every variant its own
 // judgement: servablePhotos drops a photo judged below the cutoff, and the Art
-// Director's numbered PHOTOS list shows each photo's framing. NULL when never judged.
+// Director's numbered PHOTOS list shows each photo's framing and what the judge
+// saw (`reason`, since 2026-09-26). NULL when never judged.
 const PHOTO_SCORES_SQL = `(SELECT jsonb_object_agg(s.slot, s.photo_score)
           FROM landmark_photo_scores s WHERE s.landmark_id = landmark_index.id) AS photo_scores,
         (SELECT jsonb_object_agg(s.slot, s.framing)
-          FROM landmark_photo_scores s WHERE s.landmark_id = landmark_index.id AND s.framing IS NOT NULL) AS photo_framings`;
+          FROM landmark_photo_scores s WHERE s.landmark_id = landmark_index.id AND s.framing IS NOT NULL) AS photo_framings,
+        (SELECT jsonb_object_agg(s.slot, s.reason)
+          FROM landmark_photo_scores s WHERE s.landmark_id = landmark_index.id AND s.reason IS NOT NULL) AS photo_reasons`;
 
 // Fame is a GLOBAL measure, so inside one town it ranks the wrong way round: a
 // synagogue 7km away in another village (5 language editions) beat the town's
@@ -3857,6 +3861,10 @@ function variantsFromIndexRow(row) {
         // Judged photo_score and framing (landmark_photo_scores); null = never judged.
         photoScore: Number.isFinite(judged) ? judged : null,
         framing,
+        // What the photo judge saw when it scored this photo
+        // (landmark_photo_scores.reason). Read beside the description by every
+        // reader of the photo (promptBuilders.landmarkPhotoText, 2026-09-26).
+        judgedView: row.photo_reasons?.[String(cfg.num)] || null,
         vantage: kind === 'interior' ? 'interior' : 'exterior',
         url: cfg.url,
         sourceUrl: cfg.sourceUrl,
@@ -4139,6 +4147,7 @@ function servedLandmark(l, judged) {
     ...l,
     photo_scores: judged?.scores || null,
     photo_framings: judged?.framings || null,
+    photo_reasons: judged?.reasons || null,
   }));
   return {
     name: l.name,

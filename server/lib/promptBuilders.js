@@ -892,7 +892,14 @@ function buildEraGuard(era) {
 // (the owner-approved photo-citation design, docs/decisions.md 2026-09-26),
 // and "the photo is right" with no scope told the image model to paint the
 // photo's view instead of the plate's.
-const LANDMARK_PHOTO_AUTHORITY = 'The photo is the authority on how the structures it shows look: where any words in this prompt describe their shape, structure, material or colour differently from the photo, the photo is right. The camera, the framing and everything the photo does not show come from the words.';
+//
+// SCOPED AGAIN 2026-09-26: how the structures LOOK, never which of them fills
+// the frame. The plate QC read "a landmark that matches the photograph and not
+// the words is a PASS" as licence for a plate that painted the photo's view (a
+// guild hall across the river) where its FRAMING stood at the foot of a wall
+// (staging job_1790446348343_z3fw660ie LOC004.2 retry). One sentence for the
+// author's fidelity block and the judge's LANDMARK_CHECK.
+const LANDMARK_PHOTO_AUTHORITY = 'The photo is the authority on how the structures it shows look: where any words in this prompt describe their shape, structure, material or colour differently from the photo, the photo is right. It never decides which structure or view fills the frame: the camera, the framing and everything the photo does not show come from the words.';
 
 function buildLandmarkFidelityBlock(landmark, opts = {}) {
   const name = typeof landmark === 'string'
@@ -12074,8 +12081,7 @@ function landmarkPhotoListLines(l, indent = '    ') {
     return photos.map((v) => {
       const kind = v.kind || v.vantage || 'exterior';
       const framing = v.framing ? `, framed ${v.framing}` : '';
-      const desc = String(v.description || '').trim() || '(no description stored)';
-      return `${indent}Photo ${v.variantNumber} (${kind}${framing}): ${desc}`;
+      return `${indent}Photo ${v.variantNumber} (${kind}${framing}): ${landmarkPhotoText(v)}`;
     }).join('\n');
   }
   if (l?.referencePhotoUrl || l?.referencePhotoData) {
@@ -12083,6 +12089,27 @@ function landmarkPhotoListLines(l, indent = '    ') {
     return `${indent}Photo 1: ${desc}`;
   }
   return '';
+}
+
+/**
+ * WHAT ONE LANDMARK PHOTO SHOWS, as every reader of it is told (2026-09-26):
+ * the stored description, then what the photo judge saw when it scored the
+ * photo (landmark_photo_scores.reason, carried as the variant's `judgedView`).
+ * The description is written from the photo once and can be wrong — Lindenhof
+ * slot 3 was described as a "waterfront promenade … Fraumünster" while it shows
+ * a guild hall across the river, and the Art Director cited it for a wall seen
+ * from its foot. The judge's line is a second look at the same pixels. ONE
+ * text for the Art Director's numbered PHOTOS list, the scene review (both via
+ * landmarkPhotoListLines) and the plate QC's landmark check (evalPipeline).
+ *
+ * @param {{description?: string, judgedView?: string}} v - a photo variant, or
+ *   a served landmark photo entry carrying the same two fields
+ * @returns {string}
+ */
+function landmarkPhotoText(v) {
+  const desc = String(v?.description || '').trim() || '(no description stored)';
+  const judged = String(v?.judgedView || '').trim();
+  return judged ? `${desc} Photo judge: ${judged}.` : desc;
 }
 
 // THE CITATION RULE — one constant for every author of a landmark plate (the
@@ -12457,6 +12484,7 @@ module.exports = {
   LANDMARK_PHOTO_AUTHORITY,
   LANDMARK_PHOTO_CITE_RULE,
   landmarkPhotoListLines,
+  landmarkPhotoText,
   getAgeCategory,
   getAgeCategoryLabel,
   AGE_CATEGORY_ORDER,

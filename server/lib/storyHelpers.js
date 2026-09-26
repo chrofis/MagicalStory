@@ -336,12 +336,14 @@ async function resolveLandmarkPhotoForLocation(visualBible, loc, opts = {}) {
       attribution: variant.attribution,
       source: 'swiss-variant',
       variantNumber: variant.variantNumber,
-      // `photoType` is the ONLY thing read downstream: it selects which
-      // fidelity block buildLandmarkFidelityBlock emits. The photo's own
-      // description is deliberately NOT carried — nothing consumed it
-      // (removed 2026-09-15) — so do not diagnose a prompt as "having the
-      // photo's description": it does not.
+      // `photoType` selects which fidelity block buildLandmarkFidelityBlock
+      // emits. The description and what the photo judge saw ride along for the
+      // plate QC's landmark check only (promptBuilders.landmarkPhotoText, the
+      // same text the Art Director cited the photo from, 2026-09-26); no
+      // GENERATION prompt reads them.
       photoType: served?.kind || null,
+      description: served?.description || null,
+      judgedView: served?.judgedView || null,
       // Where the citation came from, for the logs and the stored page record.
       citedBy: opts.citation?.source || null,
     };

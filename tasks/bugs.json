@@ -2235,6 +2235,18 @@
       "fixedAt": "2026-09-26",
       "fixedIn": "47fdf5f94",
       "fix": "outfitClauses splits at every top-level \";\" and \",\" and rejoins a dependent segment (wornItems.DEPENDENT_OPENER_RE) to its garment. Replay on the stored story: the adopt is a no-op and p16's line names the coat only. Stored stories keep their corrupted descriptions (not migrated). Test: tests/unit/worn-item-garment-only.test.ts."
+    },
+    {
+      "id": "plate-qc-era-from-costume",
+      "title": "The plate QC judged a present-day story's plates as \"pirate era\": its era was derived from the cast's costume, not the brief the plate author was given",
+      "reportedAt": "2026-09-26",
+      "source": "Stored evidence, staging job_1790446348343_z3fw660ie: all 19 briefs declare era \"present day\"; every plate_qc prompt in eval_calls (ids 213-228) carried \"STORY ERA: pirate (pirate / pirate)\". The LOC004.2 plate was failed `era` for cars, streetlights and boat tarps; its fed-back retry became a signed near-copy of the reference photo and shipped on pages 11-16.",
+      "rootCause": "plateQc.plateStoryEra built the QC era from clothingRequirements' costumed type + theme/topic/type (storyJobPipeline.js vantage and per-page QC, testlab.js labPlateQcOptions), while the plate AUTHOR's era guard reads the brief's `era` through buildEraGuard.",
+      "impact": "Any present-day story whose cast wears a costume had every plate judged against a period it is not set in: false `era` fails, retries fed \"remove the modern ...\" feedback, and a worse plate kept.",
+      "status": "fixed",
+      "fixedAt": "2026-09-26",
+      "fixedIn": "pending",
+      "fix": "plateStoryEra deleted; the QC takes the brief's `era` and classifies it with buildEraGuard inside buildEmptySceneQcPrompt (present day: no era block, no anachronism check). Tests: tests/unit/plate-qc-era-framing-photo.test.ts, tests/unit/lab-plate-qc-always.test.ts. docs/decisions.md 2026-09-26 \"The plate QC judges the era, the framing and the landmark photo its author was given\"."
     }
   ]
 }

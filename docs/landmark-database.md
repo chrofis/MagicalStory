@@ -41,7 +41,12 @@ not drawn, so it always ranks below one that has a picture.
 ### `landmark_photo_scores` — one row per (landmark, slot)
 
 `landmark_id`, `slot` (1–6), `draw_score`, `photo_score`, `framing`, `reason`,
-`judged_at`. PK `(landmark_id, slot)`.
+`judged_at`. PK `(landmark_id, slot)`. `reason` is read into every photo variant as
+`judgedView` (`PHOTO_SCORES_SQL` → `photo_reasons`, `bestPhotoSlots`) and shown beside the
+description wherever a photo is offered or judged: the Art Director's numbered PHOTOS, the
+scene review and the plate QC's landmark check (`landmarkPhotoText`, 2026-09-26). A wrong
+description is corrected in `photo_description_N` in both databases (Lindenhof slot 3,
+2026-09-26: staging 210 / prod 248).
 
 Migrations: `020_landmark_photo_type`, `025_landmark_fame`,
 `028_landmark_municipality`, `029_landmark_story_score`,
@@ -154,7 +159,8 @@ the wrong photographer, and attribution is a CC licence condition.
 **The plate's author cites the photo** (owner, 2026-09-26; `docs/decisions.md`,
 "The Art Director cites the landmark photo"). The Art Director is shown every
 servable photo of each offered landmark as a numbered list — slot number, kind,
-judged framing and the COMPLETE description (`promptBuilders.landmarkPhotoListLines`)
+judged framing, the COMPLETE description and what the photo judge saw — `reason`, as
+`Photo judge: …` (`promptBuilders.landmarkPhotoListLines` → `landmarkPhotoText`, since 2026-09-26)
 — and cites one per plate: `landmarkPhoto: <n> | "none"` on each vantage, or on a
 location with no vantages. The trial writer cites per location, an iterate
 rewrite that writes a fresh plate cites on the page. Code serves **exactly the

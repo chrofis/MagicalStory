@@ -4879,14 +4879,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     placements.push({ name: c.name, position: c.position, depth: c.depth });
                   }
                 }
-                // Same era derivation as every plate QC (plateQc.plateStoryEra).
-                const storyEra = require('./server/lib/plateQc').plateStoryEra(streamingClothingRequirements, inputData);
                 plateQcOpts = {
                   ...plateQcOpts,
                   sceneDescription: emptySceneDesc,
+                  // The FRAMING paragraph this plate was painted from, uncut.
+                  framing: adEmptyPrompt || null,
                   characterPlacements: placements.length > 0 ? placements : null,
                   mainScenePrompt: repPageData.scene?.sceneDescription || null,
-                  storyEra,
+                  // The era this plate's author was given (its eraGuard above),
+                  // classified by the same buildEraGuard inside the QC.
+                  era: repPageData.sceneMetadata?.era || null,
                 };
                 const qc = await validateEmptyScene(plateImage, null, `vantage-${vantageId}`, plateQcOpts);
                 if (!qc.pass) {
@@ -5003,7 +5005,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   // geometry facts or placements, which the edit never saw.
                   const derivedQcOpts = {
                     sceneDescription: shotPrefix && emptySceneDesc.startsWith(shotPrefix) ? emptySceneDesc.slice(shotPrefix.length) : emptySceneDesc,
-                    storyEra: plateQcOpts.storyEra || null,
+                    era: plateQcOpts.era || null,
+                    // No FRAMING: the derive moves the base plate's camera, so
+                    // the side and height the base's FRAMING names are not its own.
                     artStyle: artStyleDesc,
                     shot: cls,
                     // Judged on the light the derive was told to paint.
@@ -5263,18 +5267,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 const placements = (sceneMetadata?.fullData?.characters || [])
                   .filter(c => c?.name && c?.position)
                   .map(c => ({ name: c.name, position: c.position, depth: c.depth }));
-                // Derive story era for the anachronism check. Any character marked
-                // as costumed with a specific costume type is a strong period signal
-                // (e.g. "mittelalterlich" → medieval, "1920s" → early 20th century).
-                // Fallback to storyTheme/Topic/Type. If nothing indicates an era,
-                // leave null — the vision check will then skip the anachronism gate
-                // rather than false-flag a legitimate present-day scene.
-                const storyEra = require('./server/lib/plateQc').plateStoryEra(streamingClothingRequirements, inputData);
                 const pageQcOpts = {
                   sceneDescription: emptySceneDesc,
+                  // The plate text this plate was painted from, uncut.
+                  framing: expandedEmptyPrompt || null,
                   characterPlacements: placements.length > 0 ? placements : null,
                   mainScenePrompt: pageData.scene?.sceneDescription || null,
-                  storyEra,
+                  // The era this plate's author was given (eraGuard above),
+                  // classified by the same buildEraGuard inside the QC.
+                  era: sceneMetadata?.era || null,
                   artStyle: artStyleDesc,
                   shot: shotForCamera || null,
                   pageNumber: pageData.pageNumber,

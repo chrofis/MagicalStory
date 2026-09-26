@@ -20,7 +20,6 @@ const PX = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAA
 const images = require_('../../server/lib/images');
 const database = require_('../../server/services/database');
 const referenceSheets = require_('../../server/lib/referenceSheets');
-const { plateStoryEra } = require_('../../server/lib/plateQc');
 
 let qcCalls: any[] = [];
 images.generateImageOnly = async () => ({ imageData: PX, modelId: 'stub-plate-model' });
@@ -58,17 +57,6 @@ const ctx = (over: any = {}) => ({
 
 beforeEach(() => { qcCalls = []; });
 
-describe('plateStoryEra (one derivation for every plate QC)', () => {
-  it('a costume is the period, qualified by the story', () => {
-    expect(plateStoryEra({ A: { costumed: { used: true, costume: 'knight' } } }, { storyTheme: 'castle', storyType: 'adventure' }))
-      .toBe('knight (castle / adventure)');
-  });
-  it('no costume is no era — the brief era is not used', () => {
-    expect(plateStoryEra({ A: { standard: { used: true } } }, { storyTheme: 'dragon' })).toBeNull();
-    expect(plateStoryEra(null, {})).toBeNull();
-  });
-});
-
 describe('empty_scene stage runs the plate QC on a text-below story', () => {
   it('judges the plate with a null text position and reports the real verdict', async () => {
     const r = await runEmptySceneStage(ctx(), { experimentId: 1, params: {} });
@@ -85,7 +73,12 @@ describe('empty_scene stage runs the plate QC on a text-below story', () => {
     expect(o.sceneDescription).toBe('**SHOT:** wide\n\nA cobbled courtyard with a stone gate at the back.');
     expect(o.characterPlacements).toEqual([{ name: 'Hero', position: 'left', depth: 'midground' }]);
     expect(o.mainScenePrompt).toBe('The hero crosses the courtyard toward the gate.');
-    expect(o.storyEra).toBe('knight (castle / adventure)');
+    // The brief's era, as its plate author's era guard reads it — never the
+    // costume (a knight costume on a present-day page is not a period).
+    expect(o.era).toBe('present day');
+    expect(o.storyEra).toBeUndefined();
+    // The plate text rides whole as the FRAMING.
+    expect(o.framing).toBe('A cobbled courtyard with a stone gate at the back.');
     expect(o.artStyle).toMatch(/watercolor/i);
     expect(o.shot).toBe('wide');
     expect(o.pageNumber).toBe(3);
@@ -109,6 +102,8 @@ describe('edit_image on a plate runs the derived-plate QC', () => {
     expect(o.shot).toBe('aerial');
     expect(o.characterPlacements).toBeNull();
     expect(o.mainScenePrompt).toBeNull();
+    // A derive moves the camera: no FRAMING, as the story run's derived plate.
+    expect(o.framing).toBeNull();
     expect(r.qc.pass).toBe(false);
   });
 
