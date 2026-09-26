@@ -458,12 +458,38 @@ function briefOverrideOf(params) {
   return typeof v === 'string' && v.trim() ? v : null;
 }
 
-function evalSceneDescription(ctx, params = null) {
+function evalSceneDescription(ctx, params = null, render = null) {
   // A/B runs with sceneDescriptionOverride generate FROM the override — the
   // eval contract must be the same override, or the judge deducts for lacking
   // exactly the defects the override removed (observed: three P6 A/B renders
   // scored sem=0 against the stored brief's "gap in the railing"/"ankle-deep").
-  return `${briefOverrideOf(params) || ctx.scene.sceneDescription || ''}`;
+  //
+  // THE SCENE AS SENT (owner, 2026-09-26: "The eval should judge the same thing
+  // as image generation"): the one resolver the production batch eval uses
+  // (sceneMetadata.resolveEvalSceneDescription) over the render being judged —
+  // a fresh Lab render (`render`: its own sent prompt and compressedScene), a
+  // pinned stored version, or the page's stored record.
+  const { resolveEvalSceneDescription } = require('./sceneMetadata');
+  const brief = briefOverrideOf(params) || ctx.scene.sceneDescription || '';
+  if (render) {
+    return resolveEvalSceneDescription({
+      compressedScene: render.compressedScene || null, sceneDescription: brief, prompt: render.prompt || null,
+    });
+  }
+  const pinned = pinnedVersionIndex(ctx.target?.versionIndex);
+  if (pinned !== null) {
+    const version = (ctx.scene.imageVersions || [])[pinned];
+    if (!version) throw new Error(`evalSceneDescription: no stored imageVersions[${pinned}] for ${ctx.storyId} p${ctx.pageNumber}`);
+    const { resolveVersionCompressedScene } = require('./repairLogic');
+    return resolveEvalSceneDescription({
+      compressedScene: resolveVersionCompressedScene(version, ctx.scene),
+      sceneDescription: version.description || brief,
+      prompt: version.prompt || ctx.scene.prompt || null,
+    });
+  }
+  return resolveEvalSceneDescription({
+    compressedScene: ctx.scene.compressedScene || null, sceneDescription: brief, prompt: ctx.scene.prompt || null,
+  });
 }
 
 /**
@@ -770,7 +796,7 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
         artStyleKey: params.artStyleOverride || undefined,
       });
       const evalRes = await evaluateImageQuality(
-        result.imageData, evalSceneDescription(ctx, params), evalReferencePhotos(ctx), replay.evaluationType,
+        result.imageData, evalSceneDescription(ctx, params, result), evalReferencePhotos(ctx), replay.evaluationType,
         null, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
         ctx.scene.text || null, evalSceneHint(ctx, params), ctx.scene.sceneCharacters || null,
         replay.options
@@ -1453,7 +1479,12 @@ async function runSemanticEvalStage(ctx, { promptOverride, experimentId }) {
   const replay = buildEvalReplayOptions(ctx, {
     detectedFigures: ctx.scene.bboxDetection?.figures || null,
   });
-  const { buildExpectedCastBlock, buildEvalClothingContract } = require('./evalPipeline');
+  const { buildExpectedCastBlock, buildEvalClothingContract, judgedSceneText } = require('./evalPipeline');
+  // The scene text production's semantic judge reads: the prompt the render was
+  // SENT (evalSceneDescription: its recorded scene block when the shrink fired,
+  // else the brief), metadata-stripped as evaluateImageQuality strips it
+  // (owner, 2026-09-26: the eval judges what image generation was given).
+  const judgedScene = judgedSceneText(evalSceneDescription(ctx));
   const semanticOpts = {
     artStyle: replay.options.artStyle,
     clothingContract: buildEvalClothingContract({
@@ -1464,12 +1495,12 @@ async function runSemanticEvalStage(ctx, { promptOverride, experimentId }) {
       clothingRequirements: replay.options.clothingRequirements,
       sceneMetadata: replay.options.sceneMetadata,
       sceneHint: ctx.outlineHint,
-      originalPrompt: ctx.scene.sceneDescription || '',
+      originalPrompt: judgedScene,
     }).block,
     expectedCast: buildExpectedCastBlock({
       sceneCharacters: ctx.scene.sceneCharacters || null,
       sceneHint: ctx.outlineHint,
-      originalPrompt: ctx.scene.sceneDescription || '',
+      originalPrompt: judgedScene,
       visualBible: replay.options.visualBible,
       evaluationType: replay.evaluationType,
       detectedFigureCount: Array.isArray(replay.options.detectedFigures)
@@ -1494,7 +1525,7 @@ async function runSemanticEvalStage(ctx, { promptOverride, experimentId }) {
 
   const t0 = Date.now();
   const result = await evaluateSemanticFidelity(
-    imageData, storyText, ctx.scene.sceneDescription,
+    imageData, storyText, judgedScene,
     ctx.outlineHint, promptOverride || null, semanticOpts
   );
   const elapsedMs = Date.now() - t0;
@@ -2885,6 +2916,14 @@ function storedEvalFromScene(scene) {
     // runs but not in the lab).
     threeStageResult: scene.threeStageResult || newestWith('threeStageResult') || null,
     consolidatedPlan: scene.consolidatedPlan || newestWith('consolidatedPlan') || null,
+    // The scene the judges scored, rebuilt the way the pipeline's batch eval
+    // built it for this record (resolveEvalSceneDescription, then the judges'
+    // own metadata strip) — the consolidator reads this, never the brief.
+    judgedPrompt: require('./evalPipeline').judgedSceneText(require('./sceneMetadata').resolveEvalSceneDescription({
+      compressedScene: scene.compressedScene || null,
+      sceneDescription: scene.sceneDescription || null,
+      prompt: scene.prompt || null,
+    })) || null,
   };
 }
 

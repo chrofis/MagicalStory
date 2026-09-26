@@ -64,6 +64,8 @@ async function stampCanonicalScore(version, imageResult, opts = {}) {
     threeStageResult: imageResult.threeStageResult || null,
     // The required lettering the judges saw — the consolidator must see it too.
     requiredTexts: imageResult.requiredTexts || [],
+    // The scene the judges scored — the consolidator reads this, not the brief.
+    judgedPrompt: imageResult.judgedPrompt || null,
   } : null;
   const entityResult = (opts.entityIssues || opts.entityPenalty != null)
     ? { issues: opts.entityIssues || [], penalty: opts.entityPenalty || 0 }

@@ -5971,9 +5971,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // Set ONLY when the built prompt went over the image model's
               // character cap and shrinkPromptForModel changed the scene prose
               // (compressed, deduped or cut): the description the model
-              // actually received. A record only: the batch eval judges the
-              // render against the whole `scene.sceneDescription` (owner,
-              // 2026-09-26, sceneMetadata.resolveEvalSceneDescription). Undefined
+              // actually received. The batch
+              // eval judges the render against it instead of the pre-shrink
+              // `scene.sceneDescription`, which can name clauses the compressor
+              // removed (sceneMetadata.resolveEvalSceneDescription). Undefined
               // on every under-cap page, so nothing extra is stored there.
               compressedScene: genResult.compressedScene || null,
               characterPhotos: pageData.characterPhotos,
@@ -6260,8 +6261,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // pipeline's version builder resolves a version's own
               // `compressedScene` and falls back to the page's — so without
               // this the original cover version (v0) resolves to null even
-              // when the render was shrunk (a record only: the judges read the
-              // whole brief since 2026-09-26).
+              // when the render was shrunk, and every judge scores it against
+              // the pre-shrink build.
               compressedScene: coverData.compressedScene || null,
               characterPhotos: coverData.referencePhotos || [],
               // Carry the original render's references onto the pipeline img so

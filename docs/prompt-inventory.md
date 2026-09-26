@@ -123,7 +123,7 @@ Grok image cap: **7,900 characters** (`server/config/models.js` `maxPromptLength
 8. **reference-photo rule** (~512 chars) — which attached photo is a place and which is a person. *Why here:* a page fact: the plate-vs-identity binding of the attached images.
 9. **single-illustration rule** (~503 chars) — one full-bleed picture, no lettering, ids are not painted. *Why here:* the frame rule; the very last block the cut may spend.
 
-**Never cut. Once every step has run, only the text before the protected tail (from the first of REQUIRED OBJECTS / SEASON / LIGHT / COMPOSITION GUIDELINES / ART STYLE) is trimmed, at a sentence boundary; if the tail alone leaves no room, the render fails loudly.**
+**Never cut, and neither is the page's scene before the protected tail (from the first of REQUIRED OBJECTS / SEASON / LIGHT / COMPOSITION GUIDELINES / ART STYLE): THIS IMAGE DEPICTS, the cast lines and the brief's prose. If the prompt still does not fit once every step has run, the render fails loudly.**
 
 - **NO MARKS** — generator half of D-24 (sibling-registry page-image-generator-vs-critics parity anchor)
 - **HANDS** — generator half of D-16b (same parity anchor set)

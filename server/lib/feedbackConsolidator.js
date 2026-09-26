@@ -287,8 +287,7 @@ function flattenEntityIssues(entityReport, pageNumber = null) {
  * though the quality / semantic / entity evaluators raised neither issue).
  *
  * @param {object} args
- * @param {string} args.sceneDescription - intended scene description
- * @param {object} args.evaluation - quality evaluation { fixableIssues, semanticResult, bboxDetection }
+ * @param {object} args.evaluation - quality evaluation { fixableIssues, semanticResult, bboxDetection, judgedPrompt }
  * @param {object} [args.entityReport] - entity consistency report (whole story) — only entries for this page are used
  * @param {number} [args.pageNumber] - page number (for filtering entity report)
  * @param {Array} [args.characters] - story characters [{ name, physicalDescription }]
@@ -482,7 +481,6 @@ function dropCropArtifactFixes(plan, pageNumber = null) {
 }
 
 async function consolidateFeedback({
-  sceneDescription,
   evaluation = {},
   entityReport = null,
   // Pre-flattened per-page entity issues ({ characterName|name, severity,
@@ -526,6 +524,20 @@ async function consolidateFeedback({
     const template = promptOverride || PROMPT_TEMPLATES.feedbackConsolidator;
     if (!template) {
       return { plan: null, usage: null, error: 'feedbackConsolidator prompt template not loaded' };
+    }
+    // THE SCENE THE JUDGES SCORED (owner, 2026-09-26: "The eval should judge
+    // the same thing as image generation"). The consolidator reads the exact
+    // string the quality and semantic judges were given, which
+    // evaluateImageQuality stamps on its result as `judgedPrompt` — the prompt
+    // the image model received (or, on the batch eval, its scene block). It used
+    // to read the page's whole brief, a second contract beside the judges'.
+    // No judged prompt on the evaluation = nothing to consolidate against:
+    // fail, never fall back to another string.
+    const judgedPrompt = typeof evaluation.judgedPrompt === 'string' && evaluation.judgedPrompt.trim()
+      ? evaluation.judgedPrompt : null;
+    if (!judgedPrompt) {
+      log.error(`❌ [FEEDBACK-CONSOLIDATOR] page ${pageNumber}: the evaluation carries no judgedPrompt — the scene the judges scored is unknown, not consolidating`);
+      return { plan: null, usage: null, error: 'evaluation carries no judgedPrompt' };
     }
 
     // evaluateImageQuality merges the compliance (three-stage) findings into
@@ -606,7 +618,7 @@ async function consolidateFeedback({
     });
 
     const userInput = buildFeedbackInput({
-      sceneDescription,
+      sceneDescription: judgedPrompt,
       fixableIssues,
       semanticIssues,
       complianceIssues,
@@ -953,6 +965,9 @@ async function consolidateEvaluation({
   entityIssues = [],
   // Page-scoped IMG faults from the previous round's book audit.
   readerFindings = [],
+  // The page's DECLARED brief, read only for its `interactions` list by the
+  // deterministic spec-conflict check below. The scene the consolidator is
+  // shown is the one the judges scored (`evalResult.judgedPrompt`).
   sceneDescription = '',
   characters = [],
   sceneClothing = null,
@@ -1004,7 +1019,6 @@ async function consolidateEvaluation({
   }
 
   const { plan, usage, error } = await consolidateFeedback({
-    sceneDescription,
     evaluation: evalResult,
     entityIssues: Array.isArray(entityIssues) ? entityIssues : [],
     readerFindings: Array.isArray(readerFindings) ? readerFindings : [],

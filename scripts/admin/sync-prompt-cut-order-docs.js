@@ -31,7 +31,7 @@ function cutOrder() {
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const fmt = n => n.toLocaleString('en-US');
 const tailLabels = neverCut => neverCut.filter(k => k.marker).map(k => k.label).join(' / ');
-const neverCutLead = neverCut => `Never cut. Once every step has run, only the text before the protected tail (from the first of ${tailLabels(neverCut)}) is trimmed, at a sentence boundary; if the tail alone leaves no room, the render fails loudly.`;
+const neverCutLead = neverCut => `Never cut, and neither is the page's scene before the protected tail (from the first of ${tailLabels(neverCut)}): THIS IMAGE DEPICTS, the cast lines and the brief's prose. If the prompt still does not fit once every step has run, the render fails loudly.`;
 
 function renderHtml({ steps, neverCut, grokCaps }) {
   return [

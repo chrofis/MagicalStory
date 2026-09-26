@@ -56,6 +56,9 @@ function carryEvalEvidence(qualityResult) {
     // The required lettering every judge was told about (VB strings + a painted
     // cover title). The consolidator reads it so no repair plan removes it.
     requiredTexts: qualityResult?.requiredTexts ?? null,
+    // The scene text the quality and semantic judges scored against; the
+    // consolidator reads it (feedbackConsolidator.consolidateFeedback).
+    judgedPrompt: qualityResult?.judgedPrompt ?? null,
     // The blind inventory's lettering list + the declared strings the
     // undeclared-lettering check compared it against. null = the check did
     // not run on this image; {items: []} = it ran and saw no writing.
@@ -182,7 +185,7 @@ const bboxDetectionModule = require('./bboxDetection');
 const { findBadPages, selectCharRepairTasks } = require('./repairLogic');
 // IMAGE_PROMPT for the judges = the string the model actually received.
 // Sibling of resolveEvalSceneHint; see its comment in sceneMetadata.js.
-const { resolveEvalSceneDescription, castOfRewrittenBrief } = require('./sceneMetadata');
+const { resolveEvalImagePrompt, resolveEvalSceneDescription, castOfRewrittenBrief } = require('./sceneMetadata');
 // storyHelpers functions (lazy-loaded to avoid circular dependencies)
 let storyHelpersModule = null;
 function getStoryHelpers() {
@@ -984,10 +987,10 @@ const PROMPT_CUT_ORDER = [
  * NEVER CUT. None of these is a step above, and no step may reach one:
  * cutBlocks() throws if a step would remove an exact-text entry (`text`).
  * Entries with a `marker` open the PROTECTED TAIL — everything from the first
- * of them to the end of the prompt (protectedTailStart). Once every step has
- * run, only the text before that tail (the scene prose and the page's own
- * lines) is trimmed, at a sentence boundary; if the tail alone leaves no room
- * the render fails loudly instead (owner, 2026-09-23).
+ * of them to the end of the prompt (protectedTailStart). The text before that
+ * tail (THIS IMAGE DEPICTS, the cast lines, the brief's prose) is never cut
+ * either: once every step has run and the prompt still does not fit, the render
+ * fails loudly (owner, 2026-09-23 for the tail; 2026-09-26 for the scene).
  */
 const PROMPT_NEVER_CUT = [
   { label: 'NO MARKS', why: 'generator half of D-24 (sibling-registry page-image-generator-vs-critics parity anchor)', text: () => NO_CHARACTER_MARKING_RULE },
@@ -997,7 +1000,7 @@ const PROMPT_NEVER_CUT = [
   // staging job_1790277448294_5herh01j7 (p3, p10, p14 and the back cover's Grok
   // edit, 7388 -> 6886 against 7290), and on p14 a character then wore a coat
   // that should have lain on the heap. It sits after ART STYLE, inside the
-  // protected tail, so no prose trim reaches it either.
+  // protected tail.
   { label: 'REQUIRED CAST', why: 'the generator half of D-03 / D-04b: every named character in frame, exactly one of each, nobody added', text: () => '**REQUIRED CAST:**' },
   { label: 'REQUIRED OBJECTS', why: 'the commissioned elements of the page', marker: '**REQUIRED OBJECTS' },
   { label: 'SEASON', why: 'the book-wide season, even against a reference photo from another season', marker: '**SEASON:**' },
@@ -1071,13 +1074,7 @@ function sectionAwareCut(prompt, maxLen, logLabel) {
     }
   }
 
-  let proseCut = 0;
   if (out.length > maxLen) {
-    // Nothing droppable is left and the page still does not fit. Trim the SCENE
-    // PROSE at a sentence boundary — never mid-word, never a character index
-    // (owner, 2026-08-17): the head is written in reading order, so slicing at
-    // a byte offset deletes the LAST-described characters outright while the
-    // evaluator still scores the render against a contract they were cut from.
     const tailStart = protectedTailStart(out);
     if (tailStart < 0) {
       // Not an image prompt (the Grok edit body, the composite blend): no
@@ -1085,29 +1082,20 @@ function sectionAwareCut(prompt, maxLen, logLabel) {
       const truncated = truncatePromptForModel(out, maxLen, logLabel);
       return { text: truncated, dropped, droppedSteps, proseCut: out.length - truncated.length };
     }
-    const tail = out.slice(tailStart);
-    const headBudget = maxLen - tail.length - 5;
-    if (headBudget < 500) {
-      // The MUST-KEEP tail alone leaves no room for the scene. A blunt cut here
-      // would delete must-keep text (it used to: truncatePromptForModel sliced
-      // the end off, ART STYLE first). Fail the render instead (owner,
-      // 2026-09-23: must-keep sections are never cut; if it cannot fit, fail
-      // loudly).
-      throw new PromptFitError(`prompt-shrink [${logLabel}]: ${out.length} chars after every drop, cap ${maxLen}; the must-keep sections alone are ${tail.length} chars — refusing to cut them`);
-    }
-    let head = out.slice(0, tailStart);
-    const keep = head.slice(0, headBudget);
-    const lastStop = Math.max(keep.lastIndexOf('. '), keep.lastIndexOf('.\n'));
-    const cut = lastStop > headBudget * 0.5 ? lastStop + 1 : headBudget;
-    proseCut = head.length - cut;
-    head = head.slice(0, cut);
-    out = head.trimEnd() + '\n' + tail;
+    // THE SCENE IS NEVER CUT (owner, 2026-09-26: "The eval should judge the
+    // same thing as image generation"). Every ranked block is gone and the
+    // prompt still does not fit. What is left before the protected tail is the
+    // page itself — THIS IMAGE DEPICTS, the cast and worn items, the brief's
+    // prose — and the judges score the render against exactly what was sent,
+    // so trimming it here (as a last-resort sentence cut did until this date)
+    // would hand the illustrator and the judges a smaller page than the brief.
+    // Fail the render loudly instead (the 2026-09-23 prompt-fit rule).
+    throw new PromptFitError(`prompt-shrink [${logLabel}]: ${out.length} chars after every allowed drop (${dropped.join(', ') || 'none'}), cap ${maxLen}; what is left is the page's scene (${tailStart} chars) and its must-keep sections (${out.length - tailStart} chars) — refusing to cut either`);
   }
 
   log.warn(`✂️ [${logLabel}] Section-aware cut: ${prompt.length}→${out.length} chars`
-    + (droppedSteps.length ? `, cut in order: ${describeCutSteps(droppedSteps)}` : '')
-    + (proseCut ? `, AND ${proseCut} chars of scene prose — a character may be missing` : ''));
-  return { text: out, dropped, droppedSteps, proseCut };
+    + (droppedSteps.length ? `, cut in order: ${describeCutSteps(droppedSteps)}` : ''));
+  return { text: out, dropped, droppedSteps, proseCut: 0 };
 }
 
 /** "#1 COUNTS (-235) > #2 Composition: size (-305)" — step numbers are PROMPT_CUT_ORDER positions. */
@@ -1164,8 +1152,8 @@ function sceneHeadOf(prompt) {
  *   field null on the one over-cap page of staging job_1789348171785_9oxos7dwv
  *   (p7, 8,002 chars against grok-imagine-image-2.0's 7,900 cap): dedupe alone
  *   brought it to 7,242, so nothing recorded that the sent prose differed from
- *   the built prose at all. It is a RECORD of what was sent: since 2026-09-26
- *   no judge reads it — the judges read the whole brief
+ *   the built prose at all. The batch image eval judges the render against that
+ *   description rather than the pre-shrink one
  *   (sceneMetadata.resolveEvalSceneDescription). It is the head ALONE: taken
  *   from strictly before the `**REQUIRED OBJECTS` / `**ART STYLE` tail split,
  *   so it carries no ART STYLE block, and it is not a second copy of the whole
@@ -1416,8 +1404,8 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
                                           // (xAI's edit cap is 5). null = production default.
     // Out-param: receives `compressedScene` when the prompt went over the
     // model's cap and shrinkPromptForModel LLM-compressed the scene prose.
-    // Callers stamp it onto the page record as the record of what was sent
-    // (no judge reads it since 2026-09-26: judges read the whole brief).
+    // Callers stamp it onto the page record so the batch eval judges the render
+    // against the description that was actually sent.
     promptMeta = null,
   } = opts;
 
@@ -1865,13 +1853,13 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   });
 
   // Same 9-arg quality eval every non-avatar branch ran inline before.
-  // IMAGE_PROMPT = `prompt` as BUILT, before any shrink (owner, 2026-09-26:
-  // a judge reads the source the generator was given, uncut). Over the model's
-  // cap _dispatchImageGeneration cuts it and returns the sent string as
-  // `raw.promptSent`, which stays the record of what was sent, never the
-  // contract (sceneMetadata.resolveEvalSceneDescription).
+  // IMAGE_PROMPT = the string the provider actually received. `prompt` is the
+  // PRE-shrink text; over the model's cap _dispatchImageGeneration compresses
+  // it and returns the sent string as `raw.promptSent`. See
+  // sceneMetadata.resolveEvalImagePrompt for why judging the pre-shrink text
+  // manufactures "missing X" findings against instructions never given.
   const runEval = () => evaluateImageQuality(
-    raw.imageData, prompt,
+    raw.imageData, resolveEvalImagePrompt({ promptSent: raw.promptSent, originalPrompt: prompt }),
     characterPhotos, evaluationType,
     qualityModelOverride, pageContext, storyText, sceneHint, sceneCharacters
   );
@@ -2142,9 +2130,10 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   
           // Evaluate image quality with prompt and reference images
           log.debug(`📊 [EVAL] Evaluating image quality (${evaluationType})...${qualityModelOverride ? ` [model: ${qualityModelOverride}]` : ''}`);
-          // Same rule as the runEval above: judge against the prompt as built,
-          // before any shrink (parts[0].text is the post-shrink text sent).
-          const qualityResult = await evaluateImageQuality(compressedImageData, prompt, characterPhotos, evaluationType, qualityModelOverride, pageContext, storyText, sceneHint, sceneCharacters);
+          // Same rule as the runEval above: judge against what Gemini received.
+          // parts[0].text is the post-shrink text (it is also what this branch
+          // stamps as the result's `prompt`, a few lines down).
+          const qualityResult = await evaluateImageQuality(compressedImageData, resolveEvalImagePrompt({ promptSent: parts[0]?.text, originalPrompt: prompt }), characterPhotos, evaluationType, qualityModelOverride, pageContext, storyText, sceneHint, sceneCharacters);
   
           // Extract score, reasoning, and text error info from quality result
           const score = qualityResult ? qualityResult.score : null;
@@ -2311,8 +2300,8 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
   // Over-cap prompts are LLM-compressed before they are sent. `shrinkMeta`
   // collects the COMPRESSED SCENE BLOCK so it can be stamped onto the result
-  // (and from there onto the page record) as the record of what was sent; the
-  // judges read the whole brief (decisions.md 2026-09-26). Empty on the
+  // (and from there onto the page record) — the batch image eval scores the
+  // render against that description, not the pre-shrink one. Empty on the
   // overwhelmingly common under-cap path, and the field is then omitted
   // entirely, so unshrunk pages carry exactly what they carried before.
   const shrinkMeta = {};
@@ -2903,10 +2892,18 @@ async function evaluateImageBatch(images, options = {}) {
       // DESCRIPTION, and the resolveEvalArtStyle call below depends on that —
       // ORIGINAL_PROMPT here must carry no ART STYLE block.
       //
-      // The WHOLE brief, shrunk page or not (owner, 2026-09-26): the post-shrink
-      // `compressedScene` is a record of what was sent, never the judge's input.
-      // See sceneMetadata.resolveEvalSceneDescription.
+      // But when the page's built prompt went over the model cap,
+      // shrinkPromptForModel COMPRESSED the scene prose before sending it, and
+      // the description stored on the page still names clauses the model never
+      // received. The shrink path now hands its compressed scene block back
+      // (`compressedScene`), so that is what the judge scores against when it
+      // exists. No shrink → the exact chain this site always used. The resolver
+      // also re-checks the ART STYLE invariant on the compressed string, since
+      // that head is LLM-rewritten. See
+      // sceneMetadata.resolveEvalSceneDescription (sibling of
+      // resolveEvalImagePrompt, which closed the six prompt-side sites).
       const sceneDescWithClothing = resolveEvalSceneDescription({
+        compressedScene: img.compressedScene,
         sceneDescription: img.sceneDescription,
         prompt: img.prompt,
       });
@@ -5516,9 +5513,9 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       }
       try {
         iterQuality = await evaluateImageQuality(
-          // imagePrompt is the build, before any shrink: the judge reads the
-          // prompt the page was given whole (sceneMetadata.resolveEvalSceneDescription).
-          genResult.imageData, imagePrompt,
+          // genResult.prompt is the string generateImageOnly actually sent
+          // (post-shrink); imagePrompt is the pre-shrink build.
+          genResult.imageData, resolveEvalImagePrompt({ promptSent: genResult.prompt, originalPrompt: imagePrompt }),
           refApplied.characterPhotos, coverOpts ? 'cover' : 'scene', null,
           iterLabel, null, null, sceneCharacters, {
             // A cover's text contract (baked title / app-side typography),

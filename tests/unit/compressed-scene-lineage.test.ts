@@ -73,7 +73,11 @@ describe('the shrinker records the exact head it sent', () => {
     // No text model: the deterministic section-aware cut is the guarantee
     // branch, and it must record its result like the compression branch does.
     textModels.callTextModel = async () => { throw new Error('offline'); };
-    const built = buildPrompt(CAP + 4000);
+    // Over the cap by less than the DEPTH AND SIZE paragraph it carries: the
+    // scene itself is never cut (2026-09-26), only a ranked block.
+    const depth: string = fs.readFileSync(path.join(process.cwd(), 'prompts', 'image-generation.txt'), 'utf-8')
+      .split(/\n{2,}/).map(x => x.trim()).find(x => x.startsWith('**DEPTH AND SIZE:**'))!;
+    const built = `${buildPrompt(CAP - 400)}\n\n${depth}`;
     expect(built.length).toBeGreaterThan(CAP);
 
     const meta: any = {};
@@ -86,11 +90,11 @@ describe('the shrinker records the exact head it sent', () => {
     expect(meta.compressedScene).toBe(headOf(sent));
     // …and it is the head ALONE, never a second copy of the whole prompt.
     expect(meta.compressedScene).not.toContain('**ART STYLE');
-    // A record only: the judge reads the whole brief (owner, 2026-09-26).
+    // The judge reads it in preference to the stored (pre-shrink) brief.
     expect(resolveEvalSceneDescription({
       compressedScene: meta.compressedScene,
       sceneDescription: 'the PRE-shrink brief',
-    } as any)).toBe('the PRE-shrink brief');
+    })).toBe(meta.compressedScene);
   }, 30000);
 
   it('under the cap: the prompt is untouched and nothing is recorded', async () => {
@@ -103,6 +107,7 @@ describe('the shrinker records the exact head it sent', () => {
     // No fallback masking: a page that was never shrunk is judged against its
     // stored brief, exactly as before.
     expect(resolveEvalSceneDescription({
+      compressedScene: meta.compressedScene ?? null,
       sceneDescription: 'the stored brief',
     })).toBe('the stored brief');
   }, 30000);

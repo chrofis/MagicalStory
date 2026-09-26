@@ -401,10 +401,10 @@ function inheritSceneContract(target, parent) {
  *
  * `shrinkPromptForModel` (images.js) rewrites, dedupes or cuts the prompt HEAD
  * whenever the built prompt is over the image model's character cap, and stamps
- * what it actually sent as `compressedScene`: the record of which render was
- * sent which prose. No judge reads it since 2026-09-26 (the judges read the
- * whole brief, sceneMetadata.resolveEvalSceneDescription); the lineage below
- * keeps the record true per version.
+ * what it actually sent as `compressedScene`. Every judge scores the render
+ * against that string rather than the pre-shrink brief
+ * (sceneMetadata.resolveEvalSceneDescription), so the wrong one silently grades
+ * a picture against prose the model never received.
  *
  * Three cases, and the middle one is why this is not a `||` chain:
  *   - the version was compressed at its own render → its own string wins;
@@ -441,8 +441,8 @@ function resolveVersionCompressedScene(version, page) {
  * root can never describe an earlier render than its sibling `compressedScene`
  * does — but deliberately WITHOUT that helper's "authored its own brief → null"
  * branch, because the two fields are read by different kinds of consumer:
- *   - `compressedScene` is a record of the sent prose, where a stale string
- *     misstates which prose a picture was painted from. Null is strictly better.
+ *   - `compressedScene` is a JUDGE input, where a stale string silently grades a
+ *     picture against prose it was never painted from. Null is strictly better.
  *   - the root `prompt` is a MODEL input on the re-run path — repairPipeline's
  *     non-iterate regen interpolates `${img.prompt}` straight into the string it
  *     hands the image model, unguarded — and `buildEvalInputs` uses it as the

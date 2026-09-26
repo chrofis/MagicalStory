@@ -2323,32 +2323,81 @@ function resolveEvalSceneHint({ evaluationType, entryDescription = null, sceneDe
 }
 
 /**
- * ORIGINAL_PROMPT for the BATCH image eval = the page's scene DESCRIPTION, whole.
+ * IMAGE_PROMPT for the image evaluators = the string the image model ACTUALLY
+ * received.
  *
- * The batch eval feeds the judge the scene DESCRIPTION (the brief) rather than
- * the built prompt, because `resolveEvalArtStyle` (services/prompts) depends on
- * ORIGINAL_PROMPT carrying no ART STYLE block.
+ * Every image judge is told IMAGE_PROMPT is "the expanded scene sent to the
+ * image model" and scores the render against it. But a prompt over the model's
+ * character cap does not reach the model as written: `shrinkPromptForModel`
+ * (images.js) LLM-compresses the HEAD of the prompt, holding back only the
+ * `**REQUIRED OBJECTS` / `**ART STYLE` tail, the reference-card colour map and
+ * the static rendering rules. Everything else — the scene prose itself — is
+ * rewritten shorter, and clauses go missing by design.
  *
- * THE JUDGES READ THE BRIEF, NEVER THE SHRUNK TEXT (owner, 2026-09-26; the
- * standing rule "every critic judges against the source the generator was
- * given, uncut", decisions.md). Until then a page whose built prompt went over
- * the image model's cap was judged against `compressedScene` — the HEAD of the
- * built prompt after `shrinkPromptForModel` cut it — while every other page was
- * judged against its brief, and the consolidator read the whole brief either
- * way. The shrink is a transport limit of one image model, not the contract:
- * what it drops is generic guidance that is not in the brief anyway (COUNTS,
- * Composition, DEPTH, HEIGHT ORDER, AGE, the reference and frame rules) and, as
- * a last resort, the end of the scene prose. A page that could not be told its
- * whole brief is still judged against it; a miss there is a real miss.
- * `compressedScene` stays on the record as what was sent; no judge reads it.
+ * Handing the judge the PRE-shrink text makes it score the image against
+ * instructions the generator never got: the compressor drops a clause, the
+ * model never draws it, and the judge files a full-severity "it is missing"
+ * against a render that obeyed everything it was told.
+ *
+ * Measured on staging 2026-09-13, job_1789301291267_ueh8h145m: page 1 stores a
+ * 7,939-char prompt and page 4 v0 an 8,317-char one, both rendered by
+ * grok-imagine-image-2.0 whose cap is 7,900 — i.e. the shrinker fired on those
+ * pages and the string the judge was given is not the string the model saw.
+ *
+ * The generation paths return the sent string as `promptSent` (stamped onto
+ * their result as `prompt`); `originalPrompt` is the pre-shrink text and stays
+ * as the last resort for callers/tests that have nothing else.
  *
  * @param {Object} sources
+ * @param {string|null} [sources.promptSent] - the string handed to the provider
+ * @param {string|null} [sources.originalPrompt] - pre-shrink prompt (fallback only)
+ * @returns {string|null}
+ */
+function resolveEvalImagePrompt({ promptSent = null, originalPrompt = null } = {}) {
+  const pick = (...vals) => vals.find(v => typeof v === 'string' && v.trim()) || null;
+  return pick(promptSent, originalPrompt);
+}
+
+/**
+ * ORIGINAL_PROMPT for the BATCH image eval = the scene DESCRIPTION the image
+ * model actually received.
+ *
+ * Sibling of resolveEvalImagePrompt, and the last open site of the same bug.
+ * The batch eval deliberately feeds the judge a scene DESCRIPTION rather than
+ * the full prompt, because `resolveEvalArtStyle` (services/prompts) depends on
+ * ORIGINAL_PROMPT carrying NO `**ART STYLE` block — a prompt would make every
+ * style-dependent evaluator rule read the style out of the wrong string.
+ *
+ * When the page's built prompt went over the image model's character cap,
+ * `shrinkPromptForModel` (images.js) LLM-compresses the prompt's HEAD — the
+ * scene prose — and sends that instead. It now hands the compressed head back
+ * as `compressedScene`, which the generation paths stamp onto the page record.
+ * That string is the description the generator was really given, so it is what
+ * the judge must score against; without it the judge files "the boat is
+ * missing" against a clause the compressor removed before the model ever saw
+ * it.
+ *
+ * Shrinking is the uncommon case: with no `compressedScene` the chain is
+ * exactly what this site did before (sceneDescription, then prompt), so an
+ * unshrunk page's eval input is byte-identical.
+ *
+ * THE ART STYLE INVARIANT IS ENFORCED HERE, not assumed. The compressed head is
+ * taken from strictly before the `**REQUIRED OBJECTS` / `**ART STYLE` tail
+ * split, so it cannot contain a style block by construction — but the head is
+ * rewritten by an LLM, and a compressor that echoes a style heading back would
+ * silently poison resolveEvalArtStyle. A candidate carrying an ART STYLE block
+ * is therefore rejected and the page falls back to its stored description.
+ *
+ * @param {Object} sources
+ * @param {string|null} [sources.compressedScene] - post-shrink scene block, when the shrinker compressed
  * @param {string|null} [sources.sceneDescription] - the page's stored scene description
- * @param {string|null} [sources.prompt] - last resort when a record carries no description
+ * @param {string|null} [sources.prompt] - last-resort fallback (today's behaviour)
  * @returns {string} - never null; '' when nothing is available (the batch eval passes a string)
  */
-function resolveEvalSceneDescription({ sceneDescription = null, prompt = null } = {}) {
+function resolveEvalSceneDescription({ compressedScene = null, sceneDescription = null, prompt = null } = {}) {
   const usable = v => typeof v === 'string' && v.trim();
+  const carriesArtStyle = v => /\*\*ART STYLE/i.test(v);
+  if (usable(compressedScene) && !carriesArtStyle(compressedScene)) return compressedScene;
   return [sceneDescription, prompt].find(usable) || '';
 }
 
@@ -2752,6 +2801,7 @@ module.exports = {
   sceneDescriptionRecord,
   describeDegradedSceneMetadata,
   resolveEvalSceneHint,
+  resolveEvalImagePrompt,
   resolveEvalSceneDescription,
   resolveTextStagePictureSpec,
   buildTextStagePictureSpecs,

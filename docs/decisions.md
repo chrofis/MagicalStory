@@ -61,6 +61,79 @@ tests/unit/recorded-features-render-and-judge.test.ts, tests/judge-fixtures/fixt
 (`entity-lorena-paint-wash-not-vitiligo` pass replaces the wrong flag; `entity-sarah-y3n-recorded-piercings-missing` flag)
 **Status:** ✅ active (staging)
 
+---
+
+## 2026-09-26 — The judges read the prompt the image model was SENT; the shrink never cuts the page's scene; the consolidator reads what the judges read (SUPERSEDES part 3 of the same day's "The judges read what the generator was given, whole", f9d3e5cb6)
+
+**Context.** Owner correction, 2026-09-26: **"The eval should judge the same thing as image generation, not a
+different prompt."** Part 3 of f9d3e5cb6 (entry below) made the quality and semantic judges read the page's whole
+BRIEF (batch eval) or the prompt as BUILT before the shrink (direct `runEval`, the Gemini branch, iterate, the direct
+cover render) instead of the prompt actually sent to the image model, and deleted `resolveEvalImagePrompt`. That broke
+the generator↔critic rule: a judge may only deduct for what the generator was given. Two more places judged against
+text the model never got:
+- `shrinkPromptForModel` / `sectionAwareCut` — once every ranked block was dropped, a last-resort trim cut the END of
+  the text before the protected tail at a sentence boundary: the page's own scene (brief prose, cast lines). The
+  judges were then either handed the brief (f9d3e5cb6) or a scene block missing sentences (before it).
+- The feedback consolidator read the page's whole brief whatever the judges were given (`consolidatePageEval` →
+  `orig.sceneDescription`), so the repair plan was written against a second contract.
+
+**Decision.**
+1. **Part 3 reverted.** `sceneMetadata.resolveEvalImagePrompt` is back: the direct `runEval`, the Gemini branch,
+   iterate (`iteratePageCore`) and the direct cover render (`iterateCover`) judge `promptSent` — the string the
+   provider received. The batch eval's `resolveEvalSceneDescription` reads `compressedScene` again (the scene block of
+   the sent prompt, recorded by the shrink) before the brief. Parts 1 and 2 of f9d3e5cb6 stay (plate QC inputs whole,
+   STRUCTURES and the Visual Bible grid — those are what the plate's author got).
+2. **The consolidator reads what the judges read.** `evaluateImageQuality` stamps `judgedPrompt` on its result (the
+   IMAGE_PROMPT it was handed, after its own metadata strip — `evalPipeline.judgedSceneText`, one function);
+   `carryEvalEvidence` carries it; `consolidateFeedback` shows it as "Intended scene description" and **refuses to
+   consolidate an evaluation without one** (logged error, no fallback to the brief). `sceneDescription` on
+   `consolidateEvaluation` is now read only for the declared `interactions` of the deterministic spec-conflict check
+   (a declared list). The Lab mirrors production: `evalSceneDescription` resolves the sent scene of the render it
+   judges (a fresh Lab render's own `compressedScene`, a pinned version via `resolveVersionCompressedScene`, else the
+   page record) through the same resolver; `runSemanticEvalStage` reads that same text (it passed the brief);
+   `storedEvalFromScene` rebuilds `judgedPrompt` for a stored evaluation; `regeneration.stampCanonicalScore` forwards it.
+3. **The shrink never cuts the scene.** The last-resort prose trim in `sectionAwareCut` is deleted. Only
+   `PROMPT_CUT_ORDER` blocks (generic guidance: COUNTS, Composition bullets, DEPTH AND SIZE, then HEIGHT ORDER, AGE &
+   PROPORTIONS, the reference-photo and single-illustration rules) may be dropped. THIS IMAGE DEPICTS, the cast and
+   worn-item lines, the brief's prose and the protected tail (REQUIRED OBJECTS, SEASON, LIGHT, ART STYLE, REQUIRED
+   CAST, SHOT, EXACT POSES …) are never cut: a prompt the ranked drops cannot fit throws `PromptFitError` (the
+   2026-09-23 prompt-fit rule; the render fails loudly, no provider fallback). Prompts with no tail marker (the Grok
+   edit body, the composite blend) keep `truncatePromptForModel`, unchanged.
+
+**Measured (rung 1, stored data, $0).**
+- Shrink, from every stored `prompt_shrink` generation event of the last 14 days: staging 82 events on 4 stories (78
+  page/cover `cut`, 4 `plate-cut`); **the page's own head was trimmed once** (`job_1790373080139_vnx5l8iy7` p7
+  iterate-round-1, 11,605 → 7,882, 216 chars after all nine blocks were dropped; its brief prose is intact in the stored
+  prompt, so the 216 chars were page lines after it). Under this change the other 77 cut events behave byte-identically
+  (same drops, same result) and that one render fails loudly — **1 of 78**. Production records no shrink events (prod
+  runs 2026-09-20 code, before `recordPromptShrink`).
+- What the judges read, over the 159 stored page/cover prompt records of the 5 staging stories created since the
+  deterministic shrink (2026-09-21): 140 were shrunk; the judges' text is the sent prompt's own scene block on 140/140;
+  it carries every brief prose sentence on 125/140. All 15 misses are on `job_1790107559778_fcmlfa8kn`, a production
+  story copied to staging and rendered by production's older shrink.
+- Fairness of f9d3e5cb6's stricter findings on `job_1790446348343_z3fw660ie` (Fiona), read from the stored SENT
+  prompts (root and v0): p6 — the boots, breeches and "hand grasping empty air mere inches from her black ankle boots"
+  are all in the sent prompt; p12 — the coat-rope, "heavy rusted iron ring … crumbling mortar" are all in the sent
+  prompt; p3 — "sewing scissors hang from the sash knot" is in neither the brief nor the sent prompt text. It reached
+  the judge only through the CLOTHING CONTRACT (the costumed avatar's `clothingDescription`); the generator got that
+  outfit as the attached costumed reference and a WORN ITEMS line whose look is cut at "a black cotton knee-length
+  ski…". Open, owner decision (BACKLOG).
+
+**Tests.** `tests/unit/judges-read-the-sent-prompt.test.ts` (real builder, real shrink, real consolidator): every brief
+sentence, THIS IMAGE DEPICTS and LIGHT reach the model when the drops fit; a prompt they cannot fit throws; the batch
+judges' text is the sent scene block; the consolidator shows `judgedPrompt` and refuses without it.
+`eval-image-prompt-source`, `eval-scene-description-source`, `compressed-scene-lineage` restored to the sent-prompt
+contract; the shrink fixtures of `cover-shrink-must-keep`, `generator-critic-rule-reach`, `stored-prompt-is-sent-prompt`,
+`version-prompt-is-own-render`, `image-sanitization-ladder` now go over the cap by less than their droppable blocks.
+
+**Touched:** `server/lib/sceneMetadata.js`, `server/lib/images.js`, `server/lib/coverIterate.js`,
+`server/lib/repairLogic.js` (comments), `storyJobPipeline.js` (comments), `server/lib/evalPipeline.js`,
+`server/lib/feedbackConsolidator.js`, `server/routes/regeneration.js`, `server/lib/testlab.js`,
+`scripts/admin/sync-prompt-cut-order-docs.js`, `docs/image-generation-methods.html`, `docs/prompt-inventory.md`, tests above.
+**Status:** ✅ active on staging.
+
+---
+
 ## 2026-09-26 — The judges read what the generator was given, whole: the plate QC reads its inputs uncut plus the STRUCTURES and grid; the quality and semantic judges read the brief, never the shrunk text (SUPERSEDES the same day's "EXPECTED SCENE keeps its 300 cap" and the 2026-09-13 "judge the string the model actually received")
 
 **Context.** The standing rule of the same day ("Every critic judges against the source the generator was
@@ -96,7 +169,8 @@ given, uncut", below) left three input defects as owner decisions. The owner app
    A derived plate is judged against its base's structures and grid (it keeps the base's structures, as it keeps
    the base's landmark photo). Every story-run site (vantage base + retry, derived, per-page + retry) and the Lab
    (`labPlateQcOptions` + `labPlateStructureInputs`, empty_scene, edit_image, judge_fixture) pass them.
-3. The quality and semantic judges read the brief (batch eval: `resolveEvalSceneDescription` without
+3. **SUPERSEDED the same day (owner: "The eval should judge the same thing as image generation, not a different
+   prompt") — see the entry above: the judges read the SENT prompt again.** The quality and semantic judges read the brief (batch eval: `resolveEvalSceneDescription` without
    `compressedScene`) or the prompt as BUILT (direct `runEval`, the Gemini branch, iterate, the direct cover
    render). `resolveEvalImagePrompt` is DELETED. `compressedScene` and the stored `prompt` stay as the RECORD of
    what was sent; no judge reads them. **Deliberately not part of the contract:** the generic blocks the shrink cuts
@@ -142,7 +216,7 @@ given, uncut", below) left three input defects as owner decisions. The owner app
 `tests/unit/{plate-qc-era-framing-photo,plate-qc-per-page,lab-plate-qc-always,empty-scene-qc-extraction,
 eval-image-prompt-source,eval-scene-description-source,compressed-scene-lineage,plate-prompt-fit}.test.ts`,
 `docs/prompt-inventory.md`, `tasks/BACKLOG.md`.
-**Status:** 🟡 active on staging.
+**Status:** 🟡 items 1-2 active on staging; item 3 🗄 superseded (entry above, "The judges read the prompt the image model was SENT").
 
 ---
 

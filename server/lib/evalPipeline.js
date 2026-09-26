@@ -2160,6 +2160,27 @@ function styleGateEchoedFields(styleGate, artStyleText, templateText = '') {
   });
 }
 
+/**
+ * The scene text the quality and semantic judges read, from the IMAGE_PROMPT a
+ * caller hands evaluateImageQuality: the same string with a brief's METADATA
+ * block stripped. evaluateImageQuality stamps the result on its return as
+ * `judgedPrompt` (the consolidator reads it); the Lab rebuilds it for a STORED
+ * evaluation through this same function, so the two can never differ.
+ *
+ * @param {string} originalPrompt
+ * @returns {string}
+ */
+function judgedSceneText(originalPrompt) {
+  if (!originalPrompt) return originalPrompt;
+  if (require('./sceneMetadata').splitBrief(originalPrompt).carrier
+      || originalPrompt.includes('"previewMismatches"') || originalPrompt.includes('"checks"')) {
+    const { stripSceneMetadata } = getStoryHelpers();
+    const stripped = stripSceneMetadata(originalPrompt);
+    if (stripped && stripped !== originalPrompt) return stripped;
+  }
+  return originalPrompt;
+}
+
 async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene', qualityModelOverride = null, pageContext = '', storyText = null, sceneHint = null, sceneCharacters = null, evalOptions = {}) {
   // evalOptions.evalTemplateOverride / .semanticTemplateOverride: Test Lab A/B
   // variants — full replacement template strings used instead of the loaded
@@ -2192,11 +2213,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // "previewMismatches" nor "checks" skipped the strip entirely and shipped
     // the whole JSON — `objects: ["LOC006","ART001",...]` included — into the
     // evaluator prompt.
-    if (originalPrompt && (require('./sceneMetadata').splitBrief(originalPrompt).carrier
-        || originalPrompt.includes('"previewMismatches"') || originalPrompt.includes('"checks"'))) {
-      const { stripSceneMetadata } = getStoryHelpers();
-      const stripped = stripSceneMetadata(originalPrompt);
-      if (stripped && stripped !== originalPrompt) {
+    {
+      const stripped = judgedSceneText(originalPrompt);
+      if (stripped !== originalPrompt) {
         log.debug(`✂️ [QUALITY] ${pageContext} Stripped scene description: ${originalPrompt.length} → ${stripped.length} chars`);
         originalPrompt = stripped;
       }
@@ -3804,6 +3823,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         // painted cover title). The consolidator reads it so a repair plan never
         // removes a string the page must show.
         requiredTexts: requiredTextItems,
+        // The scene text the quality and semantic judges were given (after the
+        // metadata strip above): the prompt the image model received, or its
+        // scene block on the batch eval. The consolidator reads THIS string,
+        // so one page is never judged against two contracts (owner, 2026-09-26).
+        judgedPrompt: originalPrompt || null,
         issuesSummary: combinedIssuesSummary,
         textIssue,
         fixTargets: jsonFixTargets,       // Legacy format with bboxes (backwards compat)
@@ -3931,6 +3955,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         // painted cover title). The consolidator reads it so a repair plan never
         // removes a string the page must show.
         requiredTexts: requiredTextItems,
+        // The scene text the quality and semantic judges were given (after the
+        // metadata strip above): the prompt the image model received, or its
+        // scene block on the batch eval. The consolidator reads THIS string,
+        // so one page is never judged against two contracts (owner, 2026-09-26).
+        judgedPrompt: originalPrompt || null,
         issuesSummary,
         fixTargets,
         semanticResult,
@@ -3997,6 +4026,7 @@ module.exports = {
   evaluateThreeStage,
   sanitizeForGemini,
   evaluateImageQuality,
+  judgedSceneText,
   buildEvalClothingContract,
   buildEvalRequiredObjects,
   buildExpectedCastBlock,
