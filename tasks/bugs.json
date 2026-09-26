@@ -2135,7 +2135,10 @@
       "source": "Stored evidence, production: trial job_1790282439176_ppgelxibt (\"Burak und der Stein des Superritters\", 2026-09-24 22:40 CH). characters row characters_cb45705e-4309-407e-a39c-35d5de9e62f4: age \"5\", physical.apparentAge \"middle-aged\". Page 2/4 image prompts carried \"Burak: adult proportions about 7.5-8 heads tall, full adult height, mature bone structure...\", the back-cover prompt \"Burak is a middle-aged man\"; the pages show an adult man while the avatar sheets show a child.",
       "rootCause": "server/routes/trial.js wrote extractedTraits.apparentAge straight onto physical at both trial trait writers (generate-preview-avatar DB save, create-anonymous-account background save) without clampApparentAge, which the regular avatar paths (routes/avatars.js) always apply. extractCharacterVisualProfile trusts physical.apparentAge over the declared age on the premise that it is clamped. Introduced by e894b0fe6 (2026-03-08).",
       "impact": "Any trial whose photo reads more than one age group away from the declared age renders the hero at the photo's age on every page and cover (adult proportions for a child).",
-      "status": "open"
+      "status": "fixed",
+      "fixedAt": "2026-09-26",
+      "fixedIn": "63ed8628b",
+      "fix": "Both trial writers go through applyTrialPhotoTraits (server/lib/trialAge.js): clampApparentAge against the age on the row at write time, with the analysis confidence (extractTraitsShared carries it). update-character-details re-bounds a stored apparentAge on an age change (reclampTrialApparentAge). Sibling set photo-apparent-age-clamp. Test: trial-apparent-age-clamp.test.ts; replay of Burak's stored prod row: middle-aged -> young-school-age, 'adult proportions about 7.5-8 heads tall' -> 'early grade-school proportions about 5.5 heads tall'."
     }
   ]
 }
