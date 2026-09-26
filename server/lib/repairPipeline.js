@@ -508,6 +508,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // 'painted' + expectedText → evaluator letter-checks the painted text.
       expectedText: orig.expectedText ?? null,
       textMode: orig.textMode ?? null,
+      appTexts: orig.appTexts ?? null,
+      coverIsPage: orig.coverIsPage === true,
       // Detection reuse, in pairing order: the entry's OWN detection first —
       // a round-result entry carries the detection made on its accepted new
       // bytes (iterate's internal re-detect, or the round pre-detect step) —

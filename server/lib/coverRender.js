@@ -27,7 +27,7 @@ const { COVER_TEXT_POSITION } = require('./coverKeys');
  * @param {string} [ctx.title] - the story title (baked onto the front cover)
  * @param {string} [ctx.dedication]
  * @param {string} [ctx.coverTitleMode] - a run override of runtime.coverTitleMode
- * @returns {null|{coverKey, aspectRatio, textInImage, textPosition, bakeTitle, titleBaked, imageModel, textMode, expectedText, usageLabel, captureLabel}}
+ * @returns {null|{coverKey, aspectRatio, textInImage, textPosition, bakeTitle, titleBaked, imageModel, textMode, expectedText, appTexts, usageLabel, captureLabel}}
  */
 function coverRenderOptions(pageNumber, { title = '', dedication = null, coverTitleMode = null } = {}) {
   const coverKey = coverKeyOfPage(pageNumber);
@@ -35,7 +35,7 @@ function coverRenderOptions(pageNumber, { title = '', dedication = null, coverTi
   const { resolveCoverTitleMode, resolveCoverTextContract } = require('./coverTypography');
   const titleMode = resolveCoverTitleMode(coverKey, title || '', { modeOverride: coverTitleMode });
   const titleBaked = titleMode.baked === true;
-  const { textMode, expectedText } = resolveCoverTextContract(coverKey, {
+  const { textMode, expectedText, appTexts } = resolveCoverTextContract(coverKey, {
     titleBaked, title: title || null, dedication: dedication || null,
   });
   return {
@@ -48,6 +48,7 @@ function coverRenderOptions(pageNumber, { title = '', dedication = null, coverTi
     imageModel: titleMode.bakedModel || null,
     textMode,
     expectedText,
+    appTexts,
     usageLabel: 'cover_images',
     captureLabel: 'image_cover',
   };

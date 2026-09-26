@@ -93,15 +93,16 @@ describe('resolveCoverTextContract — one rule for pipeline and iterate covers'
 
   it('a baked front cover is letter-checked against the title', () => {
     expect(resolveCoverTextContract('frontCover', { titleBaked: true, title: 'The Lantern Keeper' }))
-      .toEqual({ textMode: 'painted', expectedText: 'The Lantern Keeper' });
+      .toEqual({ textMode: 'painted', expectedText: 'The Lantern Keeper', appTexts: [] });
   });
 
   it('a textless app-side cover tells the judge the text is an overlay', () => {
     const c = resolveCoverTextContract('frontCover', { titleBaked: false, title: 'The Lantern Keeper' });
     if (appSide) {
-      expect(c).toEqual({ textMode: 'appOverlay', expectedText: null });
+      // The title is the app's own string on this cover (lettering check excuse).
+      expect(c).toEqual({ textMode: 'appOverlay', expectedText: null, appTexts: ['The Lantern Keeper'] });
     } else {
-      expect(c).toEqual({ textMode: 'painted', expectedText: 'The Lantern Keeper' });
+      expect(c).toEqual({ textMode: 'painted', expectedText: 'The Lantern Keeper', appTexts: [] });
     }
   });
 

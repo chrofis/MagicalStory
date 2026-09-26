@@ -2209,8 +2209,20 @@
       "impact": "A page scored 100 was repaired as critical and reported as shipping an unrepaired CRITICAL; the paid round did nothing. Any consolidator drop (landmark guard, not-a-defect drops) could do the same.",
       "status": "fixed",
       "fixedAt": "2026-09-26",
-      "fixedIn": "",
+      "fixedIn": "2a2dbb0b4",
       "fix": "(A) evaluateImageQuality runs landmarkProtection.guardLandmarkRecord on the semantic record and the final quality list at the merge point; dropped findings are kept as suppressedIssues (record, not deduction). (B) repairLogic.scoredFindingPools: a consolidated deduped_issues array, empty included, is the only list — the one scoring.applyScore charges; collectCriticalFindings, findSafeRepairableFinding and every decideRepairMethod gate read it, the inpaint count skips on an empty consolidated list, and the identity gate joins the figure id back from the raw finding. Tests: critical-check-reads-scored-list.test.ts, cover-lettering-check.test.ts (merge guard), critical-severity-agreement.test.ts."
+    },
+    {
+      "id": "cover-caption-never-repaired",
+      "title": "A caption painted on a cover was never a CRITICAL and never repaired; the back cover shipped \"THE FIVE FRIENDS STAND TOGETHER\"",
+      "reportedAt": "2026-09-26",
+      "source": "Owner, 2026-09-26, with stored evidence: staging job_1790446348343_z3fw660ie backCover v0 (the shipped version) carries deduped MAJOR rendered_text \"Unrequested text 'THE FIVE FRIENDS STAND TOGETHER'\" beside a CRITICAL face_drift; its image prompt opened \"THIS IMAGE DEPICTS: BOOK BACK COVER. The five friends stand happily together ...\".",
+      "rootCause": "(1) evalPipeline ran the undeclared-lettering check for evaluationType 'scene' only, so on a cover the caption was a judge MAJOR, and rendered_text is not in SAFE_REPAIRABLE_TYPES. (2) With an entity CRITICAL on the same cover, decideRepairMethod routed char-fix (one method per round) and the text was never inpainted. (3) coverBeats.js opened each cover plan line with an internal label (\"BOOK BACK COVER, not a story moment\") that the Art Director copied into sceneIntent, which leads the image prompt.",
+      "impact": "Every full-story cover could ship a painted caption or stray lettering; the one on this run did.",
+      "status": "fixed",
+      "fixedAt": "2026-09-26",
+      "fixedIn": "",
+      "fix": "The lettering check runs on covers briefed as pages (evalOptions.coverIsPage from the pipeline record, the cover iterate, buildEvalInputs and the Lab/admin replay), excusing the REQUIRED TEXT items and, in appOverlay mode, the app's own string (resolveCoverTextContract appTexts: title / dedication / magicalstory.ch). A CRITICAL rendered_text takes the round ahead of an entity or identity char-fix (the figure repair runs next round). The cover beat carries no label; the page number is the identity, explained once in COVER_GAZE_EXCEPTION. Test: cover-lettering-check.test.ts."
     }
   ]
 }

@@ -3434,17 +3434,32 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             // it sees; anything readable the page did not declare is a
             // rendered_text finding. Its old reader, the blind compliance judge,
             // is switched off, and the sighted judge missed a full-width caption
-            // on dragon run 6 p6. Scenes only: covers are judged pre-typography
-            // in appOverlay mode, and a painted cover title is a REQUIRED TEXT
-            // item (declaredTexts) the judges check through D-33.
+            // on dragon run 6 p6.
+            //
+            // COVERS BRIEFED AS PAGES TOO (2026-09-26). The check used to run on
+            // scenes only, so a caption painted on a cover was left to the
+            // sighted judges, who filed it MAJOR at most — below the repair
+            // gate: staging job_1790446348343_z3fw660ie shipped a back cover
+            // captioned "THE FIVE FRIENDS STAND TOGETHER". A full-story cover is
+            // a page (coverBeats.js) and is held to the page's lettering rule.
+            // Its declared strings are the page's: a baked title is a REQUIRED
+            // TEXT item already in declaredTexts, and the app's own string for
+            // this cover (resolveCoverTextContract `appTexts` — the same three
+            // TEXT_NOTE_APP_OVERLAY excuses for the judges) is excused, because
+            // every post-persist eval sees it stamped on the served bytes.
+            // Trial covers (no `coverIsPage`) are not on this path.
+            const letteringRuns = evaluationType === 'scene' || (isCover && evalOptions.coverIsPage === true);
+            const letteringDeclared = isCover && coverTextMode === 'appOverlay' && Array.isArray(evalOptions.appTexts)
+              ? [...declaredTexts, ...evalOptions.appTexts.filter(t => typeof t === 'string' && t.trim())]
+              : declaredTexts;
             try {
-              if (evaluationType === 'scene') {
+              if (letteringRuns) {
                 letteringInventory = require('./letteringCheck').letteringRecord({
-                  lettering: p1Result.lettering, declared: declaredTexts,
+                  lettering: p1Result.lettering, declared: letteringDeclared,
                 });
               }
-              const lettering = evaluationType !== 'scene' ? [] : require('./letteringCheck').checkUndeclaredLettering({
-                lettering: p1Result.lettering, declared: declaredTexts,
+              const lettering = !letteringRuns ? [] : require('./letteringCheck').checkUndeclaredLettering({
+                lettering: p1Result.lettering, declared: letteringDeclared,
               });
               for (const f of lettering) {
                 fixableIssues.push(f);

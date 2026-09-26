@@ -82,9 +82,18 @@ function resolveCoverTitleMode(coverType, storyTitle, { modeOverride = null } = 
  * 'appOverlay' — the art is textless and typography is composited afterwards:
  *                the judge must never flag missing or present title text.
  *
+ * `appTexts` (2026-09-26) — the string the APP composites onto this cover in
+ * 'appOverlay' mode: the front cover's title, the opening page's dedication,
+ * the back cover's "magicalstory.ch". The undeclared-lettering check excuses
+ * exactly these, the same three the judges' TEXT_NOTE_APP_OVERLAY excuses
+ * (prompts/cover-evaluation-notes.txt): the pipeline judges the textless art
+ * before the stamp, but every post-persist eval (Lab, admin re-evaluate,
+ * repair of a finished story) sees the stamped served bytes. Empty in
+ * 'painted' mode, where the one string is `expectedText` (a REQUIRED TEXT).
+ *
  * @param {string} coverKeyOrType 'frontCover'|'initialPage'|'backCover' (or 'front'/'back')
  * @param {{titleBaked?: boolean, title?: string|null, dedication?: string|null}} opts
- * @returns {{ textMode: 'painted'|'appOverlay', expectedText: string|null }}
+ * @returns {{ textMode: 'painted'|'appOverlay', expectedText: string|null, appTexts: string[] }}
  */
 function resolveCoverTextContract(coverKeyOrType, { titleBaked = false, title = null, dedication = null } = {}) {
   const { MODEL_DEFAULTS } = require('../config/models');
@@ -97,9 +106,14 @@ function resolveCoverTextContract(coverKeyOrType, { titleBaked = false, title = 
   if (textMode === 'painted') {
     if (key === 'frontCover') expectedText = title || null;
     else if (key === 'initialPage') expectedText = dedication || null;
-    else if (key === 'backCover') expectedText = 'magicalstory.ch';
+    else if (key === 'backCover') expectedText = BRAND_TEXT;
   }
-  return { textMode, expectedText };
+  const appTexts = [];
+  if (textMode === 'appOverlay') {
+    const own = key === 'frontCover' ? title : key === 'initialPage' ? dedication : key === 'backCover' ? BRAND_TEXT : null;
+    if (own && String(own).trim()) appTexts.push(String(own).trim());
+  }
+  return { textMode, expectedText, appTexts };
 }
 
 // ---------------------------------------------------------------------------

@@ -23,22 +23,31 @@ const { COVER_PAGE_NUMBERS, COVER_TEXT_POSITION } = require('./coverKeys');
 const { MAX_COVER_CHARACTERS } = require('./coverCastRoster');
 const { VB_ELEMENT_BUDGET } = require('./vbElementBudget');
 
-/** The instant and the copy space of each cover, in beat words. */
+/**
+ * The instant and the copy space of each cover, in beat words.
+ *
+ * NO COVER LABEL IN THE PLAN LINE (2026-09-26). Each beat used to open with a
+ * label ("BOOK BACK COVER, not a story moment"). The Art Director copied it
+ * into `sceneIntent`, which the image prompt leads with ("THIS IMAGE DEPICTS:
+ * BOOK BACK COVER. The five friends stand ..."), and the render came back with
+ * a painted caption (staging job_1790446348343_z3fw660ie back cover, "THE FIVE
+ * FRIENDS STAND TOGETHER"). A cover is identified by structured data — its
+ * page number (-1/-2/-3, coverKeys.COVER_PAGE_NUMBERS) and `coverKey` — and the
+ * Art Director and the scene review learn what those page numbers mean from
+ * the one shared sentence promptBuilders.COVER_GAZE_EXCEPTION.
+ */
 const COVER_BEAT_TEXT = Object.freeze({
   frontCover: {
-    label: 'BOOK FRONT COVER, not a story moment',
     instant: 'the cast stand together in a bright, welcoming portrait, every figure whole in frame',
     space: 'the top third of the picture is open sky or background, clear of every figure, prop and effect, for the book title (textPosition "top-full")',
     after: 'the reader sees the book\'s title picture',
   },
   initialPage: {
-    label: 'BOOK OPENING PAGE (the dedication page), not a story moment',
     instant: 'the cast share an inviting, warm opening moment that draws the reader in, every figure whole in frame',
     space: 'the bottom fifth of the picture is calm ground, clear of every figure, face and prop, for the dedication (textPosition "bottom-full")',
     after: 'the book is opened',
   },
   backCover: {
-    label: 'BOOK BACK COVER, not a story moment',
     instant: 'the cast are happy and relaxed after the adventure, every figure whole in frame',
     space: 'the bottom tenth of the picture is calm ground, clear of every figure, face and prop (textPosition "bottom-full")',
     after: 'the book is closed',
@@ -118,7 +127,6 @@ function buildCoverBeats(inputData = {}, { coverTypes = ['frontCover', 'initialP
     }
     const inFrame = (coverKey === 'frontCover' && central && !cast.includes(central)) ? [...cast, central] : cast;
     const facts = [
-      t.label,
       t.instant,
       'at the story\'s key place: a real landmark from the Visual Bible (`isRealLandmark: true`) that the pages use; with no real landmark in the bible, the most story-defining invented place; a place the cast stand in on solid ground, never under water or in the air',
       COVER_OWN_PLACE,

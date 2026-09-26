@@ -982,6 +982,24 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
     reason: `${what} — char-fix already failed on this version (no usable image), flipping to iterate`,
   });
 
+  // LETTERING GOES FIRST (2026-09-26). A CRITICAL `rendered_text` — a caption,
+  // a misspelled or misplaced word (letteringCheck.js) — takes the round ahead
+  // of a character CRITICAL: the inpaint paints the text out this round and
+  // the figure repair runs next round, on that version. One method per page
+  // per round is the round loop's contract (one result per page per batch), so
+  // the two are sequenced across rounds, not chained inside one; the text goes
+  // first because its repair is local and its success is re-checked on the
+  // new bytes (scoring.dominatesByCritical keeps the cleared version even if
+  // its re-evaluation files new findings), while a char-fix that fails
+  // produces no version and would hold the text back a round per failure.
+  // Staging job_1790446348343_z3fw660ie back cover: an entity CRITICAL routed
+  // every round to char-fix and the caption shipped. Declared type + severity
+  // only, the same shape as gate 2b's precedence.
+  const letteringFirst = pageNumber !== 0 ? severityIssues.find(i =>
+    String(i?.type || '').toLowerCase() === 'rendered_text'
+    && /^critical$/i.test(String(i?.severity || ''))) : null;
+  let deferredFigure = null;
+
   if (pageNumber !== 0 && entityReport?.characters) {
     let worst = null; // {severity, charName, issue}
     // The page's entity findings through the report's ONE reader
@@ -1010,6 +1028,11 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
     const entityGap = worst && charFixImpossible(worst.charName);
     if (entityGap) {
       log.warn(`🚫 [REPAIR-DECIDE] page ${pageNumber}: entity ${worst.severity} on ${worst.charName} cannot take a char fix — ${entityGap.message}`);
+      worst = null;
+    }
+    if (worst && letteringFirst) {
+      deferredFigure = `entity ${worst.severity} on ${worst.charName}`;
+      log.info(`🔠 [REPAIR-DECIDE] page ${pageNumber}: ${deferredFigure} deferred — a CRITICAL rendered_text takes this round`);
       worst = null;
     }
     if (worst && charFixAlreadyFailed) {
@@ -1067,7 +1090,11 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
         && !charFixImpossible(String(i.character).trim()))
       .map(i => ({ ...i, figure: figureFor(i) }))
       .find(i => i.figure !== null);
-    if (identity) {
+    if (identity && letteringFirst) {
+      deferredFigure = deferredFigure || `figure ${identity.figure} is ${String(identity.character).trim()} drawn wrong`;
+      log.info(`🔠 [REPAIR-DECIDE] page ${pageNumber}: identity char-fix on figure ${identity.figure} deferred — a CRITICAL rendered_text takes this round`);
+    }
+    if (identity && !letteringFirst) {
       const charName = String(identity.character).trim();
       if (charFixAlreadyFailed) return flippedFromFailedCharFix(`figure ${identity.figure} is ${charName} drawn wrong`);
       const { resolveRepairAxes } = require('./faceRepair');
@@ -1265,9 +1292,10 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   // `deferredClothing` is set when gate 2b stood down this round (severity
   // precedence, above); it is carried into the reason so the round log says
   // WHY the page took the inpaint route.
-  const precedenceNote = deferredClothing
-    ? `CRITICAL ${deferredClothing.type || 'finding'} outranks clothing MAJOR (clothing figure redo deferred to next round)`
-    : null;
+  const precedenceNote = [
+    deferredFigure ? `CRITICAL rendered_text goes first (${deferredFigure} deferred to next round)` : null,
+    deferredClothing ? `CRITICAL ${deferredClothing.type || 'finding'} outranks clothing MAJOR (clothing figure redo deferred to next round)` : null,
+  ].filter(Boolean).join('; ') || null;
   const withPrecedence = (d) => (precedenceNote && d && d.method === 'inpaint'
     ? { ...d, reason: `${precedenceNote}; ${d.reason || ''}`.trim() }
     : d);

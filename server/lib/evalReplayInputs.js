@@ -77,6 +77,11 @@ const MIRRORED_EVAL_OPTION_KEYS = Object.freeze([
   // Covers only: the characters the generator was ordered to leave off (cap +
   // exclusion list, server/lib/coverCastRoster.js). Non-covers pass null.
   'excludedCastNames',
+  // Covers only (2026-09-26): the app's own string on the cover, which the
+  // undeclared-lettering check excuses, and whether the cover was briefed as a
+  // page — the check runs on those covers only. Non-covers: null / false.
+  'appTexts',
+  'coverIsPage',
 ]);
 
 /** Keys production passes that a Lab replay deliberately does NOT — see header. */
@@ -137,6 +142,8 @@ function buildEvalReplayOptions(ctx, opts = {}) {
     detectedFigures: detectedFigures || null,
     expectedText: null,
     textMode: null,
+    appTexts: null,
+    coverIsPage: false,
     excludedCastNames: null,
   };
 
@@ -152,6 +159,10 @@ function buildEvalReplayOptions(ctx, opts = {}) {
     });
     options.expectedText = contract.expectedText;
     options.textMode = contract.textMode;
+    options.appTexts = contract.appTexts;
+    // The stored cover record says how it was made: `briefedAsPage` is written
+    // by the pipeline on every full-story cover since covers became pages.
+    options.coverIsPage = scene.briefedAsPage === true;
     // THE JUDGE GETS THE GENERATOR'S TRIM (owner, 2026-09-15). The cover was
     // rendered from a roster capped at MAX_COVER_CHARACTERS with every other
     // story character excluded by name; the cover PROSE still names them, so
