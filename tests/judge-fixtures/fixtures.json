@@ -846,7 +846,14 @@
         "character": "Sarah",
         "minSeverity": "MINOR",
         "about": [
-          "piercing"
+          "facial piercing",
+          "eyebrow piercing",
+          "cheek piercing",
+          "septum",
+          "labret",
+          "philtrum",
+          "bridge piercing",
+          "lip piercing"
         ]
       },
       "source": "A recorded mark the pages leave out. Sarah's recorded features (physical.other) are 'multiple facial piercings (septum, bridge, philtrum, labret, cheek, eyebrow), multiple tattoos on shoulders and chest'. Her p2 v0 face (viewed 2026-09-26, crop around the head) shows ear piercings only: no septum, eyebrow, cheek or lip piercing. The 2026-09-26 replay with the recorded-features rule filed the missing cheek piercing (MINOR face_mismatch) and no mole; the replay without it reported an unrecorded cheek mole instead."

@@ -44,6 +44,14 @@ p6 face is still CRITICAL face_mismatch. Sarah (y3n0euk3z) — the missing recor
 (MINOR face_mismatch); the unrecorded "mole" the pre-rule judge reported is not. Sarah (z3fw660ie) — the judge cited
 her recorded stud earrings as "a recorded feature" and filed no freckle finding.
 
+**Judge fixtures after deploy (Lab #1541, #1544, #1545; $0.044):** `entity-lorena-paint-wash-not-vitiligo` TN 3/3
+(the p5 mast crop and the p6 face still CRITICAL). `entity-sarah-y3n-recorded-piercings-missing` FN 3/3 once its
+locator was narrowed to facial-piercing words (the first wording matched an unrelated "ear piercings not in R"
+finding). On the Lab's detection the grid holds 2 cells and cell R is the styled sheet, which draws no facial
+piercing, so the judge has only the Recorded Features text to go on and does not act on it; the local replay (4
+cells) did. Not a regression — the pre-rule judge never filed the piercings either — but recorded-mark recall is
+not established. Open: BACKLOG.
+
 **Cost of the block:** replayed over 202 stored page prompts of the last 12 staging stories, the block adds a median
 of 0 and at most 424 characters; 16 of 202 would cross the 7900 cap and spend the first shrink steps (COUNTS, the
 size bullet). It is not a cut step itself.
