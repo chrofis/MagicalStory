@@ -4,285 +4,894 @@
     {
       "id": "sem-lukas-p10-day-on-night-page",
       "judge": "semantic",
-      "target": { "storyId": "job_1790107559778_fcmlfa8kn", "pageNumber": 10, "versionIndex": 0 },
-      "input": { "imageUrl": "https://images.magicalstory.ch/stories/job_1790107559778_fcmlfa8kn/scene/p10/v0.jpg" },
-      "expect": { "verdict": "flag", "types": ["setting"], "minSeverity": "MAJOR", "about": ["night", "day", "bright", "sun", "light", "dark", "evening", "sky", "time of day"] },
+      "target": {
+        "storyId": "job_1790107559778_fcmlfa8kn",
+        "pageNumber": 10,
+        "versionIndex": 0
+      },
+      "input": {
+        "imageUrl": "https://images.magicalstory.ch/stories/job_1790107559778_fcmlfa8kn/scene/p10/v0.jpg"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "setting"
+        ],
+        "minSeverity": "MAJOR",
+        "about": [
+          "night",
+          "day",
+          "bright",
+          "sun",
+          "light",
+          "dark",
+          "evening",
+          "sky",
+          "time of day"
+        ]
+      },
       "source": "Lukas (prod job copied to staging) p10: owner 2026-09-23 'p10 not night'; the brief says night, the render is bright daylight (pixels checked). Eval-gap row 5: the judge saw it and filed `setting` MODERATE, page scored 95. MAJOR per the owner ruling 2026-09-25 (a contradiction of the page's light is MAJOR)."
     },
     {
       "id": "sem-fiona-p9-no-eiffel-tower",
       "judge": "semantic",
-      "target": { "storyId": "job_1790446348343_z3fw660ie", "pageNumber": 9, "versionIndex": 0 },
-      "input": { "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/scene/p9/v0.jpg" },
-      "expect": { "verdict": "pass", "types": ["setting"], "minSeverity": "MAJOR", "fields": { "landmark_element": true } },
-      "source": "Fiona p9 v0: eval_calls #259 filed CRITICAL `setting` (landmark_element) 'clearly shows the Eiffel Tower'. Zoomed pixels: the background is Zurich Hauptbahnhof behind the bridge arch plus an orange lattice construction crane; there is no Eiffel Tower. Eval-gap row 17 (judge hallucination)."
+      "target": {
+        "storyId": "job_1790446348343_z3fw660ie",
+        "pageNumber": 9,
+        "versionIndex": 0
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/scene/p9/v0.jpg"
+      },
+      "expect": {
+        "verdict": "pass",
+        "types": [
+          "setting"
+        ],
+        "minSeverity": "MAJOR",
+        "about": [
+          "eiffel",
+          "paris",
+          "tower",
+          "landmark"
+        ]
+      },
+      "source": "Fiona p9 v0: eval_calls #259 filed CRITICAL `setting` (landmark_element) 'clearly shows the Eiffel Tower'. Zoomed pixels: the background is Zurich Hauptbahnhof behind the bridge arch plus an orange lattice construction crane; there is no Eiffel Tower. Eval-gap row 17 (judge hallucination). Selector: a setting charge that names the Eiffel Tower / Paris / a tower or landmark (the page is declared fog, so a fog charge is not what this fixture measures)."
     },
     {
       "id": "sem-fiona-p6-sun-on-fog-page",
       "judge": "semantic",
-      "target": { "storyId": "job_1790446348343_z3fw660ie", "pageNumber": 6, "versionIndex": 0 },
-      "input": { "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/scene/p6/v0.jpg" },
-      "expect": { "verdict": "flag", "types": ["setting"], "minSeverity": "MAJOR", "about": ["fog", "mist", "haze", "sun", "sunny", "sunlight", "bright", "clear", "sky", "weather", "light"] },
+      "target": {
+        "storyId": "job_1790446348343_z3fw660ie",
+        "pageNumber": 6,
+        "versionIndex": 0
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/scene/p6/v0.jpg"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "setting"
+        ],
+        "minSeverity": "MAJOR",
+        "about": [
+          "fog",
+          "mist",
+          "haze",
+          "sun",
+          "sunny",
+          "sunlight",
+          "bright",
+          "clear",
+          "sky",
+          "weather",
+          "light"
+        ]
+      },
       "source": "Fiona p6: declared afternoon + fog; the render has a visible sun disc and warm clear light with only thin mist (pixels checked). decisions 2026-09-26 'Weather owns the sky' (sun discs on Fiona p6-p8); eval-gap row 16 (the judge flagged 2 of 23 fog pages)."
     },
     {
       "id": "sem-fiona-p7v1-sun-on-fog-page",
       "judge": "semantic",
-      "target": { "storyId": "job_1790446348343_z3fw660ie", "pageNumber": 7, "versionIndex": 1 },
-      "input": { "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/scene/p7/v1.jpg" },
-      "expect": { "verdict": "flag", "types": ["setting"], "minSeverity": "MAJOR", "about": ["fog", "mist", "haze", "sun", "sunny", "sunlight", "bright", "clear", "sky", "weather", "light"] },
+      "target": {
+        "storyId": "job_1790446348343_z3fw660ie",
+        "pageNumber": 7,
+        "versionIndex": 1
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/scene/p7/v1.jpg"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "setting"
+        ],
+        "minSeverity": "MAJOR",
+        "about": [
+          "fog",
+          "mist",
+          "haze",
+          "sun",
+          "sunny",
+          "sunlight",
+          "bright",
+          "clear",
+          "sky",
+          "weather",
+          "light"
+        ]
+      },
       "source": "Fiona p7 v1: declared afternoon + fog; warm sunlit sky, no fog on the deck (pixels checked). Same class as p6 (decisions 2026-09-26 'Weather owns the sky'; eval-gap row 16)."
     },
     {
       "id": "sem-fiona-p5-fog-rendered-clean",
       "judge": "semantic",
-      "target": { "storyId": "job_1790446348343_z3fw660ie", "pageNumber": 5, "versionIndex": 0 },
-      "input": { "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/scene/p5/v0.jpg" },
-      "expect": { "verdict": "pass", "types": ["setting"], "minSeverity": "MODERATE", "about": ["fog", "mist", "haze", "sun", "sunny", "bright", "sky", "weather", "light", "time of day"] },
+      "target": {
+        "storyId": "job_1790446348343_z3fw660ie",
+        "pageNumber": 5,
+        "versionIndex": 0
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/scene/p5/v0.jpg"
+      },
+      "expect": {
+        "verdict": "pass",
+        "types": [
+          "setting"
+        ],
+        "minSeverity": "MODERATE",
+        "about": [
+          "fog",
+          "mist",
+          "haze",
+          "sun",
+          "sunny",
+          "bright",
+          "sky",
+          "weather",
+          "light",
+          "time of day"
+        ]
+      },
       "source": "Fiona p5: declared afternoon + fog, and the fog is rendered (thick mist over the water, soft sky; pixels checked) — the one Fiona fog page that got it right (decisions 2026-09-26: fog rendered on 1 of 12). A light/weather charge here is a false alarm."
     },
     {
       "id": "sem-dragon-p13-clear-moon-on-fog-night",
       "judge": "semantic",
-      "target": { "storyId": "job_1790277448294_5herh01j7", "pageNumber": 13, "versionIndex": 0 },
-      "input": { "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/scene/p13/v0.jpg" },
-      "expect": { "verdict": "flag", "types": ["setting"], "minSeverity": "MAJOR", "about": ["fog", "mist", "haze", "clear", "moon", "sky", "weather", "light"] },
+      "target": {
+        "storyId": "job_1790277448294_5herh01j7",
+        "pageNumber": 13,
+        "versionIndex": 0
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/scene/p13/v0.jpg"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "setting"
+        ],
+        "minSeverity": "MAJOR",
+        "about": [
+          "fog",
+          "mist",
+          "haze",
+          "clear",
+          "moon",
+          "sky",
+          "weather",
+          "light"
+        ]
+      },
       "source": "Dragon p13 v0: declared night + fog; a bright moon in a clear night sky, no fog anywhere (pixels checked). decisions 2026-09-26 'Weather owns the sky': fog rendered on 0 of 6 night-fog pages."
     },
     {
       "id": "sem-dragon-p16-no-fog-on-fog-night",
       "judge": "semantic",
-      "target": { "storyId": "job_1790277448294_5herh01j7", "pageNumber": 16, "versionIndex": 0 },
-      "input": { "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/scene/p16/v0.jpg" },
-      "expect": { "verdict": "flag", "types": ["setting"], "minSeverity": "MAJOR", "about": ["fog", "mist", "haze", "clear", "moon", "night", "bright", "sky", "weather", "light"] },
+      "target": {
+        "storyId": "job_1790277448294_5herh01j7",
+        "pageNumber": 16,
+        "versionIndex": 0
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/scene/p16/v0.jpg"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "setting"
+        ],
+        "minSeverity": "MAJOR",
+        "about": [
+          "fog",
+          "mist",
+          "haze",
+          "clear",
+          "moon",
+          "night",
+          "bright",
+          "sky",
+          "weather",
+          "light"
+        ]
+      },
       "source": "Dragon p16 v0: declared night + fog; a warmly lit park with lamps and no fog (pixels checked). Same class as p13 (0 of 6 night-fog pages rendered fog)."
     },
     {
       "id": "sem-dragon-p8-fog-rendered-clean",
       "judge": "semantic",
-      "target": { "storyId": "job_1790277448294_5herh01j7", "pageNumber": 8, "versionIndex": 0 },
-      "input": { "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/scene/p8/v0.jpg" },
-      "expect": { "verdict": "pass", "types": ["setting"], "minSeverity": "MODERATE", "about": ["fog", "mist", "haze", "sun", "sunny", "bright", "sky", "weather", "light", "time of day"] },
+      "target": {
+        "storyId": "job_1790277448294_5herh01j7",
+        "pageNumber": 8,
+        "versionIndex": 0
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/scene/p8/v0.jpg"
+      },
+      "expect": {
+        "verdict": "pass",
+        "types": [
+          "setting"
+        ],
+        "minSeverity": "MODERATE",
+        "about": [
+          "fog",
+          "mist",
+          "haze",
+          "sun",
+          "sunny",
+          "bright",
+          "sky",
+          "weather",
+          "light",
+          "time of day"
+        ]
+      },
       "source": "Dragon p8 v0: declared dusk + fog; ground fog and a dim grey-blue dusk are rendered (pixels checked). A light/weather charge is a false alarm."
     },
     {
       "id": "sem-dragon-p4-clear-afternoon-clean",
       "judge": "semantic",
-      "target": { "storyId": "job_1790277448294_5herh01j7", "pageNumber": 4, "versionIndex": 0 },
-      "input": { "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/scene/p4/v0.jpg" },
-      "expect": { "verdict": "pass", "types": ["setting"], "minSeverity": "MODERATE", "about": ["fog", "mist", "haze", "sun", "night", "dark", "sky", "weather", "light", "time of day"] },
+      "target": {
+        "storyId": "job_1790277448294_5herh01j7",
+        "pageNumber": 4,
+        "versionIndex": 0
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/scene/p4/v0.jpg"
+      },
+      "expect": {
+        "verdict": "pass",
+        "types": [
+          "setting"
+        ],
+        "minSeverity": "MODERATE",
+        "about": [
+          "fog",
+          "mist",
+          "haze",
+          "sun",
+          "night",
+          "dark",
+          "sky",
+          "weather",
+          "light",
+          "time of day"
+        ]
+      },
       "source": "Dragon p4 v0: declared afternoon + clear; warm clear autumn daylight (pixels checked). Negative control for the light check."
     },
     {
       "id": "sem-dragon-p6-clear-afternoon-clean",
       "judge": "semantic",
-      "target": { "storyId": "job_1790277448294_5herh01j7", "pageNumber": 6, "versionIndex": 0 },
-      "input": { "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/scene/p6/v0.jpg" },
-      "expect": { "verdict": "pass", "types": ["setting"], "minSeverity": "MODERATE", "about": ["fog", "mist", "haze", "sun", "night", "dark", "sky", "weather", "light", "time of day"] },
+      "target": {
+        "storyId": "job_1790277448294_5herh01j7",
+        "pageNumber": 6,
+        "versionIndex": 0
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/scene/p6/v0.jpg"
+      },
+      "expect": {
+        "verdict": "pass",
+        "types": [
+          "setting"
+        ],
+        "minSeverity": "MODERATE",
+        "about": [
+          "fog",
+          "mist",
+          "haze",
+          "sun",
+          "night",
+          "dark",
+          "sky",
+          "weather",
+          "light",
+          "time of day"
+        ]
+      },
       "source": "Dragon p6 v0: declared afternoon + clear; warm clear autumn daylight (pixels checked). Negative control for the light check."
     },
     {
       "id": "qual-lukas-p7-invented-children",
       "judge": "quality",
-      "target": { "storyId": "job_1790107559778_fcmlfa8kn", "pageNumber": 7, "versionIndex": 0 },
-      "input": { "imageUrl": "https://images.magicalstory.ch/stories/job_1790107559778_fcmlfa8kn/scene/p7/v0.jpg" },
-      "expect": { "verdict": "flag", "types": ["extra_character"], "minSeverity": "MAJOR" },
+      "target": {
+        "storyId": "job_1790107559778_fcmlfa8kn",
+        "pageNumber": 7,
+        "versionIndex": 0
+      },
+      "input": {
+        "imageUrl": "https://images.magicalstory.ch/stories/job_1790107559778_fcmlfa8kn/scene/p7/v0.jpg"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "extra_character"
+        ],
+        "minSeverity": "MAJOR"
+      },
       "source": "Lukas p7: the page declares no cast; two invented children stand on the path (pixels checked; owner 2026-09-23 'p7 strangers'). Eval-gap row 3: the presence check filed CRITICAL extra_character — a positive control (detected; the loss was in routing)."
     },
     {
       "id": "qual-fiona-backcover-painted-caption",
       "judge": "quality",
-      "target": { "storyId": "job_1790446348343_z3fw660ie", "pageNumber": -3 },
-      "input": { "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/backCoverArt/cover/v0.jpg" },
-      "expect": { "verdict": "flag", "types": ["rendered_text"], "minSeverity": "MAJOR" },
+      "target": {
+        "storyId": "job_1790446348343_z3fw660ie",
+        "pageNumber": -3
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/backCoverArt/cover/v0.jpg"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "rendered_text"
+        ],
+        "minSeverity": "MAJOR"
+      },
       "source": "Fiona back cover art: a painted caption 'THE FIVE FRIENDS STAND TOGETHER' across the bottom (pixels checked). Eval-gap row 18: caught only by the quality judge, at MAJOR — a positive control."
     },
     {
       "id": "qual-dragon-backcover-no-text-clean",
       "judge": "quality",
-      "target": { "storyId": "job_1790277448294_5herh01j7", "pageNumber": -3 },
-      "input": { "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/backCoverArt/cover/v0.jpg" },
-      "expect": { "verdict": "pass", "types": ["rendered_text"], "minSeverity": "MODERATE" },
+      "target": {
+        "storyId": "job_1790277448294_5herh01j7",
+        "pageNumber": -3
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/backCoverArt/cover/v0.jpg"
+      },
+      "expect": {
+        "verdict": "pass",
+        "types": [
+          "rendered_text"
+        ],
+        "minSeverity": "MODERATE"
+      },
       "source": "Dragon back cover art: four children in autumn leaves, no lettering anywhere (pixels checked). Negative control for the caption finding."
     },
     {
       "id": "letter-fiona-backcover-painted-caption",
       "judge": "lettering",
-      "target": { "storyId": "job_1790446348343_z3fw660ie", "pageNumber": -3 },
-      "input": { "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/backCoverArt/cover/v0.jpg" },
-      "expect": { "verdict": "flag", "types": ["rendered_text"], "minSeverity": "MAJOR" },
+      "target": {
+        "storyId": "job_1790446348343_z3fw660ie",
+        "pageNumber": -3
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/backCoverArt/cover/v0.jpg"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "rendered_text"
+        ],
+        "minSeverity": "MAJOR"
+      },
       "source": "Fiona back cover art (as above). Eval-gap row 18: the lettering check returns [] whenever the evaluation is not a scene, so it never runs on covers; an overlay caption is its CRITICAL case. Expected to fail until covers are read by it."
     },
     {
       "id": "plate-dragon-p1-photographic",
       "judge": "plate_qc",
-      "target": { "storyId": "job_1790277448294_5herh01j7", "pageNumber": 1, "versionIndex": 0 },
-      "input": { "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/empty_scene/p1/v0.jpg" },
-      "expect": { "verdict": "flag", "types": ["medium"] },
-      "source": "Dragon p1 shipped plate: a watercolor book's plate that is a photograph of the Lindenhof steps (pixels checked). Eval-gap rows 12-13 (photographic plates)."
+      "target": {
+        "storyId": "job_1790277448294_5herh01j7",
+        "pageNumber": 1,
+        "versionIndex": 0
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/empty_scene/p1/v0.jpg"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "medium",
+          "unclassified"
+        ],
+        "about": [
+          "photo",
+          "photograph",
+          "photoreal",
+          "realistic",
+          "medium",
+          "camera",
+          "art style",
+          "3d"
+        ]
+      },
+      "source": "Dragon p1 shipped plate: a watercolor book's plate that is a photograph of the Lindenhof steps (pixels checked). Eval-gap rows 12-13 (photographic plates). An issue the judge files without its check key (`unclassified`) counts when its words name this defect: production counts an unclassified issue as a hard failure (plateQc.js UNCLASSIFIED)."
     },
     {
       "id": "plate-dragon-p1-lab1505-photographic",
       "judge": "plate_qc",
-      "target": { "storyId": "job_1790277448294_5herh01j7", "pageNumber": 1, "versionIndex": 11 },
-      "input": { "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/empty_scene/p1/v11.jpg" },
-      "expect": { "verdict": "flag", "types": ["medium"] },
-      "source": "Lab #1505 plate (Dragon p1, test v11): photoreal rendering of the Lindenhof in a watercolor book (pixels checked). Eval-gap row 13: 'Lab 1505 and 1503 still pass after the fix'."
+      "target": {
+        "storyId": "job_1790277448294_5herh01j7",
+        "pageNumber": 1,
+        "versionIndex": 11
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/empty_scene/p1/v11.jpg"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "medium",
+          "unclassified"
+        ],
+        "about": [
+          "photo",
+          "photograph",
+          "photoreal",
+          "realistic",
+          "medium",
+          "camera",
+          "art style",
+          "3d"
+        ]
+      },
+      "source": "Lab #1505 plate (Dragon p1, test v11): photoreal rendering of the Lindenhof in a watercolor book (pixels checked). Eval-gap row 13: 'Lab 1505 and 1503 still pass after the fix'. An issue the judge files without its check key (`unclassified`) counts when its words name this defect: production counts an unclassified issue as a hard failure (plateQc.js UNCLASSIFIED)."
     },
     {
       "id": "plate-dragon-p1-lab1503-photographic",
       "judge": "plate_qc",
-      "target": { "storyId": "job_1790277448294_5herh01j7", "pageNumber": 1, "versionIndex": 10 },
-      "input": { "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/empty_scene/p1/v10.jpg" },
-      "expect": { "verdict": "flag", "types": ["medium"] },
-      "source": "Lab #1503 plate (Dragon p1, test v10): photoreal Lindenhof in a watercolor book (pixels checked). Eval-gap row 13."
+      "target": {
+        "storyId": "job_1790277448294_5herh01j7",
+        "pageNumber": 1,
+        "versionIndex": 10
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/empty_scene/p1/v10.jpg"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "medium",
+          "unclassified"
+        ],
+        "about": [
+          "photo",
+          "photograph",
+          "photoreal",
+          "realistic",
+          "medium",
+          "camera",
+          "art style",
+          "3d"
+        ]
+      },
+      "source": "Lab #1503 plate (Dragon p1, test v10): photoreal Lindenhof in a watercolor book (pixels checked). Eval-gap row 13. An issue the judge files without its check key (`unclassified`) counts when its words name this defect: production counts an unclassified issue as a hard failure (plateQc.js UNCLASSIFIED)."
     },
     {
       "id": "plate-dragon-p1-lab1484-people",
       "judge": "plate_qc",
-      "target": { "storyId": "job_1790277448294_5herh01j7", "pageNumber": 1, "versionIndex": 1 },
-      "input": { "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/empty_scene/p1/v1.jpg" },
-      "expect": { "verdict": "flag", "types": ["figures"] },
+      "target": {
+        "storyId": "job_1790277448294_5herh01j7",
+        "pageNumber": 1,
+        "versionIndex": 1
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/empty_scene/p1/v1.jpg"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "figures"
+        ]
+      },
       "source": "Lab #1484 plate (Dragon p1, test v1): people walking on the square at the right (pixels checked). A plate holds no people (decisions 2026-09-26); eval-gap row 12."
     },
     {
       "id": "plate-dragon-p10-picture-in-picture",
       "judge": "plate_qc",
-      "target": { "storyId": "job_1790277448294_5herh01j7", "pageNumber": 10, "versionIndex": 0 },
-      "input": { "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/empty_scene/p10/v0.jpg" },
-      "expect": { "verdict": "flag", "types": ["artefact"] },
-      "source": "Dragon p10 shipped plate (ultra-wide derive): a glowing white-framed picture inside the picture on a paper mat, plus a signature (pixels checked). decisions 2026-09-25 'A plate derive is its own edit' (RC3); its QC replay failed it."
+      "target": {
+        "storyId": "job_1790277448294_5herh01j7",
+        "pageNumber": 10,
+        "versionIndex": 0
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/empty_scene/p10/v0.jpg"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "artefact",
+          "unclassified"
+        ],
+        "about": [
+          "margin",
+          "border",
+          "frame",
+          "mat",
+          "paper",
+          "inside the frame",
+          "patch",
+          "box",
+          "edge"
+        ]
+      },
+      "source": "Dragon p10 shipped plate (ultra-wide derive): a glowing white-framed picture inside the picture on a paper mat, plus a signature (pixels checked). decisions 2026-09-25 'A plate derive is its own edit' (RC3); its QC replay failed it. An issue the judge files without its check key (`unclassified`) counts when its words name this defect: production counts an unclassified issue as a hard failure (plateQc.js UNCLASSIFIED)."
     },
     {
       "id": "plate-dragon-p11-signature",
       "judge": "plate_qc",
-      "target": { "storyId": "job_1790277448294_5herh01j7", "pageNumber": 11, "versionIndex": 0 },
-      "input": { "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/empty_scene/p11/v0.jpg" },
-      "expect": { "verdict": "flag", "types": ["text"] },
-      "source": "Dragon p11 shipped plate: a painter's signature bottom right (zoomed pixels checked). decisions 2026-09-25 (RC4 PLATE_MARKS): its QC replay failed p11."
+      "target": {
+        "storyId": "job_1790277448294_5herh01j7",
+        "pageNumber": 11,
+        "versionIndex": 0
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/empty_scene/p11/v0.jpg"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "text",
+          "unclassified"
+        ],
+        "about": [
+          "signature",
+          "signed",
+          "lettering",
+          "text",
+          "watermark",
+          "monogram",
+          "letters"
+        ]
+      },
+      "source": "Dragon p11 shipped plate: a painter's signature bottom right (zoomed pixels checked). decisions 2026-09-25 (RC4 PLATE_MARKS): its QC replay failed p11. An issue the judge files without its check key (`unclassified`) counts when its words name this defect: production counts an unclassified issue as a hard failure (plateQc.js UNCLASSIFIED)."
     },
     {
       "id": "plate-dragon-p13-signature",
       "judge": "plate_qc",
-      "target": { "storyId": "job_1790277448294_5herh01j7", "pageNumber": 13, "versionIndex": 0 },
-      "input": { "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/empty_scene/p13/v0.jpg" },
-      "expect": { "verdict": "flag", "types": ["text"] },
-      "source": "Dragon p13 shipped plate: a painter's signature bottom right (zoomed pixels checked). decisions 2026-09-25 (RC4): its QC replay failed p13."
+      "target": {
+        "storyId": "job_1790277448294_5herh01j7",
+        "pageNumber": 13,
+        "versionIndex": 0
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/empty_scene/p13/v0.jpg"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "text",
+          "unclassified"
+        ],
+        "about": [
+          "signature",
+          "signed",
+          "lettering",
+          "text",
+          "watermark",
+          "monogram",
+          "letters"
+        ]
+      },
+      "source": "Dragon p13 shipped plate: a painter's signature bottom right (zoomed pixels checked). decisions 2026-09-25 (RC4): its QC replay failed p13. An issue the judge files without its check key (`unclassified`) counts when its words name this defect: production counts an unclassified issue as a hard failure (plateQc.js UNCLASSIFIED)."
     },
     {
       "id": "plate-dragon-p8-people",
       "judge": "plate_qc",
-      "target": { "storyId": "job_1790277448294_5herh01j7", "pageNumber": 8, "versionIndex": 0 },
-      "input": { "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/empty_scene/p8/v0.jpg" },
-      "expect": { "verdict": "flag", "types": ["figures"] },
+      "target": {
+        "storyId": "job_1790277448294_5herh01j7",
+        "pageNumber": 8,
+        "versionIndex": 0
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/empty_scene/p8/v0.jpg"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "figures"
+        ]
+      },
       "source": "Dragon p8 shipped plate: small people on the path left and right of the trees (pixels checked). A plate holds no people (decisions 2026-09-26); the run's own QC flagged the first attempt for figures."
     },
     {
       "id": "plate-dragon-p8-edges-clean",
       "judge": "plate_qc",
-      "target": { "storyId": "job_1790277448294_5herh01j7", "pageNumber": 8, "versionIndex": 0 },
-      "input": { "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/empty_scene/p8/v0.jpg" },
-      "expect": { "verdict": "pass", "types": ["artefact", "text"] },
+      "target": {
+        "storyId": "job_1790277448294_5herh01j7",
+        "pageNumber": 8,
+        "versionIndex": 0
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/empty_scene/p8/v0.jpg"
+      },
+      "expect": {
+        "verdict": "pass",
+        "types": [
+          "artefact",
+          "text"
+        ]
+      },
       "source": "Dragon p8 shipped plate: painted edge to edge, no mat, border or signature (zoomed corners checked). decisions 2026-09-25 (RC4): 'clean p4, p14, p8 pass'."
     },
     {
       "id": "plate-dragon-p18-people",
       "judge": "plate_qc",
-      "target": { "storyId": "job_1790277448294_5herh01j7", "pageNumber": 18, "versionIndex": 0 },
-      "input": { "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/empty_scene/p18/v0.jpg" },
-      "expect": { "verdict": "flag", "types": ["figures"] },
+      "target": {
+        "storyId": "job_1790277448294_5herh01j7",
+        "pageNumber": 18,
+        "versionIndex": 0
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/empty_scene/p18/v0.jpg"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "figures"
+        ]
+      },
       "source": "Dragon p18 shipped plate: small people in the lit midground left and right (pixels checked). The run's QC flagged the first attempt for figures; the shipped plate still has them."
     },
     {
       "id": "plate-dragon-p3-aux-people",
       "judge": "plate_qc",
-      "target": { "storyId": "job_1790277448294_5herh01j7", "pageNumber": 3 },
-      "input": { "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/aux/sceneImages-2-emptySceneQc-v1ImageData.jpg" },
-      "expect": { "verdict": "flag", "types": ["figures"] },
+      "target": {
+        "storyId": "job_1790277448294_5herh01j7",
+        "pageNumber": 3
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/aux/sceneImages-2-emptySceneQc-v1ImageData.jpg"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "figures"
+        ]
+      },
       "source": "Dragon p3 first plate attempt (emptySceneQc.v1ImageData): several people in the background under the trees (pixels checked). The run's QC flagged it ('small human figures')."
     },
     {
       "id": "plate-dragon-p4-clean",
       "judge": "plate_qc",
-      "target": { "storyId": "job_1790277448294_5herh01j7", "pageNumber": 4, "versionIndex": 0 },
-      "input": { "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/empty_scene/p4/v0.jpg" },
-      "expect": { "verdict": "pass", "types": ["artefact", "text", "medium", "figures"] },
+      "target": {
+        "storyId": "job_1790277448294_5herh01j7",
+        "pageNumber": 4,
+        "versionIndex": 0
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/empty_scene/p4/v0.jpg"
+      },
+      "expect": {
+        "verdict": "pass",
+        "types": [
+          "artefact",
+          "text",
+          "medium",
+          "figures"
+        ]
+      },
       "source": "Dragon p4 shipped plate: watercolor tree roots and leaves, edge to edge, no people, no marks (pixels and corner zoom checked). decisions 2026-09-25 (RC4): 'clean p4 passes'."
     },
     {
       "id": "plate-dragon-p14-clean",
       "judge": "plate_qc",
-      "target": { "storyId": "job_1790277448294_5herh01j7", "pageNumber": 14, "versionIndex": 0 },
-      "input": { "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/empty_scene/p14/v0.jpg" },
-      "expect": { "verdict": "pass", "types": ["artefact", "text", "medium", "figures"] },
+      "target": {
+        "storyId": "job_1790277448294_5herh01j7",
+        "pageNumber": 14,
+        "versionIndex": 0
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/empty_scene/p14/v0.jpg"
+      },
+      "expect": {
+        "verdict": "pass",
+        "types": [
+          "artefact",
+          "text",
+          "medium",
+          "figures"
+        ]
+      },
       "source": "Dragon p14 shipped plate (high-angle derive): watercolor park path, no people, no marks (pixels and corner zoom checked). decisions 2026-09-25 (RC4): 'clean p14 passes'."
     },
     {
       "id": "plate-lukas-p7-concrete-tower-is-right",
       "judge": "plate_qc",
-      "target": { "storyId": "job_1790107559778_fcmlfa8kn", "pageNumber": 7 },
-      "input": { "imageUrl": "https://images.magicalstory.ch/stories/job_1790107559778_fcmlfa8kn/aux/sceneImages-6-emptySceneQc-v1ImageData.jpg" },
-      "expect": { "verdict": "pass", "types": ["landmark"] },
-      "source": "Lukas p7 first plate attempt: the Fernsehturm Uetliberg drawn as its concrete shaft with antenna (pixels checked). The run's QC failed it 'solid concrete, not a lattice metal structure' from a wrong index description (bugs.json uetliberg entry; decisions 2026-09-23 'A real landmark's plate is judged against its photo'). Eval-gap row 8. A landmark charge here is false."
+      "target": {
+        "storyId": "job_1790107559778_fcmlfa8kn",
+        "pageNumber": 7
+      },
+      "input": {
+        "imageUrl": "https://images.magicalstory.ch/stories/job_1790107559778_fcmlfa8kn/aux/sceneImages-6-emptySceneQc-v1ImageData.jpg"
+      },
+      "expect": {
+        "verdict": "pass",
+        "types": [
+          "landmark"
+        ],
+        "about": [
+          "lattice"
+        ]
+      },
+      "source": "Lukas p7 first plate attempt: the Fernsehturm Uetliberg drawn with a solid shaft. The landmark photo the judge is sent (debug/p7/landmark-0.jpg, viewed) shows a solid concrete shaft under a slender red-and-white antenna mast. The run's QC failed it \"solid concrete, not a lattice metal structure\" from a wrong index description (bugs.json plate-qc-judges-landmark-against-text-not-photo; decisions 2026-09-23 \"A real landmark's plate is judged against its photo\"). Eval-gap row 8. Selector: a landmark charge that asks for a LATTICE shaft is false. A charge that the plate's proportions or banding do not match the photo is not what this fixture measures (the plate is a loose rendition)."
     },
     {
       "id": "plate-lukas-p9-aux-photographic",
       "judge": "plate_qc",
-      "target": { "storyId": "job_1790107559778_fcmlfa8kn", "pageNumber": 9 },
-      "input": { "imageUrl": "https://images.magicalstory.ch/stories/job_1790107559778_fcmlfa8kn/aux/sceneImages-8-emptySceneQc-v1ImageData.jpg" },
-      "expect": { "verdict": "flag", "types": ["medium"] },
-      "source": "Lukas p9 first plate attempt: a photograph of the Lindenhof chess players in a pixar-style book (pixels checked). Eval-gap row 12-13 (photographic plates)."
+      "target": {
+        "storyId": "job_1790107559778_fcmlfa8kn",
+        "pageNumber": 9
+      },
+      "input": {
+        "imageUrl": "https://images.magicalstory.ch/stories/job_1790107559778_fcmlfa8kn/aux/sceneImages-8-emptySceneQc-v1ImageData.jpg"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "medium",
+          "unclassified"
+        ],
+        "about": [
+          "photo",
+          "photograph",
+          "photoreal",
+          "realistic",
+          "medium",
+          "camera",
+          "art style",
+          "3d"
+        ]
+      },
+      "source": "Lukas p9 first plate attempt: a photograph of the Lindenhof chess players in a pixar-style book (pixels checked). Eval-gap row 12-13 (photographic plates). An issue the judge files without its check key (`unclassified`) counts when its words name this defect: production counts an unclassified issue as a hard failure (plateQc.js UNCLASSIFIED)."
     },
     {
       "id": "plate-lukas-p9-aux-people",
       "judge": "plate_qc",
-      "target": { "storyId": "job_1790107559778_fcmlfa8kn", "pageNumber": 9 },
-      "input": { "imageUrl": "https://images.magicalstory.ch/stories/job_1790107559778_fcmlfa8kn/aux/sceneImages-8-emptySceneQc-v1ImageData.jpg" },
-      "expect": { "verdict": "flag", "types": ["figures"] },
+      "target": {
+        "storyId": "job_1790107559778_fcmlfa8kn",
+        "pageNumber": 9
+      },
+      "input": {
+        "imageUrl": "https://images.magicalstory.ch/stories/job_1790107559778_fcmlfa8kn/aux/sceneImages-8-emptySceneQc-v1ImageData.jpg"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "figures"
+        ]
+      },
       "source": "Lukas p9 first plate attempt: five people playing and watching giant chess (pixels checked). A plate holds no people; eval-gap row 12."
     },
     {
       "id": "plate-fiona-p11-modern-city-not-anachronism",
       "judge": "plate_qc",
-      "target": { "storyId": "job_1790446348343_z3fw660ie", "pageNumber": 11 },
-      "input": { "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/aux/sceneImages-10-emptySceneQc-v1ImageData.jpg" },
-      "expect": { "verdict": "pass", "types": ["era"] },
+      "target": {
+        "storyId": "job_1790446348343_z3fw660ie",
+        "pageNumber": 11
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/aux/sceneImages-10-emptySceneQc-v1ImageData.jpg"
+      },
+      "expect": {
+        "verdict": "pass",
+        "types": [
+          "era"
+        ]
+      },
       "source": "Fiona p11 first plate attempt (Lindenhof wall): present-day boats and street lights. Fiona is a present-day Zurich story in pirate costume; the run's QC failed it 'anachronistic for a pirate era' because STORY ERA was derived from the costume (plateStoryEra). Eval-gap row 15. An era charge here is false."
     },
     {
       "id": "plate-fiona-p8-modern-crane-not-anachronism",
       "judge": "plate_qc",
-      "target": { "storyId": "job_1790446348343_z3fw660ie", "pageNumber": 8 },
-      "input": { "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/aux/sceneImages-7-emptySceneQc-v1ImageData.jpg" },
-      "expect": { "verdict": "pass", "types": ["era"] },
+      "target": {
+        "storyId": "job_1790446348343_z3fw660ie",
+        "pageNumber": 8
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/aux/sceneImages-7-emptySceneQc-v1ImageData.jpg"
+      },
+      "expect": {
+        "verdict": "pass",
+        "types": [
+          "era"
+        ]
+      },
       "source": "Fiona p8 first plate attempt (bridge by Hauptbahnhof): present-day station, a crane and street lights. Present-day story; the run's QC charged 'modern crane, vehicles, streetlights'. Same class as eval-gap row 15."
     },
     {
       "id": "entity-fiona-lorena-vitiligo",
       "judge": "entity",
-      "target": { "storyId": "job_1790446348343_z3fw660ie", "character": "Lorena" },
-      "expect": { "verdict": "flag", "character": "Lorena", "minSeverity": "MAJOR", "about": ["vitiligo", "patch", "pigment", "depigment", "skin"] },
+      "target": {
+        "storyId": "job_1790446348343_z3fw660ie",
+        "character": "Lorena"
+      },
+      "expect": {
+        "verdict": "flag",
+        "character": "Lorena",
+        "minSeverity": "MAJOR",
+        "about": [
+          "vitiligo",
+          "depigment",
+          "patches",
+          "pale patch",
+          "white patch"
+        ]
+      },
       "source": "Fiona: Lorena's reference photo shows vitiligo patches (forehead, around the mouth); no page draws them. The run's entity grid filed CRITICAL face_mismatch/face_drift 'vitiligo patches … entirely absent' (stories.data deductions). Eval-gap row 20: a positive control (detected; then capped to MINOR by MAX_SEVERITY_TYPES)."
     },
     {
       "id": "audit-lukas-p7-manuel-not-cast",
       "judge": "book_audit",
-      "target": { "storyId": "job_1790107559778_fcmlfa8kn", "pageNumber": 7 },
-      "expect": { "verdict": "pass", "fields": { "route": "IMG" }, "about": ["manuel"] },
+      "target": {
+        "storyId": "job_1790107559778_fcmlfa8kn",
+        "pageNumber": 7
+      },
+      "expect": {
+        "verdict": "pass",
+        "fields": {
+          "route": "IMG"
+        },
+        "about": [
+          "manuel"
+        ]
+      },
       "source": "Lukas p7: the page's brief declares no cast; the book-audit reader charged 'Manuel absent' against the picture. decisions 2026-09-24 'The book audit gets each page's brief (moment + cast)'; eval-gap row 11 (40 off-cast IMG faults across 17 stories). An IMG fault about Manuel on p7 is false."
     },
     {
       "id": "arc-fiona-replaceable-payoff",
       "judge": "arc_panel",
-      "target": { "storyId": "job_1790446348343_z3fw660ie" },
-      "expect": { "verdict": "flag", "types": ["REPLACEABLE"], "minSeverity": "MAJOR", "minPanelists": 1 },
+      "target": {
+        "storyId": "job_1790446348343_z3fw660ie"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "REPLACEABLE"
+        ],
+        "minSeverity": "MAJOR",
+        "minPanelists": 1
+      },
       "source": "Fiona stored arc (arcReviewReport.committed): the payoff hangs on an object anything else could replace (Fiona's sash; the refusal that snaps the mast rope). The run's panel filed [MAJOR] REPLACEABLE from two panelists (verify-run arc-sense-lens). Eval-gap row 21a: a positive control."
     },
     {
       "id": "arc-lukas-door-inside-and-outside",
       "judge": "arc_panel",
-      "target": { "storyId": "job_1790107559778_fcmlfa8kn" },
-      "expect": { "verdict": "flag", "types": ["PLACE"], "minPanelists": 1, "about": ["door", "inside", "outside", "indoor", "outdoor", "interior", "exterior", "reading room", "tower"] },
+      "target": {
+        "storyId": "job_1790107559778_fcmlfa8kn"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "PLACE"
+        ],
+        "minPanelists": 1,
+        "about": [
+          "door",
+          "inside",
+          "outside",
+          "indoor",
+          "outdoor",
+          "interior",
+          "exterior",
+          "reading room",
+          "tower"
+        ]
+      },
       "source": "Lukas stored arc: the key drawer is carried outside to try every key on the door of an indoor room (an interior door placed outdoors). decisions 2026-09-24 'One place is one place': with the PLACE lens, Lab #1444 had 3 of 3 panelists flag it. Eval-gap row 7."
     }
   ]

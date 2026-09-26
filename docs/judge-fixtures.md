@@ -47,8 +47,17 @@ file. When you tighten or correct an expectation, re-score the last run for free
 paying for the judges again.
 
 **Cost.** The runner prints the cost of each run. Each entry's `cost.basis` says whether the
-number was measured from usage the judge returned or taken from a stated flat estimate. The
-2026-09-26 baseline and its cost are in `docs/decisions.md` ("Judge regression fixtures").
+number was measured from usage the judge returned or taken from a stated flat estimate.
+
+| Run | Cost |
+|---|---|
+| One full run at 1 repeat, without the arc panel | ≈ $0.19 |
+| One full run at 1 repeat, with the arc panel | ≈ $0.41 (about $0.11 per arc story) |
+| One semantic replay | ≈ $0.003 |
+| One plate replay | ≈ $0.002 |
+
+The 2026-09-26 baseline table is in `docs/decisions.md` ("Judge regression fixtures"). The full
+per-fixture record is in `tests/judge-fixtures/baselines/2026-09-26.json`.
 
 **The Lab must run the code you are measuring.** Push to staging and wait for the deploy
 (`/api/health` commit SHA) before a run. A fixture run is an experiment, so the pre-push gate

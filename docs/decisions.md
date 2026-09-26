@@ -73,8 +73,9 @@ argued about, and the owner approved (2026-09-26) a fixture per judge to measure
   - Semantic 10: 6 flag, 4 pass.
   - Plate QC 18: 13 flag, 5 pass.
   - Quality 3, lettering 1, entity 1, book audit 1, arc panel 2.
-  - The negatives include the p9 "Eiffel Tower" (a crane and the Hauptbahnhof), the correct concrete
-    Uetliberg tower, the "pirate era" era fails on a present-day story, and clean plates and pages.
+  - The negatives include the p9 "Eiffel Tower" (a crane and the Hauptbahnhof), the Uetliberg
+    tower's solid shaft (no lattice charge; the fixture does not judge the loose proportions), the
+    "pirate era" era fails on a present-day story, and clean plates and pages.
 - **Skipped, with reasons:**
   - *Lukas p3 scale.* D-29 records `height_order` for review only, and the semantic judge checks
     the age band, not relative height. The expected verdict is an owner policy call.
@@ -86,6 +87,40 @@ argued about, and the owner approved (2026-09-26) a fixture per judge to measure
     input.
   - *Dragon p15.* The stored v1 is no longer the daylight version Lab #1471 judged.
   - Other rows are generator or plumbing defects with no judge verdict to pin (rows 1, 4, 6, 21b-d).
+**Baseline (2026-09-26, staging `b71683911`).** Lab #1525-1530 (1 repeat, every judge except the
+arc panel) and #1534/#1535/#1538/#1539 (semantic and plate QC, 2 more repeats). Stored in
+`tests/judge-fixtures/baselines/2026-09-26.json`. Recall and precision are counted over replays.
+
+| judge | fixtures | replays | TP | FN | TN | FP | recall | precision | false alarm | flips |
+|---|---|---|---|---|---|---|---|---|---|---|
+| plate_qc | 18 | 54 | 27 | 9 | 15 | 3 | 75% | 90% | 17% | 2/18 |
+| semantic | 10 | 30 | 9 | 6 | 15 | 0 | 60% | 100% | 0% | 0/10 |
+| quality | 3 | 3 | 1 | 1 | 1 | 0 | 50% | 100% | 0% | — |
+| lettering | 1 | 1 | 1 | 0 | 0 | 0 | 100% | 100% | — | — |
+| entity | 1 | 1 | 0 | 1 | 0 | 0 | 0% | — | — | — |
+| book_audit | 1 | 1 | 0 | 0 | 1 | 0 | — | — | 0% | — |
+
+- **Wrong on every replay.**
+  - Plate QC passes the photographic Lab #1503 and #1505 plates (medium, eval-gap row 13).
+  - Plate QC charges the Uetliberg plate as "not a lattice structure as shown in the reference
+    photo", but the photo shows a solid concrete shaft.
+  - Semantic misses the sunlit Fiona p7 v1 and the fog-less Dragon p16, both declared fog.
+  - Quality files nothing for the painted back-cover caption; the lettering check catches it at
+    CRITICAL now that it reads covers.
+  - The entity grid did not repeat the Lorena vitiligo catch. It filed skin_tone, face and age
+    findings instead.
+- **Flips.** Plate QC flipped on the Dragon p10 picture-in-picture plate and the Lukas p9
+  photographic plate. The QC sometimes files a hard defect with no check key; the `unclassified`
+  allowance is documented per fixture.
+- **Arc panel: not measured.** Both attempts (#1531/#1532) were killed at start by a concurrent
+  staging deploy. Under the burn-loop rule no third paid attempt was made. One arc-panel fixture
+  costs about $0.11, measured on Lab #1444.
+- **Cost.**
+  - The baseline cost ≈ $0.32 for 90 replays; each entry records whether its cost was measured or
+    estimated.
+  - One full run at 1 repeat costs ≈ $0.19 without the arc panel, and ≈ $0.41 with it.
+  - Semantic and plate QC cost ≈ $0.003 and ≈ $0.002 per replay. Quality and lettering ≈ $0.023,
+    book audit ≈ $0.024.
 **Rationale:** The fixtures give any critic change a measuring stick: an input added to a judge
 either moves its numbers or it does not. Pass fixtures keep a recall gain from being bought with
 false alarms. Running through the Lab makes every replay an experiment the owner can open, and

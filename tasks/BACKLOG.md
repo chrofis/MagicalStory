@@ -379,6 +379,8 @@ them by deleting an emotional or characterising sentence. Text refine alone: 14 
 ## Eval + scoring
 
 - [ ] **Standing rule: every owner- or agent-found judge miss (or false charge) becomes a judge fixture**, and the per-judge baseline is re-run after any critic-input or prompt change (`node scripts/admin/judge-fixtures.js run`). Not yet covered: consolidator, plan check, scene review (no stored-input replay yet) → docs/judge-fixtures.md:1
+- [ ] Run the 2 arc_panel judge fixtures once (≈ $0.22). The 2026-09-26 baseline could not measure them: both attempts were killed by a concurrent staging deploy → docs/decisions.md:24
+- [ ] Unverified from code reading: `evaluateImageQuality`'s `totalUsage` reads `semanticUsage.input_tokens` / `output_tokens`, but the semantic judge's `usage` carries only `{tokens, estimatedCost, elapsed}`, so a page eval's aggregate may count the semantic call as 0 tokens. Check it against a stored run's cost breakdown before changing anything → server/lib/evalPipeline.js:3602
 - [x] Owner decision: a declared-light contradiction is MAJOR, not MODERATE (owner ruling 2026-09-25, done 2026-09-25 in image-semantic.txt) → docs/decisions.md:51
 - [x] **The arc judge was briefed with the beats commission, not the arc's** — `buildBriefContext`
       sent the full beats page budget and omitted the age-band file and arc budgets, so judges
