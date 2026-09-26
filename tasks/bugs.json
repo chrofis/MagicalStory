@@ -2161,7 +2161,7 @@
       "impact": "On a realistic book every correctly photographic plate would be failed as medium (HARD), retried, and shipped with plate_shipped_failed_qc (or a derived plate dropped to its base).",
       "status": "fixed",
       "fixedAt": "2026-09-26",
-      "fixedIn": "pending (fix/plate-qc-coverage)",
+      "fixedIn": "319819cc6",
       "fix": "buildEmptySceneQcPrompt picks STYLE_CHECK_PHOTOGRAPHIC (\"Is the plate a photograph in it? FAIL if it reads as painted, drawn, animated or 3D-rendered\") when isPhotographicArtStyle(artStyle), STYLE_CHECK otherwise. Test: tests/unit/plate-qc-landmark-medium.test.ts."
     }
   ]

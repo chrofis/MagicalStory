@@ -2189,6 +2189,25 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "per-page-plate-qc",
+      "title": "Every per-page plate is judged on a text-below story, with a null text position",
+      "commits": [
+        "bc9fbc175",
+        "319819cc6"
+      ],
+      "addedAt": "2026-09-26",
+      "claim": "On the next staging story (text-below layout): every page plate rendered by renderPagePlate (a page not covered by a vantage) has a plate_qc eval_calls row labelled P<n> (retry P<n>-retry when it failed), no text_area finding, and a failing plate carries emptySceneQc (v1Issues, keptAttempt) on its page record; a plate with people or a photographic medium is flagged figures / medium.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "eval_calls kind plate_qc for the story: one row per per-page plate label P<n>; story_images empty_scene plates viewed against their verdicts; stored sceneImages[].emptySceneQc on failed ones. Baseline: staging job_1790277448294_5herh01j7 had no per-page plate QC at all."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }
