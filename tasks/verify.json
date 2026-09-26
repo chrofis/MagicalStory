@@ -2062,6 +2062,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "brief-no-headline-phrases",
+      "title": "Brief prose shows the mood, never names it (HEADLINE_PHRASE_RULE in all four brief authors)",
+      "commits": [
+        "54a092405"
+      ],
+      "addedAt": "2026-09-26",
+      "claim": "On the next staging full story: no page brief (sceneDescription / version prompt) contains an abstract phrase naming the mood or beat (\"a proud moment\", \"a moment of triumph\", \"a happy ending\"), and no page version carries a letteringInventory item with placement overlay whose text is such a phrase.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "stories.data.sceneImages[].sceneDescription and imageVersions[].prompt for headline phrases; imageVersions[].letteringInventory.items with placement overlay. Baseline: job_1790373080139_vnx5l8iy7 p18 (\"share a proud moment\" -> caption THE PROUD MOMENT)."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }
