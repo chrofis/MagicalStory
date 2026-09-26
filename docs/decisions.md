@@ -21,6 +21,79 @@ superseded and link forward.
 
 ---
 
+## 2026-09-26 — The whole-cast page is a counted plan-check question; every figure's EYES line carries the viewer rule; a garment element's description is that garment only
+
+**Context:** Staging job_1790446348343_z3fw660ie p16 shipped a posed group: plan line "the six stand
+together on the landing as the ship fades into the fog behind them, one of them laughing". Three faults:
+(1) the plan check filed Q1 and Q3 on it but no Q5 — a feeling on one face read as the page's action —
+so the re-plan never touched it, although story-beats.txt forbids "a row of figures facing the viewer,
+everyone present doing nothing"; (2) the page prompt's viewer rule rode a pose FILL line written only
+for a figure with no interaction row, so the one figure with a row got no viewer line, and the whole
+cast rendered facing the camera while briefed to watch a ship behind them; (3) the "is NOT wearing
+this" line quoted the character's whole costume, because `clothingCheck.outfitClauses` split on
+commas only when a contract had no semicolon — "a blouse, a coat, …, a necklace; scissors hang from
+the sash" was two clauses, the first the whole garment list, and the wardrobe-vs-bible `adopt` wrote
+it into the coat's `description` (the stored `wardrobeBibleReport` shows `elementText` = the coat
+alone, `corrected: true`).
+
+**Decision:**
+1. `WHOLE_CAST_DEF` (promptBuilders) is ONE definition filled into story-beats.txt (the one-moment
+   list; planner question 3 now asks which pages gather the whole cast and what one action they share)
+   and plan-check.txt question 17, which makes the checker enumerate every page whose ROSTER holds
+   every commissioned character and name the one action its instant gives all of them. Q17 is
+   ADVISORY: `REPLAN_MUST_FIX_CHECKS` is unchanged. Whether it should be must-fix is the owner's call —
+   ranking the whole of Q5 must-fix was measured and rejected (2026-09-09); Q17 is narrower, which is
+   why it is its own number.
+2. `buildExactPosesBlock`: every foreground/midground figure's EXPRESSIONS AND EYES line carries its
+   gaze and "face turned the same way, never to the viewer" (from `looksAt`; none → "eyes off into the
+   scene"); the header says a face turned away shows its expression in profile or three-quarter view.
+   A figure the brief sends to the viewer (covers) keeps "eyes on the viewer". The pose fill line is
+   deleted — this line replaces it. Face repair reads the same block.
+3. `outfitClauses` splits at every top-level `;` and `,` and rejoins a dependent segment
+   (`wornItems.DEPENDENT_OPENER_RE`) to its garment. Not `wornItems.splitClauses`: its closed garment
+   vocabulary merges an unknown garment ("sweatshirt") into the clause before it.
+
+**Rationale:** (1) a keyword list inside Q5 already named "stands, together" and was missed; an
+enumerated question with a required answer is a count, not a keyword. (2) the viewer rule is a
+property of every story-page figure, so it belongs on the line every figure gets. (3) the canonical
+garment text is the contract's clause for that garment; the fault was the splitter, so the fix is at
+the write site, and `wornItemLook` keeps reading `description`.
+
+**Measured (free / cents):** the plan check rebuilt with the real builder on three stored staging
+divisions is byte-identical to the stored prompt except the new question; gpt-5.6-luna-pro, $0.084
+total: z3fw660ie p16 → Q17; vnx5l8iy7 p18 ("stand close together") and p7 (one whispers, three stand
+rigid) → Q17, p1 / p6 (shared kick, shared run) → none; 5herh01j7 (no whole-cast page) → none. The p16
+page prompt rebuilt on stored data: worn line "dark grey wool pirate coat — a weathered dark grey wool
+pirate coat worn open with wide cuffs and brass buttons"; five eyes lines each ending "face turned the
+same way, never to the viewer".
+
+**Not done, and why:**
+- *Costumed off-variants* (a garment-off sheet for a costume story): `wardrobeVariants.baseCategoryFor`
+  refuses costumed categories. Enabling it is ~6 files of mechanical key/lookup changes (storyAvatars
+  projection + resolveSheetForRef gate, styledAvatars base-sheet lookup and persistence, entityConsistency
+  sheet choice) at ~$0.02-0.06 per off-set, but one design choice is open: off-sets are keyed per
+  character, not per outfit, so a character with a costume AND a plain outfit needs either per-page-
+  category keying or a refusal. Owner decision; not built.
+- *"Cut coat" vs `off`*: the plan and text had the character in her cut-down coat on the last pages; the
+  worn-state vocabulary is `worn | off` (`WORN_ITEMS_ROW_RULE`), so the Art Director could only say off.
+  No generator/critic mismatch — the state does not exist; an altered garment would be an outfit
+  version or a garment state. Not built.
+- *The "vitiligo" finding*: the character's upload shows NO vitiligo (original, face and body photos
+  viewed; trait extraction re-run on both → "none"). The pale patches are watercolor highlight washes on
+  her styled sheet's head row, and the entity judge read them as a skin condition (CRITICAL
+  `character_marking`). Nothing was missing from trait extraction; no extractor change shipped.
+- *Herr Brunner's reference cell*: he is a Visual Bible secondary character whose `pages` include 16
+  and whom the p16 plan line names — his cell in the pack is correct. The key is his `signatureLook`
+  ("large brass key ring on his belt").
+
+**Touched:** server/lib/promptBuilders.js (`WHOLE_CAST_DEF`, `buildExactPosesBlock`),
+prompts/story-beats.txt, prompts/plan-check.txt, server/lib/clothingCheck.js (`outfitClauses`),
+server/lib/wornItems.js (export), scripts/admin/sibling-registry.json, tests/unit/eyes-line-viewer-rule.test.ts,
+tests/unit/worn-item-garment-only.test.ts, tests/unit/plan-check-question-count.test.ts,
+tests/unit/plan-shared-definitions.test.ts, tests/unit/covers-as-pages.test.ts,
+tests/unit/brief-authoring-contracts.test.ts
+**Status:** ✅ active (staging)
+
 ## 2026-09-26 — Weather owns the sky: a covered weather's LIGHT line names no sun, moon or blue sky (amends 2026-09-24 "A page declares its time of day and weather")
 **Context:** `sceneLight.lightPhrase` built every LIGHT line as "<time phrase>; <weather phrase>", and every
 time phrase names a sky light source (afternoon "warm daylight from a sun past its height", dusk "a deep blue

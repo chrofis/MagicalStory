@@ -2281,6 +2281,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "whole-cast-page-and-eyes-line",
+      "title": "A whole-cast page is counted by plan-check Q17, and every story-page figure is told its face never turns to the viewer",
+      "commits": [
+        "6bf12ea9f"
+      ],
+      "addedAt": "2026-09-26",
+      "claim": "On the next staging story: the stored plan-check reply (beatsReviewReport.checkReply) answers question 17 for every page whose ROSTER holds the whole commissioned cast (a Q17 finding where that page only stands them together), and every stored page prompt's EXPRESSIONS AND EYES block has one line per foreground/midground figure ending \"never to the viewer\" (covers: \"eyes on the viewer\"); whole-cast pages are not drawn as a row facing the camera.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "beatsReviewReport.checkReply / modelFindings for check 17; sceneImages[].prompt EXPRESSIONS AND EYES lines; view each whole-cast page image. Baseline: staging job_1790446348343_z3fw660ie p16 (no Q5/Q17 finding, row facing the viewer, one figure with no viewer line)."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }

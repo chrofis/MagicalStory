@@ -2223,6 +2223,18 @@
       "fixedAt": "2026-09-26",
       "fixedIn": "6e3170843",
       "fix": "The lettering check runs on covers briefed as pages (evalOptions.coverIsPage from the pipeline record, the cover iterate, buildEvalInputs and the Lab/admin replay), excusing the REQUIRED TEXT items and, in appOverlay mode, the app's own string (resolveCoverTextContract appTexts: title / dedication / magicalstory.ch). A CRITICAL rendered_text takes the round ahead of an entity or identity char-fix (the figure repair runs next round). The cover beat carries no label; the page number is the identity, explained once in COVER_GAZE_EXCEPTION. Test: cover-lettering-check.test.ts."
+    },
+    {
+      "id": "worn-item-line-quotes-whole-outfit",
+      "title": "A garment element's Visual Bible description became the whole outfit, and the page's \"is NOT wearing this\" line quoted the entire costume",
+      "reportedAt": "2026-09-26",
+      "source": "Owner, 2026-09-26, staging job_1790446348343_z3fw660ie p16: the worn line read \"NOT wearing this on this page: dark grey wool pirate coat — white loose-weave cotton pirate blouse …, a weathered dark grey wool pirate coat …, a black cotton knee-length ski…\"; visualBible CLO001.description holds the whole costume while wardrobeBibleReport.conflicts[0].elementText is the coat alone (kind adopt, corrected true).",
+      "rootCause": "server/lib/clothingCheck.js outfitClauses split on commas only when the contract had no semicolon at all. The contract was a comma list with one semicolon tail (\"…, and a silver necklace …; sewing scissors hang from the sash knot …\"), so the first clause was the entire garment list; checkWardrobeAgainstBible found the coat inside it and applyWardrobeBibleCorrections (adopt) wrote that clause into CLO001.description. wornItems.wornItemLook quotes description.",
+      "impact": "Every page taking the garment off told the image model the character was not wearing her whole outfit; the render kept the coat (semantic MAJOR on p16). Any linked garment in an outfit written with a semicolon tail is affected.",
+      "status": "fixed",
+      "fixedAt": "2026-09-26",
+      "fixedIn": "47fdf5f94",
+      "fix": "outfitClauses splits at every top-level \";\" and \",\" and rejoins a dependent segment (wornItems.DEPENDENT_OPENER_RE) to its garment. Replay on the stored story: the adopt is a no-op and p16's line names the coat only. Stored stories keep their corrupted descriptions (not migrated). Test: tests/unit/worn-item-garment-only.test.ts."
     }
   ]
 }
