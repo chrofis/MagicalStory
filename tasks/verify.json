@@ -2263,6 +2263,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "text-stakes-oneliners",
+      "title": "Impossible turn is MAJOR, stakes rules are checked, one-sentence narration paragraphs reach the repair",
+      "commits": [
+        "84efc85b5"
+      ],
+      "addedAt": "2026-09-26",
+      "claim": "On the next staging story: stories.data.textRefineReport.oneSentenceParagraphs.writer lists the writer's one-sentence narration paragraphs, mergeStats.bySource carries style-counter, and oneSentenceParagraphs.shipped is shorter than writer (the repair joined them); no roundTrace[].arcFaults entry coincides with a page whose repair added an object no earlier page names; the arc panel prompt (arcReviewReport rounds[].panelPrompt) carries the STAKES lens, and a panel or critique finding about an action at the turn that cannot happen is tagged MAJOR or CRITICAL.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "textRefineReport.oneSentenceParagraphs writer vs shipped; mergeStats.bySource['style-counter']; roundTrace[].arcFaults and the rewritten pages; arcReviewReport panel raw replies for STAKES / CLAIM issues and their tags. Baseline: staging job_1790446348343_z3fw660ie shipped 5 one-sentence narration paragraphs (p1, p8, p9, p15, p16), the rope CLAIM was tagged MINOR and filtered, and the repair invented a second rope end."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }
