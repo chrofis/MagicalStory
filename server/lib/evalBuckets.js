@@ -127,6 +127,14 @@ const BUCKETS = {
   // composition_textzone / iterate_placement, which repositions art — it cannot
   // rebuild an undersized structure. Only a full redo can.
   structure_scale:      { owner: 'quality',  kind: 'graded', repair: 'regen' },
+  // A Visual Bible creature drawn far smaller than the size its page gave it
+  // against the figures in frame (image-evaluation D-34, 2026-09-26). Its own
+  // bucket, NOT `scale` (oversized props and figure age) and NOT
+  // `structure_scale` (vessels and buildings): the three are different
+  // defects with different sources. Repair is a page redo — repairLogic
+  // routes it to iterate; inpaint cannot re-stage a creature at several times
+  // its drawn size, and char-fix has no reference to paint a creature from.
+  creature_scale:       { owner: 'quality',  kind: 'graded', repair: 'regen' },
   // One named prop rendered twice when the scene has one of it
   // (image-evaluation D-32) — the eval-side check for the worn-item dedupe the
   // creation side now does. Its own bucket, NOT an alias of `object_presence`:
@@ -207,6 +215,7 @@ const TYPE_TO_BUCKET = {
   composition: 'composition_textzone', position_and_scale: 'composition_textzone',
   scale: 'composition_textzone', position: 'composition_textzone', textzone: 'composition_textzone',
   structure_scale: 'structure_scale', undersized_structure: 'structure_scale',
+  creature_scale: 'creature_scale',
   duplicate_object: 'duplicate_object', duplicated_object: 'duplicate_object',
   duplicate_prop: 'duplicate_object', object_duplication: 'duplicate_object',
   rendered_text: 'rendered_text', text: 'rendered_text',
@@ -422,7 +431,7 @@ const CONSOLIDATED_TYPES = Object.freeze([
   'accessory', 'accessory_missing', 'hair', 'hair_nuance', 'face_drift', 'face_destroyed',
   'cutout_artifact', 'nudity', 'anatomy', 'body_build', 'figure_completeness', 'action_interaction',
   'object_presence', 'missing_element', 'object_count', 'duplicate_object', 'scale',
-  'structure_scale', 'setting', 'style_consistency', 'rendered_text', 'required_text',
+  'structure_scale', 'creature_scale', 'setting', 'style_consistency', 'rendered_text', 'required_text',
   'character_marking', 'anachronism', 'garment_colour', 'naturalness', 'emotion',
   'viewer_address', 'physics', 'unverified_absence', 'composite_seam',
 ]);

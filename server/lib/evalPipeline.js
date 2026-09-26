@@ -2559,6 +2559,24 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // as its own input so the judge compares against the contract, not against
     // its prior of what a pirate looks like. Empty when unknown — the template
     // then tells it not to judge clothing at all, which is the honest default.
+    // CREATURE SIZES (D-34, 2026-09-26). The size each cited Visual Bible
+    // creature was given against the figures in this frame — built by the SAME
+    // function that wrote the page prompt's REQUIRED OBJECTS line
+    // (promptBuilders.creaturePageScaleNote), so the judge reads the sentence
+    // the illustrator was given. Empty when the page cites no sized creature:
+    // D-34 then skips.
+    let creatureSizesBlock = '';
+    try {
+      const creatureMeta = evalOptions.sceneMetadata || declaredSceneMeta;
+      creatureSizesBlock = require('./promptBuilders').buildCreatureSizesBlock(
+        evalOptions.visualBible || null,
+        Array.isArray(creatureMeta?.objects) ? creatureMeta.objects : [],
+        Array.isArray(sceneCharacters) ? sceneCharacters : [],
+      );
+    } catch (err) {
+      log.error(`[EVAL] ${pageContext || 'page'}: creature sizes could not be built - ${err.message}`);
+      notEvaluated.record('creature_scale', 'creature_sizes_build_failed', err.message);
+    }
     const { buildEvaluationPrompt } = require('../services/prompts');
     const evaluationPrompt = evaluationTemplate
       ? buildEvaluationPrompt({
@@ -2568,6 +2586,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           sceneIntent: sceneIntentBlock,
           clothingContract: clothingContractBlock,
           requiredObjects: requiredObjectsBlock,
+          creatureSizes: creatureSizesBlock,
           textRules: requiredTextBlock,
           expectedCast: expectedCast.block,
           // THE LANDMARK BLOCK (2026-09-18) — same block the other two judges
@@ -2789,6 +2808,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             sceneIntent: sceneIntentBlock,
             clothingContract: clothingContractBlock,
             requiredObjects: requiredObjectsBlock,
+            creatureSizes: creatureSizesBlock,
             textRules: requiredTextBlock,
             expectedCast: expectedCast.block,
             template: evalOptions.evalTemplateOverride || undefined,

@@ -191,6 +191,11 @@ const MAX_SEVERITY_TYPES = {
   // does — an evaluator escalating one to CRITICAL must not let a scale defect
   // outrank a missing or wrong character.
   structure_scale: 'major',
+  // creature_scale capped at MAJOR (owner-approved, 2026-09-26): image-evaluation
+  // D-34 defines a creature drawn far below its given size as MAJOR, the same
+  // footing as an undersized structure (D-31). The cap keeps an evaluator's
+  // escalation from outranking a missing or wrong character.
+  creature_scale: 'major',
   // duplicate_object capped at MAJOR (owner-approved addition, 2026-09-06):
   // image-evaluation D-32 defines a named prop rendered twice as MAJOR — the
   // owner's footing, "on the level of a missing key object" (D-19, also MAJOR).

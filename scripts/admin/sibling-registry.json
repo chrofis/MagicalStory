@@ -194,6 +194,11 @@
             "critic": "D-16b `action_interaction`",
             "generator": "{HANDS_HOLD_ONLY_NAMED}",
             "note": "D-16b is MAJOR when a hand holds something the scene never named while a named object is absent. The generator half is HANDS_HOLD_ONLY_NAMED_RULE, same mechanism and same reach test."
+          },
+          {
+            "critic": "D-34 `creature_scale`",
+            "generator": "{REQUIRED_OBJECTS}",
+            "note": "D-34 is MAJOR when a creature is drawn far below the size its page gave it. The generator half is the creature's line in the REQUIRED OBJECTS block, built by promptBuilders.creaturePageScaleNote (band phrase + a ratio against the people in frame); the judge reads the SAME sentence through its CREATURE SIZES input (buildCreatureSizesBlock), and every repaint through buildCreatureSizeClauseForRepair. One builder, three readers; pinned in tests/unit/creature-size-{page,eval,repair}.test.ts."
           }
         ]
       }
