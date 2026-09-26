@@ -134,6 +134,7 @@ const {
   evaluateImageQuality,
   editImageWithPrompt,
   buildInpaintInstruction,
+  buildCreatureSizeClauseForRepair,
   deleteFromImageCache,
   generateImageCacheKey,
   iteratePageCore,
@@ -3854,8 +3855,18 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
           });
           // The same instruction builder as the pipeline inpaint (images.js),
           // so this edit carries the page's declared light like every other.
+          // The size every cited creature keeps (2026-09-26) — the same
+          // clause, from the same builder, as the pipeline inpaint.
+          const creatureSizeClause = buildCreatureSizeClauseForRepair({
+            visualBible: storyData.visualBible || null,
+            sceneMetadata: currentScene.sceneMetadata
+              || require('../lib/sceneMetadata').extractSceneMetadata(currentScene.sceneDescription || currentScene.description || ''),
+            characters: storyData.characters || [],
+            nameMap: repairNames,
+          });
           const sentInstruction = buildInpaintInstruction({
             editInstruction: sanitizeIssueForInpaint(nameRepairText(editInstruction, repairNames)),
+            creatureSizeClause,
             sceneDescription: repairEvalSceneHint,
           });
           const editResult = await editImageWithPrompt(currentImageData, sentInstruction);

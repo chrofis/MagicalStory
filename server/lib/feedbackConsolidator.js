@@ -832,18 +832,21 @@ function applyRule7SceneFixGuard(plan, pageNumber) {
   // was "Replace the blue duffle coat with a blue hooded anorak…".
   // Routes on the DECLARED `types` array only (SETTLED: classification is
   // the prompt's job) — a scene_fix with no declared types is left alone.
-  const { NOT_INPAINTABLE_TYPES } = require('./repairLogic');
+  const { NOT_INPAINTABLE_TYPES, ITERATE_ROUTED_TYPES } = require('./repairLogic');
   const sceneTypes = Array.isArray(plan.scene_fix.types)
     ? plan.scene_fix.types.map(t => String(t || '').toLowerCase()).filter(Boolean)
     : [];
   if (plan.scene_fix.instruction && sceneTypes.length
       && sceneTypes.every(t => NOT_INPAINTABLE_TYPES.has(t))) {
+    // A creature drawn below its size is a page redo, not a character
+    // repair (repairLogic ITERATE_ROUTED_TYPES) — the reason says which.
+    const redo = sceneTypes.every(t => ITERATE_ROUTED_TYPES.has(t));
     plan.dropped_issues.push({
       issue: plan.scene_fix.instruction,
       severity: plan.scene_fix.severity || null,
-      reason: 'requires_char_fix_not_inpaint',
+      reason: redo ? 'requires_iterate_not_inpaint' : 'requires_char_fix_not_inpaint',
     });
-    log.warn(`[FEEDBACK-CONSOLIDATOR] page ${pageNumber}: scene_fix typed ${sceneTypes.join('/')} is a character repair, not an inpaint — dropped (rule 7)`);
+    log.warn(`[FEEDBACK-CONSOLIDATOR] page ${pageNumber}: scene_fix typed ${sceneTypes.join('/')} is ${redo ? 'a page redo' : 'a character repair'}, not an inpaint — dropped (rule 7)`);
     plan.scene_fix.instruction = '';
     plan.scene_fix.severity = 'NONE';
   }

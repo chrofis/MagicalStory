@@ -1186,6 +1186,45 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
     }
   }
 
+  // 2d. A CREATURE DRAWN FAR BELOW ITS SIZE GOES TO ITERATE (owner, 2026-09-26).
+  //
+  // Staging job_1790373080139_vnx5l8iy7 p16: the grown dragon was drawn a
+  // fraction of its twice-an-adult height; the finding came typed `scale`, the
+  // consolidator dropped it `requires_char_fix_not_inpaint`, and no method ever
+  // took it — char-fix repaints a roster figure from its avatar, and a Visual
+  // Bible creature has none. `creature_scale` (D-34) now names the defect and
+  // routes it here, like the orphan CRITICAL above: iterate rewrites the brief
+  // and re-renders the page with the creature's page-scale note in its
+  // REQUIRED OBJECTS line.
+  //
+  // One narrowing condition: a CRITICAL inpaint can execute (or an untyped
+  // one, counted executable as in 2c) takes this round, and the redo waits for
+  // the next — the same precedence gate 2b gives clothing. A MAJOR or lesser
+  // inpaintable finding does not: the redo re-renders the whole page anyway.
+  // Declared `type` / `severity` fields only.
+  if (pageNumber !== 0) {
+    const creature = severityIssues.find(i =>
+      ITERATE_ROUTED_TYPES.has(String(i?.type || '').toLowerCase())
+      && /^(major|critical)$/i.test(String(i?.severity || '')));
+    if (creature) {
+      const outranking = severityIssues.find((i) => {
+        if (!/^critical$/i.test(String(i?.severity || ''))) return false;
+        const type = String(i?.type || '').toLowerCase();
+        return !type || !NOT_INPAINTABLE_TYPES.has(type);
+      });
+      const what = `${String(creature.type).toLowerCase()} ${String(creature.severity).toLowerCase()}${creature.character ? ` on ${String(creature.character).trim()}` : ''}`;
+      if (outranking) {
+        log.info(`🪃 [REPAIR-DECIDE] page ${pageNumber}: ${what} waits — a CRITICAL ${outranking.type || 'finding'} inpaint can execute takes this round`);
+      } else {
+        const desc = require('./scoring').findingText(creature).slice(0, 80);
+        return {
+          method: 'iterate',
+          reason: `${what} — a creature drawn below its size is a page redo (no reference to char-fix from, not inpaintable): ${desc}`,
+        };
+      }
+    }
+  }
+
   // 3. Inpaint when there's something inpaintable.
   // `deferredClothing` is set when gate 2b stood down this round (severity
   // precedence, above); it is carried into the reason so the round log says
@@ -1377,6 +1416,11 @@ const NOT_INPAINTABLE_TYPES = new Set([
   'clothing', 'clothing_inconsistent', 'clothing_detail', 'garment_colour', 'garment_color',
   // body form
   'scale',
+  // A creature drawn far below its given size (D-34). Not a character repair:
+  // a Visual Bible creature has no avatar or photo to repaint it from. Not an
+  // inpaint: a local edit cannot re-stage a creature at several times its drawn
+  // size. The page redo owns it — see ITERATE_ROUTED_TYPES and gate 2d.
+  'creature_scale',
   // extra_character is NOT here (owner, 2026-09-24, superseding 2026-09-13).
   // Under the three-case presence model an `extra_character` means every cast
   // member is already matched and this figure is surplus, so removing it cannot
@@ -1387,6 +1431,16 @@ const NOT_INPAINTABLE_TYPES = new Set([
   // cutout_artifact: see CROP_ARTIFACT_TYPES — the page has no such defect.
   'cutout_artifact',
 ]);
+
+/**
+ * The subset of NOT_INPAINTABLE_TYPES whose route is the PAGE REDO, not
+ * character repair (2026-09-26). decideRepairMethod gate 2d sends them to
+ * iterate, and a plan that carries one drops it with reason
+ * `requires_iterate_not_inpaint` rather than `requires_char_fix_not_inpaint` —
+ * the p16 drop on staging job_1790373080139_vnx5l8iy7 told the log a
+ * character repair would handle a dragon, and nothing ever did.
+ */
+const ITERATE_ROUTED_TYPES = new Set(['creature_scale']);
 
 /**
  * Types that describe OUR entity-grid crop, not the page: a hard white gap or a
@@ -1721,15 +1775,20 @@ function findVbFigure(visualBible, lowerName) {
   return null;
 }
 
-// Kind + the entry's own look fields. No size: `scaleClass` is never read, and
-// the stored `description` (which may still carry a size phrase on older
+// Kind + the entry's own look fields. No size: `scaleClass` is read only for
+// the creature's MATURITY (a grown creature is "grown", 2026-09-26 — the
+// identity the Visual Bible entry states, so a repair can tell the grown
+// creature from its young when both share a look), never rendered as a size.
+// The stored `description` (which may still carry a size phrase on older
 // bibles) is used only for its FIRST clause, the kind.
 function describeVbFigure(entry, pool) {
-  const { clauseRef } = require('./visualBible');
+  const { clauseRef, isGrownCreatureScaleClass } = require('./visualBible');
   const str = (v) => (typeof v === 'string' ? v.trim().replace(/[.]\s*$/, '') : '');
   const label = str(entry.label);
   if (pool === 'animals') {
-    const kind = label || str(entry.species) || clauseRef(entry.description, { minWords: 1 }) || 'animal';
+    const bare = label || str(entry.species) || clauseRef(entry.description, { minWords: 1 }) || 'animal';
+    const kind = isGrownCreatureScaleClass(entry.scaleClass) && !/\b(grown|adult|baby|young|juvenile|hatchling)\b/i.test(bare)
+      ? `grown ${bare}` : bare;
     const coloring = str(entry.coloring);
     const features = str(entry.features).split(',').map(s => s.trim()).filter(Boolean).slice(0, 2);
     return `the ${kind}${coloring ? ` with ${coloring}` : ''}${features.length ? ` (${features.join(', ')})` : ''}`;
@@ -1825,4 +1884,4 @@ function nameRepairText(text, nameMap, { keep = null, vidByName, ownVisualId = n
 
 module.exports = {
   describeFigureForRepair, buildRepairNameMap, buildPageRepairNameMap, nameRepairText, resolveRepairIds,
-  repairAttemptFromResult, detectionForRetryEntry, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, attributeReaderFindings, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, CROP_ARTIFACT_TYPES, isCropArtifact, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX };
+  repairAttemptFromResult, detectionForRetryEntry, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, attributeReaderFindings, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, ITERATE_ROUTED_TYPES, CROP_ARTIFACT_TYPES, isCropArtifact, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX };
