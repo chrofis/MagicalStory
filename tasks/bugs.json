@@ -2271,6 +2271,18 @@
       "impact": "The reader's-eye audit judged a rewritten picture against a moment and cast it was not drawn from.",
       "fixedIn": "b17ba4ee1",
       "fix": "buildAuditPages resolves the picked version's cast and metadata first (resolveDeclaredCast), the page's otherwise. Test: book-audit-brief-and-type.test.ts."
+    },
+    {
+      "id": "lab-image-stage-edit-tier",
+      "title": "The Lab image stage rendered pages on Grok Standard (the edit tier) while production renders them on Imagine 2.0",
+      "reportedAt": "2026-09-26",
+      "source": "Owner-reported: Lab 1523 (image stage, p16 of staging job_1790446348343_z3fw660ie) recorded grok-imagine-image; the stored production p16 says grok-imagine-image-2.0. Stored: 49 image-stage experiments in 14 days without params.imageModel all recorded grok-imagine-image; recent staging and production pages are all grok-imagine-image-2.0.",
+      "rootCause": "runImageStage passed imageModelOverride: params.imageModel || null; a null override resolves through resolveGrokImageModel(null) to the Standard tier (MODEL_DEFAULTS.pageImage, the edit/inpaint key), not MODEL_DEFAULTS.pageRenderImage which every production page render reads.",
+      "impact": "Every Lab image-stage (and scene_variant) conclusion without an explicit imageModel measured a different, cheaper renderer than the one that ships.",
+      "status": "fixed",
+      "fixedAt": "2026-09-26",
+      "fixedIn": "PENDING",
+      "fix": "runImageStage resolves pageModelKey = params.imageModel || MODEL_DEFAULTS.pageRenderImage for the render and the Grok VB-text rule. Test: tests/unit/testlab-prod-prompt-parity.test.ts. docs/decisions.md 2026-09-26 \"The Lab image stage renders on the production page tier, not the edit tier\"."
     }
   ]
 }

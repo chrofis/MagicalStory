@@ -181,6 +181,17 @@ describe('runImageStage passes the set it actually sends', () => {
     expect(gridAt).toBeLessThan(promptAt);
   });
 
+  it('renders on the production page tier unless the run names another model', () => {
+    // A null override fell through to generateImageOnly's default, the
+    // edit/inpaint tier (Standard), while production pages render on
+    // pageRenderImage (Imagine 2.0) — Lab 1523 vs its stored page.
+    const stage = TESTLAB.slice(TESTLAB.indexOf('async function runImageStage'), TESTLAB.indexOf('async function runEmptySceneStage'));
+    expect(stage).toMatch(/const pageModelKey = params\.imageModel \|\| MODEL_DEFAULTS\.pageRenderImage;/);
+    expect(callBody(stage, 'generateImageOnly', 1)).toMatch(/imageModelOverride:\s*pageModelKey,/);
+    const { MODEL_DEFAULTS, IMAGE_MODELS } = nodeRequire('../../server/config/models.js');
+    expect(IMAGE_MODELS[MODEL_DEFAULTS.pageRenderImage].modelId).toBe('grok-imagine-image-2.0');
+  });
+
   it('the composite stage states an EMPTY set rather than omitting it', () => {
     // It hands its prompt to the blend pass, which attaches no element cells.
     const call = callBody(TESTLAB, 'buildImagePrompt', 2);

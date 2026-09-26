@@ -144,6 +144,37 @@ tests/unit/book-audit-brief-and-type.test.ts, docs/prompt-inventory.md.
 **Status:** ✅ active on staging.
 
 ---
+## 2026-09-26 — The Lab image stage renders on the production page tier, not the edit tier
+
+**Context:** Lab 1523 (image stage, p16 of staging job_1790446348343_z3fw660ie) recorded `grok-imagine-image`
+while the stored production p16 was painted by `grok-imagine-image-2.0`. `runImageStage` passed
+`imageModelOverride: params.imageModel || null`; a null override resolves in `_dispatchImageGeneration` via
+`resolveGrokImageModel(null)` to the Standard tier — `MODEL_DEFAULTS.pageImage`, the EDIT/INPAINT key — while every
+production page render reads `pageRenderImage` (runtime `pageRenderModel` = `grok-imagine-2` in every environment
+since 2026-09-06). Stored evidence: every image-stage experiment in the 14 days to 2026-09-26 without an explicit
+`imageModel` (49 runs) recorded `grok-imagine-image`; the only 2.0 image-stage runs passed `imageModel:
+grok-imagine-2` by hand; the last five staging stories and the last production stories with pages carry only
+`grok-imagine-image-2.0` originals.
+
+**Decision:** `runImageStage` resolves `pageModelKey = params.imageModel || MODEL_DEFAULTS.pageRenderImage` and uses
+it for both the render and the Grok VB-text rule. `scene_variant` renders through `runImageStage` and follows.
+The other Lab image stages already match production: `empty_scene` (plate tier `emptyScenePlateModel`, Standard, both
+sides), `edit_image` (plate source → plate tier as the production derive; page source → the generic edit tier),
+`iterate` (`iteratePageCore` → `pageRenderImage`), `inpaint` (`inpaintPage` → `pageRenderImage`), `char_repair`
+(`charRepairModel`, Standard, pinned both sides).
+
+**Rationale:** the Lab exists to reproduce production; a Lab page on a cheaper, different model measures a
+different renderer. Lab conclusions from image-stage runs without an explicit `imageModel` describe the Standard
+tier, not what ships.
+
+**Not done, reported instead:** the text-space calm-zone RE-RENDER in production (`storyJobPipeline.js`
+`ensureCalmZone` generateImage, and `repairPipeline.js` POST-REPAIR-TEXT) passes `img.sceneMetadata?.pageImageModel`,
+a field no code writes, so a re-roll would render on Standard. It fired on 0 of 570 stored pages in 21 days
+(no stored `textSpaceCandidates`), and the Lab `text_zone` stage matches that behaviour. Owner decision.
+
+**Touched:** server/lib/testlab.js (`runImageStage`), tests/unit/testlab-prod-prompt-parity.test.ts
+**Status:** ✅ active (staging)
+
 ## 2026-09-26 — Plan-check Q17 (the whole-cast page) is must-fix; the rejected Q5 ranking stays rejected (amends the entry below)
 
 **Context:** Q17 shipped advisory the same day (entry below) and the decision was left to the owner, because

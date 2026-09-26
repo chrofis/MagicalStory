@@ -485,9 +485,18 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
     languageLevel: ctx.languageLevel,
   };
 
+  // THE PAGE RENDER TIER, as production renders a page (2026-09-26). This
+  // stage passed `params.imageModel || null`, and a null override resolves to
+  // generateImageOnly's default — MODEL_DEFAULTS.pageImage, the EDIT/INPAINT
+  // tier (Standard, grok-imagine-image) — while every production page renders
+  // on MODEL_DEFAULTS.pageRenderImage (Imagine 2.0 since 2026-09-06). Lab 1523
+  // (p16 of staging job_1790446348343_z3fw660ie) reported grok-imagine-image
+  // against a stored page painted by grok-imagine-image-2.0. An explicit
+  // params.imageModel is still the A/B lever.
+  const pageModelKey = params.imageModel || MODEL_DEFAULTS.pageRenderImage;
   // Same VB-text rule as production: Grok's 8000-char limit means the VB prose
   // is skipped and the grid image carries the references instead.
-  const isGrokImage = IMAGE_MODELS[MODEL_DEFAULTS.pageImage]?.backend === 'grok';
+  const isGrokImage = IMAGE_MODELS[pageModelKey]?.backend === 'grok';
 
   // THE PLATE AND THE GRID ARE RESOLVED BEFORE THE PROMPT (2026-09-18), because
   // the prompt has to know which references the call actually carries. This is
@@ -688,8 +697,9 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
   const result = await generateImageOnly(prompt, ctx.referencePhotos, {
     aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
     // params.imageModel: A/B the page render model (grok-imagine vs
-    // gemini-2.5-flash-image) — style-adherence routing tests. Null = prod default.
-    imageModelOverride: params.imageModel || null,
+    // gemini-2.5-flash-image) — style-adherence routing tests. Unset = the
+    // production page render tier (pageModelKey above).
+    imageModelOverride: pageModelKey,
     landmarkPhotos: genLandmarkPhotos,
     // Plate or fail, as in production: only a cast-0 page may render on its
     // landmark photo; any other landmark page needs the plate (emptyScene).
