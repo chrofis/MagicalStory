@@ -2185,7 +2185,7 @@
       "impact": "Costume and body text painted into EMPTY plates (a knotted orange cloth on a wall), and a geometry slot spent on a non-fact; the plate judge then graded the plate on the same list.",
       "status": "fixed",
       "fixedAt": "2026-09-26",
-      "fixedIn": "",
+      "fixedIn": "7829f75dc",
       "fix": "stripCastAppositives cuts every dash- or bracket-delimited appositive whose head is a figure noun (FIGURE_RE, which now also names toddler/preschooler/teen/infant) or a cast member's name from the brief's characters[], before the sentence is split — the look never becomes a candidate and the figure's own clause keeps its subject. The three dimension lists are word-anchored (wordStart), with compound light words named by prefix (candle/moon/street/…light, …lit) and afternoon kept. Replay: 28 look-carrying facts before, 0 after. Tests: tests/unit/empty-scene-geometry.test.ts (\"a character description is never geometry\")."
     },
     {
@@ -2197,7 +2197,7 @@
       "impact": "Which gate refused a pipeline character repair was invisible in the round log, retryHistory, failedRepairs and repairRounds — every failed char-fix had to be re-diagnosed from Railway logs.",
       "status": "fixed",
       "fixedAt": "2026-09-26",
-      "fixedIn": "",
+      "fixedIn": "7829f75dc",
       "fix": "repairLogic.describeCharFixFailure(result) builds the error from rejectedReason + gateMessage (or the spine's error) and the attempt count; executeCharFixAction logs it and returns it as the failure's error, which flows unchanged into retryHistory, failedRepairs and repairRounds. Test: tests/unit/char-fix-failure-reason.test.ts."
     }
   ]

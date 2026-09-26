@@ -2230,7 +2230,9 @@
     {
       "id": "char-fix-failure-reason",
       "title": "A failed pipeline char-fix records which gate refused it",
-      "commits": [],
+      "commits": [
+        "7829f75dc"
+      ],
       "addedAt": "2026-09-26",
       "claim": "On the next staging story with a failed char-fix round: its sceneImages[].retryHistory round_repair_failed entry and repairRounds pages[].error name the gate (blend_gate / style_drift / repaired_figure_blurred / repair_unnatural / face_integrity) and its message — no entry reads exactly \"char-fix produced no usable image\".",
       "runShape": [
