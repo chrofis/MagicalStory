@@ -2079,6 +2079,30 @@
       "fixedAt": "2026-09-25",
       "fixedIn": "04c769b09",
       "fix": "runPlanCounters takes mainName; beatsPipeline and the Lab beats_replan stage pass pickMainCharacters(inputData).focus.name. No mainName, no MAIN_UNDER_HALF. Test: plan-cast-table.test.ts (Fiona declared fourth), and the csjcyp1q9 real-plan test no longer expects MAIN_UNDER_HALF for Sarah."
+    },
+    {
+      "id": "clothing-review-copies-garment-to-second-outfit",
+      "title": "The wardrobe reviewer copied one character's plot garment into a second character's outfit",
+      "reportedAt": "2026-09-26",
+      "source": "Stored evidence: staging job_1790373080139_vnx5l8iy7 stories.data.clothingReviewReport — check 12 added Levin's green quilted jacket to Julian/standard because the plan hands it to Julian from p14; the reviewer's own analysis says \"Julian never wears it… this contradicts the story\".",
+      "rootCause": "clothing-review.txt check 12 (and the writer's matching bullet) put a plot garment in the outfit of \"the character the plan gives it to\", with nothing saying a garment belongs to one outfit only.",
+      "impact": "Both brothers' avatar sheets wore the same jacket; the per-page handoff (plan + wornItems) became permanent on the receiver.",
+      "status": "fixed",
+      "fixedAt": "2026-09-26",
+      "fixedIn": "d67d87b0c",
+      "fix": "GARMENT_ONE_OUTFIT_RULE (promptBuilders) filled into story-bible-from-beats.txt and clothing-review.txt: a garment belongs to the outfit of the character who wears it first; a handoff lives in the plan line and wornItems; check 12 names any garment two outfits share. Test: garment-one-outfit.test.ts."
+    },
+    {
+      "id": "ots-figure-gets-front-face-card",
+      "title": "An over-the-shoulder (face-hidden) figure was sent a front-facing threeQuarter face card",
+      "reportedAt": "2026-09-26",
+      "source": "Stored evidence: staging job_1790373080139_vnx5l8iy7 p7 — Kiaan perspective \"over-the-shoulder\", referencePhotos photoType cell-threeQuarter-headbody; the face card's dark straight hair appeared on Levin.",
+      "rootCause": "storyAvatars.resolveCellPose mapped a perspective to the back cell only when it contained \"back\" or \"behind\"; over-the-shoulder, rear three-quarter and facing away fell through to threeQuarter.",
+      "impact": "A face with no visible figure to carry it is painted onto another character (identity bleed) on every over-the-shoulder / rear-view page.",
+      "status": "fixed",
+      "fixedAt": "2026-09-26",
+      "fixedIn": "d67d87b0c",
+      "fix": "isFaceAwayPerspective (shotVocabulary.isOverTheShoulderPerspective + back/behind/rear/facing away) picks the rear cell in the one shared resolveCellPose, which images.js iterate and regeneration.js also call. Test: face-away-cell-pose.test.ts."
     }
   ]
 }
