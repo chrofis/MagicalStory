@@ -37,6 +37,7 @@
 17. **A prop the page text puts against a character.** {STAGED_PROP}
 18. **Contact reads as a verb.** {CONTACT_VERB}
 18b. **An object several characters touch.** {REACHABLE_CONTACT}
+18c. **A small prop rests against a figure.** {SMALL_PROP_CONTACT}
 19. **A garment the page removes.** {GARMENT_REMOVED}
 20. **A worn item on someone else.** {WORN_ON_OTHER}
 21. **Counting.** {COUNTING_RULE}

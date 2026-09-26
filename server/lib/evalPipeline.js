@@ -2551,23 +2551,25 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // as its own input so the judge compares against the contract, not against
     // its prior of what a pirate looks like. Empty when unknown — the template
     // then tells it not to judge clothing at all, which is the honest default.
-    // CREATURE SIZES (D-34, 2026-09-26). The size each cited Visual Bible
-    // creature was given against the figures in this frame — built by the SAME
-    // function that wrote the page prompt's REQUIRED OBJECTS line
-    // (promptBuilders.creaturePageScaleNote), so the judge reads the sentence
-    // the illustrator was given. Empty when the page cites no sized creature:
-    // D-34 then skips.
-    let creatureSizesBlock = '';
+    // ELEMENT SIZES (D-21 objects, D-31 vehicles, D-34 creatures; 2026-09-26).
+    // The size each cited Visual Bible element was given against the figures in
+    // this frame — built by the SAME function that wrote the page prompt's
+    // REQUIRED OBJECTS line (promptBuilders.elementPageScaleNote), over the same
+    // whole figures and the same contact rows, so the judge reads the sentence
+    // the illustrator was given. Empty when the page cites no sized element.
+    let elementSizesBlock = '';
     try {
-      const creatureMeta = evalOptions.sceneMetadata || declaredSceneMeta;
-      creatureSizesBlock = require('./promptBuilders').buildCreatureSizesBlock(
+      const sizeMeta = evalOptions.sceneMetadata || declaredSceneMeta;
+      const PB = require('./promptBuilders');
+      elementSizesBlock = PB.buildElementSizesBlock(
         evalOptions.visualBible || null,
-        Array.isArray(creatureMeta?.objects) ? creatureMeta.objects : [],
-        Array.isArray(sceneCharacters) ? sceneCharacters : [],
+        Array.isArray(sizeMeta?.objects) ? sizeMeta.objects : [],
+        PB.wholeFiguresInFrame(Array.isArray(sceneCharacters) ? sceneCharacters : [], sizeMeta),
+        sizeMeta?.interactions || sizeMeta?.fullData?.interactions || [],
       );
     } catch (err) {
-      log.error(`[EVAL] ${pageContext || 'page'}: creature sizes could not be built - ${err.message}`);
-      notEvaluated.record('creature_scale', 'creature_sizes_build_failed', err.message);
+      log.error(`[EVAL] ${pageContext || 'page'}: element sizes could not be built - ${err.message}`);
+      for (const t of ['scale', 'structure_scale', 'creature_scale']) notEvaluated.record(t, 'element_sizes_build_failed', err.message);
     }
     const { buildEvaluationPrompt } = require('../services/prompts');
     const evaluationPrompt = evaluationTemplate
@@ -2578,7 +2580,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           sceneIntent: sceneIntentBlock,
           clothingContract: clothingContractBlock,
           requiredObjects: requiredObjectsBlock,
-          creatureSizes: creatureSizesBlock,
+          elementSizes: elementSizesBlock,
           textRules: requiredTextBlock,
           expectedCast: expectedCast.block,
           // THE LANDMARK BLOCK (2026-09-18) — same block the other two judges
@@ -2800,7 +2802,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             sceneIntent: sceneIntentBlock,
             clothingContract: clothingContractBlock,
             requiredObjects: requiredObjectsBlock,
-            creatureSizes: creatureSizesBlock,
+            elementSizes: elementSizesBlock,
             textRules: requiredTextBlock,
             expectedCast: expectedCast.block,
             template: evalOptions.evalTemplateOverride || undefined,

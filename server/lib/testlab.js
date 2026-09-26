@@ -561,6 +561,13 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
         // prompt production never sends. Empty grid → empty set, which is the
         // honest answer, not a missing argument.
         vbRefElementIds: (visualBibleGrid?.rawElements || []).map(e => e.id).filter(Boolean),
+        // pageScaleScope (TEST LAB ONLY, 2026-09-26): narrows which elements'
+        // REQUIRED OBJECTS lines gain a yardstick against the figures in frame
+        // ({types?: ['animal'|'object'|'vehicle'], bands?: [scaleClass...]});
+        // the rest keep the band phrase. `{types:['animal'], bands:
+        // ['adult-height','twice-adult-height']}` reproduces the creature-only
+        // build of 7e767c9d9 as an A/B arm. Unset = production.
+        pageScaleScope: params.pageScaleScope || null,
       }
     );
   } finally {

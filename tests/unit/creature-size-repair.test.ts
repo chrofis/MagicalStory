@@ -78,16 +78,16 @@ describe('D — a creature drawn too small is a page redo, and every repaint kee
 
   it('the repaint instruction states every cited creature\'s size, with no names', () => {
     const { buildRepairNameMap } = cjs('../../server/lib/repairLogic.js');
-    const { buildCreatureSizeClauseForRepair, buildInpaintInstruction } = cjs('../../server/lib/images.js');
+    const { buildElementSizeClauseForRepair, buildInpaintInstruction } = cjs('../../server/lib/images.js');
     const vb = bible();
     const nameMap = buildRepairNameMap({ characters: [LEVIN, MAX], visualBible: vb, pageNumber: 10 });
-    const clause = buildCreatureSizeClauseForRepair({
+    const clause = buildElementSizeClauseForRepair({
       visualBible: vb, sceneMetadata: { objects: ['ANI001'], characters: ['Levin', 'Max'] }, characters: [LEVIN, MAX], nameMap,
     });
-    expect(clause).toContain('Sizes that hold after the edit: the grown dragon');
+    expect(clause).toContain('Sizes that hold after the edit — the grown dragon');
     expect(clause).toContain(`${TWICE} — about three to four times the height of the people beside it`);
     expect(clause).not.toMatch(/Rubina|Levin|Max/);
-    const sent = buildInpaintInstruction({ editInstruction: '1. Turn the dragon toward the boy.', creatureSizeClause: clause });
+    const sent = buildInpaintInstruction({ editInstruction: '1. Turn the dragon toward the boy.', sizeClause: clause });
     expect(sent).toContain(clause);
   });
 });

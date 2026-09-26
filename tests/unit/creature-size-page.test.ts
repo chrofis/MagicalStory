@@ -76,27 +76,27 @@ describe('A — a grown creature states its maturity, never a size', () => {
 
 describe('B — the page measures the creature against the people in frame', () => {
   it('against children, by name, grouped by ratio (p10: Levin 5, Max 3)', () => {
-    expect(PB.creaturePageScaleNote(grown, [LEVIN, MAX]))
+    expect(PB.elementPageScaleNote(grown, [LEVIN, MAX]))
       .toBe(`${TWICE} — about three times the height of Levin and about four times the height of Max`);
   });
 
   it('against an adult it is the band phrase restated', () => {
-    expect(PB.creaturePageScaleNote(grown, [DAD])).toBe(`${TWICE} — about twice the height of Dad`);
+    expect(PB.elementPageScaleNote(grown, [DAD])).toBe(`${TWICE} — about twice the height of Dad`);
   });
 
   it('alone, or with no readable height, it is the band phrase only', () => {
-    expect(PB.creaturePageScaleNote(grown, [])).toBe(TWICE);
-    expect(PB.creaturePageScaleNote(grown, [{ name: 'Nobody' }])).toBe(TWICE);
+    expect(PB.elementPageScaleNote(grown, [])).toBe(TWICE);
+    expect(PB.elementPageScaleNote(grown, [{ name: 'Nobody' }])).toBe(TWICE);
   });
 
-  it('a band whose phrase states no exact multiple gains no comparison', () => {
-    expect(PB.creaturePageScaleNote(hatchling, [LEVIN])).toBe(MELON);
-    expect(PB.creaturePageScaleNote({ scaleClass: 'house-height' }, [LEVIN])).toBe(VB.SCALE_PHRASES['house-height']);
-    expect(PB.creaturePageScaleNote({ scaleClass: null, size: 'as long as a bench' }, [LEVIN])).toBe('as long as a bench');
+  it('a band with no yardstick, or a pre-enum stored size, keeps its phrase', () => {
+    expect(PB.elementPageScaleNote({ scaleClass: 'landmark' }, [LEVIN])).toBe(VB.SCALE_PHRASES.landmark);
+    expect(PB.elementPageScaleNote({ scaleClass: 'arm-sized' }, [LEVIN])).toBe(VB.SCALE_PHRASES['arm-sized']);
+    expect(PB.elementPageScaleNote({ scaleClass: null, size: 'as long as a bench' }, [LEVIN])).toBe('as long as a bench');
   });
 
   it('the unnamed form (repaint text) is one range over the people beside it', () => {
-    expect(PB.creaturePageScaleNote(grown, [LEVIN, MAX], { unnamed: true }))
+    expect(PB.elementPageScaleNote(grown, [LEVIN, MAX], { unnamed: true }))
       .toBe(`${TWICE} — about three to four times the height of the people beside it`);
   });
 

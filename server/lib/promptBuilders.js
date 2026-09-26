@@ -2295,88 +2295,227 @@ function joinNames(names) {
 }
 
 /**
- * A CREATURE'S SIZE AGAINST THE PEOPLE IN FRAME (owner, 2026-09-26).
- *
- * The band phrase measures against "a standing adult", and on a page of
- * children there is no adult to read it against. Staging
- * job_1790373080139_vnx5l8iy7: the grown dragon was stated "twice the height of
- * a standing adult" on every page and rendered large on p5, cat-sized on p10,
- * child-plus on p16/p17 and boy-sized on p18 — the only yardstick was a person
- * nobody drew.
- *
- * PAGE-SIDE ONLY — the page prompt, the judge's CREATURE SIZES input and the
- * repaint instructions. Never a Visual Bible cell (cells get no size,
- * 2026-09-23) and never the arc, plan or page text (sizes stay out of the
- * story, owner 2026-09-23).
- *
- * Only a band whose phrase states an exact multiple of an adult gains the
- * comparison (visualBible.SCALE_ADULT_HEIGHT_MULTIPLE); any other band, a
- * pre-enum stored `size`, or a page with no figure whose height is readable
- * returns the band phrase alone — "measured against nothing at all on a page
- * where it is alone" (TRUE_RELATIVE_SIZE_RULE).
- *
- * @param {Object} entry   the Visual Bible creature entry
- * @param {Array}  figures the page's cast in frame ({name, age, gender, height})
- * @returns {string|null}  the phrase, or null when the entry states no size
+ * The body landmarks an element shorter than a figure is read against. knee,
+ * hip and chest ARE the three body bands' own fractions
+ * (visualBible.SCALE_ADULT_HEIGHT_FRACTION); the shoulder is the same
+ * anthropometric source's 0.818 H. From WHOLE_FIGURE_FROM up (the midpoint
+ * between shoulder and crown) the element is measured as a multiple of the
+ * whole figure instead ("about as tall as Max").
  */
-function creaturePageScaleNote(entry, figures, { unnamed = false } = {}) {
-  const { elementScaleNote, scaleAdultHeightMultiple } = require('./visualBible');
-  const base = elementScaleNote(entry);
-  if (!base) return null;
-  const multiple = scaleAdultHeightMultiple(entry && entry.scaleClass);
-  if (!multiple) return base;
-  const creatureCm = multiple * STANDING_ADULT_CM;
-  if (unnamed) {
-    const ratios = (Array.isArray(figures) ? figures : [])
-      .map(f => figureHeightCm(f)).filter(cm => cm && cm > 0).map(cm => creatureCm / cm);
-    if (!ratios.length) return base;
-    const phrase = ratioRangePhrase(Math.min(...ratios), Math.max(...ratios));
-    return `${base.replace(/\.\s*$/, '')} — ${phrase} the people beside it`;
+const SHOULDER_HEIGHT_FRACTION = 0.818;
+const WHOLE_FIGURE_FROM = 0.91;
+function bodyLandmarks() {
+  const { SCALE_ADULT_HEIGHT_FRACTION: F } = require('./visualBible');
+  return [['knee', F['knee-high']], ['hip', F['waist-high']], ['chest', F['chest-high']], ['shoulder', SHOULDER_HEIGHT_FRACTION]];
+}
+
+/** One figure's yardstick for an element `elementCm` tall. `key` groups figures that read alike. */
+function heightYardstick(elementCm, figureCm) {
+  const r = elementCm / figureCm;
+  if (r >= WHOLE_FIGURE_FROM) {
+    const phrase = ratioPhrase(r);
+    return { key: phrase, ratio: r, phrase };
   }
-  const groups = new Map(); // phrase -> names, in cast order
-  for (const f of (Array.isArray(figures) ? figures : [])) {
-    const name = f && typeof f.name === 'string' ? f.name.trim() : '';
-    const cm = figureHeightCm(f);
-    if (!name || !cm || cm <= 0) continue;
-    const phrase = ratioPhrase(creatureCm / cm);
-    if (!groups.has(phrase)) groups.set(phrase, []);
-    if (!groups.get(phrase).includes(name)) groups.get(phrase).push(name);
-  }
-  if (!groups.size) return base;
-  const comparison = [...groups.entries()].map(([phrase, names]) => `${phrase} ${joinNames(names)}`).join(' and ');
-  return `${base.replace(/\.\s*$/, '')} — ${comparison}`;
+  const marks = bodyLandmarks();
+  if (r < marks[0][1] / 2) return { key: 'below:knee', part: 'knee', below: true };
+  let best = marks[0];
+  for (const m of marks) if (Math.abs(m[1] - r) < Math.abs(best[1] - r)) best = m;
+  return { key: `part:${best[0]}`, part: best[0] };
+}
+
+// Named ("Max's shoulder", "Levin's and Max's shoulders") or unnamed
+// ("the shoulder of the person beside it").
+function renderHeightYardstick(y, { names = null, who = null, plural = false } = {}) {
+  if (y.phrase) return `${y.phrase} ${names ? joinNames(names) : who}`;
+  const part = plural ? `${y.part}s` : y.part;
+  const lead = y.below ? 'below' : 'about as tall as';
+  if (names) return `${lead} ${joinNames(names.map(n => `${n}'s`))} ${part}`;
+  return `${lead} the ${part} of ${who}`;
 }
 
 /**
- * Every Visual Bible creature a page cites (its `objects[]` ids, dotted state
- * ids resolved to their entry), with its page-scale note against `figures`.
- * The ONE resolver behind the judge's CREATURE SIZES input and the repaint
- * size clause, so the critic and the repair read the sentence the page prompt
- * was given.
- *
- * @returns {Array<{id:string, name:string, note:string}>}
+ * THE SIZE BANDS' YARDSTICK IS A BODY PART (owner, 2026-09-26): a thing
+ * someone could hold is measured against the hand or head of the figure
+ * holding or touching it, else of the first figure the page lists in frame.
+ * `p` is a possessive: "Julian's", "the holder's", "the nearest person's".
+ * forearm-sized and arm-sized keep their phrase: it already names the limb.
  */
-function pageCreatureScales(visualBible, objectIds, figures, opts = {}) {
-  const animals = Array.isArray(visualBible?.animals) ? visualBible.animals : [];
-  if (!animals.length || !Array.isArray(objectIds) || !objectIds.length) return [];
-  const base = (raw) => String(typeof raw === 'string' ? raw : (raw?.id || '')).trim().toUpperCase().split('.')[0];
-  const wanted = new Set(objectIds.map(base).filter(Boolean));
+const SIZE_BAND_BODY_PART = Object.freeze({
+  'fingertip-sized': (p) => `small enough to sit on ${p} fingertip`,
+  'palm-sized': (p) => `fits in ${p} hand`,
+  'hand-sized': (p) => `about the size of ${p} open hand`,
+  'melon-sized': (p) => `about the size of ${p} head`,
+});
+
+// The REQUIRED OBJECTS block's precedence line, emitted when a line there
+// carries a yardstick against a figure: the computed size beats a ratio the
+// Art Director wrote into the prose (rule 8f, TRUE_RELATIVE_SIZE_RULE).
+const ELEMENT_SIZE_PRECEDENCE_LINE = 'Each size stated above holds over any other size the scene description gives the same element.';
+
+/**
+ * AN ELEMENT'S SIZE AGAINST THE PEOPLE IN FRAME — one yardstick for every
+ * band (owner, 2026-09-26). Generalises the creature-only comparison of
+ * 7e767c9d9 to creatures, objects and vehicles:
+ *   knee-, waist-, chest-high   a body landmark of each named figure
+ *                               ("about as tall as Max's shoulder");
+ *   adult-height, twice-adult-height, house-height
+ *                               a multiple of each figure's height;
+ *   fingertip- to melon-sized   a body part of the figure holding or touching
+ *                               it (`contacts`, from the brief's interactions),
+ *                               else of the first figure listed in frame (the
+ *                               brief places no object, so nearness cannot be
+ *                               read);
+ *   forearm-, arm-sized, landmark, a pre-enum stored `size`
+ *                               the band phrase alone;
+ *   no figure in frame          the band phrase alone.
+ *
+ * Staging job_1790373080139_vnx5l8iy7: a grown dragon stated "twice the height
+ * of a standing adult" on pages holding only children rendered cat-sized and
+ * boy-sized — the band's only yardstick was a person nobody drew.
+ *
+ * PAGE-SIDE ONLY — the REQUIRED OBJECTS line, the judges' ELEMENT SIZES input
+ * (D-21 / D-31 / D-34) and the repaint size clause, all through this function.
+ * Never a Visual Bible cell (cells get no size, 2026-09-23) and never the arc,
+ * plan or page text (sizes stay out of the story, owner 2026-09-23).
+ *
+ * `scope` ({types?, bands?}) narrows which elements gain a yardstick: the
+ * Test Lab's A/B lever (params.pageScaleScope), never passed by production.
+ *
+ * @param {Object} entry    the Visual Bible entry
+ * @param {Array}  figures  the page's whole figures in frame ({name, age, gender, height})
+ * @returns {string|null}   the phrase, or null when the entry states no size
+ */
+function elementPageScaleNote(entry, figures, { contacts = [], unnamed = false, scope = null, type = null } = {}) {
+  const VB = require('./visualBible');
+  const base = VB.elementScaleNote(entry);
+  if (!base) return null;
+  const band = VB.resolveScaleClass(entry && entry.scaleClass);
+  if (!band) return base;
+  if (scope && ((Array.isArray(scope.types) && !scope.types.includes(type))
+    || (Array.isArray(scope.bands) && !scope.bands.includes(band)))) return base;
+  const people = (Array.isArray(figures) ? figures : [])
+    .filter(f => f && typeof f.name === 'string' && f.name.trim());
+  if (!people.length) return base;
+  const stem = base.replace(/\.\s*$/, '');
+
+  const bodyPart = SIZE_BAND_BODY_PART[band];
+  if (bodyPart) {
+    const { canonicalName } = require('./castResolver');
+    const touching = new Set((Array.isArray(contacts) ? contacts : []).map(n => canonicalName(String(n || ''))).filter(Boolean));
+    const holder = people.find(f => touching.has(canonicalName(f.name)));
+    const owner = unnamed
+      ? (holder ? "the holder's" : "the nearest person's")
+      : `${(holder || people[0]).name.trim()}'s`;
+    return `${stem} — ${bodyPart(owner)}`;
+  }
+
+  const fraction = VB.scaleAdultHeightFraction(band);
+  if (!fraction) return base;
+  const elementCm = fraction * STANDING_ADULT_CM;
+  const measured = [];
+  for (const f of people) {
+    const cm = figureHeightCm(f);
+    if (!cm || cm <= 0) continue;
+    measured.push({ name: f.name.trim(), cm, y: heightYardstick(elementCm, cm) });
+  }
+  if (!measured.length) return base;
+
+  if (unnamed) {
+    const byHeight = [...measured].sort((a, b) => b.cm - a.cm);
+    const tallest = byHeight[0];
+    const smallest = byHeight[byHeight.length - 1];
+    if (measured.every(m => m.y.key === tallest.y.key)) {
+      const several = measured.length > 1;
+      return `${stem} — ${renderHeightYardstick(tallest.y, { who: several ? 'the people beside it' : 'the person beside it', plural: several })}`;
+    }
+    if (tallest.y.phrase && smallest.y.phrase) {
+      return `${stem} — ${ratioRangePhrase(tallest.y.ratio, smallest.y.ratio)} the people beside it`;
+    }
+    return `${stem} — ${renderHeightYardstick(tallest.y, { who: 'the tallest person beside it' })} and ${renderHeightYardstick(smallest.y, { who: 'the smallest' })}`;
+  }
+
+  const groups = new Map(); // key -> {y, names}, in cast order
+  for (const m of measured) {
+    if (!groups.has(m.y.key)) groups.set(m.y.key, { y: m.y, names: [] });
+    const g = groups.get(m.y.key);
+    if (!g.names.includes(m.name)) g.names.push(m.name);
+  }
+  const comparison = [...groups.values()]
+    .map(g => renderHeightYardstick(g.y, { names: g.names, plural: g.names.length > 1 }))
+    .join(' and ');
+  return `${stem} — ${comparison}`;
+}
+
+/**
+ * The names an element's interaction rows put in contact with it — held,
+ * carried, touched — from the brief's `interactions[]`, matched on the base id
+ * (a state id `ART003.1` is its entry `ART003`). The same rows EXACT POSES
+ * renders, so the figure the page puts a hand on is the figure it is measured
+ * against.
+ */
+function elementContactNames(interactions, entryId) {
+  const baseId = (raw) => String(raw || '').trim().toUpperCase().split('.')[0];
+  const want = baseId(entryId);
+  if (!want) return [];
   const out = [];
-  for (const entry of animals) {
-    if (!entry?.id || !wanted.has(base(entry.id))) continue;
-    const note = creaturePageScaleNote(entry, figures, opts);
-    if (!note) continue;
-    out.push({ id: entry.id, name: entry.name || entry.label || 'creature', note });
+  for (const row of (Array.isArray(interactions) ? interactions : [])) {
+    if (!row || typeof row !== 'object' || baseId(row.object) !== want) continue;
+    for (const actor of splitInteractionActors(row.character)) if (!out.includes(actor)) out.push(actor);
   }
   return out;
 }
 
 /**
- * The judge's CREATURE SIZES input (image-evaluation input 12, D-34): one line
- * per cited creature. '' when the page cites none that states a size.
+ * The figures a page shows WHOLE: its cast minus the over-the-shoulder crops
+ * (a crop has no height to state), read from the brief's structured
+ * `characterPerspectives` only. ONE filter for the page prompt, the judge and
+ * the repaint, so the three measure an element against the same people.
  */
-function buildCreatureSizesBlock(visualBible, objectIds, figures) {
-  return pageCreatureScales(visualBible, objectIds, figures).map(c => `- ${c.name}: ${c.note}`).join('\n');
+function wholeFiguresInFrame(figures, metadata) {
+  const { lookupByName } = require('./castResolver');
+  const ots = {};
+  for (const [name, ann] of Object.entries(metadata?.characterPerspectives || metadata?.fullData?.characterPerspectives || {})) {
+    if (isOverTheShoulderPerspective(ann?.perspective)) ots[name] = true;
+  }
+  return (Array.isArray(figures) ? figures : []).filter(f => f && !lookupByName(ots, f.name, null));
+}
+
+/**
+ * Every creature, object and vehicle a page cites (its `objects[]` ids, dotted
+ * state ids resolved to their entry), with its page-scale note against
+ * `figures`. The ONE resolver behind the judge's ELEMENT SIZES input and the
+ * repaint size clause, so the critic and the repair read the sentence the page
+ * prompt was given.
+ *
+ * @returns {Array<{id:string, name:string, type:string, note:string}>}
+ */
+function pageElementScales(visualBible, objectIds, figures, { interactions = [], unnamed = false, language = 'en' } = {}) {
+  if (!visualBible || !Array.isArray(objectIds) || !objectIds.length) return [];
+  const base = (raw) => String(typeof raw === 'string' ? raw : (raw?.id || '')).trim().toUpperCase().split('.')[0];
+  const wanted = new Set(objectIds.map(base).filter(Boolean));
+  const out = [];
+  for (const [key, type] of VB_ELEMENT_POOLS) {
+    for (const entry of (Array.isArray(visualBible[key]) ? visualBible[key] : [])) {
+      if (!entry?.id || !wanted.has(base(entry.id))) continue;
+      const note = elementPageScaleNote(entry, figures, { contacts: elementContactNames(interactions, entry.id), unnamed, type });
+      if (!note) continue;
+      const name = type === 'animal'
+        ? (entry.name || entry.label || 'creature')
+        : elementLeadLabel(entry, { language, type });
+      out.push({ id: entry.id, name, type, note });
+    }
+  }
+  return out;
+}
+
+/**
+ * The judge's ELEMENT SIZES input (image-evaluation input 12; D-21 objects,
+ * D-31 vehicles, D-34 creatures): one line per cited element. '' when the page
+ * cites none that states a size.
+ */
+function buildElementSizesBlock(visualBible, objectIds, figures, interactions, opts = {}) {
+  return pageElementScales(visualBible, objectIds, figures, { ...opts, interactions })
+    .map(c => `- ${c.name} (${c.type}): ${c.note}`).join('\n');
 }
 
 /**
@@ -2393,15 +2532,18 @@ function castFiguresInFrame(characters, castNames) {
 }
 
 /**
- * The repaint clause: the size every cited creature keeps after an edit. The
- * p10 round-1 inpaint of the job above regenerated the dragon from an
- * instruction that named no size, and it came back cat-sized. Names are left
- * in; the caller runs the clause through the repair name map
- * (repairLogic.nameRepairText) like every other repair text. '' when none.
+ * The repaint clause: the size every cited creature, object and vehicle keeps
+ * after an edit. The p10 round-1 inpaint of the job above regenerated the
+ * dragon from an instruction that named no size, and it came back cat-sized.
+ * Names are left in; the caller runs the clause through the repair name map
+ * (repairLogic.nameRepairText) like every other repair text. Each note is an
+ * apposition, never a predicate: several band phrases are verb-led ("stands
+ * hip-high", "fills an open hand"). '' when none.
  */
-function buildCreatureSizeRepairClause(visualBible, objectIds, figures) {
-  const items = pageCreatureScales(visualBible, objectIds, figures, { unnamed: true }).map(c => `${c.name} is ${c.note}`);
-  return items.length ? `\n\nSizes that hold after the edit: ${items.join('; ')}.` : '';
+function buildElementSizeRepairClause(visualBible, objectIds, figures, interactions, opts = {}) {
+  const items = pageElementScales(visualBible, objectIds, figures, { ...opts, interactions, unnamed: true })
+    .map(c => `${c.name}: ${c.note}`);
+  return items.length ? `\n\nSizes that hold after the edit — ${items.join('; ')}.` : '';
 }
 
 /**
@@ -3002,6 +3144,7 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     CONCEALED_OBJECT: CONCEALED_OBJECT_RULE,
     CONTACT_VERB: CONTACT_VERB_RULE,
     REACHABLE_CONTACT: REACHABLE_CONTACT_RULE,
+    SMALL_PROP_CONTACT: SMALL_PROP_CONTACT_RULE,
     // Rule 11 in both Art Director templates — ONE constant, so the framing and
     // the field that records it cannot drift apart.
     GAP_ACTION_FRAMING: GAP_ACTION_FRAMING_RULE,
@@ -3329,6 +3472,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     STAGED_PROP: STAGED_PROP_RULE,
     CONTACT_VERB: CONTACT_VERB_RULE,
     REACHABLE_CONTACT: REACHABLE_CONTACT_RULE,
+    SMALL_PROP_CONTACT: SMALL_PROP_CONTACT_RULE,
     // Rule 11 in both Art Director templates — ONE constant, so the framing and
     // the field that records it cannot drift apart.
     GAP_ACTION_FRAMING: GAP_ACTION_FRAMING_RULE,
@@ -3792,6 +3936,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       STAGED_PROP: STAGED_PROP_RULE,
       CONTACT_VERB: CONTACT_VERB_RULE,
       REACHABLE_CONTACT: REACHABLE_CONTACT_RULE,
+      SMALL_PROP_CONTACT: SMALL_PROP_CONTACT_RULE,
       // Eyes open and the creature face, the same constants both Art Director
       // templates and scene-review check 6 carry (2026-09-23).
       EYES_OPEN: EYES_OPEN_RULE,
@@ -4740,6 +4885,10 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
           .map(id => String(id || '').toUpperCase()).filter(Boolean)
       );
       const gridRefNames = [];
+      // The figures every element on this page is measured against, and whether
+      // any line gained that yardstick (the precedence line below).
+      const wholeFigures = wholeFiguresInFrame(sceneCharacters || [], metadata);
+      let measuredAgainstFigures = false;
       // REQUIRED TEXT (2026-09-21). An element's bible `text` -- "words that
       // must be READABLE on the object" -- had no path into the built prompt:
       // it rendered only into the VB reference CELL, so the glyphs arrived as
@@ -4865,13 +5014,20 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // in their prose were the ones that came closest; the pages that did
         // not (p8, p18) had nothing to go on, because this line dropped it.
         //
-        // A CREATURE IS MEASURED AGAINST THE PEOPLE IN FRAME (owner,
+        // EVERY ELEMENT IS MEASURED AGAINST THE PEOPLE IN FRAME (owner,
         // 2026-09-26): the band phrase names "a standing adult", which a page of
-        // children does not hold — see creaturePageScaleNote. The page's cast
-        // minus the over-the-shoulder crops (a crop has no height to state).
-        const scaleNote = obj.type === 'animal'
-          ? creaturePageScaleNote(obj.entry, (sceneCharacters || []).filter(c => !isOtsFigure(c?.name)))
+        // children does not hold — see elementPageScaleNote. A creature, object
+        // or vehicle gains a yardstick against the page's whole figures (the
+        // over-the-shoulder crops left out); a garment keeps the band phrase.
+        const measurable = obj.type === 'animal' || obj.type === 'object' || obj.type === 'vehicle';
+        const scaleNote = measurable
+          ? elementPageScaleNote(obj.entry, wholeFigures, {
+            contacts: elementContactNames(metadata?.interactions || metadata?.fullData?.interactions, obj.id),
+            scope: options.pageScaleScope || null,
+            type: obj.type,
+          })
           : elementScaleNote(obj.entry);
+        if (measurable && scaleNote && scaleNote !== elementScaleNote(obj.entry)) measuredAgainstFigures = true;
         const sizeNote = scaleNote ? ` — ${scaleNote}` : '';
         // OBJECT STATE - the fourth rider on this line, beside `size`, the
         // clothing `(worn by X)` suffix and a two-sided prop's orientation
@@ -4896,6 +5052,13 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         requiredObjectsSection += `* ${lead}${sizeNote}${stateNote}${wornSuffix}${wornOn}${offWhere}\n`;
         pushRequiredText(refEntry, refName);
       }
+      // THE COMPUTED SIZE WINS (owner, 2026-09-26). Art Director rule 8f asks
+      // the prose for a vessel's or vehicle's ratio in its own words; the line
+      // above is computed from the element's band and the figures' heights, so
+      // where the two disagree the line holds. Plain line (no "* " prefix), so
+      // parseVisualBibleObjects never reads it as an object; only on a page
+      // where some line carries a yardstick against a figure.
+      if (measuredAgainstFigures) requiredObjectsSection += `${ELEMENT_SIZE_PRECEDENCE_LINE}\n`;
       requiredTextSection = requiredTextLib.buildRequiredTextBlock(
         requiredTextLib.collectRequiredTexts({ entries: requiredTextRows })
       );
@@ -6526,11 +6689,16 @@ function buildTopicWindowSection(inputData = {}) {
  * calm, soft-faced, head lowered — the band's intent (friendly, never
  * menacing) kept, its size no longer shrunk to honour it. The prose still
  * never states a creature as a multiple of a child; the page prompt does,
- * image-side (creaturePageScaleNote).
+ * image-side (elementPageScaleNote).
+ *
+ * `not-menacing` REWORDED (owner, 2026-09-26): "frame it at the child's eye
+ * level rather than looming over them" read as "draw its head at the child's
+ * eye level" — a size cap the page prompt's computed ratio contradicts. The
+ * camera stays at the child's eye level; the creature keeps its full size.
  */
 const CREATURE_TONE_LEVELS = {
   cute: "Animals, creatures and non-human characters are drawn cute: rounded forms throughout, soft faces, large round friendly eyes, a calm or smiling mouth with no teeth showing, no displayed claws, an open upright posture, warm colours. A horned, spined or crested one carries a single pair at most, short and blunt-tipped — never a crown of horns around the head or rows of spikes down it. A non-human character reads as a playmate. For size, lean toward a creature near the child's own size — a scale a child could stand beside or hug — and go bigger only where the story needs it: a being that is ridden, carries characters or fills a doorway is that size. A being may be large — state its size in metres or against a familiar room, never as a multiple of a child. A being the story makes large is drawn at that full size and may tower gently over a child: calm and soft-faced, its head lowered toward them, never looming, lunging or menacing.",
-  'not-menacing': "Animals, creatures and non-human characters carry an open friendly face and clearly kind eyes: a level brow rather than a heavy or overhanging one, open rather than deep-set eyes, a neutral or gentle mouth that shows no teeth, open or smiling included. Claws may exist but are not raised or displayed. A horned, spined or crested one carries a single pair at most, kept short and smooth-tipped — never a crown of horns around the head or rows of spikes down it. For size, a creature may be clearly bigger than a child; prefer one that still fits in frame beside them and reads as approachable over an overwhelming one, unless the story needs otherwise — a being that is ridden, carries characters or blocks a way is that size. A being may be large — state its size in metres, not as a multiple of a child, and frame it at the child's eye level rather than looming over them.",
+  'not-menacing': "Animals, creatures and non-human characters carry an open friendly face and clearly kind eyes: a level brow rather than a heavy or overhanging one, open rather than deep-set eyes, a neutral or gentle mouth that shows no teeth, open or smiling included. Claws may exist but are not raised or displayed. A horned, spined or crested one carries a single pair at most, kept short and smooth-tipped — never a crown of horns around the head or rows of spikes down it. For size, a creature may be clearly bigger than a child; prefer one that still fits in frame beside them and reads as approachable over an overwhelming one, unless the story needs otherwise — a being that is ridden, carries characters or blocks a way is that size. A being may be large — state its size in metres, not as a multiple of a child. The camera stays at the child's eye level; a being the story makes large stands at its full size beside them, calm and upright, never looming over them.",
   formidable: "A creature the story gives a powerful, wild or formidable nature is drawn as one: claws and teeth visible rather than hidden, real physical weight and presence, weathered or rugged hide, scale, fur or feather where they suit it. No rounded, toy-like or plush softening of such a creature. It may loom, and its size may be stated against a child. A creature the story means as gentle — a pet, a domestic animal, a comic one — stays gentle and friendly-looking; the story's own nature for each creature decides which of the two it gets. Size may be whatever the story wants; a genuinely huge creature is welcome.",
 };
 
@@ -8985,6 +9153,20 @@ const CONTACT_VERB_RULE = "An interaction's `where` opens with the verb the char
  */
 const GAP_ACTION_FRAMING_RULE = `When the page has one figure act on another across a gap — sending, throwing, aiming, rolling or kicking something toward them, or calling or gesturing across to them — the page is framed one of two ways, and the prose says which. OVER THE SHOULDER (set \`shot\` to \`over-the-shoulder\`): the acting figure is the near crop — ${OTS_NEAR_FIGURE_CROP}; the receiving figure stands small and deep in the opposite back corner, about a tenth of the frame's height; the line of the throw, the call or the look runs down the diagonal between them. Take this one by default — the camera axis IS the line of the action, so the direction holds whether or not the picture understood the verb. ULTRA-WIDE (set \`shot\` to \`ultra-wide\`): take it when the page needs both faces readable, which the over-the-shoulder framing spends on the actor's back. Then the gap itself must be written — how far apart they stand, measured against something in the frame — because a gap left to the words alone is drawn as two figures almost touching however many paces the sentence claims. Either way the interaction's \`where\` carries the separation phrase ('across the square', 'a few paces apart', 'down the lane'). What is never allowed is the flat middle: both figures the same size at opposite edges of an ordinary shot, which states neither the direction nor the distance.`;
 
+/**
+ * THE CONTACT LEVER (owner, 2026-09-26). The one mechanism measured to hold a
+ * small prop at its size: the EXACT POSES size rider of 2026-09-17 on staging
+ * job_1789584708605_rts4wqupm drew a head-sized element at the right size on
+ * 6 of 6 pages whose pose line put a hand, arm or ear on it, and oversized on
+ * 3 of 3 pages that did not. A hand or body on the prop is the yardstick the
+ * picture itself carries, and the page prompt measures the prop against the
+ * figure touching it (elementPageScaleNote). So the brief gives a small prop
+ * that contact wherever the story allows it, and never where the story places
+ * it away from people. ONE constant, filled into all four brief-authoring
+ * templates (sibling set art-director-vs-iterate).
+ */
+const SMALL_PROP_CONTACT_RULE = "A small prop — anything up to the size of a head, a `scaleClass` of melon-sized or smaller — rests against a figure on every page the story allows it: held in a hand, carried in the arms, lying in a lap or held against a chest, and that contact is an `interactions` row naming the prop. Where the story places it away from everyone — set down out of reach, left behind, fallen, hidden, guarded — it stays there with no one touching it.";
+
 const REACHABLE_CONTACT_RULE = "An object more than one character touches: ask first whether moving it would change what the page is about. If it would not — a thing held, carried, passed or examined — stage it where every one of them can reach it: out on open ground, at the mouth of a recess rather than down inside it, never enclosed by or sunk below something a named toucher would have to reach through, and the prose puts it in that same open spot. If it would — an object whose position is the point, blocking, wedged, stuck fast, buried, sealed in or out of reach — it stays exactly where the plan line and the page text put it, still held by whatever holds it there, and the composition gives way instead: fewer characters in contact at once, the rest in frame straining, bracing or watching; an angle that shows the object's position and the hands in one view; the touchers ranged along the side they can actually reach. On such a page every toucher's `where` names the object together with what holds it in place — that is naming the object, not pose detail. Either way each toucher's `where` names the object itself, never another character's hands or hold.";
 
 /**
@@ -9024,7 +9206,7 @@ const REACHABLE_CONTACT_RULE = "An object more than one character touches: ask f
  * ONE constant: the rule was hand-copied, byte-identical, into both Art Director
  * templates.
  */
-const TRUE_RELATIVE_SIZE_RULE = "A vessel, building, vehicle or creature holds its real size against the figures near it — a person reaches about to a boat's rail, a doorway lintel or a wheel hub, never eye-level with a masthead, a rooftop or a chimney. Every page that cites one of THOSE — a vessel, a building, a vehicle — and holds a figure too names its size as a ratio against a figure in the prose: \"the mast rises five times her height\", \"the door stands twice as tall as the person in front of it\". Nothing else takes a ratio. An everyday prop is sized by its own rule below, a garment by where it falls on the body, and a CREATURE by the creature rule above — in metres or against a familiar room for a young reader, against a figure only where that rule allows it, because a ratio against a child is what makes a creature loom over one. Every element states its size once already, in its `scaleClass`. An adjective is not a ratio — massive, tiny, huge, enormous carry no scale into the picture. Two entries of one kind that differ in size each carry their own ratio on a page holding both. A creature or a secondary character keeps the size its entry’s `scaleClass` band states on every page it appears on, whatever the shot, and is measured against nothing at all on a page where it is alone. When an entry states its height against another named figure, write that relation into the prose on every page the two share.";
+const TRUE_RELATIVE_SIZE_RULE = "A vessel, building, vehicle or creature holds its real size against the figures near it — a person reaches about to a boat's rail, a doorway lintel or a wheel hub, never eye-level with a masthead, a rooftop or a chimney. Every page that cites one of THOSE — a vessel, a building, a vehicle — and holds a figure too names its size as a ratio against a figure in the prose: \"the mast rises five times her height\", \"the door stands twice as tall as the person in front of it\". Nothing else takes a ratio. An everyday prop is sized by its own rule below, a garment by where it falls on the body, and a CREATURE by the creature rule above — in metres or against a familiar room for a young reader, against a figure only where that rule allows it. Every element states its size once already, in its `scaleClass`, and the image prompt turns that band into a size against the figures in frame; where your prose disagrees, that computed size wins, so a ratio you write follows the band — about as tall as a grown-up for `adult-height`, twice that for `twice-adult-height`, several grown-ups high for `house-height`. An adjective is not a ratio — massive, tiny, huge, enormous carry no scale into the picture. Two entries of one kind that differ in size each carry their own ratio on a page holding both. A creature or a secondary character keeps the size its entry’s `scaleClass` band states on every page it appears on, whatever the shot, and is measured against nothing at all on a page where it is alone. When an entry states its height against another named figure, write that relation into the prose on every page the two share.";
 
 const ELEMENT_ENTRY_PAGE_RULE = "An element's `pages` always includes the page the story first brings it in \u2014 handed over, found, taken out, put on \u2014 even when that page's plan line is about something else. That is the page the reader learns what it looks like on.";
 
@@ -12201,10 +12383,13 @@ module.exports = {
   buildCharacterPromptBlock,
   buildRelativeHeightDescription,
   figureHeightCm,
-  creaturePageScaleNote,
-  pageCreatureScales,
-  buildCreatureSizesBlock,
-  buildCreatureSizeRepairClause,
+  elementPageScaleNote,
+  elementContactNames,
+  wholeFiguresInFrame,
+  pageElementScales,
+  buildElementSizesBlock,
+  buildElementSizeRepairClause,
+  ELEMENT_SIZE_PRECEDENCE_LINE,
   castFiguresInFrame,
   buildCharacterRestriction,
   buildCharacterReferenceList,
@@ -12319,6 +12504,7 @@ module.exports = {
   CREATURE_FACE_RULE,
   CONTACT_VERB_RULE,
   REACHABLE_CONTACT_RULE,
+  SMALL_PROP_CONTACT_RULE,
   GAP_ACTION_FRAMING_RULE,
   DECLARED_TRAIT_VERBATIM_RULE,
   ONE_INSTANT_RULE,

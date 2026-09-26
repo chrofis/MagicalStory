@@ -211,7 +211,17 @@
           {
             "critic": "D-34 `creature_scale`",
             "generator": "{REQUIRED_OBJECTS}",
-            "note": "D-34 is MAJOR when a creature is drawn far below the size its page gave it. The generator half is the creature's line in the REQUIRED OBJECTS block, built by promptBuilders.creaturePageScaleNote (band phrase + a ratio against the people in frame); the judge reads the SAME sentence through its CREATURE SIZES input (buildCreatureSizesBlock), and every repaint through buildCreatureSizeClauseForRepair. One builder, three readers; pinned in tests/unit/creature-size-{page,eval,repair}.test.ts."
+            "note": "D-34 is MAJOR when a creature is drawn far from the size its page gave it (half or less, twice or more). The generator half is the creature's line in the REQUIRED OBJECTS block, built by promptBuilders.elementPageScaleNote (band phrase + a yardstick against the people in frame, from the one table visualBible.SCALE_ADULT_HEIGHT_FRACTION); the judge reads the SAME sentence through its ELEMENT SIZES input (buildElementSizesBlock), and every repaint through buildElementSizeClauseForRepair. One builder, three readers; pinned in tests/unit/creature-size-{page,eval,repair}.test.ts and element-page-scale.test.ts."
+          },
+          {
+            "critic": "D-21 `scale`",
+            "generator": "{REQUIRED_OBJECTS}",
+            "note": "D-21 measures an object listed in ELEMENT SIZES against the size given there. The generator half is that object's REQUIRED OBJECTS line, the same elementPageScaleNote sentence."
+          },
+          {
+            "critic": "D-31 `structure_scale`",
+            "generator": "{REQUIRED_OBJECTS}",
+            "note": "D-31 measures a vehicle listed in ELEMENT SIZES against the size given there. The generator half is that vehicle's REQUIRED OBJECTS line, the same elementPageScaleNote sentence."
           }
         ]
       }
@@ -474,6 +484,7 @@
           "{EYES_OPEN}",
           "{CREATURE_FACE}",
           "{REACHABLE_CONTACT}",
+          "{SMALL_PROP_CONTACT}",
           "{PLAN_LINE_CAST}",
           "{COUNTING_RULE}",
           "{MULTI_PICTURE_PROP}",

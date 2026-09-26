@@ -63,22 +63,22 @@ describe('C — creature_scale is a scored type, capped at MAJOR', () => {
     expect(CONSOLIDATED_TYPES).toContain('creature_scale');
   });
 
-  it('the evaluator carries D-34 and the CREATURE SIZES input, and the consolidator keeps the type', () => {
+  it('the evaluator carries D-34 and the ELEMENT SIZES input, and the consolidator keeps the type', () => {
     const t = String(PROMPT_TEMPLATES.imageEvaluation || '');
     expect(t).toMatch(/D-34 `creature_scale` → MAJOR/);
-    expect(t).toContain('{CREATURE_SIZES}');
+    expect(t).toContain('{ELEMENT_SIZES}');
     const c = String(PROMPT_TEMPLATES.feedbackConsolidator || '');
     expect(c).toContain('`creature_scale`');
     expect(c).toContain('requires_iterate_not_inpaint');
   });
 
   it('the judge is fed the sentence the page prompt was given', () => {
-    const block = PB.buildCreatureSizesBlock(bible(), ['LOC001.4', 'ANI001'], [LEVIN, MAX]);
-    expect(block).toBe(`- Rubina: ${PB.creaturePageScaleNote(grown, [LEVIN, MAX])}`);
-    const built = buildEvaluationPrompt({ originalPrompt: 'x', creatureSizes: block });
-    expect(built).toContain(`12. CREATURE SIZES`);
+    const block = PB.buildElementSizesBlock(bible(), ['LOC001.4', 'ANI001'], [LEVIN, MAX], []);
+    expect(block).toBe(`- Rubina (animal): ${PB.elementPageScaleNote(grown, [LEVIN, MAX])}`);
+    const built = buildEvaluationPrompt({ originalPrompt: 'x', elementSizes: block });
+    expect(built).toContain(`12. ELEMENT SIZES`);
     expect(built).toContain(block);
-    expect(PB.buildCreatureSizesBlock(bible(), ['LOC001'], [LEVIN])).toBe('');
+    expect(PB.buildElementSizesBlock(bible(), ['LOC001'], [LEVIN], [])).toBe('');
   });
 });
 

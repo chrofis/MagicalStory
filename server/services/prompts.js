@@ -927,10 +927,11 @@ function buildEvaluationPrompt(opts = {}) {
     // rule reading the tail out of it can never fire. Empty when the caller
     // could not resolve the list — D-16b then skips.
     REQUIRED_OBJECTS: opts.requiredObjects || '',
-    // The size each cited Visual Bible creature was given against the figures
-    // in frame (promptBuilders.buildCreatureSizesBlock — the page prompt's own
-    // sentence). Empty when the page cites none: D-34 then skips.
-    CREATURE_SIZES: opts.creatureSizes || '',
+    // The size each cited Visual Bible creature, object and vehicle was given
+    // against the figures in frame (promptBuilders.buildElementSizesBlock — the
+    // page prompt's own sentence), read by D-21, D-31 and D-34. Empty when the
+    // page cites none.
+    ELEMENT_SIZES: opts.elementSizes || '',
     // The page's real-world landmark block, built by ONE builder shared with
     // the semantic and compliance judges (landmarkProtection.buildLandmarkContextBlock).
     // '(none)' — never an empty hole — when the caller has no landmark: this

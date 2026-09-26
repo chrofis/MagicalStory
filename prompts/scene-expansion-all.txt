@@ -85,6 +85,7 @@
 12h. **An object out of sight.** {CONCEALED_OBJECT}
 
 12k. **An object several characters touch.** {REACHABLE_CONTACT}
+12m. **A small prop rests against a figure.** {SMALL_PROP_CONTACT}
 
 12d. **A held document is read, not displayed.** A map, letter, note or book in a character's hands stays angled toward the character reading it, its face foreshortened or turned away from the camera — the shot shows the characters reading, never the document presented flat to the viewer. This holds even when the page's plan line is what the document says: stage the readers' reactions and pointing hands from the reader's side, and never make the document the frame-filling focal object.
  A prop being carried rather than read stays folded, rolled or pocketed.

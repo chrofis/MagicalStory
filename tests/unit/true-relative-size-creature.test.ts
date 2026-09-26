@@ -47,7 +47,9 @@ describe('8f no longer demands the thing the creature bands forbid', () => {
     // (A6) — the creature case was being stated twice.
     expect(r).toContain('a CREATURE by the creature rule above');
     expect(r).toContain('in metres or against a familiar room for a young reader');
-    expect(r).toContain('a ratio against a child is what makes a creature loom over one');
+    // 2026-09-26: the page prompt now states every element's size against the
+    // figures in frame, computed from its band, and that computed size wins.
+    expect(r).toContain('that computed size wins');
     expect((r.match(/creature rule/g) || []).length, 'the creature case is stated once').toBe(1);
   });
 

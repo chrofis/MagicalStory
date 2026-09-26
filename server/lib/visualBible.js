@@ -1010,26 +1010,40 @@ function withScaleNote(description, entry) {
 }
 
 /**
- * THE HEIGHT MULTIPLE A BAND'S OWN PHRASE STATES, in standing adults (2026-09-26).
+ * THE HEIGHT EACH HEIGHT BAND STANDS, AS A FRACTION OF A STANDING ADULT (owner,
+ * 2026-09-26). ONE table: the page prompt turns it into a yardstick against
+ * the people actually in frame (promptBuilders.elementPageScaleNote), the
+ * judges read that same sentence, and so does every repaint.
  *
- * Only the two bands whose phrase names an exact multiple are here: "as tall as
- * a standing adult" (1) and "twice the height of a standing adult" (2). Every
- * other band either answers HOW BIG (no height at all), is a fraction of an
- * adult its phrase does not quantify (knee / hip / chest), or says "several
- * adults high" / "fills the horizon" — a multiple nobody stated, so none is
- * invented here. `pageScaleComparison` (promptBuilders) turns this into a ratio
- * against the figures actually in frame; a band without an entry keeps its
- * phrase and gains no comparison.
+ * knee / hip / chest are the band phrases' own body landmarks, at their
+ * standard anthropometric heights as a fraction of stature (Drillis & Contini
+ * 1966, the segment-length proportions of Winter's Biomechanics and Motor
+ * Control of Human Movement: knee 0.285 H, hip 0.530 H, chest 0.720 H).
+ * `waist-high` renders "stands hip-high", so it is the hip.
+ *
+ * adult-height and twice-adult-height state their multiple outright.
+ * house-height states "several adults high, the size of a house": 3 is the
+ * reading of "several" this table defines (a one-storey house to its ridge) — the
+ * one value in this table the phrase does not spell out.
+ *
+ * No other band has an entry, and none is invented for it: the SIZE bands
+ * answer how big, not how tall (their yardstick is a body part, see
+ * promptBuilders.SIZE_BAND_BODY_PART), forearm-/arm-sized measure a length
+ * against an adult limb, and `landmark` fills the horizon.
  */
-const SCALE_ADULT_HEIGHT_MULTIPLE = Object.freeze({
+const SCALE_ADULT_HEIGHT_FRACTION = Object.freeze({
+  'knee-high': 0.285,
+  'waist-high': 0.53,
+  'chest-high': 0.72,
   'adult-height': 1,
   'twice-adult-height': 2,
+  'house-height': 3,
 });
 
-function scaleAdultHeightMultiple(raw) {
+function scaleAdultHeightFraction(raw) {
   const token = resolveScaleClass(raw);
-  return token && Object.prototype.hasOwnProperty.call(SCALE_ADULT_HEIGHT_MULTIPLE, token)
-    ? SCALE_ADULT_HEIGHT_MULTIPLE[token]
+  return token && Object.prototype.hasOwnProperty.call(SCALE_ADULT_HEIGHT_FRACTION, token)
+    ? SCALE_ADULT_HEIGHT_FRACTION[token]
     : null;
 }
 
@@ -3829,8 +3843,8 @@ module.exports = {
   isGenericEntry,
   LARGE_SCALE_CLASSES,
   isLargeScaleClass,
-  SCALE_ADULT_HEIGHT_MULTIPLE,
-  scaleAdultHeightMultiple,
+  SCALE_ADULT_HEIGHT_FRACTION,
+  scaleAdultHeightFraction,
   GROWN_CREATURE_SCALE_CLASSES,
   isGrownCreatureScaleClass,
   isPlateBorneElement,

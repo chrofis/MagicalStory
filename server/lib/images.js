@@ -3346,28 +3346,30 @@ async function evaluateImageBatch(images, options = {}) {
  * job_1790277448294_5herh01j7 p15, "remove the street lamp"). The light is read
  * from the same brief the semantic judge reads its DECLARED LIGHT from.
  */
-function buildInpaintInstruction({ editInstruction, preserveClause = '', creatureSizeClause = '', quietZoneSuffix = '', requiredTextClause = '', sceneDescription = '' }) {
+function buildInpaintInstruction({ editInstruction, preserveClause = '', sizeClause = '', quietZoneSuffix = '', requiredTextClause = '', sceneDescription = '' }) {
   const { buildRepairLightLine, declaredLightOfBrief } = require('./sceneLight');
   const lightLine = buildRepairLightLine(declaredLightOfBrief(sceneDescription));
   const lightClause = lightLine ? `\n\n${lightLine}` : '';
-  return `Fix these issues in this children's book illustration:\n${editInstruction}${preserveClause}${creatureSizeClause}${quietZoneSuffix}${requiredTextClause}${lightClause}`;
+  return `Fix these issues in this children's book illustration:\n${editInstruction}${preserveClause}${sizeClause}${quietZoneSuffix}${requiredTextClause}${lightClause}`;
 }
 
 /**
- * The size every creature the page cites keeps after a repaint (owner,
- * 2026-09-26), named for the image model: the same page-scale note the page
- * prompt carried (promptBuilders.creaturePageScaleNote), with every cast and
- * creature name swapped for its descriptor through the page's repair name map.
- * Staging job_1790373080139_vnx5l8iy7 p10: the round-1 inpaint regenerated the
- * dragon from "Regenerate this character high above in the linden tree crown"
- * — no size — and drew it cat-sized. '' when the page cites no sized creature.
- * Shared by the pipeline inpaint and the manual repair route.
+ * The size every creature, object and vehicle the page cites keeps after a
+ * repaint (owner, 2026-09-26), named for the image model: the same page-scale
+ * note the page prompt carried (promptBuilders.elementPageScaleNote, in its
+ * unnamed form), with every cast and creature name swapped for its descriptor
+ * through the page's repair name map. Staging job_1790373080139_vnx5l8iy7 p10:
+ * the round-1 inpaint regenerated the dragon from "Regenerate this character
+ * high above in the linden tree crown" — no size — and drew it cat-sized. ''
+ * when the page cites no sized element. Shared by the pipeline inpaint and the
+ * manual repair route.
  */
-function buildCreatureSizeClauseForRepair({ visualBible, sceneMetadata, characters, nameMap }) {
-  const { buildCreatureSizeRepairClause, castFiguresInFrame } = require('./promptBuilders');
+function buildElementSizeClauseForRepair({ visualBible, sceneMetadata, characters, nameMap }) {
+  const { buildElementSizeRepairClause, castFiguresInFrame, wholeFiguresInFrame } = require('./promptBuilders');
   const objectIds = Array.isArray(sceneMetadata?.objects) ? sceneMetadata.objects : [];
-  const figures = castFiguresInFrame(characters, sceneMetadata?.characters);
-  const clause = buildCreatureSizeRepairClause(visualBible, objectIds, figures);
+  const figures = wholeFiguresInFrame(castFiguresInFrame(characters, sceneMetadata?.characters), sceneMetadata);
+  const interactions = sceneMetadata?.interactions || sceneMetadata?.fullData?.interactions || [];
+  const clause = buildElementSizeRepairClause(visualBible, objectIds, figures, interactions);
   if (!clause) return '';
   return require('./repairLogic').nameRepairText(clause, nameMap);
 }
@@ -3935,10 +3937,10 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // Loud: a declared string that cannot be resolved must not be swallowed.
     log.error(`[INPAINT PAGE] Page ${pageNumber}: required-text clause could not be built - ${err.message}`);
   }
-  // CREATURE SIZES (2026-09-26) — see buildCreatureSizeClauseForRepair.
-  let creatureSizeClause = '';
+  // ELEMENT SIZES (2026-09-26) — see buildElementSizeClauseForRepair.
+  let sizeClause = '';
   try {
-    creatureSizeClause = buildCreatureSizeClauseForRepair({
+    sizeClause = buildElementSizeClauseForRepair({
       visualBible,
       sceneMetadata: sceneMetadata || (sceneDescription ? require('./sceneMetadata').extractSceneMetadata(sceneDescription) : null),
       characters,
@@ -3946,9 +3948,9 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     });
   } catch (err) {
     // Loud: a creature repainted without its size is how p10 lost it.
-    log.error(`[INPAINT PAGE] Page ${pageNumber}: creature size clause could not be built - ${err.message}`);
+    log.error(`[INPAINT PAGE] Page ${pageNumber}: element size clause could not be built - ${err.message}`);
   }
-  const fullInstruction = buildInpaintInstruction({ editInstruction, preserveClause, creatureSizeClause, quietZoneSuffix, requiredTextClause, sceneDescription });
+  const fullInstruction = buildInpaintInstruction({ editInstruction, preserveClause, sizeClause, quietZoneSuffix, requiredTextClause, sceneDescription });
   log.info(`[INPAINT PAGE] Inpainting (refs: ${referenceImages.length}): ${editInstruction.substring(0, 200)}`);
 
   try {
@@ -6370,7 +6372,7 @@ module.exports = {
   // Unified repair pipeline (the only active repair pipeline)
   inpaintPage,
   buildInpaintInstruction,
-  buildCreatureSizeClauseForRepair,
+  buildElementSizeClauseForRepair,
 
   // Active repair primitives
   iteratePageCore,

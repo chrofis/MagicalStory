@@ -28,6 +28,7 @@ You are an Art Director reviewing scene briefs for children's book illustrations
 21. **A PROP THE PAGE TEXT PUTS AGAINST A CHARACTER** - {STAGED_PROP}
 22. **CONTACT READS AS A VERB** - {CONTACT_VERB}
 22b. **AN OBJECT SEVERAL CHARACTERS TOUCH** - {REACHABLE_CONTACT}
+22c. **A SMALL PROP RESTS AGAINST A FIGURE** - {SMALL_PROP_CONTACT}
 23. **DESCRIBE A CHARACTER FROM CHARACTER DETAILS** - A figure brought back into the frame is described from CHARACTER DETAILS and from nowhere else; never invent an age look, build, hair or face for a character whose entry you were not given.
 24. **A DECLARED TRAIT IS COPIED, NOT RECALLED** - {DECLARED_TRAIT_VERBATIM}
 25. **A TRACKED ANIMAL IS CAST** - {PLAN_LINE_CAST}
