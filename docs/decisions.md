@@ -21,6 +21,35 @@ superseded and link forward.
 
 ---
 
+## 2026-09-26 — Weather owns the sky: a covered weather's LIGHT line names no sun, moon or blue sky (amends 2026-09-24 "A page declares its time of day and weather")
+**Context:** `sceneLight.lightPhrase` built every LIGHT line as "<time phrase>; <weather phrase>", and every
+time phrase names a sky light source (afternoon "warm daylight from a sun past its height", dusk "a deep blue
+fading sky", night "lit by the moon"). Fog only added "fog softening the distance". A fog page was told to paint
+a sun, and Grok did: on staging job_1790277448294_5herh01j7 fog rendered on 1 of 12 Fiona fog pages and 0 of 6
+night-fog pages (sun discs on p6-p8, a moon in a clear sky at night). The angle derive that keeps the base
+light said only "the light keeps the same direction and time of day", so the weather was dropped from it too,
+and a landmark base plate that came out sunny (the photo's light won over a line that itself named the sun)
+passed its sun on to the derived plates.
+**Decision:** time of day and weather have separate roles, composed in one table (`lightParts`, time × weather):
+the time sets brightness, colour of the light, shadows and lamps; the weather decides the sky. Each time has an
+`open` phrase (clear or undeclared weather — the old text, unchanged) and a `veiled` one that names no sky
+light source. overcast / rain / snow / fog / storm each have a day and a dark (dusk, night) sky phrase, all
+closed by `COVERED_SKY_CLAUSE` ("no sun disc, no moon and no blue sky anywhere in the picture"); fog is a flat
+pale sky by day (a dark grey haze at night) with distant forms fading out. clear and none (indoors) are
+unchanged. The one phrase feeds the page and plate LIGHT lines, `buildRepairLightLine`,
+`buildPlateRelightInstruction`, `relightClause`, and a new `keepLightClause` that the non-relit angle derive now
+ends with, so a derive names the light and weather it is painted in. Critics: `describeLightForJudge` gives the
+semantic judge (DECLARED LIGHT) and the plate QC (LIGHT_CHECK, template untouched) the labels plus the same sky
+phrase when the weather owns the sky; a clear or indoor page is judged on its labels alone, as before. The
+visual-flow judge compares enum buckets and is unchanged.
+**Rationale:** a weather appended to a phrase that already paints a sun cannot win; the image model paints both.
+Splitting the roles is the smallest change that makes every line self-consistent, and one constant keeps the
+generator and the judges saying the same thing.
+**Touched:** server/lib/sceneLight.js, server/lib/shotVocabulary.js, storyJobPipeline.js,
+server/lib/sceneValidator.js, server/lib/evalPipeline.js, tests/unit/scene-light.test.ts,
+scripts/admin/sibling-registry.json, tasks/bugs.json.
+**Status:** ✅ active on staging.
+
 ## 2026-09-26 — The Art Director cites the landmark photo: `landmarkPhoto: <n> | "none"` per plate, and code serves exactly that slot (supersedes 2026-09-24 "`landmarkView` picks the kind" and "the page's shot picks the framing")
 
 **Context.** Investigation 2026-09-26 over stored stories (full stories and trials, both environments): the

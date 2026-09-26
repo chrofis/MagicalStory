@@ -37,25 +37,111 @@ const WEATHERS = ['clear', 'overcast', 'rain', 'snow', 'fog', 'storm', 'none'];
 const TIME_OF_DAY_ENUM = TIMES_OF_DAY.join(' | ');
 const WEATHER_ENUM = WEATHERS.join(' | ');
 
-/** What the illustrator is told each value means. Generic, positive, terse. */
+/**
+ * What the illustrator is told each value means. Generic, positive, terse.
+ *
+ * WEATHER OWNS THE SKY (owner, 2026-09-26). Time of day sets the brightness,
+ * the colour of the light, the shadows and whether the lamps are lit; the
+ * weather decides what the sky shows. Each time of day therefore has two
+ * phrasings: `open`, under a clear (or undeclared) sky, which names the sun or
+ * the moon, and `veiled`, under a covered one, which names no light source in
+ * the sky. The line used to append the weather to the open phrase, so a fog
+ * page was told "warm daylight from a sun past its height; fog softening the
+ * distance" and Grok painted the sun: fog rendered on 1 of 12 staging fog
+ * pages and 0 of 6 night-fog pages (job_1790277448294_5herh01j7).
+ */
 const TIME_OF_DAY_PHRASES = {
-  dawn: 'dawn: the sun just up, low pale light, long soft shadows',
-  morning: 'morning: fresh daylight from a low sun',
-  midday: 'midday: bright daylight from a high sun, short shadows',
-  afternoon: 'afternoon: warm daylight from a sun past its height',
-  evening: 'evening: a low golden sun, long shadows',
-  dusk: 'dusk: the sun down, a deep blue fading sky, the first lamps lit',
-  night: 'night: a dark sky, the scene lit by the moon and by the light sources in it',
+  dawn: {
+    open: 'dawn: the sun just up, low pale light, long soft shadows',
+    veiled: 'dawn: faint cool early light, the day just beginning',
+  },
+  morning: {
+    open: 'morning: fresh daylight from a low sun',
+    veiled: 'morning: fresh cool daylight',
+  },
+  midday: {
+    open: 'midday: bright daylight from a high sun, short shadows',
+    veiled: 'midday: full daylight, the brightest hour of the day',
+  },
+  afternoon: {
+    open: 'afternoon: warm daylight from a sun past its height',
+    veiled: 'afternoon: full daylight, a touch warm',
+  },
+  evening: {
+    open: 'evening: a low golden sun, long shadows',
+    veiled: 'evening: the daylight fading, lit windows beginning to glow',
+  },
+  dusk: {
+    open: 'dusk: the sun down, a deep blue fading sky, the first lamps lit',
+    veiled: 'dusk: dim blue-grey light, the first lamps lit',
+  },
+  night: {
+    open: 'night: a dark sky, the scene lit by the moon and by the light sources in it',
+    veiled: 'night: dark, the scene lit only by the light sources in it',
+  },
 };
-const WEATHER_PHRASES = {
+
+/** The hours whose covered sky is dark, not pale. */
+const DARK_TIMES = new Set(['dusk', 'night']);
+
+/** Closes every covered-sky phrase: the weather hides every light source above. */
+const COVERED_SKY_CLAUSE = 'no sun disc, no moon and no blue sky anywhere in the picture';
+
+/**
+ * The weathers that OWN the sky, with a phrasing for the light hours and one
+ * for the dark hours (DARK_TIMES). Each is closed by COVERED_SKY_CLAUSE.
+ */
+const COVERED_WEATHER_PHRASES = {
+  overcast: {
+    day: 'overcast: a flat grey cloud-covered sky, soft even light, soft faint shadows',
+    dark: 'overcast: a flat dark cloud-covered sky',
+  },
+  rain: {
+    day: 'rain falling from a grey cloud-covered sky, surfaces wet and shining',
+    dark: 'rain falling from a dark cloud-covered sky, surfaces wet and shining with the reflected lamplight',
+  },
+  snow: {
+    day: 'snow falling from a pale grey sky',
+    dark: 'snow falling from a dark grey sky',
+  },
+  fog: {
+    day: 'fog: the sky a flat pale grey-white, distant forms fading out into the fog, only the nearest things clear, no hard shadows',
+    dark: 'fog: the sky a flat dark grey haze, distant forms fading out into it, the lamps glowing with soft halos',
+  },
+  storm: {
+    day: 'a storm: dark clouds filling the sky, wind, heavy rain',
+    dark: 'a storm: black clouds filling the sky, wind, heavy rain',
+  },
+};
+
+/** The weathers that leave the sky to the time of day. */
+const OPEN_WEATHER_PHRASES = {
   clear: 'a clear sky',
-  overcast: 'overcast, a grey sky and soft even light',
-  rain: 'rain falling, surfaces wet and shining',
-  snow: 'snow falling',
-  fog: 'fog softening the distance',
-  storm: 'a storm: dark clouds, wind, heavy rain',
   none: 'indoors: the light comes from the room\'s own sources and any window',
 };
+
+/** Does this declared weather own the sky? */
+function weatherOwnsSky(weather) {
+  return Object.prototype.hasOwnProperty.call(COVERED_WEATHER_PHRASES, weather);
+}
+
+/**
+ * The composition of time × weather: the time part (brightness, colour,
+ * shadows, lamps) and the sky part. Either is '' when undeclared.
+ * @returns {{time: string, sky: string}}
+ */
+function lightParts(light) {
+  const l = light || {};
+  const covered = weatherOwnsSky(l.weather);
+  const time = l.timeOfDay ? TIME_OF_DAY_PHRASES[l.timeOfDay][covered ? 'veiled' : 'open'] : '';
+  let sky = '';
+  if (covered) {
+    sky = `${COVERED_WEATHER_PHRASES[l.weather][DARK_TIMES.has(l.timeOfDay) ? 'dark' : 'day']}; ${COVERED_SKY_CLAUSE}`;
+  } else if (l.weather) {
+    sky = OPEN_WEATHER_PHRASES[l.weather];
+  }
+  return { time, sky };
+}
 
 function normaliseEnum(raw, allowed) {
   const v = String(raw == null ? '' : raw).trim().toLowerCase();
@@ -110,11 +196,22 @@ function describeLight(light) {
 
 /** The light as phrases, '' when undeclared. Shared by every line below. */
 function lightPhrase(light) {
+  const { time, sky } = lightParts(light);
+  return [time, sky].filter(Boolean).join('; ');
+}
+
+/**
+ * The light as the judges read it: the labels ("afternoon, fog"), and, when
+ * the weather owns the sky, the same sky phrase the illustrator was given — so
+ * a sun painted into a fog page is judged against the words that forbade it.
+ * A clear or indoor page is judged on its labels alone, as before.
+ * '' when undeclared.
+ */
+function describeLightForJudge(light) {
+  const words = describeLight(light);
+  if (!words) return '';
   const l = light || {};
-  const parts = [];
-  if (l.timeOfDay) parts.push(TIME_OF_DAY_PHRASES[l.timeOfDay]);
-  if (l.weather) parts.push(WEATHER_PHRASES[l.weather]);
-  return parts.join('; ');
+  return weatherOwnsSky(l.weather) ? `${words} — ${lightParts(l).sky}` : words;
 }
 
 /**
@@ -163,6 +260,17 @@ function buildPlateRelightInstruction(light) {
 function relightClause(light) {
   const phrase = lightPhrase(light);
   return phrase ? `The light changes to ${phrase}; nothing else about the place changes with it.` : '';
+}
+
+/**
+ * The sentence an angle derive ends with when the derived plate keeps the base
+ * plate's light: it names that light, weather included. "The light keeps the
+ * same direction and time of day" said nothing about the sky, and a derive of
+ * a sunny-rendered fog plate stayed sunny.
+ */
+function keepLightClause(light) {
+  const phrase = lightPhrase(light);
+  return phrase ? `The picture is painted in this light, sky and weather: ${phrase}.` : '';
 }
 
 /**
@@ -230,10 +338,15 @@ module.exports = {
   declaredLightOfBrief,
   lightKey,
   describeLight,
+  describeLightForJudge,
+  lightPhrase,
+  weatherOwnsSky,
+  COVERED_SKY_CLAUSE,
   buildLightLine,
   buildRepairLightLine,
   buildPlateRelightInstruction,
   relightClause,
+  keepLightClause,
   carryForwardLightInBrief,
   timeContradicts,
 };

@@ -816,7 +816,8 @@ function buildSemanticPrompt(template, { storyText, sceneHint, imagePrompt, inte
 }
 
 /**
- * The DECLARED LIGHT line the semantic judge is given ("night, fog"; '' when
+ * The DECLARED LIGHT line the semantic judge is given ("night, clear"; a
+ * covered weather adds its sky phrase, "night, fog — fog: …"; '' when
  * the page declares none). The brief carries the fields; the built image
  * prompt does not — and a repaired version's image prompt is the repair
  * instruction. Read the hint first for that reason, the prompt when the hint
@@ -830,7 +831,9 @@ function semanticDeclaredLight(sceneHint, imagePrompt) {
   const lit = (fromHint.timeOfDay || fromHint.weather)
     ? fromHint
     : light.declaredLight(getSceneMetadata(imagePrompt || sceneHint || ''));
-  return light.describeLight(lit);
+  // Labels, plus the illustrator's own sky phrase when the weather owns the
+  // sky (sceneLight.describeLightForJudge, 2026-09-26).
+  return light.describeLightForJudge(lit);
 }
 
 async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, sceneHint = null, templateOverride = null, evalContext = {}) {

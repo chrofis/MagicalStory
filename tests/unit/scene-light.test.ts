@@ -234,8 +234,8 @@ describe('every repair that repaints pixels carries the declared light', () => {
   it('the repair line names the light and forbids changing it; empty when undeclared', () => {
     const line = L.buildRepairLightLine({ timeOfDay: 'night', weather: 'fog' });
     expect(line.startsWith('**LIGHT:**')).toBe(true);
-    expect(line).toContain('night: a dark sky');
-    expect(line).toContain('fog softening the distance');
+    expect(line).toContain(L.lightPhrase({ timeOfDay: 'night', weather: 'fog' }));
+    expect(line).toContain('flat dark grey haze');
     expect(line).toMatch(/keeps exactly this light, sky and weather/);
     expect(L.buildRepairLightLine({ timeOfDay: null, weather: null })).toBe('');
   });
@@ -267,7 +267,7 @@ describe('every repair that repaints pixels carries the declared light', () => {
       { treatment: 'crosshatch', regionSource: 'cutout', faceOnly: false },
     ]) {
       const p = await faceRepair.buildPrompt({ ...axes, charName: 'Mira', opts: { sceneDescription: NIGHT_FOG, artStyle: 'watercolor', repairNames: NAMES } });
-      expect(p, JSON.stringify(axes)).toContain('**LIGHT:** night: a dark sky');
+      expect(p, JSON.stringify(axes)).toContain('**LIGHT:** night: dark, the scene lit only by');
       const none = await faceRepair.buildPrompt({ ...axes, charName: 'Mira', opts: { sceneDescription: UNDECLARED, artStyle: 'watercolor', repairNames: NAMES } });
       expect(none, JSON.stringify(axes)).not.toContain('**LIGHT:**');
     }
@@ -275,7 +275,7 @@ describe('every repair that repaints pixels carries the declared light', () => {
 
   it('the scale repair (whole-frame edit) carries it', () => {
     const p = buildScaleRepairPrompt({ bgChars: [], fgChars: [], shot: 'wide', interactions: [], light: { timeOfDay: 'night', weather: 'fog' } });
-    expect(p).toContain('**LIGHT:** night: a dark sky');
+    expect(p).toContain('**LIGHT:** night: dark, the scene lit only by');
     expect(buildScaleRepairPrompt({ bgChars: [], fgChars: [], shot: 'wide', interactions: [] })).not.toContain('**LIGHT:**');
   });
 
@@ -284,9 +284,82 @@ describe('every repair that repaints pixels carries the declared light', () => {
     // sceneHint = the version's brief, imagePrompt = the instruction the edit was sent.
     const hint = resolveEvalSceneHint({ evaluationType: 'scene', entryDescription: NIGHT_FOG, sceneDescription: NIGHT_FOG, outlineExtract: 'PLAN: the dragon hides' });
     const instruction = IMG.buildInpaintInstruction({ editInstruction: '1. Remove the lamp.', sceneDescription: NIGHT_FOG });
-    expect(semanticDeclaredLight(hint, instruction)).toBe('night, fog');
+    expect(semanticDeclaredLight(hint, instruction)).toBe(L.describeLightForJudge({ timeOfDay: 'night', weather: 'fog' }));
+    expect(semanticDeclaredLight(hint, instruction)).toMatch(/^night, fog — /);
     const p = String(buildSemanticPrompt(require_('../../server/services/prompts').PROMPT_TEMPLATES.imageSemantic,
       { storyText: 't', sceneHint: hint, imagePrompt: instruction, declaredLight: semanticDeclaredLight(hint, instruction) }));
     expect(p).toMatch(/\*\*DECLARED LIGHT[^\n]*\*\* night, fog/);
+  });
+});
+
+// WEATHER OWNS THE SKY (owner, 2026-09-26). The LIGHT line appended the weather
+// to a time phrase that named the sun or the moon, so a fog page was told to
+// paint "warm daylight from a sun past its height; fog softening the distance"
+// and Grok did: fog rendered on 1 of 12 staging fog pages and 0 of 6 night-fog
+// pages (job_1790277448294_5herh01j7).
+describe('weather owns the sky', () => {
+  const COVERED = ['overcast', 'rain', 'snow', 'fog', 'storm'];
+  const TIMES = [...L.TIMES_OF_DAY, null];
+  // A sky light source named anywhere except inside the clause that forbids it.
+  const namesSkySource = (s: string) => /sun|moon|blue sky|blue fading|golden/i.test(s.split(L.COVERED_SKY_CLAUSE).join(''));
+
+  it('a covered weather names no sun, moon or blue sky, and forbids them, at every hour', () => {
+    for (const weather of COVERED) for (const timeOfDay of TIMES) {
+      const phrase = L.lightPhrase({ timeOfDay, weather });
+      expect(namesSkySource(phrase), `${timeOfDay}/${weather}: ${phrase}`).toBe(false);
+      expect(phrase).toContain(L.COVERED_SKY_CLAUSE);
+    }
+  });
+
+  it('fog makes the sky flat and pale by day and fades the distance', () => {
+    const p = L.lightPhrase({ timeOfDay: 'afternoon', weather: 'fog' });
+    expect(p).toMatch(/flat pale/);
+    expect(p).toMatch(/distant forms fading/);
+    expect(p).not.toMatch(/sun past its height/);
+    expect(L.lightPhrase({ timeOfDay: 'night', weather: 'fog' })).not.toMatch(/lit by the moon/);
+  });
+
+  it('every line built from the light carries the composition — page, plate, repair, relight, derive', () => {
+    const fog = { timeOfDay: 'afternoon', weather: 'fog' };
+    const phrase = L.lightPhrase(fog);
+    const lines = [
+      L.buildLightLine(fog),
+      L.buildLightLine(fog, { plate: true }),
+      L.buildRepairLightLine(fog),
+      L.buildPlateRelightInstruction(fog),
+      buildPlateDeriveInstruction('medium', 'high-angle', { relight: L.relightClause(fog) }),
+      buildPlateDeriveInstruction('medium', 'high-angle', { keepLight: L.keepLightClause(fog) }),
+      buildEmptyScenePrompt({ style: 'watercolour', description: 'A pier.', light: fog }),
+      String(PB.buildImagePrompt(brief('The main character stands on the pier.', fog), inputData, null, { artifacts: [], locations: [] }, 1, null, {})),
+    ];
+    for (const line of lines) {
+      expect(line).toContain(phrase);
+      expect(namesSkySource(line.split(phrase).join(''))).toBe(false);
+    }
+  });
+
+  it('a derive that keeps the base light names its weather, never only the hour', () => {
+    const kept = buildPlateDeriveInstruction('medium', 'high-angle', { keepLight: L.keepLightClause({ timeOfDay: 'dusk', weather: 'rain' }) });
+    expect(kept).toContain('rain falling');
+    expect(kept).not.toContain('the light keeps the same direction and time of day');
+  });
+
+  it('clear and indoor pages are unchanged', () => {
+    expect(L.lightPhrase({ timeOfDay: 'afternoon', weather: 'clear' })).toBe('afternoon: warm daylight from a sun past its height; a clear sky');
+    expect(L.lightPhrase({ timeOfDay: 'night', weather: 'clear' })).toBe('night: a dark sky, the scene lit by the moon and by the light sources in it; a clear sky');
+    expect(L.lightPhrase({ timeOfDay: 'evening', weather: 'none' })).toBe("evening: a low golden sun, long shadows; indoors: the light comes from the room's own sources and any window");
+    expect(L.lightPhrase({ timeOfDay: 'dusk', weather: null })).toBe('dusk: the sun down, a deep blue fading sky, the first lamps lit');
+    expect(L.describeLightForJudge({ timeOfDay: 'night', weather: 'clear' })).toBe('night, clear');
+    expect(L.describeLightForJudge({ timeOfDay: null, weather: null })).toBe('');
+  });
+
+  it('the judges read the sky phrase the illustrator was given', () => {
+    const fog = { timeOfDay: 'night', weather: 'fog' };
+    const sky = L.describeLightForJudge(fog).split(' — ')[1];
+    expect(L.buildLightLine(fog)).toContain(sky);
+    expect(buildEmptySceneQcPrompt({ sceneDescription: 'A pier.', light: fog })).toContain(`the plate is painted in ${L.describeLightForJudge(fog)}`);
+    const p = String(buildSemanticPrompt(require_('../../server/services/prompts').PROMPT_TEMPLATES.imageSemantic,
+      { storyText: 't', sceneHint: 'x', imagePrompt: 'x', declaredLight: L.describeLightForJudge(fog) }));
+    expect(p).toContain(sky);
   });
 });

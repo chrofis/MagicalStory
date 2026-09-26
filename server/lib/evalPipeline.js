@@ -492,8 +492,10 @@ function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, chara
   // The plate's declared light — the same two fields its author's LIGHT line
   // was built from (sceneLight.js), so a plate is judged on the time of day and
   // weather it was told to paint and on nothing read out of prose.
-  const { describeLight } = require('./sceneLight');
-  const lightWords = describeLight(light);
+  // A weather that owns the sky adds the sky phrase the author was given
+  // (describeLightForJudge, 2026-09-26), so a sun in a fog plate is judged.
+  const { describeLightForJudge } = require('./sceneLight');
+  const lightWords = describeLightForJudge(light);
   const lightCheck = lightWords
     ? `\n${fillTemplate(qc.LIGHT_CHECK, { LIGHT: lightWords })}` : '';
   // THE PHOTO WINS OVER THE WORDS (owner, 2026-09-23). Emitted only when the

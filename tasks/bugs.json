@@ -2163,6 +2163,15 @@
       "fixedAt": "2026-09-26",
       "fixedIn": "319819cc6",
       "fix": "buildEmptySceneQcPrompt picks STYLE_CHECK_PHOTOGRAPHIC (\"Is the plate a photograph in it? FAIL if it reads as painted, drawn, animated or 3D-rendered\") when isPhotographicArtStyle(artStyle), STYLE_CHECK otherwise. Test: tests/unit/plate-qc-landmark-medium.test.ts."
+    },
+    {
+      "id": "fog-light-line-names-sun",
+      "title": "A fog (or any covered-weather) page's LIGHT line told the illustrator to paint a sun or moon, so fog did not render",
+      "reportedAt": "2026-09-26",
+      "source": "Owner-approved fix task 2026-09-26; measured on staging job_1790277448294_5herh01j7 (fog on 1/12 fog pages, 0/6 night-fog pages) and job_1790446348343_z3fw660ie p6/p13.",
+      "rootCause": "server/lib/sceneLight.js lightPhrase appended the weather phrase to a time phrase that names a sky light source (\"warm daylight from a sun past its height; fog softening the distance\"); the non-relit angle derive said only \"the light keeps the same direction and time of day\", dropping the weather.",
+      "impact": "Fog, overcast, rain, snow and storm pages rendered a sun disc, golden sunlight or a moon in a clear sky; derived plates inherited a sunny base plate.",
+      "status": "open"
     }
   ]
 }

@@ -4686,7 +4686,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // gets a plate RE-LIT from the base below — same place, same camera.
             // Before this every page inherited the representative's light:
             // prod job_1790107559778_fcmlfa8kn p2/p4/p5/p6 all got p2's rain.
-            const { declaredLight, lightKey, describeLight, relightClause, buildPlateRelightInstruction } = require('./server/lib/sceneLight');
+            const { declaredLight, lightKey, describeLight, relightClause, keepLightClause, buildPlateRelightInstruction } = require('./server/lib/sceneLight');
             const lightOfPage = (pn) => declaredLight(pageDataArray.find(pd => pd.pageNumber === pn)?.sceneMetadata);
             const lightVotes = new Map();
             for (const pn of group.pageNumbers) {
@@ -4982,7 +4982,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 const { cls, camera, light: pageLight, relit, key } = plateKeyOf(pn);
                 if ((!camera && !relit) || derivedPlates.has(key)) continue;
                 const deriveInstruction = camera
-                  ? buildPlateDeriveInstruction(vantageShot, cls, { relight: relit ? relightClause(pageLight) : '' })
+                  ? buildPlateDeriveInstruction(vantageShot, cls, relit ? { relight: relightClause(pageLight) } : { keepLight: keepLightClause(baseLight) })
                   : buildPlateRelightInstruction(pageLight);
                 if (!deriveInstruction) continue;
                 const deriveLabel = `${cls}${relit ? ` (${describeLight(pageLight)})` : ''}`;

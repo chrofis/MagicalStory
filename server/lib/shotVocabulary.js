@@ -729,7 +729,7 @@ function buildPlateSurfaceNote(characters, shot = '') {
  * image edit that word means position in the frame, and it pinned the camera
  * the instruction was asking to move (run 6 p2, 2026-09-23).
  */
-function buildPlateDeriveInstruction(baseShot, targetShot, { relight = '' } = {}) {
+function buildPlateDeriveInstruction(baseShot, targetShot, { relight = '', keepLight = '' } = {}) {
   const target = SHOTS.find(s => s.id === targetShot);
   if (!target) return null;
   const from = String(baseShot || '').trim();
@@ -739,9 +739,15 @@ function buildPlateDeriveInstruction(baseShot, targetShot, { relight = '' } = {}
   // `relight`: sceneLight.relightClause — the page this plate serves declares
   // a different time of day or weather than the base plate was painted in, so
   // the one edit moves the camera AND re-lights (2026-09-24).
+  // `keepLight`: sceneLight.keepLightClause — the page keeps the base plate's
+  // declared light, named with its weather, so a derive never drops the sky
+  // (2026-09-26: the generic "same direction and time of day" left a fog plate's
+  // weather out, and a sunny-rendered base stayed sunny).
   const light = relight
     ? `the palette and the season stay identical. ${relight}`
-    : 'the palette and the season stay identical, and the light keeps the same direction and time of day.';
+    : keepLight
+      ? `the palette and the season stay identical. ${keepLight}`
+      : 'the palette and the season stay identical, and the light keeps the same direction and time of day.';
   return `This backdrop is ${fromPhrase} of a place. ${move} `
     + `The buildings, walls, roofs, trees, paths and surfaces keep their shape, material and colour and their arrangement relative to each other; ${light} The camera moves; the place stays as it is, and no one is added to it.`;
 }
