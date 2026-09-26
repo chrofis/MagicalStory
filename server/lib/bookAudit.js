@@ -178,14 +178,23 @@ function buildAuditPages(images, pickVersion) {
     const picked = typeof pickVersion === 'function' ? pickVersion(img.pageNumber) : null;
     const imageData = picked?.imageData || img.imageData;
     if (!imageData) continue;
+    // THE PICKED VERSION'S OWN BRIEF (2026-09-26). An iterate rewrite carries
+    // its own cast and metadata, and the picture the reader sees was drawn from
+    // THEM; the page's original brief is a different contract. Same resolution
+    // the per-page judges (repairPipeline.buildEvalInputs) and the final
+    // promotion use: the version's declaration when it has one — an empty cast
+    // included — else the page's.
+    const { resolveDeclaredCast } = require('./repairLogic');
+    const sceneCharacters = resolveDeclaredCast(picked?.sceneCharacters, img.sceneCharacters);
+    const sceneMetadata = picked?.sceneMetadata || img.sceneMetadata || null;
     out.push({
       pageNumber: img.pageNumber,
       text: img.text || '',
       imageData,
-      citedIds: [...citedIds(img)],
+      citedIds: [...citedIds({ sceneMetadata, objects: img.objects })],
       // The brief the picture was drawn from rides along (auditPageBrief).
-      sceneCharacters: Array.isArray(img.sceneCharacters) ? img.sceneCharacters : null,
-      sceneMetadata: img.sceneMetadata || null,
+      sceneCharacters: Array.isArray(sceneCharacters) ? sceneCharacters : null,
+      sceneMetadata,
       outlineCharacters: Array.isArray(img.outlineCharacters) ? img.outlineCharacters : [],
     });
   }
