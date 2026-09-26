@@ -61506,3 +61506,47 @@ tests/unit/landmark-plate-crop.test.ts (was plate-photo-options.test.ts), tests/
 scripts/admin/sibling-registry.json, docs/image-routing.md, docs/image-generation-methods.html,
 docs/SETTLED.md.
 **Status:** ✅ active on staging.
+
+---
+
+## 2026-09-26 — Plate geometry never reads a character's description; a failed char-fix names its gate
+
+**Context:** staging job_1790446348343_z3fw660ie shipped "- a broad orange sailcloth sash knotted at the
+left hip." (LOC004.2 plate; v1 painted an orange knotted cloth on the wall) and "- light stubble." (p6) as
+SCENE GEOMETRY. Same class as the 2026-09-21 gilet leak, which was closed by adding one garment word.
+Separately, `executeCharFixAction` (repairPipeline.js) replaced the repair spine's `rejectedReason` /
+`gateMessage` with the fixed "char-fix produced no usable image" (10 stored occurrences in 14 days).
+
+**Decision:** (1) `sceneGeometry.stripCastAppositives` cuts every dash- or bracket-delimited appositive
+whose head word is a figure noun (`FIGURE_RE`, now with toddler/preschooler/teen/infant) or a cast
+member's name, before the sentence is split. The Art Director writes each look as exactly that appositive
+(scene-expansion rule 10), so the look is removed by its position in the sentence, not by its vocabulary —
+a growing garment list cannot close an open vocabulary (stubble, sash, hip, belly, "4 heads tall"…).
+(2) The three dimension lists are word-anchored: unanchored, "b-ROAD", "s-LIGHT-ly", "de-LIGHT-ed" and
+"LIT-tle" made a look clause a geometry candidate. Compound light words are named by prefix
+(candle/moon/street/…light, …lit) and "afternoon" is kept (it matched only through "noon").
+(3) `repairLogic.describeCharFixFailure` builds the failure error from the gate reason, its message and
+the attempt count; it reaches the log, retryHistory, failedRepairs and repairRounds.
+
+**Replay (rung 1, free):** `selectGeometryFacts` over all 342 stored page briefs of the last 14 days
+(27 stories, staging + prod), before/after, every candidate (maxFacts 99): 403 → 372 candidates; 44 pages
+change. Removed: 28 facts carrying a character's look (18 whole — sash ×3, stubble ×2, "light brown" hair
+×2, "4 heads tall with light blonde" ×4, "a toddler/preschooler with light blonde", "slightly rounded
+belly", "slight forward lean", "a scruffy light brown" dog… — and 10 old-format lines cleaned of an
+expression fragment such as "brow slightly furrowed", "mouth slightly open", "delighted"); 7 figure
+action/framing fragments. After: 0 candidates carry a look. Lost with no look in them: 3 camera-angle
+lines and 5 place/prop lines that matched only through a substring ("broad sweep of the gravel plaza",
+"root overarching the hollow", "split shell", "crack splits", "little model barque"); 5 more lines stay
+minus a substring-matched fragment (one of them "the street slopes slightly underfoot", a slope with no
+direction). None of the lost text states a path direction, an opening position or a light direction. Not closed here: figure pose/action fragments with
+no dash (e.g. "hips aligned toward the trail ahead") — the ELIDED_SUBJECT class, not a look.
+
+**Siblings:** the plate author (prompts.js buildEmptyScenePrompt) and the plate judge
+(evalPipeline.js buildEmptySceneQcPrompt) both call `selectGeometryFacts` — one change covers both. The
+char-fix reason was already carried by entityConsistency.js, routes/regeneration.js, testlab.js
+char_repair and sceneComposite.js; only repairPipeline.js dropped it.
+
+**Touched:** server/lib/sceneGeometry.js, server/lib/repairPipeline.js, server/lib/repairLogic.js,
+tests/unit/empty-scene-geometry.test.ts, tests/unit/char-fix-failure-reason.test.ts, tasks/bugs.json,
+tasks/verify.json.
+**Status:** ✅ active on staging.

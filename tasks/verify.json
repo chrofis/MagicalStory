@@ -2226,6 +2226,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "char-fix-failure-reason",
+      "title": "A failed pipeline char-fix records which gate refused it",
+      "commits": [],
+      "addedAt": "2026-09-26",
+      "claim": "On the next staging story with a failed char-fix round: its sceneImages[].retryHistory round_repair_failed entry and repairRounds pages[].error name the gate (blend_gate / style_drift / repaired_figure_blurred / repair_unnatural / face_integrity) and its message — no entry reads exactly \"char-fix produced no usable image\".",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "stories.data sceneImages[].retryHistory (type round_repair_failed, method char-fix) and repairRounds[].pages[].error; the Railway log line \"🚫 [CHAR-FIX] Page N <name>: …\". Baseline: staging job_1790446348343_z3fw660ie carried the bare sentence."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }

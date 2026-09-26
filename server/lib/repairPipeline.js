@@ -1617,7 +1617,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }
 
     if (!repairResult?.imageData || repairResult.imageData.length < 1000) {
-      return { pageNumber, imageData: null, error: 'char-fix produced no usable image' };
+      // The gate that refused travels with the failure (repairLogic.describeCharFixFailure)
+      // into the log, retryHistory, failedRepairs and repairRounds.
+      const error = require('./repairLogic').describeCharFixFailure(repairResult);
+      log.warn(`🚫 [CHAR-FIX] Page ${pageNumber} ${charName}: ${error}`);
+      return { pageNumber, imageData: null, method: 'char-fix', error };
     }
 
     // FACE-INTEGRITY GATE — one implementation, shared with the two manual

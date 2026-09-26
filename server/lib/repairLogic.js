@@ -1296,6 +1296,26 @@ function repairAttemptFromResult(r) {
 }
 
 /**
+ * Why a character repair returned no usable image, as the failure's `error`.
+ *
+ * A no-image return from the repair spine (faceRepair.repairCharacterFace) is a
+ * GATE decision: it carries `rejectedReason` (blend_gate, style_drift,
+ * repaired_figure_blurred, repair_unnatural, …) and `gateMessage`. The pipeline
+ * replaced both with the fixed "char-fix produced no usable image", so the log,
+ * retryHistory, failedRepairs and repairRounds could never say which gate
+ * refused (2026-09-26). The manual routes and the Lab stage always carried it.
+ * @param {object|null} r - the repairCharacterMismatch result.
+ * @returns {string}
+ */
+function describeCharFixFailure(r) {
+  const attempts = r?.attempts ? ` after ${r.attempts} attempt(s)` : '';
+  const why = r?.imageData
+    ? `image too small (${r.imageData.length} bytes)`
+    : [r?.rejectedReason, r?.gateMessage || r?.error].filter(Boolean).join(' — ') || 'no reason reported';
+  return `char-fix produced no usable image${attempts}: ${why}`;
+}
+
+/**
  * The bucket key is the BARE method.
  *
  * Measured on staging `job_1789348171785_9oxos7dwv`: a SUCCESSFUL result carries
@@ -1884,4 +1904,4 @@ function nameRepairText(text, nameMap, { keep = null, vidByName, ownVisualId = n
 
 module.exports = {
   describeFigureForRepair, buildRepairNameMap, buildPageRepairNameMap, nameRepairText, resolveRepairIds,
-  repairAttemptFromResult, detectionForRetryEntry, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, attributeReaderFindings, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, ITERATE_ROUTED_TYPES, CROP_ARTIFACT_TYPES, isCropArtifact, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX };
+  repairAttemptFromResult, describeCharFixFailure, detectionForRetryEntry, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, attributeReaderFindings, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, ITERATE_ROUTED_TYPES, CROP_ARTIFACT_TYPES, isCropArtifact, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX };

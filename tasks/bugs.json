@@ -2175,6 +2175,30 @@
       "fixedAt": "2026-09-26",
       "fixedIn": "df1ae6680",
       "fix": "sceneLight.lightParts composes time x weather: a covered weather (overcast/rain/snow/fog/storm) owns the sky with a phrase closed by COVERED_SKY_CLAUSE, and the time uses a 'veiled' phrase naming no sky light source; the non-relit angle derive ends on keepLightClause; judges read describeLightForJudge. Test: tests/unit/scene-light.test.ts 'weather owns the sky'."
+    },
+    {
+      "id": "plate-geometry-cast-description-leak",
+      "title": "Character appearance and wardrobe clauses reached the plate SCENE GEOMETRY block",
+      "reportedAt": "2026-09-26",
+      "source": "Owner, 2026-09-26, staging job_1790446348343_z3fw660ie: the LOC004.2 plate prompt listed \"- a broad orange sailcloth sash knotted at the left hip.\" (v1 painted an orange knotted cloth on the wall) and the p6 plate \"- light stubble.\" (Facundo's beard). Replay over 342 stored briefs (27 stories, staging + prod, last 14 days) found 28 candidate facts carrying a character's look.",
+      "rootCause": "server/lib/sceneGeometry.js, two causes. (1) The Art Director writes each character's look as an appositive hung on the figure (\"An adult woman—…, a broad orange sash knotted at the left hip, …—stands\"; \"Julian (a toddler, … light blonde hair)\"). CLAUSE_SPLIT_RE cuts at those dashes, so every item of the look became a clause naming nobody, and the figure/garment filters could only veto the items whose words happened to be listed (the 2026-09-21 gilet fix grew GARMENT_RE for exactly one). (2) PATH_RE / OPENING_RE / LIGHT_RE had no word boundary, so \"b-road\", \"s-light-ly\", \"de-light-ed\" and \"lit-tle\" made a look clause a geometry candidate.",
+      "impact": "Costume and body text painted into EMPTY plates (a knotted orange cloth on a wall), and a geometry slot spent on a non-fact; the plate judge then graded the plate on the same list.",
+      "status": "fixed",
+      "fixedAt": "2026-09-26",
+      "fixedIn": "",
+      "fix": "stripCastAppositives cuts every dash- or bracket-delimited appositive whose head is a figure noun (FIGURE_RE, which now also names toddler/preschooler/teen/infant) or a cast member's name from the brief's characters[], before the sentence is split — the look never becomes a candidate and the figure's own clause keeps its subject. The three dimension lists are word-anchored (wordStart), with compound light words named by prefix (candle/moon/street/…light, …lit) and afternoon kept. Replay: 28 look-carrying facts before, 0 after. Tests: tests/unit/empty-scene-geometry.test.ts (\"a character description is never geometry\")."
+    },
+    {
+      "id": "char-fix-failure-reason-lost",
+      "title": "The pipeline char-fix replaced the repair gate's rejection reason with a fixed sentence",
+      "reportedAt": "2026-09-26",
+      "source": "Owner, 2026-09-26. Stored evidence: 10 retryHistory / repairRounds entries in the last 14 days read exactly \"char-fix produced no usable image\" (staging job_1790107559778_fcmlfa8kn ×3, job_1789348171785_9oxos7dwv ×2, job_1789584708605_rts4wqupm, job_1790446348343_z3fw660ie; prod job_1790107559778_fcmlfa8kn ×3).",
+      "rootCause": "server/lib/repairPipeline.js executeCharFixAction: `if (!repairResult?.imageData …) return { …, error: 'char-fix produced no usable image' }` dropped faceRepair's rejectedReason / gateMessage (blend_gate, style_drift, repaired_figure_blurred, repair_unnatural) and attempt count. The sibling entry points (entityConsistency.js single-page repair, routes/regeneration.js, testlab.js char_repair, sceneComposite.js) already carried the reason.",
+      "impact": "Which gate refused a pipeline character repair was invisible in the round log, retryHistory, failedRepairs and repairRounds — every failed char-fix had to be re-diagnosed from Railway logs.",
+      "status": "fixed",
+      "fixedAt": "2026-09-26",
+      "fixedIn": "",
+      "fix": "repairLogic.describeCharFixFailure(result) builds the error from rejectedReason + gateMessage (or the spine's error) and the attempt count; executeCharFixAction logs it and returns it as the failure's error, which flows unchanged into retryHistory, failedRepairs and repairRounds. Test: tests/unit/char-fix-failure-reason.test.ts."
     }
   ]
 }
