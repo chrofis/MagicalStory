@@ -94,7 +94,17 @@ No stored citation is inferred from the page's recorded `landmarkPhotos[].varian
 metadata picker's output). If the owner wants old stories re-cited, that is a one-off migration, not a code
 path.
 
-**Validation.** See the addendum below (free replay + Lab).
+**Validation — rung 1, free (real code, staging DB, no model call).**
+- AD prompt rebuilt for staging `job_1790277448294_5herh01j7` (`resolveAvailableLandmarks` as production,
+  unshuffled): Lindenhof lists **Photo 1** (medium, the chess square), **Photo 2** (wide, the aerial city) and
+  **Photo 3** (wide, the river promenade) — all three, descriptions whole; before, the list showed two, each cut
+  at 110 characters. Rathausbrücke lists 3 photos. `job_1790107559778_fcmlfa8kn`: Fernsehturm Uetliberg's three
+  photos, photo 2's "two separate towers" description whole.
+- Serving replay on the stored bible (variants re-read from staging, citations applied by hand): p1 with
+  `LOC001.1: "none"` → no photo, no miss, "prose carries the place" logged; p11 with `LOC002.2: 3` → exactly slot 3
+  (viewed: the bridge plaza with the modern balusters and the "30" sign, the photo the brief's railing corner
+  describes), with `LOC002.2: 1` → exactly slot 1; p2 (its vantage uncited, i.e. the stored-story case) → no
+  photo, `log.error` "no landmarkPhoto cited (vantage LOC001.3)", one miss.
 
 **Touched:** `server/lib/landmarkPhotos.js`, `server/lib/storyHelpers.js`, `server/lib/promptBuilders.js`,
 `server/lib/sceneMetadata.js`, `server/lib/images.js`, `server/lib/coverIterate.js`, `server/lib/beatsPipeline.js`,

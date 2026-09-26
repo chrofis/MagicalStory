@@ -2208,6 +2208,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "landmark-photo-cited",
+      "title": "Every real-landmark plate cites its landmark photo, and the page is served exactly that slot",
+      "commits": [
+        "b881cd2c1"
+      ],
+      "addedAt": "2026-09-26",
+      "claim": "On the next staging story with a real landmark: every real-landmark vantage (or vantage-less landmark location) in stories.data.visualBible carries landmarkPhoto (a servable photo number or \"none\"), the genLog has no landmark_photo_citation warning, and each page's stored landmarkPhotos[].variantNumber equals the landmarkPhoto of the vantage whose pages name it (no photo where it cites \"none\").",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "visualBible.locations[].vantages[].landmarkPhoto vs sceneImages[].landmarkPhotos[].variantNumber per page; generationLog for landmark_photo_citation; view the cited photo against the vantage emptyScenePrompt (does it show what the plate frames?). Baseline: staging job_1790277448294_5herh01j7 — p1 (stairs up to the square) was served the chess-square photo, no citation existed."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }
