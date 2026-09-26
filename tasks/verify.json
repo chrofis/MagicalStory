@@ -2153,6 +2153,42 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "element-yardstick-page",
+      "title": "Every creature, object and vehicle on a page prompt is sized against the people in frame; the judges and repaints read the same sentence",
+      "commits": [
+        "9020a56bb"
+      ],
+      "addedAt": "2026-09-26",
+      "claim": "On the next staging story: every REQUIRED OBJECTS line for a VB creature/object/vehicle in a knee-high..house-height band carries a yardstick against the named figures in frame (body landmark or multiple), every melon-sized-or-smaller one names a body part of the figure touching it (else the first figure in frame), and the precedence line follows; the stored quality eval input ELEMENT SIZES carries the same sentences; the elements render near that size (no creature at half or less / twice or more, no held prop at 2x or more).",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "sceneImages[].imageVersions[].prompt REQUIRED OBJECTS lines vs VB scaleClass; look at every page with a cited element and compare its size to the named figure/body part. Baselines: run 7 job_1790277448294_5herh01j7 p9/p11 (egg melon-sized, dragon waist-high), run 8 job_1790373080139_vnx5l8iy7 p10 (grown dragon). A/B bodies: image stage, params.variants current-build (pageScaleScope {types:[animal],bands:[adult-height,twice-adult-height]}) vs new-build."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "small-prop-contact",
+      "title": "The Art Director gives a melon-sized-or-smaller prop a hand or body contact wherever the story allows it",
+      "commits": [
+        "9020a56bb"
+      ],
+      "addedAt": "2026-09-26",
+      "claim": "On the next staging story with a small VB prop: on pages where the story has a figure hold, carry or keep it, the brief carries an interactions row naming the prop (held, carried, in a lap, against a chest); pages where the story places it away from people carry no such row; the prop renders at its size on the contact pages.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "sceneDescriptions[].description METADATA interactions[] rows naming the small prop id, against the page text; view each page image. Baseline: EXACT POSES rider on job_1789584708605_rts4wqupm - right size 6/6 with contact, oversized 3/3 without."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }
