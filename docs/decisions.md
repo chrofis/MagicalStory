@@ -191,10 +191,21 @@ that show a deck and no hull) is one the check cannot be certain of.
   so no Q18 finding there is defensible. The replay therefore shows no false Q18 alarms and a
   finding count within run-to-run noise. It does **not** show that Q18 catches a real break: neither
   stored plan had an unambiguous one. Spend $0.225.
-- Plate QC fixtures (`judge-fixtures.js run --judge=plate_qc`). Four new fixtures come from z3fw:
-  p7 (deck with one central mast, pass), p9 (aboard bow view, pass), p6 and p10 (three masts against
-  a single-mast signature, flag). Before, on staging without the check (Lab #1547): 9 TP, 5 FN, 7 TN,
-  1 FP. The two structure flags were FN. After: see the follow-up line added once the deploy ran.
+- Plate QC fixtures (`judge-fixtures.js run --judge=plate_qc`), $0.043 per run. There are four new
+  fixtures. From z3fw: p7 (deck with one central mast, pass) and p9 (aboard bow view, pass). From
+  `job_1788295892348_l028ggiq7a`: p1 (the green two-master matching its description and render,
+  pass) and p16 (plate text "between two wooden ships", but the plate shows only the black ship,
+  flag). Before, on staging without the check (Lab #1547, older fixture draft): 9 TP, 5 FN, 7 TN,
+  1 FP. After, on the deployed check (Lab #1549): 11 TP, 2 FN, 8 TN, 1 FP. p16 is caught under
+  `structures` ("The 'Goldene Möwe' ship is missing"). Across the 18 older fixtures there is no new
+  false fail and no `structures` finding. The FP (lukas p7 landmark) and the two FN (dragon p1
+  Lab 1503/1505 photographic) are the same as before. Recall 85%, precision 92%.
+- **Withdrawn fixture draft.** The first draft flagged z3fw p6/p10 (three masts against a
+  description whose signature is "single tall thick wooden mast"), and Lab #1548 passed both. The
+  pixels explain it: the story's own Visual Bible render `vb/VEH001.jpg` has three masts, and the
+  plates match it. The judge sided with the reference the author was told to match, so the
+  expectation depended on the unruled description-vs-render conflict and was removed. The element-cell
+  gate passed that render as "a single mast", which is a separate miss (tasks/BACKLOG.md).
 
 **Touched:** server/lib/promptBuilders.js, server/lib/beatsPipeline.js, server/lib/beatsReplayInputs.js,
 server/lib/testlab.js, prompts/story-beats.txt, prompts/plan-check.txt, scripts/analysis/dump-beats-prompt.js,
