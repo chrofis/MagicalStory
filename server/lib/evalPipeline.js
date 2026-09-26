@@ -2462,6 +2462,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         landmarkContext: landmarkContextBlock,
         // Same REQUIRED TEXT allow-list the other two judges get.
         textRules: requiredTextBlock,
+        // The bible the PAGE ELEMENTS and DECLARED INTERACTIONS blocks resolve
+        // their ids against — the quality judge's builder gets the same one
+        // (sceneValidator.semanticDeclaredBlocks, 2026-09-26).
+        visualBible: evalOptions.visualBible || null,
         // Where the call's prompt is recorded (eval_calls).
         pageNumber: evalOptions.pageNumber ?? null,
       });
