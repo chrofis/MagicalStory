@@ -27,7 +27,7 @@ const { COVER_TEXT_POSITION } = require('./coverKeys');
  * @param {string} [ctx.title] - the story title (baked onto the front cover)
  * @param {string} [ctx.dedication]
  * @param {string} [ctx.coverTitleMode] - a run override of runtime.coverTitleMode
- * @returns {null|{coverKey, aspectRatio, textInImage, textPosition, bakeTitle, titleBaked, imageModel, textMode, expectedText, appTexts, usageLabel, captureLabel}}
+ * @returns {null|{coverKey, aspectRatio, textInImage, textPosition, bakeTitle, titleBaked, imageModel, textMode, expectedText, usageLabel, captureLabel}}
  */
 function coverRenderOptions(pageNumber, { title = '', dedication = null, coverTitleMode = null } = {}) {
   const coverKey = coverKeyOfPage(pageNumber);
@@ -35,7 +35,7 @@ function coverRenderOptions(pageNumber, { title = '', dedication = null, coverTi
   const { resolveCoverTitleMode, resolveCoverTextContract } = require('./coverTypography');
   const titleMode = resolveCoverTitleMode(coverKey, title || '', { modeOverride: coverTitleMode });
   const titleBaked = titleMode.baked === true;
-  const { textMode, expectedText, appTexts } = resolveCoverTextContract(coverKey, {
+  const { textMode, expectedText } = resolveCoverTextContract(coverKey, {
     titleBaked, title: title || null, dedication: dedication || null,
   });
   return {
@@ -48,7 +48,6 @@ function coverRenderOptions(pageNumber, { title = '', dedication = null, coverTi
     imageModel: titleMode.bakedModel || null,
     textMode,
     expectedText,
-    appTexts,
     usageLabel: 'cover_images',
     captureLabel: 'image_cover',
   };
@@ -81,7 +80,12 @@ async function iterateFullStoryCover(coverKey, storyData, options = {}) {
   const record = storyData.coverImages[coverKey];
   if (!record.imageData) throw new Error(`${coverKey}: no cover image to iterate`);
   const pageNumber = COVER_PAGE_NUMBERS[coverKey];
-  const result = await require('./images').iteratePage(record.imageData, pageNumber, storyData, options);
+  // The iterate reads the current cover (its image analysis feeds the rewrite,
+  // and it can serve as a reference render) — the TEXTLESS art of the active
+  // version, never the served bytes with the app's title / dedication /
+  // "magicalstory.ch" stamped on. A stamped cover with no art layer throws.
+  const { imageData: currentArt } = await require('./coverEvalLayer').resolveCoverEvalImage(storyData.id, coverKey, null);
+  const result = await require('./images').iteratePage(currentArt, pageNumber, storyData, options);
   if (result.previewOnly) return result;
   const opts = coverRenderOptions(pageNumber, {
     title: storyData.title || storyData.storyTitle || '',

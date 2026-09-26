@@ -2966,9 +2966,7 @@ async function evaluateImageBatch(images, options = {}) {
           // (expectedText / textMode) — see evaluateImageQuality's cover branch.
           expectedText: img.expectedText ?? null,
           textMode: img.textMode ?? null,
-          // The app's own cover string (excused by the lettering check) and
-          // whether this cover was briefed as a page (runs that check).
-          appTexts: img.appTexts ?? null,
+          // Whether this cover was briefed as a page (runs the lettering check).
           coverIsPage: img.coverIsPage === true,
           // Era-aware landmark protection: set by buildEvalInputs in the repair
           // pipeline (landmark refs + scene era). Absent → no protection.
@@ -5536,7 +5534,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
             // resolved by the same resolver as its first render.
             // Only a full-story cover page iterates here (coverRender), so a
             // cover on this path is always one briefed as a page.
-            ...(coverOpts ? { expectedText: coverOpts.expectedText, textMode: coverOpts.textMode, appTexts: coverOpts.appTexts, coverIsPage: true } : {}),
+            ...(coverOpts ? { expectedText: coverOpts.expectedText, textMode: coverOpts.textMode, coverIsPage: true } : {}),
             // Era-aware landmark protection — iterate uses the same refs it
             // just rendered from and the era it resolved above.
             landmarkPhotos: refApplied.landmarkPhotos || null,

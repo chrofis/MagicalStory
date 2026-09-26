@@ -3546,23 +3546,20 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             // captioned "THE FIVE FRIENDS STAND TOGETHER". A full-story cover is
             // a page (coverBeats.js) and is held to the page's lettering rule.
             // Its declared strings are the page's: a baked title is a REQUIRED
-            // TEXT item already in declaredTexts, and the app's own string for
-            // this cover (resolveCoverTextContract `appTexts` — the same three
-            // TEXT_NOTE_APP_OVERLAY excuses for the judges) is excused, because
-            // every post-persist eval sees it stamped on the served bytes.
+            // TEXT item already in declaredTexts. Nothing else is excused: every
+            // cover eval reads the TEXTLESS art (coverEvalLayer.js), so the
+            // app's composited title / dedication / "magicalstory.ch" never
+            // reach this inventory, and lettering that does is the model's.
             // Trial covers (no `coverIsPage`) are not on this path.
             const letteringRuns = evaluationType === 'scene' || (isCover && evalOptions.coverIsPage === true);
-            const letteringDeclared = isCover && coverTextMode === 'appOverlay' && Array.isArray(evalOptions.appTexts)
-              ? [...declaredTexts, ...evalOptions.appTexts.filter(t => typeof t === 'string' && t.trim())]
-              : declaredTexts;
             try {
               if (letteringRuns) {
                 letteringInventory = require('./letteringCheck').letteringRecord({
-                  lettering: p1Result.lettering, declared: letteringDeclared,
+                  lettering: p1Result.lettering, declared: declaredTexts,
                 });
               }
               const lettering = !letteringRuns ? [] : require('./letteringCheck').checkUndeclaredLettering({
-                lettering: p1Result.lettering, declared: letteringDeclared,
+                lettering: p1Result.lettering, declared: declaredTexts,
               });
               for (const f of lettering) {
                 fixableIssues.push(f);

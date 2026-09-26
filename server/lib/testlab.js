@@ -230,30 +230,40 @@ async function loadActivePageImage(storyId, pageNumber, versionIndex = null, ima
   // loadedFrom={unrecorded} symptom AND the 2026-08-19 "detected on v0
   // although activeVersion=2" mystery (bug lab-unpinned-loads-v0).
   const pinned = pinnedVersionIndex(versionIndex);
+  // A COVER is its TEXTLESS art layer here, for every stage — the image a
+  // judge reads and a repair edits, as in production (owner, 2026-09-26:
+  // "evaluate first, then add the text"). The served cover carries the app's
+  // title / dedication / "magicalstory.ch"; coverEvalLayer resolves the art of
+  // exactly this version (active, or the pinned one — a Lab cover version
+  // stores its own art row) and throws for a stamped version without one.
+  // Only a pinned intermediate of ANOTHER type (a tl_step, a plate) is not a
+  // cover image and loads below.
+  const pinnedOtherType = pinned !== null && !!imageType && imageType !== coverKey;
+  if (coverKey && !pinnedOtherType) {
+    const { resolveCoverEvalImage } = require('./coverEvalLayer');
+    const res = await resolveCoverEvalImage(storyId, coverKey, pinned);
+    _lastPageLoad = { storyId, pageNumber, activeIdx: pinned === null ? res.versionIndex : null, loadedVersion: res.versionIndex, fellBackToV0: false, coverLayer: res.layer };
+    log.info(`[TESTLAB] ${storyId} ${coverKey}: loaded v${res.versionIndex} ${res.layer === 'art' ? 'textless art layer' : 'unstamped render'}`);
+    return res.imageData;
+  }
   // A Lab step image is written with is_test = true, and getStoryImage filters
   // those out — so an intermediate has to come through loadTestImage, which
   // does not.
-  if (pinned !== null && imageType) {
+  if (pinnedOtherType) {
     const img = await loadTestImage(storyId, imageType, pageNumber, pinned);
     if (!img?.imageData) throw new Error(`No ${imageType} v${pinned} for ${storyId} page ${pageNumber}`);
     return img.imageData;
   }
   if (pinned !== null) {
-    const row = await getStoryImage(storyId, coverKey || 'scene', coverKey ? null : pageNumber, pinned);
+    const row = await getStoryImage(storyId, 'scene', pageNumber, pinned);
     if (!row) throw new Error(`No version ${pinned} for ${storyId} page ${pageNumber}`);
     const bytes = await bytesFor(row);
     if (!bytes) throw new Error(`Bytes unavailable for ${storyId} page ${pageNumber} v${pinned}`);
     return bytes;
   }
-  // Cover rows live in story_images as image_type=<coverKey> with NULL
-  // page_number; active-version meta is keyed by the cover key string.
-  const activeIdx = await getActiveVersion(storyId, coverKey || pageNumber);
-  const atActive = coverKey
-    ? await getStoryImage(storyId, coverKey, null, activeIdx)
-    : await getStoryImage(storyId, 'scene', pageNumber, activeIdx);
-  const img = atActive || (coverKey
-    ? await getStoryImage(storyId, coverKey, null, 0)
-    : await getStoryImage(storyId, 'scene', pageNumber, 0));
+  const activeIdx = await getActiveVersion(storyId, pageNumber);
+  const atActive = await getStoryImage(storyId, 'scene', pageNumber, activeIdx);
+  const img = atActive || await getStoryImage(storyId, 'scene', pageNumber, 0);
   // OBSERVABLE, ALWAYS (owner, 2026-08-19). Three unpinned Lab runs on
   // job_1787120984020_pg71z58ba9 p7 detected on v0 content although
   // image_version_meta says activeVersion=2 and the pinned load of v2 works —
@@ -398,6 +408,24 @@ async function saveTestVersion(storyId, imageType, pageNumber, imageData, experi
   _saveChains.set(key, run);
   run.finally(() => { if (_saveChains.get(key) === run) _saveChains.delete(key); }).catch(() => {});
   return run;
+}
+
+/**
+ * A Lab COVER version: the served image AND its textless art layer, at the
+ * same version index — the pair production keeps (`${coverKey}` +
+ * `${coverKey}Art`), so a later Lab eval of this version reads its art
+ * (coverEvalLayer.resolveCoverEvalImage), never its stamped bytes.
+ * `artImageData` is the textless render; when the served image was not
+ * stamped (baked title, typography skipped) it is the served image itself.
+ */
+async function saveTestCoverVersion(storyId, coverKey, servedImageData, artImageData, experimentId, qualityScore = null) {
+  if (!artImageData) throw new Error(`saveTestCoverVersion: ${coverKey} has no textless art to store`);
+  const versionIndex = await saveTestVersion(storyId, coverKey, null, servedImageData, experimentId, qualityScore);
+  const { saveStoryImage } = require('../services/database');
+  await saveStoryImage(storyId, `${coverKey}Art`, null, artImageData, {
+    versionIndex, isTest: true, experimentId, generatedAt: new Date().toISOString(),
+  });
+  return versionIndex;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -2340,6 +2368,9 @@ async function runEntityStage(ctx, { experimentId, params = {} }) {
   if (rows.length === 0) throw new Error('Story not found');
   let storyData = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
   storyData = await rehydrateStoryImages(ctx.storyId, storyData);
+  // Covers are judged on their textless art (coverEvalLayer.js); a stamped
+  // cover with no art layer is left out and named in the result.
+  const { notEvaluated: coversNotEvaluated } = await require('./coverEvalLayer').applyCoverEvalView(ctx.storyId, storyData);
 
   const stripImages = (obj) => JSON.parse(JSON.stringify(obj, (key, value) => {
     if (typeof value === 'string' && value.startsWith('data:image')) return `[image ${Math.round(value.length / 1024)}KB]`;
@@ -2394,7 +2425,7 @@ async function runEntityStage(ctx, { experimentId, params = {} }) {
     runs.push({ run: i, elapsedMs: Date.now() - t0, ...extract(report) });
   }
 
-  if (repeats === 1) return { elapsedMs: runs[0].elapsedMs, report: firstReport };
+  if (repeats === 1) return { elapsedMs: runs[0].elapsedMs, report: firstReport, coversNotEvaluated };
 
   // Match issues across runs by the SAME rule the ranker uses to merge findings
   // across evaluators, so "did it find the same thing twice?" is not a second
@@ -2418,7 +2449,7 @@ async function runEntityStage(ctx, { experimentId, params = {} }) {
   const spread = (vals) => ({ values: vals, min: Math.min(...vals), max: Math.max(...vals), range: Math.max(...vals) - Math.min(...vals) });
 
   return {
-    storyId: ctx.storyId, repeats,
+    storyId: ctx.storyId, repeats, coversNotEvaluated,
     issueCountSpread: spread(runs.map(r => r.issues.length)),
     penaltySpread: spread(runs.map(r => r.penaltyTotal)),
     evalFailureSpread: spread(runs.map(r => r.evalFailures)),
@@ -2887,8 +2918,9 @@ async function runCoverStage(target, { experimentId, promptOverride, params = {}
     });
     const elapsed = Date.now() - t0;
     if (!pageResult?.imageData) throw new Error('Cover render returned no image');
-    const vIdx = await saveTestVersion(
-      target.storyId, coverKey, null, pageResult.imageData, experimentId,
+    // artImageData null = the served bytes are the raw render (stampRepaintedCover).
+    const vIdx = await saveTestCoverVersion(
+      target.storyId, coverKey, pageResult.imageData, pageResult.artImageData || pageResult.imageData, experimentId,
       pageResult.score != null ? Math.round(pageResult.score) : null
     );
     return {
@@ -2918,8 +2950,9 @@ async function runCoverStage(target, { experimentId, promptOverride, params = {}
   const elapsedMs = Date.now() - t0;
   if (!result?.imageData) throw new Error('Cover render returned no image');
 
-  const versionIndex = await saveTestVersion(
-    target.storyId, coverKey, null, result.imageData, experimentId,
+  // artImageData null = the served bytes are the raw render (stampRepaintedCover).
+  const versionIndex = await saveTestCoverVersion(
+    target.storyId, coverKey, result.imageData, result.artImageData || result.imageData, experimentId,
     result.score != null ? Math.round(result.score) : null
   );
   return {
@@ -3043,13 +3076,14 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
   // stories, so reading that and falling back to `cover.imageData` fed the
   // SERVED, ALREADY-TITLED cover into the pipeline (exp #311 — every crop went
   // to Qwen with the title baked in twice, and "Das Seil fliegt…" came back
-  // showing two titles). Read the Art row; fail loudly if there is none.
-  const artRow = await loadTestImage(target.storyId, `${coverKey}Art`, null, 0);
-  const artSrc = artRow?.imageData || cover.artImageData;
-  if (!artSrc) {
-    throw new Error(`No textless cover plate (story_images ${coverKey}Art) — this story predates `
+  // showing two titles). Read the Art row OF THE ACTIVE VERSION (it used to
+  // read v0 whatever was active); fail loudly if there is none.
+  const artLayer = await require('./coverEvalLayer').resolveCoverEvalImage(target.storyId, coverKey, null);
+  if (artLayer.layer !== 'art') {
+    throw new Error(`No textless cover plate (story_images ${coverKey}Art v${artLayer.versionIndex}) — this story predates `
       + 'app-side typography, so compositing a title would double-stamp it.');
   }
+  const artSrc = artLayer.imageData;
   const artBytes = await r2.bytesFromAnyImage(artSrc);
   if (!artBytes) throw new Error('Could not resolve cover art bytes');
 
@@ -3157,7 +3191,7 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
     const elapsedP = Date.now() - t0p;
     if (r.debug?.plate) await addStep('INPUT 2 (edited): title strip on WHITE, preset-padded', r.debug.plate);
     if (r.debug?.raw) await addStep('raw model output (lettering plate)', r.debug.raw);
-    const viP = await saveTestVersion(target.storyId, coverKey, null, r.imageData, experimentId);
+    const viP = await saveTestCoverVersion(target.storyId, coverKey, r.imageData, artSrc, experimentId);
     return {
       imageType: coverKey, coverType: coverKey, versionIndex: viP, steps,
       modelId: params.model || params.backend || 'grok-imagine', elapsedMs: elapsedP, cost: r.cost ?? null,
@@ -3629,7 +3663,7 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
     gateError = e.message;
   }
 
-  const versionIndex = await saveTestVersion(target.storyId, coverKey, null, finalUri, experimentId);
+  const versionIndex = await saveTestCoverVersion(target.storyId, coverKey, finalUri, artSrc, experimentId);
   return {
     imageType: coverKey, coverType: coverKey, versionIndex, steps,
     promptUsed: prompt, modelId: result.modelId || params.model || backend, elapsedMs,
@@ -3678,6 +3712,8 @@ async function runStyleCheckStage(target, { experimentId }) {
   await loadPromptTemplates();
   const { checkStoryStyleConsistency } = require('./styleConsistency');
   const { storyData } = await loadStoryDataFull(target.storyId);
+  // Covers are judged on their textless art (coverEvalLayer.js).
+  const { notEvaluated: coversNotEvaluated } = await require('./coverEvalLayer').applyCoverEvalView(target.storyId, storyData);
   const t0 = Date.now();
   const result = await checkStoryStyleConsistency(storyData);
   const elapsedMs = Date.now() - t0;
@@ -3685,7 +3721,7 @@ async function runStyleCheckStage(target, { experimentId }) {
     if (typeof value === 'string' && value.startsWith('data:image')) return `[image ${Math.round(value.length / 1024)}KB]`;
     return value;
   }));
-  return { elapsedMs, report: safe };
+  return { elapsedMs, report: safe, coversNotEvaluated };
 }
 
 /**
@@ -3702,6 +3738,9 @@ async function runBookAuditStage(target, { params = {}, promptOverride = null })
   const { auditStoryBook } = require('./bookAudit');
   const { calculateTextCost } = require('../config/models');
   const { storyData } = await loadStoryDataFull(target.storyId);
+  // Covers are audited on their textless art, as in the story run
+  // (coverEvalLayer.js); a stamped cover with no art layer is left out.
+  const { notEvaluated: coversNotEvaluated } = await require('./coverEvalLayer').applyCoverEvalView(target.storyId, storyData);
   const t0 = Date.now();
   // Same collector every other paid Lab stage uses. Without a tracker
   // bookAudit's `if (usageTracker …)` branch never fires, so a Lab audit spent
@@ -3740,6 +3779,7 @@ async function runBookAuditStage(target, { params = {}, promptOverride = null })
     byRoute: audit.byRoute,
     pagesRead: audit.pagesRead,
     pagesSkipped: audit.pagesSkipped,
+    coversNotEvaluated,
     // The fault lines verbatim — the same yardstick countFaults reads.
     logLines: [...audit.byRoute.IMG, ...audit.byRoute.TEXT]
       .sort((a, b) => (a.page ?? 0) - (b.page ?? 0))

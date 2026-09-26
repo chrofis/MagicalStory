@@ -165,6 +165,7 @@ const { hasPhotos: hasCharacterPhotos, getStandardAvatar } = require('../lib/cha
 const { isGrokConfigured } = require('../lib/grok');
 const { coverKeyToType, coverTypeToKey, coverLabel, COVER_PAGE_NUMBERS } = require('../lib/coverKeys');
 const { buildStoryEvalOptions } = require('../lib/evalReplayInputs');
+const { resolveCoverEvalImage, applyCoverEvalView, isCoverStamped } = require('../lib/coverEvalLayer');
 const r2 = require('../lib/r2');
 
 // Cover type ↔ virtual page number mapping
@@ -1683,10 +1684,13 @@ router.post('/:id/style-check', authenticateToken, async (req, res) => {
     const story = storyResult.rows[0];
     let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
     storyData = await rehydrateStoryImages(id, storyData);
+    // Covers are judged on their textless art (coverEvalLayer.js); a stamped
+    // cover with no art layer is left out and named in the response.
+    const { notEvaluated: coversNotEvaluated } = await applyCoverEvalView(id, storyData);
 
     const { checkStoryStyleConsistency } = require('../lib/styleConsistency');
     const result = await checkStoryStyleConsistency(storyData);
-    res.json({ success: true, ...result });
+    res.json({ success: true, ...result, coversNotEvaluated });
   } catch (err) {
     log.error('Error in style-check:', err);
     res.status(500).json({ error: 'Style check failed: ' + err.message });
@@ -4176,7 +4180,20 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
       try {
         // Get image data - look up active version from DB, then fallback to scene.imageData
         let imageData = scene.imageData;
-        if (scene.imageVersions?.length > 0) {
+        if (evaluationType === 'cover') {
+          // A cover is judged on the TEXTLESS art of its active version, never
+          // on the served bytes with the app's title / dedication /
+          // "magicalstory.ch" stamped on (coverEvalLayer.js). A stamped cover
+          // with no art layer is not judged.
+          try {
+            imageData = (await resolveCoverEvalImage(id, versionType, null)).imageData;
+          } catch (layerErr) {
+            if (layerErr.code !== 'NO_ART_LAYER') throw layerErr;
+            log.error(`❌ [REPAIR-WORKFLOW] ${pageLabel}: ${layerErr.message}`);
+            pages[pageNumber] = { qualityScore: null, fixableIssues: [], error: layerErr.message };
+            return;
+          }
+        } else if (scene.imageVersions?.length > 0) {
           const activeDbIndex = await getActiveVersion(id, versionKey);
           const activeVersion = scene.imageVersions?.[arrayIndexForDb(scene.imageVersions, activeDbIndex, versionType)];
           if (activeVersion?.imageData) {
@@ -4486,9 +4503,19 @@ router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res)
       return res.status(404).json({ error: `Page ${pageNumber} not found` });
     }
 
-    // Get active version's image data
+    // Get active version's image data. A cover: the TEXTLESS art of its active
+    // version (coverEvalLayer.js) — every judge below reads this one image, so
+    // none of them sees the app's stamped title / dedication / brand line.
     let imageData = scene.imageData;
-    if (scene.imageVersions?.length > 0) {
+    if (evaluationType === 'cover') {
+      try {
+        imageData = (await resolveCoverEvalImage(id, versionType, null)).imageData;
+      } catch (layerErr) {
+        if (layerErr.code !== 'NO_ART_LAYER') throw layerErr;
+        log.error(`❌ [EVAL-SINGLE] ${pageLabel}: ${layerErr.message}`);
+        return res.status(409).json({ error: layerErr.message });
+      }
+    } else if (scene.imageVersions?.length > 0) {
       const activeDbIndex = await getActiveVersion(id, versionKey);
       const activeVersion = scene.imageVersions?.[arrayIndexForDb(scene.imageVersions, activeDbIndex, versionType)];
       if (activeVersion?.imageData) {
@@ -5200,10 +5227,15 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (
 
     // Rehydrate image data into a COPY for crop extraction (don't modify original)
     const rehydratedData = await rehydrateStoryImages(id, JSON.parse(JSON.stringify(storyData)));
+    // Covers are judged on their textless art (coverEvalLayer.js), on this
+    // eval-only copy. A stamped cover with no art layer is left out of the
+    // check (logged) and named in the response.
+    const { notEvaluated: coversNotEvaluated, servedByKey: coverServedBytes } = await applyCoverEvalView(id, rehydratedData);
 
     // Run entity consistency check with rehydrated data
     const characters = rehydratedData.characters || [];
     const report = await runEntityConsistencyChecks(rehydratedData, characters);
+    if (coversNotEvaluated.length) report.coversNotEvaluated = coversNotEvaluated;
 
     // Save any newly-generated bboxDetection back to the original storyData
     // so it's cached in retryHistory for next time (avoids redundant API calls)
@@ -5215,6 +5247,13 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (
         for (const [coverType, bbox] of Object.entries(report.coverBboxDetections)) {
           const cover = storyData.coverImages[coverType];
           if (!cover) continue;
+          // This detection ran on the textless art; the stored one pairs with
+          // the SERVED (stamped) bytes. The stamp moves no figure, so re-point
+          // its fingerprint (the cover-text exception of
+          // restampDetectionForCoverText).
+          if (coverServedBytes[coverType]) {
+            require('../lib/bboxDetection').restampDetectionForCoverText(bbox, coverServedBytes[coverType]);
+          }
           cover.bboxDetection = bbox;
           if (cover.imageVersions?.length > 0) {
             // Active version from image_version_meta (single source of truth).
@@ -6407,6 +6446,12 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             const evalType = isCover ? 'cover' : 'scene';
             const evalPrompt = existingImage.description || existingImage.prompt || '';
             const pageLabel = isCover ? `[${coverType}]` : `[Page ${update.pageNumber}]`;
+            // This repair ran on the served cover; on a cover the app has
+            // stamped, the result carries the stamp and has no textless art
+            // layer, so it is not judged (coverEvalLayer.js).
+            if (isCover && await isCoverStamped(id, coverType)) {
+              throw Object.assign(new Error(`${coverType}: repaired from the stamped image, no textless art layer — refusing to judge the stamped image`), { code: 'NO_ART_LAYER' });
+            }
             log.info(`🔍 [CHAR REPAIR] ${pageLabel} Evaluating repaired image (before: ${beforeScore}%)...`);
             // The page text and the brief, as /evaluate-single resolves them, so
             // the semantic judge runs and judges the repaired version's light
@@ -6446,7 +6491,8 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               log.info(`🔍 [CHAR REPAIR] ${pageLabel} After: ${afterScore}% (before: ${beforeScore}%, delta: ${delta != null ? (delta >= 0 ? '+' : '') + delta : 'n/a'})`);
             }
           } catch (evalErr) {
-            log.warn(`⚠️ [CHAR REPAIR] Evaluation failed for page ${update.pageNumber}: ${evalErr.message}`);
+            if (evalErr.code === 'NO_ART_LAYER') log.error(`❌ [CHAR REPAIR] Evaluation refused for page ${update.pageNumber}: ${evalErr.message}`);
+            else log.warn(`⚠️ [CHAR REPAIR] Evaluation failed for page ${update.pageNumber}: ${evalErr.message}`);
           }
 
           delete existingImage.imageData;
@@ -6769,6 +6815,10 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
     // image again and editedArt holds the new textless source. Mutating
     // editResult.imageData keeps every downstream use (eval / version / save /
     // response) on the titled bytes with no further changes.
+    // The edit's own output, before any text is stamped on it: the image the
+    // judge reads below (coverEvalLayer.js — covers are evaluated first, the
+    // app's text is added after).
+    const editedUnstamped = editResult.imageData;
     let editedArt = null;
     if (editedTextless) {
       try {
@@ -6793,8 +6843,14 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
       // scored by a judge holding almost none of the generator's spec. Same
       // resolvers as every other cover eval site.
       const coverPageNumber = COVER_PAGE_NUMBERS[coverKey];
+      // Edited from the served image (no art layer) on a cover the app has
+      // stamped: the output carries the stamp and has no textless twin, so it
+      // is not judged.
+      if (!editedTextless && await isCoverStamped(id, coverKey)) {
+        throw Object.assign(new Error(`${coverKey}: edited from the stamped image (no textless art layer) — refusing to judge the stamped image`), { code: 'NO_ART_LAYER' });
+      }
       const evaluation = await evaluateImageQuality(
-        editResult.imageData,
+        editedUnstamped,
         coverPrompt,
         buildWholeCastReferencePhotos(
           storyData.characters || [],

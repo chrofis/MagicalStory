@@ -5992,10 +5992,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 evaluationType: 'cover',
                 expectedText: pageData.coverOpts.expectedText,
                 textMode: pageData.coverOpts.textMode,
-                // The app's own string on this cover, and the mark that this
-                // cover was briefed as a page — together they switch the
-                // undeclared-lettering check on for it (evalPipeline).
-                appTexts: pageData.coverOpts.appTexts,
+                // The mark that this cover was briefed as a page — it switches
+                // the undeclared-lettering check on for it (evalPipeline).
                 coverIsPage: true,
                 titleBaked: pageData.coverOpts.titleBaked,
                 referencePhotos: pageData.characterPhotos,
@@ -6194,7 +6192,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // ONE resolver, shared with the cover ITERATE path (2026-09-13) so
             // a regenerated / Lab cover is judged under the same text contract
             // as a freshly generated one.
-            const { textMode, expectedText, appTexts } = require('./server/lib/coverTypography').resolveCoverTextContract(coverKey, {
+            const { textMode, expectedText } = require('./server/lib/coverTypography').resolveCoverTextContract(coverKey, {
               titleBaked: coverData.titleBaked === true,
               title: title || inputData.title || inputData.storyTitle || null,
               dedication: coverData.dedication || inputData.dedication || null,
@@ -6233,7 +6231,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               sceneMetadata: coverSceneMetadata,
               expectedText,
               textMode,
-              appTexts,
               imageData: coverData.imageData,
               // WHICH MODEL PAINTED IT. The page path has carried
               // `modelId: activeModelId` since it was written; this push never

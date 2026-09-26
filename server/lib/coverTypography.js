@@ -80,20 +80,15 @@ function resolveCoverTitleMode(coverType, storyTitle, { modeOverride = null } = 
  * 'painted'    — the image model rendered the text (baked front cover, or
  *                appSideCoverType off): the judge letter-checks `expectedText`.
  * 'appOverlay' — the art is textless and typography is composited afterwards:
- *                the judge must never flag missing or present title text.
- *
- * `appTexts` (2026-09-26) — the string the APP composites onto this cover in
- * 'appOverlay' mode: the front cover's title, the opening page's dedication,
- * the back cover's "magicalstory.ch". The undeclared-lettering check excuses
- * exactly these, the same three the judges' TEXT_NOTE_APP_OVERLAY excuses
- * (prompts/cover-evaluation-notes.txt): the pipeline judges the textless art
- * before the stamp, but every post-persist eval (Lab, admin re-evaluate,
- * repair of a finished story) sees the stamped served bytes. Empty in
- * 'painted' mode, where the one string is `expectedText` (a REQUIRED TEXT).
+ *                the judge must never flag the title missing. Every judge
+ *                reads the TEXTLESS art (coverEvalLayer.resolveCoverEvalImage),
+ *                never the stamped served bytes, so no judge ever sees the
+ *                app's own strings and none of them is excused: any lettering
+ *                on the art was painted by the image model.
  *
  * @param {string} coverKeyOrType 'frontCover'|'initialPage'|'backCover' (or 'front'/'back')
  * @param {{titleBaked?: boolean, title?: string|null, dedication?: string|null}} opts
- * @returns {{ textMode: 'painted'|'appOverlay', expectedText: string|null, appTexts: string[] }}
+ * @returns {{ textMode: 'painted'|'appOverlay', expectedText: string|null }}
  */
 function resolveCoverTextContract(coverKeyOrType, { titleBaked = false, title = null, dedication = null } = {}) {
   const { MODEL_DEFAULTS } = require('../config/models');
@@ -108,12 +103,7 @@ function resolveCoverTextContract(coverKeyOrType, { titleBaked = false, title = 
     else if (key === 'initialPage') expectedText = dedication || null;
     else if (key === 'backCover') expectedText = BRAND_TEXT;
   }
-  const appTexts = [];
-  if (textMode === 'appOverlay') {
-    const own = key === 'frontCover' ? title : key === 'initialPage' ? dedication : key === 'backCover' ? BRAND_TEXT : null;
-    if (own && String(own).trim()) appTexts.push(String(own).trim());
-  }
-  return { textMode, expectedText, appTexts };
+  return { textMode, expectedText };
 }
 
 // ---------------------------------------------------------------------------
@@ -691,7 +681,9 @@ async function bakeCoverTypographyPostPersist(storyId, storyData, { title, dedic
         log.error(`❌ [COVER TYPO POST] frontCover: story title is EMPTY — cannot stamp a title; cover left un-baked so a later pass with the real title can still stamp it`);
         continue;
       }
-      const already = await dbQuery("SELECT 1 FROM story_images WHERE story_id=$1 AND image_type=$2 LIMIT 1", [storyId, `${key}Art`]);
+      // Production rows only: a Test Lab cover version stores its own art row
+      // (is_test), which says nothing about whether this story was stamped.
+      const already = await dbQuery("SELECT 1 FROM story_images WHERE story_id=$1 AND image_type=$2 AND NOT is_test LIMIT 1", [storyId, `${key}Art`]);
       if (already.length) { log.debug(`[COVER TYPO POST] ${key}: already baked — skip`); continue; }
       const activeIdx = meta[key]?.activeVersion ?? 0;
       const rows = await dbQuery(
@@ -705,8 +697,12 @@ async function bakeCoverTypographyPostPersist(storyId, storyData, { title, dedic
       const figures = storyData?.coverImages?.[key]?.bboxDetection?.figures || [];
       const { buffer, spec } = await composeCover({ artBuffer: bytes, kind, title: title || '', dedication: ded, seed: seed || title, figures });
       // Textless original first (for no-AI re-edits), then overwrite the served
-      // version row with the titled render.
-      await saveStoryImage(storyId, `${key}Art`, null, 'data:image/jpeg;base64,' + bytes.toString('base64'), { versionIndex: 0 });
+      // version row with the titled render. The art row takes the SERVED
+      // version's index: it was hard-coded to v0, so with a non-zero active
+      // version the loop below overwrote Art v0 with v0's own pixels and the
+      // active version's textless layer was lost (54 staging / 16 prod covers,
+      // 2026-09-26) — an eval of that version has nothing textless to judge.
+      await saveStoryImage(storyId, `${key}Art`, null, 'data:image/jpeg;base64,' + bytes.toString('base64'), { versionIndex: activeIdx });
       await saveStoryImage(storyId, key, null, 'data:image/jpeg;base64,' + buffer.toString('base64'), { versionIndex: activeIdx, cacheBust: true, preserveScore: true });
       if (storyData?.coverImages?.[key]) storyData.coverImages[key].typography = spec;
       log.info(`🅰️ [COVER TYPO POST] ${key}: baked title${ded ? '+dedication' : ''} onto served v${activeIdx} (${spec.fontId || '?'}/${spec.layout || '?'})`);
@@ -1069,7 +1065,7 @@ async function stampRepaintedCover(storyData, coverKey, imageResult, { force = f
   let bakeAlreadyRan = false;
   try {
     const { dbQuery } = require('../services/database');
-    const rows = await dbQuery("SELECT 1 FROM story_images WHERE story_id=$1 AND image_type=$2 LIMIT 1", [storyData.id, `${coverKey}Art`]);
+    const rows = await dbQuery("SELECT 1 FROM story_images WHERE story_id=$1 AND image_type=$2 AND NOT is_test LIMIT 1", [storyData.id, `${coverKey}Art`]);
     bakeAlreadyRan = rows.length > 0;
   } catch (e) { /* check failed → skip restamp (safe: textless served, initial bake handles it) */ }
   if (skip) {

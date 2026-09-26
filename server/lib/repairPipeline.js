@@ -504,11 +504,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       }),
       evaluationType: orig.evaluationType,
       // Structured cover text contract (replaces the old prompt-string surgery):
-      // 'appOverlay' → evaluator must never flag missing/present title text;
+      // 'appOverlay' → evaluator must never flag the (textless) title missing;
       // 'painted' + expectedText → evaluator letter-checks the painted text.
       expectedText: orig.expectedText ?? null,
       textMode: orig.textMode ?? null,
-      appTexts: orig.appTexts ?? null,
       coverIsPage: orig.coverIsPage === true,
       // Detection reuse, in pairing order: the entry's OWN detection first —
       // a round-result entry carries the detection made on its accepted new

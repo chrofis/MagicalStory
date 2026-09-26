@@ -7,10 +7,11 @@
  *
  *  (A) The undeclared-lettering check ran on scenes only, so the caption was a
  *      judge's MAJOR `rendered_text` at best — below the repair gate. It now
- *      runs on covers briefed as pages (`coverIsPage`). The cover's declared
- *      strings are excused: a baked title (REQUIRED TEXT) and, in appOverlay
- *      mode, the app's own string (`appTexts`: title / dedication /
- *      "magicalstory.ch"), which a post-persist eval sees stamped.
+ *      runs on covers briefed as pages (`coverIsPage`). Only a baked title
+ *      (REQUIRED TEXT) is excused. The app's own strings (title / dedication /
+ *      "magicalstory.ch") are NOT (2026-09-26): every cover eval reads the
+ *      textless art layer (coverEvalLayer.js), so no judge sees them, and
+ *      lettering the judge does see was painted by the model.
  *  (B) An entity CRITICAL routed every round to char-fix, one method per
  *      round, and the caption was never painted out. A CRITICAL rendered_text
  *      now takes the round; the figure repair waits for the next.
@@ -56,12 +57,14 @@ const QUALITY_JSON = (issues: any[] = []) => JSON.stringify({
   fixable_issues: issues,
 });
 
-// The back cover's two strings as the blind inventory reports a stamped cover:
-// the model's caption, and the app's brand line.
+// The back cover's lettering as the blind inventory reports the TEXTLESS art
+// layer: the model's caption, and nothing of the app's stamp.
 const BACK_COVER_LETTERING = [
   { text: 'THE FIVE FRIENDS STAND TOGETHER', surface: 'caption band', position: 'bottom-center', placement: 'overlay', spelling: 'correct' },
-  { text: 'magicalstory.ch', surface: 'bottom edge', position: 'bottom-left', placement: 'overlay', spelling: 'correct' },
 ];
+// A brand line on the pixels the judge reads can only have been painted by
+// the model (the app stamps it after the eval) — it is not excused.
+const PAINTED_BRAND = { text: 'magicalstory.ch', surface: 'bottom edge', position: 'bottom-left', placement: 'overlay', spelling: 'correct' };
 const inventoryJson = (lettering: any[]) => JSON.stringify({
   figures: [{ label: 'the child in a coat', zone: 'center-foreground' }],
   interactions: [], objects: [], setting: {}, lettering, rendering: {},
@@ -96,24 +99,29 @@ const letteringFindings = (r: any) => (r?.fixableIssues || []).filter((f: any) =
 describe('(A) the lettering check runs on covers briefed as pages', () => {
   const backContract = resolveCoverTextContract('backCover', { titleBaked: false });
 
-  it('the contract names the app string of each cover in appOverlay mode, none when painted', () => {
+  it('the contract carries no app strings to excuse', () => {
     if (!MODEL_DEFAULTS.appSideCoverType) return; // painted-everywhere configuration: nothing app-side
-    expect(backContract).toEqual({ textMode: 'appOverlay', expectedText: null, appTexts: ['magicalstory.ch'] });
-    expect(resolveCoverTextContract('frontCover', { titleBaked: false, title: 'The Lantern Keeper' }).appTexts).toEqual(['The Lantern Keeper']);
-    expect(resolveCoverTextContract('initialPage', { titleBaked: false, dedication: 'For Ada' }).appTexts).toEqual(['For Ada']);
-    expect(resolveCoverTextContract('initialPage', { titleBaked: false, dedication: '' }).appTexts).toEqual([]);
-    expect(resolveCoverTextContract('frontCover', { titleBaked: true, title: 'T' }).appTexts).toEqual([]);
+    expect(backContract).toEqual({ textMode: 'appOverlay', expectedText: null });
+    expect(resolveCoverTextContract('frontCover', { titleBaked: false, title: 'The Lantern Keeper' })).not.toHaveProperty('appTexts');
   });
 
-  it('a caption on a cover page is a CRITICAL; the stamped brand line is excused', async () => {
+  it('a caption on a cover page is a CRITICAL', async () => {
     const r = await runEval('cover', { ...backContract, coverIsPage: true }, { lettering: BACK_COVER_LETTERING });
     const found = letteringFindings(r);
-    expect(found).toHaveLength(MODEL_DEFAULTS.appSideCoverType ? 1 : 2);
+    expect(found).toHaveLength(1);
     expect(found[0]).toMatchObject({ type: 'rendered_text', severity: 'CRITICAL' });
     expect(found[0].description).toContain('THE FIVE FRIENDS STAND TOGETHER');
     // The stored record is what the critical-gone-wins re-check compares.
-    expect(r.letteringInventory.items).toHaveLength(2);
-    if (MODEL_DEFAULTS.appSideCoverType) expect(r.letteringInventory.declared).toContain('magicalstory.ch');
+    expect(r.letteringInventory.items).toHaveLength(1);
+    if (MODEL_DEFAULTS.appSideCoverType) expect(r.letteringInventory.declared).toEqual([]);
+  });
+
+  it('a brand line on the judged pixels is lettering the model painted, never excused', async () => {
+    if (!MODEL_DEFAULTS.appSideCoverType) return; // painted mode: the brand line IS the required text
+    const r = await runEval('cover', { ...backContract, coverIsPage: true }, { lettering: [PAINTED_BRAND] });
+    const found = letteringFindings(r);
+    expect(found).toHaveLength(1);
+    expect(found[0].description).toContain('magicalstory.ch');
   });
 
   it('a cover NOT briefed as a page (trial) is not checked', async () => {
@@ -135,10 +143,9 @@ describe('(A) the lettering check runs on covers briefed as pages', () => {
       pageNumber: -3, scene: { briefedAsPage: true, titleBaked: false, referencePhotos: [] }, characters: [], title: 'T',
     });
     expect(options.coverIsPage).toBe(true);
-    expect(options.appTexts).toEqual(backContract.appTexts);
+    expect(options).not.toHaveProperty('appTexts');
     const page = buildEvalReplayOptions({ pageNumber: 4, scene: {}, characters: [] }).options;
     expect(page.coverIsPage).toBe(false);
-    expect(page.appTexts).toBeNull();
   });
 });
 

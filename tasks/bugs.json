@@ -2283,6 +2283,30 @@
       "fixedAt": "2026-09-26",
       "fixedIn": "7c9129c82",
       "fix": "runImageStage resolves pageModelKey = params.imageModel || MODEL_DEFAULTS.pageRenderImage for the render and the Grok VB-text rule. Test: tests/unit/testlab-prod-prompt-parity.test.ts. docs/decisions.md 2026-09-26 \"The Lab image stage renders on the production page tier, not the edit tier\"."
+    },
+    {
+      "id": "cover-eval-reads-stamped-bytes",
+      "title": "Every eval of a stored cover judged the served image with the app's title / dedication / \"magicalstory.ch\" stamped on it",
+      "reportedAt": "2026-09-26",
+      "source": "Owner, 2026-09-26: \"the app texts (magicalstory.ch, dedication, composited title) should not be part of the evaluated image — evaluate first, then add the text.\" Lab 1521 quality_eval on the back cover of staging job_1790446348343_z3fw660ie reported \"magicalstory.ch\".",
+      "rootCause": "Covers render textless and coverTypography stamps the text after persistence; the textless original is the `${key}Art` row of the same version. Only the story run judged the art. The Test Lab loader, admin re-evaluate / evaluate-single, admin consistency-check / style-check, Lab entity / style_check / book_audit, the cover edit's eval (of its restamped output) and the full-story cover iterate (image analysis + reference) all read the served, stamped bytes. 6e3170843 excused the app strings (appTexts) instead.",
+      "impact": "Judges read lettering the model never painted; the excusal also hid a brand line or title the model DID paint.",
+      "status": "fixed",
+      "fixedAt": "2026-09-26",
+      "fixedIn": "pending",
+      "fix": "server/lib/coverEvalLayer.js resolveCoverEvalImage / applyCoverEvalView (art of exactly the judged version; NO_ART_LAYER thrown for a stamped version without one), wired into every path above; Lab cover versions store their own art row; appTexts and the \"never flag them present\" excuse deleted. Test: tests/unit/cover-eval-layer.test.ts."
+    },
+    {
+      "id": "cover-bake-art-written-to-v0",
+      "title": "The post-persist cover bake wrote the active version's textless art to `${key}Art` v0, and the non-active loop overwrote it",
+      "reportedAt": "2026-09-26",
+      "source": "Stored evidence: covers whose active version has no `${key}Art` row while the story has art rows, e.g. staging job_1789759147125_p08djwhbl backCover active v1, art [0]; staging 54 covers / 38 stories, prod 16 / 12.",
+      "rootCause": "bakeCoverTypographyPostPersist saved the active version's textless bytes with versionIndex 0 regardless of activeVersion; the loop over the other versions then saved v0's own textless bytes to Art v0, so the active version's art was lost.",
+      "impact": "The active cover of those stories has no textless layer: it cannot be judged without its stamp (now fails loudly), and restampServedCover / paintServedCoverTitle / the cover edit fall back to another version's art.",
+      "status": "fixed",
+      "fixedAt": "2026-09-26",
+      "fixedIn": "pending",
+      "fix": "The art row takes the active version's index. Stored stories are not repaired (the lost layer is not recoverable). Test: tests/unit/cover-eval-layer.test.ts (the bake keeps the ACTIVE version's art)."
     }
   ]
 }
