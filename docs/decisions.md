@@ -21,6 +21,95 @@ superseded and link forward.
 
 ---
 
+## 2026-09-26 — The Art Director cites the landmark photo: `landmarkPhoto: <n> | "none"` per plate, and code serves exactly that slot (supersedes 2026-09-24 "`landmarkView` picks the kind" and "the page's shot picks the framing")
+
+**Context.** Investigation 2026-09-26 over stored stories (full stories and trials, both environments): the
+landmark photo was picked by METADATA only — `pickVariantForView(loc, landmarkView, shot)` took the page's
+view word, mapped the page's shot to a judged framing (`SHOT_PHOTO_FRAMINGS`), then ranked by score. No step
+read what a photo SHOWS, and the photo's description was dropped before the prompt (storyHelpers). Measured:
+- among full stories, **23% of briefs staged a structure or view that no photo of the landmark shows** (a stair,
+  a slope, a shaft, a far side) and **12% were served a wrong-subject photo**;
+- vantage plates took their representative PAGE's photo, chosen by that page's view and shot, whatever the
+  vantage framed;
+- the Art Director's PHOTOS line cut every description at 110 characters, and the offered list held ONE photo
+  per framing (`bestPhotoSlots` DISTINCT ON framing): Lindenhof showed 2 of its 3 photos;
+- the 2026-09-24 framing rule served a "wide" slot that does not show the landmark at all (Lindenhof slot 3 is
+  a river quay; staging `job_1790277448294_5herh01j7`);
+- the plate prompt said both "the photo is right" (`LANDMARK_PHOTO_AUTHORITY`) and "content comes from the
+  description", so on a plate whose frame the photo does not show Grok chose one or the other.
+
+**Decision (owner-approved design, 2026-09-26).**
+1. **The author sees every photo.** The Art Director's REAL LANDMARKS section lists each landmark's photos as a
+   numbered list — slot number, kind, judged framing, the COMPLETE description (`landmarkPhotoListLines`),
+   never cut. The list is `landmarkPhotos.servablePhotos` (URL, not `bad`, not judged < 40, slot order) over
+   `variantsFromIndexRow` — the SAME set a citation is answered from, on both sides: `servedLandmark` (the
+   offer) now carries every servable photo (`bestPhotoSlots` reads every judged slot), and the story's linked
+   bible gets the same list from `loadLandmarkPhotoDescriptions`. The writers (arc, divider) keep their one short
+   PHOTOS line.
+2. **The author cites per PLATE.** `landmarkPhoto: <n> | "none"` on each vantage of a real landmark, or on the
+   location when it has no vantages (scene-expansion-all.txt); per location in the trial writer's bible (one
+   plate per location); per PAGE only in an iterate rewrite that writes a fresh plate (`reuseEmptyScene: false`,
+   scene-iteration*.txt). One rule, `LANDMARK_PHOTO_CITE_RULE` (promptBuilders.js): cite the photo whose content
+   the plate shows, from roughly its viewpoint; cite "none" when the frame is dominated by a structure, feature
+   or view no listed photo shows — that plate and its pages then carry the place in words.
+3. **Code serves exactly the cited slot.** `storyHelpers.landmarkPhotoCitation` finds the citation — the page's
+   own (iterate, primary location only), else the vantage the page cites by dotted id or whose `pages` name it
+   (covers by their negative page number; the vantage plate by its vantage id), else the location's own — and
+   `decideLandmarkPhotoSource` checks it against `servablePhotos`. "none" → no photo (by design, not a miss).
+   **NO FALLBACK:** a missing citation, an unparseable one, or a number that is not a servable photo is an
+   error — `log.error`, a miss (the page's existing "renders WITHOUT its landmark reference photo" warning), no
+   photo; nothing picks one in its place. `landmarkPhotoCitationFaults` reports every faulty plate once per
+   story after the scene review (genLog `landmark_photo_citation`), and the Lab `beats_scenes` stage returns them.
+4. **ONE mechanism.** Deleted: `pickVariantForView`, `SHOT_PHOTO_FRAMINGS`, `photoFramingsForShot`,
+   `landmarkPhotoShot`, the page field `landmarkView` (all four brief templates, story-trial.txt, the parsers,
+   the iterate carry-forward — replaced by `landmarkPhoto`), and the vantage plate's legacy
+   `referencePhotoData` branch, which attached a photo whatever the vantage cited. `KIND_FROM_FRAMING` stays:
+   the kind now only picks the fidelity block's wording and labels the list.
+5. **`LANDMARK_PHOTO_AUTHORITY` is scoped:** the photo is the authority on how the structures it SHOWS look;
+   the camera, the framing and everything the photo does not show come from the words. Both sides read the one
+   constant (fidelity block, plate QC `LANDMARK_CHECK`); the QC's own lines already held the landmark only to
+   the part in view and never failed it for scenery outside the photo, so its template is unchanged.
+6. **Critic.** scene-review.txt check 10ab `[landmark_photo_mismatch]` gets the same constant, each plate's
+   citation on its VANTAGE PLATES line and the numbered PHOTOS; `applyReviewBibleCorrections` adopts a corrected
+   `landmarkPhoto` (on a vantage row, a dotted top-level row, or a vantage-less location) only when it is a
+   servable photo or "none".
+7. **Lab.** `beats_scenes` now resolves the landmark list the way production does (`resolveAvailableLandmarks`,
+   unshuffled; it was never stored on the story, so the Lab's Art Director had NO landmark section), links the
+   authored bible to the index like production, and returns `landmarkPhotoCitations` (every plate, its
+   citation, its numbered photos, the faults).
+
+**Why this is not the deleted dotted-id channel (2026-09-24).** That channel read the NUMBER in a vantage id
+(`LOC002.3`) as a photo slot: one namespace with two meanings, and the author never saw the photos when it
+numbered its vantages. `landmarkPhoto` is its own field whose only value space is the numbered photo list the
+author is shown beside it (or "none"); the vantage id keeps meaning a camera position and is used only to find
+which plate's citation a page reads. A cited number that is not a servable photo is an error, never a slot to
+look up anyway.
+
+**Stored stories** (no `landmarkPhoto` anywhere). Every citation lookup returns "no landmarkPhoto cited" → an
+error-level log, a miss, NO photo. Consequences: iterate / regenerate / repair REUSE the stored plate (painted
+from the old photo), so a repaired page keeps its landmark; a NEW plate render for such a page (none stored, or
+an iterate rewrite that writes a fresh plate without citing) paints the place from words; a cast-0 page
+re-render renders on its plate instead of the photo; the plate QC and the fidelity block get no landmark photo.
+No stored citation is inferred from the page's recorded `landmarkPhotos[].variantNumber` (that was the
+metadata picker's output). If the owner wants old stories re-cited, that is a one-off migration, not a code
+path.
+
+**Validation.** See the addendum below (free replay + Lab).
+
+**Touched:** `server/lib/landmarkPhotos.js`, `server/lib/storyHelpers.js`, `server/lib/promptBuilders.js`,
+`server/lib/sceneMetadata.js`, `server/lib/images.js`, `server/lib/coverIterate.js`, `server/lib/beatsPipeline.js`,
+`server/lib/testlab.js`, `server/lib/iterateBeat.js`, `server/lib/sceneBriefCheck.js`, `storyJobPipeline.js`,
+`prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`, `prompts/scene-iteration.txt`,
+`prompts/scene-iteration-free.txt`, `prompts/story-trial.txt`, `prompts/scene-review.txt`,
+`scripts/admin/sibling-registry.json`, `tests/unit/landmark-photo-citation.test.ts` (new),
+`tests/unit/landmark-vantage-id-not-photo.test.ts`, `tests/unit/landmark-plate-resolve.test.ts`,
+`tests/unit/landmark-photo-kind-to-prompt.test.ts`, `tests/unit/ad-iterate-parity.test.ts`,
+`tests/unit/iterate-parity-staging.test.ts`, `tests/unit/landmark-photo-shot-framing.test.ts` (deleted),
+`docs/landmark-database.md`, `docs/image-routing.md`, `docs/prompt-inventory.md`, `docs/SETTLED.md`.
+**Status:** 🟡 active on staging.
+
+---
+
 ## 2026-09-26 — One people yardstick on the page prompt for every band; a small prop gets a hand on it wherever the story allows
 
 **Context:** The creature ratio of the entry below (7e767c9d9) measured only `adult-height` / `twice-adult-height` creatures against the people in frame. Every other element still carried a band phrase whose referent is not drawn on a page of children — "stands hip-high to an adult", "about as big as a human head". Staging job_1790277448294_5herh01j7 (run 7) p9/p11 sent the egg (`melon-sized`) and the waist-high dragon with the band phrase only; job_1790373080139_vnx5l8iy7 (run 8) p10 is the grown dragon. What is known to work, and what is ruled out: (1) **contact** — the EXACT POSES size rider (2026-09-17, staging job_1789584708605_rts4wqupm) drew a head-sized element at the right size on 6/6 pages whose pose line put a hand, arm or ear on it and oversized on 3/3 without; (2) **an in-frame body-part / figure anchor** — the one page of the 2026-09-14 validation runs where two creatures shared the frame came out roughly right, the comparison being free; (3) **a yardstick in the reference cell leaks** onto the page (owner, 2026-09-14) and **cells get no size** (owner, 2026-09-23); cell AREA is an identity dial, not a size dial (SETTLED 2026-09-19); (4) a band phrase alone, with no referent in frame, did not move the pixels (2026-09-15/09-19).
@@ -1418,7 +1507,9 @@ keep slot 1, which they now get by rule rather than by substitution.
 `prompts/scene-iteration.txt`, `prompts/scene-iteration-free.txt`,
 `tests/unit/landmark-vantage-id-not-photo.test.ts`, `tests/unit/landmark-plate-resolve.test.ts`,
 `tests/unit/landmark-photo-kind-to-prompt.test.ts`, `tasks/bugs.json`, `tasks/BACKLOG.md`.
-Supersedes the 2026-08-11 "variant 0" convention. **Status:** ✅ active.
+Supersedes the 2026-08-11 "variant 0" convention. **Status:** 🗄 decision 1 (`landmarkView` + score picks the photo)
+superseded 2026-09-26 by "The Art Director cites the landmark photo"; decision 2 (a dotted id is never a photo,
+no cross-slot substitution) stands.
 
 ---
 
@@ -1478,7 +1569,9 @@ to the owner, not applied (a DB write).
 
 **Touched files.** `server/lib/landmarkPhotos.js`, `server/lib/storyHelpers.js`,
 `server/lib/shotVocabulary.js`, `tests/unit/landmark-photo-shot-framing.test.ts`,
-`docs/landmark-database.md`, `docs/landmarks.html`. **Status:** ✅ active.
+`docs/landmark-database.md`, `docs/landmarks.html`. **Status:** 🗄 superseded 2026-09-26 by "The Art Director
+cites the landmark photo" (the shot no longer picks the photo; the slot-3 wrong subject it served is part of the
+evidence). Decision 4 (`KIND_FROM_FRAMING`) stands.
 
 ---
 

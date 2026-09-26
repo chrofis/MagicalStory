@@ -122,6 +122,7 @@
           "\"properName\"",
           "\"type\"",
           "\"isRealLandmark\"",
+          "\"landmarkPhoto\"",
           "\"scaleClass\"",
           "\"generic\"",
           "\"states\""
@@ -232,6 +233,21 @@
       "reason": "scene-review.txt critiques the briefs scene-expansion-all.txt authors; a check the reviewer applies that the Art Director was never given produces a finding no rewrite can satisfy.",
       "generators": [
         "prompts/scene-expansion-all.txt"
+      ],
+      "critics": [
+        "prompts/scene-review.txt"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "landmark-photo-generator-vs-critic",
+      "axis": "generator-vs-critic",
+      "reason": "A real landmark's photo is the one its plate's author cites in `landmarkPhoto` (docs/decisions.md 2026-09-26). The citation is authored at three sites - the all-pages Art Director per vantage (inside {AVAILABLE_LANDMARKS_SECTION}), the trial writer per location (inside {LANDMARKS}), an iterate rewrite per page (`{LANDMARK_PHOTO_CITE}`) - and judged by scene-review.txt check 10ab [landmark_photo_mismatch] (`{LANDMARK_PHOTO_CITE}`). All four read ONE constant, promptBuilders.LANDMARK_PHOTO_CITE_RULE; tests/unit/landmark-photo-citation.test.ts pins that it reaches every built prompt. A citation rule the reviewer applies that an author was never given is a correction no author can pre-empt.",
+      "generators": [
+        "prompts/scene-expansion-all.txt",
+        "prompts/story-trial.txt",
+        "prompts/scene-iteration.txt",
+        "prompts/scene-iteration-free.txt"
       ],
       "critics": [
         "prompts/scene-review.txt"

@@ -1021,9 +1021,10 @@ function extractSceneMetadata(sceneDescription) {
       // Story era for buildEraGuard (anachronism guard) — restored 2026-08-11;
       // lost in the metadata-format migration like `shot`.
       era: metadata.era || null,
-      // Which view of a cited real landmark this page shows — selects the
-      // reference photo by kind (landmarkPhotos.pickVariantForView).
-      landmarkView: metadata.landmarkView || null,
+      // A page's OWN landmark photo citation — written only by an iterate
+      // rewrite that authors a fresh plate (reuseEmptyScene: false); every
+      // other page takes its vantage's citation (storyHelpers.landmarkPhotoCitation).
+      landmarkPhoto: metadata.landmarkPhoto ?? null,
       imageSummary: prose,
       setting: null, // Setting details are in the prose, not structured
       sceneComplexity,
@@ -1042,9 +1043,10 @@ function extractSceneMetadata(sceneDescription) {
       textPosition: metadata.textPosition || null,
       textZoneDescription: metadata.textZoneDescription || null,
       era: metadata.era || null,
-      // Which view of a cited real landmark this page shows — selects the
-      // reference photo by kind (landmarkPhotos.pickVariantForView).
-      landmarkView: metadata.landmarkView || null,
+      // A page's OWN landmark photo citation — written only by an iterate
+      // rewrite that authors a fresh plate (reuseEmptyScene: false); every
+      // other page takes its vantage's citation (storyHelpers.landmarkPhotoCitation).
+      landmarkPhoto: metadata.landmarkPhoto ?? null,
       sceneIntent: metadata.sceneIntent || null,
       timeOfDay: normaliseTimeOfDay(metadata.timeOfDay),
       weather: normaliseWeather(metadata.weather),
@@ -1120,7 +1122,7 @@ function extractSceneMetadata(sceneDescription) {
 
     // Also extract location from setting.location (e.g., "Kurpark [LOC001]")
     // This ensures landmark photos are passed to image generation. The photo
-    // itself is picked by the scene's `landmarkView` (getLandmarkPhotosForScene).
+    // itself is the one the plate's author cited (storyHelpers.landmarkPhotoCitation).
     if (parsedData.setting?.location) {
       if (/\[LOC\d+(?:\.\d+)?\]/i.test(parsedData.setting.location)) {
         objectIds.push(parsedData.setting.location);

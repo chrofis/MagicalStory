@@ -3196,8 +3196,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     }
 
     // Load photo variant descriptions for Swiss landmarks (descriptions only, no image data)
-    // This enables scene description AI to intelligently select which photo variant to use
+    // — the photos each location's `landmarkPhoto` citation is answered from.
     await loadLandmarkPhotoDescriptions(visualBible);
+    // Every real-landmark plate's citation, checked once for the story (the
+    // trial writer cites per location). A fault is logged and recorded here;
+    // its pages then get no landmark photo (docs/decisions.md 2026-09-26).
+    {
+      const { landmarkPhotoCitationFaults } = require('./server/lib/storyHelpers');
+      for (const f of landmarkPhotoCitationFaults(visualBible)) {
+        log.error(`❌ [LANDMARK] Plate ${f.plateId} ("${f.locName}"): ${f.reason} — its pages get no landmark photo`);
+        genLog.warn('landmark_photo_citation', `${f.plateId} (${f.locName}): ${f.reason}`, null, f);
+      }
+    }
 
     // Start background fetch for landmark reference photos (runs in parallel with avatar generation)
     // NOTE: For Swiss landmarks with photo variants, we'll load photos on-demand during image generation
@@ -4760,17 +4770,26 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // Surfaces only, like the per-page note (shotVocabulary.buildPlateSurfaceNote);
             // the template's PLATE_NO_PEOPLE rule keeps people off the plate.
             const characterSpace = require('./server/lib/shotVocabulary').buildPlateSurfaceNote(null);
-            // Pull landmark photos for the LOC if real — used as a strict
-            // visual reference for the Wikimedia-photo case.
-            // NOT resolveLandmarkPhotoForLocation: this is the per-vantage plate
-            // path and the photo is the LOC's own legacy referencePhotoData, not a
-            // variant slot. It therefore carries no `photoType`, and
-            // buildLandmarkFidelityBlock falls to its close/exterior wording —
-            // correct for a single legacy landmark photo, and the reason a wide
-            // curated view must not be routed here.
-            const landmarkPhotos = (v.location?.isRealLandmark && v.location?.referencePhotoData)
-              ? [{ name: v.location.name, photoData: v.location.referencePhotoData, attribution: v.location.photoAttribution, source: v.location.photoSource }]
-              : (repPageData.landmarkPhotos || []);
+            // THE PHOTO THIS VANTAGE CITES (docs/decisions.md 2026-09-26): the
+            // plate is painted from the `landmarkPhoto` the Art Director wrote on
+            // this vantage (or on its location, when it has no vantages), and a
+            // second landmark the representative page also shows keeps its own
+            // plate's citation. It used to take the representative page's photo,
+            // chosen by that page's view and shot, whatever the vantage framed —
+            // and, before that, the LOC's legacy referencePhotoData whatever the
+            // vantage cited. Same resolver as every page (block ⇔ bytes).
+            const vantageLandmarkMisses = [];
+            const landmarkPhotos = await ensureLandmarkPhotoBytes(
+              await getLandmarkPhotosForScene(visualBible, repPageData.sceneMetadata, {
+                pageNumber: repPageNum, vantageId, misses: vantageLandmarkMisses,
+              }),
+              { misses: vantageLandmarkMisses },
+            );
+            if (vantageLandmarkMisses.length > 0) {
+              genLog.warn('vantage_landmark_photo_missing', `Vantage ${vantageId} plate renders without its landmark photo: ${vantageLandmarkMisses.map(m => `${m.name}: ${m.reason}`).join('; ')}`, null, {
+                vantageId, pages: group.pageNumbers, misses: vantageLandmarkMisses,
+              });
+            }
             const { buildLandmarkFidelityBlock } = require('./server/lib/storyHelpers');
             try {
               // Built BEFORE the prompt: which reference family is attached

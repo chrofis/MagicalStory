@@ -13,7 +13,6 @@ const { callTextModel } = require('./textModels');
 const { TEXT_MODELS } = require('../config/models');
 const r2 = require('./r2');
 const { servedPhotoUrl } = require('./landmarkPhotoStore');
-const { SHOT_TYPES, resolveShotId } = require('./shotVocabulary');
 
 // Simple in-memory cache (24-hour TTL)
 const photoCache = new Map();
@@ -2609,17 +2608,30 @@ async function bestPhotoSlots(ids) {
     // the castle, the church, the covered bridge — the scene needs that picture,
     // not a better exterior. The caller takes the top row as the primary and
     // keeps the rest as variants.
+    //
+    // EVERY judged slot is read (scores + framings, the usable ones and the
+    // rest): servedLandmark builds the landmark's photoVariants from them with
+    // the same variantsFromIndexRow + servablePhotos the story's serving uses,
+    // so the numbered PHOTOS list the Art Director cites from is exactly the
+    // set a citation is answered from (docs/decisions.md 2026-09-26).
     const { rows } = await getPool().query(
-      `SELECT DISTINCT ON (landmark_id, coalesce(framing, 'medium'))
-              landmark_id, slot, coalesce(framing, 'medium') framing, photo_score,
-              ${FRAMING_RANK_SQL} rank
+      `SELECT landmark_id, slot, framing, photo_score, ${FRAMING_RANK_SQL} rank
          FROM landmark_photo_scores
-        WHERE landmark_id = ANY($1) AND photo_score >= ${MIN_USABLE_PHOTO}
-        ORDER BY landmark_id, coalesce(framing, 'medium'), photo_score DESC, slot ASC`, [clean]);
+        WHERE landmark_id = ANY($1)`, [clean]);
     for (const r of rows) {
-      const e = map.get(r.landmark_id) || { primary: null, byFraming: [] };
-      e.byFraming.push({ slot: r.slot, framing: r.framing, photoScore: r.photo_score, rank: r.rank });
+      const e = map.get(r.landmark_id) || { primary: null, byFraming: [], scores: {}, framings: {} };
+      e.scores[String(r.slot)] = r.photo_score;
+      if (r.framing) e.framings[String(r.slot)] = r.framing;
       map.set(r.landmark_id, e);
+      if (!(r.photo_score >= MIN_USABLE_PHOTO)) continue;
+      // Best usable slot per framing (unframed reads as medium).
+      const framing = r.framing || 'medium';
+      const prior = e.byFraming.find(f => f.framing === framing);
+      const cand = { slot: r.slot, framing, photoScore: r.photo_score, rank: r.rank };
+      if (!prior) e.byFraming.push(cand);
+      else if (cand.photoScore > prior.photoScore || (cand.photoScore === prior.photoScore && cand.slot < prior.slot)) {
+        e.byFraming[e.byFraming.indexOf(prior)] = cand;
+      }
     }
     for (const e of map.values()) {
       e.byFraming.sort((a, b) => a.rank - b.rank || b.photoScore - a.photoScore || a.slot - b.slot);
@@ -2793,8 +2805,8 @@ const JUDGED_USABLE_SQL = `(story_score IS NULL OR story_score >= ${MIN_USABLE_P
 
 // Each slot's judged photo_score and framing as {slot: value}, selected beside
 // the slot columns so variantsFromIndexRow can hand every variant its own
-// judgement: pickVariantForView ranks by the score and matches the page's shot
-// against the framing. NULL when never judged.
+// judgement: servablePhotos drops a photo judged below the cutoff, and the Art
+// Director's numbered PHOTOS list shows each photo's framing. NULL when never judged.
 const PHOTO_SCORES_SQL = `(SELECT jsonb_object_agg(s.slot, s.photo_score)
           FROM landmark_photo_scores s WHERE s.landmark_id = landmark_index.id) AS photo_scores,
         (SELECT jsonb_object_agg(s.slot, s.framing)
@@ -3757,98 +3769,39 @@ function normalizePhotoKind(raw) {
 }
 
 /**
- * Which photo (if any) fits a scene's view of the landmark.
+ * THE PHOTOS A LANDMARK CAN SERVE — one set, read by the Art Director's
+ * numbered PHOTOS list (promptBuilders.landmarkPhotoListLines) and by the
+ * server that answers a citation (storyHelpers.decideLandmarkPhotoSource).
  *
- * The scene declares HOW it sees the landmark in the same vocabulary the index
- * classifies photos with. A view the index has no photo for — a world state
- * like `underwater`, or an interior nobody photographed — returns null, and the
- * caller attaches nothing: prose carries the place. Silently serving slot 1
- * instead is how a sunset exterior ended up anchoring riverbed scenes.
+ * A photo is servable when it has a URL, is not classified `bad`, and is not
+ * judged below MIN_USABLE_PHOTO (an unjudged photo counts). Ordered by slot, so
+ * the number the Art Director is shown IS the slot it cites.
  *
- * This is the ONLY selector. A dotted id in a brief (`LOC002.3`) names a
- * Visual Bible VANTAGE — a camera position the plate is grouped by — and has
- * no link to an index photo slot, so it never picks a photo (staging
- * job_1790100385959_1nitlympp served a riverside promenade on six Lindenhof
- * pages because vantage 3 was read as slot 3; docs/decisions.md 2026-09-24).
- *
- * THE PAGE'S CAMERA PICKS THE FRAMING (owner, 2026-09-24: "For ultra wide a
- * different one than for a normal image. If we have landmark variants that
- * match. If not we use the same one."). Among the photos of the view's accepted
- * kinds, one whose judged `framing` fits the page's shot wins
- * (SHOT_PHOTO_FRAMINGS; framing preference, then photoScore, then slot). When
- * none fits, the page gets the normal choice below — the same photo a medium
- * page gets.
- *
- * The normal choice: within the first accepted kind that has a photo, the
- * judged `photoScore` ranks (slot order breaks ties and orders unjudged
- * photos). A photo judged below MIN_USABLE_PHOTO is never a candidate, the same
- * cutoff serving applies.
- *
- * @param {Object} location - VB location with photoVariants[] carrying `kind`
- *   and, when judged, `photoScore` and `framing`
- * @param {string|null} view - scene's landmark view
- * @param {string|null} [shot] - the page's camera shot (shotVocabulary word)
- * @returns {number|null} variantNumber to attach, or null for "no photo"
+ * @param {Array} variants - photoVariants (variantsFromIndexRow shape)
+ * @returns {Array} the servable variants, slot order
  */
-function pickVariantForView(location, view, shot = null) {
-  const variants = (location?.photoVariants || []).filter(v => v?.url && v.kind !== 'bad'
-    && !(Number.isFinite(v.photoScore) && v.photoScore < MIN_USABLE_PHOTO));
-  if (variants.length === 0) return null;
-  const v = normalizePhotoKind(view) || (String(view || '').trim().toLowerCase() || null);
-  if (v === 'underwater' || v === 'none') return null;
-  const ACCEPTS = {
-    exterior: ['exterior', 'distant', 'close'],
-    distant: ['distant', 'exterior'],
-    close: ['close', 'exterior'],
-    interior: ['interior'],
-    'view-from': ['view-from'],
-  };
-  const kinds = ACCEPTS[v] || ACCEPTS.exterior;
-  const score = x => (Number.isFinite(x.photoScore) ? x.photoScore : -1);
-
-  const wanted = photoFramingsForShot(shot);
-  const fitting = variants.filter(x => kinds.includes(x.kind) && wanted.includes(x.framing));
-  if (fitting.length > 0) {
-    fitting.sort((a, b) => wanted.indexOf(a.framing) - wanted.indexOf(b.framing)
-      || score(b) - score(a) || a.variantNumber - b.variantNumber);
-    return fitting[0].variantNumber;
-  }
-
-  for (const kind of kinds) {
-    const ofKind = variants.filter(x => x.kind === kind);
-    if (ofKind.length === 0) continue;
-    ofKind.sort((a, b) => score(b) - score(a) || a.variantNumber - b.variantNumber);
-    return ofKind[0].variantNumber;
-  }
-  return null;
+function servablePhotos(variants) {
+  return (Array.isArray(variants) ? variants : [])
+    .filter(v => v?.url && v.kind !== 'bad'
+      && Number.isInteger(v.variantNumber)
+      && !(Number.isFinite(v.photoScore) && v.photoScore < MIN_USABLE_PHOTO))
+    .sort((a, b) => a.variantNumber - b.variantNumber);
 }
 
 /**
- * Which judged photo framings (landmark_photo_scores.framing — docs/
- * landmark-judging-instructions.md) fit a page's camera shot, best first.
+ * Read an authored `landmarkPhoto` citation (docs/decisions.md 2026-09-26,
+ * "The Art Director cites the landmark photo"). Its value space is the photo
+ * numbers of the landmark's PHOTOS list, or "none".
  *
- * Only the two shots whose camera is far from the PLACE have their own photo.
- * The judge's `wide` is "the place sits small inside a landscape or a
- * townscape" — the page's ULTRA-WIDE, not its `wide` (which "shows the full
- * setting" and is drawn from a medium photo like every eye-level page).
- * `aerial` and `ultra-wide` each take the other far framing second.
- * A close-up is close to a FIGURE, not to the place: a child waist-up in front
- * of a tower is not a `closeup` detail of the tower (the same reason `shot`
- * never derives `landmarkView`, decisions.md 2026-09-24), so it keeps the
- * normal photo. A camera POSITION (high-angle, low-angle, over-the-shoulder)
- * states no distance and gets the normal photo too, as does a page with no shot.
+ * @param {*} raw - the field as authored (number, numeric string, "none")
+ * @returns {number|'none'|null} null when absent or not a citation
  */
-const SHOT_PHOTO_FRAMINGS = {
-  'ultra-wide': ['wide', 'aerial'],
-  aerial: ['aerial', 'wide'],
-};
-const NORMAL_PHOTO_FRAMINGS = ['medium'];
-if (Object.keys(SHOT_PHOTO_FRAMINGS).some(id => !SHOT_TYPES.includes(id))) {
-  throw new Error('landmarkPhotos: SHOT_PHOTO_FRAMINGS names a shot shotVocabulary does not define');
-}
-
-function photoFramingsForShot(shot) {
-  return SHOT_PHOTO_FRAMINGS[resolveShotId(shot)] || NORMAL_PHOTO_FRAMINGS;
+function parseLandmarkPhotoCitation(raw) {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw === 'number') return Number.isInteger(raw) && raw > 0 ? raw : null;
+  const t = String(raw).trim().toLowerCase();
+  if (t === 'none') return 'none';
+  return /^\d+$/.test(t) && Number(t) > 0 ? Number(t) : null;
 }
 
 /**
@@ -4033,8 +3986,8 @@ async function loadLandmarkPhotoVariant(visualBible, locId, variantNumber = 1) {
 
   // Look up by variantNumber (the slot id), never by array position — slots
   // compact (e.g. slots 1,2,4 present), so position indexing serves the wrong
-  // photo. The number always comes from pickVariantForView, which only returns
-  // a slot the location has; a slot that is not there is an error, never a
+  // photo. The number is the Art Director's citation, checked against
+  // servablePhotos before it gets here; a slot that is not there is an error, never a
   // cue to serve some other photo (that substitution is how brief vantage ids
   // `.4` / `.5` were quietly answered with slot 1).
   const variant = location.photoVariants.find(v => v.variantNumber === variantNumber);
@@ -4175,33 +4128,18 @@ function servedLandmark(l, judged) {
   // photographer. A missing description beats a wrong one.
   const served = judged?.primary || 1;
   const at = key => l[served === 1 ? key : `${key}_${served}`] ?? null;
-  const col = (s, v) => l[v === 1 ? s : `${s}_${v}`] ?? null;
 
-  // One variant per framing, so a scene set INSIDE the castle can reach the
-  // interior shot even though a medium exterior is the primary. Falls back
-  // to every described slot when the landmark has not been judged yet.
-  const photoVariants = judged
-    ? judged.byFraming.map(f => ({
-      variantNumber: f.slot,
-      vantage: f.framing,
-      photoScore: f.photoScore,
-      url: servedPhotoUrl(l, f.slot),
-      sourceUrl: col('photo_url', f.slot),
-      description: col('photo_description', f.slot),
-      attribution: col('photo_attribution', f.slot),
-    }))
-    : Array.from({ length: 6 }, (_, i) => i + 1)
-      .filter(v => col('photo_url', v) && col('photo_description', v))
-      .map(v => ({
-        variantNumber: v,
-        // photo_type is recorded per slot; the old v>=4 rule was a guess
-        // about how the indexer filled the columns, not the stored fact.
-        vantage: col('photo_type', v) || (v >= 4 ? 'interior' : 'exterior'),
-        url: servedPhotoUrl(l, v),
-        sourceUrl: col('photo_url', v),
-        description: col('photo_description', v),
-        attribution: col('photo_attribution', v),
-      }));
+  // EVERY servable photo, numbered by slot — the set the Art Director's PHOTOS
+  // list shows and a `landmarkPhoto` citation is answered from once the story
+  // links the landmark (loadLandmarkPhotoDescriptions reads the same row
+  // through the same two functions). It used to be one photo per framing,
+  // which hid a second photo of the same framing: Lindenhof has two `wide`
+  // photos and the list showed one (docs/decisions.md 2026-09-26).
+  const photoVariants = servablePhotos(variantsFromIndexRow({
+    ...l,
+    photo_scores: judged?.scores || null,
+    photo_framings: judged?.framings || null,
+  }));
   return {
     name: l.name,
     query: l.name,
@@ -4365,6 +4303,7 @@ module.exports = {
   isFreelyLicensedImageUrl,
   fetchLandmarkPhoto,
   resolveAvailableLandmarks,
+  servedLandmark,
   premiseMentionsLandmark,
   availableLandmarkCache,
   AVAILABLE_LANDMARK_CACHE_TTL,
@@ -4394,8 +4333,8 @@ module.exports = {
 
   // Lazy photo variant loading
   loadLandmarkPhotoDescriptions,
-  pickVariantForView,
-  photoFramingsForShot,
+  servablePhotos,
+  parseLandmarkPhotoCitation,
   variantsFromIndexRow,
   loadLandmarkPhotoVariant,
 

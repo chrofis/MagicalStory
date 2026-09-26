@@ -972,8 +972,8 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
   }
 
   // (No L. `landmark_view_missing` was removed 2026-09-24, Lab 1433 — see
-  // docs/decisions.md: a missing landmarkView already resolves to the
-  // exterior photo, and the views it cannot give are not derivable here.)
+  // docs/decisions.md. The page no longer declares a view at all since 2026-09-26:
+  // the photo is cited per vantage, and scene-review check [landmark_photo_mismatch] judges it.)
 
   // M — the page's camera is one its vantage's plate cannot hold.
   const offPlate = checkShotOffPlate(page, metadata, visualBible);

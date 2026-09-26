@@ -1871,7 +1871,12 @@ async function buildCoverReferences({
     }
   }
 
-  let landmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata) : [];
+  // The cover's own (negative) page number: it is not a story page, so the
+  // page gate skips it, and it is how the cover finds the vantage whose `pages`
+  // name it — the photo that vantage cites (landmarkPhotoCitation).
+  let landmarkPhotos = visualBible
+    ? await getLandmarkPhotosForScene(visualBible, sceneMetadata, { pageNumber: COVER_PAGE_NUMBERS[coverKey] ?? -1 })
+    : [];
   // Append curated non-landmark photos so the composite path's landmarkBuf
   // resolves and pass 2 (watercolor + landmark) actually runs. Without this
   // back covers whose outline picked a curated location (e.g. Limmatufer

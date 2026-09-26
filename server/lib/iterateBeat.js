@@ -588,7 +588,7 @@ function checkRewrittenBrief({ pageNumber, brief, parentBrief = null, planLine =
  * out — the template makes it a claim about contact, so its absence is a
  * legitimate answer, not a dropped field.
  *
- * AND ONLY the fields nothing else already carries. `shot`, `landmarkView`,
+ * AND ONLY the fields nothing else already carries. `shot`, `landmarkPhoto`,
  * `wornItems`, `era`, `aboard`, `crowdExpected` and `textZoneDescription` were
  * dropped by all 11 rounds too and are restored in code by the
  * `iterateSceneMetadata` merge (images.js) — reporting them here would ask the

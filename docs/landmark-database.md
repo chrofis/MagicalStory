@@ -146,20 +146,28 @@ and `JUDGED_USABLE_SQL = (story_score IS NULL OR story_score >= 40)`. Note an
 **Framing outranks score** (`FRAMING_RANK_SQL`). Most stories put the action *at*
 the place, which needs the building filling the frame — a superb photo of the
 same castle as a speck on a ridge scores higher and is useless. `bestPhotoSlots()`
-returns the best slot **per framing**, so a scene set inside a castle can reach
-the interior shot. Serving takes **every field from the same slot**: no
+picks the landmark's primary slot by framing rank (the photo the offer's
+`photoUrl` / description / credit describe). Serving takes **every field from the same slot**: no
 cross-slot fallback, because pairing slot 3's photo with slot 1's credit names
 the wrong photographer, and attribution is a CC licence condition.
 
-**Per page, the camera picks the framing** (owner, 2026-09-24; `docs/decisions.md`).
-`variantsFromIndexRow` carries each slot's `framing` beside its `photo_score`
-(`PHOTO_SCORES_SQL` selects both), and `pickVariantForView(loc, landmarkView, shot)`
-serves an `ultra-wide` page a `wide` (then `aerial`) photo and an `aerial` page an
-`aerial` (then `wide`) photo when the landmark has one scoring ≥ 40; every other
-shot — and any page whose far framing has no photo — gets the normal choice
-(`medium` first, then best score within the view's kind). The shot is the page's
-own, else its vantage's. A slot with no `photo_type` takes its kind from its
-framing (`KIND_FROM_FRAMING`), not from the slot number.
+**The plate's author cites the photo** (owner, 2026-09-26; `docs/decisions.md`,
+"The Art Director cites the landmark photo"). The Art Director is shown every
+servable photo of each offered landmark as a numbered list — slot number, kind,
+judged framing and the COMPLETE description (`promptBuilders.landmarkPhotoListLines`)
+— and cites one per plate: `landmarkPhoto: <n> | "none"` on each vantage, or on a
+location with no vantages. The trial writer cites per location, an iterate
+rewrite that writes a fresh plate cites on the page. Code serves **exactly the
+cited slot**; `"none"` serves nothing and the page carries the place in words. A
+missing or unlisted citation is an error: logged, reported as a miss, no photo —
+nothing picks one in its place. The set shown and the set served are ONE list,
+`landmarkPhotos.servablePhotos` (URL present, not `bad`, not judged below 40,
+slot order), over `variantsFromIndexRow` for both the offer (`servedLandmark`) and
+the story's linked bible (`loadLandmarkPhotoDescriptions`). The metadata picker
+(`pickVariantForView` — view word, shot → framing, score) and `SHOT_PHOTO_FRAMINGS`
+were deleted with it; the page's `landmarkView` field is gone. A slot with no
+`photo_type` still takes its kind from its framing (`KIND_FROM_FRAMING`) — the kind
+now only chooses the fidelity block's wording and labels the list.
 
 Judging is done by **Claude agents reading the image files directly — $0**, not
 by a vision API. See `docs/landmark-judging-instructions.md`,
@@ -225,8 +233,10 @@ landmark and none lost one, because the weak rows are still returned when
 nothing is found within 100 km. The JS guard stays as the tripwire behind the
 SQL filter.
 
-Then `resolveAvailableLandmarks` layers on: best-slot photo selection, per-framing
-`photoVariants`, language-matched Wikidata name variants, and optional
+Then `resolveAvailableLandmarks` layers on: best-slot photo selection, the
+landmark's `photoVariants` (every servable photo, numbered by slot — the list the
+Art Director cites from; until 2026-09-26 one per framing, which hid a second
+photo of the same framing), language-matched Wikidata name variants, and optional
 Fisher-Yates `shuffle` (the pipeline uses it so the model stops reaching for the
 same top entries every story).
 
@@ -480,3 +490,4 @@ search for `landmark`. The load-bearing ones:
 - 2026-08-29 — a failed photo analysis is not a verdict about the place
 - 2026-09-03 — landmark photos are stored on R2; Commons URL kept as provenance
 - 2026-09-24 — every servable photo judged worldwide; unjudged is not a serving tier
+- 2026-09-26 — the Art Director cites the landmark photo per plate; code serves exactly that slot

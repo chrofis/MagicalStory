@@ -886,7 +886,13 @@ function buildEraGuard(era) {
 // prod job_1790107559778_fcmlfa8kn: a mis-described photo put "lattice metal
 // structure" in the brief; the judge failed the photo-faithful plate and its
 // "must be lattice" feedback repainted the landmark as something else.
-const LANDMARK_PHOTO_AUTHORITY = 'The photo is the authority on what the landmark looks like: where any words in this prompt describe its shape, structure, material or colour differently from the photo, the photo is right.';
+//
+// SCOPED 2026-09-26: the photo is right about the structures it SHOWS, and
+// nothing else. A plate may frame a part of the place the photo does not show
+// (the owner-approved photo-citation design, docs/decisions.md 2026-09-26),
+// and "the photo is right" with no scope told the image model to paint the
+// photo's view instead of the plate's.
+const LANDMARK_PHOTO_AUTHORITY = 'The photo is the authority on how the structures it shows look: where any words in this prompt describe their shape, structure, material or colour differently from the photo, the photo is right. The camera, the framing and everything the photo does not show come from the words.';
 
 function buildLandmarkFidelityBlock(landmark, opts = {}) {
   const name = typeof landmark === 'string'
@@ -3108,8 +3114,9 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // The Art Director AUTHORS the Visual Bible now (2026-09-11), so the three
     // inputs the bible rules need travel here instead of to the bible stage.
     CHARACTER_NAMES: characters.map(c => c.name).filter(Boolean).join(', ') || 'None',
-    // Each landmark's PHOTOS line: the bible may only name a viewpoint one of
-    // them shows, and the per-page `landmarkView` is picked from the same list.
+    // Each landmark's numbered PHOTOS list: the bible names a viewpoint one of
+    // them shows, and each real-landmark vantage cites its photo from the same
+    // list in `landmarkPhoto` (LANDMARK_PHOTO_CITE_RULE, inside this section).
     // The Art Director variant: it marks which of the plan's places are listed
     // landmarks and writes no story (2026-09-23).
     AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote, { forArtDirector: true }),
@@ -3920,6 +3927,9 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       // dump and come back described by species instead of by name.
       STAGED_FIGURES: stagedFigures || '',
       RECURRING_ELEMENTS: recurringElements,
+      // The `landmarkPhoto` field of a rewrite that writes a fresh plate: the
+      // one citation rule every plate author gets (LANDMARK_PHOTO_CITE_RULE).
+      LANDMARK_PHOTO_CITE: LANDMARK_PHOTO_CITE_RULE,
       AVAILABLE_AVATARS: availableAvatars || buildAvailableAvatarsForPrompt(characters),
       EXPECTED_CLOTHING: expectedClothingText,
       LOCKED_PERSPECTIVES: lockedPerspectivesText,
@@ -11336,13 +11346,21 @@ function buildSceneReviewBibleBlock(visualBible) {
     const vantages = Array.isArray(loc.vantages) && loc.vantages.length > 0
       ? loc.vantages
       : [{ id: `${id}.1`, name: loc.name || '', shot: '', pages: loc.pages, emptyScenePrompt: loc.emptyScenePrompt }];
+    // A real landmark's plates each cite a photo (landmarkPhoto), judged by
+    // check [landmark_photo_mismatch] against the numbered PHOTOS list.
+    const photoList = loc.isRealLandmark ? landmarkPhotoListLines(loc, '    ') : '';
+    const ownVantages = Array.isArray(loc.vantages) && loc.vantages.length > 0;
     for (const v of vantages) {
       if (!v) continue;
       const plate = String(v.emptyScenePrompt || '').trim();
       if (!plate) continue;
       const pages = Array.isArray(v.pages) ? v.pages.map(Number) : (Array.isArray(loc.pages) ? loc.pages.map(Number) : []);
-      plateLines.push(`- ${String(v.id || `${id}.1`).trim().toUpperCase()} (${label}${v.shot ? `, ${v.shot}` : ''}) — pages ${JSON.stringify(pages)}: ${plate}`);
+      const citation = ownVantages ? v.landmarkPhoto : loc.landmarkPhoto;
+      const cited = !photoList ? ''
+        : ` — landmarkPhoto: ${citation === undefined || citation === null || citation === '' ? '(none cited)' : JSON.stringify(citation)}`;
+      plateLines.push(`- ${String(v.id || `${id}.1`).trim().toUpperCase()} (${label}${v.shot ? `, ${v.shot}` : ''}) — pages ${JSON.stringify(pages)}${cited}: ${plate}`);
     }
+    if (photoList) plateLines.push(`  ${id} (${label}) PHOTOS:\n${photoList}`);
   }
 
   // DECLARED TEXT. Check 9g faults an element that must carry readable
@@ -11481,6 +11499,8 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
     // No TEXT_NOT_A_CHECKLIST: this reviewer is shown neither the page text
     // (written after the images are planned) nor the arc — its job is
     // drawability (owner, 2026-09-23).
+    // Check [landmark_photo_mismatch]: the rule every plate author is given.
+    LANDMARK_PHOTO_CITE: LANDMARK_PHOTO_CITE_RULE,
     // Check 6, from the constants both Art Director templates state as 6d / 8l.
     EYES_OPEN: EYES_OPEN_RULE,
     SHARED_GRIP: SHARED_GRIP_RULE,
@@ -11797,13 +11817,11 @@ The main character has two avatar styles available:
     }
 
     // Build landmarks instruction for the visual bible.
-    // Each landmark lists what its indexed photos show, so the writer knows
-    // which views exist (an interior shot, a view from the top). The scene
-    // hint's `landmarkView` then picks the photo by kind
-    // (landmarkPhotos.pickVariantForView). The writer no longer cites a photo
-    // number as `[LOC###.N]`: a dotted id is a Visual Bible vantage, and
-    // reading it as a photo slot served the wrong photo (docs/decisions.md
-    // 2026-09-24).
+    // Each landmark lists its numbered photos (landmarkPhotoListLines), and
+    // the writer cites the one its location's plate shows in the location's
+    // `landmarkPhoto` (LANDMARK_PHOTO_CITE_RULE; a trial bible has one plate
+    // per location). Never a dotted `[LOC###.N]`: that reading served the
+    // wrong photo (docs/decisions.md 2026-09-24, 2026-09-26).
     let landmarksInstruction = '';
     if (inputData.ideaKind === 'fantasy') {
       // The make-believe idea: the real town frames the story, the pages
@@ -11821,11 +11839,8 @@ A make-believe world.${worldSentence ? ` ${worldSentence}` : ''} The first scene
       const cityName = inputData.userLocation?.city || '';
       const landmarkBlock = top3.map(l => {
         let entry = `- ${l.name}`;
-        const variants = l.photoVariants || [];
-        if (variants.length >= 2) {
-          const views = variants.map(v => `    - ${v.description}`).join('\n');
-          entry += `\n  PHOTOS (the views a scene's landmarkView can select):\n${views}`;
-        }
+        const list = landmarkPhotoListLines(l);
+        if (list) entry += `\n  PHOTOS:\n${list}`;
         return entry;
       }).join('\n');
       landmarksInstruction = `# Location${cityName ? `: ${cityName}` : ''}
@@ -11833,7 +11848,8 @@ The story takes place in ${cityName || 'the child\'s hometown'}. Use real place 
 At least one scene MUST take place at one of these real local landmarks:
 ${landmarkBlock}
 Include the chosen landmark(s) in the visual bible locations section with their real name and accurate visual description.
-Reference the landmark by its LOC ID in the relevant scene hints.`;
+Reference the landmark by its LOC ID in the relevant scene hints.
+${LANDMARK_PHOTO_CITE_RULE} The plate of a location is its \`backgrounds[]\` description, and the citation goes on the location's own entry.`;
     } else if (inputData.userLocation?.city) {
       landmarksInstruction = `# Location: ${inputData.userLocation.city}
 The story takes place in ${inputData.userLocation.city}. Use real place names — do NOT invent fictional city names.`;
@@ -11918,27 +11934,29 @@ Output: Title, then each page with story text and a scene hint for illustration.
  * @returns {string} - Prompt section with available landmarks, or empty string if none
  */
 /**
- * One VB location as prompt lines — SINGLE source for both Art Director
- * builders (all-pages + per-page). Real landmarks with any photo list their
- * dotted variant ids (vantage-labelled) so the AD can cite them in objects[];
- * without a listed id the photo never attaches.
+ * One VB location as prompt lines — SINGLE source for the per-page Art
+ * Director (buildRecurringElementsText) and the iterate rewrite
+ * (buildSceneDescriptionPrompt). A real landmark lists its numbered PHOTOS
+ * (landmarkPhotoListLines) and the photo each of its plates cites
+ * (`landmarkPhoto`, docs/decisions.md 2026-09-26). The old dotted
+ * `[LOC###.N]` photo handles are gone: a dotted id is a vantage.
  */
 function buildVbLocationLines(loc) {
   const description = loc.extractedDescription || loc.description;
-  const vantageTag = (v) => v.vantage ? `(${v.vantage}) ` : (v.variantNumber >= 4 ? '(interior) ' : '(exterior) ');
-  if (loc.isRealLandmark && loc.photoVariants && loc.photoVariants.length > 1) {
-    const variantStrs = loc.photoVariants.map(v =>
-      `[${loc.id}.${v.variantNumber}] ${vantageTag(v)}${v.description || `Photo ${v.variantNumber}`}`);
-    return `* **${loc.name}** [${loc.id}] (real landmark): ${description}\n`
-      + `  Photo variants: ${variantStrs.join(', ')}\n`;
-  }
-  if (loc.isRealLandmark && (loc.photoVariants?.length === 1 || loc.referencePhotoUrl || loc.referencePhotoData)) {
-    const v1 = loc.photoVariants?.[0];
-    return `* **${loc.name}** [${loc.id}] (real landmark): ${description}\n`
-      + `  Photo variants: [${loc.id}.1] ${v1 ? vantageTag(v1) : '(exterior) '}${v1?.description || 'reference photo'}\n`;
-  }
   const locType = loc.isRealLandmark ? 'real landmark' : 'location';
-  return `* **${loc.name}** [${loc.id}] (${locType}): ${description}\n`;
+  let out = `* **${loc.name}** [${loc.id}] (${locType}): ${description}\n`;
+  if (!loc.isRealLandmark) return out;
+  const list = landmarkPhotoListLines(loc);
+  if (!list) return out;
+  out += `  PHOTOS:\n${list}\n`;
+  const cite = (v) => (v === undefined || v === null || v === '' ? '(none cited)' : (String(v).toLowerCase() === 'none' ? 'none' : `Photo ${v}`));
+  const vantages = Array.isArray(loc.vantages) ? loc.vantages.filter(Boolean) : [];
+  if (vantages.length > 0) {
+    out += `  Plate photos: ${vantages.map(v => `${v.id} "${v.name || ''}" → ${cite(v.landmarkPhoto)}`).join('; ')}\n`;
+  } else {
+    out += `  Plate photo: ${cite(loc.landmarkPhoto)}\n`;
+  }
+  return out;
 }
 
 // `retryNote` (optional): one generic sentence injected when a previous writer
@@ -11974,6 +11992,43 @@ function shortLandmarkDescription(extract) {
 // landmark as far as the pictures are concerned, and the bible may only
 // name a viewpoint one of them shows.
 const LANDMARK_VANTAGE_RULE = "A landmark is drawn from one of its PHOTOS. Name a location or a vantage of it only from a viewpoint one of its photos shows — an exterior is seen from the street or the square, an interior from inside, a distant or view-from photo from afar. If no photo shows the view a page needs (a skyline from a hilltop, a bird's-eye, the far side), that landmark is not available for that page: use one whose photos fit, or none. A view the commission's own words describe is the exception: it stands, and the landmark in it is drawn from what its photos show";
+
+/**
+ * THE NUMBERED PHOTO LIST a plate author cites from (docs/decisions.md
+ * 2026-09-26). Every servable photo (landmarkPhotos.servablePhotos — the same
+ * set the server answers a citation from), numbered by slot, with its kind,
+ * its judged framing and its COMPLETE description: never cut, never merged by
+ * framing. The number is the value a `landmarkPhoto` field cites.
+ *
+ * @param {Object} l - an available landmark or a Visual Bible location
+ *   carrying photoVariants (variantsFromIndexRow shape); a legacy single-photo
+ *   location is photo 1
+ * @param {string} [indent]
+ * @returns {string} lines, '' when the landmark has no photo
+ */
+function landmarkPhotoListLines(l, indent = '    ') {
+  const { servablePhotos } = require('./landmarkPhotos');
+  const photos = servablePhotos(l?.photoVariants);
+  if (photos.length > 0) {
+    return photos.map((v) => {
+      const kind = v.kind || v.vantage || 'exterior';
+      const framing = v.framing ? `, framed ${v.framing}` : '';
+      const desc = String(v.description || '').trim() || '(no description stored)';
+      return `${indent}Photo ${v.variantNumber} (${kind}${framing}): ${desc}`;
+    }).join('\n');
+  }
+  if (l?.referencePhotoUrl || l?.referencePhotoData) {
+    const desc = String(l.extractedDescription || l.photoDescription || '').trim() || '(no description stored)';
+    return `${indent}Photo 1: ${desc}`;
+  }
+  return '';
+}
+
+// THE CITATION RULE — one constant for every author of a landmark plate (the
+// all-pages Art Director's vantages, the trial writer's locations, the iterate
+// rewrite's fresh plate) and for the scene review's critic check
+// [landmark_photo_mismatch] (sibling set landmark-photo-generator-vs-critic).
+const LANDMARK_PHOTO_CITE_RULE = 'Each plate of a real landmark cites, in `landmarkPhoto`, the number of the one photo in that landmark\'s PHOTOS list whose content the plate shows, seen from roughly that photo\'s viewpoint. A photo of another side, of a neighbouring place or of the wider town is not the plate\'s photo. It cites "none" when the plate\'s frame is dominated by a structure, a feature or a view that no listed photo shows: that plate, and every page on it, then carries the place in words alone. Nothing the cited photo shows is contradicted in the plate or its pages; what lies outside the photo comes from the words.';
 
 function landmarkPhotoLine(l) {
   const variants = Array.isArray(l.photoVariants) ? l.photoVariants : [];
@@ -12043,7 +12098,11 @@ function buildAvailableLandmarksSection(landmarks, retryNote = '', { forArtDirec
   if (!landmarks || landmarks.length === 0) {
     return '';
   }
-  const photoLine = landmarkPhotoLine;
+  // The Art Director cites a photo by number, so it gets the full numbered
+  // list (landmarkPhotoListLines); the writers get one short PHOTOS line.
+  const photoLine = forArtDirector
+    ? (l) => { const list = landmarkPhotoListLines(l); return list ? `\n  PHOTOS:\n${list}` : ''; }
+    : landmarkPhotoLine;
   const landmarkList = landmarks
     .map(l => {
       let entry = `- ${l.name}`;
@@ -12071,7 +12130,7 @@ ${landmarkList}
 
 For each landmark you use:
 - \`isRealLandmark\`: true, and \`landmarkQuery\`: its EXACT name from the list above, without the [type]. Its \`name\` may be the one the story uses.
-${hasDescriptions ? `- The DESCRIPTION says what the landmark is; it is not wording for a brief.\n` : ''}${photoRule}
+${hasDescriptions ? `- The DESCRIPTION says what the landmark is; it is not wording for a brief.\n` : ''}${photoRule}${hasPhotos ? `\n- ${LANDMARK_PHOTO_CITE_RULE}` : ''}
 `;
   }
   return `**REAL LANDMARKS — use only where they belong to the world the commission names. When the story's own places offer landmarks from this list, build at least two of them in, woven into the story's action (two to four is the target); never relocate the story or bend the plot to collect them. A story set anywhere else uses none, and no listed landmark renamed or reworked into a feature of the story's own setting. A landmark carried as background scenery counts as used:**
@@ -12335,6 +12394,8 @@ module.exports = {
   buildEraGuard,
   buildLandmarkFidelityBlock,
   LANDMARK_PHOTO_AUTHORITY,
+  LANDMARK_PHOTO_CITE_RULE,
+  landmarkPhotoListLines,
   getAgeCategory,
   getAgeCategoryLabel,
   AGE_CATEGORY_ORDER,

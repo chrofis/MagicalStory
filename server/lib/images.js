@@ -5256,23 +5256,23 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     wornItems: require('./wornItems').carryForwardWornItems(newSceneMetadata, savedMeta),
     // Same class, two more fields the rewrite may legitimately re-decide and
     // must never silently drop: `shot` drives the background plate's framing,
-    // the scale repair's foreground/background split and the reference mode;
-    // `landmarkView` picks the landmark reference photo. Both were emitted by
-    // the Art Director on every page of both staging runs and by NONE of the 11
-    // rewrites. A rewrite that states one wins; a rewrite that is silent keeps
-    // the page's own.
+    // the scale repair's foreground/background split and the reference mode.
+    // It was emitted by the Art Director on every page of both staging runs
+    // and by NONE of the 11 rewrites. A rewrite that states one wins; a
+    // rewrite that is silent keeps the page's own.
     shot: newSceneMetadata?.shot || newSceneMetadata?.fullData?.shot
       || savedMeta.shot || savedMeta.fullData?.shot || null,
-    landmarkView: newSceneMetadata?.landmarkView || newSceneMetadata?.fullData?.landmarkView
-      || savedMeta.landmarkView || savedMeta.fullData?.landmarkView || null,
+    // The page's OWN landmark photo citation: a rewrite that writes a fresh
+    // plate cites the photo that plate shows; one that keeps the plate cites
+    // none, and the page's vantage citation stands (landmarkPhotoCitation).
+    // Same carry-forward as `shot`: a page cited earlier keeps its citation.
+    landmarkPhoto: newSceneMetadata?.landmarkPhoto ?? newSceneMetadata?.fullData?.landmarkPhoto
+      ?? savedMeta.landmarkPhoto ?? savedMeta.fullData?.landmarkPhoto ?? null,
   };
 
   // Build landmark photos — from the MERGED metadata, not the raw rewrite.
-  // getLandmarkPhotosForScene reads `landmarkView` to pick the reference photo,
-  // and the rewrite emitted none on 11 of 11 stored iterate rounds across two
-  // staging runs, so every repaired page chose its landmark photo blind. The
-  // merge below is what restores the parent's value; running it first is the
-  // whole point. (2026-09-17.)
+  // getLandmarkPhotosForScene reads the page's citation (its own, else its
+  // vantage's), so the merge above runs first. (2026-09-17, 2026-09-26.)
   const pageLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, iterateSceneMetadata, { pageNumber }) : [];
 
   // Determine image model and backend (needed before empty scene generation)

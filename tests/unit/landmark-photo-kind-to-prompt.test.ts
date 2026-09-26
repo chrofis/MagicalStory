@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 // The gap this file locks down: the index classifies every landmark photo
 // (photo_type: exterior | distant | close | interior | view-from),
-// pickVariantForView SELECTS on that classification — and then every consumer
+// a plate's cited photo carries that classification — and then every consumer
 // dropped it. resolveLandmarkPhotoForLocation returned {name, photoData,
 // attribution, source, variantNumber} and buildLandmarkFidelityBlock therefore
 // had only a name to work with, so a village-panorama reference was still
@@ -43,7 +43,7 @@ const location = {
 describe('resolveLandmarkPhotoForLocation — photo kind reaches the caller', () => {
   it('carries the kind of the slot that was actually served', async () => {
     servedSlot = 2;
-    const photo = await resolveLandmarkPhotoForLocation({}, location, { sceneView: 'distant' });
+    const photo = await resolveLandmarkPhotoForLocation({}, location, { citation: { value: 2, source: 'location', vantageId: null, raw: 2 } });
     expect(photo.variantNumber).toBe(2);
     expect(photo.photoType).toBe('distant');
     // The photo's own description is NOT carried: nothing downstream read it.

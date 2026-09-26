@@ -174,7 +174,7 @@ Only a place listed in the REAL LANDMARKS section above gets `isRealLandmark: tr
 
 {PLACE_SEPARATE} {PLACE_INSIDE_OUTSIDE}
 
-A location shown from one viewpoint needs no `vantages[]`. Give it `vantages[]` and split it when the same place appears from a fundamentally different camera position — exterior/interior, on a structure/beside it, wide vista/close on one element, approach/arrival. Never split for a different cast, time of day or weather: each page declares its light in `timeOfDay` and `weather`, and the plate is painted, or re-lit, in that page's light. An object with `states[]` is cited by a page as `ART###.N`, the state whose `pages` include that page; otherwise the bare `ART###`. Vantage ids are `LOC###.N` from 1; each carries `name` (3-8 words), `shot` (one of {SHOT_ENUM}; {VANTAGE_SHOT}), a 2-3 sentence background-only `description` of what the place looks like from here, an `emptyScenePrompt` (the plate, rules below), and `pages`. Every page in the location's `pages` appears in exactly one vantage.
+A location shown from one viewpoint needs no `vantages[]`. Give it `vantages[]` and split it when the same place appears from a fundamentally different camera position — exterior/interior, on a structure/beside it, wide vista/close on one element, approach/arrival. Never split for a different cast, time of day or weather: each page declares its light in `timeOfDay` and `weather`, and the plate is painted, or re-lit, in that page's light. An object with `states[]` is cited by a page as `ART###.N`, the state whose `pages` include that page; otherwise the bare `ART###`. Vantage ids are `LOC###.N` from 1; each carries `name` (3-8 words), `shot` (one of {SHOT_ENUM}; {VANTAGE_SHOT}), a 2-3 sentence background-only `description` of what the place looks like from here, an `emptyScenePrompt` (the plate, rules below), and `pages`; a real landmark's vantage also carries `landmarkPhoto`, the photo its plate shows (the rule in the REAL LANDMARKS section). Every page in the location's `pages` appears in exactly one vantage.
 
 One backdrop plate is painted per vantage, and every page of that vantage is drawn on it. A location with no `vantages[]` carries its single plate in its own `emptyScenePrompt`. A page whose backdrop the shared plate cannot hold — a different camera position, a different part of the place, a framing the plate has no room for — takes a vantage of its own, with its own plate. Decide that split here, from the plan lines: a plate is written once for the pages that share it, never once per page.
 
@@ -265,7 +265,8 @@ First, exactly:
       "isRealLandmark": false,
       "landmarkQuery": null,
       "emptyScenePrompt": "[the backdrop plate for this place; OMIT when this entry has vantages[], which carry one each]",
-      "vantages": "[OMIT unless the place appears from more than one camera position. Otherwise one row per viewpoint, and every page of this entry in exactly one of them: {\"id\": \"LOC001.1\", \"name\": \"[3-8 words]\", \"shot\": \"wide\", \"description\": \"[2-3 sentences, background only]\", \"emptyScenePrompt\": \"[this viewpoint's plate]\", \"pages\": [X, Y]}]"
+      "landmarkPhoto": "[a real landmark only: the number of the photo this plate shows, from its PHOTOS list, or \"none\". OMIT when this entry has vantages[], which cite one each, and on every invented location]",
+      "vantages": "[OMIT unless the place appears from more than one camera position. Otherwise one row per viewpoint, and every page of this entry in exactly one of them: {\"id\": \"LOC001.1\", \"name\": \"[3-8 words]\", \"shot\": \"wide\", \"description\": \"[2-3 sentences, background only]\", \"emptyScenePrompt\": \"[this viewpoint's plate]\", \"landmarkPhoto\": \"[a real landmark only: a photo number, or none]\", \"pages\": [X, Y]}]"
     }
   ],
   "vehicles": [
@@ -342,7 +343,6 @@ Then a single-line JSON object:
   "shot": "medium",
   "population": "cast_only",
   "aboard": "VEH001",
-  "landmarkView": "exterior",
   "era": "present day",
   "timeOfDay": "midday",
   "weather": "none",
@@ -384,7 +384,6 @@ Then a single-line JSON object:
   - `"ambient"` — a public place that simply has people in it: a city square, a park, a promenade, a quay, a playground, a station concourse, a shop. Distant passers-by, someone on a bench, a figure by a wall belong in the picture and are not cast.
   - `"cast_only"` — nobody but the listed figures: a private room, a garden, a forest clearing, an empty night street.
   Omit it and the page is read as `"cast_only"`. Choose `"ambient"` over `"cast_only"` whenever the location is one the public can walk into; a square with nobody on it reads as abandoned. The prose then must NOT claim the place is empty — never write "no other people are present" about an `ambient` or `crowd` setting. Describe background people the way the setting holds them, in this page's own prose ("a few distant passers-by cross the far side of the square") and never in a plate, which holds no people; keep them unnamed, distant and small. The page render draws them. The rule runs both ways: prose that puts unnamed figures in the frame — people crossing the square, riders passing, adults at the tables, onlookers — is a setting with people in it, so `population` is `ambient` or `crowd` on that page, never `cast_only`.
-- `landmarkView` is required on every page citing a real landmark — how the page sees it: `exterior` (from outside), `distant` (skyline or backdrop), `close` (a detail of the structure), `interior` (inside it), `view-from` (looking out from it, structure not visible), or `underwater` / `none` when no photograph of the place could show this scene. It selects the reference photo; a view with no matching photo attaches none and your prose carries the place.
 - A `close-up` frame ends at the waist. A pose the frame simply crops — sitting, kneeling, crouching — is fine there: the legs fall below the bottom edge, which is what a close-up IS, and a crouch or a kneel brings the head DOWN to what it is looking at. What a close-up cannot show is an action whose subject lies below the frame line — no {CLOSEUP_BELOW_WAIST}, and nothing placed behind the character. The outfit list still names all garments including footwear. A plan line whose point is below the waist is a `medium` shot, not a close-up.
 
 **`objects[]`**
@@ -394,7 +393,7 @@ Then a single-line JSON object:
 - A NAME IS NOT A PRESENCE. An element named only to say whose it is — a character's bag, a creature's egg — puts THAT element in the scene, not its owner. Cite the owner only on a page where the owner is in the picture. On the page an owner arrives, or a creature comes out of its egg, both are in the picture and both are cited.
 - At most {VB_ELEMENT_BUDGET} Visual Bible elements per page — secondary characters, animals, artifacts and vehicles count; a LOC does not, real or invented. Keep the ones the page is about and leave the rest out of `objects[]` and out of the prose.
 - An object listed with `States:` is cited with the dotted form `ART###.N` — the state whose `pages` include this page. An object with no states keeps the bare `ART###`. An object WITH states is always cited dotted, the pages before its first change included — those pages are its first state. Never two states of one object on one page.
-- Real-landmark LOCs are cited by their bare id (`LOC003`); the page's `landmarkView` decides which reference photo is attached.
+- Real-landmark LOCs are cited by their bare id (`LOC003`); the page's reference photo is the one its vantage cites in `landmarkPhoto`.
 - Invented LOCs (`isRealLandmark: false`) use the bare id `LOC001`, or the dotted form `LOC001.2` when the Visual Bible gives that location `vantages[]` — cite the vantage whose `pages` list contains this page.
 
 **`depth`, `expression` and `emotion`** — required for every character. `depth` is `foreground`, `midground` or `background`; `expression` is 3-8 words naming brows, eyes and mouth ("brows pulled tight, eyes narrowed, jaw set"). Never write a bare mood word in `expression` — "happy" and "sad" cannot be drawn; the one word goes in `emotion`, from rule 8k's list. A character's expression may change page to page with the story; their depth follows the composition. On a `wide` shot, or a plain `back view` with no head turn, faces are too small or hidden to read — describe body language in the prose instead of facial detail (rule 8i covers a back-view character whose expression must read).
@@ -454,7 +453,7 @@ Distance rule: an action across a gap is framed by rule 11 and its `where` carri
 - The Visual Bible id of the vehicle or structure the camera stands on or inside for this page (`VEH001`, `LOC004`). Omit it when the camera is outside the element looking at it, or when no such element is in the shot.
 - It tells the plate builder to render the surfaces around the camera instead of the element's full exterior, so a page set on board does not gain a second copy of the vessel in its background.
 
-**Landmark accuracy:** Read all photo variant descriptions before writing. Use the most common structural features across variants. If characters are inside an enclosed landmark, describe the scene from inside.
+**Landmark accuracy:** A real landmark's plate, and every page on it, draws the structures its cited photo shows the way that photo shows them. A plate citing "none" carries the place in words, from what the landmark's photos and DESCRIPTION say it is. If characters are inside an enclosed landmark, describe the scene from inside.
 
 **Prop placement vs landmark.** When a separate prop shares a depth band with the landmark, position the prop relative to the landmark (in front of, beside, between camera and landmark) — not by an unanchored frame slot.
 

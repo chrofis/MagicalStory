@@ -4280,6 +4280,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   // still costs money and must show up somewhere), and the model that answered.
   let allPagesCost = null;
   let allPagesModelId = null;
+  let landmarkPhotoCitations = null;
   if (params.expandScenes !== false) {
     const { buildSceneExpansionPrompt, buildAvailableAvatarsForPrompt } = require('./storyHelpers');
     const { callTextModelStreaming: callStream } = require('./textModels');
@@ -4307,6 +4308,21 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       ? buildAvailableAvatarsForPrompt(storyData.characters || [], storyData.clothingRequirements || null)
       : '';
     const storedByPage = new Map((storyData.sceneImages || []).map(s => [s.pageNumber, s.sceneDescription || '']));
+
+    // THE LANDMARK LIST production hands the Art Director. It is resolved at
+    // job start (storyJobPipeline.js, resolveAvailableLandmarks) and never
+    // stored on the story, so a replay that reads only stories.data gave the
+    // Art Director no REAL LANDMARKS section at all — every location came back
+    // invented and no photo could be cited. Same resolver, same limit and
+    // premise pin; unshuffled, so two arms of one experiment read one list.
+    let labAvailableLandmarks = [];
+    if (storyData.userLocation?.city && storyData.storyCategory !== 'historical' && params.landmarks !== false) {
+      const { resolveAvailableLandmarks } = require('./landmarkPhotos');
+      labAvailableLandmarks = await resolveAvailableLandmarks(storyData.userLocation, {
+        limit: 20, discoverOnMiss: false, language: storyData.language, shuffle: false,
+        premiseText: [storyData.storyDetails, storyData.title].filter(Boolean).join('\n'),
+      });
+    }
 
     // ONE resolver for BOTH Art-Director call shapes in this stage — the
     // all-pages builder below and the per-page `expandOnePage` fallback. That
@@ -4366,7 +4382,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     if (params.perPageExpansion !== true) {
       const { buildSceneExpansionAllPrompt, parseRefinedText: parseAll, BRIEF_TRAILING_MARKERS } = require('./storyHelpers');
       const allPrompt = buildSceneExpansionAllPrompt(
-        { ...storyData, characters: storyData.characters || [], pageClothing: null },
+        { ...storyData, characters: storyData.characters || [], pageClothing: null, availableLandmarks: labAvailableLandmarks },
         toExpand.map(b => ({ pageNumber: b.pageNumber, planLine: b.planLine })),
         // No visualBible: the Art Director AUTHORS it now (2026-09-11), ahead
         // of page 1. The stage still measures the page briefs — parseAll
@@ -4496,6 +4512,36 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     }
 
     if (!sceneExpansions) sceneExpansions = await Promise.all(toExpand.map(expandOnePage));
+
+    // THE LANDMARK LINK production runs right after the Art Director
+    // (beatsPipeline.js): each real landmark of the authored bible gets its
+    // index photos, so the scene review below reads the same numbered PHOTOS
+    // lists and the result reports every plate's photo citation — exactly
+    // the photo each plate would be served (docs/decisions.md 2026-09-26).
+    {
+      const vbLinked = runVisualBible();
+      if (vbLinked) {
+        try {
+          if (labAvailableLandmarks.length) require('./visualBible').linkPreDiscoveredLandmarks(vbLinked, labAvailableLandmarks);
+          await require('./landmarkPhotos').loadLandmarkPhotoDescriptions(vbLinked);
+          const { landmarkPhotoCitationFaults } = require('./storyHelpers');
+          const { servablePhotos } = require('./landmarkPhotos');
+          landmarkPhotoCitations = {
+            plates: (vbLinked.locations || []).filter(l => l && l.isRealLandmark).flatMap((l) => {
+              const photos = servablePhotos(l.photoVariants).map(v => ({ n: v.variantNumber, kind: v.kind, framing: v.framing, description: v.description }));
+              const plates = Array.isArray(l.vantages) && l.vantages.length > 0
+                ? l.vantages.filter(Boolean).map(v => ({ plateId: v.id, name: v.name, pages: v.pages, landmarkPhoto: v.landmarkPhoto ?? null }))
+                : [{ plateId: l.id, name: l.name, pages: l.pages, landmarkPhoto: l.landmarkPhoto ?? null }];
+              return plates.map(p => ({ locId: l.id, landmark: l.landmarkQuery || l.name, ...p, photos }));
+            }),
+            faults: landmarkPhotoCitationFaults(vbLinked),
+          };
+        } catch (lmErr) {
+          log.error(`❌ [TESTLAB] beats_scenes: landmark link failed (${lmErr.message}) — citations not reported`);
+          landmarkPhotoCitations = { error: lmErr.message };
+        }
+      }
+    }
     // ── Step 4: ONE review over ALL scene briefs ──────────────────────────
     // Repetition between pages, visual arc and continuity are invisible to a
     // per-scene reviewer — they only exist across the set — so every brief goes
@@ -4624,6 +4670,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     sceneReview,
     sceneReviews,
     authoredBible,
+    landmarkPhotoCitations,
     timeToScenesMs,
     storyId: target.storyId,
     title: storyData.title || null,

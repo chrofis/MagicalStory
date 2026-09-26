@@ -63,7 +63,6 @@ It must be detailed enough to illustrate without additional context.
     },
     "timeOfDay": "[{TIME_OF_DAY_ENUM}]",
     "weather": "[{WEATHER_ENUM}]",
-    "landmarkView": "[exterior|distant|close|interior|view-from|none — OMIT unless setting.location is a real landmark]",
     "characters": [
       {
         "id": "[CHR001 or null for main character]",
@@ -94,7 +93,6 @@ It must be detailed enough to illustrate without additional context.
 - `characters.depth` (optional, default `foreground`): how far from camera. Use `background` for tiny/distant figures. `depth` never states a size: a stated size holds at every depth.
 - `characters.perspective` (optional, default `front`): camera angle on this character.
 - `setting.location`: use `"Name [LOC001]"`.
-- `landmarkView` (only when `setting.location` is a real landmark): how the scene sees it — `exterior` (from outside), `distant` (skyline or backdrop), `close` (a detail of the structure), `interior` (inside it), `view-from` (looking out from it, structure not visible), or `none` when no photograph of the place could show this scene. It selects the reference photo; a view with no matching photo attaches none.
 - `setting.camera`: shot type determines facial detail visibility. `close-up`/`medium` = expressions visible. `wide`/`ultra-wide` = body language only.
 - `objects`: include visual bible items visible in the scene with their IDs. `size` restates the object's scale for this page's shot, in the same shape the visual bible uses; it overrides the bible entry where they differ.
 - `background`: describes crowd/environment density. Tells image generator if scene feels isolated or populated.
@@ -124,7 +122,7 @@ TITLE: [A creative, specific title in {LANGUAGE}, containing the name {MAIN_CHAR
     { "id": "ART001", "label": "[the one English name every prompt uses for this element: one to four words ending in the noun, unique in this bible, never a bare category, never a proper noun, never a word from the story language]", "name": "[plain English description of the object, e.g. 'toy treasure chest' — never a proper noun; a name the story gives it goes in properName]", "properName": "[OMIT unless the story names this object]", "pages": [2, 3, 4], "scaleClass": "{SCALE_CLASS_SPEC}", "generic": "[OMIT for every element that must look the same on every page it appears on. Set to true only when any instance of the thing would serve: swap it between two pages and no reader could tell. A generic element gets no entry beyond this one, no id and no reference image — it is written into the page prose by name and nothing else. If the story ever refers back to THIS one — it is found, lost, given, marked, recognised, or a character owns it — it is not generic.]", "type": "[the category the reference-sheet gate checks the cell against, in English: 'hand tool', 'sea chest']", "text": "[OMIT unless the story asks a reader to read words on this object; then the exact characters, in the order they must appear — a few words, or a run of letters or digits]", "description": "[appearance, its first noun the noun its `label` ends in — the word that names the thing, never the family in `type`: shape, colour, material, distinctive features. No lettering unless this entry names the exact characters it carries in `text`; otherwise its writing is illegible]", "states": "[OMIT unless the story alters this object. Otherwise the COMPLETE set of looks it wears, the unaltered look FIRST, at most 4 in all: {\"name\": \"[one or two words]\", \"delta\": \"[what distinguishes this look, one clause, at most 15 words, never a feature `description` already carries]\", \"pages\": [X]}]" }
   ],
   "locations": [
-    { "id": "LOC001", "name": "[Location name]", "pages": [1, 2, 3], "scaleClass": "{SCALE_CLASS_SPEC}", "setting": "[indoor/outdoor, type]", "colors": "[specific colors]", "features": "[distinctive visual elements]", "signatureElement": "[ONE unique detail]", "isRealLandmark": false, "landmarkQuery": null }
+    { "id": "LOC001", "name": "[Location name]", "pages": [1, 2, 3], "scaleClass": "{SCALE_CLASS_SPEC}", "setting": "[indoor/outdoor, type]", "colors": "[specific colors]", "features": "[distinctive visual elements]", "signatureElement": "[ONE unique detail]", "isRealLandmark": false, "landmarkQuery": null, "landmarkPhoto": "[a real landmark only: the number of the photo its plate shows, from its PHOTOS list, or \"none\". OMIT on an invented location]" }
   ],
   "backgrounds": [
     { "pages": [1, 2], "description": "A sun-drenched cobblestone village square with a medieval fountain in the center. Warm afternoon light. Wide shot. Open space in foreground where characters would stand." },
@@ -142,6 +140,7 @@ An entry shaped like a person — an invented figure, a small winged being, a do
 **Real-world landmarks:** Any location whose name comes from (or is recognisably) an entry in the LANDMARKS section above is a real-world landmark. For every such location:
 - `"isRealLandmark": true` (not false — if you wrote the landmark's name, you picked it from the list, so it is real)
 - `"landmarkQuery"`: the exact landmark name from the LANDMARKS section. Copy it verbatim — do not paraphrase, do not drop parens, do not anglicise.
+- `"landmarkPhoto"`: the number of the photo from its PHOTOS list that the location's background shows, or `"none"` (the citation rule in the LANDMARKS section).
 
 This is the difference between the system fetching a real Wikipedia photo of the actual building (correct) and the model inventing a generic illustration of what it thinks the building looks like (wrong). A place that exists in reality but is not listed in the LANDMARKS section stays `"isRealLandmark": false` — when in doubt, leave it false. With no LANDMARKS section, every location is false.
 
@@ -153,14 +152,15 @@ Example — picking "Kapellbrücke (Luzern) [Bridge]" from the LANDMARKS section
   "pages": [1, 2, 3],
   "setting": "outdoor bridge over the Reuss river",
   "isRealLandmark": true,
-  "landmarkQuery": "Kapellbrücke (Luzern)"
+  "landmarkQuery": "Kapellbrücke (Luzern)",
+  "landmarkPhoto": 1
 }
 ```
 Note: `name` can be styled for your story, but `landmarkQuery` must match the LANDMARKS entry character-for-character (parentheses and umlauts included).
 
 **BACKGROUNDS (style anchors for each scene):**
 Each background describes a scene with no people, no human figures. Include: location details, architecture, objects, lighting, weather, camera angle. Leave open space where characters would stand. Backgrounds can be reused across multiple pages. Every page must have a background.
-- Use the landmark photo descriptions if available to describe real locations accurately
+- A real landmark's background shows what the photo its location cites shows; a location citing "none" is described in words
 - For indoor scenes: describe furniture, walls, lighting, floor
 - For outdoor scenes: describe landscape, sky, vegetation, architecture
 

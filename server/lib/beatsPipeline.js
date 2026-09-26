@@ -427,8 +427,11 @@ function applyReviewBibleCorrections(raw, visualBible, pageCount, citedHandles) 
         out.applied.push({ id, name: '(text)', oldText: before, newText: after });
       }
     }
+    // LANDMARK PHOTO (check [landmark_photo_mismatch]): a location row may
+    // carry only a corrected `landmarkPhoto` citation.
+    const photoCorrected = applyLandmarkPhotoCorrection(row, entry, id, out);
     if (!Array.isArray(row.states) || row.states.length === 0) {
-      if (!Object.prototype.hasOwnProperty.call(row, 'text')) {
+      if (!Object.prototype.hasOwnProperty.call(row, 'text') && !photoCorrected) {
         out.rejected.push({ id, reason: 'correction carries no states[] and no text' });
       }
       continue;
@@ -511,6 +514,48 @@ function applyReviewBibleCorrections(raw, visualBible, pageCount, citedHandles) 
     });
   }
   return out;
+}
+
+/**
+ * The scene review's [landmark_photo_mismatch] correction: a location row
+ * carrying `landmarkPhoto` (on the entry, or on `vantages[]` rows by id).
+ * Taken only for a real landmark and only when the value is a servable photo
+ * number or "none"; anything else is rejected and the authored citation stands.
+ */
+function applyLandmarkPhotoCorrection(row, entry, id, out) {
+  const { servablePhotos, parseLandmarkPhotoCitation } = require('./landmarkPhotos');
+  const touches = Object.prototype.hasOwnProperty.call(row, 'landmarkPhoto')
+    || (Array.isArray(row.vantages) && row.vantages.some(v => v && Object.prototype.hasOwnProperty.call(v, 'landmarkPhoto')));
+  if (!touches) return false;
+  if (!entry.isRealLandmark) { out.rejected.push({ id, reason: 'landmarkPhoto on a location that is not a real landmark' }); return true; }
+  const photos = servablePhotos(entry.photoVariants).map(v => v.variantNumber);
+  const allowed = photos.length === 0 && (entry.referencePhotoUrl || entry.referencePhotoData) ? [1] : photos;
+  const valid = (raw) => { const c = parseLandmarkPhotoCitation(raw); return c === 'none' || (c != null && allowed.includes(c)) ? c : null; };
+  const set = (target, raw, label) => {
+    const c = valid(raw);
+    if (c == null) { out.rejected.push({ id: label, reason: `landmarkPhoto ${JSON.stringify(raw)} is not one of its photos (${allowed.join(',') || 'none'}) or "none"` }); return; }
+    if (target.landmarkPhoto === c) return;
+    out.applied.push({ id: label, name: '(landmarkPhoto)', oldPhoto: target.landmarkPhoto ?? null, newPhoto: c });
+    target.landmarkPhoto = c;
+  };
+  const rowId = String(row.id || '').trim().toUpperCase();
+  const rowVantage = rowId.includes('.')
+    ? (entry.vantages || []).find(v => String(v?.id || '').trim().toUpperCase() === rowId) : null;
+  if (Object.prototype.hasOwnProperty.call(row, 'landmarkPhoto') && rowVantage) {
+    set(rowVantage, row.landmarkPhoto, rowId); // a vantage row filed at the top level
+  } else if (Object.prototype.hasOwnProperty.call(row, 'landmarkPhoto')) {
+    if (Array.isArray(entry.vantages) && entry.vantages.length > 0) {
+      out.rejected.push({ id, reason: 'landmarkPhoto on a location with vantages — cite it per vantage' });
+    } else set(entry, row.landmarkPhoto, id);
+  }
+  for (const rv of (Array.isArray(row.vantages) ? row.vantages : [])) {
+    if (!rv || !Object.prototype.hasOwnProperty.call(rv, 'landmarkPhoto')) continue;
+    const vid = String(rv.id || '').trim().toUpperCase();
+    const target = (entry.vantages || []).find(v => String(v?.id || '').trim().toUpperCase() === vid);
+    if (!target) { out.rejected.push({ id: vid || id, reason: 'no vantage has that id' }); continue; }
+    set(target, rv.landmarkPhoto, vid);
+  }
+  return true;
 }
 
 const SYNCED_COLLECTIONS = ['secondaryCharacters', 'animals', 'artifacts', 'vehicles', 'locations', 'clothing'];
@@ -2598,8 +2643,8 @@ ${bibleBody}` : bibleBody;
   }
 
   // The page images need each real landmark's PHOTO VARIANTS on the bible entry
-  // (the resolver serves the variant a brief's landmarkView asks for). The Art
-  // Director already chose its viewpoints from the PHOTOS lines in
+  // (the resolver serves the photo a vantage's `landmarkPhoto` cites). The Art
+  // Director already cited its photos from the numbered PHOTOS lists in
   // {AVAILABLE_LANDMARKS_SECTION}; these two steps link what it chose to the
   // index rows. Both are cheap (in-memory matching; one DB query) and
   // idempotent, so the caller repeating them costs nothing.

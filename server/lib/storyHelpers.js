@@ -16,7 +16,7 @@
  */
 
 const { log } = require('../utils/logger');
-const { loadLandmarkPhotoVariant, pickVariantForView } = require('./landmarkPhotos');
+const { loadLandmarkPhotoVariant, servablePhotos, parseLandmarkPhotoCitation } = require('./landmarkPhotos');
 const { parseClothingCategory, parseCharacterClothing, resolveClothingForPage, buildSceneClothingRequirements, buildAvailableAvatarsForPrompt, convertClothingToCurrentFormat, getCharacterPhotos, getCharacterPhotoDetails, buildWholeCastReferencePhotos, prefetchAvatarBytesForCharacters, applyReferenceMode } = require('./clothingResolve');
 const { wrapUserInput, stripAgeWords, buildHairDescription, buildCharacterDescriptionsForBbox, buildSecondaryCharacterDescriptions, buildSecondaryExpectedCharacters, buildCastIdentityDescription, buildIdentityClothingText, buildIdentityLine, buildSecondaryExpectedForPage, buildTextZoneInstruction, buildEraGuard, buildLandmarkFidelityBlock, getAgeCategory, getAgeCategoryLabel, AGE_CATEGORY_ORDER, getAgeCategoryIndex, clampApparentAge, getTeachingGuide, getIdeaGuide, preloadHistoricalLocations, getHistoricalLocations, preloadHistoricalObjects, getHistoricalObjects, getAdventureGuide, getSceneComplexityGuide, ART_STYLES, WORLD_ART_STYLES, buildStyleWardrobeBlock, resolveArtStyle, resolveArtStyleForSheet, LANGUAGE_LEVELS, getReadingLevel, getTokensPerPage, extractCharacterVisualProfile, buildCharacterPhysicalDescription, buildGroundingPrompt, buildCharacterPromptBlock, buildRelativeHeightDescription, buildCharacterRestriction, buildCharacterReferenceList, buildReferenceCardColours, buildCoverPrompt, buildBasePrompt, buildSceneExpansionAllPrompt, buildSceneExpansionPrompt, buildSceneDescriptionPrompt, stripWornStateFromDescription, buildImagePrompt, sanitizeVbIdsInPrompt, buildOutlineReviewPrompt, buildTextRefinePrompt, parseRefinedText, BRIEF_TRAILING_MARKERS, buildBeatsPrompt, buildChallengeIdeasSection, buildArcCreatePrompt, buildArcPanelPrompt, buildArcRetellPrompt, buildArcHintsPrompt, parseArcHints, parseArcCreate, parseArcRetell, parseStoryLogic, filterPanelFindings, filterCritiqueFaults, arcRepairFindings, splitCommittedBlock, arcShapeCounts, arcInventedAllowance, critiqueMaxSeverity, buildPlanCheckPrompt, parsePlanCheck, buildReplanSection, replanRank, countsTowardConvergence, convergenceMustFixCount, replanRoundConverged, replanRoundRegressed, replanFindingKey, findingPages, buildArcReviewPrompt, buildArcAuditPrompt, buildTextAuditPrompt, buildTextAuditBlindPrompt, buildTextProofreadPrompt, buildTextDiffPrompt, countFaults, faultsByCategory, parseArcReview, buildStoryShapeSection, buildClothingReviewPrompt, parseClothingReview, parseBeats, parsePagePlan, parsePlanResponse, planBlocks, planInstant, buildSceneReviewPrompt, buildDoNotWriteSection, buildStoryTextFromBeatsPrompt, buildStoryBibleFromBeatsPrompt, buildTrialStoryPrompt, buildAvailableLandmarksSection, buildPreviousScenesContext, buildChildCriticPrompt, youngestMainAge } = require('./promptBuilders');
 const { extractJsonFromText, parseProseMetadataFormat, splitBrief, POSITION_ABBREVIATIONS, expandPositionAbbreviations, stripEntityIds, stripSceneMetadata, parseCharacterDescriptions, enforceSpreadTextPosition, mirrorLeftRight, extractSceneMetadata, collectSceneCharacterNames, findCastMissingFromMetadata, getCharactersInScene, unionPageCast, parseSceneHintMetadata, parseStoryPages, parseSceneDescriptions, extractShortSceneDescriptions, extractCoverScenes, extractPageClothing, getPrimaryVantageForPage, resolvePagePlate, groupPagesByVantage, groupTrialPlatePagesByVantage, normalizePositionToLCR, getPageText, updatePageText } = require('./sceneMetadata');
@@ -66,17 +66,20 @@ function calculateStoryPageCount(storyData, includeCoverPages = true) {
  * Also checks setting.location for landmark references
  * Supports on-demand loading of photo variants for Swiss landmarks
  * @param {Object} visualBible - Visual Bible object with locations
- * @param {Object} sceneMetadata - Scene metadata with objects array, setting.location and landmarkView
+ * @param {Object} sceneMetadata - Scene metadata with objects array, setting.location and (iterate rewrites only) landmarkPhoto
  * @param {Object} [opts]
  * @param {number} [opts.pageNumber] - Current page. When given (positive int), a
  *   landmark is served only if its VB pages list includes this page — the
  *   writer's pages list is the authority on WHERE a landmark appears; an AD
- *   reference alone is not enough. Cover callers pass nothing (covers pick
- *   their backdrop by a different rule and have no positive page number).
+ *   reference alone is not enough. Covers pass their NEGATIVE page number
+ *   (coverKeys.COVER_PAGE_NUMBERS): the gate skips it, and it finds the
+ *   vantage whose `pages` name the cover, i.e. the photo that vantage cites.
+ * @param {string} [opts.vantageId] - the vantage a plate is being painted for
+ *   (the vantage-plate path): that vantage's citation wins for its location.
  * @param {Array} [opts.misses] - caller-owned array; every landmark the scene
  *   cites that SHOULD have produced a photo but could not (fetch failed, no
  *   photo source at all) is pushed as {id, name, reason}. By-design "attach
- *   nothing" outcomes (no photo for the scene's landmarkView) are NOT
+ *   nothing" outcomes (a plate that cites "none") are NOT
  *   misses. Lets the page renderer downgrade loudly instead of silently
  *   rendering a real landmark blind (dragon run job_1788551692337_bc479p945:
  *   Commons fetches failed, 5 pages rendered with zero reference photos and
@@ -88,10 +91,8 @@ async function getLandmarkPhotosForScene(visualBible, sceneMetadata, opts = {}) 
 
   // Extract LOC IDs and names from objects like "Burgruine Stein [LOC002]" or "Kennedy Space Center [LOC001.2]".
   // A dotted `.N` is a Visual Bible VANTAGE id (the plate's camera position),
-  // never a photo slot: the page's `landmarkView` picks the photo's kind and
-  // the page's shot its framing (pickVariantForView; docs/decisions.md
-  // 2026-09-24). The vantage is kept only for its `shot`, the camera of a page
-  // that declares none.
+  // never a photo slot (docs/decisions.md 2026-09-24). It names the vantage
+  // whose `landmarkPhoto` citation this page's photo is (landmarkPhotoCitation).
   const locIds = [];
   const locNames = [];
   const vantageIds = [];
@@ -171,13 +172,15 @@ async function getLandmarkPhotosForScene(visualBible, sceneMetadata, opts = {}) 
     return [];
   }
 
-  // Load photos for each matching location
-  const sceneView = sceneMetadata?.landmarkView || sceneMetadata?.fullData?.landmarkView || null;
+  // Load the CITED photo for each matching location (landmarkPhotoCitation).
+  // Covers pass their negative page number: it takes no part in the page gate
+  // above, and it is how a cover finds the vantage whose `pages` name it.
+  const citePage = Number.isInteger(opts.pageNumber) ? opts.pageNumber : null;
+  if (opts.vantageId) vantageIds.push(String(opts.vantageId).trim().toUpperCase());
   const results = [];
   for (const loc of matchingLocations) {
     const photo = await resolveLandmarkPhotoForLocation(visualBible, loc, {
-      sceneView,
-      shot: landmarkPhotoShot(sceneMetadata, loc, vantageIds, gatePage),
+      citation: landmarkPhotoCitation(visualBible, loc, { sceneMetadata, pageNumber: citePage, vantageIds }),
       misses: opts.misses,
     });
     if (photo) results.push(photo);
@@ -187,23 +190,82 @@ async function getLandmarkPhotosForScene(visualBible, sceneMetadata, opts = {}) 
 }
 
 /**
- * The camera shot a landmark photo is matched to: the page's own shot, else the
- * shot of the vantage the page is drawn from (the dotted id it cites, else the
- * vantage whose `pages[]` names the page). Same precedence the vantage plate
- * uses for its SHOT line — the page's shot wins over the vantage's.
- * Covers carry theirs in `setting.camera`.
+ * WHICH PHOTO A PAGE CITES for one real landmark (docs/decisions.md
+ * 2026-09-26, "The Art Director cites the landmark photo").
  *
- * @returns {string|null} a shot word, or null when neither states one
+ * The Art Director cites a photo per PLATE, because the photo is what a plate
+ * is painted from: `landmarkPhoto` on each vantage, or on the location itself
+ * when it has no `vantages[]` (one viewpoint, one plate). A page is drawn on
+ * its vantage's plate, so it takes that vantage's citation:
+ *   1. 'page'     the page brief's own `landmarkPhoto`, for the location whose
+ *                 plate the page authors itself — an iterate rewrite that writes
+ *                 a fresh plate (`reuseEmptyScene: false`). Only the page's
+ *                 primary location (getPrimaryVantageForPage), never a second
+ *                 landmark the page also shows.
+ *   2. 'vantage'  the vantage the page cites by its dotted id, else the one
+ *                 whose `pages` name the page.
+ *   3. 'location' a location with no `vantages[]`.
+ * No level applies → `{ value: null }`, which the resolver reports as an error.
+ * Nothing here looks at the page's shot, a view word or a photo's framing: the
+ * citation is the whole selection.
+ *
+ * @returns {{value: number|'none'|null, source: 'page'|'vantage'|'location'|null, vantageId: string|null, raw: *}}
  */
-function landmarkPhotoShot(sceneMetadata, loc, vantageIds = [], pageNumber = null) {
-  const own = sceneMetadata?.shot || sceneMetadata?.fullData?.shot || sceneMetadata?.setting?.camera
-    || sceneMetadata?.fullData?.setting?.camera || null;
-  if (typeof own === 'string' && own.trim()) return own.trim();
-  const vantages = Array.isArray(loc?.vantages) ? loc.vantages : [];
-  const cited = vantages.find(v => vantageIds.includes(String(v?.id || '').toUpperCase()));
-  const onPage = pageNumber != null ? vantages.find(v => Array.isArray(v?.pages) && v.pages.includes(pageNumber)) : null;
-  const shot = (cited || onPage)?.shot;
-  return typeof shot === 'string' && shot.trim() ? shot.trim() : null;
+function landmarkPhotoCitation(visualBible, loc, { sceneMetadata = null, pageNumber = null, vantageIds = [] } = {}) {
+  const locId = String(loc?.id || '').toUpperCase();
+  const own = sceneMetadata?.landmarkPhoto ?? sceneMetadata?.fullData?.landmarkPhoto;
+  if (own !== undefined && own !== null && sceneMetadata) {
+    const { getPrimaryVantageForPage } = require('./sceneMetadata');
+    const primary = getPrimaryVantageForPage(sceneMetadata, visualBible, {
+      pageNumber, emptyScenePrompt: sceneMetadata?.emptyScenePrompt || '',
+    });
+    if (primary && primary.locId === locId) {
+      return { value: parseLandmarkPhotoCitation(own), source: 'page', vantageId: null, raw: own };
+    }
+  }
+  const vantages = Array.isArray(loc?.vantages) ? loc.vantages.filter(Boolean) : [];
+  if (vantages.length > 0) {
+    const cited = vantages.find(v => vantageIds.includes(String(v.id || '').toUpperCase()));
+    const onPage = pageNumber != null
+      ? vantages.find(v => Array.isArray(v.pages) && v.pages.map(Number).includes(pageNumber)) : null;
+    const v = cited || onPage;
+    if (!v) return { value: null, source: null, vantageId: null, raw: undefined };
+    return { value: parseLandmarkPhotoCitation(v.landmarkPhoto), source: 'vantage', vantageId: v.id || null, raw: v.landmarkPhoto };
+  }
+  return { value: parseLandmarkPhotoCitation(loc?.landmarkPhoto), source: 'location', vantageId: null, raw: loc?.landmarkPhoto };
+}
+
+/**
+ * Every real-landmark PLATE's photo citation, checked against the photos the
+ * landmark can serve (docs/decisions.md 2026-09-26). A plate is a vantage, or a
+ * location with no vantages. Pure: the story run reports each fault once, on
+ * the final bible after the scene review (storyJobPipeline.js, log.error +
+ * genLog `landmark_photo_citation`), and the Lab stage returns them. Never
+ * repairs one — the citation is the plate author's, and the scene review's
+ * [landmark_photo_mismatch] check is the stage that corrects it.
+ *
+ * @returns {Array<{locId, plateId, cited, reason}>} the faults found
+ */
+function landmarkPhotoCitationFaults(visualBible) {
+  const faults = [];
+  for (const loc of (visualBible?.locations || [])) {
+    if (!loc?.isRealLandmark) continue;
+    const photos = servablePhotos(loc.photoVariants).map(v => v.variantNumber);
+    const legacy = photos.length === 0 && (loc.referencePhotoUrl || loc.referencePhotoData);
+    const allowed = legacy ? [1] : photos;
+    const plates = Array.isArray(loc.vantages) && loc.vantages.length > 0
+      ? loc.vantages.filter(Boolean).map(v => ({ id: v.id || `${loc.id}.?`, raw: v.landmarkPhoto }))
+      : [{ id: loc.id, raw: loc.landmarkPhoto }];
+    for (const p of plates) {
+      const cited = parseLandmarkPhotoCitation(p.raw);
+      let reason = null;
+      if (p.raw === undefined || p.raw === null || p.raw === '') reason = 'no landmarkPhoto cited';
+      else if (cited == null) reason = `landmarkPhoto ${JSON.stringify(p.raw)} is not a photo number or "none"`;
+      else if (cited !== 'none' && !allowed.includes(cited)) reason = `landmarkPhoto ${cited} is not one of its photos (${allowed.join(',') || 'none servable'})`;
+      if (reason) faults.push({ locId: loc.id, locName: loc.name, plateId: p.id, cited: p.raw ?? null, reason });
+    }
+  }
+  return faults;
 }
 
 /**
@@ -211,7 +273,7 @@ function landmarkPhotoShot(sceneMetadata, loc, vantageIds = [], pageNumber = nul
  *
  * Two storage shapes exist and only one of them uses `photoFetchStatus`:
  *  - VARIANT landmarks (Swiss pre-indexed, 2-3 photos by kind) resolve
- *    on-demand through pickVariantForView + loadLandmarkPhotoVariant. They are
+ *    on-demand through the cited slot + loadLandmarkPhotoVariant. They are
  *    deliberately EXCLUDED from prefetchLandmarkPhotos (see the
  *    `!l.photoVariants?.length` filter at its call site), so their
  *    photoFetchStatus stays 'pending_lazy' forever — checking it is always wrong.
@@ -226,20 +288,17 @@ function landmarkPhotoShot(sceneMetadata, loc, vantageIds = [], pageNumber = nul
  * bystanders, real signage, in a watercolour book). Both callers now share this
  * resolver — never inline a third copy.
  *
- * The scene's declared landmark view picks the photo by KIND
- * (pickVariantForView), ranked by the judged photo score — and a view the index
- * has no photo for (underwater, an unphotographed interior) attaches nothing
- * rather than falling back to slot 1, which is how a surface photo ended up
- * anchoring underwater scenes. A dotted id in the brief (`LOC002.3`) is a
- * Visual Bible vantage and plays no part here; the old `.N`-is-a-photo-slot
- * channel (and its `.0` = attach nothing) was deleted 2026-09-24 — `none` /
- * `underwater` is how a page asks for no photo.
+ * The photo is the one the Art Director CITED (landmarkPhotoCitation): exactly
+ * that slot, or nothing for "none". A missing citation, or a number that is not
+ * one of the landmark's servable photos, is an ERROR — logged and reported as a
+ * miss, and no photo is attached; nothing picks a photo in its place
+ * (docs/decisions.md 2026-09-26). The metadata picker that chose by view word,
+ * framing and score (pickVariantForView) is deleted.
  *
  * @param {Object} visualBible
  * @param {Object} loc - one VB location (isRealLandmark)
  * @param {Object} [opts]
- * @param {string|null} [opts.sceneView] - declared landmark view; null picks an exterior
- * @param {string|null} [opts.shot] - the page's camera shot; picks the photo's framing
+ * @param {Object} [opts.citation] - landmarkPhotoCitation() for this location
  * @param {Array} [opts.misses] - see getLandmarkPhotosForScene; failure-to-serve
  *   entries {id, name, reason} are pushed here (never by-design nulls)
  * @returns {Promise<Object|null>} landmark photo entry, or null to attach nothing
@@ -247,14 +306,10 @@ function landmarkPhotoShot(sceneMetadata, loc, vantageIds = [], pageNumber = nul
 async function resolveLandmarkPhotoForLocation(visualBible, loc, opts = {}) {
   const misses = Array.isArray(opts.misses) ? opts.misses : null;
   const decision = decideLandmarkPhotoSource(loc, opts);
-  if (!decision) {
-    // A variant-backed landmark returning null is by design (no photo for the
-    // scene's view — the prose carries the setting). A landmark
-    // with NO variants and no successful photo is a genuine miss: the scene
-    // cites a real landmark and we have nothing to show the model.
-    if (misses && !(loc.photoVariants?.length > 0)) {
-      misses.push({ id: loc.id, name: loc.name, reason: `no photo available (fetchStatus=${loc.photoFetchStatus || 'none'})` });
-    }
+  if (decision.mode === 'none') return null; // cited "none": the prose carries the place
+  if (decision.mode === 'error') {
+    log.error(`❌ [LANDMARK-SCENE] "${loc.name}" [${loc.id}]: ${decision.reason} — no photo attached`);
+    if (misses) misses.push({ id: loc.id, name: loc.name, reason: decision.reason });
     return null;
   }
 
@@ -269,7 +324,7 @@ async function resolveLandmarkPhotoForLocation(visualBible, loc, opts = {}) {
     log.debug(`[LANDMARK-SCENE] Loaded "${loc.name}" variant ${variant.variantNumber}`);
     // Carry the indexer's own classification of THIS photo (photo_type:
     // exterior | distant | close | interior | view-from) and its description
-    // through to the prompt. pickVariantForView selects on `kind` and then
+    // through to the prompt. The index classifies every photo by `kind`, and
     // every consumer dropped it, so buildLandmarkFidelityBlock had only a name
     // to go on and told the model "preserve the silhouette… never a tiny speck
     // against a wide cityscape" even when the reference was a village panorama,
@@ -287,6 +342,8 @@ async function resolveLandmarkPhotoForLocation(visualBible, loc, opts = {}) {
       // (removed 2026-09-15) — so do not diagnose a prompt as "having the
       // photo's description": it does not.
       photoType: served?.kind || null,
+      // Where the citation came from, for the logs and the stored page record.
+      citedBy: opts.citation?.source || null,
     };
   }
 
@@ -303,35 +360,52 @@ async function resolveLandmarkPhotoForLocation(visualBible, loc, opts = {}) {
 }
 
 /**
- * The POLICY half of resolveLandmarkPhotoForLocation, with no I/O — which
- * shape of landmark is this, and which photo should it get?
+ * The POLICY half of resolveLandmarkPhotoForLocation, with no I/O: which photo
+ * does the citation serve?
  *
- * Split out so the rule that caused the bug is directly testable: a
- * variant-backed landmark must be decided on its VARIANTS, never on
- * `photoFetchStatus` (which only the legacy shape ever has stamped).
+ * A variant-backed landmark is decided on its VARIANTS, never on
+ * `photoFetchStatus` (which only the legacy shape ever has stamped): the cited
+ * number must be one of servablePhotos(loc.photoVariants) — the same list the
+ * Art Director was shown. A legacy single-photo landmark shows the Art Director
+ * one photo, number 1.
  *
- * @returns {{mode:'variant', variantNumber:number}|{mode:'legacy'}|null}
- *   null = attach nothing.
+ * @param {Object} loc
+ * @param {Object} [opts]
+ * @param {Object} [opts.citation] - landmarkPhotoCitation() result
+ * @returns {{mode:'variant', variantNumber:number}|{mode:'legacy'}|{mode:'none'}|{mode:'error', reason:string}}
  */
 function decideLandmarkPhotoSource(loc, opts = {}) {
-  if (!loc) return null;
-  const { sceneView = null, shot = null } = opts;
-
-  if (loc.photoVariants && loc.photoVariants.length > 0) {
-    const variantNumber = pickVariantForView(loc, sceneView, shot);
-    if (variantNumber == null) {
-      log.info(`📍 [LANDMARK-SCENE] ${loc.name}: no photo attached (view=${sceneView || 'unset'}) — prose carries the setting`);
-      return null;
-    }
-    return { mode: 'variant', variantNumber };
+  if (!loc) return { mode: 'error', reason: 'no location' };
+  const citation = opts.citation || { value: null, source: null, raw: undefined };
+  const hasVariants = Array.isArray(loc.photoVariants) && loc.photoVariants.length > 0;
+  const hasLegacy = !hasVariants && (loc.referencePhotoUrl || loc.referencePhotoData) && loc.photoFetchStatus === 'success';
+  if (!hasVariants && !hasLegacy) {
+    log.debug(`[LANDMARK-SCENE] "${loc.name}" (${loc.id}) has no photos (variants=${loc.photoVariants?.length || 0}, fetchStatus=${loc.photoFetchStatus || 'none'})`);
+    return { mode: 'error', reason: `no photo available (fetchStatus=${loc.photoFetchStatus || 'none'})` };
   }
-
-  if ((loc.referencePhotoUrl || loc.referencePhotoData) && loc.photoFetchStatus === 'success') {
-    return { mode: 'legacy' };
+  const where = citation.source === 'vantage' ? `vantage ${citation.vantageId || '?'}`
+    : (citation.source || 'no vantage names this page');
+  if (citation.value == null) {
+    return {
+      mode: 'error',
+      reason: citation.raw === undefined || citation.raw === null
+        ? `no landmarkPhoto cited (${where})`
+        : `landmarkPhoto ${JSON.stringify(citation.raw)} is not a photo number or "none" (${where})`,
+    };
   }
-
-  log.debug(`[LANDMARK-SCENE] "${loc.name}" (${loc.id}) has no photos (variants=${loc.photoVariants?.length || 0}, fetchStatus=${loc.photoFetchStatus || 'none'})`);
-  return null;
+  if (citation.value === 'none') {
+    log.info(`📍 [LANDMARK-SCENE] ${loc.name}: ${where} cites no photo — the prose carries the place`);
+    return { mode: 'none' };
+  }
+  if (hasLegacy) {
+    return citation.value === 1 ? { mode: 'legacy' }
+      : { mode: 'error', reason: `landmarkPhoto ${citation.value} is not one of its photos (1) (${where})` };
+  }
+  const servable = servablePhotos(loc.photoVariants).map(v => v.variantNumber);
+  if (!servable.includes(citation.value)) {
+    return { mode: 'error', reason: `landmarkPhoto ${citation.value} is not one of its photos (${servable.join(',') || 'none servable'}) (${where})` };
+  }
+  return { mode: 'variant', variantNumber: citation.value };
 }
 
 /**
@@ -405,10 +479,11 @@ function trialPlateLandmarkPromisesByPage(visualBible, opts = {}) {
     if (!loc.isRealLandmark || !loc.pages?.length) continue;
     const p = (async () => {
       if (opts.descriptionsPromise) await opts.descriptionsPromise;
-      // No scene view and no shot exist here (the plate is built from the VB
-      // background, before any brief, and its prompt names no camera), so the
-      // resolver picks the normal exterior — what a background plate wants.
-      const photo = await resolveLandmarkPhotoForLocation(visualBible, loc, { sceneView: null, shot: null });
+      // One plate per location (trial bibles carry no vantages), so the photo
+      // is the one the trial writer cited on the location's own entry.
+      const photo = await resolveLandmarkPhotoForLocation(visualBible, loc, {
+        citation: landmarkPhotoCitation(visualBible, loc, { pageNumber: loc.pages[0] }),
+      });
       if (!photo) return null;
       // block ⇔ bytes: a legacy entry can resolve to a URL with no inline data,
       // and the fidelity block must never ship without the photo it describes.
@@ -610,6 +685,8 @@ module.exports = {
   getLandmarkPhotosForScene,
   resolveLandmarkPhotoForLocation,
   decideLandmarkPhotoSource,
+  landmarkPhotoCitation,
+  landmarkPhotoCitationFaults,
   ensureLandmarkPhotoBytes,
   trialPlateLandmarkPromisesByPage,
   buildAvailableLandmarksSection,
