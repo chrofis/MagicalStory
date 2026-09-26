@@ -78,6 +78,8 @@
 
 12c. **No lettering on any surface.** No words, names or letters anywhere in the image; the only exception is text the Visual Bible explicitly specifies for an element, painted exactly as specified. Applies to `sceneIntent` and every metadata field, not only the prose.
 
+12l. **The mood is shown, not named.** {NO_HEADLINE_PHRASES}
+
 12g. **Build descriptions are visual, not nominal.** Describe an object by its shape and parts ("two-masted with square topsails"), never by a style name ("brigantine-style") — style words are lettering bait the sanitizer can't catch.
 
 12h. **An object out of sight.** {CONCEALED_OBJECT}

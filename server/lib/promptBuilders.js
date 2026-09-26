@@ -2875,6 +2875,7 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     WORN_ITEMS_ROW: WORN_ITEMS_ROW_RULE,
     WORN_ON_OTHER: WORN_ON_OTHER_RULE,
     NEVER_NAME_ABSENT: ABSENT_THING_RULE,
+    NO_HEADLINE_PHRASES: HEADLINE_PHRASE_RULE,
     SCENE_INTENT_FIELD: SCENE_INTENT_FIELD_RULE,
     // The page's declared light (sceneLight.js) — one rule for every brief author
     // and the scene review's check (sibling set scene-light-generator-vs-critic).
@@ -3201,6 +3202,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     WORN_ITEMS_ROW: WORN_ITEMS_ROW_RULE,
     WORN_ON_OTHER: WORN_ON_OTHER_RULE,
     NEVER_NAME_ABSENT: ABSENT_THING_RULE,
+    NO_HEADLINE_PHRASES: HEADLINE_PHRASE_RULE,
     SCENE_INTENT_FIELD: SCENE_INTENT_FIELD_RULE,
     // The page's declared light (sceneLight.js) — one rule for every brief author
     // and the scene review's check (sibling set scene-light-generator-vs-critic).
@@ -3663,6 +3665,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     WORN_ITEMS_ROW: WORN_ITEMS_ROW_RULE,
     WORN_ON_OTHER: WORN_ON_OTHER_RULE,
     NEVER_NAME_ABSENT: ABSENT_THING_RULE,
+    NO_HEADLINE_PHRASES: HEADLINE_PHRASE_RULE,
     SCENE_INTENT_FIELD: SCENE_INTENT_FIELD_RULE,
     // The page's declared light (sceneLight.js) — one rule for every brief author
     // and the scene review's check (sibling set scene-light-generator-vs-critic).
@@ -8992,6 +8995,16 @@ const WORN_ON_OTHER_RULE = "When the page has a character other than the item's 
 
 const ABSENT_THING_RULE = "\"no glow\", \"bare rail\", \"no other figures in the room\", \"does not wave\" each paint the named thing into the picture. Leave it unwritten and describe what does occupy that space instead (\"the rail runs smooth grey iron\", \"the far wall is plain plaster\"). This covers props, people and the medium alike — you are not shown the art style, and a ban on glow, colour, text, reflections or weather can contradict the style the picture is drawn in.";
 
+/**
+ * THE MOOD IS SHOWN, NOT NAMED (owner, 2026-09-26: "no headline phrases in
+ * briefs"). An abstract phrase naming the moment ("share a proud moment")
+ * reaches the image model as words, and it paints them as a caption: staging
+ * job_1790373080139_vnx5l8iy7 p18 carried "THE PROUD MOMENT" as an overlay.
+ * One constant for all four brief authors (scene-expansion, scene-expansion-all,
+ * scene-iteration, scene-iteration-free).
+ */
+const HEADLINE_PHRASE_RULE = "Write what the picture shows — faces, gestures, poses, light, what the hands do. A phrase that names the mood or the beat (\"share a proud moment\", \"a moment of triumph\", \"a happy ending\") is painted as a caption; it goes in no field.";
+
 const SCENE_INTENT_FIELD_RULE = "2-3 present-tense sentences naming the single moment the image depicts. Sentence 1: who does what to whom, where. Sentence 2: what characters hold or reach for, and the page's one gaze target — never a second target, and never a character facing one person while gazing at another. Sentence 3: the setting and the light. Name every character physically present. List the main and primary characters among them in `characters[]`; secondary characters stay in the prose and carry their CHR id in `objects[]`. One moment only — not cause plus effect.";
 
 /**
@@ -12115,6 +12128,7 @@ module.exports = {
   WORN_ITEMS_ROW_RULE,
   WORN_ON_OTHER_RULE,
   ABSENT_THING_RULE,
+  HEADLINE_PHRASE_RULE,
   SCENE_INTENT_FIELD_RULE,
   // Re-exported from sceneLight.js: the parity tests read every brief-authoring
   // rule off this module.

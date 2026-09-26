@@ -21,6 +21,14 @@ superseded and link forward.
 
 ---
 
+## 2026-09-26 — Brief prose shows the mood, never names it: HEADLINE_PHRASE_RULE in all four brief authors
+
+**Context:** Staging job_1790373080139_vnx5l8iy7 p18: the Art Director wrote "the four boys share a proud moment with the dragons"; the image model painted "THE PROUD MOMENT" as a caption overlay (CRITICAL rendered_text). An abstract phrase naming the moment reaches the image model as words. Rule 12c (no lettering) bans text on surfaces but says nothing about headline-like prose.
+**Decision:** (owner: "no headline phrases in briefs") one constant, promptBuilders.HEADLINE_PHRASE_RULE, filled as {NO_HEADLINE_PHRASES} into scene-expansion.txt (12l), scene-expansion-all.txt (12l), scene-iteration.txt (15c) and scene-iteration-free.txt (29b) by the three existing fill sites; anchored in the art-director-vs-iterate sibling set and pinned byte-identical in all four built prompts by ad-iterate-parity.test.ts. The rule is positive: describe faces, gestures, poses, light, what the hands do; a phrase naming the mood or beat goes in no field. scene-review.txt does NOT get it: it is a critic that receives none of the Art Director's prose-writing constants (NEVER_NAME_ABSENT etc.), and the generator↔critic rule runs critic ⊆ generator, which holds. A review lens for it would be a new critic check — an owner call, not taken here. The trial cover (cover-composition.txt, JS hint) has no Art Director prose and is untouched.
+**Rationale:** the defect is authored upstream; a rewrite that lacks the rule would reintroduce it, so all four authors carry one string.
+**Touched:** server/lib/promptBuilders.js, prompts/scene-expansion.txt, prompts/scene-expansion-all.txt, prompts/scene-iteration.txt, prompts/scene-iteration-free.txt, scripts/admin/sibling-registry.json, tests/unit/ad-iterate-parity.test.ts
+**Status:** ✅ active
+
 ## 2026-09-26 — Critical-gone wins: a version whose CRITICAL is confirmed gone never loses to one that still carries it
 
 **Context:** Staging job_1790373080139_vnx5l8iy7 p18. v0 carried a caption overlay "THE PROUD MOMENT" (lettering inventory placement `overlay` → CRITICAL `rendered_text`, letteringCheck.js), score 75. Inpaint round 1 removed it cleanly (its lettering inventory is empty), its re-evaluation filed unrelated MAJORs and scored 33. pickBestVersionIndex ranked by score only, so v0 shipped with the caption (`unrepairedCritical: rendered_text`).

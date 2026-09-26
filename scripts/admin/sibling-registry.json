@@ -448,6 +448,7 @@
           "{WORN_ITEMS_ROW}",
           "{WORN_ON_OTHER}",
           "{NEVER_NAME_ABSENT}",
+          "{NO_HEADLINE_PHRASES}",
           "{SCENE_INTENT_FIELD}",
           "{SCENE_LIGHT_FIELD}",
           "{CONCEALED_OBJECT}",
