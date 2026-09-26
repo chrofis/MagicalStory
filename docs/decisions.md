@@ -21,6 +21,14 @@ superseded and link forward.
 
 ---
 
+## 2026-09-26 — A garment belongs to one outfit; a face-away figure gets the rear cell
+
+**Context:** Staging job_1790373080139_vnx5l8iy7 (dragon run 8). (1) The wardrobe reviewer's check 12 said to put a plot garment in the outfit "of the character the plan gives it to"; the plan hands one brother's jacket to the other from p14, so DeepSeek copied the jacket into the second outfit while its own analysis said the receiver never wears it (clothingReviewReport), and both sheets wore the same jacket. (2) resolveCellPose mapped a perspective to the back cell only for "back"/"behind", so the p7 `over-the-shoulder` near figure (face hidden) was sent a threeQuarter head card; the model put that face on another child.
+**Decision:** (1) GARMENT_ONE_OUTFIT_RULE (promptBuilders) is filled into the bible writer and the wardrobe reviewer: a garment belongs to the outfit of the character who wears it first; a handoff lives in the plan line and `wornItems`, never a second outfit; check 12 names any garment two outfits share. No code duplicate check: outfits are prose with no garment ids at review time, and matching prose in code is forbidden. (2) storyAvatars.isFaceAwayPerspective (shotVocabulary.isOverTheShoulderPerspective + back/behind/rear/facing away) sends the rear cell; images.js iterate and regeneration.js already call the shared resolveCellPose.
+**Rationale:** the handoff is per-page state already carried by the plan and wornItems; a second outfit makes it permanent. A face card for a hidden face is a face with no figure to land on.
+**Touched:** server/lib/promptBuilders.js, prompts/story-bible-from-beats.txt, prompts/clothing-review.txt, server/lib/storyAvatars.js, scripts/admin/sibling-registry.json, tests/unit/garment-one-outfit.test.ts, tests/unit/face-away-cell-pose.test.ts
+**Status:** ✅ active
+
 ## 2026-09-25 — `storyData.sceneDescriptions[]` has one shape everywhere: the brief is `description`, built by `sceneDescriptionRecord`
 
 **Context:** Staging job_1790277448294_5herh01j7: every in-generation page iterate failed with "No scene

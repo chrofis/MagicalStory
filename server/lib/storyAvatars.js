@@ -17,6 +17,7 @@
 'use strict';
 
 const { log } = require('../utils/logger');
+const { isOverTheShoulderPerspective } = require('./shotVocabulary');
 
 /**
  * Pull a URL out of whatever shape the legacy code stored.
@@ -175,7 +176,7 @@ function resolveCellPose(sc) {
     ? sc.pose : null;
   if (!pose && sc?.perspective) {
     const persp = String(sc.perspective).toLowerCase();
-    if (/\bback\b|behind/.test(persp)) pose = 'back';
+    if (isFaceAwayPerspective(persp)) pose = 'back';
     else if (/profile|side/.test(persp)) pose = 'profile';
     else if (/front|camera/.test(persp)) pose = 'front';
   }
@@ -183,6 +184,23 @@ function resolveCellPose(sc) {
   const depth = (sc?.depth && ['foreground', 'midground', 'background'].includes(sc.depth))
     ? sc.depth : 'foreground';
   return { pose, depth, flip: sc?.flip === true };
+}
+
+/**
+ * A perspective that turns the figure's face away from the camera. Such a
+ * figure gets the rear cell (body turned away, back-of-head face card): a
+ * front face card hands the model a face it has no figure to put on, and it
+ * paints it on someone else (staging job_1790373080139_vnx5l8iy7 p7: the
+ * `over-the-shoulder` near figure was sent a threeQuarter head card, and its
+ * hair appeared on another child). Reads the structured `perspective` field
+ * only; the over-the-shoulder word is shotVocabulary's own predicate. The
+ * other words are the face-away perspectives stored on staging pages
+ * ("back view", "rear three-quarter", "three-quarter rear view", "facing away").
+ */
+function isFaceAwayPerspective(perspective) {
+  const persp = String(perspective || '').toLowerCase();
+  if (isOverTheShoulderPerspective(persp)) return true;
+  return /\bback\b|behind|\brear\b|facing away|away from (?:the )?(?:camera|viewer)/.test(persp);
 }
 
 /**
@@ -507,6 +525,7 @@ module.exports = {
   applyStoryCellRefs,
   wornResolvedForPage,
   resolveCellPose,
+  isFaceAwayPerspective,
   resolveSheetForRef,
   appendStoryHistory,
   extractUrl,

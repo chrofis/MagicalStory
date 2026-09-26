@@ -10740,6 +10740,16 @@ function wardrobeAppearanceBlock(char) {
 const OUTFIT_APPEARANCE_RULE = 'An outfit `description` is appearance only: garments, colours, materials, fastenings. No page numbers, no events, no other character or creature, no carried item or what a pocket holds. A garment a page takes off stays in the outfit as worn; the `wornItems` row of that page records it off, never the outfit.';
 
 /**
+ * One garment, one outfit — ONE string, filled into the bible writer and the
+ * wardrobe reviewer as {GARMENT_ONE_OUTFIT_RULE}. A garment the plan hands to
+ * another character is carried by that page's plan line and `wornItems` row,
+ * never by a second outfit: staging job_1790373080139_vnx5l8iy7 had the
+ * reviewer copy one child's jacket into his brother's outfit because the plan
+ * hands it over from a later page, and both sheets then wore the same jacket.
+ */
+const GARMENT_ONE_OUTFIT_RULE = "A garment belongs to ONE outfit: that of the character who wears it first. When the plan hands it to another character — to hold, wrap, wear or keep — the plan line and that page's `wornItems` row carry the handoff; the receiver's outfit never names it. No two outfits name the same garment.";
+
+/**
  * Wardrobe review of the bible's clothing contract. Returns null when the
  * story has no dressed character to review — a bible that produced no usable
  * outfit has nothing for a reviewer to correct.
@@ -10775,6 +10785,7 @@ function buildClothingReviewPrompt(inputData, clothingRequirements, beats = []) 
     CURRENT_CLOTHING: blocks.join('\n\n'),
     PLAN_LINES: planBlocks(beats) || '(page plan not available)',
     OUTFIT_APPEARANCE_RULE,
+    GARMENT_ONE_OUTFIT_RULE,
   });
 }
 
@@ -11299,6 +11310,7 @@ function buildStoryBibleFromBeatsPrompt(inputData, beats = [], { arc = '' } = {}
       : '',
     PLAN_LINES: planBlocks(beats),
     OUTFIT_APPEARANCE_RULE,
+    GARMENT_ONE_OUTFIT_RULE,
   });
 }
 
@@ -12178,6 +12190,7 @@ module.exports = {
   parseArcReview,
   buildClothingReviewPrompt,
   OUTFIT_APPEARANCE_RULE,
+  GARMENT_ONE_OUTFIT_RULE,
   parseClothingReview,
   parseBeats,
   parsePagePlan,
