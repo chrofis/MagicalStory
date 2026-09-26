@@ -304,7 +304,11 @@ describe('wiring guards — no Lab eval site may hand-roll its options again', (
   it('the Lab semantic stage passes the sixth argument production passes', () => {
     const idx = testlabSrc.indexOf('async function runSemanticEvalStage');
     expect(idx).toBeGreaterThan(0);
-    const body = testlabSrc.slice(idx, idx + 3500);
+    // The function body up to the next top-level function, not a fixed char
+    // window: a window sized to the function's length at one commit fails on
+    // the next comment line (and sooner in a CRLF checkout).
+    const rest = testlabSrc.slice(idx + 1);
+    const body = testlabSrc.slice(idx, idx + 1 + (rest.search(/\n(async )?function /) + 1 || rest.length));
     expect(body).toMatch(/evaluateSemanticFidelity\([\s\S]*?semanticOpts/);
     expect(body).toMatch(/buildEvalClothingContract/);
     expect(body).toMatch(/buildExpectedCastBlock/);

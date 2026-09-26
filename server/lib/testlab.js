@@ -797,6 +797,41 @@ function labPlateQcOptions(ctx, { sceneDescription, framing = null, shot, artSty
   };
 }
 
+/**
+ * The page's plate text as the per-page plate path builds it: the plate text
+ * production resolves (resolvePagePlate) under the page's SHOT line. One
+ * helper for the empty_scene stage (the text it renders from) and the
+ * judge_fixture plate replay (the text a stored plate is judged against).
+ */
+function labPagePlateText(ctx) {
+  const meta = ctx.scene.sceneMetadata || {};
+  const { resolvePagePlate } = require('./storyHelpers');
+  const pagePlate = resolvePagePlate({
+    pageNumber: ctx.pageNumber, sceneMetadata: meta, visualBible: ctx.visualBible, outlinePlate: '',
+  });
+  const pageShot = String(meta.fullData?.shot || '').trim();
+  const description = pagePlate.text ? `${pageShot ? `**SHOT:** ${pageShot}\n\n` : ''}${pagePlate.text}` : '';
+  return { pagePlate, pageShot, description };
+}
+
+/**
+ * validateEmptyScene options for a DERIVED plate — the story run's
+ * `derivedQcOpts` (storyJobPipeline.js): no text zone, its own camera class,
+ * the medium, the place; not the page's geometry facts or placements, which the
+ * derive edit never saw. Shared by edit_image (a replayed derive) and the
+ * judge_fixture plate replay (a stored derived plate).
+ */
+function labDerivedPlateQcOptions(ctx) {
+  const { resolvePagePlate, resolveArtStyle } = require('./storyHelpers');
+  const meta = ctx.scene.sceneMetadata || {};
+  const opts = labPlateQcOptions(ctx, {
+    sceneDescription: resolvePagePlate({ pageNumber: ctx.pageNumber, sceneMetadata: meta, visualBible: ctx.visualBible, outlinePlate: '' }).text || null,
+    shot: require('./shotVocabulary').plateClass(String(meta.fullData?.shot || '').trim()),
+    artStyle: resolveArtStyle(ctx.artStyle || 'pixar') || '',
+  });
+  return { ...opts, characterPlacements: null, mainScenePrompt: null };
+}
+
 async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = {} }) {
   const { loadPromptTemplates, buildEmptyScenePrompt } = require('../services/prompts');
   await loadPromptTemplates();
@@ -819,14 +854,8 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
   // No outline plate: ctx.scene is the STORED page record, whose
   // `emptyScenePrompt` is the fully BUILT plate prompt of the run, not plate
   // text — wrapping it in the template again doubled it (Lab 1482: 11,761 chars).
-  const { resolvePagePlate } = require('./storyHelpers');
-  const pagePlate = resolvePagePlate({
-    pageNumber: ctx.pageNumber, sceneMetadata: meta, visualBible: ctx.visualBible, outlinePlate: '',
-  });
-  const pagePlateText = pagePlate.text;
-  const pageShot = String(meta.fullData?.shot || '').trim();
-  const description = params.descriptionOverride
-    || (pagePlateText ? `${pageShot ? `**SHOT:** ${pageShot}\n\n` : ''}${pagePlateText}` : '');
+  const { pagePlate, pageShot, description: storedDescription } = labPagePlateText(ctx);
+  const description = params.descriptionOverride || storedDescription;
   if (!description) throw new Error('No plate text for this page: the vantage and the brief carry no emptyScenePrompt (pass params.descriptionOverride)');
 
   // Text zone only when this story overlays text on the image AND the scene
@@ -918,7 +947,7 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
     const { validateEmptyScene } = require('./images');
     const qcTextPos = require('./plateQc').plateQcTextPosition(wantsTextZone, ctx.textPosition);
     const qcRes = await validateEmptyScene(result.imageData, qcTextPos, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
-      labPlateQcOptions(ctx, { sceneDescription: description, framing: params.descriptionOverride || pagePlateText, shot: pageShot || meta.setting?.camera || 'wide shot', artStyle: plateStyle }));
+      labPlateQcOptions(ctx, { sceneDescription: description, framing: params.descriptionOverride || pagePlate.text, shot: pageShot || meta.setting?.camera || 'wide shot', artStyle: plateStyle }));
     qc = { pass: qcRes.pass, issues: qcRes.issues || [], findings: qcRes.findings || [], visionFeedback: qcRes.visionFeedback || null, textPosition: qcTextPos };
   } catch (err) {
     log.warn(`[TESTLAB] empty-scene QC failed: ${err.message}`);
@@ -937,7 +966,9 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId, params =
   // A pinned target evaluates THAT version (2026-09-12). Without this the stage
   // always judged the active one, so two versions of a page — an original and
   // the repair that replaced it — could not be scored against each other.
-  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, ctx.versionIndex ?? null);
+  // ctx.imageDataOverride: the judge_fixture stage hands the fixture's own
+  // stored image (by R2 URL), so a fixture judges exactly the picture it pins.
+  const imageData = ctx.imageDataOverride || await loadActivePageImage(ctx.storyId, ctx.pageNumber, ctx.versionIndex ?? null);
   const t0 = Date.now();
   // PRODUCTION'S OPTION SET (buildEvalReplayOptions) + this stage's explicit
   // A/B knobs. The baseline must equal production; the overrides are the point
@@ -1011,6 +1042,9 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId, params =
     // counts (a model's input-token signature is how a swap is verified).
     modelId: params.model || require('../config/models').MODEL_DEFAULTS.qualityEval,
     usage: { ...(result.threeStageResult?.usage || {}), quality_input_tokens: result.usage?.input_tokens ?? null, quality_output_tokens: result.usage?.output_tokens ?? null },
+    // The whole call's aggregate (quality + P1 + three-stage), as the pipeline
+    // records it — what the judge_fixture stage prices a replay from.
+    totalUsage: result.usage || null,
     storedBaseline: { qualityScore: ctx.scene.qualityScore ?? null, semanticScore: ctx.scene.semanticScore ?? null },
   };
 }
@@ -1330,7 +1364,7 @@ async function runSemanticEvalStage(ctx, { promptOverride, experimentId }) {
   // A pinned target evaluates THAT version, as quality_eval and inventory_ab
   // already do — judging the active version instead makes an original-vs-repair
   // comparison compare the repair with itself.
-  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, ctx.versionIndex ?? null);
+  const imageData = ctx.imageDataOverride || await loadActivePageImage(ctx.storyId, ctx.pageNumber, ctx.versionIndex ?? null);
   const storyText = ctx.scene.text || null;
   if (!storyText) throw new Error('Scene has no story text — semantic eval needs it');
 
@@ -1397,6 +1431,7 @@ async function runSemanticEvalStage(ctx, { promptOverride, experimentId }) {
     visible: result.visible || null,
     expected: result.expected || null,
     storedBaseline: { semanticScore: ctx.scene.semanticScore ?? null },
+    usage: result.usage || null,
   };
 }
 
@@ -2328,11 +2363,19 @@ async function runEntityStage(ctx, { experimentId, params = {} }) {
     };
   };
 
+  // params.character: judge ONE character's grid (a judge fixture pins one
+  // character), instead of paying for every character's call.
+  const allCharacters = storyData.characters || [];
+  const characters = params.character
+    ? allCharacters.filter(c => String(c?.name || '').toLowerCase() === String(params.character).toLowerCase())
+    : allCharacters;
+  if (params.character && !characters.length) throw new Error(`No character "${params.character}" in story ${ctx.storyId}`);
+
   const runs = [];
   let firstReport = null;
   for (let i = 1; i <= repeats; i++) {
     const t0 = Date.now();
-    const report = await runEntityConsistencyChecks(storyData, storyData.characters || [], {
+    const report = await runEntityConsistencyChecks(storyData, characters, {
       checkCharacters: true,
       checkObjects: false,
       saveGrids: false,
@@ -5728,15 +5771,8 @@ async function runEditImageStage(ctx, { experimentId, promptOverride, params = {
   if (onPlate) {
     try {
       const { validateEmptyScene } = require('./images');
-      const { resolvePagePlate, resolveArtStyle } = require('./storyHelpers');
-      const meta = ctx.scene.sceneMetadata || {};
-      const opts = labPlateQcOptions(ctx, {
-        sceneDescription: resolvePagePlate({ pageNumber: ctx.pageNumber, sceneMetadata: meta, visualBible: ctx.visualBible, outlinePlate: '' }).text || null,
-        shot: require('./shotVocabulary').plateClass(String(meta.fullData?.shot || '').trim()),
-        artStyle: resolveArtStyle(ctx.artStyle || 'pixar') || '',
-      });
       const qcRes = await validateEmptyScene(edited, null, `testlab-exp${experimentId}-P${ctx.pageNumber}-edit`,
-        { ...opts, characterPlacements: null, mainScenePrompt: null });
+        labDerivedPlateQcOptions(ctx));
       qc = { pass: qcRes.pass, issues: qcRes.issues || [], findings: qcRes.findings || [], visionFeedback: qcRes.visionFeedback || null, textPosition: null };
     } catch (err) {
       log.warn(`[TESTLAB] edited-plate QC failed: ${err.message}`);
@@ -10513,7 +10549,131 @@ function castPageSummary({ listed = [], stats = {}, actions = [], aliases = {} }
   });
 }
 
+/**
+ * JUDGE FIXTURE — replay one regression fixture through the CURRENT production
+ * judge and score the answer against the fixture's expected verdict
+ * (server/lib/judgeFixtures.js; fixtures in tests/judge-fixtures/fixtures.json;
+ * runner scripts/admin/judge-fixtures.js; doc docs/judge-fixtures.md).
+ *
+ * Each judge goes through the Lab stage that already replays it with
+ * production's builders — semantic_eval, quality_eval, the plate QC the
+ * empty_scene / edit_image stages run, entity, book_audit, arc_panel_replay —
+ * so a fixture measures the judge production runs, never a proxy of it. The
+ * image judges are handed the fixture's OWN stored image (params.imageUrl), so
+ * a later repair on the page cannot change what the fixture judges.
+ *
+ * Target {storyId, fixture, pageNumber?, versionIndex?, character?} — the
+ * fixture id rides on the target so two fixtures on one page are two set
+ * members. params {judge, expect, imageUrl?} come from the set member.
+ */
+async function runJudgeFixtureStage(target, { experimentId, params = {} }) {
+  const JF = require('./judgeFixtures');
+  const judge = params.judge;
+  if (!JF.JUDGES.includes(judge)) throw new Error(`judge_fixture: unknown judge "${judge}" (known: ${JF.JUDGES.join(', ')})`);
+  if (!params.expect) throw new Error('judge_fixture: params.expect required');
+
+  const loadPage = async () => {
+    if (target.pageNumber == null) throw new Error(`judge_fixture ${judge}: target.pageNumber required`);
+    const ctx = await loadSceneContext(target.storyId, Number(target.pageNumber));
+    ctx.target = target;
+    // The stored detection belongs to the ACTIVE version's pixels. A fixture
+    // pinned to the active version keeps it (as production had it); any other
+    // version is judged without it rather than against another picture's boxes.
+    const pinned = pinnedVersionIndex(target.versionIndex);
+    const active = Number(target.pageNumber) < 0 ? null
+      : await require('../services/database').getActiveVersion(target.storyId, Number(target.pageNumber));
+    ctx.versionIndex = pinned !== null && pinned === active ? null : pinned;
+    return ctx;
+  };
+  const loadFixtureImage = async () => {
+    if (!params.imageUrl) throw new Error(`judge_fixture ${judge}: params.imageUrl required`);
+    const buf = await require('./r2').bytesFromAnyImage(params.imageUrl);
+    if (!buf || !buf.length) throw new Error(`judge_fixture: fixture image did not load: ${params.imageUrl}`);
+    const mime = buf[0] === 0x89 ? 'image/png' : buf[0] === 0x52 ? 'image/webp' : 'image/jpeg';
+    return `data:${mime};base64,${buf.toString('base64')}`;
+  };
+
+  const t0 = Date.now();
+  let raw;
+  switch (judge) {
+    case 'semantic': {
+      const ctx = await loadPage();
+      ctx.imageDataOverride = await loadFixtureImage();
+      raw = await runSemanticEvalStage(ctx, { experimentId });
+      break;
+    }
+    case 'quality':
+    case 'lettering': {
+      const ctx = await loadPage();
+      ctx.imageDataOverride = await loadFixtureImage();
+      raw = await runQualityEvalStage(ctx, { experimentId, params: {} });
+      break;
+    }
+    case 'plate_qc': {
+      // The QC production runs on this page's plate: the derived-plate option
+      // set when the page's plate was derived, else the per-page set — the same
+      // two sets the Lab's edit_image and empty_scene stages judge with.
+      const ctx = await loadPage();
+      const plate = await loadFixtureImage();
+      const { validateEmptyScene } = require('./images');
+      const derived = !!ctx.scene.plateDerivedFor;
+      let opts, textPos = null;
+      if (derived) {
+        opts = labDerivedPlateQcOptions(ctx);
+      } else {
+        const { pagePlate, pageShot, description } = labPagePlateText(ctx);
+        const meta = ctx.scene.sceneMetadata || {};
+        const wantsTextZone = ctx.layout?.textInImage !== false && !!ctx.textPosition;
+        textPos = require('./plateQc').plateQcTextPosition(wantsTextZone, ctx.textPosition);
+        opts = labPlateQcOptions(ctx, {
+          sceneDescription: description,
+          framing: pagePlate.text,
+          shot: pageShot || meta.setting?.camera || 'wide shot',
+          artStyle: require('./storyHelpers').resolveArtStyle(ctx.artStyle || 'pixar') || '',
+        });
+      }
+      const qcRes = await validateEmptyScene(plate, textPos, `testlab-exp${experimentId}-P${ctx.pageNumber}-fixture`, opts);
+      raw = { qc: { pass: qcRes.pass, issues: qcRes.issues || [], findings: qcRes.findings || [], visionFeedback: qcRes.visionFeedback || null, textPosition: textPos, plateKind: derived ? 'derived' : 'page' } };
+      break;
+    }
+    case 'entity':
+      if (!target.character) throw new Error('judge_fixture entity: target.character required');
+      raw = await runEntityStage({ storyId: target.storyId }, { experimentId, params: { character: target.character } });
+      break;
+    case 'book_audit':
+      raw = await runBookAuditStage({ storyId: target.storyId }, { params: {} });
+      break;
+    case 'arc_panel':
+      raw = await runArcPanelReplayStage({ storyId: target.storyId }, { params: {} });
+      break;
+    default:
+      throw new Error(`judge_fixture: no replay wired for judge "${judge}"`);
+  }
+
+  const findings = JF.normalizeFindings(judge, raw);
+  // Story-level judges answer for a whole book; the fixture's page scopes them.
+  const expect = (target.pageNumber != null && ['book_audit', 'entity'].includes(judge))
+    ? { page: Number(target.pageNumber), ...params.expect } : params.expect;
+  const verdict = JF.scoreFixture(expect, findings);
+  // The judge's own result, minus the bulk a reader never needs here (the arc
+  // panel's full prompt and committed block, the book audit's raw reply).
+  const { prompt: _p, committed: _c, raw: _r, ...judgeResult } = raw || {};
+  return {
+    stageKind: 'judge_fixture',
+    judge,
+    fixtureId: target.fixture || null,
+    input: { imageUrl: params.imageUrl || null, versionIndex: target.versionIndex ?? null, character: target.character || null },
+    expect,
+    verdict,
+    findings,
+    cost: JF.estimateCostUsd(judge, raw),
+    elapsedMs: Date.now() - t0,
+    judgeResult,
+  };
+}
+
 const STORY_STAGES = {
+  judge_fixture: runJudgeFixtureStage,
   trial_idea_variety: runTrialIdeaVarietyStage,
   trial_challenge_draw: runTrialChallengeDrawStage,
   vb_element_cell: runVbElementCellStage,
@@ -10729,4 +10889,7 @@ module.exports = {
   labPlateQcOptions,
   runEmptySceneStage,
   runEditImageStage,
+  // Judge regression fixtures — the dispatch and its scoring, pinned with the
+  // judges stubbed (tests/unit/judge-fixtures.test.ts).
+  runJudgeFixtureStage,
 };

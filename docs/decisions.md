@@ -21,6 +21,66 @@ superseded and link forward.
 
 ---
 
+## 2026-09-26 — Judge regression fixtures: judge recall and precision are measured on stored inputs, one Lab set per judge
+**Context:** No judge's recall had ever been measured. The eval-gap analysis of 24 problems (the
+Lukas prod job `job_1790107559778_fcmlfa8kn`, Fiona `job_1790446348343_z3fw660ie` and Dragon
+`job_1790277448294_5herh01j7`) found that about 15 of the 24 misses were structural: the critic was
+blind to an input it needed, shared the generator's wrong spec, or had no check at all. Another 4
+were detected and then lost to severity or routing. Changes to critic inputs could therefore only be
+argued about, and the owner approved (2026-09-26) a fixture per judge to measure them.
+**Decision:**
+- A **fixture** is one stored input a judge is handed and the verdict it must return:
+  - `flag`: a finding of the named type at or above a minimum severity;
+  - `pass`: no such finding.
+
+  Each fixture records the image by R2 URL, the story, page and version, the character for the
+  entity judge, and a source note. Fixtures live in `tests/judge-fixtures/fixtures.json`, which is
+  the source of truth.
+- **One mechanism, the existing one.** The file is mirrored into stage-typed `testlab_sets`, one set
+  per judge (`Judge fixtures · <judge>`), and run by a new story-level Lab stage `judge_fixture`.
+  - The stage dispatches to the Lab stage that already replays that judge with production's
+    builders: `semantic_eval`, `quality_eval` (also used for the lettering check), the plate QC
+    option sets of `empty_scene` / `edit_image`, `entity`, `book_audit` and `arc_panel_replay`.
+  - It hands the image judges the fixture's own image (`ctx.imageDataOverride`), so a later repair
+    of the page cannot change what the fixture judges.
+  - No parallel sets table, no hand-rolled judge call.
+- **Scoring** (`server/lib/judgeFixtures.js`, pure) produces TP / FN / TN / FP per replay, and per
+  judge: recall, precision, false-alarm rate and flip rate over N repeats.
+  - `about` is a word locator that picks WHICH finding answers a fixture. It is used by the
+    measuring stick only and never reaches production scoring, classification or routing.
+  - The report prints the matched finding's own words.
+- **Runner** `scripts/admin/judge-fixtures.js`: `validate` / `sync` / `run [--judge] [--repeats]` /
+  `score --experiments` (re-scores stored runs against the current file at $0).
+- **Standing rule:** every owner- or agent-found judge miss, and every correct render a judge falsely
+  charged, becomes a fixture.
+- **Seed: 36 fixtures.** Each expected verdict was written after looking at the full-size pixels.
+  - Semantic 10: 6 flag, 4 pass.
+  - Plate QC 18: 13 flag, 5 pass.
+  - Quality 3, lettering 1, entity 1, book audit 1, arc panel 2.
+  - The negatives include the p9 "Eiffel Tower" (a crane and the Hauptbahnhof), the correct concrete
+    Uetliberg tower, the "pirate era" era fails on a present-day story, and clean plates and pages.
+- **Skipped, with reasons:**
+  - *Lukas p3 scale.* D-29 records `height_order` for review only, and the semantic judge checks
+    the age band, not relative height. The expected verdict is an owner policy call.
+  - *Lukas p6 "pliers".* 2026-09-24 found the judge right about the picture, since the VB cell itself
+    is plier-shaped. The escalation came from a reader vote.
+  - *Consolidator (rows 9, 10).* Its input is the merged per-version findings, and the vote clamp
+    makes the case deterministic code.
+  - *Plan check (row 19) and scene review (row 14).* No Lab stage replays either alone on stored
+    input.
+  - *Dragon p15.* The stored v1 is no longer the daylight version Lab #1471 judged.
+  - Other rows are generator or plumbing defects with no judge verdict to pin (rows 1, 4, 6, 21b-d).
+**Rationale:** The fixtures give any critic change a measuring stick: an input added to a judge
+either moves its numbers or it does not. Pass fixtures keep a recall gain from being bought with
+false alarms. Running through the Lab makes every replay an experiment the owner can open, and
+reusing the replay stages keeps the fixture on the same inputs production sends.
+**Touched:** `server/lib/judgeFixtures.js`, `server/lib/testlab.js` (`judge_fixture` stage;
+`labPagePlateText` / `labDerivedPlateQcOptions` shared with `empty_scene` / `edit_image`; `entity`
+takes `params.character`; `semantic_eval` / `quality_eval` return usage), `client/src/services/testlabService.ts`,
+`scripts/admin/judge-fixtures.js`, `tests/judge-fixtures/fixtures.json`, `tests/unit/judge-fixtures.test.ts`,
+`docs/judge-fixtures.md`, `tasks/BACKLOG.md`
+**Status:** ✅ active
+
 ## 2026-09-26 — Every critic judges against the source the generator was given, uncut
 
 **Context.** The eval-gap analysis (owner-approved audit, 2026-09-26) found 10 of 24 problems where a critic
