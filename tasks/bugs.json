@@ -2245,7 +2245,7 @@
       "impact": "Any present-day story whose cast wears a costume had every plate judged against a period it is not set in: false `era` fails, retries fed \"remove the modern ...\" feedback, and a worse plate kept.",
       "status": "fixed",
       "fixedAt": "2026-09-26",
-      "fixedIn": "81a5d9aa7",
+      "fixedIn": "2eeb3e0da",
       "fix": "plateStoryEra deleted; the QC takes the brief's `era` and classifies it with buildEraGuard inside buildEmptySceneQcPrompt (present day: no era block, no anachronism check). Tests: tests/unit/plate-qc-era-framing-photo.test.ts, tests/unit/lab-plate-qc-always.test.ts. docs/decisions.md 2026-09-26 \"The plate QC judges the era, the framing and the landmark photo its author was given\"."
     }
   ]
