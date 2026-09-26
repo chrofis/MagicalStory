@@ -2080,6 +2080,61 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "creature-size-page-ratio",
+      "title": "A grown creature's VB entry states its maturity, and the page prompt measures it against the people in frame",
+      "commits": [
+        "7e767c9d9"
+      ],
+      "addedAt": "2026-09-26",
+      "claim": "On the next staging story with a VB creature at adult-height or above: its stored description starts 'a fully grown adult <species> with adult body proportions', its reference cell shows adult proportions (not a hatchling's), and every page citing it carries a REQUIRED OBJECTS line '<band phrase> — about N times the height of <names>' for the cast in frame; the creature renders at or near that ratio (no page at half of it or less).",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "stories.data.visualBible.animals[].description + vb/<id>.jpg; sceneImages[].imageVersions[].prompt REQUIRED OBJECTS line; look at each page image and compare creature height to the named figures. Baseline: job_1790373080139_vnx5l8iy7 (dragon run 8) - grown dragon ANI001 twice-adult-height: large p5, cat-sized p10, child-plus p16/p17, boy-sized p18; ANI001 cell looked like hatchling ANI002."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "creature-size-eval-d34",
+      "title": "D-34 creature_scale fires on a creature drawn far below its given size, fed CREATURE SIZES",
+      "commits": [
+        "0e4e72a22"
+      ],
+      "addedAt": "2026-09-26",
+      "claim": "On the next staging story where a cited creature is drawn at half its given size or less against the figures beside it, the quality eval emits a creature_scale finding (MAJOR, never charged above MAJOR) on that page, and none on pages where it is drawn at or near its size.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "sceneImages[].imageVersions[].fixableIssues / deductions for type creature_scale vs the pixels; qualityRawOutput shows the CREATURE SIZES input was non-empty on creature pages. Baseline: job_1790373080139_vnx5l8iy7 (dragon run 8) - grown dragon ANI001 twice-adult-height: large p5, cat-sized p10, child-plus p16/p17, boy-sized p18; ANI001 cell looked like hatchling ANI002."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "creature-size-repair-iterate",
+      "title": "A creature_scale finding routes to iterate; every inpaint states each cited creature's size",
+      "commits": [
+        "459dcec19"
+      ],
+      "addedAt": "2026-09-26",
+      "claim": "On the next staging story with a creature_scale finding: that page's repair round is iterate (not char-fix, never dropped requires_char_fix_not_inpaint), unless a CRITICAL inpaintable finding took the round; and every inpaint round on a page citing a sized creature carries 'Sizes that hold after the edit: ...' with no character or creature names in retryHistory[].inpaintInstruction.",
+      "runShape": [
+        "full-story",
+        "needs-iterate-repair"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "retryHistory[].source (iterate-round-N) on creature_scale pages; consolidator dropped_issues reasons; retryHistory[].inpaintInstruction for the Sizes clause. Baseline: job_1790373080139_vnx5l8iy7 (dragon run 8) - grown dragon ANI001 twice-adult-height: large p5, cat-sized p10, child-plus p16/p17, boy-sized p18; ANI001 cell looked like hatchling ANI002. p10 v1 inpaint had no size; p16 scale finding orphaned."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }
