@@ -10,7 +10,7 @@
       "impact": "Any page whose calm zone failed the text-space gate was re-rendered on a different, cheaper model than the rest of the book; the Lab text_zone stage measured that other model.",
       "status": "fixed",
       "fixedAt": "2026-09-26",
-      "fixedIn": "",
+      "fixedIn": "ca7f76a85",
       "fix": "ensureCalmZone (textSpaceRepair.js) passes imageModelOverride: MODEL_DEFAULTS.pageRenderImage to every retry - the contract models.js states for every redo of a page, and the one regeneration.js already uses - and the three generateImage closures forward opts.imageModelOverride (generateImageOnly derives the backend from IMAGE_MODELS). The dead sceneMetadata.pageImageModel/pageImageBackend reads are deleted. Test: tests/unit/calm-zone-render-tier.test.ts."
     },
     {
