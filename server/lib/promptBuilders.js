@@ -8011,6 +8011,12 @@ function buildReplanSection(pagePlan, findingLines, { pageCount = null, keep = [
     '# RE-DIVIDE',
     '',
     'You divided this story once. Your plan and the findings against it follow. Return a line for every page you change, in the same format, and for no other page — a page you leave out stands exactly as it is. Where a must-fix finding and a noted one pull opposite ways, the must-fix wins.',
+    // THE WHOLE-CAST PAGE (2026-09-26, Lab #1537). The block restated no
+    // definition for a CHECK[17] line, and the round answered it with one
+    // figure's deed while the rest watched; answering another finding on a
+    // whole-cast page (p6) it traded the shared action for a two-figure one.
+    // The same constant plan-check question 17 reads.
+    `A page holding every commissioned character — the one a whole-cast finding names, and any such page you rewrite for another finding — gets one action all of them do together. ${WHOLE_CAST_DEF}`,
     `The book keeps ${span}. No number is added and none is retired. A moment that earns a picture of its own takes an existing number: that page's material joins a neighbouring page, and the freed number stages the moment. Return both pages.`,
     'A finding is answered by adding or by removing, whichever that finding asks for. A page holding none of the commissioned characters gains one. A page past the cast ceiling loses one, or a page holding more than one action keeps the first alone and what follows from it goes to "what is true after" or to a page of its own. A name, an action or a page goes only where a finding asks for less in frame, never where one asks for more.',
     `Two figures stay wherever they are: the character whose action a page's instant works against, and a character the division would leave with fewer than two pages in the book${floor > 2 ? ` — for a commissioned character, fewer than ${floor}` : ''}.`,
@@ -9003,8 +9009,15 @@ const UNNAMED_FIGURE_EXEMPT = 'a figure given no name, referred to only by what 
  * makes the checker enumerate every whole-cast page and name the one action it
  * gives all of them, so the fault is a counted answer, not a keyword it may
  * miss. Must-fix since 2026-09-26 (owner): REPLAN_MUST_FIX_CHECKS carries it.
+ *
+ * THE LAST SENTENCE (2026-09-26, Lab #1537). The planner's general one-action
+ * rule says "everyone else watches it or does that same thing", and the re-plan
+ * answered Q17 on z3fw660ie p16 with one figure pressing a prop into another's
+ * hands while the rest looked on — the watching half of that rule. The recheck
+ * filed Q17 again. On a whole-cast page the watching half does not apply; the
+ * sentence says so on both sides, so the planner is told what the check counts.
  */
-const WHOLE_CAST_DEF = 'A page that gathers the whole cast is wide or distant, all of them sharing one simple action — boarding, hauling one line together, all turned toward one thing ahead of them — or seen from behind moving off. Standing or gathering together while a feeling shows, or while the event happens behind them, is everyone present doing nothing — never a row of figures facing the viewer.';
+const WHOLE_CAST_DEF = 'A page that gathers the whole cast is wide or distant, all of them sharing one simple action — boarding, hauling one line together, all turned toward one thing ahead of them — or seen from behind moving off. Standing or gathering together while a feeling shows, or while the event happens behind them, is everyone present doing nothing — never a row of figures facing the viewer. One of them acting while the rest look on — a hand-over between two, one speaking, one laughing — is not a shared action: every one of them does the same thing.';
 
 const TWO_HEIGHTS_DEF = 'two named characters at different heights — deck and water, ledge and ground, roof and street. A whole cast carried together on one back or one boat is one level.';
 // No leading article: the planner says "stages THEIR arrival", the checker "stages AN arrival", and both wordings are pinned by tests.

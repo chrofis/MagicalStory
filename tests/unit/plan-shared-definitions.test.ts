@@ -157,6 +157,40 @@ describe('plan-check Q6 nominates the peopleless page, and the planner is told',
 });
 
 /**
+ * THE RE-PLAN IS THE THIRD READER OF WHOLE_CAST_DEF (2026-09-26, Lab #1537).
+ * A CHECK[17] line reached MUST FIX with no definition beside it, and the round
+ * answered it with one figure's deed while the rest looked on; the recheck filed
+ * Q17 again. The re-plan block now carries the same constant the checker's
+ * question 17 reads, whatever findings it lists — a whole-cast page rewritten
+ * for another finding (p6 there) must keep its shared action too.
+ */
+describe('the re-plan block carries the whole-cast definition the check grades by', () => {
+  beforeAll(async () => { await loadPromptTemplates(); });
+  const plan = 'Page 1: wide — Levin — he runs — he is out';
+
+  it('a whole-cast finding in MUST FIX is answered next to the checker\'s own definition', () => {
+    const section = pb.buildReplanSection(plan,
+      [{ check: 17, line: 'CHECK[17]: page 1 holds the whole commissioned cast, but they only stand.' }],
+      { pageCount: 1 });
+    expect(section).toContain(pb.WHOLE_CAST_DEF);
+    expect(checker()).toContain(pb.WHOLE_CAST_DEF);
+    expect(section.indexOf(pb.WHOLE_CAST_DEF)).toBeLessThan(section.indexOf('## MUST FIX'));
+  });
+
+  it('it is there for a round with no whole-cast finding, which may still rewrite a whole-cast page', () => {
+    const section = pb.buildReplanSection(plan,
+      [{ code: 'CENTRAL_FIGURE_ABSENT_THIRD', pages: [1], line: 'PLAN[CENTRAL_FIGURE_ABSENT_THIRD] page 1: x' }],
+      { pageCount: 1 });
+    expect(section).toContain(pb.WHOLE_CAST_DEF);
+  });
+
+  it('it is stated once in the block', () => {
+    const section = pb.buildReplanSection(plan, [{ check: 17, line: 'CHECK[17]: page 1 x' }], { pageCount: 1 });
+    expect(section.split(pb.WHOLE_CAST_DEF).length - 1).toBe(1);
+  });
+});
+
+/**
  * The over-the-shoulder contact rule (shotVocabulary.OTS_NO_CONTACT_RULE) is one
  * constant filled into both sides: the planner's {OTS_NO_CONTACT} and the
  * checker's question 14. Before 2026-09-24 only the planner had it, and an OTS
