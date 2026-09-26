@@ -2317,7 +2317,7 @@
       "impact": "Grok repainted over the app's text (mangled or doubled lettering); the version could never be re-titled or judged without its stamp, and its array-index version number could collide with an existing row.",
       "status": "fixed",
       "fixedAt": "2026-09-26",
-      "fixedIn": "pending",
+      "fixedIn": "a1ac0bf2c",
       "fix": "coverEvalLayer.loadCoverArtForRepair puts the active version's art on the repaired cover (stamped cover without art: refused); the repaired art is judged, restamped (restampRepairedCover -> coverTypography.restampCover) and saved at the next DB index with its own art row. Cover edit refuses (409) without the active version's art; trial iterate references the art. Stored versions above are not recoverable. Test: tests/unit/cover-eval-layer.test.ts."
     }
   ]
