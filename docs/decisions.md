@@ -39,6 +39,70 @@ superseded and link forward.
 
 ---
 
+## 2026-09-26 — The plate QC sees people and a photograph: the landmark photo is for the landmark alone; the landmark check judges the part the camera sees
+
+**Context:** Lab 1505 (a near-photograph of the Lindenhof reference with a half-erased ghost of a person)
+PASSED the plate QC; Lab 1506 (a clear watercolour with about six walkers) was failed only on the landmark
+("church-like building… does not resemble Lindenhof square") — the page looks up the stairs to Lindenhof with
+the brief's Grossmünster towers beyond, and the prompt asks for those towers. Investigation, rung 1-2 (the
+real `validateEmptyScene`, gemini-2.5-flash, Lab option set, over stored plates):
+- **The attached landmark photo made the judge lenient on medium AND people.** With the photo removed, the
+  photographic run p1 plate failed `medium` and Lab 1484 (three walkers) failed `figures`; with it, both passed.
+  The LANDMARK_CHECK said "In every check below, judge the landmark's look against that photograph", and the
+  photo itself has people in it.
+- **The medium check did not name a filtered photograph.** 1505 and 1503 passed even without the photo.
+- **Input:** the plate goes to the model whole (1024 px sent; the API bills it as one 258-token tile, and
+  `mediaResolution: HIGH` changes nothing on gemini-2.5-flash — measured). No crop or downscale in our code.
+- **Truncation:** EXPECTED SCENE is cut at 300 chars; the stored plate texts are 186-518 chars, so the tail
+  (often the distant buildings) is lost — why the judge calls the brief's towers "not the landmark".
+**Decision (owner-approved task, 2026-09-26; classification in the prompt, severities unchanged):**
+1. LANDMARK_CHECK: the photo is used for the landmark alone — every other check judges the plate on its own,
+   the photo is never evidence of the medium, and people in it never excuse people on the plate. The judge
+   is told the author's REFERENCE line verbatim (`shotVocabulary.PLATE_LANDMARK_REFERENCE`, one constant for
+   empty-scene's `**REFERENCE:**` line and the judge): the plate shows the landmark as the camera sees it —
+   all of it, a part of it, or the view from it; only the part in view is held to the photo, and buildings,
+   towers and scenery not in the photo belong to the scene around it.
+2. STYLE_CHECK: judge how the picture is made; a photograph FAILS and so does a photograph made to look
+   painted (camera-real detail, light and depth under brush-like marks, paper grain or washes), however well
+   it matches the scene or a reference photo. A photographic book (`isPhotographicArtStyle`, the `realistic`
+   style) takes the new STYLE_CHECK_PHOTOGRAPHIC instead — the old check failed a photograph on every book,
+   the realistic book's own medium included (tasks/bugs.json `plate-qc-fails-photographic-book`).
+3. Figures: `PLATE_PEOPLE` (one list for the author's PLATE_NO_PEOPLE_RULE and the judge) names "part or
+   faint trace of one"; the check searches the whole frame, counts a half-erased or ghostly human shape, and
+   says the characters of CHARACTER PLACEMENTS / MAIN SCENE PROSE are painted in later, never on the plate.
+   `figures` stays SOFT, `medium` HARD (plateQc.js; only the key descriptions changed).
+**Replay (22 stored plates, before → after):**
+
+| plate | defect (viewed) | before | after |
+|---|---|---|---|
+| Lab 1505 | filtered photo + ghost person | pass | figures |
+| Lab 1503 | filtered photo | pass | pass |
+| Lab 1506 | ~6 walkers | landmark | figures, landmark |
+| Lab 1484 | 3 walkers | pass | figures |
+| 5herh p1 run plate | photograph + one seated person | pass | figures, medium |
+| 5herh p3 / p8 / p18 | walkers | figures (+landmark p3, p18) | figures (+landmark p3) |
+| 5herh p11 / p13, ref_p10 | signature (p10 also mat) | text (+landmark p13) | text/unclassified (+landmark p11, p13) |
+| back-cover plate | photograph + people | setting, medium | setting, figures, medium, placements |
+| 9oxos7dwv p3, kc2joi4ax p4, 1nitlympp p2 | people / crowd / one tiny figure | figures | figures |
+| 5herh p2, p14, p15; 622wecmhj p3, p10 | clean | pass | pass |
+| wkt20ckod p2 | clean of people/medium/text | pass | setting, camera |
+| rts4wqupm p6 | clean of people/medium/text | pass | placements |
+
+People: 6/11 caught → 11/11 (every figures finding real; p1's seated person confirmed on a crop). Medium:
+1/4 → 2/4 (1505 and 1503 still pass — a filtered photograph at this resolution is beyond this prompt).
+Any-fail on the 15 bad plates: 11 → 14. False figures/medium findings on the 7 clean plates: 0 → 0. The two
+new clean-plate failures are setting/camera/placements checks this change does not touch; both describe a
+real brief mismatch (a close-up of a wall asked, a wide cityscape painted) that the photo leniency hid.
+Landmark false fails on the brief's own towers: 3 → 2 (1506 and p3 still fail). One call with the EXPECTED
+SCENE cap raised to 1500 chars cleared 1506's landmark but lost its walkers (the old brief text names
+"a few distant passers-by"), so the cap stays 300 — open (tasks/BACKLOG.md). The judge filed two issues under
+unknown keys (a signature, a paper margin); both count HARD as before.
+Cost: ~76 gemini-2.5-flash calls, about $0.003 each (usage measured on one call), ≈ CHF 0.19.
+**Touched:** `prompts/empty-scene-qc.txt`, `server/lib/evalPipeline.js`, `server/lib/shotVocabulary.js`,
+`server/services/prompts.js`, `server/lib/plateQc.js`, `tests/unit/plate-qc-landmark-medium.test.ts`,
+`tests/unit/empty-scene-qc-extraction.test.ts`, `docs/prompt-inventory.md`
+**Status:** ✅ active on staging.
+
 ## 2026-09-26 — Every per-page plate is judged; its calm-zone check only runs on a text-in-image page (amends 2026-09-05 "No reading level defaults to the A4 text-overlay layout")
 
 **Context:** The story run's per-page plate path (`renderPagePlate`, storyJobPipeline.js Phase 5a-pre and

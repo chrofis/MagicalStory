@@ -2151,6 +2151,18 @@
       "fixedAt": "2026-09-26",
       "fixedIn": "e8dca2d19",
       "fix": "runEmptySceneStage always runs validateEmptyScene, with the text position only when a text zone is active and null otherwise, and the per-page plate QC option set (labPlateQcOptions: placements, mainScenePrompt, plateQc.plateStoryEra, full art style, shot, pageNumber, landmark photo, light). edit_image on a plate runs the derived-plate QC (null text position, plateClass camera, no page geometry or placements). The era derivation is one helper (plateQc.plateStoryEra) used by both story-run plate QCs and the Lab. Test: lab-plate-qc-always.test.ts."
+    },
+    {
+      "id": "plate-qc-fails-photographic-book",
+      "title": "The plate QC failed a photograph as a HARD medium defect on every book, the realistic (photographic) style included",
+      "reportedAt": "2026-09-26",
+      "source": "Found while fixing the plate QC medium check (owner task 2026-09-26); reproduced by building the QC prompt for the realistic style: its ART STYLE reads \"A photograph. Real people captured by a camera…\" and the Medium check then said \"FAIL if it reads as a photograph\".",
+      "rootCause": "prompts/empty-scene-qc.txt STYLE_CHECK had one wording for every style; buildEmptySceneQcPrompt never asked isPhotographicArtStyle, which the repair style guard already uses.",
+      "impact": "On a realistic book every correctly photographic plate would be failed as medium (HARD), retried, and shipped with plate_shipped_failed_qc (or a derived plate dropped to its base).",
+      "status": "fixed",
+      "fixedAt": "2026-09-26",
+      "fixedIn": "pending (fix/plate-qc-coverage)",
+      "fix": "buildEmptySceneQcPrompt picks STYLE_CHECK_PHOTOGRAPHIC (\"Is the plate a photograph in it? FAIL if it reads as painted, drawn, animated or 3D-rendered\") when isPhotographicArtStyle(artStyle), STYLE_CHECK otherwise. Test: tests/unit/plate-qc-landmark-medium.test.ts."
     }
   ]
 }

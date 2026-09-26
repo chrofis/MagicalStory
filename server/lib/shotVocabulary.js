@@ -653,8 +653,21 @@ const PLATE_EDGE_RULE = `The painting fills the frame edge to edge, the scene it
  * PLATE_NO_PEOPLE_RULE; the plate QC (empty-scene-qc.txt) fails any PLATE_PEOPLE
  * item in its "Figures" check.
  */
-const PLATE_PEOPLE = 'person, passer-by, crowd, rider, or silhouette of a person';
+// "part or faint trace of one" named 2026-09-26: Lab 1505 carried a
+// half-erased ghost of a person and passed the Figures check.
+const PLATE_PEOPLE = 'person, passer-by, crowd, rider, silhouette of a person, or part or faint trace of one';
 const PLATE_NO_PEOPLE_RULE = `The place is painted with no people in it: no ${PLATE_PEOPLE} anywhere in the frame, however small or distant, even where such a place is normally busy or the description mentions people.`;
+
+/**
+ * What a landmark plate is told about its reference photo, and what its judge
+ * is told the plate was told (2026-09-26). The plate renders the part of the
+ * place its camera sees — the landmark, a part of it, or the view from it — so
+ * the judge holds only that part to the photograph. Lab 1506 failed its
+ * landmark check on a plate that looked from the landmark toward other towers
+ * the brief named. One sentence for both sides: empty-scene's REFERENCE line
+ * (prompts.js buildEmptyScenePrompt) and the plate QC's LANDMARK_CHECK.
+ */
+const PLATE_LANDMARK_REFERENCE = 'The place in this scene is the one shown in the attached reference image — render the part of it the camera sees, consistent in colour and construction.';
 
 /**
  * The plate's band note: which depth bands must give FOOTING, and which of them
@@ -752,6 +765,7 @@ module.exports = {
   PLATE_EDGE_RULE,
   PLATE_PEOPLE,
   PLATE_NO_PEOPLE_RULE,
+  PLATE_LANDMARK_REFERENCE,
   buildPlateSurfaceNote,
   DISTANCE_SHOTS,
   POSITION_SHOTS,

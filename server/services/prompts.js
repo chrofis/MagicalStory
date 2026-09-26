@@ -752,7 +752,8 @@ function buildEmptyScenePrompt(opts = {}) {
   // 2026-09-24): it is built from the description above, so the element line
   // names only the vessel or structure.
   if (opts.referenceKind === 'landmark') {
-    description += `\n\n**REFERENCE:** The place in this scene is the one shown in the attached reference image — render the part of it the camera sees, consistent in colour and construction.`;
+    // The plate QC's landmark check is told this same sentence (shotVocabulary).
+    description += `\n\n**REFERENCE:** ${require('../lib/shotVocabulary').PLATE_LANDMARK_REFERENCE}`;
   } else if (opts.referenceKind === 'element') {
     description += `\n\n**REFERENCE:** The vessel or structure in this scene is the one shown in the attached reference image — render the part of it the camera sees, consistent in colour and construction.`;
   }

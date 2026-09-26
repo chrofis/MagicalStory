@@ -475,8 +475,13 @@ function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, chara
   // neither, so a photographic plate or a wrong camera passed (staging
   // job_1790100385959_1nitlympp: the p12 aerial derive read as a photograph,
   // the LOC002.4/.5 plates came back eye-level medium-wide).
+  // A photographic book's plate is held to a photograph; every other style's
+  // plate fails one, a photograph made to look painted included (2026-09-26).
+  // The same classifier the repair style guard uses.
+  const styleSection = require('../services/prompts').isPhotographicArtStyle(artStyle)
+    ? qc.STYLE_CHECK_PHOTOGRAPHIC : qc.STYLE_CHECK;
   const styleCheck = String(artStyle || '').trim()
-    ? `\n${fillTemplate(qc.STYLE_CHECK, { ART_STYLE: String(artStyle).trim() })}` : '';
+    ? `\n${fillTemplate(styleSection, { ART_STYLE: String(artStyle).trim() })}` : '';
   // `shot` is a shot id, or the base plate class ('eye-level'): a vantage's
   // base plate is shared by every close-up, medium and wide page on it, so it
   // is held to its height and angle only, never to one page's distance.
@@ -500,7 +505,13 @@ function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, chara
   const landmarkCheck = landmark
     ? `
 
-${fillTemplate(qc.LANDMARK_CHECK, { LANDMARK_NAME: landmark, LANDMARK_PHOTO_AUTHORITY: require('./promptBuilders').LANDMARK_PHOTO_AUTHORITY })}` : '';
+${fillTemplate(qc.LANDMARK_CHECK, {
+    LANDMARK_NAME: landmark,
+    LANDMARK_PHOTO_AUTHORITY: require('./promptBuilders').LANDMARK_PHOTO_AUTHORITY,
+    // The REFERENCE line the plate author was given, verbatim: the plate shows
+    // the part of the place its camera sees, and is judged on that part.
+    PLATE_LANDMARK_REFERENCE: require('./shotVocabulary').PLATE_LANDMARK_REFERENCE,
+  })}` : '';
   return fillTemplate(qc.BODY, {
     // The closed list of checks an issue is filed under (plateQc.js) — what a
     // double QC failure is decided on, so it is one constant, never prose.
