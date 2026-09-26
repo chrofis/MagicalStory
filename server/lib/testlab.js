@@ -1377,6 +1377,9 @@ async function runSemanticEvalStage(ctx, { promptOverride, experimentId }) {
         landmarkPhotos: replay.options.landmarkPhotos,
         era: replay.options.era,
       })),
+    // The bible PAGE ELEMENTS / DECLARED INTERACTIONS resolve ids against, as
+    // production passes it (evalPipeline, 2026-09-26).
+    visualBible: replay.options.visualBible || null,
   };
 
   const t0 = Date.now();

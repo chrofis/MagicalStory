@@ -836,6 +836,47 @@ function semanticDeclaredLight(sceneHint, imagePrompt) {
   return light.describeLightForJudge(lit);
 }
 
+/**
+ * The semantic judge's DECLARED blocks, read from the page's BRIEF — the
+ * source the illustrator's prompt was built from. Pure.
+ *
+ * DECLARED INTERACTIONS: the brief's `interactions` rows and gazes.
+ * PAGE ELEMENTS: the one place a raw id is SHOWN to this judge on purpose. It
+ * reads the page's declared objects, resolves each to its bible name, and the
+ * judge copies the id back as `element` on every finding about that thing —
+ * which is how the repair is later handed the element's picture by id.
+ *
+ * The brief comes first — the same source order the quality judge reads its
+ * declared interactions from (evalPipeline `sceneHint || originalPrompt`). This
+ * read `imagePrompt || sceneHint`, and on every pipeline eval imagePrompt is the
+ * metadata-stripped prose (stripSceneMetadata), so the judge got
+ * "(none declared)" / "(none)" on 80 of 80 stored staging semantic prompts
+ * while the brief declared objects on 80 and interactions on 70; and the
+ * pipeline passed no bible, so no id could resolve either (2026-09-26,
+ * docs/decisions.md "Every critic judges against the source the generator was
+ * given, uncut").
+ */
+function semanticDeclaredBlocks({ sceneHint = null, imagePrompt = null, visualBible = null } = {}) {
+  let interactionsBlock = '(none declared)';
+  let elementsBlock = '(none)';
+  let declaredLightLine = '';
+  try {
+    const { extractSceneMetadata: getSceneMetadata } = require('./storyHelpers');
+    const sceneMeta = getSceneMetadata(sceneHint || imagePrompt || '');
+    const interactions = sceneMeta?.interactions
+      || (Array.isArray(sceneMeta?.fullData?.interactions) ? sceneMeta.fullData.interactions : null);
+    const guard = require('./vbIdGuard');
+    interactionsBlock = guard.formatInteractionsBlock(interactions, visualBible, guard.gazeCharacters(sceneMeta));
+    const objects = sceneMeta?.objects
+      || (Array.isArray(sceneMeta?.fullData?.objects) ? sceneMeta.fullData.objects : null);
+    elementsBlock = guard.formatElementsBlock(objects, visualBible);
+    declaredLightLine = semanticDeclaredLight(sceneHint, imagePrompt);
+  } catch (err) {
+    log.error(`[SEMANTIC] declared blocks could not be read from the brief (${err.message}) — the judge gets none`);
+  }
+  return { interactionsBlock, elementsBlock, declaredLightLine };
+}
+
 async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, sceneHint = null, templateOverride = null, evalContext = {}) {
   // evalContext.artStyle / .clothingContract: the same resolved values every
   // other evaluator gets — commissioned style and per-character outfits are
@@ -870,25 +911,8 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
   // STORY_TEXT / SCENE_HINT / IMAGE_PROMPT all go through stripEntityIds below,
   // and this block — which is the ONE place `i.object` (a raw VB id) is
   // rendered — was the exception. Shared builder now (vbIdGuard.js).
-  let interactionsBlock = '(none declared)';
-  // PAGE ELEMENTS: the one place a raw id is SHOWN to this judge on purpose. It
-  // reads the page's declared objects, resolves each to its bible name, and the
-  // judge copies the id back as `element` on every finding about that thing —
-  // which is how the repair is later handed the element's picture by id.
-  let elementsBlock = '(none)';
-  let declaredLightLine = '';
-  try {
-    const { extractSceneMetadata: getSceneMetadata } = require('./storyHelpers');
-    const sceneMeta = getSceneMetadata(imagePrompt || sceneHint || '');
-    const interactions = sceneMeta?.interactions
-      || (Array.isArray(sceneMeta?.fullData?.interactions) ? sceneMeta.fullData.interactions : null);
-    const guard = require('./vbIdGuard');
-    interactionsBlock = guard.formatInteractionsBlock(interactions, evalContext.visualBible || null, guard.gazeCharacters(sceneMeta));
-    const objects = sceneMeta?.objects
-      || (Array.isArray(sceneMeta?.fullData?.objects) ? sceneMeta.fullData.objects : null);
-    elementsBlock = guard.formatElementsBlock(objects, evalContext.visualBible || null);
-    declaredLightLine = semanticDeclaredLight(sceneHint, imagePrompt);
-  } catch { /* silent fallback */ }
+  const { interactionsBlock, elementsBlock, declaredLightLine } =
+    semanticDeclaredBlocks({ sceneHint, imagePrompt, visualBible: evalContext.visualBible || null });
 
   // Convert image to base64 if needed
   let imageBase64 = imageData;
@@ -1041,5 +1065,6 @@ module.exports = {
   buildSimplePreviewPrompt,
   evaluateSemanticFidelity,
   buildSemanticPrompt,
-  semanticDeclaredLight
+  semanticDeclaredLight,
+  semanticDeclaredBlocks
 };
