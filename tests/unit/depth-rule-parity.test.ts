@@ -42,6 +42,6 @@ describe('must-survive render rules sit in the protected tail', () => {
 
   it('the required-cast rule is below the tail split', () => {
     const t = tmpl();
-    expect(t.indexOf('**REQUIRED CAST:')).toBeGreaterThan(tailStart(t));
+    expect(t.indexOf('{REQUIRED_CAST}')).toBeGreaterThan(tailStart(t));
   });
 });

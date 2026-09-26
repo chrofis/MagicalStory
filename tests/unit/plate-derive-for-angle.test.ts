@@ -181,8 +181,4 @@ describe('the pipeline honours it', () => {
   it('a derived plate records the base plate as its one reference', () => {
     expect(src).toContain('grokRefImages: derivedForPage ? [plateImage] : plateRefs');
   });
-
-  it('reads a derived plate\'s population on its own, not as its base plate', () => {
-    expect(src).toMatch(/bg\.plateDerivedFor \? `:\$\{bg\.plateDerivedFor\}`/);
-  });
 });

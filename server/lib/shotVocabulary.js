@@ -642,6 +642,75 @@ const PLATE_MARKS = 'signature, monogram or initials';
 const PLATE_SURROUNDS = 'paper margin, mat, deckle or torn-paper edge, vignette, border, keyline or frame around the picture';
 const PLATE_EDGE_RULE = `The painting fills the frame edge to edge, the scene itself reaching all four sides; it carries no ${PLATE_MARKS} and no ${PLATE_SURROUNDS}.`;
 
+/**
+ * A plate holds NO people (owner, 2026-09-26). A vantage plate is shared by
+ * every page on it, so a passer-by painted on the plate is repeated on each of
+ * those pages: staging job_1789506283204_3kxqshifx showed the same six people on
+ * 17 pages. Background people — passers-by, onlookers, a crowd — are drawn in
+ * each PAGE render instead, from the brief's `population`
+ * (promptBuilders.buildRequiredCastRule). One source for both sides: the plate
+ * author (empty-scene.txt) and the derive edit (plate-derive.txt) get
+ * PLATE_NO_PEOPLE_RULE; the plate QC (empty-scene-qc.txt) fails any PLATE_PEOPLE
+ * item in its "Figures" check.
+ */
+const PLATE_PEOPLE = 'person, passer-by, crowd, rider, or silhouette of a person';
+const PLATE_NO_PEOPLE_RULE = `The place is painted with no people in it: no ${PLATE_PEOPLE} anywhere in the frame, however small or distant, even where such a place is normally busy or the description mentions people.`;
+
+/**
+ * The plate's band note: which depth bands must give FOOTING, and which of them
+ * stay open from side to side. It names SURFACES only — never a character, and
+ * never a count (owner, 2026-09-26). The per-page note used to read "1 character
+ * in the foreground (1 on the left) and 1 character in the midground (1 on the
+ * right) will be composited into this scene later", and the plate model painted
+ * exactly those figures (staging job_1789348171785_9oxos7dwv p8/p16,
+ * job_1789343124794_z2c779f7i p18).
+ *
+ * @param {Array|null} characters the page's brief characters (`depth`,
+ *   `position`), or null for a vantage plate shared by several pages — then
+ *   every band shows the place's own surface.
+ * @param {string} [shot] the page's shot (close-up / medium add a floor line)
+ * @returns {string} '' when the page places no character
+ */
+function buildPlateSurfaceNote(characters, shot = '') {
+  if (!Array.isArray(characters)) {
+    return 'Render this as an empty location backdrop. The foreground, midground and background all show the place\'s own ground, floor or water surface continuing unbroken. No animals.';
+  }
+  // Depth AND lateral side, so each band is told whether both of its sides
+  // stay open ("far-left and far-right") instead of being walled in.
+  const buckets = { fgLeft: 0, fgRight: 0, fgCenter: 0, mgLeft: 0, mgRight: 0, mgCenter: 0, bgLeft: 0, bgRight: 0, bgCenter: 0 };
+  for (const c of characters) {
+    const depth = String(c?.depth || '').toLowerCase();
+    const pos = String(c?.position || '').toLowerCase();
+    const isBg = depth === 'background' || pos.includes('far background') || pos.includes('tiny figure') || pos.includes('background');
+    const isMg = !isBg && (depth === 'midground' || pos.includes('midground'));
+    const isLeft = /\bfar[-\s]?left|\bleft\b/.test(pos) && !/right/.test(pos);
+    const isRight = /\bfar[-\s]?right|\bright\b/.test(pos) && !/left/.test(pos);
+    buckets[(isBg ? 'bg' : isMg ? 'mg' : 'fg') + (isLeft ? 'Left' : isRight ? 'Right' : 'Center')]++;
+  }
+  const BAND_LABEL = { fg: 'foreground', mg: 'midground', bg: 'far background' };
+  const used = ['fg', 'mg', 'bg'].filter(d => buckets[`${d}Left`] + buckets[`${d}Right`] + buckets[`${d}Center`] > 0);
+  if (used.length === 0) return '';
+  const labels = used.map(d => BAND_LABEL[d]);
+  const bandList = labels.length === 1 ? labels[0] : `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`;
+  const many = labels.length > 1;
+  // Scene material, never "open space" or "leave room": Grok resolves those
+  // with blank patches and half-finished building fragments. FOOTING, never
+  // "natural surface": on a river panorama that was open water, and a figure
+  // later drawn into that band floated on it.
+  let note = `The ${bandList} ${many ? 'each show' : 'shows'} a standable surface — ground, path, bank, floor, deck, walkway, jetty, or the floor of a shaft or pit — continuing unbroken, the light and surface texture carrying across. `
+    + `Open water, air or a drop fills ${many ? 'those bands' : 'that band'} only where the description above puts it. `
+    + `${many ? 'They hold' : 'It holds'} no props, signage, vehicles or extra structures, and ${many ? 'are' : 'is'} painted as part of the scene — never a blank, white or unfinished patch, never an abrupt building cutoff.`;
+  const bothSides = used.find(d => buckets[`${d}Left`] > 0 && buckets[`${d}Right`] > 0);
+  if (bothSides) {
+    note += ` The far left and far right of the ${BAND_LABEL[bothSides]} are both flat continuous ground, with no building wall, prop or barrier closing either side.`;
+  }
+  const s = String(shot || '').toLowerCase();
+  if (s.includes('close') || s.includes('medium')) {
+    note += ` This is a ${s.includes('close') ? 'close-up' : 'medium'} shot: the frame keeps open floor or ground in front of the backdrop, never filled edge to edge with furniture.`;
+  }
+  return note;
+}
+
 /*
  * What stays is the place's STRUCTURE, never an object's "position": in an
  * image edit that word means position in the frame, and it pinned the camera
@@ -681,6 +750,9 @@ module.exports = {
   PLATE_MARKS,
   PLATE_SURROUNDS,
   PLATE_EDGE_RULE,
+  PLATE_PEOPLE,
+  PLATE_NO_PEOPLE_RULE,
+  buildPlateSurfaceNote,
   DISTANCE_SHOTS,
   POSITION_SHOTS,
   SHOT_PATTERNS,

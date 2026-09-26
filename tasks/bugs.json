@@ -2,6 +2,15 @@
   "_readme": "CLEAR-BUG REGISTRY. A bug the owner reported, or one confirmed from stored evidence, goes here the moment it is confirmed - and the pre-push gate (scripts/admin/check-open-bugs.js) BLOCKS every push while any entry is open. That is the point: a reported bug is fixed immediately, not backlogged. Only CLEAR bugs belong here (reproduced, or owner-reported with evidence); design questions and improvements go to the task list instead. Close an entry by setting status to 'fixed' with the commit hash IN THE SAME COMMIT as the fix. Emergency escape: PUSH_WITH_OPEN_BUGS=1 git push (documented, visible, deliberate).",
   "bugs": [
     {
+      "id": "plate-band-note-names-figures",
+      "title": "The per-page plate prompt named the page's figures by band and side, and the plate model painted them onto the people-free plate",
+      "reportedAt": "2026-09-26",
+      "source": "Stored evidence, staging. The stored per-page plate prompts of job_1789348171785_9oxos7dwv p8 (\"2 characters in the foreground (1 on the left, 1 on the right) will be composited into this scene later\") and p16 and job_1789343124794_z2c779f7i p18 (\"1 character in the foreground (1 on the left) and 1 character in the midground (1 on the right) will be composited into this scene later\"). The p16 plate image was viewed: a child walking at left foreground and a second child at right midground, painted on the plate.",
+      "rootCause": "storyJobPipeline.js renderPagePlate (Phase 5a-pre, ~line 5165) built CHARACTER_SPACE from the brief's characters as a count per depth band and side, framed as figures to be composited later. The image model reads a count of characters as an instruction to draw them.",
+      "impact": "Every page without a vantage plate got a plate with figures standing where the cast is drawn; the page render then doubled or merged them with the real cast.",
+      "status": "open"
+    },
+    {
       "id": "trial-cover-sends-raw-landmark-photo",
       "title": "The trial front cover was an edit of the RAW landmark photograph (a Wikimedia close-up of a silhouette artist and his customer) - two strange men were painted beside the child",
       "reportedAt": "2026-09-23",

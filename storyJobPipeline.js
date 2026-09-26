@@ -4757,7 +4757,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 ? `**FRAMING:** ${adEmptyPrompt}\n\n${vantageShot ? 'The SHOT line decides the camera: its height, angle and distance. The FRAMING paragraph decides the composition and what fills the foreground; a camera it names gives way to the SHOT line.' : 'The FRAMING paragraph decides the camera, the composition and what fills the foreground.'} The LOCATION and VANTAGE lines are setting context — use them for what the place looks like, not for how it is framed.`
                 : '',
             ].filter(Boolean).join('\n\n');
-            const characterSpace = `Render this as an empty location backdrop. Foreground, midground and background bands all show the scene's natural ground/floor/water surface continuing unbroken — characters will be composited into them later. No figures, no animals.`;
+            // Surfaces only, like the per-page note (shotVocabulary.buildPlateSurfaceNote);
+            // the template's PLATE_NO_PEOPLE rule keeps people off the plate.
+            const characterSpace = require('./server/lib/shotVocabulary').buildPlateSurfaceNote(null);
             // Pull landmark photos for the LOC if real — used as a strict
             // visual reference for the Wikimedia-photo case.
             // NOT resolveLandmarkPhotoForLocation: this is the per-vantage plate
@@ -5048,8 +5050,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   imageData: derivedForPage ? derivedForPage.imageData : plateImage,
                   prompt: derivedForPage ? derivedForPage.prompt : platePrompt,
                   // The derive's identity — its camera class, plus the light
-                  // when it was re-lit ("eye-level (night, rain)"). Also the
-                  // plate-population key, so each distinct image is read once.
+                  // when it was re-lit ("eye-level (night, rain)").
                   plateDerivedFor: derivedForPage ? derivedForPage.label : null,
                   // The time of day and weather this plate was painted in.
                   plateLight: describeLight(derivedForPage ? derivedForPage.light : baseLight) || null,
@@ -5120,65 +5121,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const emptySceneDesc = shotPrefix + (expandedEmptyPrompt
               || `**SETTING:** ${settingDesc}\n**CAMERA:** ${camera}${lighting ? `\n**LIGHTING:** ${lighting}` : ''}`);
 
-            // Classify each character by depth AND lateral side so the empty scene leaves
-            // room in the right band. "Leave space for 2 figures in the far background" is
-            // useless when the two figures need to be at opposite edges — Grok will paint
-            // buildings flanking both sides and the characters get jammed together later.
-            const characters = sceneMetadata?.fullData?.characters || [];
-            const buckets = { fgLeft: 0, fgRight: 0, fgCenter: 0, mgLeft: 0, mgRight: 0, mgCenter: 0, bgLeft: 0, bgRight: 0, bgCenter: 0 };
-            for (const char of characters) {
-              const depth = (char.depth || '').toLowerCase();
-              const pos = (char.position || '').toLowerCase();
-              const isBg = depth === 'background' || pos.includes('far background') || pos.includes('tiny figure') || pos.includes('background');
-              const isMg = !isBg && (depth === 'midground' || pos.includes('midground'));
-              const depthKey = isBg ? 'bg' : isMg ? 'mg' : 'fg';
-              // Parse lateral side — normalise "center-left"/"left-center" to just "left" etc.
-              const isLeft = /\bfar[-\s]?left|\bleft\b/.test(pos) && !/right/.test(pos);
-              const isRight = /\bfar[-\s]?right|\bright\b/.test(pos) && !/left/.test(pos);
-              const sideKey = isLeft ? 'Left' : isRight ? 'Right' : 'Center';
-              buckets[depthKey + sideKey]++;
-            }
-            const total = (depth) => buckets[depth + 'Left'] + buckets[depth + 'Right'] + buckets[depth + 'Center'];
-            let characterSpace = '';
-            if (total('fg') + total('mg') + total('bg') > 0) {
-              const parts = [];
-              const describe = (depth, label) => {
-                const L = buckets[depth + 'Left'], R = buckets[depth + 'Right'], C = buckets[depth + 'Center'];
-                const t = L + R + C;
-                if (t === 0) return;
-                const sides = [];
-                if (L > 0) sides.push(`${L} on the left`);
-                if (R > 0) sides.push(`${R} on the right`);
-                if (C > 0) sides.push(`${C} in the center`);
-                parts.push(`${t} character${t > 1 ? 's' : ''} in the ${label}${sides.length > 0 ? ` (${sides.join(', ')})` : ''}`);
-              };
-              describe('fg', 'foreground');
-              describe('mg', 'midground');
-              describe('bg', 'far background');
-              // Frame these bands as scene material that continues unbroken — NOT as
-              // "open space" or "leave room", which Grok reads as render-less and
-              // resolves with blank patches or half-finished building fragments.
-              // The figure will be composited on top later; until then the band must
-              // give it FOOTING. "Natural surface" was the old wording — on a river
-              // panorama the natural surface at a background band is open water, the
-              // plate complied, and the composited figure floated on it.
-              characterSpace = `${parts.join(' and ').replace(/^./, c => c.toUpperCase())} will be composited into this scene later. Each of those bands must give its figures FOOTING — a standable surface at that depth (ground, path, bank, floor, deck, walkway, jetty, the floor of a shaft or pit a figure stands inside — whatever structure the setting offers) rendered continuing through unbroken. Open water, air, or a drop may fill a figure band only when the scene's figures are in the water or airborne. Lighting and surface texture must continue across the bands. They hold no props, signage, vehicles, or extra structures, but they ARE part of the scene — never blank, white, or unfinished patches, never abrupt building cutoffs.`;
-
-              // If any depth band needs both-sides placement, spell it out so Grok doesn't
-              // wall the frame with buildings on left and right.
-              const bothSides = ['fg', 'mg', 'bg'].find(d => buckets[d + 'Left'] > 0 && buckets[d + 'Right'] > 0);
-              if (bothSides) {
-                const label = { fg: 'foreground', mg: 'midground', bg: 'far background' }[bothSides];
-                characterSpace += ` Both the far-left and far-right ${label} render as flat continuous ground — no building walls, props, or barriers between the two sides.`;
-              }
-
-              // For close-up/medium shots, add explicit space guidance so the empty scene
-              // doesn't fill the frame with just furniture (e.g. table surface only)
-              const shotType = (sceneMetadata?.fullData?.shot || camera || '').toLowerCase();
-              if (shotType.includes('close') || shotType.includes('medium')) {
-                characterSpace += ` This is a ${shotType.includes('close') ? 'close-up' : 'medium'} shot — characters will be composited into this scene later. The frame must include enough space for character bodies to be placed naturally.`;
-              }
-            }
+            // The band note: which depth bands give FOOTING and stay open side
+            // to side. Surfaces only — never a character and never a count: the
+            // old note ("1 character in the foreground (1 on the left) ... will
+            // be composited into this scene later") got those figures painted
+            // onto the plate (2026-09-26, shotVocabulary.buildPlateSurfaceNote).
+            const characterSpace = require('./server/lib/shotVocabulary').buildPlateSurfaceNote(
+              sceneMetadata?.fullData?.characters || [],
+              sceneMetadata?.fullData?.shot || camera || '',
+            );
 
             // Build text area instruction from scene metadata (keeps text area calm in empty scene too)
             // Enforce spread rule: odd pages = left side, even = right side
@@ -5462,51 +5413,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         for (const bg of emptyScenes) storePagePlate(bg);
         const bgElapsed = ((Date.now() - bgStartTime) / 1000).toFixed(1);
         log.info(`🎨 [UNIFIED] Phase 5a-pre: ${Object.keys(sceneBackgrounds).length}/${pageDataArray.length} empty scenes in ${bgElapsed}s`);
-      }
-
-      // Phase 5a-pre-pop: READ THE POPULATION OFF THE PLATE, don't take the
-      // Art Director's word for it (owner, 2026-09-19).
-      //
-      // `population` decides whether the presence arithmetic bills an
-      // `extra_character` CRITICAL for background people, and the Art Director
-      // is exactly the input that got it wrong — it wrote "No other people or
-      // animals are present" about the Lindenhof, a public plaza. The plate is
-      // evidence instead of a declaration: it is rendered BEFORE any cast is
-      // composited, so everyone in it belongs to the setting.
-      //
-      // ONE DETECTION PER PLATE, not per page: a vantage canvas serves several
-      // pages and they share its answer. The pass reuses the GroundingDINO
-      // person call every page render already makes (our own analyzer service,
-      // no vendor cost). A plate that shows nobody, or a page with no plate at
-      // all, leaves the declaration untouched — which is why a genuinely
-      // uncommissioned figure on a plateless page still fires.
-      if (!runSinglePassScene) {
-        const { detectPlatePopulation } = require('./server/lib/bboxDetection');
-        const byPlate = new Map();   // plate identity -> [pageNumber]
-        for (const [pn, bg] of Object.entries(sceneBackgrounds)) {
-          const img = bg?.imageData;
-          if (!img || typeof img !== 'string') continue;
-          // A derived plate is a different image from its vantage's base
-          // plate (a wider view can show people the base does not), so it is
-          // read on its own.
-          const key = bg.vantageId ? `${bg.vantageId}${bg.plateDerivedFor ? `:${bg.plateDerivedFor}` : ''}` : `p${pn}`;
-          if (!byPlate.has(key)) byPlate.set(key, { imageData: img, pages: [] });
-          byPlate.get(key).pages.push(Number(pn));
-        }
-        const popStart = Date.now();
-        await Promise.all([...byPlate.entries()].map(async ([key, plate]) => {
-          const got = await detectPlatePopulation(plate.imageData, `${key} `);
-          if (!got?.population) return;
-          for (const pn of plate.pages) {
-            if (sceneBackgrounds[pn]) sceneBackgrounds[pn].platePopulation = got.population;
-            const pd = pageDataArray.find(x => Number(x.pageNumber) === pn);
-            if (pd?.sceneMetadata) pd.sceneMetadata.platePopulation = got.population;
-          }
-        }));
-        const overridden = Object.values(sceneBackgrounds).filter(b => b?.platePopulation).length;
-        if (byPlate.size) {
-          log.info(`👥 [PLATE-POP] ${byPlate.size} plate(s) read in ${((Date.now() - popStart) / 1000).toFixed(1)}s — ${overridden} page(s) carry a plate-derived population`);
-        }
       }
 
       // Phase 5a-pre-grid: build each page's Visual Bible reference grid, NOW

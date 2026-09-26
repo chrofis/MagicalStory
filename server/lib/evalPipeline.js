@@ -519,6 +519,8 @@ ${fillTemplate(qc.LANDMARK_CHECK, { LANDMARK_NAME: landmark, LANDMARK_PHOTO_AUTH
     // The same lists the plate author's PLATE_EDGE_RULE names.
     PLATE_MARKS: require('./shotVocabulary').PLATE_MARKS,
     PLATE_SURROUNDS: require('./shotVocabulary').PLATE_SURROUNDS,
+    // The list the plate author's PLATE_NO_PEOPLE_RULE forbids (2026-09-26).
+    PLATE_PEOPLE: require('./shotVocabulary').PLATE_PEOPLE,
   });
 }
 
@@ -1324,26 +1326,16 @@ function buildExpectedCastBlock({
     // cites as CHR001). The parsed metadata is passed in where the caller
     // holds it; parsing a hint stays the fallback.
     const sceneMeta = sceneMetadata || sh.extractSceneMetadata(sceneHint || originalPrompt);
-    const { normalisePopulation, resolvePopulation } = require('./sceneMetadata');
+    const { normalisePopulation } = require('./sceneMetadata');
     const rawPop = sceneMeta?.population || sceneMeta?.fullData?.population || null;
     const legacyCrowd = sceneMeta?.crowdExpected === true || sceneMeta?.fullData?.crowdExpected === true;
-    const declaredPop = normalisePopulation(rawPop, legacyCrowd);
-    // THE PLATE IS THE SECOND WITNESS (owner, 2026-09-19). The empty-scene
-    // plate is rendered BEFORE any cast is composited, so the people in it
-    // belong to the setting by construction — evidence, where the Art
-    // Director's `population` is a declaration. Where they disagree the plate
-    // wins, and it can only raise the state (bboxDetection.detectPlatePopulation
-    // → sceneMetadata.resolvePopulation). A page with no plate keeps the
-    // declaration untouched, which is why the genuine uncommissioned-child
-    // page still fires.
-    const platePop = sceneMeta?.platePopulation || sceneMeta?.fullData?.platePopulation || null;
-    const resolved = resolvePopulation(declaredPop, platePop);
-    population = resolved.population;
-    // LOG THE DISAGREEMENT, so how often the Art Director is wrong about its
-    // own setting is a measured number rather than an impression.
-    if (resolved.disagreed) {
-      log.info(`👥 [PLATE-POP] ${pageLabel || 'page'}: brief declared "${declaredPop}", plate shows "${platePop}" — plate wins`);
-    }
+    // THE BRIEF'S FIELD IS THE ONE SOURCE (owner, 2026-09-26). The page render
+    // draws background people from this same field (promptBuilders
+    // buildRequiredCastRule) and the plate holds none, so the judge's answer
+    // and the illustrator's instruction are one value. The plate reading that
+    // could raise it (2026-09-19, detectPlatePopulation) is deleted with the
+    // people it read.
+    population = normalisePopulation(rawPop, legacyCrowd);
     crowdExpected = population === 'crowd';
     for (const e of sh.buildSecondaryExpectedCharacters(visualBible, sceneMeta, [...names], { pageLabel, extraNames, includeAnimals: true })) add(e.name, vbKind(e.name));
     // A SECONDARY THAT DECLARES THIS PAGE IS ON THIS PAGE (2026-09-13). The

@@ -142,7 +142,7 @@ describe('an over-cap prompt keeps the page facts and pays with generic guidance
     const tail = prompt.slice(tailStart);
     // Pad the SCENE PROSE — the part a real page grows — until the whole thing
     // is over the model's cap, as every page of that book was.
-    const filler = Array.from({ length: 26 },
+    const filler = Array.from({ length: 30 },
       (_, i) => `Figure ${i} stands near landmark ${i} wearing garment ${i} in colour ${i}.`).join(' ');
     return `${head}
 ${filler}
