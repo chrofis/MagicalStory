@@ -2293,7 +2293,7 @@
       "impact": "Judges read lettering the model never painted; the excusal also hid a brand line or title the model DID paint.",
       "status": "fixed",
       "fixedAt": "2026-09-26",
-      "fixedIn": "pending",
+      "fixedIn": "caf53e092",
       "fix": "server/lib/coverEvalLayer.js resolveCoverEvalImage / applyCoverEvalView (art of exactly the judged version; NO_ART_LAYER thrown for a stamped version without one), wired into every path above; Lab cover versions store their own art row; appTexts and the \"never flag them present\" excuse deleted. Test: tests/unit/cover-eval-layer.test.ts."
     },
     {
@@ -2305,7 +2305,7 @@
       "impact": "The active cover of those stories has no textless layer: it cannot be judged without its stamp (now fails loudly), and restampServedCover / paintServedCoverTitle / the cover edit fall back to another version's art.",
       "status": "fixed",
       "fixedAt": "2026-09-26",
-      "fixedIn": "pending",
+      "fixedIn": "caf53e092",
       "fix": "The art row takes the active version's index. Stored stories are not repaired (the lost layer is not recoverable). Test: tests/unit/cover-eval-layer.test.ts (the bake keeps the ACTIVE version's art)."
     }
   ]
