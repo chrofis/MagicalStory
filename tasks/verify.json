@@ -1713,6 +1713,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "plate-no-people",
+      "title": "A plate holds no people; ambient/crowd pages draw their own background people; no plate carries the page's figures",
+      "commits": [
+        "8d979ae8d"
+      ],
+      "addedAt": "2026-09-26",
+      "claim": "On a new full story: every stored empty_scene plate (story_images image_type empty_scene) shows no person; pages whose brief declares population ambient show a few small, distant passers-by drawn in the page, none resembling a cast member, and cast_only pages none; no page carries an extra_character CRITICAL for background-scale people on an ambient page.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "View every empty_scene plate image of the run (no people), then the ambient pages (a few small distant passers-by, no cast look-alike) and their stored finalChecks for extra_character / duplicate_identity"
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }
