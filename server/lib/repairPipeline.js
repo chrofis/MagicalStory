@@ -3899,6 +3899,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // told apart from one the check never ran on.
       // null = the check did not run; {items: []} = it ran and saw no writing.
       letteringInventory: v.evaluation?.letteringInventory ?? null,
+      // Quality findings the landmark guard suppressed — the record, never the
+      // deduction (2026-09-26). The semantic judge's ride on semanticResult.
+      suppressedIssues: v.evaluation?.suppressedIssues ?? null,
       // The style repaint's own record — which anchor it aimed at, and the
       // comparative verdict the gate decided on. Same whitelist lesson as
       // rawOutput and styleGate above: without this line the field exists only

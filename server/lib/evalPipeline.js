@@ -2181,6 +2181,22 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     const landmarkProtection = require('./landmarkProtection')
       .computeLandmarkProtection({ landmarkPhotos: evalOptions.landmarkPhotos || null, era: evalOptions.era || null });
     const landmarkContextBlock = require('./landmarkProtection').buildLandmarkContextBlock(landmarkProtection);
+    // THE LANDMARK GUARD RUNS WHERE THE FINDINGS ARE MADE (2026-09-26). It used
+    // to run at eval time only inside the compliance judge — which is switched
+    // off — and otherwise only inside the consolidator. The consolidator's copy
+    // protected the SCORE (its deduped list came back empty, the page scored
+    // 100), but the raw semantic list still carried the finding, and every
+    // reader that fell back to the raw lists saw a CRITICAL the score had never
+    // charged: staging job_1790446348343_z3fw660ie p9 was admitted to repair as
+    // critical on a guarded "replace the cityscape" finding, routed to inpaint,
+    // and failed with "no instruction to send". Guarding the record itself means
+    // no reader, present or future, can see the finding as live.
+    //
+    // Same contract as the compliance judge: the kept list replaces the record,
+    // the dropped findings survive as `suppressedIssues` (stamped
+    // `suppressed: 'landmark_protected'`) — the record, never the deduction.
+    const guardLandmarkRecord = (holder, key, label) => require('./landmarkProtection')
+      .guardLandmarkRecord(holder, key, landmarkProtection, { pageNumber: pageContext || null, label });
     if (contract.error) {
       log.debug(`[EVAL] clothing contract block skipped: ${contract.error}`);
       notEvaluated.record('clothing', 'clothing_contract_build_failed', contract.error);
@@ -3478,6 +3494,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
               semanticResult.semanticIssues = kept;
             }
           }
+          // LANDMARK GUARD ON THE SEMANTIC RECORD (2026-09-26) — see
+          // guardLandmarkRecord. Before the penalty and the summary below, so
+          // neither ever sees a suppressed finding.
+          guardLandmarkRecord(semanticResult, 'semanticIssues', '[EVAL semantic]');
           if (semanticResult && semanticResult.semanticIssues && semanticResult.semanticIssues.length > 0) {
             // Semantic surcharge via the ONE shared table (scoring.js
             // SEMANTIC_ISSUE_PENALTY): the hand-copied chain here billed
@@ -3550,6 +3570,15 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           log.warn(`[THREE-STAGE] Parallel evaluation failed: ${tsErr.message}`);
         }
       }
+
+      // LANDMARK GUARD ON THE QUALITY RECORD (2026-09-26). Here, once the
+      // page's merged list is final and before the absence second look and the
+      // score below. The compliance findings merged above were already guarded
+      // inside evaluateThreeStage, so re-running over them drops nothing.
+      const qualityRecord = { fixableIssues };
+      guardLandmarkRecord(qualityRecord, 'fixableIssues', '[EVAL quality]');
+      fixableIssues = qualityRecord.fixableIssues;
+      const suppressedIssues = qualityRecord.suppressedIssues;
 
       // TWO SEVERITY GUARDS ON "IT IS NOT THERE" (owner, 2026-09-23; see
       // absenceCheck.js). Both run before the score below and before the
@@ -3651,6 +3680,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         // presence derivation keeps `final_checks`; only the quality judge's
         // own findings are filled in here.
         fixableIssues: stampFindingSource(Array.isArray(fixableIssues) ? fixableIssues : [], FINDING_SOURCES.QUALITY),  // always an array — eliminates downstream null-checks
+        // Landmark-guard casualties from the quality list. Recording only, zero
+        // points — a sibling of fixableIssues, never merged into it. The
+        // semantic judge's live on semanticResult.suppressedIssues, the
+        // compliance judge's on threeStageResult.suppressedIssues.
+        suppressedIssues: stampFindingSource(suppressedIssues || [], FINDING_SOURCES.QUALITY),
         figures,                          // Detected figures with descriptions
         matches,                          // Character name → figure mapping with face_bbox
         coherenceGate,                    // STEP 0 gate {applied, reason} — drives the forced redo above
@@ -3689,6 +3723,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       if (semanticPromise) {
         try {
           semanticResult = await semanticPromise;
+          // Same landmark guard as the parsed-JSON path (guardLandmarkRecord).
+          guardLandmarkRecord(semanticResult, 'semanticIssues', '[EVAL semantic]');
           if (semanticResult && semanticResult.semanticIssues && semanticResult.semanticIssues.length > 0) {
             // Shared table (scoring.js semanticPenaltyPoints) — same reason as
             // the parsed-JSON chain: the hand-copy billed CATASTROPHIC 10.

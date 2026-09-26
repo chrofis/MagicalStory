@@ -773,10 +773,14 @@ function _buildBreakdownFromEvalResult(evalResult, entityResult) {
     issues: Array.isArray(evalResult.fixableIssues)
       ? evalResult.fixableIssues.filter(i => i?.source !== 'three-stage')
       : [],
-  } : { score: 0, reasoning: null, issues: [] };
+    // Landmark-guard casualties, same sibling-not-member contract as
+    // threeStage.suppressedIssues below (2026-09-26).
+    suppressedIssues: Array.isArray(evalResult.suppressedIssues) ? evalResult.suppressedIssues : [],
+  } : { score: 0, reasoning: null, issues: [], suppressedIssues: [] };
   const semantic = evalResult?.semanticResult ? {
     score: typeof evalResult.semanticResult.score === 'number' ? evalResult.semanticResult.score : 0,
     issues: Array.isArray(evalResult.semanticResult.semanticIssues) ? evalResult.semanticResult.semanticIssues : [],
+    suppressedIssues: Array.isArray(evalResult.semanticResult.suppressedIssues) ? evalResult.semanticResult.suppressedIssues : [],
   } : null;
   const threeStage = evalResult?.threeStageResult ? {
     score: typeof evalResult.threeStageResult.score === 'number' ? evalResult.threeStageResult.score : 0,

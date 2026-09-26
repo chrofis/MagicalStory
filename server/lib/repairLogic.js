@@ -96,12 +96,7 @@ function findBadPages(evalPages, options = {}) {
  * char-fix, not inpaint. This path must not become a back door around it.
  */
 function findSafeRepairableFinding(result) {
-  const pools = [
-    ['quality', result?.fixableIssues],
-    ['semantic', semanticFindings(result?.semanticResult)],
-    ['consolidated', result?.consolidatedPlan?.deduped_issues],
-  ];
-  for (const [pool, list] of pools) {
+  for (const [pool, list] of scoredFindingPools(result)) {
     if (!Array.isArray(list)) continue;
     for (const i of list) {
       const severity = String(i?.severity || '').toLowerCase();
@@ -619,6 +614,29 @@ function collectSurvivingCriticals(results, repairRounds, regenThreshold) {
 }
 
 /**
+ * THE FINDING POOLS THE SCORE IS BUILT FROM — the one answer every repair
+ * reader (bad-page gate, critical report, type rescue, method router) uses.
+ *
+ * Mirrors scoring.applyScore/composeDeductions exactly: when the version
+ * carries a consolidated plan whose `deduped_issues` is an array — EMPTY
+ * INCLUDED — that list is the only list, because it is the only list the score
+ * charged. Only a page that was never consolidated falls back to the raw
+ * quality + semantic pools. A reader that consults a pool the scorer did not
+ * charge can call a page critical that scored 100 (2026-09-26, job_1790446348343
+ * p9) or clean that scored a CRITICAL (2026-09-11, e62bec843).
+ *
+ * @returns {Array<[string, Array]>}
+ */
+function scoredFindingPools(result) {
+  const deduped = result?.consolidatedPlan?.deduped_issues;
+  if (Array.isArray(deduped)) return [['consolidated', deduped]];
+  return [
+    ['quality', Array.isArray(result?.fixableIssues) ? result.fixableIssues : []],
+    ['semantic', semanticFindings(result?.semanticResult)],
+  ];
+}
+
+/**
  * Does this eval carry any CRITICAL or CATASTROPHIC finding? Reads the
  * structured severity field on the three finding pools (quality fixableIssues,
  * semantic issues, consolidated deduped_issues) — never the prose.
@@ -644,15 +662,17 @@ function collectCriticalFindings(result) {
   // CRITICAL here and MAJOR there: job_1789147573901_m3uam0nxi p13 and p17 each
   // reported an unrepaired CRITICAL `object_presence` and a finalScore of 85.
   // When the page has been consolidated, that merged list is the only list.
-  const deduped = result?.consolidatedPlan?.deduped_issues;
-  const pools = Array.isArray(deduped) && deduped.length > 0
-    ? [['consolidated', deduped]]
-    : [
-      ['quality', result?.fixableIssues],
-      ['semantic', semanticFindings(result?.semanticResult)],
-    ];
+  //
+  // AN EMPTY MERGED LIST IS A VERDICT, NOT AN ABSENCE (2026-09-26). The `> 0`
+  // that used to sit here read `deduped_issues: []` as "never consolidated" and
+  // fell back to the raw pools — but the scorer reads `[]` as zero deductions
+  // (scoring.applyScore takes any array). Staging job_1790446348343_z3fw660ie
+  // p9: the consolidator's landmark guard had dropped the only finding, the
+  // page scored 100, and this function found the raw semantic CRITICAL,
+  // admitted the page as critical and routed it to an inpaint that had no
+  // instruction to send. See scoredFindingPools.
   const out = [];
-  for (const [pool, list] of pools) {
+  for (const [pool, list] of scoredFindingPools(result)) {
     if (!Array.isArray(list)) continue;
     for (const i of list) {
       if (!/^(critical|catastrophic)$/i.test(String(i?.severity || ''))) continue;
@@ -881,11 +901,10 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   // the numeric subscores stay above the floors — the eval rubric reserves
   // this severity for defects only a full regen can fix. Same case-insensitive
   // match the round loop's unresolved-issue surfacing uses (images.js).
-  const severityIssues = [
-    ...(evaluator.fixableIssues || []),
-    ...semanticFindings(evaluator.semanticResult),
-    ...(Array.isArray(evaluator.consolidatedPlan?.deduped_issues) ? evaluator.consolidatedPlan.deduped_issues : []),
-  ];
+  // The pools the score charged (scoredFindingPools) — never the raw lists
+  // alongside a consolidated plan, which would route on findings the score and
+  // the consolidator's guards had already set aside (2026-09-26).
+  const severityIssues = scoredFindingPools(evaluator).flatMap(([, list]) => list);
   const catastrophicIssue = severityIssues.find(i => /catastrophic/i.test(String(i?.severity || '')));
   if (catastrophicIssue) {
     const desc = require('./scoring').findingText(catastrophicIssue).slice(0, 80);
@@ -1025,12 +1044,29 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   // fields: `character` (the missing name) and `figure` (the evaluator's figure
   // id, whose box the repair paints). A name with no roster entry has nothing to
   // paint from and is left to gate 2c.
+  //
+  // WHICH LIST, WHICH FIELD (2026-09-26). The finding must be one the score
+  // charged (severityIssues = scoredFindingPools), but the consolidated entry
+  // carries no `figure` — only the evaluator's own finding does. So the figure
+  // id is joined back from the raw finding of the same type and character:
+  // structured fields only, never prose.
   if (pageNumber !== 0) {
-    const identity = severityIssues.find(i => String(i?.type || '').toLowerCase() === 'character_identity'
-      && /^(critical|catastrophic)$/i.test(String(i?.severity || ''))
-      && Number.isFinite(Number(i?.figure)) && i?.figure !== null
-      && String(i?.character || '').trim()
-      && !charFixImpossible(String(i.character).trim()));
+    const hasFigure = (i) => i?.figure !== null && i?.figure !== undefined && Number.isFinite(Number(i.figure));
+    const rawIdentity = [...(Array.isArray(evaluator.fixableIssues) ? evaluator.fixableIssues : []), ...semanticFindings(evaluator.semanticResult)]
+      .filter(i => String(i?.type || '').toLowerCase() === 'character_identity' && hasFigure(i));
+    const figureFor = (i) => {
+      if (hasFigure(i)) return Number(i.figure);
+      const who = canonName(String(i?.character || ''));
+      const raw = rawIdentity.find(r => canonName(String(r?.character || '')) === who);
+      return raw ? Number(raw.figure) : null;
+    };
+    const identity = severityIssues
+      .filter(i => String(i?.type || '').toLowerCase() === 'character_identity'
+        && /^(critical|catastrophic)$/i.test(String(i?.severity || ''))
+        && String(i?.character || '').trim()
+        && !charFixImpossible(String(i.character).trim()))
+      .map(i => ({ ...i, figure: figureFor(i) }))
+      .find(i => i.figure !== null);
     if (identity) {
       const charName = String(identity.character).trim();
       if (charFixAlreadyFailed) return flippedFromFailedCharFix(`figure ${identity.figure} is ${charName} drawn wrong`);
@@ -1238,7 +1274,18 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   if (typeof options.chooseRepairStrategy === 'function') {
     return withPrecedence(mapStrategyToMethod(options.chooseRepairStrategy(evaluator)));
   }
-  // Inline fallback when chooseRepairStrategy isn't injected (tests).
+  // No strategy injected — the production path (repairPipeline passes none).
+  // A CONSOLIDATED page is inpainted from its plan, so it has something to
+  // inpaint only when the scored list does: an empty `deduped_issues` next to
+  // raw findings the consolidator's guards set aside used to route here and
+  // fail with "no instruction to send" (2026-09-26, job_1790446348343 p9).
+  const deduped = evaluator.consolidatedPlan?.deduped_issues;
+  if (Array.isArray(deduped)) {
+    if (deduped.length > 0) {
+      return withPrecedence({ method: 'inpaint', reason: `${deduped.length} consolidated` });
+    }
+    return { method: 'skip', reason: 'no repair needed — the consolidated list the score charged is empty' };
+  }
   const fixableCount = evaluator.fixableIssues?.length || 0;
   const enrichedCount = evaluator.enrichedFixTargets?.length || 0;
   const fixTargetCount = evaluator.fixTargets?.length || 0;
@@ -1904,4 +1951,4 @@ function nameRepairText(text, nameMap, { keep = null, vidByName, ownVisualId = n
 
 module.exports = {
   describeFigureForRepair, buildRepairNameMap, buildPageRepairNameMap, nameRepairText, resolveRepairIds,
-  repairAttemptFromResult, describeCharFixFailure, detectionForRetryEntry, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, attributeReaderFindings, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, ITERATE_ROUTED_TYPES, CROP_ARTIFACT_TYPES, isCropArtifact, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX };
+  repairAttemptFromResult, describeCharFixFailure, detectionForRetryEntry, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, attributeReaderFindings, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, ITERATE_ROUTED_TYPES, CROP_ARTIFACT_TYPES, isCropArtifact, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX, scoredFindingPools };

@@ -2199,6 +2199,18 @@
       "fixedAt": "2026-09-26",
       "fixedIn": "7829f75dc",
       "fix": "repairLogic.describeCharFixFailure(result) builds the error from rejectedReason + gateMessage (or the spine's error) and the attempt count; executeCharFixAction logs it and returns it as the failure's error, which flows unchanged into retryHistory, failedRepairs and repairRounds. Test: tests/unit/char-fix-failure-reason.test.ts."
+    },
+    {
+      "id": "critical-check-reads-raw-list",
+      "title": "A page the score cleared (100) was admitted to repair as CRITICAL from the raw list the landmark guard had set aside",
+      "reportedAt": "2026-09-26",
+      "source": "Owner, 2026-09-26, with stored evidence: staging job_1790446348343_z3fw660ie p9 stored finalScore 100, consolidatedPlan.deduped_issues [] and unrepairedCritical [setting]; its repair round failed \"inpaint had no instruction to send\". The only finding was a semantic CRITICAL setting, landmark_element true, fix \"Replace the Parisian cityscape and Eiffel Tower ...\".",
+      "rootCause": "The landmark guard (filterProtectedRemovals) ran at eval time only inside the compliance judge (disabled) and in the consolidator, never on the semantic/quality records. The consolidator dropped the finding and the scorer charged the empty list (100), but repairLogic.collectCriticalFindings treated `deduped_issues.length > 0` as the test for consolidated and fell back to the raw semantic list; findSafeRepairableFinding and decideRepairMethod also read the raw pools beside the consolidated one, and the step-3 inpaint count counted raw findings.",
+      "impact": "A page scored 100 was repaired as critical and reported as shipping an unrepaired CRITICAL; the paid round did nothing. Any consolidator drop (landmark guard, not-a-defect drops) could do the same.",
+      "status": "fixed",
+      "fixedAt": "2026-09-26",
+      "fixedIn": "",
+      "fix": "(A) evaluateImageQuality runs landmarkProtection.guardLandmarkRecord on the semantic record and the final quality list at the merge point; dropped findings are kept as suppressedIssues (record, not deduction). (B) repairLogic.scoredFindingPools: a consolidated deduped_issues array, empty included, is the only list — the one scoring.applyScore charges; collectCriticalFindings, findSafeRepairableFinding and every decideRepairMethod gate read it, the inpaint count skips on an empty consolidated list, and the identity gate joins the figure id back from the raw finding. Tests: critical-check-reads-scored-list.test.ts, cover-lettering-check.test.ts (merge guard), critical-severity-agreement.test.ts."
     }
   ]
 }

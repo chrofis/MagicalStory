@@ -60,6 +60,9 @@ function carryEvalEvidence(qualityResult) {
     // undeclared-lettering check compared it against. null = the check did
     // not run on this image; {items: []} = it ran and saw no writing.
     letteringInventory: qualityResult?.letteringInventory ?? null,
+    // Quality findings the landmark guard suppressed (recording only, zero
+    // points; 2026-09-26). null = the evaluator predates the field.
+    suppressedIssues: qualityResult?.suppressedIssues ?? null,
   };
 }
 // Eval cluster now lives in evalPipeline.js (verbatim move; see its header).
