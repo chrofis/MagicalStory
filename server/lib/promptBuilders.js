@@ -2249,6 +2249,162 @@ function buildCharacterPromptBlock(char, opts = {}) {
 }
 
 /**
+ * A figure's standing height in cm: the explicit height when the character has
+ * one (new `physical.height` or legacy `height`), else the age+gender estimate.
+ * null when neither is readable. ONE resolver for the height order and the
+ * creature comparison, so the two can never size one child differently.
+ */
+function figureHeightCm(c) {
+  if (!c) return null;
+  const explicit = c.height || c.physical?.height;
+  const explicitNum = explicit ? parseInt(explicit) : NaN;
+  if (!isNaN(explicitNum)) return explicitNum;
+  return estimateHeightFromAgeGender(c);
+}
+
+// The standing adult every height band is phrased against — the same growth
+// curve's adult value, sex unstated.
+const STANDING_ADULT_CM = estimateHeightFromAgeGender({ age: 30 });
+
+const RATIO_WORDS = ['', 'one', 'twice', 'three times', 'four times', 'five times', 'six times', 'seven times', 'eight times', 'nine times', 'ten times'];
+
+function ratioPhrase(r) {
+  if (r < 1.25) return 'about as tall as';
+  if (r < 1.75) return 'about one and a half times the height of';
+  const n = Math.round(r);
+  return `about ${RATIO_WORDS[n] || `${n} times`} the height of`;
+}
+
+const COUNT_WORDS = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+
+// The unnamed form, for repaint text: a repair names no one (the image model
+// knows no names, owner 2026-09-24), and a list of look-alike descriptors
+// ("the 3-year-old boy, the 3-year-old boy") says less than one range.
+function ratioRangePhrase(lo, hi) {
+  const low = ratioPhrase(lo);
+  const high = ratioPhrase(hi);
+  if (low === high) return low;
+  const a = Math.max(1, Math.round(lo));
+  const b = Math.max(a, Math.round(hi));
+  if (a === b) return high;
+  return `about ${COUNT_WORDS[a] || a} to ${COUNT_WORDS[b] || b} times the height of`;
+}
+
+function joinNames(names) {
+  return names.length <= 1 ? (names[0] || '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+/**
+ * A CREATURE'S SIZE AGAINST THE PEOPLE IN FRAME (owner, 2026-09-26).
+ *
+ * The band phrase measures against "a standing adult", and on a page of
+ * children there is no adult to read it against. Staging
+ * job_1790373080139_vnx5l8iy7: the grown dragon was stated "twice the height of
+ * a standing adult" on every page and rendered large on p5, cat-sized on p10,
+ * child-plus on p16/p17 and boy-sized on p18 — the only yardstick was a person
+ * nobody drew.
+ *
+ * PAGE-SIDE ONLY — the page prompt, the judge's CREATURE SIZES input and the
+ * repaint instructions. Never a Visual Bible cell (cells get no size,
+ * 2026-09-23) and never the arc, plan or page text (sizes stay out of the
+ * story, owner 2026-09-23).
+ *
+ * Only a band whose phrase states an exact multiple of an adult gains the
+ * comparison (visualBible.SCALE_ADULT_HEIGHT_MULTIPLE); any other band, a
+ * pre-enum stored `size`, or a page with no figure whose height is readable
+ * returns the band phrase alone — "measured against nothing at all on a page
+ * where it is alone" (TRUE_RELATIVE_SIZE_RULE).
+ *
+ * @param {Object} entry   the Visual Bible creature entry
+ * @param {Array}  figures the page's cast in frame ({name, age, gender, height})
+ * @returns {string|null}  the phrase, or null when the entry states no size
+ */
+function creaturePageScaleNote(entry, figures, { unnamed = false } = {}) {
+  const { elementScaleNote, scaleAdultHeightMultiple } = require('./visualBible');
+  const base = elementScaleNote(entry);
+  if (!base) return null;
+  const multiple = scaleAdultHeightMultiple(entry && entry.scaleClass);
+  if (!multiple) return base;
+  const creatureCm = multiple * STANDING_ADULT_CM;
+  if (unnamed) {
+    const ratios = (Array.isArray(figures) ? figures : [])
+      .map(f => figureHeightCm(f)).filter(cm => cm && cm > 0).map(cm => creatureCm / cm);
+    if (!ratios.length) return base;
+    const phrase = ratioRangePhrase(Math.min(...ratios), Math.max(...ratios));
+    return `${base.replace(/\.\s*$/, '')} — ${phrase} the people beside it`;
+  }
+  const groups = new Map(); // phrase -> names, in cast order
+  for (const f of (Array.isArray(figures) ? figures : [])) {
+    const name = f && typeof f.name === 'string' ? f.name.trim() : '';
+    const cm = figureHeightCm(f);
+    if (!name || !cm || cm <= 0) continue;
+    const phrase = ratioPhrase(creatureCm / cm);
+    if (!groups.has(phrase)) groups.set(phrase, []);
+    if (!groups.get(phrase).includes(name)) groups.get(phrase).push(name);
+  }
+  if (!groups.size) return base;
+  const comparison = [...groups.entries()].map(([phrase, names]) => `${phrase} ${joinNames(names)}`).join(' and ');
+  return `${base.replace(/\.\s*$/, '')} — ${comparison}`;
+}
+
+/**
+ * Every Visual Bible creature a page cites (its `objects[]` ids, dotted state
+ * ids resolved to their entry), with its page-scale note against `figures`.
+ * The ONE resolver behind the judge's CREATURE SIZES input and the repaint
+ * size clause, so the critic and the repair read the sentence the page prompt
+ * was given.
+ *
+ * @returns {Array<{id:string, name:string, note:string}>}
+ */
+function pageCreatureScales(visualBible, objectIds, figures, opts = {}) {
+  const animals = Array.isArray(visualBible?.animals) ? visualBible.animals : [];
+  if (!animals.length || !Array.isArray(objectIds) || !objectIds.length) return [];
+  const base = (raw) => String(typeof raw === 'string' ? raw : (raw?.id || '')).trim().toUpperCase().split('.')[0];
+  const wanted = new Set(objectIds.map(base).filter(Boolean));
+  const out = [];
+  for (const entry of animals) {
+    if (!entry?.id || !wanted.has(base(entry.id))) continue;
+    const note = creaturePageScaleNote(entry, figures, opts);
+    if (!note) continue;
+    out.push({ id: entry.id, name: entry.name || entry.label || 'creature', note });
+  }
+  return out;
+}
+
+/**
+ * The judge's CREATURE SIZES input (image-evaluation input 12, D-34): one line
+ * per cited creature. '' when the page cites none that states a size.
+ */
+function buildCreatureSizesBlock(visualBible, objectIds, figures) {
+  return pageCreatureScales(visualBible, objectIds, figures).map(c => `- ${c.name}: ${c.note}`).join('\n');
+}
+
+/**
+ * The roster characters a page's declared cast names (canonical-name match),
+ * for the repair paths that hold the whole roster and the page's metadata
+ * rather than the page's sceneCharacters.
+ */
+function castFiguresInFrame(characters, castNames) {
+  const { canonicalName } = require('./castResolver');
+  const want = new Set((Array.isArray(castNames) ? castNames : [])
+    .map(n => canonicalName(typeof n === 'string' ? n : (n?.name || ''))).filter(Boolean));
+  if (!want.size) return [];
+  return (Array.isArray(characters) ? characters : []).filter(c => c?.name && want.has(canonicalName(c.name)));
+}
+
+/**
+ * The repaint clause: the size every cited creature keeps after an edit. The
+ * p10 round-1 inpaint of the job above regenerated the dragon from an
+ * instruction that named no size, and it came back cat-sized. Names are left
+ * in; the caller runs the clause through the repair name map
+ * (repairLogic.nameRepairText) like every other repair text. '' when none.
+ */
+function buildCreatureSizeRepairClause(visualBible, objectIds, figures) {
+  const items = pageCreatureScales(visualBible, objectIds, figures, { unnamed: true }).map(c => `${c.name} is ${c.note}`);
+  return items.length ? `\n\nSizes that hold after the edit: ${items.join('; ')}.` : '';
+}
+
+/**
  * Build relative height description for characters
  * Instead of absolute cm values, describes relative heights which AI understands better.
  * Characters without explicit height fall back to age+gender estimation so they
@@ -2260,20 +2416,10 @@ function buildCharacterPromptBlock(char, opts = {}) {
 function buildRelativeHeightDescription(characters) {
   if (!characters || characters.length < 2) return '';
 
-  // Resolve a height for every character: prefer explicit, fall back to estimate.
-  // Support both new structure (char.physical.height) and legacy (char.height).
   const withHeight = characters
     .map(c => {
-      const explicit = c.height || c.physical?.height;
-      const explicitNum = explicit ? parseInt(explicit) : NaN;
-      if (!isNaN(explicitNum)) {
-        return { name: c.name, height: explicitNum };
-      }
-      const estimate = estimateHeightFromAgeGender(c);
-      if (estimate != null) {
-        return { name: c.name, height: estimate };
-      }
-      return null;
+      const height = figureHeightCm(c);
+      return height != null ? { name: c.name, height } : null;
     })
     .filter(Boolean)
     .sort((a, b) => a.height - b.height);
@@ -4718,7 +4864,14 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // third and house-sized on a fourth. The pages that restated the size
         // in their prose were the ones that came closest; the pages that did
         // not (p8, p18) had nothing to go on, because this line dropped it.
-        const scaleNote = elementScaleNote(obj.entry);
+        //
+        // A CREATURE IS MEASURED AGAINST THE PEOPLE IN FRAME (owner,
+        // 2026-09-26): the band phrase names "a standing adult", which a page of
+        // children does not hold — see creaturePageScaleNote. The page's cast
+        // minus the over-the-shoulder crops (a crop has no height to state).
+        const scaleNote = obj.type === 'animal'
+          ? creaturePageScaleNote(obj.entry, (sceneCharacters || []).filter(c => !isOtsFigure(c?.name)))
+          : elementScaleNote(obj.entry);
         const sizeNote = scaleNote ? ` — ${scaleNote}` : '';
         // OBJECT STATE - the fourth rider on this line, beside `size`, the
         // clothing `(worn by X)` suffix and a two-sided prop's orientation
@@ -6357,9 +6510,19 @@ function buildTopicWindowSection(inputData = {}) {
  * Evidence: job_1788903616404_iqvhj4l8m, ANI002 (a creature sized in city-bus
  * lengths, children tiny beside it, backward-swept horns) and CHR002 (heavy
  * brow ridges, deep-set eyes, jutting chin, hunched) beside a 5-year-old.
+ *
+ * `cute` RELAXED (owner, 2026-09-26): it said "never with the child dwarfed
+ * beside it, and never frame it leaning or towering over a child" — which a
+ * creature the story makes large cannot satisfy. On staging
+ * job_1790373080139_vnx5l8iy7 a grown dragon stated twice an adult's height
+ * was drawn cat-sized and boy-sized. A large creature now towers GENTLY:
+ * calm, soft-faced, head lowered — the band's intent (friendly, never
+ * menacing) kept, its size no longer shrunk to honour it. The prose still
+ * never states a creature as a multiple of a child; the page prompt does,
+ * image-side (creaturePageScaleNote).
  */
 const CREATURE_TONE_LEVELS = {
-  cute: "Animals, creatures and non-human characters are drawn cute: rounded forms throughout, soft faces, large round friendly eyes, a calm or smiling mouth with no teeth showing, no displayed claws, an open upright posture, warm colours. A horned, spined or crested one carries a single pair at most, short and blunt-tipped — never a crown of horns around the head or rows of spikes down it. A non-human character reads as a playmate. For size, lean toward a creature near the child's own size — a scale a child could stand beside or hug — and go bigger only where the story needs it: a being that is ridden, carries characters or fills a doorway is that size. A being may be large — state its size in metres or against a familiar room, never as a multiple of a child and never with the child dwarfed beside it, and never frame it leaning or towering over a child.",
+  cute: "Animals, creatures and non-human characters are drawn cute: rounded forms throughout, soft faces, large round friendly eyes, a calm or smiling mouth with no teeth showing, no displayed claws, an open upright posture, warm colours. A horned, spined or crested one carries a single pair at most, short and blunt-tipped — never a crown of horns around the head or rows of spikes down it. A non-human character reads as a playmate. For size, lean toward a creature near the child's own size — a scale a child could stand beside or hug — and go bigger only where the story needs it: a being that is ridden, carries characters or fills a doorway is that size. A being may be large — state its size in metres or against a familiar room, never as a multiple of a child. A being the story makes large is drawn at that full size and may tower gently over a child: calm and soft-faced, its head lowered toward them, never looming, lunging or menacing.",
   'not-menacing': "Animals, creatures and non-human characters carry an open friendly face and clearly kind eyes: a level brow rather than a heavy or overhanging one, open rather than deep-set eyes, a neutral or gentle mouth that shows no teeth, open or smiling included. Claws may exist but are not raised or displayed. A horned, spined or crested one carries a single pair at most, kept short and smooth-tipped — never a crown of horns around the head or rows of spikes down it. For size, a creature may be clearly bigger than a child; prefer one that still fits in frame beside them and reads as approachable over an overwhelming one, unless the story needs otherwise — a being that is ridden, carries characters or blocks a way is that size. A being may be large — state its size in metres, not as a multiple of a child, and frame it at the child's eye level rather than looming over them.",
   formidable: "A creature the story gives a powerful, wild or formidable nature is drawn as one: claws and teeth visible rather than hidden, real physical weight and presence, weathered or rugged hide, scale, fur or feather where they suit it. No rounded, toy-like or plush softening of such a creature. It may loom, and its size may be stated against a child. A creature the story means as gentle — a pet, a domestic animal, a comic one — stays gentle and friendly-looking; the story's own nature for each creature decides which of the two it gets. Size may be whatever the story wants; a genuinely huge creature is welcome.",
 };
@@ -12003,6 +12166,12 @@ module.exports = {
   buildExpansionCastBlock,
   buildCharacterPromptBlock,
   buildRelativeHeightDescription,
+  figureHeightCm,
+  creaturePageScaleNote,
+  pageCreatureScales,
+  buildCreatureSizesBlock,
+  buildCreatureSizeRepairClause,
+  castFiguresInFrame,
   buildCharacterRestriction,
   buildCharacterReferenceList,
   buildReferenceCardColours,

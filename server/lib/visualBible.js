@@ -1009,6 +1009,60 @@ function withScaleNote(description, entry) {
   return `${desc.replace(/\.\s*$/, '')}. Size: ${phrase}`;
 }
 
+/**
+ * THE HEIGHT MULTIPLE A BAND'S OWN PHRASE STATES, in standing adults (2026-09-26).
+ *
+ * Only the two bands whose phrase names an exact multiple are here: "as tall as
+ * a standing adult" (1) and "twice the height of a standing adult" (2). Every
+ * other band either answers HOW BIG (no height at all), is a fraction of an
+ * adult its phrase does not quantify (knee / hip / chest), or says "several
+ * adults high" / "fills the horizon" — a multiple nobody stated, so none is
+ * invented here. `pageScaleComparison` (promptBuilders) turns this into a ratio
+ * against the figures actually in frame; a band without an entry keeps its
+ * phrase and gains no comparison.
+ */
+const SCALE_ADULT_HEIGHT_MULTIPLE = Object.freeze({
+  'adult-height': 1,
+  'twice-adult-height': 2,
+});
+
+function scaleAdultHeightMultiple(raw) {
+  const token = resolveScaleClass(raw);
+  return token && Object.prototype.hasOwnProperty.call(SCALE_ADULT_HEIGHT_MULTIPLE, token)
+    ? SCALE_ADULT_HEIGHT_MULTIPLE[token]
+    : null;
+}
+
+/**
+ * A CREATURE AT LEAST AS TALL AS A STANDING ADULT IS A GROWN ONE (owner, 2026-09-26).
+ *
+ * Staging job_1790373080139_vnx5l8iy7: the grown dragon (ANI001,
+ * `twice-adult-height`) and its hatchling (ANI002, `melon-sized`) were authored
+ * with one shared feature list, and nothing in the grown one's entry said
+ * "adult". Its reference cell came back with a hatchling's chibi proportions,
+ * and the pages copied the cell's look — including its build — so the dragon
+ * rendered cat-sized on p10 and boy-sized on p18.
+ *
+ * The fix is IDENTITY, never size: the entry states the creature's MATURITY
+ * ("a fully grown adult dragon with adult body proportions"), which a cell can
+ * draw alone. It states no band phrase and measures the creature against
+ * nothing (cells get no size, 2026-09-23; no scale referent in a VB cell,
+ * 2026-09-14; SETTLED 2026-09-19: cell area is an identity dial, not a size
+ * dial). The bands are the four from a standing adult up: a creature that tall
+ * is not a juvenile, and the young one of the same kind sits below them.
+ */
+const GROWN_CREATURE_SCALE_CLASSES = new Set(['adult-height', 'twice-adult-height', 'house-height', 'landmark']);
+
+function isGrownCreatureScaleClass(raw) {
+  const token = resolveScaleClass(raw);
+  return token !== null && GROWN_CREATURE_SCALE_CLASSES.has(token);
+}
+
+// A species field that already states an age keeps it: "a fully grown adult
+// baby giant" would contradict itself. Reads the entry's OWN authored field to
+// avoid writing a second age beside it — never a finding's prose.
+const STATED_AGE_WORDS = /\b(baby|babies|young|juvenile|hatchling|infant|cub|foal|calf|puppy|kitten|chick|fledgling|adult|grown|full-grown|elderly|old)\b/i;
+
 function normaliseScaleClass(raw, id) {
   const who = id ? String(id) : 'entry';
   if (raw === undefined || raw === null || (typeof raw === 'string' && !raw.trim())) {
@@ -1339,7 +1393,12 @@ function buildCharacterDescription(char) {
  */
 function buildAnimalDescription(animal) {
   const parts = [];
-  if (animal.species) parts.push(animal.species);
+  // A grown creature's MATURITY leads its description (see
+  // GROWN_CREATURE_SCALE_CLASSES): identity the cell can draw, never a size.
+  const species = typeof animal.species === 'string' ? animal.species.trim() : '';
+  const grown = isGrownCreatureScaleClass(animal.scaleClass) && !STATED_AGE_WORDS.test(species);
+  if (grown) parts.push(`a fully grown adult ${species || 'creature'} with adult body proportions`);
+  else if (species) parts.push(species);
   if (animal.coloring) parts.push(animal.coloring);
   // NO SIZE (owner, 2026-09-23: "Cells get no size"). `description` is what a
   // Visual Bible reference cell paints, and a cell shows one element alone —
@@ -3770,6 +3829,10 @@ module.exports = {
   isGenericEntry,
   LARGE_SCALE_CLASSES,
   isLargeScaleClass,
+  SCALE_ADULT_HEIGHT_MULTIPLE,
+  scaleAdultHeightMultiple,
+  GROWN_CREATURE_SCALE_CLASSES,
+  isGrownCreatureScaleClass,
   isPlateBorneElement,
   splitGenericEntries,
   genericCitationTokens,

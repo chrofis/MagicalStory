@@ -447,7 +447,9 @@ describe('scaleClass — the parser the pipeline actually runs', () => {
   // band and a pre-enum stored size stay on the entry for the page readers.
   it('computes an animal description with NO scale, and keeps the scale on the entry', () => {
     const classed = parse({ animals: [{ id: 'ANI001', name: 'Fauchi', pages: [1], species: 'dragon', coloring: 'green', scaleClass: 'house' }] });
-    expect(classed.animals[0].description).toBe('dragon. green');
+    // A house-height creature leads with its MATURITY (identity, 2026-09-26 —
+    // creature-size-page.test.ts), still no scale phrase.
+    expect(classed.animals[0].description).toBe('a fully grown adult dragon with adult body proportions. green');
     expect(elementScaleNote(classed.animals[0])).toBe('several adults high, the size of a house');
     const stored = parse({ animals: [{ id: 'ANI001', name: 'Fauchi', pages: [1], species: 'dragon', size: 'as long as a city bus' }] });
     expect(stored.animals[0].description).toBe('dragon');
