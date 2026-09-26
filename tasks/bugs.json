@@ -2281,7 +2281,7 @@
       "impact": "Every Lab image-stage (and scene_variant) conclusion without an explicit imageModel measured a different, cheaper renderer than the one that ships.",
       "status": "fixed",
       "fixedAt": "2026-09-26",
-      "fixedIn": "PENDING",
+      "fixedIn": "7c9129c82",
       "fix": "runImageStage resolves pageModelKey = params.imageModel || MODEL_DEFAULTS.pageRenderImage for the render and the Grok VB-text rule. Test: tests/unit/testlab-prod-prompt-parity.test.ts. docs/decisions.md 2026-09-26 \"The Lab image stage renders on the production page tier, not the edit tier\"."
     }
   ]

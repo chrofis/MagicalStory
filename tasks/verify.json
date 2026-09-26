@@ -2299,6 +2299,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "plan-check-q17-must-fix",
+      "title": "A plan-check Q17 finding (whole-cast page with no shared action) forces a re-plan round",
+      "commits": [
+        "a784db591"
+      ],
+      "addedAt": "2026-09-26",
+      "claim": "On the next staging story with a whole-cast page: a Q17 finding appears under MUST FIX in the re-plan prompt, the re-plan answers it by giving that page one shared action (or the round is discarded with a logged reason), and no Q4/Q8 wanted picture is lost to it.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "beatsReviewReport.modelFindings check 17; the round-1 re-plan prompt's MUST FIX block; beatsReviewReport.pages before/after for the named page; recheck findings; discardedRounds. Baseline: staging job_1790446348343_z3fw660ie p16 and job_1790373080139_vnx5l8iy7 p18 (\"stand together\") shipped unanswered while Q17 did not exist / was advisory."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }
