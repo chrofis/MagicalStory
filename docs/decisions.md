@@ -231,7 +231,11 @@ Per defect class (bad plates): era false fails 3 → **0**; people 3/5 → **5/5
 → 1/2; light (covered sky/fog) 0/5 → 1/5; medium (photograph) 0/4 → 0/4. Any-fail on the 9 bad plates 5 → 7; false
 fails on the 7 clean plates 2 → 0. Between tuning runs (3 more samples of subsets) the judge was unstable on light (5herh
 p15's moon under fog failed in 1 of 3 samples) and once filed an unmentioned prop as `framing` on z3 p2 before the
-"never a framing fault" sentence. Open: the medium and covered-sky misses (BACKLOG). Cost ≈ 72 flash calls ≈ CHF 0.25.
+"never a framing fault" sentence. **After rebasing onto the concurrent "Weather owns the sky" entry** (the judge's
+{LIGHT} now carries the author's sky phrase), one more sample of the 8 light-relevant plates: light 2/5 (the LOC004.2
+retry now fails `light` too, 5herh p13's moon), and 5herh p15 fails `light` for a moon disc under declared fog — a real
+defect by the new rule (viewed; its plate was counted clean above because nothing judged the sky before). LOC005.1 and
+its p8 derive still pass light. Open: the medium and covered-sky misses (BACKLOG). Cost ≈ 80 flash calls ≈ CHF 0.27.
 
 **AD photo list after the data fix** (rebuilt for the stored story, free): Lindenhof Photo 3 now reads the corrected
 description plus `Photo judge: hill and old houses seen across the river with moored boats.`
