@@ -106,6 +106,22 @@ path.
   describes), with `LOC002.2: 1` → exactly slot 1; p2 (its vantage uncited, i.e. the stored-story case) → no
   photo, `log.error` "no landmarkPhoto cited (vantage LOC001.3)", one miss.
 
+**Validation — rung 2, Test Lab `beats_scenes` on the deployed build** (`plainStoredBeats`, `coverBeats: false`,
+`reviewScenes: false`; gemini-3.1-pro Art Director; ≈ $0.46 for both, under the CHF 0.50 cap):
+- **Lab 1514**, `job_1790277448294_5herh01j7` p1-p11 ($0.23): Lindenhof vantage 1 "stone stairs up" (p1) →
+  `"none"`; "open gravel square" (p3) → photo 1 (the tree-lined square); "base of giant linden" (p4-7) and
+  "misty edge of square" (p8-9) → `"none"`; the Grossmünster (p1's distant twin towers) → photo 1 (the twin
+  towers); Rathausbrücke (p11, "stone bridge railing … plaza surface") → **photo 3**, the plaza-level photo with
+  the modern balusters. No faults. Before: p1 was served the chess-square photo and its plate traced it.
+  Found, not caused by this change: the p11 brief's `objects[]` cites `LOC003.2` (no such vantage) and not
+  `LOC004`, so p11 would not attach the bridge photo at all — the page gate needs the brief to cite the
+  landmark. That is the scene review's `[element_uncited]` check, switched off in this run.
+- **Lab 1515**, `job_1790107559778_fcmlfa8kn` p1-p8: Fernsehturm Uetliberg "Ultra-wide tower" (p7) → photo 1
+  (the tower above the forest), "Forest path" (p8) → `"none"`. No faults. (The Lab reported the call's cost
+  as 0 — its usage carried no direct cost; the estimate above assumes it matches 1514.)
+No plate was rendered: the Lab's plate stages replay the photo stored on the page, which predates the
+citation, so a render there would not exercise it.
+
 **Touched:** `server/lib/landmarkPhotos.js`, `server/lib/storyHelpers.js`, `server/lib/promptBuilders.js`,
 `server/lib/sceneMetadata.js`, `server/lib/images.js`, `server/lib/coverIterate.js`, `server/lib/beatsPipeline.js`,
 `server/lib/testlab.js`, `server/lib/iterateBeat.js`, `server/lib/sceneBriefCheck.js`, `storyJobPipeline.js`,
