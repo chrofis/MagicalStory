@@ -1232,9 +1232,11 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
  * Pure function, no I/O: `attempts` are what the round tried, `beforeScores`
  * the finalScore findBadPages ranked on, `afterScores` the finalScore stamped
  * on the new version. A page with either score missing is `unknown`, never
- * silently counted as unchanged.
+ * silently counted as unchanged. `criticalCleared[page]` true marks a repair
+ * that dominates the version it started from (scoring.js dominatesByCritical):
+ * it is `improved` whatever its score delta.
  *
- * @param {{round:number, attempts:Array<{pageNumber:number, method:string|null, ok:boolean, error?:string|null}>, beforeScores:Object<number,number|null>, afterScores:Object<number,number|null>}} args
+ * @param {{round:number, attempts:Array<{pageNumber:number, method:string|null, ok:boolean, error?:string|null}>, beforeScores:Object<number,number|null>, afterScores:Object<number,number|null>, criticalCleared?:Object<number,boolean>}} args
  */
 /**
  * One repair result → one attempt row for summarizeRepairRound.
@@ -1274,7 +1276,7 @@ function baseRepairMethod(method) {
   return m.replace(/-round-\d+$/i, '') || 'unknown';
 }
 
-function summarizeRepairRound({ round, attempts = [], beforeScores = {}, afterScores = {} }) {
+function summarizeRepairRound({ round, attempts = [], beforeScores = {}, afterScores = {}, criticalCleared = {} }) {
   const byMethod = {};
   const pages = [];
 
@@ -1305,12 +1307,17 @@ function summarizeRepairRound({ round, attempts = [], beforeScores = {}, afterSc
       m.unknown++;
     } else {
       delta = Math.round((after - before) * 10) / 10;
-      outcome = delta > 0 ? 'improved' : (delta < 0 ? 'regressed' : 'unchanged');
+      // Critical-gone wins (scoring.js dominatesByCritical): a repair that
+      // cleared a CRITICAL the page carried in has improved it, whatever the
+      // score says — the picker ships it, so the record must not call it a
+      // regression.
+      outcome = criticalCleared[a.pageNumber] ? 'improved'
+        : delta > 0 ? 'improved' : (delta < 0 ? 'regressed' : 'unchanged');
       m[outcome]++;
       m.totalDelta += delta;
       m.scoredPages++;
     }
-    pages.push({ page: a.pageNumber, method: rawMethod, before: before ?? null, after: after ?? null, delta, outcome });
+    pages.push({ page: a.pageNumber, method: rawMethod, before: before ?? null, after: after ?? null, delta, outcome, ...(criticalCleared[a.pageNumber] ? { criticalCleared: true } : {}) });
   }
 
   for (const m of Object.values(byMethod)) {

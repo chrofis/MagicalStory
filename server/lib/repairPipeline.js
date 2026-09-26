@@ -194,6 +194,12 @@ function lastRepairRegressed(versions) {
   }
   if (!isFinite(priorBest)) return null;
   if (lastScore >= priorBest) return null;
+  // Critical-gone wins (scoring.js dominatesByCritical): a repair that cleared
+  // a CRITICAL every higher-scoring earlier version still carries did not
+  // regress — the picker ships it over them.
+  const { dominatesByCritical } = require('./scoring');
+  const outscoring = versions.slice(0, lastIdx).filter(v => { const s = scoreOf(v); return s != null && s > lastScore; });
+  if (outscoring.every(v => dominatesByCritical(last, v))) return null;
   return last.source.startsWith('inpaint-') ? 'iterate' : 'inpaint';
 }
 
@@ -219,7 +225,20 @@ function bothStrategiesTriedAndRegressed(versions) {
   }
   if (!hasInpaint || !hasIterate) return false;
   if (!isFinite(preRepairBest)) return false;
-  return repairBest <= preRepairBest;
+  if (repairBest > preRepairBest) return false;
+  // Critical-gone wins (scoring.js dominatesByCritical): a repair that cleared
+  // a CRITICAL every pre-repair version scoring at least as high still carries
+  // improved the page, whatever its score.
+  const { dominatesByCritical } = require('./scoring');
+  const isRepair = (v) => /^(inpaint|iterate)-/.test(v?.source || '');
+  const preRepair = versions.filter(v => !isRepair(v));
+  const cleared = versions.filter(isRepair).some(r => {
+    const rs = scoreOf(r);
+    if (rs == null) return false;
+    const atLeastAsHigh = preRepair.filter(v => { const s = scoreOf(v); return s != null && s >= rs; });
+    return atLeastAsHigh.length > 0 && atLeastAsHigh.every(v => dominatesByCritical(r, v));
+  });
+  return !cleared;
 }
 
 // resolveCharBbox now lives in charRepairTarget.js — ONE targeting
@@ -2323,9 +2342,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // the per-method effectiveness record; taken here because roundEvalPages is
     // rebuilt at the top of every round.
     const roundBeforeScores = {};
+    // The version each page carries INTO the round, for the critical-gone
+    // comparison in the effectiveness record below.
+    const roundBeforeVersions = {};
     for (const img of badPages) {
       const fs = roundEvalPages[img.pageNumber]?.finalScore;
       roundBeforeScores[img.pageNumber] = typeof fs === 'number' ? fs : null;
+      roundBeforeVersions[img.pageNumber] = selectBestVersion(pageVersions.get(img.pageNumber) || []);
     }
     if (colourOnlyNums.length) {
       log.info(`🎨 [GARMENT-COLOUR] Round ${round}: ${colourOnlyNums.length} colour-only page(s) pulled in: ${colourOnlyNums.join(', ')}`);
@@ -3025,17 +3048,22 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // as `unknown` rather than being counted as unchanged.
     {
       const { summarizeRepairRound, repairAttemptFromResult } = require('./repairLogic');
+      const { dominatesByCritical } = require('./scoring');
       const roundAfterScores = {};
+      const roundCriticalCleared = {};
       for (const r of roundSuccess) {
         const versions = pageVersions.get(r.pageNumber) || [];
         const latest = versions[versions.length - 1];
         roundAfterScores[r.pageNumber] = typeof latest?.finalScore === 'number' ? latest.finalScore : null;
+        const before = roundBeforeVersions[r.pageNumber];
+        if (before && latest && before !== latest && dominatesByCritical(latest, before)) roundCriticalCleared[r.pageNumber] = true;
       }
       repairRounds.push(summarizeRepairRound({
         round,
         attempts: roundResults.filter(Boolean).map(repairAttemptFromResult),
         beforeScores: roundBeforeScores,
         afterScores: roundAfterScores,
+        criticalCleared: roundCriticalCleared,
       }));
       const summary = repairRounds[repairRounds.length - 1];
       const methodLine = Object.entries(summary.byMethod)

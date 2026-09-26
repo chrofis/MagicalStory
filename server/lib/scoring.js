@@ -924,10 +924,106 @@ function versionDeductionTotal(version) {
 
 
 
+// ── CRITICAL-GONE WINS (owner, 2026-09-26) ─────────────────────────────────
+// A version whose CRITICAL is confirmed gone never loses to a version that
+// still carries it. Staging job_1790373080139_vnx5l8iy7 p18: the original
+// carried a caption overlay (CRITICAL rendered_text, score 75); inpaint
+// round 1 removed it cleanly (lettering inventory empty, pixels otherwise
+// unchanged), its re-evaluation filed unrelated MAJORs and scored 33, and the
+// score-only pick shipped the caption.
+//
+// Everything here is structural — finding classes and severities as the score
+// charged them, never a finding's prose:
+//   * A version's charged CRITICALs are the entries of its `deductions` (the
+//     record applyScore computed the score from) whose charge, after the type
+//     ceilings and floors, is at least a CRITICAL's. A version without a
+//     `deductions` record has an UNKNOWN set and takes no part in the rule.
+//   * Two CRITICALs are the same defect when deductionClassKey agrees — the
+//     scorer's own class identity (category + subject), so the evaluator pool
+//     that reported it does not matter.
+//   * A lettering CRITICAL is confirmed gone only when the version's own
+//     lettering record re-checks clean (checkUndeclaredLettering on its stored
+//     inventory yields no CRITICAL); no record, no confirmation.
+//   * A dominates B when A's CRITICAL classes are a strict subset of B's and
+//     every class B has and A lacks is confirmed gone in A. Every other pair —
+//     both clean, equal sets, or each carrying a CRITICAL the other lacks (a
+//     child that fixed one CRITICAL but gained a new one of another class) —
+//     is decided by the score, as before.
+//   * The picker first removes every scoreable version another scoreable
+//     version dominates, then ranks the rest by score. Removing (rather than a
+//     pairwise comparator) keeps the pick well-defined: dominance is a strict
+//     partial order, the score a total order on what is left.
+const CRITICAL_CHARGE = SEVERITY_POINTS.critical;
+const LETTERING_TYPE = 'rendered_text';
+
+function criticalClassKey(d) {
+  return deductionClassKey({ ...d, type: d?.subType || d?.type });
+}
+
+/**
+ * The CRITICAL classes the score charged this version for, or null when the
+ * version carries no `deductions` record (unknown — never dominates, never
+ * dominated).
+ * @returns {Set<string>|null}
+ */
+function chargedCriticalKeys(version) {
+  const d = version?.deductions;
+  if (!d || typeof d !== 'object') return null;
+  const keys = new Set();
+  for (const [bucket, list] of Object.entries(d)) {
+    if (!Array.isArray(list)) continue;
+    for (const f of list) {
+      if (deductionPoints(f, { entity: bucket === 'entity' }) >= CRITICAL_CHARGE) keys.add(criticalClassKey(f));
+    }
+  }
+  return keys;
+}
+
+/** The lettering record the check compared, on a stored or an in-pipeline version. */
+function letteringRecordOf(version) {
+  return version?.letteringInventory ?? version?.evaluation?.letteringInventory ?? null;
+}
+
+/**
+ * Is CRITICAL class `key` confirmed gone in `version`? The version's charged
+ * set must be known and lack it; a lettering class additionally needs the
+ * version's own lettering record to re-check without a CRITICAL.
+ */
+function criticalConfirmedGone(version, key, keys = chargedCriticalKeys(version)) {
+  if (!keys || keys.has(key)) return false;
+  if (key !== criticalClassKey({ type: LETTERING_TYPE })) return true;
+  const rec = letteringRecordOf(version);
+  if (!rec || !Array.isArray(rec.items)) return false;
+  const { checkUndeclaredLettering } = require('./letteringCheck');
+  return !checkUndeclaredLettering({ lettering: rec.items, declared: rec.declared })
+    .some(f => String(f.severity).toUpperCase() === 'CRITICAL');
+}
+
+/**
+ * Does version `a` dominate version `b` under critical-gone-wins? See the
+ * block comment above for the rule and its ties.
+ */
+function dominatesByCritical(a, b) {
+  const ka = chargedCriticalKeys(a);
+  const kb = chargedCriticalKeys(b);
+  if (!ka || !kb) return false;
+  for (const k of ka) if (!kb.has(k)) return false;   // a carries a CRITICAL b lacks
+  let cleared = false;
+  for (const k of kb) {
+    if (ka.has(k)) continue;
+    if (!criticalConfirmedGone(a, k, ka)) return false;
+    cleared = true;
+  }
+  return cleared;
+}
+
 /**
  * Pick the best version index out of an `imageVersions[]` array.
  * Tie-break: HIGHER index wins (newer version preferred when scores tie),
  * because newer versions usually incorporate later repair work.
+ *
+ * Critical-gone wins: a version dominated by another scoreable version
+ * (dominatesByCritical) is removed before the score ranks the rest.
  *
  * Returns -1 when no version has a non-null score (e.g. all just-pushed,
  * un-evaluated). Caller should leave activeVersion alone in that case.
@@ -937,9 +1033,7 @@ function versionDeductionTotal(version) {
  */
 function pickBestVersionIndex(versions, { tieBreak = 'latest' } = {}) {
   if (!Array.isArray(versions) || versions.length === 0) return -1;
-  let bestIdx = -1;
-  let bestScore = -Infinity;
-  let bestDeduction = Infinity;
+  const scored = [];
   for (let i = 0; i < versions.length; i++) {
     const s = computeFinalScore(versions[i]);
     // An unscored version used to be SKIPPED silently, which meant a repair
@@ -965,6 +1059,20 @@ function pickBestVersionIndex(versions, { tieBreak = 'latest' } = {}) {
       log.error(`[SCORE] ${versions[i]?.source || 'version'} ${versions[i]?.pageNumber != null ? 'p' + versions[i].pageNumber : ''}: bytes do not match the evaluated fingerprint (${fp}) — score refused, version cannot win`);
       continue;
     }
+    scored.push({ i, s });
+  }
+  // Critical-gone wins: drop every scoreable version another one dominates.
+  const dominated = new Set();
+  for (const a of scored) {
+    for (const b of scored) {
+      if (a !== b && !dominated.has(b.i) && dominatesByCritical(versions[a.i], versions[b.i])) dominated.add(b.i);
+    }
+  }
+  let bestIdx = -1;
+  let bestScore = -Infinity;
+  let bestDeduction = Infinity;
+  for (const { i, s } of scored) {
+    if (dominated.has(i)) continue;
     const ded = versionDeductionTotal(versions[i]);
     // Primary: finalScore (higher better; may be negative since the 0-floor
     // was removed 2026-08-08, so failing versions now rank against each other
@@ -1307,6 +1415,9 @@ module.exports = {
   PAGE_SCOPED_BUCKETS,
   BUCKET_BILLING_CATEGORY,
   pickBestVersionIndex,
+  chargedCriticalKeys,
+  criticalConfirmedGone,
+  dominatesByCritical,
   recomputeActiveVersion,
   recomputeAllActiveVersions,
   shouldRedo,
