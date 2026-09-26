@@ -2044,6 +2044,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "picker-critical-gone-wins",
+      "title": "Critical-gone wins: a version whose CRITICAL is confirmed gone never loses to one that still carries it",
+      "commits": [
+        "500d2ac89"
+      ],
+      "addedAt": "2026-09-26",
+      "claim": "On the next staging story whose repair round removes a charged CRITICAL but scores lower than the version it repaired: the shipped (active) version is the repair, the page has no unrepairedCritical of that class, and the round record marks the page criticalCleared/improved, not regressed.",
+      "runShape": [
+        "needs-inpaint"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "stories.data.sceneImages[].imageVersions: for each page, chargedCriticalKeys per version (scoring.js) vs activeVersion; repairRounds[].pages[].criticalCleared; replay pickBestVersionIndex over the stored versions. Baseline: job_1790373080139_vnx5l8iy7 p18 shipped v0 (75, rendered_text) over v1 (33, clean)."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }

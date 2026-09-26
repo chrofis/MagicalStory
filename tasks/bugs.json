@@ -2103,6 +2103,18 @@
       "fixedAt": "2026-09-26",
       "fixedIn": "d67d87b0c",
       "fix": "isFaceAwayPerspective (shotVocabulary.isOverTheShoulderPerspective + back/behind/rear/facing away) picks the rear cell in the one shared resolveCellPose, which images.js iterate and regeneration.js also call. Test: face-away-cell-pose.test.ts."
+    },
+    {
+      "id": "picker-kept-critical-over-clean-repair",
+      "title": "pickBestVersionIndex shipped a version still carrying a CRITICAL over a repair that confirmedly removed it, because it ranked by score only",
+      "reportedAt": "2026-09-26",
+      "source": "Stored evidence: staging job_1790373080139_vnx5l8iy7 p18. v0 (original, 75) carries CRITICAL rendered_text (lettering inventory: caption \"THE PROUD MOMENT\", placement overlay); v1 (inpaint-round-1, 33) has an empty lettering inventory and no charged CRITICAL. activeVersion 0, unrepairedCritical rendered_text.",
+      "rootCause": "pickBestVersionIndex (scoring.js) ranked candidates by finalScore alone; a re-evaluation that filed unrelated MAJORs against the repaired image outscored the removal of the CRITICAL.",
+      "impact": "A caption (or any CRITICAL) the repair had removed shipped anyway; the repair round was logged as a regression.",
+      "status": "fixed",
+      "fixedAt": "2026-09-26",
+      "fixedIn": "500d2ac89",
+      "fix": "Critical-gone wins: dominatesByCritical removes every version another dominates before the score ranks; lastRepairRegressed / bothStrategiesTriedAndRegressed / summarizeRepairRound apply the same rule. Test: critical-gone-wins.test.ts; replay flips p18 to v1 and changes no other page of this story or run 7."
     }
   ]
 }
