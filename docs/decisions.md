@@ -304,6 +304,12 @@ its p8 derive still pass light. Open: the medium and covered-sky misses (BACKLOG
 **AD photo list after the data fix** (rebuilt for the stored story, free): Lindenhof Photo 3 now reads the corrected
 description plus `Photo judge: hill and old houses seen across the river with moored boats.`
 
+**Lab 1524** (`beats_scenes` on the deployed build eae1cf7c9, `job_1790446348343_z3fw660ie` p1-p11, `plainStoredBeats`,
+no review; gemini-3.1-pro Art Director; $0.42 — over the CHF 0.25 set for this run, the story is longer than Lab 1514's):
+the Art Director's prompt carries the `Photo judge:` lines, and the Lindenhof wall plate that cited photo 3 in the stored
+run (now `LOC005.1 "wall medium"`, pages 9 and 11) cites **"none"**, as does its high-angle vantage (p10). No citation
+faults. National Museum → photo 1, Hauptbahnhof low-angle deck → photo 1.
+
 **Touched:** `server/lib/plateQc.js`, `server/lib/evalPipeline.js`, `prompts/empty-scene-qc.txt`,
 `prompts/scene-review.txt`, `server/lib/promptBuilders.js`, `server/lib/landmarkPhotos.js`, `server/lib/storyHelpers.js`,
 `server/lib/testlab.js`, `storyJobPipeline.js`, `tests/unit/plate-qc-era-framing-photo.test.ts` (new),
