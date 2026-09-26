@@ -1744,6 +1744,7 @@ module.exports = {
   carryForwardWornItemsInBrief,
   splitClauses,
   splitClausesDetailed,
+  DEPENDENT_OPENER_RE,
   buildWornStateLines,
   buildWornStateBlock,
   removeWornItemFromOutfit,
