@@ -3266,8 +3266,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           storyId: storyData?.id || null, pageNumber, label: 'POST-REPAIR-TEXT',
         });
         return images().generateImageOnly(repairPrompt, img.characterPhotos || [], {
-          imageModelOverride: img.sceneMetadata?.pageImageModel || null,
-          imageBackendOverride: img.sceneMetadata?.pageImageBackend || null,
+          imageModelOverride: opts.imageModelOverride,
           landmarkPhotos: img.landmarkPhotos || [],
           landmarkScene: repairScene.landmarkScene,
           sceneBackground: repairScene.sceneBackground,

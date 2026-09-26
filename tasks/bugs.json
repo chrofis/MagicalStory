@@ -2,6 +2,18 @@
   "_readme": "CLEAR-BUG REGISTRY. A bug the owner reported, or one confirmed from stored evidence, goes here the moment it is confirmed - and the pre-push gate (scripts/admin/check-open-bugs.js) BLOCKS every push while any entry is open. That is the point: a reported bug is fixed immediately, not backlogged. Only CLEAR bugs belong here (reproduced, or owner-reported with evidence); design questions and improvements go to the task list instead. Close an entry by setting status to 'fixed' with the commit hash IN THE SAME COMMIT as the fix. Emergency escape: PUSH_WITH_OPEN_BUGS=1 git push (documented, visible, deliberate).",
   "bugs": [
     {
+      "id": "calm-zone-rerender-drops-to-edit-tier",
+      "title": "The calm-zone re-render (text-space gate, POST-REPAIR-TEXT, Lab text_zone) rendered on the Standard edit tier instead of the page render tier",
+      "reportedAt": "2026-09-26",
+      "source": "Code trace: storyJobPipeline.js (text-space gate generateImage) and repairPipeline.js (POST-REPAIR-TEXT generateImage) passed imageModelOverride: img.sceneMetadata?.pageImageModel. No code writes sceneMetadata.pageImageModel (the name exists only as a local variable of the page render), so the override was always null. The Lab text_zone stage (testlab.js runTextZoneStage) passed no model. Recorded in docs/decisions.md (Lab 1536 entry, 'Not done, reported instead').",
+      "rootCause": "A null imageModelOverride resolves to generateImageOnly's default, MODEL_DEFAULTS.pageImage - the EDIT/INPAINT tier (grok-imagine-image, Standard) - while every page render uses MODEL_DEFAULTS.pageRenderImage (grok-imagine-image-2.0).",
+      "impact": "Any page whose calm zone failed the text-space gate was re-rendered on a different, cheaper model than the rest of the book; the Lab text_zone stage measured that other model.",
+      "status": "fixed",
+      "fixedAt": "2026-09-26",
+      "fixedIn": "",
+      "fix": "ensureCalmZone (textSpaceRepair.js) passes imageModelOverride: MODEL_DEFAULTS.pageRenderImage to every retry - the contract models.js states for every redo of a page, and the one regeneration.js already uses - and the three generateImage closures forward opts.imageModelOverride (generateImageOnly derives the backend from IMAGE_MODELS). The dead sceneMetadata.pageImageModel/pageImageBackend reads are deleted. Test: tests/unit/calm-zone-render-tier.test.ts."
+    },
+    {
       "id": "plate-band-note-names-figures",
       "title": "The per-page plate prompt named the page's figures by band and side, and the plate model painted them onto the people-free plate",
       "reportedAt": "2026-09-26",

@@ -5064,6 +5064,7 @@ async function runTextZoneStage(ctx, { experimentId, params = {} }) {
       storyId: ctx.storyId, pageNumber: ctx.pageNumber, label: 'LAB TEXT-ZONE',
     });
     return generateImageOnly(repairPrompt, ctx.referencePhotos, {
+      imageModelOverride: opts.imageModelOverride,
       landmarkPhotos: ctx.landmarkPhotos,
       landmarkScene: repairScene.landmarkScene,
       sceneBackground: repairScene.sceneBackground,

@@ -312,6 +312,13 @@ tier, not what ships. Validated after deploy: Lab #1536 (image stage, p16 of z3f
 `ensureCalmZone` generateImage, and `repairPipeline.js` POST-REPAIR-TEXT) passes `img.sceneMetadata?.pageImageModel`,
 a field no code writes, so a re-roll would render on Standard. It fired on 0 of 570 stored pages in 21 days
 (no stored `textSpaceCandidates`), and the Lab `text_zone` stage matches that behaviour. Owner decision.
+**Done 2026-09-26 (owner, bugs.json `calm-zone-rerender-drops-to-edit-tier`):** `ensureCalmZone` passes
+`imageModelOverride: MODEL_DEFAULTS.pageRenderImage` to every retry — a calm-zone retry is a re-render of the page,
+and `pageRenderImage` is the tier models.js names for every redo (regeneration.js already uses it). The production
+text-space gate, POST-REPAIR-TEXT and the Lab `text_zone` stage forward `opts.imageModelOverride`; the dead
+`sceneMetadata.pageImageModel` reads are deleted. Not the page's stored `modelId`: every page renders on
+`pageRenderImage`, and a stored id would make the retry tier depend on which version happens to be active.
+Pinned by tests/unit/calm-zone-render-tier.test.ts.
 
 **Touched:** server/lib/testlab.js (`runImageStage`), tests/unit/testlab-prod-prompt-parity.test.ts
 **Status:** ✅ active (staging)

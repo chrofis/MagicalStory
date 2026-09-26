@@ -6332,8 +6332,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 storyId: jobId, pageNumber: img.pageNumber, label: 'CALM-ZONE',
               });
               return generateImageOnly(repairPrompt, img.characterPhotos || [], {
-              imageModelOverride: img.sceneMetadata?.pageImageModel || null,
-              imageBackendOverride: img.sceneMetadata?.pageImageBackend || null,
+              imageModelOverride: opts.imageModelOverride,
               landmarkPhotos: img.landmarkPhotos || [],
               landmarkScene: repairScene.landmarkScene,
               sceneBackground: repairScene.sceneBackground,
