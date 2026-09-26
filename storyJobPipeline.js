@@ -5227,13 +5227,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
               // Validate the empty scene before using it as a background.
               // Phase 1: pixel analysis (white boxes, too dark, text area calmness) — <50ms, free
-              // Phase 2: Gemini Flash-lite vision (people, landmark, artifacts) — ~2s, cheap
-              // Skipped entirely when layout has no text-in-image: the calm-zone QC
-              // checks don't apply, and we save the vision call cost on those pages.
-              if (result?.imageData && layoutTextInImage) {
+              // Phase 2: Gemini Flash vision (people, medium, landmark, artefacts) — ~2s, cheap
+              // EVERY page plate is judged (owner, 2026-09-26). It used to be
+              // skipped when the layout had no text in the image, and since every
+              // level went text-below (2026-09-05) no per-page plate was judged at
+              // all — only the vantage and derived plates were. A text-below page
+              // has no calm zone, so it is judged with a null text position, as
+              // the vantage plates are; a text-in-image page is graded on the
+              // zone its author was told to keep calm (the same textPos).
+              if (result?.imageData) {
                 const { validateEmptyScene } = require('./server/lib/images');
-                const { decidePlateAfterRetry, plateQcRecord: buildPlateQcRecord, logPlateOutcome, nullOnPromptFit } = require('./server/lib/plateQc');
-                const textPos = enforceSpreadTextPosition(sceneMetadata?.textPosition || null, pageData.pageNumber);
+                const { decidePlateAfterRetry, plateQcRecord: buildPlateQcRecord, logPlateOutcome, nullOnPromptFit, plateQcTextPosition } = require('./server/lib/plateQc');
+                const qcTextPos = plateQcTextPosition(layoutTextInImage, textPos);
                 // Pass the outline's declared character positions so the vision check
                 // can verify each has usable flat ground in the rendered empty scene.
                 const placements = (sceneMetadata?.fullData?.characters || [])
@@ -5257,26 +5262,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   landmarkPhoto: pageData.landmarkPhotos?.[0] || null,
                   light: pageLight,
                 };
-                const qc = await validateEmptyScene(result.imageData, textPos, `P${pageData.pageNumber}`, pageQcOpts);
+                const qc = await validateEmptyScene(result.imageData, qcTextPos, `P${pageData.pageNumber}`, pageQcOpts);
                 if (!qc.pass) {
                   // Retry with Gemini's feedback appended to the description.
-                  // The text-area instruction is rebuilt with the SAME shared
-                  // builder and parameters as the first attempt — only the
-                  // fixHint differs between the two prompts. (An earlier
-                  // comment claimed the retry "softens" the instruction; it
-                  // never did.)
+                  // The text-area instruction is the first attempt's own
+                  // (emptyTextAreaInstr, '' on a text-below page) — only the
+                  // fixHint differs between the two prompts.
                   const fixHint = qc.visionFeedback
                     ? `\n\nIMPORTANT: The previous attempt had this problem: ${qc.visionFeedback}. Fix this in the new version.`
-                    : '';
-                  const retryTextInstr = textPos
-                    ? buildTextZoneInstruction(textPos, textZoneDesc, emptyAreaPct, { isEmptyScene: true })
                     : '';
                   log.info(`🔄 [EMPTY SCENE] P${pageData.pageNumber} failed QC (${qc.issues.join(', ')}), retrying with feedback...`);
                   const retryPrompt = buildEmptyScenePrompt({
                     style: artStyleDesc,
                     description: emptySceneDesc + fixHint,
                     characterSpace,
-                    textAreaInstruction: retryTextInstr,
+                    textAreaInstruction: emptyTextAreaInstr,
                     eraGuard,
                     landmarkFidelity: pageLandmarkFidelity,
                     referenceKind: emptySceneRefKind,
@@ -5306,7 +5306,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   // and the keeper picked by SEVERITY (plateQc.js) — the same
                   // rule as the vantage base plate. Both attempts are stored.
                   const retryQc = retryResult?.imageData
-                    ? await validateEmptyScene(retryResult.imageData, textPos, `P${pageData.pageNumber}-retry`, pageQcOpts)
+                    ? await validateEmptyScene(retryResult.imageData, qcTextPos, `P${pageData.pageNumber}-retry`, pageQcOpts)
                     : null;
                   const outcome = decidePlateAfterRetry({ firstQc: qc, retryQc, derived: false });
                   logPlateOutcome(genLog, { event: 'empty_scene_qc_retry', label: `Page ${pageData.pageNumber} plate`, pages: [pageData.pageNumber], outcome, firstQc: qc, retryQc });

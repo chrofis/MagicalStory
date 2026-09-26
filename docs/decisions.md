@@ -39,6 +39,30 @@ superseded and link forward.
 
 ---
 
+## 2026-09-26 — Every per-page plate is judged; its calm-zone check only runs on a text-in-image page (amends 2026-09-05 "No reading level defaults to the A4 text-overlay layout")
+
+**Context:** The story run's per-page plate path (`renderPagePlate`, storyJobPipeline.js Phase 5a-pre and
+the missing-page retry) ran `validateEmptyScene` only `if (layoutTextInImage)` — the 2026-09-05 entry lists
+empty-scene QC among the overlay parts that went dormant with the text-below default. Every level has been
+text-below since then, so no per-page plate was judged: a photographic, peopled or signed per-page plate
+shipped unseen, while the vantage and derived plates of the same story were judged with a null text position.
+The Test Lab already judges every plate (entry below).
+**Decision (owner, 2026-09-26):** every per-page plate is judged. The text position it is judged with is
+`plateQc.plateQcTextPosition(layout.textInImage, textPos)` — the page's own text position (the one its
+plate prompt's text-zone instruction was built from, covers included) on a text-in-image page, null
+otherwise, exactly as the vantage plates are judged. The Lab `empty_scene` stage uses the same helper. The
+one fed-back retry and the double-failure policy (`decidePlateAfterRetry`) apply unchanged; the retry
+prompt reuses the first attempt's text-zone instruction (`''` on a text-below page) instead of rebuilding it.
+Treated as an owner decision, not a bug: the gate was deliberate on 2026-09-05.
+**Rationale:** the plate is the scene every page render is composited into; a check that runs on two plate
+paths out of three leaves the third path's defects to surface on the finished page. The extra vision call
+is one gemini-2.5-flash call per per-page plate (about $0.003), plus one retry render when it fails.
+**Not covered:** the iterate/regenerate plate (`images.renderStoryPagePlate`), the cover plate and the trial
+plate still run no QC (as before; not part of this decision).
+**Touched:** `storyJobPipeline.js` (renderPagePlate), `server/lib/plateQc.js` (`plateQcTextPosition`),
+`server/lib/testlab.js`, `tests/unit/plate-qc-per-page.test.ts`
+**Status:** ✅ active on staging.
+
 ## 2026-09-26 — The Test Lab judges every plate; one story-era derivation for every plate QC
 **Context:** The Lab `empty_scene` stage skipped the whole plate QC when a story had no text zone
 and stored `{ pass: true, skipped: 'no text zone (text-below layout)' }`, on the premise that
@@ -59,6 +83,8 @@ QC only when `layout.textInImage` (the 2026-09-05 "overlay pipeline is dormant" 
 empty-scene QC among the gated parts), so on a text-below story only vantage and derived plates
 are judged. The Lab now judges every plate; whether the per-page run path should too is an open
 owner question.
+**Forward note (2026-09-26):** answered — the per-page run path judges every plate too (entry above,
+"Every per-page plate is judged").
 **Touched:** `server/lib/testlab.js`, `server/lib/plateQc.js`, `storyJobPipeline.js`,
 `tests/unit/lab-plate-qc-always.test.ts`
 **Status:** ✅ active
@@ -36295,7 +36321,9 @@ the shortest; since even its ceiling does not clear the zone with headroom, no l
 Stated plainly so the next session does not read the code as an oversight: **the overlay
 pipeline is now dormant by default** — the text-zone prompt rules, calm-zone detection, mask
 reference cell, empty-scene QC and text-space repair all gate on `layout.textInImage` and so
-run only for an overridden story. That is deliberate, and it is the cheap half of the change:
+run only for an overridden story. **Forward note (2026-09-26):** empty-scene QC no longer gates on it —
+every per-page plate is judged, with a text position only on a text-in-image page (decisions.md
+2026-09-26 "Every per-page plate is judged"). That is deliberate, and it is the cheap half of the change:
 nothing was deleted, and flipping one level back to `a4-overlay` is a one-line change once the
 zone is bigger or the word budget is actually enforced.
 

@@ -195,8 +195,21 @@ function plateStoryEra(clothingRequirements, { storyTheme, storyTopic, storyType
   return themeBits ? `${costumedTypes[0]} (${themeBits})` : costumedTypes[0];
 }
 
+/**
+ * The text position a page's plate is judged with. EVERY page plate is judged
+ * (owner, 2026-09-26); only its calm-zone grading depends on the layout: a
+ * text-in-image page is graded on the zone its author was told to keep calm,
+ * a text-below page has no zone and is judged with null — as the vantage and
+ * derived plates always were. One rule for the story run's per-page plate and
+ * the Test Lab's empty_scene stage.
+ */
+function plateQcTextPosition(textInImage, textPosition) {
+  return textInImage && textPosition ? textPosition : null;
+}
+
 module.exports = {
   plateStoryEra,
+  plateQcTextPosition,
   nullOnPromptFit,
   logPlateOutcome,
   PLATE_QC_CHECKS,

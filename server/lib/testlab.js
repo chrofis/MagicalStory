@@ -915,15 +915,17 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
   // retry loop: the point is seeing whether a prompt variant passes the gate.
   // It runs on EVERY plate. A text-below layout has no calm zone, so the text
   // position is null — exactly as the story run's vantage plates are judged
-  // (storyJobPipeline.js validateEmptyScene(plate, null, …)). It used to be
+  // (storyJobPipeline.js validateEmptyScene(plate, null, …)) and, since
+  // 2026-09-26, the run's per-page plates (plateQc.plateQcTextPosition). It used to be
   // skipped for text-below and reported a fake pass on every Lab plate since
   // text-below became every level's layout (2026-09-05).
   let qc = null;
   try {
     const { validateEmptyScene } = require('./images');
-    const qcRes = await validateEmptyScene(result.imageData, wantsTextZone ? ctx.textPosition : null, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
+    const qcTextPos = require('./plateQc').plateQcTextPosition(wantsTextZone, ctx.textPosition);
+    const qcRes = await validateEmptyScene(result.imageData, qcTextPos, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
       labPlateQcOptions(ctx, { sceneDescription: description, shot: pageShot || meta.setting?.camera || 'wide shot', artStyle: plateStyle }));
-    qc = { pass: qcRes.pass, issues: qcRes.issues || [], findings: qcRes.findings || [], visionFeedback: qcRes.visionFeedback || null, textPosition: wantsTextZone ? ctx.textPosition : null };
+    qc = { pass: qcRes.pass, issues: qcRes.issues || [], findings: qcRes.findings || [], visionFeedback: qcRes.visionFeedback || null, textPosition: qcTextPos };
   } catch (err) {
     log.warn(`[TESTLAB] empty-scene QC failed: ${err.message}`);
     qc = { error: err.message };
