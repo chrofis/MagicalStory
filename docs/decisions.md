@@ -181,7 +181,8 @@ sides), `edit_image` (plate source → plate tier as the production derive; page
 
 **Rationale:** the Lab exists to reproduce production; a Lab page on a cheaper, different model measures a
 different renderer. Lab conclusions from image-stage runs without an explicit `imageModel` describe the Standard
-tier, not what ships.
+tier, not what ships. Validated after deploy: Lab #1536 (image stage, p16 of z3fw660ie, no `imageModel`) recorded
+`grok-imagine-image-2.0`.
 
 **Not done, reported instead:** the text-space calm-zone RE-RENDER in production (`storyJobPipeline.js`
 `ensureCalmZone` generateImage, and `repairPipeline.js` POST-REPAIR-TEXT) passes `img.sceneMetadata?.pageImageModel`,
@@ -220,6 +221,16 @@ rigid") and p1 ("the boys and Mama different actions"), all must, all inside MUS
 the question itself names as a finding. The re-plan loop needs no code change: it ranks by `check` number
 (`beatsPipeline.js` MUST FIX section, round-2 `stillMustFix`, convergence count), and the Lab `beats_replan`
 stage imports the same `replanRank`.
+
+**Lab #1537 (beats_replan on z3fw660ie, after deploy, $0.12) — the plumbing works, the planner's answer did not:**
+the first check filed Q17 on p16 and it reached the re-plan's MUST FIX block. The planner rewrote p16 to "Fiona
+laughs … and presses the chart into Herr Brunner's hands while the open chest … sits before them all" — one
+character's deed with the rest still present — and, unasked by Q17, rewrote p6 from "all moving together toward the
+bow" to a hauling action for two. The recheck filed Q17 on BOTH pages, the cast/focal must-fix count went 3 → 4, and
+the round-keeping guard DISCARDED the round, so the standing division shipped. One story, one round: no Q4/Q8
+picture was lost (the guard held), and the fault stayed unfixed. If the next stories repeat this, the fix is on
+the planner side (the re-plan prompt's answer to a Q17 finding: name ONE action every figure shares), not a
+return to advisory.
 
 **Touched:** server/lib/promptBuilders.js (`REPLAN_MUST_FIX_CHECKS` + its header, `WHOLE_CAST_DEF` comment),
 tests/unit/plan-replan-ranking.test.ts
