@@ -6147,6 +6147,7 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     STYLE_RULEBOOK,
     MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
     PAYOFF_KEEP: PAYOFF_KEEP_RULE,
+    MECHANISM_FIX: MECHANISM_FIX_RULE,
   });
 }
 
@@ -9568,6 +9569,21 @@ const MOTIVE_AT_THE_ACT_RULE = 'Where a character refuses, demands, flees, hides
 const PAYOFF_KEEP_RULE = 'A sentence that shows something an earlier page set up doing its work, or a payoff the story names, is never deleted by a fix. Where a finding touches it, the fix rewrites around it and keeps what it shows.';
 
 /**
+ * A mechanism is fixed with what the pages hold (owner, 2026-09-26). ONE
+ * string for every whole-page text pass (text-refine.txt: the repair, its
+ * repetition_fix / length_fix rounds and the book-audit round). Staging
+ * job_1790446348343_z3fw660ie: the arc-informed audit filed that the climax's
+ * physical means could not work as told; the repair "fixed" it by adding a
+ * part of an object no page had and no geometry allowed, and nothing reads a
+ * repair for logic. The repair already may not invent an event that eases an
+ * obstacle; this closes the same door for a physical means. A mechanism the
+ * pages cannot make work is the arc's fault: the pass says so on a fixed
+ * "ARC FAULT:" ledger line (parseArcFaultLines, textRefine.js), which is
+ * stored on the round and logged, instead of inventing hardware.
+ */
+const MECHANISM_FIX_RULE = 'A fault about how something physically works (how a thing is lifted, tied, opened, crossed or carried) is fixed only with the objects, parts, positions and abilities the pages already establish. Where none of them makes it work, add nothing to make it work: the page stays as it is, and the ledger closes the fault on a line of its own, "ARC FAULT: p<N>: <what cannot happen as told, and what the story lacks>".';
+
+/**
  * The Art Director composition rules for a writer that authors its own scene
  * hints without an Art Director stage: trial and both unified variants. The
  * six bullets were reworded for a scene hint from scene-expansion(-all).txt
@@ -9716,6 +9732,29 @@ const ARC_EXCITING_DEF_SIMPLE = 'a problem that moves and pushes back — a thin
 const ARC_MAIN_TURN_RULE = 'Each main character the STORY SHAPE names carries an important part of the journey, with a turn of their own that changes the outcome — with two, one\'s idea and the other\'s deed; never one hero and a passenger';
 const ARC_PART_CHECK = 'a main character with no turn of their own that changes the outcome; an opposition or danger that only waits and never acts.';
 
+/**
+ * STAKES AND OPEN QUESTIONS (owner, 2026-09-26). Two rules the creator and the
+ * re-teller were given in RULES OF THE LOGIC ("it does not yield on request",
+ * "every question raised is answered") had no critic: the critique's only
+ * opposition fault was one that waits, and no panel lens read either. Staging
+ * job_1790446348343_z3fw660ie: the creator gave its opponent a limit ("he will
+ * not take a thing from a visitor by force") that licensed an early scene and
+ * then emptied the turn: he demands, is refused, and yields; the ending left
+ * open who keeps the prize. ONE string each, filled into {TELLING_RULES}
+ * (generator), the critique's fault list (arcCritiqueSpec) and the panel's
+ * STAKES lens (critics), through arcStakesRules. The opposition rule is off
+ * for the simple bands, whose telling rules forbid anyone standing in the way.
+ */
+const ARC_OPPOSITION_HOLDS_RULE = 'The opposition never gives way just because it is asked, and no limit the story logic gives it takes away its power at the turning point.';
+const ARC_QUESTIONS_ANSWERED_RULE = 'Every question the story raises is answered by its end, including who keeps what was sought, won or fought over.';
+
+/** The stakes rules this band's arc is written to and checked against — one list, both sides. */
+function arcStakesRules(inputData = {}) {
+  return SIMPLE_BANDS.has(resolveAgeBand(inputData))
+    ? [ARC_QUESTIONS_ANSWERED_RULE]
+    : [ARC_OPPOSITION_HOLDS_RULE, ARC_QUESTIONS_ANSWERED_RULE];
+}
+
 function arcExcitingDef(inputData = {}) {
   return SIMPLE_BANDS.has(resolveAgeBand(inputData)) ? ARC_EXCITING_DEF_SIMPLE : ARC_EXCITING_DEF;
 }
@@ -9787,14 +9826,14 @@ function buildTellingRulesSection(inputData = {}) {
     '- Challenges belong to the story, never dealt out one per character in turn; what the youngest does stays within a very young child\'s reach — noticing, holding, fetching, naming, offering, refusing.',
     simple
       ? '- Nothing stands in the way on purpose. What holds the main character up is a thing or a circumstance — out of reach, missing, not working yet — never anyone unwilling, and whoever they meet is friendly.'
-      : '- The opposition presses on the story to the end and stands in the scene at the turning point; it does not yield on request. A rival\'s thread ends with the rival present — arriving too late, seeing what they lost, paying.',
+      : `- The opposition presses on the story to the end and stands in the scene at the turning point. ${ARC_OPPOSITION_HOLDS_RULE} A rival's thread ends with the rival present — arriving too late, seeing what they lost, paying.`,
     '- Reasons come from who someone is, what a place is for, or what someone needs; a sign, an inscription or a rule stated once to license a turn is not a reason.',
     '- An obstacle comes from the story\'s own world — weather, distance, a rival, a broken or missing or guarded thing, a character\'s own flaw — and exists for its own reasons: never shaped around a thing a character carries, never a puzzle door, riddle or test set by no one unless the commission sets it.',
     '- Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level; a refusal, a loss, a delay or a broken promise carries the peril instead. Nobody looks monstrous, no familiar character turns frightening, and anyone separated or lost is reunited.',
     RISK_FRAMING_RULE,
     `- ${ANIMAL_FATE_RULE}`,
     '- The story ends with the children safe and together, one of them feeling something a child can name. A container or reveal the story promises opens before the end, and a story that enters through a doorway, portal or frame returns through it.',
-    '- Every question raised is answered, and what resolves the conflict has an origin — an earlier setup or a rule the story logic states. A figure singled out — the only one who can help, waited for, chosen — has a stated reason.',
+    `- ${ARC_QUESTIONS_ANSWERED_RULE} What resolves the conflict has an origin — an earlier setup or a rule the story logic states. A figure singled out — the only one who can help, waited for, chosen — has a stated reason.`,
     noSplit
       ? '- The cast stays together on one path — never two groups going separate ways; where the commission itself splits them, keep them together and justify it in one line.'
       : '- The group stays together unless it has a reason to separate and a reason to meet again.',
@@ -9914,7 +9953,13 @@ function arcLogicSpec(inputData = {}, pageCount = 10) {
  * repaired. A panel finding without a tag is dropped as a parse error
  * (filterPanelFindings), never read as one severity or another.
  */
-const ARC_SEVERITY_DEF = '[CRITICAL] — the story is broken; [MAJOR] — a real fault repairable inside the existing structure, which an act from no motive line and a main character with no turn always are; or [MINOR] — a blemish.';
+// IMPOSSIBLE ACTION = MAJOR (owner, 2026-09-26). Staging
+// job_1790446348343_z3fw660ie: a panelist caught that one rope could not do
+// the jobs the climax gave it and tagged it [MINOR]; the re-tell gate
+// (MAJOR/CRITICAL only) filtered it out, it rode into the pages, and the text
+// repair invented hardware to close it. The generator half is ARC_SENSE_RULE
+// ("that could not happen").
+const ARC_SEVERITY_DEF = '[CRITICAL] — the story is broken; [MAJOR] — a real fault repairable inside the existing structure, which an act from no motive line, a main character with no turn, and an action at the turn or the climax that could not happen as the arc states it always are; or [MINOR] — a blemish.';
 
 /**
  * THE ARC CRITIQUE SPEC — ONE source, both arc templates (owner, 2026-09-19).
@@ -9936,10 +9981,10 @@ const ARC_SEVERITY_DEF = '[CRITICAL] — the story is broken; [MAJOR] — a real
  *   retell  the arc-retell variant — the same spec against a final arc, whose
  *           faults are the ones that REMAIN after the re-telling.
  */
-function arcCritiqueSpec({ retell = false } = {}) {
+function arcCritiqueSpec({ retell = false, inputData = {} } = {}) {
   const remain = retell ? ' that remain' : '';
   return [
-    `"Faults:" then the arc's three worst faults${remain}, one per numbered line, or the single word "none". ${ARC_ISSUE_RULE} A fault is one of these: ${ARC_LOGIC_CHECK} Or one of these: ${ARC_PART_CHECK} Each line: ${arcIssueLine()} ${ARC_FINDING_RULE} Tag each ${ARC_SEVERITY_DEF} A fault is never a count, a page number or a sourced measurement.`,
+    `"Faults:" then the arc's three worst faults${remain}, one per numbered line, or the single word "none". ${ARC_ISSUE_RULE} A fault is one of these: ${ARC_LOGIC_CHECK} Or one of these: ${ARC_PART_CHECK} Or a break of one of these rules: ${arcStakesRules(inputData).join(' ')} Each line: ${arcIssueLine()} ${ARC_FINDING_RULE} Tag each ${ARC_SEVERITY_DEF} A fault is never a count, a page number or a sourced measurement.`,
     '',
     '"Commission honored:" one line — "yes", or the commission\'s own words the arc drops or inverts, quoted; a TOPIC PROMISE, where one is given, counts among the commission\'s words.',
   ].join('\n');
@@ -9965,7 +10010,7 @@ function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null } = 
     TELLING_RULES: buildTellingRulesSection(inputData),
     CHALLENGE_IDEAS: challengeIdeas ?? buildChallengeIdeasSection(inputData),
     ARC_LOGIC_SPEC: arcLogicSpec(inputData, pageCount),
-    ARC_CRITIQUE_SPEC: arcCritiqueSpec(),
+    ARC_CRITIQUE_SPEC: arcCritiqueSpec({ inputData }),
     ARC_LENGTH: arcLengthRange(pageCount),
   });
 }
@@ -10001,6 +10046,9 @@ function buildArcPanelPrompt(inputData, committedBlock) {
     ARC_GIVEN_RULE,
     ARC_SENSE_RULE,
     ARC_PLACE_RULE,
+    // The STAKES lens reads the rules the creator's TELLING_RULES carry, for
+    // this band (2026-09-26).
+    ARC_STAKES_RULES: arcStakesRules(inputData).join(' '),
     // A14: the REAL LANDMARKS block is one constant with three consumers
     // (create, panel, retell). The panel is the only independent reader of the
     // arc; without the list it cannot see a real place the arc invented, and
@@ -10042,7 +10090,7 @@ function buildArcRetellPrompt(inputData, pageCount, arcBlock, repairFindings, { 
     ARC_TO_REPAIR: String(arcBlock || '').trim(),
     REPAIR_FINDINGS: String(repairFindings).trim(),
     ARC_LOGIC_SPEC: arcLogicSpec(inputData, pageCount),
-    ARC_CRITIQUE_SPEC: arcCritiqueSpec({ retell: true }),
+    ARC_CRITIQUE_SPEC: arcCritiqueSpec({ retell: true, inputData }),
     ARC_LENGTH: arcLengthRange(pageCount),
     // A14: same block the creator got (see buildArcPanelPrompt).
     AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote),
@@ -12520,6 +12568,9 @@ module.exports = {
   arcRepairFindings,
   splitCommittedBlock,
   ARC_SEVERITY_DEF,
+  ARC_OPPOSITION_HOLDS_RULE,
+  ARC_QUESTIONS_ANSWERED_RULE,
+  arcStakesRules,
   COMMISSIONED_CAST_DEF,
   ARC_ENTRANCE_RULE,
   ARC_GIVEN_RULE,
@@ -12605,6 +12656,7 @@ module.exports = {
   STYLE_RULEBOOK,
   MOTIVE_AT_THE_ACT_RULE,
   PAYOFF_KEEP_RULE,
+  MECHANISM_FIX_RULE,
   AD_COMPOSITION_RULE,
   parseArcHints,
   parseArcCreate,

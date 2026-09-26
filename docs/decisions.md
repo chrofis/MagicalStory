@@ -61580,4 +61580,85 @@ char_repair and sceneComposite.js; only repairPipeline.js dropped it.
 **Touched:** server/lib/sceneGeometry.js, server/lib/repairPipeline.js, server/lib/repairLogic.js,
 tests/unit/empty-scene-geometry.test.ts, tests/unit/char-fix-failure-reason.test.ts, tasks/bugs.json,
 tasks/verify.json.
+
+## 2026-09-26 — An action at the turn or climax that could not happen is at least MAJOR; the text repair fixes a mechanism only with what the pages hold
+
+**Context:** staging job_1790446348343_z3fw660ie (Fiona). The climax gave one rope more jobs than one
+rope can do. A panelist caught it ("CLAIM … without showing any rerigging or second line") but tagged it
+`[MINOR]`, and the 2026-09-25 re-tell gate (MAJOR/CRITICAL only) filtered it out, so it rode into the
+pages. The arc-informed text audit filed it again (`FAULT[INFERRED]` p14); the repair (claude-opus)
+closed it by inventing a second rope end the geometry did not allow ("das zweite Seilende"). Nothing
+reads a repair for logic (the diff pass is grammar-only since 2026-09-23; the re-audit stays deleted,
+2026-09-03).
+
+**Decision (owner, 2026-09-26):**
+1. `ARC_SEVERITY_DEF` (promptBuilders.js, the one scale of the critique and the panel) lists "an action
+   at the turn or the climax that could not happen as the arc states it" among the faults that are
+   always at least MAJOR, so it reaches the re-telling. Its generator half is the existing
+   `ARC_SENSE_RULE` ("that could not happen"). The gate itself is unchanged.
+2. `MECHANISM_FIX_RULE`, filled as `{MECHANISM_FIX}` into text-refine.txt (so the repair, its
+   repetition_fix / length_fix rounds and the book-audit round): a fault about how something
+   physically works is fixed only with the objects, parts, positions and abilities the pages already
+   establish; otherwise the page stays and the ledger closes the fault on an `ARC FAULT: p<N>: …`
+   line. `parseArcFaultLines` (textRefine.js) reads that fixed marker into the round's `arcFaults`
+   and logs a WARN — a marker the prompt asks for, never an interpretation of prose.
+
+**Not done:** a logic re-read of the repair's output (would partially reverse the 2026-09-03 re-audit
+deletion); the owner declined "payoff on the same object".
+
+**Validation:** Lab `arc_panel_replay` on the stored Fiona committed arc — see the next entries' Lab ids
+in the commit report; the refine rule is not validated live (no stored stage replays one finding).
+
+**Touched:** server/lib/promptBuilders.js, server/lib/textRefine.js, prompts/text-refine.txt,
+tests/unit/text-stakes-impossible-oneliners.test.ts, docs/prompt-inventory.md.
+**Status:** ✅ active on staging.
+
+## 2026-09-26 — The arc critic checks the stakes rules the creator is given: an opposition that yields, a question left open
+
+**Context:** same story. RULES OF THE LOGIC told the creator and the re-teller "the opposition … does
+not yield on request" and "every question raised is answered", and no critic checked either: the
+critique's only opposition fault was one that "only waits and never acts", and no panel lens read
+them. The creator gave its opponent a limit ("will not take a thing from a visitor by force") that
+licensed an early scene and then emptied the turn — he demands, is refused, yields — and the ending
+left open who keeps the coins.
+
+**Decision (owner, 2026-09-26):** two constants, one list — `arcStakesRules(inputData)` returns
+`ARC_OPPOSITION_HOLDS_RULE` ("never gives way just because it is asked, and no limit the story logic
+gives it takes away its power at the turning point"; off the simple bands, whose telling rules forbid
+anyone standing in the way) and `ARC_QUESTIONS_ANSWERED_RULE` ("every question the story raises is
+answered by its end, including who keeps what was sought, won or fought over"). The same strings are
+stated to the creator and re-teller (`buildTellingRulesSection`), checked by their critique
+(`arcCritiqueSpec`, a third fault family "a break of one of these rules", now band-aware through
+`inputData`) and by the panel (new STAKES lens, `{ARC_STAKES_RULES}`). The generator wording was
+tightened to what the critic checks (the limit clause and "who keeps").
+
+**Touched:** server/lib/promptBuilders.js, prompts/arc-panel.txt, scripts/admin/sibling-registry.json
+(`arc-generator-vs-critic`), tests/unit/text-stakes-impossible-oneliners.test.ts,
+docs/prompt-inventory.md.
+**Status:** ✅ active on staging.
+
+## 2026-09-26 — One-sentence narration paragraphs are counted in code and handed to the repair as STYLE findings
+
+**Context:** `STYLE_RULEBOOK` bans "a one-sentence paragraph for drama" and the writer breaks it anyway;
+the rulebook reaches a page only where the writer honours it or an audit files the page (open item of
+the 2026-09-23 rulebook entry). Stored writer texts: Fiona 9, "Das Ei in den Wurzeln"
+(job_1790277448294_5herh01j7) 6, "Vier Freunde und das Drachenei" (job_1790373080139_vnx5l8iy7) 3;
+shipped: 5, 2 and 4.
+
+**Decision (owner, 2026-09-26):** `findOneSentenceParagraphs` (textRefine.js, $0, no model): a paragraph
+of exactly one sentence (`pageSentences`, the counter's own splitter) carrying no quotation mark, on a
+page of more than one paragraph. A spoken line standing alone is dialogue and is not counted; a
+one-paragraph page is the reading level's shape. `buildOneSentenceParagraphFindings` turns each hit into
+a `FAULT[STYLE]: p<N> — «<sentence>» …` line, merged as a fourth finding source (`style-counter`) before
+the one repair pass, which closes a STYLE finding by recasting or joining that one sentence. The count
+runs again on the shipped text (`oneSentenceParagraphs.shipped`, WARN per hit), no further pass.
+`mergeAuditFindings` folds two STYLE findings only when they quote the same sentence (`sameFault`):
+folding on the tag alone would drop a counter hit under a blind finding about another sentence.
+
+**Evidence (rung 1, free):** the counter over the three stored stories' writer and shipped texts —
+every hit is narration; the 53 single-sentence paragraphs that carry a spoken line (writer + shipped) were all excluded — no false hit on dialogue.
+
+**Touched:** server/lib/textRefine.js, scripts/admin/sibling-registry.json
+(`text-audit-sighted-vs-blind`), tests/unit/text-stakes-impossible-oneliners.test.ts,
+docs/prompt-inventory.md.
 **Status:** ✅ active on staging.

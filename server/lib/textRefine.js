@@ -140,6 +140,32 @@ function wordOverlap(a, b) {
  */
 const DUPLICATE_OVERLAP = 0.4;
 
+/** The sentence a STYLE finding quotes, «…», normalised; '' when it quotes none. */
+function styleQuote(text) {
+  const m = String(text || '').match(/«([^»]+)»/);
+  return m ? m[1].toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim() : '';
+}
+
+/**
+ * Two findings on one page from different sources name the same fault.
+ *
+ * STYLE is the exception to "same category = same fault" (2026-09-26): a STYLE
+ * finding is ONE SENTENCE (the blind audit files one per sentence, and the
+ * one-sentence-paragraph counter does the same), so two STYLE findings are one
+ * fault only when they quote the same sentence. Folding on the tag alone would
+ * drop the counter's p15 finding under a blind finding about another p15
+ * sentence, and the repair would never see it.
+ */
+function sameFault(k, f) {
+  if (k.category === 'STYLE' && f.category === 'STYLE') {
+    const a = styleQuote(k.text);
+    const b = styleQuote(f.text);
+    if (a && b) return a === b;
+    return wordOverlap(k.text, f.text) >= DUPLICATE_OVERLAP;
+  }
+  return k.category === f.category || wordOverlap(k.text, f.text) >= DUPLICATE_OVERLAP;
+}
+
 /**
  * Merge the audits' fault lists into the single list the repair pass answers.
  *
@@ -163,7 +189,7 @@ function mergeAuditFindings(lists = []) {
         k.pageNumber != null && f.pageNumber != null &&
         k.pageNumber === f.pageNumber &&
         !k.sources.includes(source) &&
-        (k.category === f.category || wordOverlap(k.text, f.text) >= DUPLICATE_OVERLAP)
+        sameFault(k, f)
       );
       if (twin) {
         if (!twin.sources.includes(source)) twin.sources.push(source);
@@ -524,6 +550,73 @@ function buildWordBudgetFindings(pages = [], languageLevel) {
     }
   }
   return lines.join('\n');
+}
+
+/**
+ * ONE-SENTENCE NARRATION PARAGRAPHS, counted in code (owner, 2026-09-26).
+ *
+ * STYLE_RULEBOOK bans "a one-sentence paragraph for drama", and the writer
+ * breaks it anyway: staging job_1790446348343_z3fw660ie shipped three (p9, p15,
+ * p16), the dragon runs job_1790277448294_5herh01j7 and
+ * job_1790373080139_vnx5l8iy7 four more. The blind audit files one now and
+ * then; the rest reach a page only if something else makes it rewritable. So
+ * the count is code's, like the word budget and the repetition check: no
+ * model reads meaning here, only paragraph and sentence boundaries
+ * (pageSentences, the counter's own splitter).
+ *
+ * What counts: a paragraph of exactly one sentence that carries no quotation
+ * mark, on a page of more than one paragraph. A spoken line standing alone is
+ * dialogue, which the rule does not govern; a page that is a single sentence
+ * is the reading level's shape, not a set-piece.
+ *
+ * @param {Array<{pageNumber:number,text:string}>} pages
+ * @returns {Array<{pageNumber:number, sentence:string}>}
+ */
+const DIALOGUE_MARK_RE = /[«»‹›„“”"]/;
+function findOneSentenceParagraphs(pages = []) {
+  const { pageSentences } = require('./promptBuilders');
+  const hits = [];
+  for (const p of pages) {
+    const sentences = pageSentences(p.text);
+    const byParagraph = new Map();
+    for (const s of sentences) byParagraph.set(s.paragraph, [...(byParagraph.get(s.paragraph) || []), s]);
+    if (byParagraph.size < 2) continue;
+    for (const list of byParagraph.values()) {
+      if (list.length === 1 && !DIALOGUE_MARK_RE.test(list[0].text)) {
+        hits.push({ pageNumber: p.pageNumber, sentence: list[0].text });
+      }
+    }
+  }
+  return hits;
+}
+
+/**
+ * The hits as STYLE findings, one per sentence, in the blind audit's STYLE
+ * shape, so the repair closes each the way text-refine.txt closes a STYLE
+ * finding: that sentence recast or joined into the one beside it.
+ * @returns {string} newline-joined FAULT[STYLE] lines ('' when none)
+ */
+function buildOneSentenceParagraphFindings(pages = []) {
+  return findOneSentenceParagraphs(pages)
+    .map(h => `FAULT[STYLE]: p${h.pageNumber} — «${h.sentence}» stands alone as a one-sentence paragraph; join it into the paragraph beside it.`)
+    .join('\n');
+}
+
+/**
+ * The repair's "ARC FAULT: p<N>: …" ledger lines (MECHANISM_FIX_RULE,
+ * promptBuilders.js): a mechanism the pages cannot make work, left standing
+ * as the arc's fault instead of closed with invented hardware. A fixed marker
+ * the prompt asks for, read verbatim; nothing here interprets meaning.
+ * @param {string} analysis
+ * @returns {string[]}
+ */
+function parseArcFaultLines(analysis) {
+  const out = [];
+  for (const raw of String(analysis || '').split('\n')) {
+    const m = raw.trim().replace(/^[-*]\s*/, '').replace(/^\*\*(ARC FAULT:)\*\*/i, '$1').match(/^ARC FAULT:\s*(.+)$/i);
+    if (m) out.push(m[1].trim());
+  }
+  return out;
 }
 
 // ─────────────── LECTOR: FINDINGS PARSED, CORRECTIONS APPLIED IN CODE ──────────
@@ -959,6 +1052,8 @@ async function runPostAuditTextRound(storyData, pages, textFaults = [], opts = {
     if (outOfScopePages.length) {
       log.warn(`⚠️ [TEXT-POST-AUDIT] the pass returned page(s) ${outOfScopePages.join(', ')} that no TEXT fault names — dropped, their pictures are final`);
     }
+    const arcFaults = parseArcFaultLines(parsed.analysis);
+    for (const a of arcFaults) log.warn(`⚠️ [TEXT-POST-AUDIT] ARC FAULT left standing (a mechanism the pages cannot make work): ${a}`);
     const elapsedMs = Date.now() - t0;
     log.info(`📖✍️  [TEXT-POST-AUDIT] ${model}: ${lines.length} TEXT fault(s) on page(s) ${scope.join(', ')} → rewrote page(s) ${changedPages.join(', ') || 'none'} in ${(elapsedMs / 1000).toFixed(0)}s`);
     const beforeByPage = new Map(pages.map(p => [p.pageNumber, p.text]));
@@ -977,6 +1072,7 @@ async function runPostAuditTextRound(storyData, pages, textFaults = [], opts = {
         returnedPages,
         outOfScopePages,
         changedPages,
+        arcFaults,
         findingOutcomes,
         unresolvedCount: unresolvedFindings(findingOutcomes).length,
         prompt,
@@ -1124,6 +1220,9 @@ async function refineStoryText(storyData, pages, opts = {}) {
   let lectorPromptSent = '';
   let repetition = null;
   let wordBudget = null;
+  // { writer: [{pageNumber, sentence}], shipped: [...] | null } — see
+  // findOneSentenceParagraphs.
+  let oneSentenceParagraphs = null;
 
   // PUBLISH AS WE GO (2026-08-24). This function used to return all-or-nothing,
   // and its caller races it against a join deadline — so finished audits and a
@@ -1153,6 +1252,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     diffDropped: diffDropped.slice(),
     repetition,
     wordBudget,
+    oneSentenceParagraphs,
     partial: true,
     // IN FLIGHT (2026-09-14). Whether a model step is RUNNING right now.
     // `beginStep()` publishes the state so far with this set; the publish()
@@ -1282,9 +1382,18 @@ async function refineStoryText(storyData, pages, opts = {}) {
   if (counterRaw) {
     log.info(`🔢 [TEXT-COUNTER] ${counterRaw.split('\n').length} page(s) outside the '${storyData?.languageLevel || 'standard'}' word budget`);
   }
+  // THE ONE-SENTENCE COUNTER — a fourth finding source, free, on the writer's
+  // text; its STYLE lines fold only into a blind STYLE finding that quotes the
+  // same sentence (sameFault). Counted again on the shipped text below.
+  const oneSentenceRaw = buildOneSentenceParagraphFindings(current);
+  oneSentenceParagraphs = { writer: findOneSentenceParagraphs(current), shipped: null };
+  if (oneSentenceRaw) {
+    log.info(`🔢 [TEXT-COUNTER] ${oneSentenceParagraphs.writer.length} one-sentence narration paragraph(s) on page(s) ${[...new Set(oneSentenceParagraphs.writer.map(h => h.pageNumber))].join(', ')} — STYLE findings for the repair`);
+  }
   const merged = mergeAuditFindings([
     ...audits.filter(a => a.ok).map(a => ({ source: a.source, raw: a.raw })),
     ...(counterRaw ? [{ source: 'counter', raw: counterRaw }] : []),
+    ...(oneSentenceRaw ? [{ source: 'style-counter', raw: oneSentenceRaw }] : []),
   ]);
   mergedFindings = merged.findings;
   mergeStats = { bySource: merged.bySource, duplicates: merged.duplicates.length };
@@ -1352,6 +1461,8 @@ async function refineStoryText(storyData, pages, opts = {}) {
     if (changedUnasked.length) {
       log.info(`✏️ [TEXT-REPAIR/${kind}] also rewrote page(s) ${changedUnasked.join(', ')}, which no finding named`);
     }
+    const arcFaults = parseArcFaultLines(parsed.analysis);
+    for (const a of arcFaults) log.warn(`⚠️ [TEXT-REPAIR/${kind}] ARC FAULT left standing (a mechanism the pages cannot make work): ${a}`);
     return {
       next,
       entry: {
@@ -1378,6 +1489,8 @@ async function refineStoryText(storyData, pages, opts = {}) {
         // The two diff-checked halves of this pass's own report (above).
         returnedIdentical,
         changedUnasked,
+        // Mechanism faults the pass left standing as the arc's (MECHANISM_FIX_RULE).
+        arcFaults,
         // WHAT THIS ROUND APPLIED, in ITS unit.
         //
         // The whole-page passes (repair / repetition_fix / length_fix) rewrite
@@ -1818,6 +1931,15 @@ async function refineStoryText(storyData, pages, opts = {}) {
       log.warn(`⚠️ [TEXT-COUNTER] SHIPS OUTSIDE the budget after the diff and the lector: ${line}`);
     }
   }
+  // The one-sentence count on the text that ships: a paragraph the repair
+  // kept, or the lector or the diff re-created, is visible here. Measured
+  // only, no further pass.
+  if (oneSentenceParagraphs) {
+    oneSentenceParagraphs.shipped = findOneSentenceParagraphs(current);
+    for (const h of oneSentenceParagraphs.shipped) {
+      log.warn(`⚠️ [TEXT-COUNTER] SHIPS a one-sentence narration paragraph on p${h.pageNumber}: «${h.sentence}»`);
+    }
+  }
 
   const changed = current
     .map((p, idx) => (p.text !== original[idx].text ? p.pageNumber : null))
@@ -1846,7 +1968,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     audits, mergedFindings, mergeStats, findingLedger,
     proofread, lectorFindings, lectorApplied, lectorDropped,
     diffReview, diffFindings, diffApplied, diffDropped,
-    repetition, wordBudget,
+    repetition, wordBudget, oneSentenceParagraphs,
     partial: false,
   };
 }
@@ -2079,6 +2201,7 @@ function projectTextRefineReport(usable, beforeByPage = new Map()) {
       unparsedCount: r.unparsedCount ?? null,
       unparsedLines: r.unparsedLines || [],
       droppedFindings: r.droppedFindings || [],
+      arcFaults: r.arcFaults || [],
       findingOutcomes: (r.findingOutcomes || []).map(f => ({
         pageNumber: f.pageNumber, category: f.category, sources: f.sources || [],
         text: f.text, outcome: f.outcome, reason: f.reason || null,
@@ -2137,6 +2260,7 @@ function projectTextRefineReport(usable, beforeByPage = new Map()) {
     // a second implementation of unresolvedFindings.
     unresolvedCount: unresolvedFindings(usable.findingLedger || []).length,
     wordBudget: usable.wordBudget || null,
+    oneSentenceParagraphs: usable.oneSentenceParagraphs || null,
     proofread: usable.proofread || '',
     lectorFindings: (usable.lectorFindings || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
     lectorApplied: (usable.lectorApplied || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
@@ -2205,4 +2329,7 @@ module.exports = {
   isTotalTextAuditLoss,
   TEXT_REFINE_JOIN_BASE_MS,
   TEXT_REFINE_JOIN_PER_PAGE_MS,
+  findOneSentenceParagraphs,
+  buildOneSentenceParagraphFindings,
+  parseArcFaultLines,
 };
