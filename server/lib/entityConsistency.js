@@ -26,6 +26,7 @@ const r2 = require('./r2');
 const geminiPad = require('./geminiPad');
 const { canonicalName } = require('./castResolver');
 const { ENTITY_CHECK_TYPES, isEntityCheckType } = require('./evalBuckets');
+const { baseVbId } = require('./vbIdGuard');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -1137,23 +1138,10 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             : [];
           const gridLabel = `${charName} (${clothingCategory})`;
 
-          // Split crops into batches for multiple 3x3 grids (8 crops + 1 ref per grid)
-          const maxCrops = MAX_APPEARANCE_CELLS;
-          const numGrids = Math.ceil(crops.length / maxCrops);
-          const batches = [];
-          if (numGrids <= 1) {
-            batches.push(crops);
-          } else {
-            // Balance crops evenly across grids (e.g., 10 → 5+5, not 8+2)
-            const baseSize = Math.floor(crops.length / numGrids);
-            const remainder = crops.length % numGrids;
-            let offset = 0;
-            for (let g = 0; g < numGrids; g++) {
-              const size = baseSize + (g < remainder ? 1 : 0);
-              batches.push(crops.slice(offset, offset + size));
-              offset += size;
-            }
-            log.info(`🔍 [ENTITY-CHECK] ${charName} (${clothingCategory}): ${crops.length} crops → ${numGrids} grids (${batches.map(b => b.length).join('+')})`);
+          // Split crops into batches of MAX_APPEARANCE_CELLS (+ the reference cell)
+          const batches = balancedCropBatches(crops);
+          if (batches.length > 1) {
+            log.info(`🔍 [ENTITY-CHECK] ${charName} (${clothingCategory}): ${crops.length} crops → ${batches.length} grids (${batches.map(b => b.length).join('+')})`);
           }
 
           // Create and evaluate each grid
@@ -1589,59 +1577,92 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             continue;
           }
 
-          // Create grid (no reference photo for objects)
-          const gridResult = await createEntityGrid(crops, objName, null);
-
-          // Store grid for dev panel
-          report.grids.push({
-            entityName: objName,
-            entityType: 'object',
-            gridImage: `data:image/jpeg;base64,${gridResult.buffer.toString('base64')}`,
-            manifest: gridResult.manifest,
-            cellCount: crops.length
-          });
-
-          // Save grid to disk if requested
-          if (saveGrids && outputDir) {
-            await saveEntityGrid(gridResult.buffer, objName, 'object', outputDir);
+          // THE SOURCE THE ILLUSTRATOR WAS GIVEN (standing rule 2026-09-26:
+          // every critic judges against the generator's source, uncut). The
+          // Visual Bible entry's reference image is cell R — the same
+          // `referenceImageUrl` the page generator loads — and its description
+          // and per-page state go in as text. Without them the grid compared
+          // crops only with each other: a prop drawn wrong on every page read
+          // as consistent.
+          const vbSource = objectVbSource(storyData.visualBible, appearances);
+          if (!vbSource.entry) {
+            log.warn(`⚠️  [ENTITY-CHECK] object "${objName}" matches no Visual Bible entry — judged without a reference image or description`);
           }
 
-          // Evaluate consistency
-          const evalResult = await evaluateEntityConsistency(
-            gridResult.buffer,
-            gridResult.manifest,
-            {
-              entityType: 'object',
-              entityName: objName,
-              referencePhoto: null,
-              cellCount: crops.length
-            }
-          );
+          // Every crop is judged: MAX_APPEARANCE_CELLS per grid plus cell R,
+          // as many grids as it takes (was one grid, cells past 9 dropped).
+          const sortedCrops = [...crops].sort((a, b) => a.pageNumber - b.pageNumber);
+          const batches = balancedCropBatches(sortedCrops);
+          if (batches.length > 1) {
+            log.info(`🔍 [ENTITY-CHECK] object ${objName}: ${crops.length} crops → ${batches.length} grids (${batches.map(b => b.length).join('+')})`);
+          }
 
-          // Store result
+          const batchResults = [];
+          for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
+            const batchCrops = batches[batchIdx];
+            const batchLabel = batches.length > 1 ? `${objName} (${batchIdx + 1}/${batches.length})` : objName;
+            const gridResult = await createEntityGrid(batchCrops, batchLabel, vbSource.referenceImageUrl);
+
+            // Store grid for dev panel
+            report.grids.push({
+              entityName: objName,
+              entityType: 'object',
+              gridImage: `data:image/jpeg;base64,${gridResult.buffer.toString('base64')}`,
+              manifest: gridResult.manifest,
+              cellCount: batchCrops.length
+            });
+
+            if (saveGrids && outputDir) {
+              await saveEntityGrid(gridResult.buffer, batchLabel, 'object', outputDir);
+            }
+
+            const evalResult = gridsOnly
+              ? { consistent: true, score: null, issues: [], summary: 'grids-only (no eval)' }
+              : await evaluateEntityConsistency(
+                gridResult.buffer,
+                gridResult.manifest,
+                {
+                  entityType: 'object',
+                  entityName: objName,
+                  referencePhoto: vbSource.referenceImageUrl,
+                  vbDescription: vbSource.description,
+                  cellStates: vbSource.statesByPage,
+                  cellCount: batchCrops.length
+                }
+              );
+            batchResults.push({ gridResult, evalResult });
+          }
+
+          const evals = batchResults.map(b => b.evalResult);
+          const scores = evals.filter(r => !r.evalFailed && typeof r.score === 'number').map(r => r.score);
+          const issues = evals.flatMap(r => r.issues || []);
           report.objects[objName] = {
-            gridImage: `data:image/jpeg;base64,${gridResult.buffer.toString('base64')}`,
-            consistent: evalResult.consistent,
-            score: evalResult.score,
-            issues: evalResult.issues || [],
-            summary: evalResult.summary,
-            // Include debug info for parse failures
+            // First grid only, as before; every grid is in report.grids.
+            gridImage: `data:image/jpeg;base64,${batchResults[0].gridResult.buffer.toString('base64')}`,
+            vbId: vbSource.entry?.id || null,
+            consistent: evals.every(r => !!r.consistent),
+            ...(evals.some(r => r.evalFailed) && { evalFailed: true }),
+            score: scores.length ? Math.min(...scores) : (gridsOnly ? null : 0),
+            issues,
+            summary: evals.map(r => r.summary).filter(Boolean).join(' | '),
             // O7: raw output persisted for successful evals too (was error-only)
-          ...(evalResult.rawResponse && { rawResponse: evalResult.rawResponse }),
-          ...(evalResult.parseError && { parseError: true })
+            ...(evals.some(r => r.rawResponse) && { rawResponse: evals.map(r => r.rawResponse).filter(Boolean).join('\n---\n') }),
+            ...(evals.some(r => r.parseError) && { parseError: true })
           };
 
           // Aggregate
-          if (!evalResult.consistent) {
+          if (!report.objects[objName].consistent) {
             report.overallConsistent = false;
           }
-          report.totalIssues += evalResult.issues?.length || 0;
+          report.totalIssues += issues.length;
 
           // Track token usage
-          if (evalResult.usage) {
-            report.tokenUsage.inputTokens += evalResult.usage.promptTokenCount || 0;
-            report.tokenUsage.outputTokens += evalResult.usage.candidatesTokenCount || 0;
-            report.tokenUsage.calls++;
+          for (const r of evals) {
+            if (r.usage) {
+              report.tokenUsage.inputTokens += r.usage.promptTokenCount || 0;
+              report.tokenUsage.outputTokens += r.usage.candidatesTokenCount || 0;
+              report.tokenUsage.calls++;
+            }
           }
 
         } catch (err) {
@@ -2330,6 +2351,11 @@ function collectObjectAppearances(sceneImages, visualBible = null) {
         label: obj.label,
         rawLabel: rawName,
         canonicalId: canonical?.id || null,
+        // The dotted state handle this page's brief cites for the entry
+        // ("ART001.2"), so the judge is told which look the page was given.
+        citedHandle: canonical?.id
+          ? ((bboxDetection.expectedObjects || []).find(h => baseVbId(h) === canonical.id) || null)
+          : null,
         confidence: match?.confidence || 0.7,
         isObject: true  // Mark as object for 15% padding in crop extraction
       });
@@ -2602,6 +2628,59 @@ async function extractCropFromImage(imageData, bbox, targetSize, padding = 0, op
 }
 
 /**
+ * Split crops into grids of at most `size` appearance cells, balanced so no
+ * grid is a near-empty tail (10 → 5+5, 11 → 4+4+3). Every crop lands in a
+ * grid — the character and object checks both batch through here.
+ */
+function balancedCropBatches(crops, size = MAX_APPEARANCE_CELLS) {
+  const numGrids = Math.ceil(crops.length / size);
+  if (numGrids <= 1) return [crops];
+  const baseSize = Math.floor(crops.length / numGrids);
+  const remainder = crops.length % numGrids;
+  const batches = [];
+  let offset = 0;
+  for (let g = 0; g < numGrids; g++) {
+    const n = baseSize + (g < remainder ? 1 : 0);
+    batches.push(crops.slice(offset, offset + n));
+    offset += n;
+  }
+  return batches;
+}
+
+const OBJECT_VB_POOLS = ['animals', 'artifacts', 'vehicles', 'secondaryCharacters'];
+
+/**
+ * What the illustrator was given for a checked object: its Visual Bible entry,
+ * the entry's reference image (the `referenceImageUrl` the page generator
+ * loads — loadVbReferenceBytes), the description the page prompts carry
+ * (`extractedDescription || description`) and, per page, the state the page's
+ * brief cites. The entry is the one collectObjectAppearances canonicalised
+ * the detections to (by id — no second name matcher here, SETTLED 2026-09-13).
+ *
+ * @returns {{entry: Object|null, referenceImageUrl: string|null, description: string, statesByPage: Object<number,string>}}
+ */
+function objectVbSource(visualBible, appearances = []) {
+  const entries = OBJECT_VB_POOLS.flatMap(k => (Array.isArray(visualBible?.[k]) ? visualBible[k] : [])).filter(Boolean);
+  const ids = new Set(appearances.map(a => a.canonicalId).filter(Boolean));
+  const entry = entries.find(e => e.id && ids.has(e.id)) || null;
+  if (!entry) return { entry: null, referenceImageUrl: null, description: '', statesByPage: {} };
+  const { resolveObjectState, objectStates } = require('./visualBible');
+  const statesByPage = {};
+  if (objectStates(entry).length > 0) {
+    for (const a of appearances) {
+      const { state } = resolveObjectState(entry, a.citedHandle || null, a.pageNumber, null, { silent: true, visualBible });
+      if (state) statesByPage[a.pageNumber] = [state.name, state.delta].filter(Boolean).join(': ');
+    }
+  }
+  return {
+    entry,
+    referenceImageUrl: entry.referenceImageUrl || null,
+    description: String(entry.extractedDescription || entry.description || '').trim(),
+    statesByPage,
+  };
+}
+
+/**
  * Create an entity grid image from appearance crops
  *
  * @param {Array<object>} crops - Array of crop objects
@@ -2615,6 +2694,11 @@ async function createEntityGrid(crops, entityName, referencePhoto = null) {
 
   // Limit to max grid cells (leave 1 slot for reference if available)
   const maxCrops = referencePhoto ? MAX_GRID_CELLS - 1 : MAX_GRID_CELLS;
+  // Callers batch through balancedCropBatches, so this never cuts. If one
+  // ever passes more, the cells past the grid are NOT judged — say so.
+  if (sortedCrops.length > maxCrops) {
+    log.error(`❌ [ENTITY-GRID] ${entityName}: ${sortedCrops.length} crops for a ${maxCrops}-cell grid — pages ${sortedCrops.slice(maxCrops).map(c => c.pageNumber).join(', ')} are NOT judged (batch with balancedCropBatches)`);
+  }
   const cropsToUse = sortedCrops.slice(0, maxCrops);
 
   // Build cells array
@@ -2687,6 +2771,9 @@ async function createEntityGrid(crops, entityName, referencePhoto = null) {
  */
 async function createEntityHeadGrid(crops, entityName, referencePhoto = null) {
   const sortedCrops = [...crops].sort((a, b) => a.pageNumber - b.pageNumber);
+  if (sortedCrops.length > MAX_APPEARANCE_CELLS) {
+    log.error(`❌ [ENTITY-GRID] ${entityName}: ${sortedCrops.length} crops for a ${MAX_APPEARANCE_CELLS}-cell head grid — pages ${sortedCrops.slice(MAX_APPEARANCE_CELLS).map(c => c.pageNumber).join(', ')} are NOT judged (batch with balancedCropBatches)`);
+  }
   const cropsToUse = sortedCrops.slice(0, MAX_APPEARANCE_CELLS);
   const cells = [];
 
@@ -2775,7 +2862,9 @@ function entityIssueTypesForPrompt() {
 
 async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headGridBuffer = null) {
   const { entityType, entityName, referencePhoto, cellCount, clothingCategory, expectedClothing,
-          removedGarments = [], primaryIsHeadGrid = false, focus = null } = entityInfo;
+          removedGarments = [], primaryIsHeadGrid = false, focus = null,
+          vbDescription = '', cellStates = {} } = entityInfo;
+  const isObject = entityType === 'object';
 
   // Build prompt from template
   const promptTemplate = PROMPT_TEMPLATES.entityConsistencyCheck;
@@ -2800,6 +2889,17 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headG
   // "standard" and having it score the crop against an outfit from another
   // story. 'unknown' is inert: the prompt has no expectations attached to it.
   const cellInfo = manifest.cells.map(cell => {
+    // An object has no wardrobe: its cells carry the Visual Bible state the
+    // page was given instead (when the entry has states).
+    if (isObject) {
+      const state = cell.isReference ? null : cellStates[cell.pageNumber];
+      return {
+        cell: cell.letter,
+        page: cell.isReference ? 'Visual Bible reference' : cell.pageNumber,
+        ...(state && { state }),
+        cropType: cell.cropType || 'body',
+      };
+    }
     const clothing = cell.clothing || clothingCategory;
     if (!clothing && !cell.isReference) {
       log.error(`❌ [ENTITY-GRID] cell ${cell.letter} (page ${cell.pageNumber}) has no clothing category — sending 'unknown' rather than defaulting to 'standard'.`);
@@ -2812,8 +2912,19 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headG
     };
   });
 
-  // Build reference photo info
-  const refPhotoInfo = !referencePhoto
+  // Build reference photo info. An object's reference is its Visual Bible
+  // entry: the image and the description the illustrator was given.
+  const refPhotoInfo = isObject
+    ? [
+      referencePhoto
+        ? 'Cell R is the Visual Bible reference image of this object — the image the illustrator was given for it.'
+        : 'No reference image: the illustrator was given only the description below.',
+      vbDescription ? `**Visual Bible description (given to the illustrator):** ${vbDescription}` : '',
+      Object.keys(cellStates).length > 0
+        ? 'The object has more than one state in the story; each cell\'s "state" is the one its page was given.'
+        : '',
+    ].filter(Boolean).join('\n')
+    : !referencePhoto
     ? 'No reference photo available.'
     : primaryIsHeadGrid
       ? 'A reference of this character is provided as cell R in both images: the reference FACE in the first image, the full reference sheet in the second.'
@@ -3705,6 +3816,8 @@ module.exports = {
   extractEntityCrops,
   extractCropFromImage,
   createEntityGrid,
+  balancedCropBatches,
+  objectVbSource,
   createEntityHeadGrid,
   evaluateEntityConsistency,
   entityIssueTypesForPrompt,

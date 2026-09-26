@@ -22,6 +22,7 @@ Each entry contains:
 - "cell": The letter label (A, B, C, etc.)
 - "page": Story page number this crop came from
 - "clothing": Expected clothing for this page (if applicable)
+- "state": For an object, the Visual Bible state its page was given (if the object has more than one)
 - "cropType": "face" (256px face crop) or "body" (512px full body crop)
 
 ## Your Task

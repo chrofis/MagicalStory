@@ -271,6 +271,73 @@ return to advisory.
 tests/unit/plan-replan-ranking.test.ts
 **Status:** ✅ active (staging)
 
+## 2026-09-26 — Critic inputs, round two: plan check and arc-informed text audit read CHARACTER DETAILS; the object entity grid reads its Visual Bible entry
+
+**Context.** Three of the "Not built — owner decisions" items in the entry above, approved by the owner
+2026-09-26 under the same standing rule. Before building, what each generator actually gets was checked
+in the builders: the planner (`buildBeatsPrompt`) and the text writer (`buildStoryTextFromBeatsPrompt`)
+both read CHARACTER DETAILS; **neither reads STORY LOGIC** — only arc-hints.txt does (`{STORY_LOGIC}`),
+and the planner gets the FINAL ARC and the hints derived from the logic. The object entity check is
+**off at every call site** (`checkObjects: false` in repairPipeline.js ×3 and testlab.js) and its input
+does not exist on current stories: DINO object grounding is gated off since 2026-08-10
+(figureDetection.js, `GDINO_GROUND_OBJECTS`), so stored detections carry `objects: []` on every page
+drawn since then (Fiona `job_1789207854566_l43qgl34w`: 1 of 16 pages has object boxes, a pre-DINO one).
+
+**Decision.**
+1. **Plan check** (plan-check.txt, `buildPlanCheckPrompt`): a `# CHARACTER DETAILS` section with the
+   planner's own block and its arc-master source rule (`characterSourceRule({ master: 'arc' })`). The
+   block comes from ONE function, `storyCharacterDetails` (promptBuilders.js), which
+   `buildStoryContextFields` now calls too, so critic and generator cannot read different text.
+2. **Arc-informed text audit** (story-text-audit.txt, `buildTextAuditPrompt`): the writer's block,
+   headed by the writer's own use statement — `CHARACTER_DETAILS_USE`, one constant now filled into
+   both story-text-from-beats.txt and story-text-audit.txt (the writer's heading renders byte-identical).
+   The intro names the details as a source that, like the arc, is never evidence a page works. The
+   **blind audit stays blind** (by design, entry 2026-09-03); the lector and the grammar check judge
+   language, not the source, and get nothing new.
+3. **STORY LOGIC for the plan check: NOT built.** The approval's premise was that the planner gets it;
+   it does not. Giving the checker a source the planner never saw would let it fault a division for
+   ignoring text the planner was not given — the inverse of the rule. Owner decision if wanted: give
+   it to BOTH (planner and checker), or to neither.
+4. **Object entity grid** (entityConsistency.js): cell R is the Visual Bible entry's reference image
+   (the `referenceImageUrl` the page generator loads — `loadVbReferenceBytes`), the entry's description
+   (`extractedDescription || description`, what the page prompts carry) and each cell's state (the
+   dotted handle the page's brief cites, resolved by `resolveObjectState`) go in as labelled text; an
+   object cell no longer carries a meaningless `clothing: "unknown"` (and its error log). Every crop is
+   judged: `balancedCropBatches` (shared with the character path) makes grids of 5 + R, where the
+   object path used to build ONE grid and `createEntityGrid` silently dropped cells past 9
+   (`slice(0, maxCrops)`). Both grid builders now log an ERROR naming the unjudged pages if a caller
+   ever passes more cells than fit. The entry is found by the id `collectObjectAppearances`
+   canonicalised to — no second name matcher (SETTLED 2026-09-13).
+No type, severity, threshold or question changed.
+
+**Validation.**
+- Rung 1 (free), stored staging stories `job_1790446348343_z3fw660ie` and `job_1790277448294_5herh01j7`:
+  the block `storyCharacterDetails` builds is byte-identical to the one in each stored PLANNER prompt
+  and in each stored writer prompt, and was absent from both stored plan-check prompts. The plan check
+  rebuilt with the real builder on the stored inputs carries it, no placeholder survives, and the
+  template tail is intact. Size: plan check +972 / +2,399 chars (≈ +243 / +600 tokens, +4.6% / +13.8%);
+  text audit +668 / +2,095 chars.
+- Plan check replay (gpt-5.6-luna-pro, stored prompt vs stored prompt + block, $0.16 incl. a second
+  "before" run as a noise probe): z3fw 16 → 18 findings (second before: 15), 5herh 10 → 11 (second
+  before: 14). Every question that moved between arms also moved between the two before runs; no
+  finding in either after reply cites a trait, age, strength, flaw or special detail. Cost per call
+  +≈$0.0001. Read: no measurable change in what it faults on these two plans.
+- Object replay (gemini-2.5-flash, origin/staging module vs this branch, ~$0.002): the only stored
+  object boxes are Fiona `job_1789207854566_l43qgl34w` p11. After: the chest grid carries cell R (the
+  VB reference — pixels checked: same iron-strapped chest, consistent in both arms, correct), the
+  lantern (no VB reference image) gets its description only; verdicts unchanged. The multi-page chest,
+  chart and prop cases the owner named cannot be replayed on any current story because no object boxes
+  exist; the batching is unit-pinned instead.
+
+**Touched:** server/lib/promptBuilders.js, server/lib/entityConsistency.js, prompts/plan-check.txt,
+prompts/story-text-audit.txt, prompts/story-text-from-beats.txt, prompts/entity-consistency-check.txt,
+tests/unit/critic-sees-generator-source.test.ts (new), docs/prompt-inventory.md.
+**Status:** ✅ active on staging (plan check, text audit); 🟡 object grid built but its check stays OFF —
+turning it on needs object grounding back on (a DINO pass per expected object per page) plus
+`checkObjects: true`: owner decision.
+
+---
+
 ## 2026-09-26 — The whole-cast page is a counted plan-check question; every figure's EYES line carries the viewer rule; a garment element's description is that garment only
 
 **Context:** Staging job_1790446348343_z3fw660ie p16 shipped a posed group: plan line "the six stand

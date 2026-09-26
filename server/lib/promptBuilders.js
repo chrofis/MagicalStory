@@ -7250,13 +7250,15 @@ function buildTopicPromiseSection(guideText) {
   return promise ? `${TOPIC_PROMISE_HEADING}\n${promise}` : '';
 }
 
-function buildStoryContextFields(inputData) {
-  const language = inputData.language || 'en';
-  const brief = buildStoryBriefBody(inputData);
-  const characterSourceRuleText = characterSourceRule();
-
+/**
+ * The CHARACTER DETAILS block every story stage reads — the planner, the text
+ * writer, the arc stages, and the critics that judge their output (plan check,
+ * arc-informed text audit). One function, so a critic reads exactly what its
+ * generator was given.
+ */
+function storyCharacterDetails(inputData) {
   const mainIds = inputData.mainCharacters || [];
-  const characterDetails = (inputData.characters || []).map(char => {
+  return (inputData.characters || []).map(char => {
     const t = getTraits(char);
     const line = (label, v) => {
       const s = Array.isArray(v) ? v.filter(Boolean).join(', ') : v;
@@ -7273,6 +7275,13 @@ function buildStoryContextFields(inputData) {
       line('Special details', t.specialDetails),
     ].filter(Boolean).join('\n');
   }).join('\n\n') || '(no character details available)';
+}
+
+function buildStoryContextFields(inputData) {
+  const language = inputData.language || 'en';
+  const brief = buildStoryBriefBody(inputData);
+  const characterSourceRuleText = characterSourceRule();
+  const characterDetails = storyCharacterDetails(inputData);
 
   // The topic guide (historical event, educational subject, adventure setting).
   // The unified writer path has always had this (see the storyCategory branches
@@ -9595,6 +9604,10 @@ const MOTIVE_AT_THE_ACT_RULE = 'Where a character refuses, demands, flees, hides
  */
 const PAYOFF_KEEP_RULE = 'A sentence that shows something an earlier page set up doing its work, or a payoff the story names, is never deleted by a fix. Where a finding touches it, the fix rewrites around it and keeps what it shows.';
 
+// How the text writer is told to use CHARACTER DETAILS — its heading, and the
+// arc-informed audit's statement of what the writer was told (one string).
+const CHARACTER_DETAILS_USE = 'optional colour — use a trait where it fits a moment, never contradict one, never work through the list';
+
 /**
  * A mechanism is fixed with what the pages hold (owner, 2026-09-26). ONE
  * string for every whole-page text pass (text-refine.txt: the repair, its
@@ -10765,6 +10778,11 @@ ${castTableBlock(castTable)}`
       : '',
 
     ...buildStoryContextFields(inputData),
+    // CHARACTER DETAILS as the planner reads them (2026-09-26, the standing
+    // rule "every critic judges the source the generator was given"): the
+    // same block and the same arc-master source rule buildBeatsPrompt fills.
+    // CHARACTER_DETAILS rides in from buildStoryContextFields above.
+    CHARACTER_SOURCE_RULE: characterSourceRule({ master: 'arc' }),
     PAGE_COUNT: beats.length,
     // The plan line per page IS the division (2026-09-02); the block the
     // planner emitted is preferred, and the parsed pages stand in when a
@@ -11109,6 +11127,12 @@ function buildTextAuditPrompt(inputData, pages = [], arc = '', { arcHints = '' }
   return fillTemplate(template, {
     STORY_ARC: String(arc || '').trim() || '(no story was recorded — audit the pages alone)',
     ARC_HINTS: buildCriticArcHintsSection(arcHints),
+    // The CHARACTER DETAILS the writer wrote from (2026-09-26, standing rule
+    // "every critic judges the source the generator was given"): the same
+    // block and the same statement of how the writer was told to use it.
+    // The blind audit stays blind by design and does not get it.
+    CHARACTER_DETAILS: storyCharacterDetails(inputData),
+    CHARACTER_DETAILS_USE,
     PLAN_LINES: planLines || '(no page plan was recorded)',
     PULL_QUESTION: simpleBand
       ? 'skip this question — this book is built from self-contained moments, so a page that leaves nothing open is correct.'
@@ -11690,6 +11714,7 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     // Text stage: the full reading-level block, PACING rhythm included.
     READING_LEVEL: getReadingLevel(inputData.languageLevel),
     PARAGRAPH_SHAPE: paragraphShapeRule(),
+    CHARACTER_DETAILS_USE,
     PAGE_COUNT: beats.length,
     PLAN_LINES: blocks,
     TITLE_RULE: buildTitleRule(inputData),
@@ -12583,6 +12608,8 @@ module.exports = {
   parseTitleBlock,
   BRIEF_TRAILING_MARKERS,
   buildStoryContextFields,
+  storyCharacterDetails,
+  CHARACTER_DETAILS_USE,
   buildRelationshipLines,
   buildBeatsPrompt,
   buildChallengeIdeasSection,

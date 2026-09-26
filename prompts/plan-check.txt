@@ -8,6 +8,12 @@ Commissioned characters: {CHARACTER_NAMES}
 
 {ARC_HINTS}
 
+# CHARACTER DETAILS
+
+{CHARACTER_SOURCE_RULE}
+
+{CHARACTER_DETAILS}
+
 # THE PAGE PLAN
 
 One line per page: shot — who is in frame — the instant the picture shows — what is true after this page that was not before.
