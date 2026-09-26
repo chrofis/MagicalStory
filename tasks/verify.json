@@ -2249,7 +2249,8 @@
       "id": "cover-lettering-check",
       "title": "Covers briefed as pages are lettering-checked; a CRITICAL caption is painted out before a character repair; no page scored 100 is admitted as critical",
       "commits": [
-        "2a2dbb0b4"
+        "21f0067a5",
+        "6e3170843"
       ],
       "addedAt": "2026-09-26",
       "claim": "On the next staging full story: every full-story cover version carries letteringInventory (not null) whose declared list holds the cover's app string in appOverlay mode (magicalstory.ch on the back cover, the dedication on the opening page); a caption or other undeclared overlay on a cover is a CRITICAL rendered_text with source lettering-check; on a page or cover that carries both a CRITICAL rendered_text and an entity/identity CRITICAL, the repair round's decision reason says \"CRITICAL rendered_text goes first\" and the method is inpaint; no page has finalScore 100 with unrepairedCritical, and no repair round fails with \"inpaint had no instruction to send\" on a page whose consolidated list is empty; findings the landmark guard drops appear under semanticResult.suppressedIssues / suppressedIssues.",

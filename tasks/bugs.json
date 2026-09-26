@@ -2209,7 +2209,7 @@
       "impact": "A page scored 100 was repaired as critical and reported as shipping an unrepaired CRITICAL; the paid round did nothing. Any consolidator drop (landmark guard, not-a-defect drops) could do the same.",
       "status": "fixed",
       "fixedAt": "2026-09-26",
-      "fixedIn": "2a2dbb0b4",
+      "fixedIn": "21f0067a5",
       "fix": "(A) evaluateImageQuality runs landmarkProtection.guardLandmarkRecord on the semantic record and the final quality list at the merge point; dropped findings are kept as suppressedIssues (record, not deduction). (B) repairLogic.scoredFindingPools: a consolidated deduped_issues array, empty included, is the only list — the one scoring.applyScore charges; collectCriticalFindings, findSafeRepairableFinding and every decideRepairMethod gate read it, the inpaint count skips on an empty consolidated list, and the identity gate joins the figure id back from the raw finding. Tests: critical-check-reads-scored-list.test.ts, cover-lettering-check.test.ts (merge guard), critical-severity-agreement.test.ts."
     },
     {
@@ -2221,7 +2221,7 @@
       "impact": "Every full-story cover could ship a painted caption or stray lettering; the one on this run did.",
       "status": "fixed",
       "fixedAt": "2026-09-26",
-      "fixedIn": "",
+      "fixedIn": "6e3170843",
       "fix": "The lettering check runs on covers briefed as pages (evalOptions.coverIsPage from the pipeline record, the cover iterate, buildEvalInputs and the Lab/admin replay), excusing the REQUIRED TEXT items and, in appOverlay mode, the app's own string (resolveCoverTextContract appTexts: title / dedication / magicalstory.ch). A CRITICAL rendered_text takes the round ahead of an entity or identity char-fix (the figure repair runs next round). The cover beat carries no label; the page number is the identity, explained once in COVER_GAZE_EXCEPTION. Test: cover-lettering-check.test.ts."
     }
   ]
