@@ -901,12 +901,6 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
     textAreaMask: wantsTextZone ? getTextAreaMask(ctx.textPosition, ctx.languageLevel) : null,
     pageNumber: ctx.pageNumber,
     skipCache: true,
-    // RC5 arms (2026-09-25), landmark plates only; unset = production.
-    // plateExtensionPrefix: 'default' | 'structure_only' (magenta prefix drops
-    // the pixel-faithful clause). plateRefFit: 'pad' | 'crop' (centre-crop the
-    // photo to the page aspect; no pad, no prefix).
-    ...(params.plateExtensionPrefix ? { plateExtensionPrefix: params.plateExtensionPrefix } : {}),
-    ...(params.plateRefFit ? { plateRefFit: params.plateRefFit } : {}),
   });
   const elapsedMs = Date.now() - t0;
   if (!result?.imageData) throw new Error('Empty-scene generation returned no image');

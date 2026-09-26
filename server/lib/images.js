@@ -15,7 +15,7 @@ const { PROMPT_TEMPLATES, fillTemplate, guardPromptString, assertPromptFilled } 
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
 const { buildCastIndex, resolveEntity } = require('./castResolver');
 const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./runware');
-const { generateWithGrok, editWithGrok, isGrokConfigured, packReferences, cropToFrontColumn, MAX_MAGENTA_EXTENSION_PREFIX_LENGTH } = require('./grok');
+const { generateWithGrok, editWithGrok, isGrokConfigured, packReferences, cropToFrontColumn } = require('./grok');
 const { PromptFitError } = require('./promptFitError');
 const { MODEL_PRICING } = require('../config/models');
 const { getCurrentLogger } = require('./generationLogger');
@@ -1411,14 +1411,6 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
     maxRefSlots = null,                  // Test Lab only: raise packReferences/editWithGrok's
                                           // slot budget above the production default of 3
                                           // (xAI's edit cap is 5). null = production default.
-    // Test Lab only, landmark PLATE calls only (RC5, 2026-09-25): how the
-    // photo reaches Grok. plateExtensionPrefix picks the magenta-extension
-    // prefix variant ('default' = pixel-faithful centre; 'structure_only' =
-    // repaint the whole frame, the photo gives structure only). plateRefFit
-    // 'crop' centre-crops the photo to the page aspect instead of padding it,
-    // so no pad and no prefix reach Grok. Production keeps 'default' / 'pad'.
-    plateExtensionPrefix = 'default',
-    plateRefFit = 'pad',
     // Out-param: receives `compressedScene` when the prompt went over the
     // model's cap and shrinkPromptForModel LLM-compressed the scene prose.
     // Callers stamp it onto the page record so the batch eval judges the render
@@ -1435,28 +1427,22 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
   // sentinel, so a failing fallback reports both errors (withUpstreamErrors).
   const upstreamErrors = [];
 
-  if (!['default', 'structure_only'].includes(plateExtensionPrefix)) throw new Error(`[${logLabel}] unknown plateExtensionPrefix "${plateExtensionPrefix}"`);
-  if (!['pad', 'crop'].includes(plateRefFit)) throw new Error(`[${logLabel}] unknown plateRefFit "${plateRefFit}"`);
-  if ((plateExtensionPrefix !== 'default' || plateRefFit !== 'pad') && landmarkScene !== 'plate') {
-    throw new Error(`[${logLabel}] plateExtensionPrefix/plateRefFit apply to landmark plate calls only (landmarkScene is ${landmarkScene})`);
-  }
-  if (plateExtensionPrefix !== 'default' && plateRefFit === 'crop') {
-    throw new Error(`[${logLabel}] plateRefFit 'crop' sends no extension prefix — plateExtensionPrefix "${plateExtensionPrefix}" would be ignored`);
-  }
-
-  // Whether slot-0 scene plates get magenta-extension padding (gen-only only).
-  // A cropped plate source already has the page aspect: nothing to extend.
-  const slot0IsScenePlate = usePadExtension && plateRefFit !== 'crop' && !!(sceneBackground || (Array.isArray(landmarkPhotos) && landmarkPhotos.length) || previousImage);
+  // Whether slot 0 gets magenta-extension padding (gen-only only): a page
+  // render editing onto a plate or a previous image, or a cast-0 page anchored
+  // on its landmark photo. Never a PLATE call (landmarkScene 'plate'):
+  // packReferences centre-crops the plate's landmark photo to the page aspect,
+  // so no pad and no prefix reach Grok (decisions.md 2026-09-26).
+  const slot0IsScenePlate = usePadExtension && landmarkScene !== 'plate' && !!(sceneBackground || (Array.isArray(landmarkPhotos) && landmarkPhotos.length) || previousImage);
 
   // A PLATE call (emptyScenePlateRouting marks it landmarkScene 'plate') is
-  // fitted by its own cut order, with the worst-case magenta-extension prefix
-  // reserved up front: editWithGrok prepends that prefix after this fit, and a
-  // plate prompt cannot be refitted there (owner, 2026-09-25). Every other
-  // prompt keeps the page shrink and editWithGrok's exact-prefix refit.
+  // fitted by its own cut order against the full cap: it carries no
+  // magenta-extension prefix, so the prompt that is fitted is the prompt that
+  // is sent (owner, 2026-09-25/26). Every other prompt keeps the page shrink
+  // and editWithGrok's exact-prefix refit.
   const fitPrompt = async (p, cap, model, meta) => {
     try {
       return landmarkScene === 'plate'
-        ? fitPlatePrompt(p, cap - (slot0IsScenePlate ? MAX_MAGENTA_EXTENSION_PREFIX_LENGTH : 0), logLabel, model)
+        ? fitPlatePrompt(p, cap, logLabel, model)
         : await shrinkPromptForModel(p, cap, logLabel, model, meta);
     } catch (fitErr) {
       rethrowLocalFault(fitErr, { logLabel, pageLabel, provider: model || 'the image model' });
@@ -1525,12 +1511,12 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
     try {
       const refImages = await packReferences(
         { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground, textAreaMask, landmarkScene },
-        { aspectRatio: grokAspect, pageLabel, padInputWithExtension: slot0IsScenePlate, plateSourceFit: plateRefFit, ...(maxRefSlots ? { maxSlots: maxRefSlots } : {}), ...(vbColumnFraction ? { vbColumnFraction } : {}) }
+        { aspectRatio: grokAspect, pageLabel, padInputWithExtension: slot0IsScenePlate, ...(maxRefSlots ? { maxSlots: maxRefSlots } : {}), ...(vbColumnFraction ? { vbColumnFraction } : {}) }
       );
 
       let result;
       if (refImages.length > 0) {
-        result = await editWithGrok(grokPrompt, refImages, { model: grokModel, aspectRatio: grokAspect, padInputWithExtension: slot0IsScenePlate, extensionPrefix: plateExtensionPrefix, ...(maxRefSlots ? { maxRefs: maxRefSlots } : {}) });
+        result = await editWithGrok(grokPrompt, refImages, { model: grokModel, aspectRatio: grokAspect, padInputWithExtension: slot0IsScenePlate, ...(maxRefSlots ? { maxRefs: maxRefSlots } : {}) });
       } else {
         result = await generateWithGrok(grokPrompt, { model: grokModel, aspectRatio: grokAspect });
       }
@@ -1771,13 +1757,13 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
       } else {
         refImages = await packReferences(
           { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground, landmarkScene },
-          { aspectRatio: grokAspect, pageLabel, padInputWithExtension: slot0IsScenePlate, plateSourceFit: plateRefFit }
+          { aspectRatio: grokAspect, pageLabel, padInputWithExtension: slot0IsScenePlate }
         );
       }
 
       let result;
       if (refImages.length > 0) {
-        result = await editWithGrok(effectivePrompt, refImages, { model: grokModel, aspectRatio: grokAspect, padInputWithExtension: slot0IsScenePlate, extensionPrefix: plateExtensionPrefix });
+        result = await editWithGrok(effectivePrompt, refImages, { model: grokModel, aspectRatio: grokAspect, padInputWithExtension: slot0IsScenePlate });
       } else {
         result = await generateWithGrok(effectivePrompt, { model: grokModel, aspectRatio: grokAspect });
       }
@@ -2293,9 +2279,6 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     // | null) — server/lib/landmarkScene.js. Checked BEFORE the cache, so a
     // cached render can never stand in for a refused one.
     landmarkScene = null,
-    // Test Lab only, landmark plate calls: see _dispatchImageGeneration.
-    plateExtensionPrefix = 'default',
-    plateRefFit = 'pad',
   } = options;
   assertLandmarkScene({ landmarkPhotos, sceneBackground, landmarkScene, label: `IMAGE GEN-ONLY P${pageNumber ?? '?'}` });
 
@@ -2307,10 +2290,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
   const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null, pageNumber, sceneBackground ? 'bg' : null);
 
   // For generateImageOnly, we use a separate cache namespace to avoid conflicts with evaluated images
-  // A plate-fit arm is a different request than the production default, so it
-  // gets its own key; the production key is unchanged.
-  const plateArm = (plateExtensionPrefix !== 'default' || plateRefFit !== 'pad') ? `_${plateExtensionPrefix}_${plateRefFit}` : '';
-  const genOnlyCacheKey = `genonly_${cacheKey}${plateArm}`;
+  const genOnlyCacheKey = `genonly_${cacheKey}`;
 
   if (!skipCache && imageCache.has(genOnlyCacheKey)) {
     log.debug(`💾 [IMAGE GEN-ONLY] Cache HIT (${imageCache.size} cached)`);
@@ -2360,8 +2340,6 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     includeSceneBackgroundPart: true,
     maxRefSlots,
     vbColumnFraction,
-    plateExtensionPrefix,
-    plateRefFit,
   });
 
   // Strip a stray uniform frame the model painted despite the D-01 prompt ban

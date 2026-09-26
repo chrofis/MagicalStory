@@ -758,6 +758,21 @@
       "severity": "block"
     },
     {
+      "id": "landmark-plate-photo-crop",
+      "axis": "plate photo packing (grok.js) vs plate prompt budget (images.js)",
+      "reason": "A landmark plate's photo is centre-cropped to the plate aspect with no magenta pad and no magenta prefix (owner, 2026-09-26, decisions.md; reverses 2026-06-16 for landmark plates). Two files hold the two halves: grok.js packReferences crops the plate source and refuses a plate call with padInputWithExtension on, and editWithGrok prepends the prefix only to a padded slot 0; images.js _dispatchImageGeneration turns the extension off for landmarkScene 'plate' (slot0IsScenePlate) and fits the plate prompt against the FULL cap because no prefix follows. Turn the extension back on for plates in one file and the other either throws or sends a prefix the plate fit never reserved room for (the 2026-09-25 over-cap bug). Every plate caller (vantage, per-page, trial, cover, iterate, Lab empty_scene) reaches this through generateImageOnly with emptyScenePlateRouting(); the derive/relight edit sends the base plate, not the photo, and is not part of this set.",
+      "members": [
+        "server/lib/grok.js",
+        "server/lib/images.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "landmarkScene === 'plate'"
+        ]
+      }
+    },
+    {
       "id": "page-plate-or-fail-callers",
       "axis": "page first render vs retry vs trial page vs iterate vs regenerate/test-models/style-lab vs calm-zone repair vs Lab mirror",
       "reason": "Plate or fail (owner, 2026-09-24): a landmark page that is not cast-0 renders on its plate or fails, and only the declared roles in server/lib/landmarkScene.js ('plate', 'castless', 'composite') may take the raw photo with no plate. The rule is applied at every page render site - Phase 5a render and retry and the trial page (storyJobPipeline.js), iteratePageCore / ensureStoryPagePlate / the dispatch check (images.js), the calm-zone and regenerate repairs (repairPipeline.js), the page regenerate, test-models and style-lab routes (regeneration.js) and the Lab mirrors (testlab.js). A site that stops passing its plate or its role either fails every landmark page or, worse, is the one that quietly packs the photo again.",

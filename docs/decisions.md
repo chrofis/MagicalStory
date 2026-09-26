@@ -10025,7 +10025,7 @@ the p8 landmark: before = 17%/17% bars, after = 1%/1% full-bleed.
 - `server/lib/grok.js` — `packReferences` accepts `padInputWithExtension`, skips
   slot-0 pad when set; `editWithGrok` magenta logic unchanged
 - `server/lib/images.js` — both Grok branches in `generateImageOnly` pass the flag
-**Status:** ✅ active.
+**Status:** ✅ active for page renders on a plate or a previous image and cast-0 pages on their photo. **Superseded for landmark PLATES by 2026-09-26 "A landmark plate's photo is centre-cropped, never magenta-extended"** (Lab 1485-1487, 1507-1511: the pixel-faithful centre copied the photo's strangers and signs).
 
 ### One shared provider-dispatch core: `_dispatchImageGeneration` (2026-07-29)
 **Context:** The two image-gen entry functions `callGeminiAPIForImage` (eval
@@ -60464,7 +60464,7 @@ fitted by the plate cut order alone. Unit tests: `tests/unit/plate-prompt-fit.te
 
 **Touched:** `server/lib/promptFitError.js` (new), `server/lib/images.js`, `server/lib/grok.js`,
 `storyJobPipeline.js`, `docs/image-generation-methods.html`, `tests/unit/plate-prompt-fit.test.ts`.
-**Status:** ✅ active on staging.
+**Status:** ✅ active on staging. Point 2's prefix reserve is gone since 2026-09-26: a plate carries no magenta prefix (its photo is centre-cropped), so it is fitted against the full cap and `MAX_MAGENTA_EXTENSION_PREFIX_LENGTH` is deleted.
 
 ## 2026-09-25 — A page is derived from its base plate only for what the base lacks (amends 2026-09-21 "An angled page takes a plate DERIVED")
 
@@ -61300,3 +61300,61 @@ the physical description from "Burak is a middle-aged man" to "Burak is a young-
 **Touched:** server/lib/trialAge.js, server/routes/trial.js, scripts/admin/sibling-registry.json
 (new set `photo-apparent-age-clamp`), tests/unit/trial-apparent-age-clamp.test.ts,
 tests/unit/trial-age-mandatory.test.ts, tasks/bugs.json.
+
+## 2026-09-26 — A landmark plate's photo is centre-cropped, never magenta-extended (SUPERSEDES 2026-06-16 "Scene-plate slot 0 is magenta-extended" for landmark plates)
+
+**Context:** Since 2026-06-16 a plate call sent its landmark photo at native aspect and `editWithGrok`
+magenta-padded it to the plate aspect with a prefix that says "The non-magenta center region must remain
+pixel-faithful in composition and geometry". On a landmark plate that clause makes Grok trace the
+photograph: its strangers, signs and lettering come through into a plate that must be people-free and
+painted (RC5 — Lindenhof chess players on 4 plates across 3 stories). Two Lab arms were built for it
+(51e745371): `structure_only` (the prefix says the photo gives structure only) and `crop` (the photo is
+centre-cropped to the plate aspect in `packReferences`; no pad, no prefix).
+
+**Evidence:** staging job_1790277448294_5herh01j7, watercolor, post-9cf38a556.
+- Lab 1485 / 1486 / 1487 (n=4 per arm, p1 Lindenhof + p11 Rathausbrücke): renders that copied the photo's
+  strangers or signs — padded baseline 2/4, `structure_only` 3/4 (one a full photo copy), **crop 0/4**.
+- Lab 1507-1511 (p11): crop (1509, 1510) was the only arm with clean watercolor that followed the brief —
+  the street lamp, dusk, mist — with no ghosts. The padded baseline (1511) traced the photo, left ghost
+  people and ignored the lamp and the dusk. `structure_only` (1507, 1508) still traced the photo, copied its
+  lettering and flag, and left paper bands.
+- Known cost: the photo's edge content is lost (p11's right-hand building). p1 failed under every arm
+  because its brief contradicts its photo (the photo does not show the declared stairs); that is a
+  photo-choice fix, separate from this one.
+
+**Decision (owner sign-off 2026-09-26, after viewing the Lab images; SETTLED reversal):**
+1. A plate call (`landmarkScene: 'plate'`, set by `emptyScenePlateRouting()`) never gets the magenta
+   extension. `_dispatchImageGeneration` (images.js) sets `slot0IsScenePlate` false for it, and
+   `packReferences` (grok.js) centre-crops the plate's landmark photo to the target aspect; it throws if a
+   plate call arrives with `padInputWithExtension` on. There is one path: the padded path for landmark
+   plates, the `structure_only` prefix variant (`MAGENTA_EXTENSION_CENTRE_CLAUSE`, `editWithGrok`
+   `extensionPrefix`) and the Lab params `plateExtensionPrefix` / `plateRefFit` / `plateSourceFit` are
+   deleted.
+2. With no prefix following it, a plate prompt is fitted against the FULL cap (`fitPlatePrompt(p, cap)`).
+   `MAX_MAGENTA_EXTENSION_PREFIX_LENGTH` existed only for that reserve and is deleted. The 2026-09-25 plate
+   cut order and "a prompt that does not fit fails loudly" stand unchanged.
+3. Magenta extension stays for every other slot-0 scene input — a page render editing onto its plate or a
+   previous image, and a cast-0 page anchored on its landmark photo (`landmarkScene: 'castless'`). The
+   2026-06-16 entry still governs those.
+
+**Siblings:** every plate caller reaches this through `generateImageOnly` + `emptyScenePlateRouting()` —
+the vantage base plate and its QC retry, the per-page plate, the trial plate, the cover plate
+(coverIterate.js), the iterate/regenerate fresh plate (images.js) and the Lab `empty_scene` stage — so the
+one dispatcher change covers them all. The derive/relight edit (`editImageWithPrompt` with `plateDerive`)
+sends the BASE PLATE, not the photo, and never set the extension; unchanged. The Gemini fallback branch
+attaches the photo as an inline part with no pad and no prefix; unchanged. New sibling set
+`landmark-plate-photo-crop` (grok.js packing vs images.js plate budget).
+
+**Replay (rung 1, free):** all 128 stored plate-template prompts, staging + production (a fresh 14-day
+pull unioned with the 2026-09-25 pull; 90 landmark plates), through the shipped `fitPlatePrompt` at the
+full 7,900 cap: 128/128 fit untouched, 0 cut, 0 throws; largest 7,653 (a staging cover plate), smallest
+landmark headroom 247 chars. Five landmark plates (5herh01j7 p1 7,552 / p11 7,463, vnx5l8iy7 front /
+initial / back 7,653 / 7,493 / 7,620) were over the old reserved budget of 7,284 and would have been cut;
+now they go out whole. With the cap artificially lowered by 600, 123 fit untouched and 5 are fitted by the
+plate cut order alone, 0 throw.
+
+**Touched:** server/lib/grok.js, server/lib/images.js, server/lib/testlab.js,
+tests/unit/landmark-plate-crop.test.ts (was plate-photo-options.test.ts), tests/unit/plate-prompt-fit.test.ts,
+scripts/admin/sibling-registry.json, docs/image-routing.md, docs/image-generation-methods.html,
+docs/SETTLED.md.
+**Status:** ✅ active on staging.
