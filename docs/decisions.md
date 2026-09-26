@@ -45,6 +45,16 @@ visual-flow judge compares enum buckets and is unchanged.
 **Rationale:** a weather appended to a phrase that already paints a sun cannot win; the image model paints both.
 Splitting the roles is the smallest change that makes every line self-consistent, and one constant keeps the
 generator and the judges saying the same thing.
+**Evidence (Lab, staging 70cf665d, pixels read):** exp 1516 re-rendered three fog pages on their STORED
+plates with the new page line: z3fw660ie p6 (afternoon fog) came out fogged, pale sky, no sun disc; p13 (dusk
+fog) kept its plate's blue sky; 5herh01j7 p13 (night fog) kept its plate's full moon, and the semantic judge
+filed the moon against DECLARED LIGHT ("contradicts ... no moon anywhere in the picture"), so the critic side
+reads the new rule. The page copies its plate's sky, so the plate has to be painted with the new line too:
+exp 1517 (empty_scene, dusk fog) gave a flat grey sky with no blue and no disc; exp 1518 (the page on it) kept
+that sky, distant hills hazed; exp 1519 (the production relight instruction, edit of the base plate, night
+fog) removed the moon and gave a flat dark grey fog with the lamp haloed and the skyline fading; exp 1520 (the
+page on it) kept the fog and no moon. A stored story's old plate keeps its old sky until the plate is
+re-rendered; a new run paints every plate with the new line.
 **Touched:** server/lib/sceneLight.js, server/lib/shotVocabulary.js, storyJobPipeline.js,
 server/lib/sceneValidator.js, server/lib/evalPipeline.js, tests/unit/scene-light.test.ts,
 scripts/admin/sibling-registry.json, tasks/bugs.json.
