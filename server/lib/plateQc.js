@@ -35,6 +35,12 @@ const PLATE_QC_CHECKS = [
   { key: 'placements', hard: false, what: 'a character position with no usable ground' },
   { key: 'geometry', hard: false, what: 'path direction, vanishing point or light direction' },
   { key: 'landmark', hard: false, what: 'the landmark does not resemble its photo' },
+  // SOFT (2026-09-26). A wrong or missing vessel is the plate differing from
+  // its brief, like `framing` and `landmark`, not a broken picture. Hard would
+  // also drop a derived plate to its base on a judgement the check cannot make
+  // sure of: which part of a structure the camera sees, and the aboard page
+  // that shows a deck and no hull.
+  { key: 'structures', hard: false, what: 'a described vessel, vehicle or structure missing, or another kind or shape' },
 ];
 
 /** Keys the pixel checks in validateEmptyScene file their issues under. */

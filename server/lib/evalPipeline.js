@@ -506,6 +506,18 @@ function buildEmptySceneQcPrompt({ sceneDescription = '', era = null, framing = 
   const structuresBlock = structuresText
     ? `\n\n${fillTemplate(qc.STRUCTURES, { STRUCTURES_TEXT: structuresText })}` : '';
   const structureRefBlock = structureReference ? `\n\n${qc.STRUCTURE_REFERENCE}` : '';
+  // THE STRUCTURES CHECK (owner, 2026-09-26): a structure the author was told
+  // to match — missing where the scene puts it in view, or another kind or
+  // shape — fails, under the soft `structures` key (plateQc.js). It quotes the
+  // author's own two rules (prompts.PLATE_STRUCTURE_*_RULE), and exists only
+  // when the author was given structures.
+  const { PLATE_STRUCTURE_MATCH_RULE, PLATE_STRUCTURE_PART_RULE } = require('../services/prompts');
+  const structureCheck = structuresText
+    ? `\n${fillTemplate(qc.STRUCTURE_CHECK, {
+      PLATE_STRUCTURE_MATCH_RULE,
+      PLATE_STRUCTURE_PART_RULE,
+      STRUCTURE_REFERENCE_NAME: structureReference ? ' or the STRUCTURE REFERENCE' : '',
+    })}` : '';
   const placementsCheck = placementsBlock ? `\n${qc.PLACEMENTS_CHECK}` : '';
   // Composition geometry fidelity — the main scene will composite
   // characters and aim lines onto this empty scene. If the path
@@ -628,6 +640,7 @@ ${fillTemplate(qc.LANDMARK_CHECK, {
     MAIN_SCENE_BLOCK: mainSceneBlock,
     ERA_CHECK: eraText ? `\n${qc.ERA_CHECK}` : '',
     PLACEMENTS_CHECK: placementsCheck,
+    STRUCTURE_CHECK: structureCheck,
     GEOMETRY_CHECK: geometryCheck,
     LANDMARK_CHECK: landmarkCheck,
     // The same lists the plate author's PLATE_EDGE_RULE names.

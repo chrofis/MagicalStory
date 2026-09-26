@@ -917,6 +917,90 @@
         ]
       },
       "source": "Lukas stored arc: the key drawer is carried outside to try every key on the door of an indoor room (an interior door placed outdoors). decisions 2026-09-24 'One place is one place': with the PLACE lens, Lab #1444 had 3 of 3 panelists flag it. Eval-gap row 7."
+    },
+    {
+      "id": "plate-fiona-p7-cutter-deck-matches",
+      "judge": "plate_qc",
+      "target": {
+        "storyId": "job_1790446348343_z3fw660ie",
+        "pageNumber": 7,
+        "versionIndex": 0
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/empty_scene/p7/v0.jpg"
+      },
+      "expect": {
+        "verdict": "pass",
+        "types": [
+          "structures"
+        ]
+      },
+      "source": "Fiona p7 shipped plate (close-up on the cutter deck). STRUCTURES gave the author VEH001 \"weathered wooden pirate cutter\": a weathered dark brown wooden ship with a single tall mast, square rigged grey sails, and thick wooden rowing benches along the open deck. Signature: single tall thick wooden mast. The plate text puts the deck and its tall thick central mast in frame; the pixels show a plank deck with one thick mast rising centrally (full image checked). A structures charge here is false."
+    },
+    {
+      "id": "plate-fiona-p9-aboard-bow-matches",
+      "judge": "plate_qc",
+      "target": {
+        "storyId": "job_1790446348343_z3fw660ie",
+        "pageNumber": 9,
+        "versionIndex": 0
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/empty_scene/p9/v0.jpg"
+      },
+      "expect": {
+        "verdict": "pass",
+        "types": [
+          "structures"
+        ]
+      },
+      "source": "Fiona p9 shipped plate: aboard=VEH001, so STRUCTURES told the author to render the deck, rail and fittings around the camera, never the hull. The pixels show the cutter's wooden bow and deck boards in the foreground under a bridge arch, no mast in view (camera looks forward). Only the part the camera sees is judged: not missing, not another kind. (The plate has other defects — distant people, modern station — this fixture scopes to structures only.)"
+    },
+    {
+      "id": "plate-fiona-p6-three-masts-not-single",
+      "judge": "plate_qc",
+      "target": {
+        "storyId": "job_1790446348343_z3fw660ie",
+        "pageNumber": 6,
+        "versionIndex": 0
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/empty_scene/p6/v0.jpg"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "structures"
+        ],
+        "about": [
+          "mast",
+          "masts"
+        ]
+      },
+      "source": "Fiona p6 shipped plate (riverside landing, cutter alongside). STRUCTURES gave the author VEH001 \"weathered wooden pirate cutter\": a weathered dark brown wooden ship with a single tall mast, square rigged grey sails, and thick wooden rowing benches along the open deck. Signature: single tall thick wooden mast. The pixels show a full-rigged ship with three masts (fore, main and a mizzen with its own yard) and a bowsprit — not the single-masted cutter the description names as its signature. Clearly another shape."
+    },
+    {
+      "id": "plate-fiona-p10-three-masts-not-single",
+      "judge": "plate_qc",
+      "target": {
+        "storyId": "job_1790446348343_z3fw660ie",
+        "pageNumber": 10,
+        "versionIndex": 0
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/empty_scene/p10/v0.jpg"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "structures"
+        ],
+        "about": [
+          "mast",
+          "masts"
+        ]
+      },
+      "source": "Fiona p10 shipped plate (ship against the Lindenhof retaining wall). STRUCTURES gave the author VEH001 \"weathered wooden pirate cutter\": a weathered dark brown wooden ship with a single tall mast, square rigged grey sails, and thick wooden rowing benches along the open deck. Signature: single tall thick wooden mast. The pixels show three masts — a main mast with a fighting top, a foremast and a mizzen, each with sails — against a description whose signature is a single tall mast. Clearly another shape."
     }
   ]
 }

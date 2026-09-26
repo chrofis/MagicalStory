@@ -765,6 +765,14 @@ function buildEmptyScenePrompt(opts = {}) {
  * @param {{visualBible?: object, pageNumber?: number, aboardId?: string|null, sceneObjects?: Array|null}} opts
  * @returns {string} the block text without its heading; '' when nothing is staged
  */
+// THE PLATE AUTHOR'S TWO STRUCTURE RULES, one source for the author and its
+// judge (2026-09-26). buildPlateStructuresText wraps the page's structure lines
+// in them; the plate QC's `structures` check (empty-scene-qc.txt STRUCTURE_CHECK)
+// quotes them, so a plate is failed only for a structure its author was told
+// to match, and never for showing the part of it the camera sees.
+const PLATE_STRUCTURE_MATCH_RULE = 'Any vessel, vehicle or built structure in this backdrop is one of those described below — match its colour, construction and named parts, never a generic substitute';
+const PLATE_STRUCTURE_PART_RULE = 'Render only the part of the vessel the camera sees. When the camera stands on board, show the deck, rail and fittings around it — never the vessel seen from outside.';
+
 function buildPlateStructuresText(opts = {}) {
   // The Visual Bible description of every vehicle listed for this page.
   // The Art Director's plate prose routinely names a vessel generically ("a
@@ -827,7 +835,7 @@ function buildPlateStructuresText(opts = {}) {
       // ("render it exactly to its description") demanded the full vehicle even
       // when the camera stands on its deck, which shipped duplicate ships, a
       // ship inside a cave, and wheels on dry land (audit 2026-08-29).
-      const text = `Any vessel, vehicle or built structure in this backdrop is one of those described below — match its colour, construction and named parts, never a generic substitute:\n${lines.join('\n')}\nRender only the part of the vessel the camera sees. When the camera stands on board, show the deck, rail and fittings around it — never the vessel seen from outside.`;
+      const text = `${PLATE_STRUCTURE_MATCH_RULE}:\n${lines.join('\n')}\n${PLATE_STRUCTURE_PART_RULE}`;
       // VB ids resolved here, not only on the whole plate prompt: the plate QC
       // reads this string on its own (buildEmptyScenePrompt's own pass over
       // the filled prompt then finds nothing left to resolve).
@@ -988,6 +996,8 @@ module.exports = {
   promptSections,
   buildEmptyScenePrompt,
   buildPlateStructuresText,
+  PLATE_STRUCTURE_MATCH_RULE,
+  PLATE_STRUCTURE_PART_RULE,
   buildPlateDerivePrompt,
   buildEvaluationPrompt,
   extractArtStyle,
