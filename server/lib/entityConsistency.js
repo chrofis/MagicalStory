@@ -1183,6 +1183,12 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
               // the state itself is said in words (removedGarments).
               entityType: 'character', entityName: charName, clothingCategory: baseCategory || clothingCategory,
               removedGarments,
+              // The marks the page render was told (promptBuilders.recordedFeatures,
+              // one source). A Visual Bible secondary has no recorded traits: its
+              // description is its whole record, and it is the expected text.
+              recordedFeatures: character.__vbSecondary
+                ? null
+                : require('./promptBuilders').recordedFeatures(character),
               expectedClothing, referencePhoto: refAvatar, cellCount: batchCrops.length,
             };
             const runPass = (buffer, focus) => evaluateEntityConsistency(
@@ -2863,7 +2869,7 @@ function entityIssueTypesForPrompt() {
 async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headGridBuffer = null) {
   const { entityType, entityName, referencePhoto, cellCount, clothingCategory, expectedClothing,
           removedGarments = [], primaryIsHeadGrid = false, focus = null,
-          vbDescription = '', cellStates = {} } = entityInfo;
+          vbDescription = '', cellStates = {}, recordedFeatures = null } = entityInfo;
   const isObject = entityType === 'object';
 
   // Build prompt from template
@@ -2979,6 +2985,13 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headG
     ENTITY_TYPE: entityType,
     ENTITY_NAME: entityName,
     REFERENCE_PHOTO_INFO: refPhotoInfo,
+    // The judge's half of the recorded-marks contract (entity-consistency-check.txt:
+    // a skin mark the Recorded Features do not name is never reported). '' for
+    // an object, and for a Visual Bible secondary, whose expected description
+    // already names every feature it has.
+    RECORDED_FEATURES: isObject || recordedFeatures === null
+      ? ''
+      : `**Recorded Features:** ${recordedFeatures || 'none'}`,
     HEAD_GRID_INFO: focus === 'identity'
       // TWO PASSES, ONE IMAGE EACH (owner, 2026-08-27). Whenever two images
       // were attached, garment enumeration stopped happening: measured 0

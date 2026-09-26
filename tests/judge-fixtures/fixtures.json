@@ -814,25 +814,42 @@
       "source": "Fiona p8 first plate attempt (bridge by Hauptbahnhof): present-day station, a crane and street lights. Present-day story; the run's QC charged 'modern crane, vehicles, streetlights'. Same class as eval-gap row 15."
     },
     {
-      "id": "entity-fiona-lorena-vitiligo",
+      "id": "entity-lorena-paint-wash-not-vitiligo",
       "judge": "entity",
       "target": {
         "storyId": "job_1790446348343_z3fw660ie",
         "character": "Lorena"
       },
       "expect": {
-        "verdict": "flag",
+        "verdict": "pass",
         "character": "Lorena",
-        "minSeverity": "MAJOR",
         "about": [
           "vitiligo",
           "depigment",
-          "patches",
           "pale patch",
-          "white patch"
+          "white patch",
+          "lighter patch",
+          "light patch"
         ]
       },
-      "source": "Fiona: Lorena's reference photo shows vitiligo patches (forehead, around the mouth); no page draws them. The run's entity grid filed CRITICAL face_mismatch/face_drift 'vitiligo patches … entirely absent' (stories.data deductions). Eval-gap row 20: a positive control (detected; then capped to MINOR by MAX_SEVERITY_TYPES)."
+      "source": "Replaces entity-fiona-lorena-vitiligo, whose expectation was wrong. Lorena's uploaded photo (avatar-refs face, viewed 2026-09-26) shows no skin mark, and her recorded features are earrings and necklaces only; the pale areas on her watercolour styled sheet are highlight washes. The run's entity grid filed CRITICAL face_mismatch 'vitiligo patches ... entirely absent' on p16 and the covers. Owner, 2026-09-26: Lorena has no vitiligo; paint texture is never a skin feature. Her genuinely wrong p6 face stays a separate finding and does not use these words."
+    },
+    {
+      "id": "entity-sarah-y3n-recorded-piercings-missing",
+      "judge": "entity",
+      "target": {
+        "storyId": "job_1789304198359_y3n0euk3z",
+        "character": "Sarah"
+      },
+      "expect": {
+        "verdict": "flag",
+        "character": "Sarah",
+        "minSeverity": "MINOR",
+        "about": [
+          "piercing"
+        ]
+      },
+      "source": "A recorded mark the pages leave out. Sarah's recorded features (physical.other) are 'multiple facial piercings (septum, bridge, philtrum, labret, cheek, eyebrow), multiple tattoos on shoulders and chest'. Her p2 v0 face (viewed 2026-09-26, crop around the head) shows ear piercings only: no septum, eyebrow, cheek or lip piercing. The 2026-09-26 replay with the recorded-features rule filed the missing cheek piercing (MINOR face_mismatch) and no mole; the replay without it reported an unrecorded cheek mole instead."
     },
     {
       "id": "audit-lukas-p7-manuel-not-cast",

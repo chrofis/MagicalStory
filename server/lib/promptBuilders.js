@@ -2021,6 +2021,28 @@ function extractCharacterVisualProfile(char, options = {}) {
 }
 
 /**
+ * A character's RECORDED FEATURES — the distinctive marks read off the photo
+ * (`physical.other`: freckles, a mole, a scar, a piercing, jewellery), as
+ * text, or '' when none is recorded.
+ *
+ * ONE source for both sides of the grid check (sibling set
+ * entity-grid-generator-vs-critic, 2026-09-26): the page render states them in
+ * its DISTINCTIVE FEATURES block, and the entity grid judge is told them as
+ * its Recorded Features line and reports no skin mark they do not name. The
+ * judge had been reading watercolour highlight washes on a styled sheet as a
+ * skin condition the character does not have, while the page prompt carried
+ * the recorded marks only when the Art Director happened to weave them in.
+ */
+function recordedFeatures(char) {
+  return formatRecordedFeatures(extractCharacterVisualProfile(char).other);
+}
+
+/** The recorded-features text of a visual profile's `other` field ('' for none). */
+function formatRecordedFeatures(other) {
+  return isNone(other) ? '' : stripAgeWords(other);
+}
+
+/**
  * Build the shared labeled-parts array used by numbered-list and
  * [Name]: markdown formatters. Returns an array of "Label: value" strings
  * with "none"-synonyms filtered out and age-word cleanup applied.
@@ -2052,7 +2074,8 @@ function buildLabeledPhysicalParts(profile, options = {}) {
   const face = includeFace ? buildFaceDescription(profile.face) : '';
   if (face) parts.push(`Face: ${face}`);
   if (!isNone(profile.glasses)) parts.push(`Glasses: ${profile.glasses}`);
-  if (!isNone(profile.other)) parts.push(`Distinctive marks: ${stripAgeWords(profile.other)}`);
+  const marks = formatRecordedFeatures(profile.other);
+  if (marks) parts.push(`Distinctive marks: ${marks}`);
 
   if (profile.clothing) parts.push(`${clothingLabel}: ${profile.clothing}`);
   else if (profile.clothingStyle) parts.push(`Clothing style: ${profile.clothingStyle}`);
@@ -2099,7 +2122,8 @@ function buildCharacterPhysicalDescription(char, clothingOverride = null) {
   const face = buildFaceDescription(p.face);
   if (face) s += `, ${face}`;
   if (!isNone(p.glasses)) s += `. Glasses: ${p.glasses}`;
-  if (!isNone(p.other)) s += `, ${stripAgeWords(p.other)}`;
+  const marks = formatRecordedFeatures(p.other);
+  if (marks) s += `, ${marks}`;
   if (p.clothing) s += `. Wearing: ${p.clothing}`;
   return s;
 }
@@ -4604,6 +4628,20 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     if (ageCueLines.length > 0) {
       characterReferenceList += `\nAGE & PROPORTIONS (render each character at their real age, regardless of the action described):\n${ageCueLines.join('\n')}\n`;
       log.debug(`[IMAGE PROMPT] Added age proportions for ${ageCueLines.length} character(s)`);
+    }
+
+    // The recorded marks, stated for the render (2026-09-26). The entity grid
+    // judge is told these same marks (recordedFeatures, one source) and judges
+    // a recorded mark missing from a page; the prose carried them only when
+    // the Art Director wove them in — on staging job_1790446348343_z3fw660ie a
+    // character's recorded freckles reached 0 of her 4 page prompts.
+    const featureLines = (sceneCharacters || [])
+      .filter(c => !isOtsFigure(c?.name))
+      .map(c => [c.name, recordedFeatures(c)])
+      .filter(([, marks]) => marks)
+      .map(([name, marks]) => `- ${name}: ${marks}`);
+    if (featureLines.length > 0) {
+      characterReferenceList += `\nDISTINCTIVE FEATURES (each character carries these on every page, wherever the angle shows them):\n${featureLines.join('\n')}\n`;
     }
 
     // Colour-frame mapping. Each reference card is framed in a colour (not
@@ -12557,6 +12595,7 @@ module.exports = {
   isNone,
   extractCharacterVisualProfile,
   buildLabeledPhysicalParts,
+  recordedFeatures,
   buildCharacterPhysicalDescription,
   buildFaceDescription,
   buildGroundingPrompt,

@@ -21,6 +21,38 @@ superseded and link forward.
 
 ---
 
+## 2026-09-26 — Recorded features: the entity grid judge reports only the skin marks the character's record names, and the page render states that same record
+
+**Context:** on staging job_1790446348343_z3fw660ie the entity grid judge read the pale highlight washes of
+Lorena's watercolour styled sheet as vitiligo and filed CRITICAL face_mismatch "vitiligo patches … entirely absent"
+on p16 and the three covers. Her uploaded photo has no skin mark (viewed) and her record (`physical.other`) names
+earrings and necklaces only. The existing judge fixture `entity-fiona-lorena-vitiligo` had taken the finding as a
+true positive. On the generator side, the recorded marks reached a page render only when the Art Director wove them
+into the prose: a character's recorded "light freckles" reached 0 of her 4 page prompts in that story, and another's
+recorded facial piercings 1 of 2 pages in job_1789304198359_y3n0euk3z.
+
+**Decision (owner-approved A+B):** (A) `promptBuilders.recordedFeatures(char)` — `physical.other` with "none"
+dropped — is ONE source for both sides. The judge gets it as a `**Recorded Features:**` line (`{RECORDED_FEATURES}`,
+"none" when empty; no line for an object or a Visual Bible secondary, whose description is its record). The page
+render (`buildImagePrompt`, pages and full-story covers) states it per scene character in a DISTINCTIVE FEATURES
+block after AGE & PROPORTIONS; trial covers already carry it through `buildCharacterPhysicalDescription`, which now
+formats it through the same helper. (B) entity-consistency-check.txt: "Paint texture is never a skin feature. …
+a mark they do not name is never reported, as missing or as present, in any finding."
+
+**Replay (shipped code, stored staging stories, a few cents of Gemini Flash):** Lorena — the vitiligo finding is gone; the genuinely different
+p6 face is still CRITICAL face_mismatch. Sarah (y3n0euk3z) — the missing recorded cheek piercing is still filed
+(MINOR face_mismatch); the unrecorded "mole" the pre-rule judge reported is not. Sarah (z3fw660ie) — the judge cited
+her recorded stud earrings as "a recorded feature" and filed no freckle finding.
+
+**Cost of the block:** replayed over 202 stored page prompts of the last 12 staging stories, the block adds a median
+of 0 and at most 424 characters; 16 of 202 would cross the 7900 cap and spend the first shrink steps (COUNTS, the
+size bullet). It is not a cut step itself.
+
+**Touched:** prompts/entity-consistency-check.txt, server/lib/entityConsistency.js, server/lib/promptBuilders.js,
+tests/unit/recorded-features-render-and-judge.test.ts, tests/judge-fixtures/fixtures.json
+(`entity-lorena-paint-wash-not-vitiligo` pass replaces the wrong flag; `entity-sarah-y3n-recorded-piercings-missing` flag)
+**Status:** ✅ active (staging)
+
 ## 2026-09-26 — The judges read what the generator was given, whole: the plate QC reads its inputs uncut plus the STRUCTURES and grid; the quality and semantic judges read the brief, never the shrunk text (SUPERSEDES the same day's "EXPECTED SCENE keeps its 300 cap" and the 2026-09-13 "judge the string the model actually received")
 
 **Context.** The standing rule of the same day ("Every critic judges against the source the generator was

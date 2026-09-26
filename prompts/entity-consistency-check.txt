@@ -7,6 +7,7 @@ You are reviewing cropped images of a single entity (character or object) across
 **Entity Type:** {ENTITY_TYPE}
 **Entity Name:** {ENTITY_NAME}
 {REFERENCE_PHOTO_INFO}
+{RECORDED_FEATURES}
 {HEAD_GRID_INFO}
 {CLOTHING_CONTEXT}
 
@@ -67,6 +68,7 @@ Analyze whether this entity (specifically {ENTITY_NAME}) looks consistent across
 - A cell with missing regions, hard white gaps or truncated limbs is a cropping artifact — report `type: "cutout_artifact"`; never describe it as a skin, clothing or anatomy difference.
 - `cutout_artifact` covers damage that ends at the cell edge: a hard white gap, a clean straight boundary, a limb stopping where the cut ran.
 - A face rendered without eyes, nose or mouth, or smeared to an unreadable surface, with the damage contained inside the head and away from any cell edge, is `type: "face_destroyed"` at CRITICAL — never a skin, hair or identity difference, and never a reason to say features could not be assessed.
+- Paint texture is never a skin feature. Washes, highlights, pale or darker blooms, brush marks and paper grain, on the reference or on any cell, are the art style. The skin marks a character has are the ones the Recorded Features name; a mark they do not name is never reported, as missing or as present, in any finding.
 
 ## Output Format
 
