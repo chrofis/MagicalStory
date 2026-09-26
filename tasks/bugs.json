@@ -2127,6 +2127,15 @@
       "fixedAt": "2026-09-26",
       "fixedIn": "500d2ac89",
       "fix": "Critical-gone wins: dominatesByCritical removes every version another dominates before the score ranks; lastRepairRegressed / bothStrategiesTriedAndRegressed / summarizeRepairRound apply the same rule. Test: critical-gone-wins.test.ts; replay flips p18 to v1 and changes no other page of this story or run 7."
+    },
+    {
+      "id": "trial-apparent-age-unclamped",
+      "title": "The trial copied the photo's apparentAge onto the character unclamped, so a declared 5-year-old with an adult's photo was drawn as a middle-aged man",
+      "reportedAt": "2026-09-26",
+      "source": "Stored evidence, production: trial job_1790282439176_ppgelxibt (\"Burak und der Stein des Superritters\", 2026-09-24 22:40 CH). characters row characters_cb45705e-4309-407e-a39c-35d5de9e62f4: age \"5\", physical.apparentAge \"middle-aged\". Page 2/4 image prompts carried \"Burak: adult proportions about 7.5-8 heads tall, full adult height, mature bone structure...\", the back-cover prompt \"Burak is a middle-aged man\"; the pages show an adult man while the avatar sheets show a child.",
+      "rootCause": "server/routes/trial.js wrote extractedTraits.apparentAge straight onto physical at both trial trait writers (generate-preview-avatar DB save, create-anonymous-account background save) without clampApparentAge, which the regular avatar paths (routes/avatars.js) always apply. extractCharacterVisualProfile trusts physical.apparentAge over the declared age on the premise that it is clamped. Introduced by e894b0fe6 (2026-03-08).",
+      "impact": "Any trial whose photo reads more than one age group away from the declared age renders the hero at the photo's age on every page and cover (adult proportions for a child).",
+      "status": "open"
     }
   ]
 }

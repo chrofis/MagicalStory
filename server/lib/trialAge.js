@@ -23,6 +23,8 @@
  * side effect of making the field mandatory.
  */
 
+const { clampApparentAge } = require('./promptBuilders');
+
 const TRIAL_MIN_AGE = 1;
 const TRIAL_MAX_AGE = 18;
 
@@ -45,4 +47,51 @@ function parseTrialAge(age) {
   return { ok: true, years };
 }
 
-module.exports = { parseTrialAge, TRIAL_MIN_AGE, TRIAL_MAX_AGE };
+/**
+ * Copy the photo-analysis traits onto a trial character's `physical`, with the
+ * photo's apparentAge CLAMPED to within one age group of the declared age —
+ * the same clampApparentAge() the regular avatar paths apply
+ * (routes/avatars.js). extractCharacterVisualProfile trusts
+ * `physical.apparentAge` over the declared age precisely because that clamp
+ * bounds it, so an unclamped write lets an adult's photo on a 5-year-old
+ * character draw the story's pages as an adult ("adult proportions",
+ * "middle-aged man").
+ *
+ * Every trial writer of photo traits goes through here: the preview-avatar
+ * save and the create-anonymous-account background save.
+ *
+ * @param {Object} physical   the character's physical object (mutated)
+ * @param {Object} traits     extracted traits (may carry `confidence`)
+ * @param {string|number} statedAge  the age currently on the character row
+ * @returns {{clamp: Object|null}} the clamp result for logging
+ */
+function applyTrialPhotoTraits(physical, traits, statedAge) {
+  if (traits.hairColor) physical.hairColor = traits.hairColor;
+  if (traits.eyeColor) physical.eyeColor = traits.eyeColor;
+  if (traits.skinTone) physical.skinTone = traits.skinTone;
+  if (traits.detailedHairAnalysis) physical.detailedHairAnalysis = traits.detailedHairAnalysis;
+  let clamp = null;
+  if (traits.apparentAge) {
+    clamp = clampApparentAge(traits.apparentAge, statedAge, traits.confidence?.overallConfidence || null);
+    physical.apparentAge = clamp.category;
+  }
+  return { clamp };
+}
+
+/**
+ * Re-bound a stored apparentAge against a (possibly changed) declared age.
+ * The trial wizard syncs an age edited after the prewarm through
+ * update-character-details; the stored apparentAge was clamped against the OLD
+ * age and must stay within one group of the NEW one. Idempotent when the age
+ * did not change (a clamped value is already within one group).
+ *
+ * @returns {Object|null} the clamp result, or null when there is nothing to clamp
+ */
+function reclampTrialApparentAge(physical, statedAge) {
+  if (!physical?.apparentAge) return null;
+  const clamp = clampApparentAge(physical.apparentAge, statedAge);
+  physical.apparentAge = clamp.category;
+  return clamp;
+}
+
+module.exports = { parseTrialAge, applyTrialPhotoTraits, reclampTrialApparentAge, TRIAL_MIN_AGE, TRIAL_MAX_AGE };

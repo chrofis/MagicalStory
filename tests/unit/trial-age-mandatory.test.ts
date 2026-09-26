@@ -68,7 +68,7 @@ describe('the server refuses a trial character with no age', () => {
 
   it('update-character-details refuses an invalid age and never clears a stored one', () => {
     expect(TRIAL_ROUTE).toMatch(/if \(age !== undefined\) \{[\s\S]{0,200}parseTrialAge\(age\)/);
-    expect(TRIAL_ROUTE).toMatch(/if \(patchedAge !== null\) c\.age = patchedAge;/);
+    expect(TRIAL_ROUTE).toMatch(/if \(patchedAge !== null\) \{\s*c\.age = patchedAge;/);
   });
 });
 

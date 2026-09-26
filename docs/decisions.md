@@ -61099,3 +61099,29 @@ nothing there. Whether the planner keeps its own table needs a paid beats_replan
 server/lib/beatsPipeline.js, server/lib/testlab.js, prompts/story-beats.txt, prompts/plan-check.txt,
 scripts/admin/sibling-registry.json, docs/prompt-inventory.md, tests/unit/plan-cast-table.test.ts,
 tests/unit/plan-counters.test.ts, tests/unit/plan-collective-cast.test.ts, tests/unit/built-prompt-values.test.ts.
+
+## 2026-09-26 — The trial clamps the photo's apparentAge like every other path; a changed age re-bounds it
+
+**Context:** prod trial job_1790282439176_ppgelxibt: declared age 5, an adult's photo, stored
+`physical.apparentAge = "middle-aged"`; the page prompts described the hero with adult proportions
+and the back cover as "a middle-aged man". `extractCharacterVisualProfile` trusts apparentAge over the
+declared age because `clampApparentAge()` bounds it to one group of the declared age (2026-08-05
+entry, settled). The regular avatar paths clamp; the two trial writers (preview-avatar save,
+create-anonymous-account background save) copied the photo read unclamped since e894b0fe6.
+
+**Decision:** every trial write of photo traits goes through `applyTrialPhotoTraits`
+(server/lib/trialAge.js), which clamps against the age ON THE ROW at write time (a PATCH may have
+changed it while the extraction ran) and passes the analysis confidence, as avatars.js does
+(`extractTraitsShared` now carries `confidence` with the traits). `update-character-details`
+re-bounds a stored apparentAge against a newly declared age (`reclampTrialApparentAge`) — lossy
+(the raw photo read is not kept) but it restores the one-group invariant the readers depend on, and
+it is idempotent when the age did not change.
+
+**Evidence (rung 1, free):** Burak's stored prod row replayed through the fixed write path:
+apparentAge middle-aged → young-school-age; the AGE & PROPORTIONS line changes from "adult
+proportions about 7.5-8 heads tall…" to "early grade-school proportions about 5.5 heads tall…",
+the physical description from "Burak is a middle-aged man" to "Burak is a young-school-age boy".
+
+**Touched:** server/lib/trialAge.js, server/routes/trial.js, scripts/admin/sibling-registry.json
+(new set `photo-apparent-age-clamp`), tests/unit/trial-apparent-age-clamp.test.ts,
+tests/unit/trial-age-mandatory.test.ts, tasks/bugs.json.

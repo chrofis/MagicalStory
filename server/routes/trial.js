@@ -25,7 +25,7 @@ const { assertPromptFilled } = require('../services/prompts');
 // The trial's declared age is MANDATORY (owner, 2026-09-15) — one parser for
 // every entry point below. See server/lib/trialAge.js for the range and why
 // the field became load-bearing (de8753cc1).
-const { parseTrialAge } = require('../lib/trialAge');
+const { parseTrialAge, applyTrialPhotoTraits, reclampTrialApparentAge } = require('../lib/trialAge');
 
 // Server.js-local dependencies received via initTrialRoutes()
 let deps = {};
@@ -83,7 +83,11 @@ function extractTraitsShared(photoStr, photoDataUri, extractFn) {
   const p = (async () => {
     try {
       const result = await extractFn(photoDataUri);
-      const traits = result?.traits || null;
+      // Carry the analysis confidence with the traits: clampApparentAge treats a
+      // low-confidence age read as untrustworthy (as routes/avatars.js does).
+      const traits = result?.traits
+        ? (result.confidence && !result.traits.confidence ? { ...result.traits, confidence: result.confidence } : result.traits)
+        : null;
       if (traits) cacheTraits(photoStr, traits);
       return traits;
     } catch {
@@ -1115,11 +1119,9 @@ OUTPUT: A single character illustration. No text, no borders, no additional elem
               // Save extracted physical traits for story generation pipeline
               if (extractedTraits) {
                 const physical = charData.characters[0].physical || {};
-                if (extractedTraits.hairColor) physical.hairColor = extractedTraits.hairColor;
-                if (extractedTraits.eyeColor) physical.eyeColor = extractedTraits.eyeColor;
-                if (extractedTraits.skinTone) physical.skinTone = extractedTraits.skinTone;
-                if (extractedTraits.apparentAge) physical.apparentAge = extractedTraits.apparentAge;
-                if (extractedTraits.detailedHairAnalysis) physical.detailedHairAnalysis = extractedTraits.detailedHairAnalysis;
+                // apparentAge is clamped against the age on the row (applyTrialPhotoTraits).
+                const { clamp } = applyTrialPhotoTraits(physical, extractedTraits, charData.characters[0].age);
+                if (clamp?.clamped) log.info(`[AGE CLAMP] trial ${req.body.characterId}: ${clamp.reason}`);
                 charData.characters[0].physical = physical;
               }
               await offloadCharacterImages(req.body.characterId, decoded.userId, charData);
@@ -1284,11 +1286,10 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
           ? JSON.parse(charResult.rows[0].data) : charResult.rows[0].data;
         if (!charData.characters?.[0]) return;
         const physical = charData.characters[0].physical || {};
-        if (t.hairColor) physical.hairColor = t.hairColor;
-        if (t.eyeColor) physical.eyeColor = t.eyeColor;
-        if (t.skinTone) physical.skinTone = t.skinTone;
-        if (t.apparentAge) physical.apparentAge = t.apparentAge;
-        if (t.detailedHairAnalysis) physical.detailedHairAnalysis = t.detailedHairAnalysis;
+        // Clamp against the age on the row NOW — a PATCH may have changed it
+        // while the extraction ran.
+        const { clamp } = applyTrialPhotoTraits(physical, t, charData.characters[0].age);
+        if (clamp?.clamped) log.info(`[AGE CLAMP] trial ${characterId}: ${clamp.reason}`);
         charData.characters[0].physical = physical;
         // Whole-blob rewrite: without the sweep this re-persists any bytes an
         // earlier path left inline. No-op when the row is already clean.
@@ -1319,7 +1320,8 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
  * edits made AFTER the background create-anonymous-account fired — without
  * this the prewarmed account is locked to whatever the form held at fire
  * time. Does NOT touch `physical` (extracted from photo, server-owned) or
- * any avatar fields.
+ * any avatar fields — except that a changed age re-bounds the stored photo
+ * apparentAge to within one group of it (reclampTrialApparentAge).
  */
 router.patch('/update-character-details', verifySessionToken, async (req, res) => {
   try {
@@ -1376,7 +1378,13 @@ router.patch('/update-character-details', verifySessionToken, async (req, res) =
     c.name = name.replace(/[\r\n]/g, '').trim();
     // An omitted age leaves the stored one intact; a supplied one is the
     // normalised whole-year value parsed above.
-    if (patchedAge !== null) c.age = patchedAge;
+    if (patchedAge !== null) {
+      c.age = patchedAge;
+      // The stored photo apparentAge was clamped against the age the prewarm
+      // sent; keep it within one group of the age now declared.
+      const clamp = reclampTrialApparentAge(c.physical, patchedAge);
+      if (clamp?.clamped) log.info(`[AGE CLAMP] trial ${characterId}: ${clamp.reason}`);
+    }
     c.gender = gender || '';
     c.traits = structuredTraits;
     if (customTraits != null) c.customTraits = customTraits;
