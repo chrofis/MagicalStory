@@ -2317,6 +2317,42 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "plan-storylogic-q18",
+      "title": "The planner and the plan check read the arc's STORY LOGIC; plan-check Q18 names a page that breaks a stated fact",
+      "commits": [
+        "520a69e69"
+      ],
+      "addedAt": "2026-09-27",
+      "claim": "On the next staging story: beatsReviewReport.plannerPrompt and .prompt both carry the \"# THE STORY LOGIC\" section with the arc's logic block (arcReviewReport.logic); every Q18 finding in modelFindings names a page and a fact the logic actually states (no false charge), and no plan line contradicts a stated fact without a Q18 finding.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "beatsReviewReport.plannerPrompt / .prompt / replanPrompts contain arcReviewReport.logic verbatim; modelFindings with check 18 read against the logic Facts; plan lines vs Facts. Baseline: staging job_1790446348343_z3fw660ie (logic dropped by the hints step, coat-rope contradiction)."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "plate-qc-structures-check",
+      "title": "The plate QC fails a structure that is missing or of another kind or shape (soft key structures)",
+      "commits": [
+        "4a8f7dce0"
+      ],
+      "addedAt": "2026-09-27",
+      "claim": "On the next staging story with a Visual Bible vehicle or large structure on a plate: the plate QC prompt carries the Structures check, a plate whose vessel is another kind or shape (or missing where the plate text puts it in view) gets a structures finding and a retry, and a plate whose vessel matches (or shows only the deck on an aboard page) gets none.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "sceneImages[].emptySceneQc v1Issues/retryIssues and the generation log plate events for pages whose buildPlateStructuresText is non-empty; look at the plate pixels against the VB description. Fixtures: plate-fiona-p6/p10 (flag), p7/p9 (pass)."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }
