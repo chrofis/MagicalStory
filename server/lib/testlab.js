@@ -71,6 +71,8 @@ async function loadSceneContext(storyId, pageNumber) {
               data->>'language' AS language,
               data->>'languageLevel' AS language_level,
               data->>'storyType' AS story_type,
+              data->>'storyTheme' AS story_theme,
+              data->>'storyTopic' AS story_topic,
               data->>'title' AS title,
               data->'layout' AS layout,
               (data->'visualBible')::text AS visual_bible,
@@ -86,6 +88,8 @@ async function loadSceneContext(storyId, pageNumber) {
               data->>'language' AS language,
               data->>'languageLevel' AS language_level,
               data->>'storyType' AS story_type,
+              data->>'storyTheme' AS story_theme,
+              data->>'storyTopic' AS story_topic,
               data->>'title' AS title,
               data->'layout' AS layout,
               (data->'visualBible')::text AS visual_bible,
@@ -144,6 +148,10 @@ async function loadSceneContext(storyId, pageNumber) {
     language: rows[0].language || 'de',
     languageLevel: rows[0].language_level || 'standard',
     storyType: rows[0].story_type || null,
+    // With storyType and clothingRequirements, what plateQc.plateStoryEra
+    // derives the plate QC's era from — as the story run does.
+    storyTheme: rows[0].story_theme || null,
+    storyTopic: rows[0].story_topic || null,
     title: rows[0].title || null,
     clothingRequirements,
     characters,
@@ -764,6 +772,31 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
   return { imageType: 'scene', versionIndex, promptUsed: prompt, modelId: result.modelId || null, elapsedMs, scores, artStyle: params.artStyleOverride || undefined, ...(steps.length ? { steps } : {}) };
 }
 
+/**
+ * validateEmptyScene options for a Lab plate — the per-page plate QC's option
+ * set (storyJobPipeline.js `pageQcOpts`), field for field: the page's declared
+ * placements, the scene prose the geometry is graded on, the era the story run
+ * derives (plateQc.plateStoryEra — NOT the brief's `era`, which the run never
+ * hands the judge), the full art style, the shot, the landmark photo, the light.
+ */
+function labPlateQcOptions(ctx, { sceneDescription, shot, artStyle }) {
+  const meta = ctx.scene.sceneMetadata || {};
+  const placements = (meta.fullData?.characters || [])
+    .filter(c => c?.name && c?.position)
+    .map(c => ({ name: c.name, position: c.position, depth: c.depth }));
+  return {
+    sceneDescription,
+    characterPlacements: placements.length > 0 ? placements : null,
+    mainScenePrompt: ctx.scene.sceneDescription || null,
+    storyEra: require('./plateQc').plateStoryEra(ctx.clothingRequirements, ctx),
+    artStyle,
+    shot: String(shot || '').trim() || null,
+    pageNumber: ctx.pageNumber,
+    landmarkPhoto: ctx.landmarkPhotos?.[0] || null,
+    light: require('./sceneLight').declaredLight(meta),
+  };
+}
+
 async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = {} }) {
   const { loadPromptTemplates, buildEmptyScenePrompt } = require('../services/prompts');
   await loadPromptTemplates();
@@ -880,22 +913,17 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
 
   // Same QC the pipeline runs (pixel + Gemini vision) — report-only here, no
   // retry loop: the point is seeing whether a prompt variant passes the gate.
-  // The calm-zone half needs a text position, so QC is skipped for text-below
-  // layouts (production never validates those either).
+  // It runs on EVERY plate. A text-below layout has no calm zone, so the text
+  // position is null — exactly as the story run's vantage plates are judged
+  // (storyJobPipeline.js validateEmptyScene(plate, null, …)). It used to be
+  // skipped for text-below and reported a fake pass on every Lab plate since
+  // text-below became every level's layout (2026-09-05).
   let qc = null;
-  if (!wantsTextZone) qc = { pass: true, issues: [], skipped: 'no text zone (text-below layout)' };
-  else try {
+  try {
     const { validateEmptyScene } = require('./images');
-    const qcRes = await validateEmptyScene(result.imageData, ctx.textPosition, `testlab-exp${experimentId}-P${ctx.pageNumber}`, {
-      sceneDescription: description,
-      mainScenePrompt: ctx.scene.sceneDescription || null,
-      storyEra: meta.era || null,
-      artStyle: plateStyle,
-      shot: (meta.fullData?.shot || meta.shot || '').trim() || null,
-      landmarkPhoto: ctx.landmarkPhotos?.[0] || null,
-      light: require('./sceneLight').declaredLight(meta),
-    });
-    qc = { pass: qcRes.pass, issues: qcRes.issues || [], findings: qcRes.findings || [], visionFeedback: qcRes.visionFeedback || null };
+    const qcRes = await validateEmptyScene(result.imageData, wantsTextZone ? ctx.textPosition : null, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
+      labPlateQcOptions(ctx, { sceneDescription: description, shot: pageShot || meta.setting?.camera || 'wide shot', artStyle: plateStyle }));
+    qc = { pass: qcRes.pass, issues: qcRes.issues || [], findings: qcRes.findings || [], visionFeedback: qcRes.visionFeedback || null, textPosition: wantsTextZone ? ctx.textPosition : null };
   } catch (err) {
     log.warn(`[TESTLAB] empty-scene QC failed: ${err.message}`);
     qc = { error: err.message };
@@ -5645,10 +5673,35 @@ async function runEditImageStage(ctx, { experimentId, promptOverride, params = {
   const edited = result?.imageData || null;
   if (!edited) throw new Error('edit produced no image');
 
+  // An edited PLATE is judged like the story run's derived plate
+  // (storyJobPipeline.js `derivedQcOpts`): no text zone, its own camera class,
+  // the medium, the place — not the page's geometry facts or placements, which
+  // the edit never saw. Without it the Lab replayed the derive and skipped the
+  // QC production runs on its output.
+  let qc;
+  if (onPlate) {
+    try {
+      const { validateEmptyScene } = require('./images');
+      const { resolvePagePlate, resolveArtStyle } = require('./storyHelpers');
+      const meta = ctx.scene.sceneMetadata || {};
+      const opts = labPlateQcOptions(ctx, {
+        sceneDescription: resolvePagePlate({ pageNumber: ctx.pageNumber, sceneMetadata: meta, visualBible: ctx.visualBible, outlinePlate: '' }).text || null,
+        shot: require('./shotVocabulary').plateClass(String(meta.fullData?.shot || '').trim()),
+        artStyle: resolveArtStyle(ctx.artStyle || 'pixar') || '',
+      });
+      const qcRes = await validateEmptyScene(edited, null, `testlab-exp${experimentId}-P${ctx.pageNumber}-edit`,
+        { ...opts, characterPlacements: null, mainScenePrompt: null });
+      qc = { pass: qcRes.pass, issues: qcRes.issues || [], findings: qcRes.findings || [], visionFeedback: qcRes.visionFeedback || null, textPosition: null };
+    } catch (err) {
+      log.warn(`[TESTLAB] edited-plate QC failed: ${err.message}`);
+      qc = { error: err.message };
+    }
+  }
+
   const imageType = onPlate ? 'empty_scene' : 'scene';
   const versionIndex = await saveTestVersion(ctx.storyId, imageType, ctx.pageNumber, edited, experimentId);
   // editImageWithPrompt reports the model at usage.model (no top-level modelId).
-  return { imageType, versionIndex, elapsedMs, modelId: result.usage?.model || null, promptUsed: instruction };
+  return { imageType, versionIndex, elapsedMs, modelId: result.usage?.model || null, promptUsed: instruction, ...(qc ? { qc } : {}) };
 }
 
 /**
@@ -10624,4 +10677,10 @@ module.exports = {
   // The stored challenge draw a create prompt carried, both stored shapes
   // (tests/unit/testlab-stored-challenge-section.test.ts).
   storedChallengeSection,
+  // The plate stages and their QC option set — exported so "the Lab judges
+  // every plate the way the story run does" is pinned by running them with the
+  // network and DB stubbed (tests/unit/lab-plate-qc-always.test.ts).
+  labPlateQcOptions,
+  runEmptySceneStage,
+  runEditImageStage,
 };

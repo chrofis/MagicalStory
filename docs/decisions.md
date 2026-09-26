@@ -39,6 +39,30 @@ superseded and link forward.
 
 ---
 
+## 2026-09-26 — The Test Lab judges every plate; one story-era derivation for every plate QC
+**Context:** The Lab `empty_scene` stage skipped the whole plate QC when a story had no text zone
+and stored `{ pass: true, skipped: 'no text zone (text-below layout)' }`, on the premise that
+production never validates those plates. It does: the story run judges every VANTAGE plate (and
+its retry and every plate derived from it) with `textPosition` null. Every level is text-below
+since 2026-09-05, so every Lab plate verdict since then was a fake pass (Lab 1503). The Lab's
+option set also differed: it handed the judge the brief's `era` (the run never does) and no
+character placements. `edit_image` on a plate replays the plate derive and ran no QC at all.
+**Decision:** The Lab always runs `validateEmptyScene` — the text position when a text zone is
+active, null otherwise — with the per-page plate QC option set (`labPlateQcOptions`). An edited
+plate is judged like a derived plate (`derivedQcOpts`: null text position, `plateClass` camera,
+no page geometry or placements). The story era the anachronism gate reads is one helper,
+`plateQc.plateStoryEra` (costume type + theme/topic/type, else null), used by the run's vantage
+and per-page QCs and by the Lab; it replaces two inline copies. Story-run behaviour is unchanged.
+**Rationale:** a Lab stage that reports a verdict production would not reach measures nothing.
+Note, NOT changed here: the story run's PER-PAGE plate path (`renderPagePlate`) still runs its
+QC only when `layout.textInImage` (the 2026-09-05 "overlay pipeline is dormant" entry lists
+empty-scene QC among the gated parts), so on a text-below story only vantage and derived plates
+are judged. The Lab now judges every plate; whether the per-page run path should too is an open
+owner question.
+**Touched:** `server/lib/testlab.js`, `server/lib/plateQc.js`, `storyJobPipeline.js`,
+`tests/unit/lab-plate-qc-always.test.ts`
+**Status:** ✅ active
+
 ## 2026-09-26 — A large creature is measured against the people in frame; drawn too small, it is a D-34 finding and a page redo
 
 **Context:** Staging job_1790373080139_vnx5l8iy7 (dragon run 8). The grown dragon (VB ANI001, `scaleClass: twice-adult-height`) was stated twice in every page prompt and rendered large on p5, cat-sized on p10, child-plus on p16/p17, boy-sized on p18. Four causes: (1) its reference cell looked like the hatchling ANI002 — both entries shared one feature list and nothing in the grown one said "adult"; (2) the band phrase measures against "a standing adult" and no adult was in frame; (3) the `cute` creature tone said "never with the child dwarfed beside it … never towering over a child"; (4) the p10 inpaint regenerated the dragon from an instruction with no size, and on p16 the finding came typed `scale` (in NOT_INPAINTABLE_TYPES), the consolidator dropped it `requires_char_fix_not_inpaint`, and char-fix cannot paint a VB creature — orphaned. The evaluator had no creature-too-small rule.
@@ -280,6 +304,7 @@ no "identical / resize"):**
   (four invented houses around a bare tree seen from above). The aerial move is not proven to keep the place.
 - Open: the watercolor style text asks for "rough cold-press paper texture throughout, edges dissolving into the
   paper", a candidate source of the deckle edge and the mat. Not changed here (style text is outside this fix).
+  Closed by the next entry ("The watercolor style paints to the picture's edges").
 
 
 **Touched:** prompts/plate-derive.txt (new), prompts/empty-scene.txt, prompts/empty-scene-qc.txt,
@@ -287,6 +312,46 @@ server/lib/shotVocabulary.js, server/services/prompts.js, server/lib/images.js, 
 server/lib/testlab.js, storyJobPipeline.js, scripts/admin/sibling-registry.json,
 tests/unit/plate-edge-and-derive-template.test.ts, tests/unit/plate-derive-for-angle.test.ts,
 tests/unit/empty-scene-qc-extraction.test.ts, docs/prompt-inventory.md, docs/image-routing.md.
+**Status:** ✅ active on staging.
+
+## 2026-09-25 — The watercolor style paints to the picture's edges; paper texture and soft edges stay inside the picture, and the plate QC fails a deckle edge
+
+**Context:** Watercolor renders kept arriving on a painted paper surround: Lab 1480 (ultra-wide derive of the
+p4 plate, staging job_1790277448294_5herh01j7) had a cream deckle edge along the top and sides, Lab 1479 a
+torn-paper corner, Lab 1484 (p1 plate) ragged white paper edges of which the auto frame-strip removed only the
+uniform part, and the stored LOC002.1 plate sat on a mat. The page prompt (image-generation.txt: "bleeding off all
+four edges") and the plate prompts (`PLATE_EDGE_RULE`) already ask for paint to all four sides; the watercolor
+`ART_STYLES` text sent with them said "rough cold-press paper texture throughout, edges dissolving into the paper",
+which the model drew as the picture's own rim. The plate QC passed 1479 and 1480: its Frame edge check listed a
+"paper margin, mat, border, keyline or frame" and the judge did not count a deckle edge as any of them.
+
+**Decision:**
+- `ART_STYLES.watercolor` (promptBuilders.js): "rough cold-press paper texture throughout the painted surface,
+  soft edges between forms. No vignette, no unpainted paper margin, no deckle or torn-paper edge." The medium words
+  the 2026-08-20 note calls load-bearing (bold, expressive, prominent, strong, throughout, paint-dominant) stay.
+- No positive "paint to every edge" sentence in the style text: the same constant reaches the character 2x4 sheet
+  (`resolveArtStyleForSheet` keeps a sentence with "no" verbatim), whose cells have a plain light-grey ground and
+  dividers, and a painted wash on those sheets was a measured failure. The denial names only paper-edge devices, so
+  sheet grounds and dividers are untouched. Edge-to-edge is already stated by the frame rules (pages, covers,
+  plates, derives).
+- `PLATE_SURROUNDS` (shotVocabulary.js) adds "deckle or torn-paper edge, vignette". It is one constant read by the
+  plate author and the derive (`PLATE_EDGE_RULE`) and by the plate QC's Frame edge check, so generator and critic
+  move together. The check key stays `artefact` (HARD); `plateQc.js` is unchanged.
+- No other style carried "dissolving", "vignette" or "paper border" wording (all 14 `ART_STYLES` checked;
+  prompts/art-styles.txt's watercolor line for the legacy avatar loaders says "soft edges" only).
+- The style-consistency judge reads the same constant, so it no longer asks for "edges dissolving into the paper"
+  (a stored rationale on job_1788614817116_vxnu60yjg faulted "sharp, defined edges instead of dissolving into the
+  paper").
+- The pixel check's comment (evalPipeline.js `largestInteriorUniformFraction`, 2026-09-14) calls a watercolour
+  paper border "an intended part of the art style". That is no longer the intent, but the peel stays: it only
+  keeps a perimeter band from being counted as an interior box, and the semantic Frame edge check is the one that
+  fails a border.
+
+**Lab (rung 2, staging 9cf38a556):** Lab 1503 (empty_scene, job_1790277448294_5herh01j7 p1, deploy f445a654 which also carries 8d979ae8d plates-hold-no-people): frame painted edge to edge, no deckle/mat/vignette/letterbox, no people - BUT the render reads photographic (a photo with a light painterly filter), unlike Lab 1484's clearly painted plate; n=1, cause not isolated. Plate QC was SKIPPED ('no text zone (text-below layout)'), so the widened Frame edge check did not run. Lab 1504 (edit_image ultra-wide on the p4 plate, Lab 1480's params): watercolor, painted to the edges; the cream deckle frame of Lab 1480 is gone; soft wash blooms leave small pale paper patches in the sky at the top corners (in-image, not a margin). About $0.04. Open: the photographic p1 render, and plate QC being skipped on text-below stories.
+
+**Touched:** server/lib/promptBuilders.js, server/lib/shotVocabulary.js,
+tests/unit/plate-edge-and-derive-template.test.ts, tests/unit/empty-scene-qc-extraction.test.ts,
+docs/prompt-inventory.md.
 **Status:** ✅ active on staging.
 
 ## 2026-09-24 — An outfit description is appearance only, and a repair descriptor names one closed-vocabulary garment, never the outfit sentence

@@ -4860,15 +4860,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     placements.push({ name: c.name, position: c.position, depth: c.depth });
                   }
                 }
-                // Same era derivation as the per-page path below.
-                let storyEra = null;
-                const costumedTypes = Object.values(streamingClothingRequirements || {})
-                  .map(r => r?.costumed?.used && r?.costumed?.costume)
-                  .filter(Boolean);
-                if (costumedTypes.length > 0) {
-                  const themeBits = [inputData.storyTheme, inputData.storyTopic, inputData.storyType].filter(Boolean).join(' / ');
-                  storyEra = themeBits ? `${costumedTypes[0]} (${themeBits})` : costumedTypes[0];
-                }
+                // Same era derivation as every plate QC (plateQc.plateStoryEra).
+                const storyEra = require('./server/lib/plateQc').plateStoryEra(streamingClothingRequirements, inputData);
                 plateQcOpts = {
                   ...plateQcOpts,
                   sceneDescription: emptySceneDesc,
@@ -5252,14 +5245,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 // Fallback to storyTheme/Topic/Type. If nothing indicates an era,
                 // leave null — the vision check will then skip the anachronism gate
                 // rather than false-flag a legitimate present-day scene.
-                let storyEra = null;
-                const costumedTypes = Object.values(streamingClothingRequirements || {})
-                  .map(r => r?.costumed?.used && r?.costumed?.costume)
-                  .filter(Boolean);
-                if (costumedTypes.length > 0) {
-                  const themeBits = [inputData.storyTheme, inputData.storyTopic, inputData.storyType].filter(Boolean).join(' / ');
-                  storyEra = themeBits ? `${costumedTypes[0]} (${themeBits})` : costumedTypes[0];
-                }
+                const storyEra = require('./server/lib/plateQc').plateStoryEra(streamingClothingRequirements, inputData);
                 const pageQcOpts = {
                   sceneDescription: emptySceneDesc,
                   characterPlacements: placements.length > 0 ? placements : null,

@@ -2139,6 +2139,18 @@
       "fixedAt": "2026-09-26",
       "fixedIn": "63ed8628b",
       "fix": "Both trial writers go through applyTrialPhotoTraits (server/lib/trialAge.js): clampApparentAge against the age on the row at write time, with the analysis confidence (extractTraitsShared carries it). update-character-details re-bounds a stored apparentAge on an age change (reclampTrialApparentAge). Sibling set photo-apparent-age-clamp. Test: trial-apparent-age-clamp.test.ts; replay of Burak's stored prod row: middle-aged -> young-school-age, 'adult proportions about 7.5-8 heads tall' -> 'early grade-school proportions about 5.5 heads tall'."
+    },
+    {
+      "id": "lab-plate-qc-skipped-text-below",
+      "title": "The Test Lab empty_scene stage skipped the whole plate QC on text-below stories and reported a fake pass",
+      "reportedAt": "2026-09-26",
+      "source": "Owner, 2026-09-26, with stored evidence: Lab 1503 (empty_scene, staging job_1790277448294_5herh01j7 p1) stored qc = { pass: true, skipped: \"no text zone (text-below layout)\" } (docs/decisions.md rung-2 note on the watercolor edge fix), so the widened Frame edge check never ran on it.",
+      "rootCause": "server/lib/testlab.js runEmptySceneStage: `if (!wantsTextZone) qc = { pass: true, issues: [], skipped: ... }`, on the premise 'production never validates those either'. The story run judges every vantage plate with textPosition null (storyJobPipeline.js validateEmptyScene(plate, null, ...)). Every level has been text-below since 2026-09-05, so every Lab plate since then reported pass without being judged. Sibling: edit_image on a plate (source empty_scene / derive_base) replays the plate derive and never ran the QC the run gives a derived plate.",
+      "impact": "Every Lab empty_scene verdict since 2026-09-05 was a fake pass; a plate-prompt change could not be measured against the plate judge in the Lab. The Lab QC option set also differed from production (the brief's era instead of the derived story era; no character placements; no pageNumber).",
+      "status": "fixed",
+      "fixedAt": "2026-09-26",
+      "fixedIn": "e8dca2d19",
+      "fix": "runEmptySceneStage always runs validateEmptyScene, with the text position only when a text zone is active and null otherwise, and the per-page plate QC option set (labPlateQcOptions: placements, mainScenePrompt, plateQc.plateStoryEra, full art style, shot, pageNumber, landmark photo, light). edit_image on a plate runs the derived-plate QC (null text position, plateClass camera, no page geometry or placements). The era derivation is one helper (plateQc.plateStoryEra) used by both story-run plate QCs and the Lab. Test: lab-plate-qc-always.test.ts."
     }
   ]
 }
