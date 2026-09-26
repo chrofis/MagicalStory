@@ -2247,6 +2247,30 @@
       "fixedAt": "2026-09-26",
       "fixedIn": "2eeb3e0da",
       "fix": "plateStoryEra deleted; the QC takes the brief's `era` and classifies it with buildEraGuard inside buildEmptySceneQcPrompt (present day: no era block, no anachronism check). Tests: tests/unit/plate-qc-era-framing-photo.test.ts, tests/unit/lab-plate-qc-always.test.ts. docs/decisions.md 2026-09-26 \"The plate QC judges the era, the framing and the landmark photo its author was given\"."
+    },
+    {
+      "id": "semantic-declared-blocks-empty",
+      "title": "The semantic judge got \"(none declared)\" interactions and \"(none)\" page elements on every pipeline eval",
+      "reportedAt": "2026-09-26",
+      "status": "fixed",
+      "fixedAt": "2026-09-26",
+      "source": "Critic input audit 2026-09-26: 80 of 80 stored staging semantic prompts (eval_calls, 3 stories) carry both empty blocks while the brief in the same prompt declares objects on 80 and interactions on 70.",
+      "rootCause": "evaluateSemanticFidelity parsed metadata from `imagePrompt || sceneHint`; the pipeline's imagePrompt is the metadata-stripped prose, and evaluateImageQuality passed no visualBible for the ids to resolve against.",
+      "impact": "The judge could not check declared placements or name an element id, so element-targeted repair got no reference from it.",
+      "fixedIn": "84f60f202, 10a9b7084",
+      "fix": "semanticDeclaredBlocks reads the brief first (the quality judge's order) and the bible is passed (evalPipeline 10a9b7084, Lab semantic_eval). Replay over 52 stored pages: interactions 0 -> 50, elements 0 -> 52. Test: semantic-declared-blocks.test.ts."
+    },
+    {
+      "id": "book-audit-reads-original-brief",
+      "title": "The in-flight book audit read the page's original brief beside the picked iterate rewrite's picture",
+      "reportedAt": "2026-09-26",
+      "status": "fixed",
+      "fixedAt": "2026-09-26",
+      "source": "Critic input audit 2026-09-26: 30 of 471 shipped staging pages (40 stories) shipped an iterate rewrite with its own brief; its sceneIntent differs from the page's original on all 30 (e.g. job_1790107559778_fcmlfa8kn p8).",
+      "rootCause": "buildAuditPages took sceneCharacters / sceneMetadata from the page record (the original brief) while taking the image from the picked version.",
+      "impact": "The reader's-eye audit judged a rewritten picture against a moment and cast it was not drawn from.",
+      "fixedIn": "b17ba4ee1",
+      "fix": "buildAuditPages resolves the picked version's cast and metadata first (resolveDeclaredCast), the page's otherwise. Test: book-audit-brief-and-type.test.ts."
     }
   ]
 }

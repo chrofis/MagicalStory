@@ -21,6 +21,70 @@ superseded and link forward.
 
 ---
 
+## 2026-09-26 — Every critic judges against the source the generator was given, uncut
+
+**Context.** The eval-gap analysis (owner-approved audit, 2026-09-26) found 10 of 24 problems where a critic
+judged against the generator's own derived text, and 8 where a critic was blind to an input it needs. An
+input audit of every critic (semantic, quality, entity grid, lettering, plate QC, VB cell gates, book
+audit, plan-check, arc panel/hints, scene review, text audits, visual flow, consolidator) found two input
+defects measurable on stored data that no other change covers:
+- **Semantic judge** read its DECLARED INTERACTIONS and PAGE ELEMENTS from `imagePrompt || sceneHint`;
+  on every pipeline eval `imagePrompt` is the metadata-stripped prose, and the pipeline passed no bible.
+  80 of 80 stored staging semantic prompts (eval_calls, 3 stories) said "(none declared)" / "(none)"
+  while the brief in the same prompt declared objects on 80 and interactions on 70 — the judge could not
+  name an element id, and element-targeted repair got nothing from it.
+- **Book audit** (in-flight path) read each page's ORIGINAL brief (`sceneIntent`, cast) beside the
+  PICKED version's picture. 30 of 471 shipped staging pages (40 stories) shipped an iterate rewrite with
+  its own brief; its `sceneIntent` differs from the audited one on all 30.
+
+**Decision (standing rule, owner 2026-09-26).** Every critic gets the ORIGINAL source the generator was
+supposed to honour — plan line, page text, declared structured fields, landmark photo, VB reference, cast
+roster — UNCUT. A critic never judges against the generator's derived text (the built prompt, the Art
+Director's rewritten brief, stripped or shrunk text) unless that derived text IS the contract under test
+(the semantic judge's image-vs-BRIEF is such a contract, SETTLED 2026-09-13; a repaired version's own
+brief is its contract, SETTLED "evaluated against their OWN scene contract"). An input fix — handing a
+critic an uncut or original source it lacks — is in scope for any session; what counts as a defect and
+how much it costs is not (SETTLED "Classification is the PROMPT's job"), and neither is a settled
+contract. Built under this rule:
+1. `semanticDeclaredBlocks` (sceneValidator.js, new, pure): the blocks are read from the brief first
+   (`sceneHint || imagePrompt`, the quality judge's order) and resolved against the bible, which
+   `evaluateImageQuality` and the Lab `semantic_eval` stage now pass.
+2. `buildAuditPages` (bookAudit.js): the brief line comes from the picked version's own cast and
+   metadata when it has them (`resolveDeclaredCast`, the resolution buildEvalInputs and the final
+   promotion use), the page's otherwise. The Lab stage reads the stored, already-promoted page.
+No template, type, severity or threshold changed.
+
+**Validation (rung 1, free).** Semantic: the new builder over the 52 stored pages of the three stories
+with stored semantic calls — interactions declared on 50/52, elements on 52/52 (old read: 0/52, 0/52).
+Book audit: the counts above; unit-pinned.
+
+**Plate QC EXPECTED SCENE (not built here — coordination).** The cut at 300 chars (and MAIN SCENE PROSE at
+800) is still in place: the concurrent plate-QC change (2eeb3e0da) keeps the 300 cap on the evidence of one
+Lab 1506 call and adds the FRAMING paragraph as its own uncut field. This audit measured 50 of 59 stored
+staging plate_qc prompts cut at 300 and 27 of 59 at 800, and replayed 10 stored plates of
+`job_1790277448294_5herh01j7` with both inputs whole (real `validateEmptyScene`, ~$0.03): p3's false
+`landmark` on the brief's own towers went away, p1's photograph was caught as `medium` and p13's signature
+as `text` (both missed with the cut), and no `figures` finding was lost (p1/p3/p8/p18 in both arms). That
+is evidence against the 1506 result, whose stored brief still asked for "a few distant passers-by" from
+before the no-people rule; the owner decides.
+
+**Not built — owner decisions** (inputs a critic lacks where adding them could change what it faults, or a
+settled contract): the quality/semantic judges read `compressedScene` (the shrunk prose) while the
+consolidator reads the whole brief; plan-check gets no STORY LOGIC (the planner has none either) and no
+CHARACTER_DETAILS; the arc-informed text audit gets no CHARACTER_DETAILS (the writer does); the per-page
+EXPECTED CAST omits VB secondaries that list the page (the detector roster and the book audit include
+them); the object entity grid gets no VB description or reference cell and drops cells past 9; the plate
+QC never sees the STRUCTURES text or VB grid its author gets; the scene review's worn-state round gets no
+Visual Bible; the arc panel's quote check also accepts quotes found only in the creator's critique (no
+stored instance in 99 panel replies); the disabled compliance judge still cuts STORY_TEXT at 2000 chars.
+
+**Touched:** server/lib/sceneValidator.js, server/lib/evalPipeline.js, server/lib/bookAudit.js,
+server/lib/testlab.js, tests/unit/semantic-declared-blocks.test.ts (new),
+tests/unit/book-audit-brief-and-type.test.ts, docs/prompt-inventory.md.
+**Status:** ✅ active on staging.
+
+---
+
 ## 2026-09-26 — The whole-cast page is a counted plan-check question; every figure's EYES line carries the viewer rule; a garment element's description is that garment only
 
 **Context:** Staging job_1790446348343_z3fw660ie p16 shipped a posed group: plan line "the six stand
