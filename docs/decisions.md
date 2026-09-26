@@ -21,6 +21,30 @@ superseded and link forward.
 
 ---
 
+## 2026-09-26 — The Test Lab judges every plate; one story-era derivation for every plate QC
+**Context:** The Lab `empty_scene` stage skipped the whole plate QC when a story had no text zone
+and stored `{ pass: true, skipped: 'no text zone (text-below layout)' }`, on the premise that
+production never validates those plates. It does: the story run judges every VANTAGE plate (and
+its retry and every plate derived from it) with `textPosition` null. Every level is text-below
+since 2026-09-05, so every Lab plate verdict since then was a fake pass (Lab 1503). The Lab's
+option set also differed: it handed the judge the brief's `era` (the run never does) and no
+character placements. `edit_image` on a plate replays the plate derive and ran no QC at all.
+**Decision:** The Lab always runs `validateEmptyScene` — the text position when a text zone is
+active, null otherwise — with the per-page plate QC option set (`labPlateQcOptions`). An edited
+plate is judged like a derived plate (`derivedQcOpts`: null text position, `plateClass` camera,
+no page geometry or placements). The story era the anachronism gate reads is one helper,
+`plateQc.plateStoryEra` (costume type + theme/topic/type, else null), used by the run's vantage
+and per-page QCs and by the Lab; it replaces two inline copies. Story-run behaviour is unchanged.
+**Rationale:** a Lab stage that reports a verdict production would not reach measures nothing.
+Note, NOT changed here: the story run's PER-PAGE plate path (`renderPagePlate`) still runs its
+QC only when `layout.textInImage` (the 2026-09-05 "overlay pipeline is dormant" entry lists
+empty-scene QC among the gated parts), so on a text-below story only vantage and derived plates
+are judged. The Lab now judges every plate; whether the per-page run path should too is an open
+owner question.
+**Touched:** `server/lib/testlab.js`, `server/lib/plateQc.js`, `storyJobPipeline.js`,
+`tests/unit/lab-plate-qc-always.test.ts`
+**Status:** ✅ active
+
 ## 2026-09-26 — A large creature is measured against the people in frame; drawn too small, it is a D-34 finding and a page redo
 
 **Context:** Staging job_1790373080139_vnx5l8iy7 (dragon run 8). The grown dragon (VB ANI001, `scaleClass: twice-adult-height`) was stated twice in every page prompt and rendered large on p5, cat-sized on p10, child-plus on p16/p17, boy-sized on p18. Four causes: (1) its reference cell looked like the hatchling ANI002 — both entries shared one feature list and nothing in the grown one said "adult"; (2) the band phrase measures against "a standing adult" and no adult was in frame; (3) the `cute` creature tone said "never with the child dwarfed beside it … never towering over a child"; (4) the p10 inpaint regenerated the dragon from an instruction with no size, and on p16 the finding came typed `scale` (in NOT_INPAINTABLE_TYPES), the consolidator dropped it `requires_char_fix_not_inpaint`, and char-fix cannot paint a VB creature — orphaned. The evaluator had no creature-too-small rule.

@@ -179,7 +179,24 @@ function logPlateOutcome(genLog, { event, label, pages = null, outcome, firstQc,
   }
 }
 
+/**
+ * The story era the plate QC's anachronism gate is judged against — the ONE
+ * derivation every plate QC uses (story-run vantage + per-page plates, Test Lab
+ * plate stages). A costumed outfit type is the period signal, qualified by the
+ * story's theme/topic/type; with no costume the era is null and the judge skips
+ * the anachronism gate rather than false-flag a present-day scene.
+ */
+function plateStoryEra(clothingRequirements, { storyTheme, storyTopic, storyType } = {}) {
+  const costumedTypes = Object.values(clothingRequirements || {})
+    .map(r => r?.costumed?.used && r?.costumed?.costume)
+    .filter(Boolean);
+  if (costumedTypes.length === 0) return null;
+  const themeBits = [storyTheme, storyTopic, storyType].filter(Boolean).join(' / ');
+  return themeBits ? `${costumedTypes[0]} (${themeBits})` : costumedTypes[0];
+}
+
 module.exports = {
+  plateStoryEra,
   nullOnPromptFit,
   logPlateOutcome,
   PLATE_QC_CHECKS,
