@@ -2149,7 +2149,7 @@
       "impact": "Every Lab empty_scene verdict since 2026-09-05 was a fake pass; a plate-prompt change could not be measured against the plate judge in the Lab. The Lab QC option set also differed from production (the brief's era instead of the derived story era; no character placements; no pageNumber).",
       "status": "fixed",
       "fixedAt": "2026-09-26",
-      "fixedIn": "",
+      "fixedIn": "e8dca2d19",
       "fix": "runEmptySceneStage always runs validateEmptyScene, with the text position only when a text zone is active and null otherwise, and the per-page plate QC option set (labPlateQcOptions: placements, mainScenePrompt, plateQc.plateStoryEra, full art style, shot, pageNumber, landmark photo, light). edit_image on a plate runs the derived-plate QC (null text position, plateClass camera, no page geometry or placements). The era derivation is one helper (plateQc.plateStoryEra) used by both story-run plate QCs and the Lab. Test: lab-plate-qc-always.test.ts."
     }
   ]
