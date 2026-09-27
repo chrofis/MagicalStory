@@ -66,6 +66,16 @@ $0.34, which leaves no room under the CHF 0.35 cap for the second story):
   constant, which is the only builder input that changed. It carries the new definition once, with 0 unfilled
   placeholders.
 
+**Measured, Lab #1553** (same story, after deploy 93df21cb9, same models, $0.12):
+- The first check filed Q17 on p16 only.
+- p16 became "all six walk away from the landing together along the Limmat bank, the fog closing behind them".
+  That is the definition's seen-from-behind-moving-off case, not a from-behind watching page.
+- p6 became "all five haul on one line together at the rail". It was rewritten for other findings and declared
+  CHECK[17], so it kept a shared action.
+- The recheck files NO Q17. Cast/focal must-fix went 4 → 0 and the guard KEPT the round.
+- 0 undeclared edits: every returned page (2, 3, 6, 8-12, 14-16) was declared. The review refused and restored
+  p8 and p9, which are protected pages that the round changed for noted findings.
+
 **Touched:** server/lib/promptBuilders.js (`WHOLE_CAST_DEF` incl. the 2026-09-27 watching clause, `buildReplanSection`),
 tests/unit/plan-shared-definitions.test.ts (510c0fca2)
 **Status:** ✅ active (staging)
