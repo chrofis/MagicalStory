@@ -10,7 +10,7 @@
       "impact": "Every face repair and every cutout repair told the model the scene was the reference and the avatar was the image to edit.",
       "status": "fixed",
       "fixedAt": "2026-09-27",
-      "fixedIn": "",
+      "fixedIn": "cbbdd3a48",
       "fix": "faceRepair.repairImageOrder returns the order constant each send site builds its image array from (CALL_MODEL_IMAGE_ORDER in callModel, imageCompositing.SCENE_EXACT_IMAGE_ORDER in grokEditSceneExact); buildPrompt fills {EDIT_IMAGE}/{REFERENCE_IMAGE} (and the whiteout/fallback ordinals) from it, and a template with a hard-coded 'IMAGE n' or without both placeholders throws. Send order unchanged. Test: tests/unit/char-repair-image-order.test.ts captures the images actually sent and checks the slot the prompt calls REFERENCE carries the avatar, for every axis combination."
     },
     {
@@ -22,7 +22,7 @@
       "impact": "A cover repair's text ordered one outfit while its reference showed another; on the Fiona cover the pasted torso region came back in a vest/apron instead of the pirate coat.",
       "status": "fixed",
       "fixedAt": "2026-09-27",
-      "fixedIn": "",
+      "fixedIn": "27cd9de6d",
       "fix": "clothingCategories.resolveRenderedClothingCategory is the one resolver for the outfit a character was rendered in: the record's own sceneCharacterClothing / perCharClothing / characterClothing / sceneMetadata.characterClothing, then resolvePageClothingCategory (cover brief, cover hint, pageClothing, primary). Used by the Lab stage (which now also loads pageClothing + coverHints and builds the text with buildClothingDescription), the manual route and the in-run char-fix (context now carries coverHints). null refuses; no 'standard' default. Test: tests/unit/rendered-clothing-category.test.ts."
     },
     {
