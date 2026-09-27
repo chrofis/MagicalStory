@@ -149,8 +149,13 @@ describe('a conflict never re-renders the default avatar', () => {
   const pipeline = fs.readFileSync(path.join(root, 'storyJobPipeline.js'), 'utf8');
 
   it('the kickoff still runs BEFORE the check', () => {
-    expect(beats.indexOf('onClothingRequirements(clothingRequirements)'))
-      .toBeLessThan(beats.indexOf('applyWardrobeBibleCorrections(clothingRequirements, visualBible)'));
+    // The check runs inside runArtDirector (shared with the Test Lab since
+    // 2026-09-27); the run calls it after the kickoff.
+    const run = beats.slice(beats.indexOf('async function generateStoryViaBeats('));
+    expect(run.indexOf('onClothingRequirements(clothingRequirements)'))
+      .toBeLessThan(run.indexOf('const ad = await runArtDirector({'));
+    const ad = beats.slice(beats.indexOf('async function runArtDirector('), beats.indexOf('async function generateStoryViaBeats('));
+    expect(ad).toContain('applyWardrobeBibleCorrections(clothingRequirements, visualBible)');
   });
 
   it('the re-render hook and its wiring are deleted', () => {

@@ -20,7 +20,7 @@
 const { log } = require('../utils/logger');
 const { geminiUsage } = require('./providerUsage');
 const { samUnionBlend, maskBlurThreshold, fetchMaskWithRetry, BLEND_RULE_VERSION } = require('./samBlend');
-const { assessSceneReview, assertReviewedArtifactUsable, pickReviewedBrief } = require('./sceneReviewGuard');
+const { assertReviewedArtifactUsable, pickReviewedBrief } = require('./sceneReviewGuard');
 // Production's arguments for the beats writer/Art-Director calls, resolved from
 // a stored story. Every replay stage builds its inputs through these so a
 // divergent, thinner expression cannot be written a fourth time.
@@ -4259,117 +4259,6 @@ async function runSceneHazardCountStage(target, { params = {}, promptOverride = 
  *   planning the same cast and setting from a different idea.
  */
 /**
- * Land reviewer rewrites on the expansions. The FIRST reviewer is primary and
- * fills `reviewedBrief` / `reviewRewrote` (unchanged single-reviewer behaviour);
- * every OTHER reviewer that passed the truncation guard stores its rewrite in
- * `reviewedBriefs[modelKey]` so a multi-reviewer fan-out can be judged per
- * reviewer (scene_hazard_count params.reviewer). A failed reviewer stores
- * nothing — its pages must never read as reviewed. Pure; unit-tested.
- */
-function applyReviewerPages(sceneExpansions, sceneReviews) {
-  sceneReviews.forEach((r, i) => {
-    if (!r || r.ok === false || !Array.isArray(r._pages)) return;
-    const byPage = new Map(r._pages.map(x => [x.pageNumber, x.text]));
-    for (const x of sceneExpansions) {
-      const reviewed = byPage.get(x.pageNumber);
-      if (!reviewed) continue;
-      // Production's rule (beatsPipeline keepDeclaredWornRows): a reviewed
-      // brief keeps every worn-state row the raw expansion declared.
-      const carry = require('./wornItems').carryForwardWornItemsInBrief(reviewed, x.fromBeats);
-      const fixed = carry ? carry.brief : reviewed;
-      if (i === 0) { x.reviewedBrief = fixed; x.reviewRewrote = true; }
-      else { (x.reviewedBriefs = x.reviewedBriefs || {})[r.modelKey] = fixed; }
-    }
-  });
-  for (const r of sceneReviews) if (r) delete r._pages;
-}
-
-/**
- * The all-pages scene expansion, with production's recovery.
- *
- * WHY THIS EXISTS - Test Lab experiment 1275 (`beats_scenes`, 16 pages): the Art
- * Director's all-pages reply was cut mid-JSON inside page 9. The stage took every
- * `## Page N` chunk verbatim, so it reported sixteen expansions of which seven
- * were empty and one was half a spec - and the run still read as a success.
- * An experiment that reports 16 and measured 9 produces conclusions nobody can
- * trust. Production never had that hole: `beatsPipeline.js` refuses a brief that
- * fails the scene-brief contract, retries the batch once, and re-expands whatever
- * is still missing page by page. This is those three guards, calling the SAME
- * contract helper (`iterateBriefGuard.partitionSceneBriefs`), not a second copy.
- *
- * It is dependency-injected - the batch call, the parser, the per-page fallback -
- * because the stage around it needs a story, a DB and paid models, and the
- * recovery decisions must be pinnable without any of those.
- *
- * @param {object} o
- * @param {Array<{pageNumber:number}>} o.expected  pages the batch owes
- * @param {function():Promise<object>} o.callBatch  one paid all-pages call
- * @param {function(object):Array<{pageNumber:number,text:string}>} o.parsePages
- * @param {function(object):Promise<object>} o.expandOnePage  per-page fallback
- * @param {function(object):void} [o.onAttempt]  each reply, before parsing
- * @param {function(object):number} [o.costOf]
- * @param {number} [o.attempts=2]  batch attempts, production's number
- * @returns {Promise<{byPage:Map, recovered:Array, cost:number, lastRes:object|null, attemptsMade:number}>}
- */
-async function collectAllPagesBriefs(o) {
-  const { partitionSceneBriefs, describeSceneBrief } = require('./iterateBriefGuard');
-  const expected = o.expected || [];
-  const attempts = o.attempts || 2;
-  const costOfRes = o.costOf || (() => 0);
-  // First attempt's pages win, so a retry can only FILL gaps, never rewrite a
-  // page already parsed.
-  const byPage = new Map();
-  let lastRes = null;
-  let cost = 0;
-  let attemptsMade = 0;
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    let res;
-    attemptsMade = attempt;
-    try {
-      res = await o.callBatch(attempt);
-    } catch (err) {
-      log.error(`\u{1F6A8} [TESTLAB] beats_scenes: all-pages attempt ${attempt} failed (${err.message}) - falling back to per-page expansion`);
-      break;
-    }
-    lastRes = res;
-    cost += costOfRes(res) || 0;
-    if (o.onAttempt) o.onAttempt(res);
-    const { whole, cut, formatWide } = partitionSceneBriefs(o.parsePages(res) || []);
-    for (const p of (formatWide ? cut : whole)) {
-      if (!byPage.has(p.pageNumber)) byPage.set(p.pageNumber, { text: p.text, res });
-    }
-    if (formatWide) {
-      // Not one page meets the contract: the reply is in a shape the parser does
-      // not know rather than a truncated one, and re-expanding a whole book page
-      // by page would spend a paid call each to get the same shape back.
-      log.error(`\u{1F6A8} [TESTLAB] beats_scenes attempt ${attempt}: not one of the ${cut.length} brief(s) meets the brief contract (${describeSceneBrief(cut[0].verdict)}) - accepting them as written rather than re-expanding the whole book`);
-    } else if (cut.length > 0) {
-      log.error(`\u{1F6A8} [TESTLAB] beats_scenes attempt ${attempt}: incomplete brief(s) - ${cut.map(p => `p${p.pageNumber} (${describeSceneBrief(p.verdict)})`).join('; ')} - treating them as NOT delivered`);
-    }
-    if (byPage.size >= expected.length) break;
-    if (attempt < attempts) {
-      const missingNow = expected.filter(b => !byPage.has(b.pageNumber)).map(b => b.pageNumber);
-      log.error(`\u{1F6A8} [TESTLAB] beats_scenes: all-pages call returned ${byPage.size}/${expected.length} briefs, missing page(s) ${missingNow.join(', ')} - retrying the batch ONCE at full cap`);
-    }
-  }
-
-  // Per-page fallback for whatever the batch still owes. A page that fails here
-  // too stays a NON-result: ok:false and no brief text, so neither the scene
-  // review nor the comparison can mistake half a spec for a measurement.
-  let recovered = [];
-  const stillMissing = expected.filter(b => !byPage.has(b.pageNumber));
-  if (stillMissing.length > 0) {
-    log.error(`\u{1F6A8} [TESTLAB] beats_scenes: ${byPage.size}/${expected.length} briefs after ${attemptsMade} batch attempt(s) - re-expanding page(s) ${stillMissing.map(b => b.pageNumber).join(', ')} per-page`);
-    recovered = await Promise.all(stillMissing.map(b => o.expandOnePage(b)));
-    for (const r of recovered) r.recoveredBy = 'per-page fallback';
-    const okAgain = recovered.filter(r => r.ok).map(r => r.pageNumber);
-    const lost = recovered.filter(r => !r.ok).map(r => r.pageNumber);
-    log.error(`\u{1F6A8} [TESTLAB] beats_scenes: per-page fallback recovered page(s) ${okAgain.length ? okAgain.join(', ') : 'none'}; still missing ${lost.length ? lost.join(', ') : 'none'}`);
-  }
-  return { byPage, recovered, cost, lastRes, attemptsMade };
-}
-
-/**
  * "N of M pages measured" - the marker a partial beats_scenes run announces
  * itself with. Null when every page has a brief.
  */
@@ -4393,7 +4282,9 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   const { callTextModelStreaming } = require('./textModels');
   const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
 
-  const { storyData: loaded } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  // The run's inputData: the stored landmark list and model overrides
+  // (resolveReplayInputData, stored since 2026-09-27).
+  const loaded = resolveReplayInputData((await loadStoryDataFull(target.storyId, { rehydrate: false })).storyData);
   // Same cast, same setting, different idea — the only way to measure a change
   // to the idea generator downstream of it.
   const storyData = params.storyDetails
@@ -4502,378 +4393,153 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   let sceneReviews = null;
   let authoredBible = null;
   let timeToScenesMs = null;
-  // All-pages batch: dollars across BOTH attempts (a retry that fills no gap
-  // still costs money and must show up somewhere), and the model that answered.
   let allPagesCost = null;
   let allPagesModelId = null;
   let landmarkPhotoCitations = null;
+  const events = [];
   if (params.expandScenes !== false) {
-    const { buildSceneExpansionPrompt, buildAvailableAvatarsForPrompt } = require('./storyHelpers');
-    const { callTextModelStreaming: callStream } = require('./textModels');
-    const { IMAGE_MODELS } = require('../config/models');
-
-    const expandLimit = parseInt(params.expandPages, 10) || finalBeats.length;
-    // THE COVER PAGES ride with the story pages, exactly as in production
-    // (beatsPipeline: covers are pages the Art Director briefs from code-written
-    // beats, 2026-09-24). `params.coverBeats: false` measures the story pages alone.
-    const { buildCoverBeats } = require('./coverBeats');
-    const { coverTypesFor } = require('./coverKeys');
-    // The front cover names the arc's central figure, as in production: the
-    // stored one (arcReviewReport.centralFigure), or `params.centralFigure`
-    // (names array) for a story stored before the arc recorded it.
-    const { resolveReplayCentralFigure } = require('./beatsReplayInputs');
-    const labCentralFigure = Array.isArray(params.centralFigure) ? params.centralFigure : resolveReplayCentralFigure(storyData);
-    const labCoverBeats = params.coverBeats === false ? [] : buildCoverBeats(storyData, {
-      coverTypes: coverTypesFor(storyData), clothingRequirements: storyData.clothingRequirements || null,
-      centralFigure: labCentralFigure,
-    });
-    const toExpand = [...finalBeats.slice(0, expandLimit), ...labCoverBeats];
-    const lang = storyData.language || 'en';
-    const imgModelConfig = IMAGE_MODELS[storyData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageRenderImage];
-    const availableAvatars = buildAvailableAvatarsForPrompt
-      ? buildAvailableAvatarsForPrompt(storyData.characters || [], storyData.clothingRequirements || null)
-      : '';
+    // THE RUN'S OWN ART DIRECTOR AND SCENE REVIEW (owner 2026-09-27: "The Lab
+    // must use 100% identical code to production"): beatsPipeline.runArtDirector
+    // (the all-pages call with its retry, the bible's adoption — label round,
+    // age clamp, transcript sync — the landmark link, the wardrobe-vs-bible
+    // corrections and the per-page fallback) and beatsPipeline.runSceneReview,
+    // on the inputs the run held. The stage used to re-implement the batch
+    // retry, the recovery, the bible adoption and the review merge, and it
+    // reviewed on the beats reviewer's model with no clothing findings.
+    const { runArtDirector, runSceneReview } = require('./beatsPipeline');
+    const { calculateTextCost: textCost } = require('../config/models');
+    const record = (level) => (event, message) => { events.push({ level, event, message }); };
+    const gl = { info: record('info'), warn: record('warn'), error: record('error'), debug: record('debug') };
     const storedByPage = new Map((storyData.sceneImages || []).map(s => [s.pageNumber, s.sceneDescription || '']));
-
-    // THE LANDMARK LIST production hands the Art Director. It is resolved at
-    // job start (storyJobPipeline.js, resolveAvailableLandmarks) and never
-    // stored on the story, so a replay that reads only stories.data gave the
-    // Art Director no REAL LANDMARKS section at all — every location came back
-    // invented and no photo could be cited. Same resolver, same limit and
-    // premise pin; unshuffled, so two arms of one experiment read one list.
-    let labAvailableLandmarks = [];
-    if (storyData.userLocation?.city && storyData.storyCategory !== 'historical' && params.landmarks !== false) {
+    // expandPages (Lab only): brief the first N story pages alone.
+    const expandLimit = parseInt(params.expandPages, 10) || finalBeats.length;
+    const beatsIn = finalBeats.slice(0, expandLimit).map(b => ({ pageNumber: b.pageNumber, planLine: b.planLine }));
+    // The landmark list the run's Art Director read: stored since 2026-09-27
+    // (replayInputs). An older story has none stored; the run's resolver
+    // rebuilds it, unshuffled, and the order may differ from the run's.
+    if (!storyData.replayInputsStored && storyData.userLocation?.city && storyData.storyCategory !== 'historical' && params.landmarks !== false) {
       const { resolveAvailableLandmarks } = require('./landmarkPhotos');
-      labAvailableLandmarks = await resolveAvailableLandmarks(storyData.userLocation, {
+      storyData.availableLandmarks = await resolveAvailableLandmarks(storyData.userLocation, {
         limit: 20, discoverOnMiss: false, language: storyData.language, shuffle: false,
         premiseText: [storyData.storyDetails, storyData.title].filter(Boolean).join('\n'),
       });
     }
-
-    // ONE resolver for BOTH Art-Director call shapes in this stage — the
-    // all-pages builder below and the per-page `expandOnePage` fallback. That
-    // is why buildReplaySceneOptions exists: the all-pages sibling was routed
-    // through it and the per-page one was not, so the two measured different
-    // inputs from the same stored story (no clothing contract at all on the
-    // per-page side).
-    const replayScene = buildReplaySceneOptions(storyData, {
-      availableAvatars,
-      maxCharactersPerScene: imgModelConfig?.maxCharactersPerScene || 3,
-      parseBeats,
-    });
-
-    // THE BIBLE THIS RUN AUTHORED, parsed ONCE and read by every consumer in
-    // this stage. Production adopts `adBible.visualBible` before the per-page
-    // fallback runs, "so a recovered page is expanded against the same bible
-    // the batch wrote" (beatsPipeline.js). The Lab had the parse in exactly one
-    // place — the brief pre-check — so the per-page expansion and the pre-check
-    // read different bibles, and the stored one is a different id space
-    // (Lab #1195: findings naming ART002 as an egg while the new bible's ART002
-    // was a coin). The stored bible stays the fallback for a run that authored
-    // none (`params.perPageExpansion`, where no batch call happens at all).
-    //
-    // Declared HERE, above the batch call, on purpose: `expandOnePage` runs as
-    // the batch's recovery callback, so a `let` further down would still be in
-    // its temporal dead zone when the first recovered page asks for the bible.
-    let _runVb;
-    function runVisualBible() {
-      if (_runVb !== undefined) return _runVb;
-      _runVb = storyData.visualBible || null;
-      if (authoredBible?.body) {
-        try {
-          const { UnifiedStoryParser } = require('./outlineParser/unified');
-          const parsed = new UnifiedStoryParser(authoredBible.body).extractVisualBible();
-          if (parsed) _runVb = parsed;
-        } catch (vbErr) {
-          log.warn(`[TESTLAB] beats_scenes: authored bible did not parse (${vbErr.message}) — falling back to the stored bible`);
-        }
-      }
-      return _runVb;
-    }
-
+    if (params.landmarks === false) storyData.availableLandmarks = undefined;
+    const sceneModel = params.sceneModel || storyData.modelOverrides.sceneDescriptionModel || MODEL_DEFAULTS.sceneDescription;
+    const adCalls = [];
     const expStart = Date.now();
+    const meta = { timings: {}, labelRound: null };
+    const ad = await runArtDirector({
+      inputData: { ...storyData, pageClothing: null }, modelOverrides: storyData.modelOverrides,
+      clothingRequirements: storyData.clothingRequirements || null, visualBible: null, bibleSections: null,
+      sceneModel, onChunk: null, gl, meta, stage: async () => {}, beats: beatsIn,
+      arcCentralFigure: Array.isArray(params.centralFigure) ? params.centralFigure : resolveReplayCentralFigure(storyData),
+      approvedArc: resolveReplayArc(storyData, { parseBeats }), onVisualBible: null, wardrobeBibleReport: null,
+      labCallOptions: params.sceneNoReasoning ? { reasoning: { enabled: false } } : {},
+      labForcePerPage: params.perPageExpansion === true,
+      onCall: (res) => adCalls.push(res),
+    });
+    const costOfCall = (r) => r.usage?.direct_cost ?? textCost(r.modelId || '', r.usage || {});
+    allPagesCost = adCalls.reduce((a, r) => a + costOfCall(r), 0);
+    allPagesModelId = adCalls[adCalls.length - 1]?.modelId || null;
+    authoredBible = ad.visualBible ? { visualBible: ad.visualBible, bibleSections: ad.bibleSections, wardrobeBibleReport: ad.wardrobeBibleReport, labelRound: meta.labelRound || null } : null;
+    const fallbackPages = new Set(ad.sceneExpansionReport.fallbackPages || []);
+    sceneExpansions = ad.briefBeats.map((b) => {
+      const x = ad.expansions.find(e => e.pageNumber === b.pageNumber);
+      if (!x) return { pageNumber: b.pageNumber, ok: false, error: 'the Art Director delivered no brief for this page' };
+      return {
+        pageNumber: b.pageNumber, ok: true, modelId: x.modelId, promptChars: String(x.prompt || '').length, prompt: x.prompt,
+        fromBeats: String(x.brief || '').slice(0, 20000),
+        storedProduction: (storedByPage.get(b.pageNumber) || '').slice(0, 20000),
+        ...(fallbackPages.has(b.pageNumber) ? { recoveredBy: 'per-page fallback' } : {}),
+      };
+    });
+    timeToScenesMs = Date.now() - lockStart;
 
-    // ALL-PAGES PATH — what production actually runs (owner, 2026-08-09).
-    // beatsPipeline expands every page in ONE call via buildSceneExpansionAllPrompt
-    // and hands the Art Director each character's resolved OUTFIT TEXT. This
-    // harness was still calling the PER-PAGE builder with no clothing at all, so
-    // it measured a code path production no longer uses and would have
-    // reproduced the old outfit bug no matter what shipped. Opt out with
-    // params.perPageExpansion for the historical comparison.
-    //
-    // `primaryClothing` is deliberately NOT passed: production cannot have it
-    // here (pageClothing is derived from THIS stage's output), and a finished
-    // story does, so passing it made the lab resolve outfits down a branch
-    // production never takes — masking exactly the bug that shipped.
-    if (params.perPageExpansion !== true) {
-      const { buildSceneExpansionAllPrompt, parseRefinedText: parseAll, BRIEF_TRAILING_MARKERS } = require('./storyHelpers');
-      const allPrompt = buildSceneExpansionAllPrompt(
-        { ...storyData, characters: storyData.characters || [], pageClothing: null, availableLandmarks: labAvailableLandmarks },
-        toExpand.map(b => ({ pageNumber: b.pageNumber, planLine: b.planLine })),
-        // No visualBible: the Art Director AUTHORS it now (2026-09-11), ahead
-        // of page 1. The stage still measures the page briefs — parseAll
-        // reads the `## Page N` blocks and ignores the leading sections.
-        //
-        // finalArc comes through the shared resolver: production passes
-        // `finalArc: approvedArc` (beatsPipeline.js:1511) and this stage passed
-        // nothing, so FINAL_ARC rendered as "(no arc was recorded for this
-        // story)" on every run while production's Art Director staged each page
-        // with the whole arc in view. It is the SAME arc the stage already hands
-        // its own planner above — one expression for both, now.
-        replayScene
-      );
-      if (allPrompt) {
-        const tAll = Date.now();
-        // TRUNCATION RECOVERY - production's three guards, in the Lab.
-        const collected = await collectAllPagesBriefs({
-          expected: toExpand,
-          callBatch: () => callStream(allPrompt, null, null, params.sceneModel || MODEL_DEFAULTS.sceneDescription, {
-            usageLabel: 'testlab_beats_scene_expansion_all',
-            ...(params.sceneNoReasoning ? { reasoning: { enabled: false } } : {}),
+    // Each real landmark's plate citation, read off the bible the Art Director
+    // wrote and the run's landmark link.
+    if (ad.visualBible) {
+      try {
+        const { landmarkPhotoCitationFaults } = require('./storyHelpers');
+        const { servablePhotos } = require('./landmarkPhotos');
+        landmarkPhotoCitations = {
+          plates: (ad.visualBible.locations || []).filter(l => l && l.isRealLandmark).flatMap((l) => {
+            const photos = servablePhotos(l.photoVariants).map(v => ({ n: v.variantNumber, kind: v.kind, framing: v.framing, description: v.description }));
+            const plates = Array.isArray(l.vantages) && l.vantages.length > 0
+              ? l.vantages.filter(Boolean).map(v => ({ plateId: v.id, name: v.name, pages: v.pages, landmarkPhoto: v.landmarkPhoto ?? null }))
+              : [{ plateId: l.id, name: l.name, pages: l.pages, landmarkPhoto: l.landmarkPhoto ?? null }];
+            return plates.map(p => ({ locId: l.id, landmark: l.landmarkQuery || l.name, ...p, photos }));
           }),
-          parsePages: (res) => (parseAll(res.text || '', toExpand.map(b => b.pageNumber), 'SCENES', BRIEF_TRAILING_MARKERS).pages || []),
-          costOf,
-          // The bible this call AUTHORS, kept on the result. Without it the stage
-          // measures page briefs written against a bible nobody can read back,
-          // and a bible fault in a Lab run is invisible. The first attempt that
-          // carries one wins, exactly as production's `adBible` does.
-          onAttempt: (res) => {
-            if (authoredBible) return;
-            try {
-              const { extractBibleSections, AD_BIBLE_MARKERS } = require('./beatsPipeline');
-              authoredBible = extractBibleSections(res.text || '', AD_BIBLE_MARKERS) || null;
-            } catch (err) {
-              log.warn(`[TESTLAB] beats_scenes: could not extract the authored bible (${err.message})`);
-            }
-          },
-          expandOnePage,
-        });
-        sceneExpansions = toExpand
-          .filter(b => collected.byPage.has(b.pageNumber))
-          .map(b => {
-            const hit = collected.byPage.get(b.pageNumber);
-            return {
-              pageNumber: b.pageNumber,
-              ok: true,
-              elapsedMs: Date.now() - tAll,
-              modelId: hit.res.modelId,
-              provider: hit.res.provider || null,
-              usage: hit.res.usage,
-              cost: costOf(hit.res),
-              promptChars: allPrompt.length,
-              prompt: allPrompt,
-              fromBeats: String(hit.text || '').slice(0, 20000),
-              storedProduction: (storedByPage.get(b.pageNumber) || '').slice(0, 20000),
-            };
-          })
-          .concat(collected.recovered.map(r => ({
-            ...r,
-            storedProduction: (storedByPage.get(r.pageNumber) || '').slice(0, 20000),
-          })))
-          .sort((a, b) => a.pageNumber - b.pageNumber);
-        allPagesCost = collected.cost;
-        allPagesModelId = collected.lastRes?.modelId || null;
-        timeToScenesMs = Date.now() - lockStart;
-      }
-    }
-
-    // Per-page expansion. TWO callers: the historical per-page comparison
-    // (params.perPageExpansion) and the all-pages RECOVERY above — production
-    // re-expands a missing page exactly this way (beatsPipeline.js
-    // `expandOnePage`), so the Lab's fallback is the same call, not a copy of a
-    // different one. A function DECLARATION so the block above can call it.
-    async function expandOnePage(b) {
-      // BEAT + PLAN line stands in for page.text. No rawOutlineContext: in a
-      // beats-first run there is no outline block yet, so this measures the
-      // Art Director working from the plan alone.
-      const pageContent = `PLAN: ${b.planLine || ''}`;
-      const prompt = buildSceneExpansionPrompt(
-        b.pageNumber, pageContent, storyData.characters || [], lang,
-        runVisualBible(), replayScene.availableAvatars, null,
-        {
-          maxCharactersPerScene: replayScene.maxCharactersPerScene,
-          artStyleId: storyData.artStyle,
-          imageBackend: imgModelConfig?.backend,
-          // THE TWO OPTIONS PRODUCTION PASSES AND THIS CALL DID NOT
-          // (beatsPipeline.js `expandOnePage`). Both are measurable in the
-          // built prompt, on every page:
-          //   - `clothingRequirements` — the per-page fallback attaches no
-          //     referencePhotos, so the contract is the ONLY outfit source.
-          //     Without it every character's CHARACTER DETAILS line ended at
-          //     its face and carried no `Wearing:` clause at all.
-          //   - `story` — decides the book's SEASON and whether the text-zone
-          //     rule family is asked for. With neither, `seasonLabel` fell back
-          //     to TODAY's date (a summer story replayed in September was told
-          //     "the season is Autumn on every page") and the text-zone rules
-          //     were always on, where 94 of 118 recent stories gate them off.
-          clothingRequirements: replayScene.clothingRequirements,
-          story: storyData,
-        }
-      );
-      const t = Date.now();
-      try {
-        const res = await callStream(prompt, null, null, params.sceneModel || MODEL_DEFAULTS.sceneDescription, {
-          usageLabel: 'testlab_beats_scene_expansion',
-          // Scene expansion is transcription, not judgement — reasoning is pure
-          // waste here (measured 14,867 reasoning tokens for 2,505 of answer).
-          ...(params.sceneNoReasoning ? { reasoning: { enabled: false } } : {}),
-        });
-        return {
-          pageNumber: b.pageNumber,
-          ok: true,
-          elapsedMs: Date.now() - t,
-          modelId: res.modelId,
-          provider: res.provider || null,
-          ttftMs: res.ttft ?? null,
-          usage: res.usage,
-          cost: costOf(res),
-          promptChars: prompt.length,
-          prompt,
-          fromBeats: (res.text || '').slice(0, 20000),
-          storedProduction: (storedByPage.get(b.pageNumber) || '').slice(0, 20000),
+          faults: landmarkPhotoCitationFaults(ad.visualBible),
         };
-      } catch (err) {
-        return { pageNumber: b.pageNumber, ok: false, elapsedMs: Date.now() - t, error: err.message };
+      } catch (lmErr) {
+        log.error(`❌ [TESTLAB] beats_scenes: landmark citations not reported (${lmErr.message})`);
+        landmarkPhotoCitations = { error: lmErr.message };
       }
     }
 
-    if (!sceneExpansions) sceneExpansions = await Promise.all(toExpand.map(expandOnePage));
-
-    // THE LANDMARK LINK production runs right after the Art Director
-    // (beatsPipeline.js): each real landmark of the authored bible gets its
-    // index photos, so the scene review below reads the same numbered PHOTOS
-    // lists and the result reports every plate's photo citation — exactly
-    // the photo each plate would be served (docs/decisions.md 2026-09-26).
-    {
-      const vbLinked = runVisualBible();
-      if (vbLinked) {
-        try {
-          if (labAvailableLandmarks.length) require('./visualBible').linkPreDiscoveredLandmarks(vbLinked, labAvailableLandmarks);
-          await require('./landmarkPhotos').loadLandmarkPhotoDescriptions(vbLinked);
-          const { landmarkPhotoCitationFaults } = require('./storyHelpers');
-          const { servablePhotos } = require('./landmarkPhotos');
-          landmarkPhotoCitations = {
-            plates: (vbLinked.locations || []).filter(l => l && l.isRealLandmark).flatMap((l) => {
-              const photos = servablePhotos(l.photoVariants).map(v => ({ n: v.variantNumber, kind: v.kind, framing: v.framing, description: v.description }));
-              const plates = Array.isArray(l.vantages) && l.vantages.length > 0
-                ? l.vantages.filter(Boolean).map(v => ({ plateId: v.id, name: v.name, pages: v.pages, landmarkPhoto: v.landmarkPhoto ?? null }))
-                : [{ plateId: l.id, name: l.name, pages: l.pages, landmarkPhoto: l.landmarkPhoto ?? null }];
-              return plates.map(p => ({ locId: l.id, landmark: l.landmarkQuery || l.name, ...p, photos }));
-            }),
-            faults: landmarkPhotoCitationFaults(vbLinked),
-          };
-        } catch (lmErr) {
-          log.error(`❌ [TESTLAB] beats_scenes: landmark link failed (${lmErr.message}) — citations not reported`);
-          landmarkPhotoCitations = { error: lmErr.message };
-        }
-      }
-    }
-    // ── Step 4: ONE review over ALL scene briefs ──────────────────────────
-    // Repetition between pages, visual arc and continuity are invisible to a
-    // per-scene reviewer — they only exist across the set — so every brief goes
-    // into a single call. Reviews whatever model wrote the scenes, so Sonnet vs
-    // DeepSeek can be compared as REVIEWER independently of who generated.
-    const okScenes = sceneExpansions.filter(x => x.ok);
-    if (params.reviewScenes !== false && okScenes.length > 0) {
-      const { buildSceneReviewPrompt, parseRefinedText, BRIEF_TRAILING_MARKERS } = require('./storyHelpers');
-      // Comma-separated list runs every model against ONE frozen set of briefs.
-      // Scene expansion is non-deterministic, so two separate experiments give
-      // the reviewers different inputs — measured on exp 357 vs 358, where the
-      // page-3 cast differed and made the comparison meaningless. Fanning out
-      // from a single expansion is the only way the difference is the reviewer.
-      const srModels = String(params.sceneReviewModel || MODEL_DEFAULTS.outlineReviewModel)
-        .split(',').map(s => s.trim()).filter(Boolean);
+    // ── the run's scene review ────────────────────────────────────────────
+    // A comma-separated params.sceneReviewModel fans out over ONE frozen set
+    // of briefs; each arm reviews its own copy of the briefs and the bible, as
+    // the run would.
+    if (params.reviewScenes !== false && ad.expansions.length > 0) {
+      const mo = storyData.modelOverrides;
+      const srModels = String(params.sceneReviewModel || mo.sceneReviewModel || MODEL_DEFAULTS.sceneReviewModel || mo.outlineReviewModel || MODEL_DEFAULTS.outlineReviewModel)
+        .split(',').map(x => x.trim()).filter(Boolean);
       for (const m of srModels) if (!TEXT_MODELS[m]) throw new Error('Unknown model "' + m + '"');
-      const expectedPages = okScenes.map(x => x.pageNumber);
-      // Deterministic brief pre-check → {BRIEF_FINDINGS}, exactly as production
-      // does it (beatsPipeline.js). Without this the harness handed the reviewer
-      // a WEAKER prompt than the real pipeline and could never measure whether a
-      // finding changes what it rewrites: exp 821 produced four two-action pages
-      // and the review prompt carried no BRIEF FAULTS block at all.
-      let briefFindings = '';
-      // CHECK THE BIBLE THIS RUN AUTHORED, not the one the story shipped with
-      // (2026-09-12). The Art Director writes a fresh bible ahead of page 1, so
-      // the stored one is a different id space: on Lab #1195 the findings named
-      // "The Dragon Egg (ART002)" while the new bible's ART002 was a coin, no
-      // finding could name it by an id that meant the same thing in both
-      // bibles, and the reviewer was told to drop an element by an id that
-      // meant something else in its own bible. Declared out here so the
-      // scene-review prompt below gets the SAME bible the pre-check read —
-      // production passes it (beatsPipeline.js) and a Lab that did not would
-      // stop reproducing the review it is measuring. `runVisualBible` is the
-      // one parse, shared with the per-page expansion above.
-      const vb = runVisualBible();
-      try {
-        const { checkScenes: checkBriefs, renderFindingsBlock: renderBriefBlock } = require('./sceneBriefCheck');
-        const secondaryList = Array.isArray(vb?.secondaryCharacters)
-          ? vb.secondaryCharacters : Object.values(vb?.secondaryCharacters || {});
-        const seen = new Set();
-        const castNames = [
-          ...(storyData.characters || []).map(c => c && c.name),
-          ...secondaryList.map(c => c && c.name),
-        ].filter(Boolean).filter((n) => {
-          const k = String(n).trim().toLowerCase();
-          if (!k || seen.has(k)) return false;
-          seen.add(k);
-          return true;
-        });
-        const res = checkBriefs(okScenes.map(x => ({ pageNumber: x.pageNumber, brief: x.fromBeats })), castNames, vb);
-        briefFindings = renderBriefBlock(res.byPage);
-        log.info(`[TESTLAB] beats_scenes brief pre-check: ${res.findings.length} finding(s), block ${briefFindings ? briefFindings.length + ' chars' : 'empty'}`);
-      } catch (bcErr) {
-        log.warn(`[TESTLAB] beats_scenes brief pre-check failed (non-fatal): ${bcErr.message}`);
+      sceneReviews = [];
+      for (const srModel of srModels) {
+        const t2 = Date.now();
+        try {
+          const srCalls = [];
+          const armEvents = [];
+          const rec = (level) => (event, message) => { armEvents.push({ level, event, message }); };
+          const expansions = ad.expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief }));
+          const out = await runSceneReview({
+            inputData: storyData, expansions, clothingRequirements: storyData.clothingRequirements || null,
+            visualBible: ad.visualBible ? JSON.parse(JSON.stringify(ad.visualBible)) : null, briefBeats: ad.briefBeats, beats: beatsIn,
+            bibleSections: ad.bibleSections, meta: { timings: {}, labelRound: meta.labelRound || null }, sceneReviewModel: srModel,
+            stage: async () => {}, onChunk: null, gl: { info: rec('info'), warn: rec('warn'), error: rec('error'), debug: rec('debug') },
+            onCall: (res) => srCalls.push(res),
+          });
+          const report = out.sceneReviewReport;
+          const failed = report?.failed || armEvents.find(e => e.event === 'beats_scene_review_empty' || e.event === 'beats_scene_review_failed')?.message || null;
+          sceneReviews.push({
+            modelKey: srModel,
+            modelId: report?.model || null,
+            ok: !!report && !failed,
+            error: failed,
+            elapsedMs: Date.now() - t2,
+            usage: srCalls[0]?.usage || null,
+            cost: srCalls.reduce((a, r) => a + costOfCall(r), 0),
+            promptChars: String(report?.prompt || '').length,
+            prompt: report?.prompt || null,
+            analysis: String(out.sceneReviewAnalysis || '').slice(0, 40000),
+            rewrotePages: report ? report.changedPages : [],
+            clothingUnfixed: report?.clothingUnfixed || [],
+            briefUnfixed: report?.briefUnfixed || [],
+            briefIntroduced: report?.briefIntroduced || [],
+            wornRound: report?.wornRound || null,
+            events: armEvents,
+            _reviewed: expansions,
+          });
+        } catch (err) {
+          sceneReviews.push({ modelKey: srModel, ok: false, elapsedMs: Date.now() - t2, error: err.message });
+        }
       }
-      // finalBeats feeds the review's check 5 (character in beat vs brief),
-      // same as the production callsite in beatsPipeline.js.
-      const srPrompt = buildSceneReviewPrompt(storyData, okScenes.map(x => ({ pageNumber: x.pageNumber, brief: x.fromBeats })), { beats: toExpand, briefFindings, visualBible: vb, clothingRequirements: storyData.clothingRequirements || null });
-      if (srPrompt) {
-        const reviewOnce = async (srModel) => {
-          const t2 = Date.now();
-          try {
-            // null = model max, exactly as production (beatsPipeline.js). The
-            // former 16000 cap silently truncated 6 of 8 reviews in the
-            // 2026-09-10 AD redo (1107-1124) — no error, briefs kept as raw.
-            const srRes = await callStream(srPrompt, null, null, srModel, { usageLabel: 'testlab_scene_review' });
-            const parsed = parseRefinedText(srRes.text || '', expectedPages, 'SCENES', BRIEF_TRAILING_MARKERS);
-            const outTok = srRes.usage?.output_tokens ?? null;
-            const capInForce = TEXT_MODELS[srModel]?.maxOutputTokens ?? null;
-            const verdict = assessSceneReview({
-              text: srRes.text, outputTokens: outTok, stopReason: srRes.stop_reason || null,
-              capInForce, parsedPageCount: parsed.pages.length,
-            });
-            if (!verdict.ok) {
-              log.warn(`⚠️ [TESTLAB] beats_scenes scene review FAILED (story ${target.storyId}, reviewer ${srModel} → ${srRes.modelId || '?'} via ${srRes.provider || '?'}, out ${outTok ?? '?'} tok, cap ${capInForce ?? '?'}): ${verdict.error}`);
-            }
-            return {
-              modelKey: srModel,
-              modelId: srRes.modelId,
-              provider: srRes.provider || null,
-              ok: verdict.ok,
-              error: verdict.error,
-              elapsedMs: Date.now() - t2,
-              ttftMs: srRes.ttft ?? null,
-              usage: srRes.usage,
-              stopReason: srRes.stop_reason || null,
-              capInForce,
-              cost: costOf(srRes),
-              promptChars: srPrompt.length,
-              prompt: srPrompt,
-              // Storage clip only (dev-panel display) — not a model truncation.
-              rawResponse: (srRes.text || '').slice(0, 40000),
-              analysis: (parsed.analysis || '').slice(0, 40000),
-              rewrotePages: verdict.ok ? parsed.pages.map(x => x.pageNumber) : [],
-              _pages: verdict.ok ? parsed.pages : [],
-            };
-          } catch (err) {
-            return { modelKey: srModel, ok: false, elapsedMs: Date.now() - t2, error: err.message };
-          }
-        };
-        sceneReviews = await Promise.all(srModels.map(reviewOnce));
-        applyReviewerPages(sceneExpansions, sceneReviews);
-        sceneReview = sceneReviews[0] || null;
-      }
+      // Each page's reviewed brief, as the run's review merged it (the first
+      // arm on `reviewedBrief`, further arms under `reviewedBriefs[model]`).
+      sceneReviews.forEach((r, i) => {
+        if (!r._reviewed) return;
+        for (const x of sceneExpansions) {
+          const reviewed = r._reviewed.find(e => e.pageNumber === x.pageNumber);
+          if (!reviewed || reviewed.brief === x.fromBeats || !(r.rewrotePages || []).includes(x.pageNumber)) continue;
+          if (i === 0) { x.reviewedBrief = reviewed.brief; x.reviewRewrote = true; } else { (x.reviewedBriefs = x.reviewedBriefs || {})[r.modelKey] = reviewed.brief; }
+        }
+        delete r._reviewed;
+      });
+      sceneReview = sceneReviews[0] || null;
     }
-    // Parallel, as production runs them — so this is wall-clock, not the sum.
     timeToScenesMs = timeToLockMs + (Date.now() - expStart);
   }
 
@@ -4890,6 +4556,8 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   return {
     stageKind: 'beats_scenes',
     sceneExpansions,
+    events,
+    replayInputsStored: storyData.replayInputsStored,
     sceneExpansionIncomplete,
     allPagesCost,
     allPagesModelId,
@@ -10993,10 +10661,8 @@ async function checkRuleGenericity(ruleText, storyId) {
 
 module.exports = {
   pinnedVersionIndex,
-  applyReviewerPages,
   // beats_scenes truncation recovery — exported so the decisions can be pinned
   // without a story, a DB or a paid model (tests/unit/testlab-beats-scenes-recovery.test.ts)
-  collectAllPagesBriefs,
   summarizeSceneExpansions,
   // The two copies of the commission the judge reads — exported so their
   // agreement under a brief override can be pinned without a paid render
@@ -11051,6 +10717,7 @@ module.exports = {
   runBeatsReplanStage,
   runSceneReviewReplayStage,
   runArcPanelReplayStage,
+  runBeatsScenesStage,
   runEmptySceneStage,
   runEditImageStage,
   // The page render and the char-fix, exported so "with no params the Lab sends

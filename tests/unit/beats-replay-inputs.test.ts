@@ -172,8 +172,10 @@ describe('wiring — the Lab replay stages call through the resolver', () => {
   });
 
   it('every Lab call to the all-pages Art Director builds its options through the resolver', () => {
+    // beats_scenes runs the run's own Art Director (beatsPipeline.runArtDirector)
+    // since 2026-09-27; any other Lab call site must use the resolver.
+    expect(testlabSrc).toMatch(/await runArtDirector\(\{/);
     const calls = testlabSrc.match(/buildSceneExpansionAllPrompt\([\s\S]{0,1400}?\n\s*\);/g) || [];
-    expect(calls.length).toBeGreaterThan(0);
     // Inline, or through a local the resolver assigns — the Lab's beats stage
     // hoists one `buildReplaySceneOptions` call and hands it to BOTH the
     // all-pages builder and the per-page `expandOnePage` fallback, which is

@@ -968,7 +968,8 @@
       "severity": "block",
       "parity": {
         "anchors": [
-          "runSceneReview"
+          "runSceneReview",
+          "runArtDirector"
         ]
       }
     },

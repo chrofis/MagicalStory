@@ -887,6 +887,62 @@ describe('arc_panel_replay: no params = the run\'s panel and re-telling calls', 
   });
 });
 
+// ── beats_scenes: the run's Art Director and scene review ────────────────────
+describe('beats_scenes (stored plan lines): the run\'s Art Director and review calls', () => {
+  const PLAN_1 = 'medium — Mira, Tobias — Mira holds the lantern up — the way is lit';
+  const AD_REPLY = [
+    '---VISUAL BIBLE---', '```json',
+    JSON.stringify({ locations: [{ id: 'LOC001', name: 'the harbour wall', label: 'harbour wall', description: 'a low granite sea wall', appearsInPages: [1] }] }, null, 2),
+    '```', '',
+    '## Page 1', 'Mira stands on the harbour wall holding the lantern while Tobias crouches beside her.', '', '---METADATA---',
+    JSON.stringify({ sceneIntent: 'Mira lights the way', characters: [{ name: 'Mira' }, { name: 'Tobias' }], objects: ['LOC001'], shot: 'medium' }), '',
+    '## Page -1', 'Mira and Tobias stand on the quay facing the viewer.', '', '---METADATA---',
+    JSON.stringify({ sceneIntent: 'the cover', characters: [{ name: 'Mira' }, { name: 'Tobias' }], objects: ['LOC001'], shot: 'medium' }), '',
+  ].join('\n');
+  let modelCalls: any[] = []; let savedStream: any;
+  beforeEach(() => {
+    modelCalls = [];
+    savedStream = textModelsMod.callTextModelStreaming;
+    textModelsMod.callTextModelStreaming = async (prompt: string, _s: any, _c: any, model: string, opts: any) => {
+      modelCalls.push({ prompt, model, label: opts?.usageLabel });
+      const text = /scene_expansion/.test(opts?.usageLabel || '') ? AD_REPLY : 'ANALYSIS:\nFAULTED PAGES: none\n';
+      return { text, modelId: model, usage: { input_tokens: 1, output_tokens: 5 } };
+    };
+  });
+  afterEach(() => { textModelsMod.callTextModelStreaming = savedStream; });
+
+  it('briefs and reviews as the run does: the run\'s Art Director call, then the SCENE reviewer', async () => {
+    STORY = {
+      ...storyFor(storedScene({ pageNumber: 1, outlineExtract: `PLAN: ${PLAN_1}` }), { textInImage: false }), pages: 1,
+      coverTypes: ['frontCover'], arcReviewReport: { finalArc: 'Mira lights the way home.', centralFigure: ['Mira'] },
+    };
+    const r = await testlab.runBeatsScenesStage({ storyId: 'job_parity' }, { params: { plainStoredBeats: true } });
+    const labCalls = modelCalls.splice(0);
+    // PRODUCTION, on the inputs generateStoryViaBeats holds at that point.
+    const gl = { info() {}, warn() {}, error() {}, debug() {} };
+    const inputData = { ...STORY, availableLandmarks: undefined, modelOverrides: {}, replayInputsStored: false, pageClothing: null };
+    const ad = await BP.runArtDirector({
+      inputData, modelOverrides: {}, clothingRequirements: STORY.clothingRequirements, visualBible: null, bibleSections: null,
+      sceneModel: MODEL_DEFAULTS.sceneDescription, onChunk: null, gl, meta: { timings: {} }, stage: async () => {},
+      beats: [{ pageNumber: 1, planLine: PLAN_1 }], arcCentralFigure: ['Mira'], approvedArc: 'Mira lights the way home.',
+    });
+    await BP.runSceneReview({
+      inputData, expansions: ad.expansions.map((x: any) => ({ pageNumber: x.pageNumber, brief: x.brief })), clothingRequirements: STORY.clothingRequirements,
+      visualBible: ad.visualBible, briefBeats: ad.briefBeats, beats: [{ pageNumber: 1, planLine: PLAN_1 }], bibleSections: ad.bibleSections,
+      meta: { timings: {} }, sceneReviewModel: MODEL_DEFAULTS.sceneReviewModel, stage: async () => {}, onChunk: null, gl,
+    });
+    const prodCalls = modelCalls.splice(0);
+    expect(labCalls.map(c => [c.label, c.model, c.prompt])).toEqual(prodCalls.map(c => [c.label, c.model, c.prompt]));
+    const review = labCalls.find(c => c.label === 'beats_scene_review');
+    expect(review.model).toBe(MODEL_DEFAULTS.sceneReviewModel);                 // pre-fix: the beats reviewer's model
+    expect(r.sceneExpansions.map((x: any) => x.pageNumber)).toEqual([1, -1]);
+  });
+
+  it('the run briefs through runArtDirector (source scan)', () => {
+    expect(read('server/lib/beatsPipeline.js')).toMatch(/const ad = await runArtDirector\(\{/);
+  });
+});
+
 describe('the run still calls the shared builders (source scan)', () => {
   const pipeline = read('storyJobPipeline.js');
   const repair = read('server/lib/repairPipeline.js');

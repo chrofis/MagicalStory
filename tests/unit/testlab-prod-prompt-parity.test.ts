@@ -232,32 +232,16 @@ describe('the per-page Art Director prompt is decided by the clothing contract a
   });
 });
 
-describe('the Lab beats stage hands the per-page builder production\'s inputs', () => {
-  const call = callBody(TESTLAB, 'buildSceneExpansionPrompt', 1);
-
-  it('passes the clothing contract and the story', () => {
-    expect(call).toMatch(/clothingRequirements:/);
-    expect(call).toMatch(/story:\s*storyData/);
-  });
-
-  it('routes the shared inputs through buildReplaySceneOptions, like its all-pages sibling', () => {
-    // ONE resolver for both Art-Director call shapes in the stage. That is what
-    // buildReplaySceneOptions exists for; the per-page call used to bypass it.
-    expect(call).toMatch(/replayScene\.clothingRequirements/);
-    expect(call).toMatch(/replayScene\.maxCharactersPerScene/);
-    expect(TESTLAB).toMatch(/const replayScene = buildReplaySceneOptions\(/);
-  });
-
-  it('expands against the bible THIS run authored, parsed once for the whole stage', () => {
-    // Production adopts the batch's own bible before the per-page fallback runs;
-    // the stored bible is a different id space. The parse must not be duplicated
-    // — two copies drift, and the pre-check would then judge briefs written
-    // against a bible it never saw.
-    expect(call).toMatch(/runVisualBible\(\)/);
-    const parses = TESTLAB.match(/new UnifiedStoryParser\([^)]*\)\.extractVisualBible\(\)/g) || [];
-    expect(parses).toHaveLength(1);
-    // …and the scene-review pre-check reads the same resolver.
-    expect((TESTLAB.match(/runVisualBible\(\)/g) || []).length).toBeGreaterThanOrEqual(2);
+describe('the Lab beats stage runs the run\'s own Art Director and review', () => {
+  // Since 2026-09-27 beats_scenes calls beatsPipeline.runArtDirector (the
+  // all-pages call, its recovery, the per-page fallback with the clothing
+  // contract and the story, the bible adoption) and runSceneReview; it keeps
+  // no builder call, parse or bible adoption of its own.
+  it('calls the shared functions and no Art Director builder of its own', () => {
+    const stage = TESTLAB.slice(TESTLAB.indexOf('async function runBeatsScenesStage'), TESTLAB.indexOf('async function runTextRefineStage'));
+    expect(stage).toMatch(/await runArtDirector\(\{/);
+    expect(stage).toMatch(/await runSceneReview\(\{/);
+    expect(stage).not.toMatch(/buildSceneExpansionPrompt\(|buildSceneExpansionAllPrompt\(|new UnifiedStoryParser\(/);
   });
 });
 
