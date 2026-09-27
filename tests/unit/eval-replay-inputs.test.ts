@@ -25,8 +25,8 @@ const {
 const { buildEvalClothingContract } = require('../../server/lib/evalPipeline');
 
 const ROOT = path.resolve(__dirname, '../..');
-const testlabSrc = fs.readFileSync(path.join(ROOT, 'server/lib/testlab.js'), 'utf8');
-const imagesSrc = fs.readFileSync(path.join(ROOT, 'server/lib/images.js'), 'utf8');
+const testlabSrc = fs.readFileSync(path.join(ROOT, 'server/lib/testlab.js'), 'utf8').replace(/\r\n/g, '\n');
+const imagesSrc = fs.readFileSync(path.join(ROOT, 'server/lib/images.js'), 'utf8').replace(/\r\n/g, '\n');
 
 // ── REAL STORED SHAPES (staging job_1789348171785_9oxos7dwv, page 13) ───────
 const VISUAL_BIBLE = {

@@ -201,7 +201,7 @@ describe('the consolidator is told the required lettering', () => {
 });
 
 describe('repair keeps a baked title', () => {
-  const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
+  const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
 
   it('the production inpaint dispatch hands inpaintPage the cover text contract', () => {
     // The call is built by buildInpaintCall since 2026-09-27 (shared with the Test Lab).
