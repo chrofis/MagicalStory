@@ -809,6 +809,44 @@ function selectCharRepairTasks(entityReport, options = {}) {
  *        repeated on the same pixels: the page flips to iterate.
  * @returns {{method: 'skip'|'inpaint'|'iterate'|'char-fix', reason: string, charName?: string, severity?: string, issueTypes?: string[]}}
  */
+/**
+ * The page's entity findings a char-fix can act on, in report order: a
+ * CRITICAL character finding (not a crop artefact, not off by design) whose
+ * type is on the entity judge's closed list and decides a face or a
+ * full-figure repair. decideRepairMethod repairs the first; the Test Lab
+ * char_repair stage reads the same list to reconstruct the run's decision for
+ * a stored page (one filter, so the two cannot disagree about what is fixable).
+ * `{ severities }` widens the severity set for that reconstruction only.
+ */
+function charFixEntityFindings(pageNumber, entityReport, { severities = ['critical'] } = {}) {
+  const out = [];
+  if (!entityReport?.characters) return out;
+  // The page's entity findings through the report's ONE reader
+  // (scoring.entityFindingsForPage) — a finding on several pages reaches
+  // each; one voided by the page's declared wardrobe state reaches none.
+  const { entityFindingsForPage } = require('./scoring');
+  for (const { name: charName, source, issue, offByDesign } of entityFindingsForPage(pageNumber, entityReport)) {
+    if (source !== 'character' || offByDesign) continue;
+    const sev = String(issue.severity || '').toLowerCase();
+    if (!severities.includes(sev) || isCropArtifact(issue, { entity: true })) continue;
+    // The finding's TYPE decides face vs full figure (resolveRepairAxes). A
+    // type the evaluator vocabulary does not know decides nothing, and the
+    // judge's sentence is never read in its place — that finding cannot be
+    // routed, so it is declined here, loudly, and the next one is tried.
+    // An entity finding routes only when its type is on the entity judge's
+    // closed list (evalBuckets.ENTITY_CHECK_TYPES, owner 2026-09-24) — an
+    // off-list type was logged as a parse error and is never repaired.
+    const { repairTargetForTypes } = require('./faceRepair');
+    const { isEntityCheckType } = require('./evalBuckets');
+    if (!isEntityCheckType(issue.subType || issue.type) || !repairTargetForTypes([issue.subType || issue.type])) {
+      log.error(`🚫 [REPAIR-DECIDE] page ${pageNumber}: entity ${sev} on ${charName} has type "${issue.subType || issue.type || ''}", which is off the entity closed list or decides neither a face nor a full-figure repair — no char-fix for it`);
+      continue;
+    }
+    out.push({ severity: sev, charName, issue });
+  }
+  return out;
+}
+
 function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) {
   const evaluator = evaluation || {};
   // Canonical reads via scoreBreakdown (post chunk-2 scoring migration). Each
@@ -1001,30 +1039,7 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   let deferredFigure = null;
 
   if (pageNumber !== 0 && entityReport?.characters) {
-    let worst = null; // {severity, charName, issue}
-    // The page's entity findings through the report's ONE reader
-    // (scoring.entityFindingsForPage) — a finding on several pages reaches
-    // each; one voided by the page's declared wardrobe state reaches none.
-    const { entityFindingsForPage } = require('./scoring');
-    for (const { name: charName, source, issue, offByDesign } of entityFindingsForPage(pageNumber, entityReport)) {
-      if (source !== 'character' || offByDesign) continue;
-      const sev = String(issue.severity || '').toLowerCase();
-      if (sev !== 'critical' || isCropArtifact(issue, { entity: true })) continue;
-      // The finding's TYPE decides face vs full figure (resolveRepairAxes). A
-      // type the evaluator vocabulary does not know decides nothing, and the
-      // judge's sentence is never read in its place — that finding cannot be
-      // routed, so it is declined here, loudly, and the next one is tried.
-      // An entity finding routes only when its type is on the entity judge's
-      // closed list (evalBuckets.ENTITY_CHECK_TYPES, owner 2026-09-24) — an
-      // off-list type was logged as a parse error and is never repaired.
-      const { repairTargetForTypes } = require('./faceRepair');
-      const { isEntityCheckType } = require('./evalBuckets');
-      if (!isEntityCheckType(issue.subType || issue.type) || !repairTargetForTypes([issue.subType || issue.type])) {
-        log.error(`🚫 [REPAIR-DECIDE] page ${pageNumber}: entity ${sev} on ${charName} has type "${issue.subType || issue.type || ''}", which is off the entity closed list or decides neither a face nor a full-figure repair — no char-fix for it`);
-        continue;
-      }
-      if (!worst) worst = { severity: sev, charName, issue };
-    }
+    let worst = charFixEntityFindings(pageNumber, entityReport)[0] || null; // {severity, charName, issue}
     const entityGap = worst && charFixImpossible(worst.charName);
     if (entityGap) {
       log.warn(`🚫 [REPAIR-DECIDE] page ${pageNumber}: entity ${worst.severity} on ${worst.charName} cannot take a char fix — ${entityGap.message}`);
@@ -1979,4 +1994,4 @@ function nameRepairText(text, nameMap, { keep = null, vidByName, ownVisualId = n
 
 module.exports = {
   describeFigureForRepair, buildRepairNameMap, buildPageRepairNameMap, nameRepairText, resolveRepairIds,
-  repairAttemptFromResult, describeCharFixFailure, detectionForRetryEntry, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, attributeReaderFindings, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, ITERATE_ROUTED_TYPES, CROP_ARTIFACT_TYPES, isCropArtifact, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX, scoredFindingPools };
+  repairAttemptFromResult, describeCharFixFailure, detectionForRetryEntry, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, attributeReaderFindings, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, charFixEntityFindings, NOT_INPAINTABLE_TYPES, ITERATE_ROUTED_TYPES, CROP_ARTIFACT_TYPES, isCropArtifact, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX, scoredFindingPools };

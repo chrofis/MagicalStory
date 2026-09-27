@@ -600,6 +600,33 @@ measurement, is lost).
 
 ---
 
+## Test Lab ↔ production parity (2026-09-27)
+
+Owner: "The Lab must use 100% identical code to production." Fixed on 2026-09-27: image,
+char_repair, and the edit_image plate derive (decisions.md 2026-09-27). The remaining divergences
+are listed stage by stage in the audit table.
+
+- [ ] empty_scene: build the mask with `pageTextAreaMask`; render a vantage page's plate from the representative page → docs/testlab-prod-parity.md:31
+- [ ] inpaint / consolidate: pass the page's real entity issues, `sceneClothing` and `readerFindings` to the consolidator; use an eval with `requiredTexts` → docs/testlab-prod-parity.md:34
+- [ ] quality_eval / semantic_eval / eval_variance: `pagePrompt`, the whole-cast refs (`composeEvalReferencePhotos`), full `storyData`, `resolveEvalSceneHint`, the post-eval batch steps (share `buildEvalInputs`) → docs/testlab-prod-parity.md:36
+- [ ] bbox: build the cast with the run's identity cast / `buildPageCast`, pass `expectedObjects`, drop the 2000-char cap and the own retry loop → docs/testlab-prod-parity.md:38
+- [ ] text_zone: pass `visualBible` and `visualBibleGrid`, the stored plate, and the mask via `pageTextAreaMask` → docs/testlab-prod-parity.md:41
+- [ ] pick_best: tie-break `'earliest'`, the pipeline's rule → docs/testlab-prod-parity.md:47
+- [ ] scene_expansion / _ab / scene_variant: the all-pages builder, the production model, the plan line, `story` and the clothing contract → docs/testlab-prod-parity.md:48
+- [ ] beats_scenes: `sceneReviewModel`, clothing findings, `checkBriefs` with `planLine`/`textZoneRules`, the planner landmarks; export the production recovery / bible-adoption / review-merge blocks and delete the Lab copies → docs/testlab-prod-parity.md:57
+- [ ] beats_replan: `castTable`, the parsed `plannerReply` page plan, invented / commissioned figures, `peoplelessPick`; export `runPlanCheck` / `runReplanRound` from beatsPipeline → docs/testlab-prod-parity.md:58
+- [ ] arc_panel_replay: landmarks, the job's stored challenge draw for the re-tell, `creatorCall` → docs/testlab-prod-parity.md:59
+- [ ] scene_review_replay: default input `sceneReviewReport.briefsIn` with covers; `keepDeclaredLight`; truncation guard → docs/testlab-prod-parity.md:60
+- [ ] judge_fixture plate_qc: derived-plate QC options from the base plate and the representative page (shared with `derivedQcOpts`) → docs/testlab-prod-parity.md:61
+- [ ] writer_compare: the text arm always throws (`parseRefinedText` is given a number instead of a page array) — Lab-only → docs/testlab-prod-parity.md:67
+- [ ] audit_replay: `promptOverride` has no effect (the prompt is built outside `withTemplates`) → docs/testlab-prod-parity.md:65
+- [ ] Persist `availableLandmarks` (post-shuffle), `modelOverrides` and the pre-review bible on `stories.data`, so replays can be exact → docs/testlab-prod-parity.md:75
+- [ ] Manual char-repair route (`regeneration.js` character-repair) still builds its own inputs: `buildClothingDescription`, no wardrobe-state sheet, and a mode default of blended/fullScene where the round passes none. Move it onto `charFixCall` (owner call: it changes the user-facing button) → docs/testlab-prod-parity.md:33
+- [ ] The run's page-retry render ("retrying once") skips `applyReferenceMode` and the shared options builder; `pageRenderOptions` fits it (a production behaviour change, not done unasked) → docs/testlab-prod-parity.md:30
+- [ ] Production route `POST /repair-workflow/artifact-repair` calls `gridBasedRepair(scene, {retryHistory})` against the `(imageData, pageNum, evalResults, {outputDir})` signature, so it always throws "outputDir is required" (code-read 2026-09-27, not reproduced from logs) → server/routes/regeneration.js:6636
+
+---
+
 ## Test Lab tooling
 
 - [ ] **A running experiment cannot be cancelled.** No abort route (only `/experiments/:id/redo`)

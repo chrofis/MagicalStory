@@ -140,7 +140,9 @@ describe('presence routing: a name the page does not hold is never char-fixed; E
   });
 
   it('the char-fix executor and the Lab both target by figure', () => {
-    expect(pipelineSrc).toMatch(/resolveFigureBbox\(decision\.targetFigure, \{ bestEval \}\)/);
+    // The repair round's call is built by charFixCall.js (shared with the Lab char_repair stage).
+    expect(readFileSync(path.join(here, '../../server/lib/charFixCall.js'), 'utf8')).toMatch(/resolveFigureBbox\(decision\.targetFigure, \{ bestEval \}\)/);
+    expect(pipelineSrc).toMatch(/buildCharFixCall\(\{/);
     const lab = readFileSync(path.join(here, '../../server/lib/testlab.js'), 'utf8');
     expect(lab).toMatch(/resolveFigureBbox\(decision\.targetFigure, \{ bestEval: latestEval \}\)/);
   });

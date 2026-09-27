@@ -31,7 +31,6 @@ const { pickBestVersionIndex, applyScore, computeFinalScore } = require('./scori
 const { decideRepairMethod, findBadPages, collectCriticalFindings, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, AUDIT_ADMIT_MAX } = require('./repairLogic');
 const { sanitizeIssueForInpaint } = require('./imageCompositing');
 const pLimit = require('p-limit');
-const { getFacePhoto } = require('./characterPhotos');
 
 const getStoryHelpers = () => require('./storyHelpers');
 // Leaf module (parsers only) — safe to require eagerly, no cycle back here.
@@ -1356,229 +1355,23 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const currentImageData = inputOverride || best?.imageData || img.imageData;
     const bestEval = best?.evaluation;
 
-    // Single bbox source-of-truth — same helper feeds target + protection
-    // so they can't disagree. detectAllBoundingBoxes is NOT re-called on miss;
-    // its internal safety+model retries already exhausted before storing the
-    // result, so a re-call just burns another API hit.
-    // A decision carrying `targetFigure` (the presence model's MIXED case)
-    // paints THAT figure into `charName`; the name is on no figure yet.
-    const byFigure = decision.targetFigure != null;
-    const targetResolved = byFigure
-      ? require('./charRepairTarget').resolveFigureBbox(decision.targetFigure, { bestEval })
-      : resolveCharBbox(charName, {
-        bestEval, entityReport: currentEntityReport, pageNumber, imageData: currentImageData,
-      });
-    const faceBbox = targetResolved.faceBbox;
-    const bodyBbox = targetResolved.bodyBbox;
-    if (!faceBbox && !bodyBbox) {
-      return { pageNumber, imageData: null, error: byFigure ? `no box for figure ${decision.targetFigure} (target ${charName})` : `no bbox for ${charName}` };
-    }
-
-    // SAME GUARD THE MANUAL ENDPOINT USES. The detector distributes the names
-    // it is given across the figures it sees and never refuses, so a page whose
-    // brief names more characters than the render drew hands somebody a
-    // borrowed label. Repainting the face under a borrowed label destroys a
-    // bystander — an automatic repair does it without anyone watching, which is
-    // worse than the manual case, not better.
-    // Not for a figure-targeted repaint: there the figure is chosen by id from
-    // the evaluation, and no detector label is borrowed.
-    const { findBorrowedLabel } = require('./charRepairTarget');
-    const borrowed = !byFigure && findBorrowedLabel({
-      figures: Array.isArray(targetResolved.figures) ? targetResolved.figures : null,
-      sceneCharacters: img.sceneCharacters || [],
-      sceneMetadata: img.sceneMetadata || {},
-      characterName: charName,
-      pageNumber,
+    // Every input of the repair — target box (one targeting ladder, no re-detect:
+    // detectAllBoundingBoxes' own retries already ran), borrowed-label and
+    // reference-gap guards, the outfit it was rendered in and its wardrobe-state
+    // sheet, the axes, protection, clothing text and the request — built by the
+    // ONE builder the Test Lab char_repair stage calls too (charFixCall.js).
+    const call = await require('./charFixCall').buildCharFixCall({
+      storyData, characters, artStyle, img, decision, currentImageData, bestEval,
+      entityReport: currentEntityReport, jobKey: storyData?.id || jobId,
     });
-    if (borrowed) {
-      require('./runMetrics').forJob(storyData?.id || jobId).count('char_repair_reject_borrowed_label');
-      return { pageNumber, imageData: null, error: borrowed.message, borrowedLabel: borrowed };
-    }
-
-    // "not found" was the wrong sentence for the commonest case: the figure is
-    // right there, drawn and detected, and what is missing is the REFERENCE a
-    // repaint needs. charFixReferenceGap says which — one answer shared with
-    // the router (which now declines earlier) and the manual endpoint.
-    const { charFixReferenceGap } = require('./charRepairTarget');
-    const refGap = charFixReferenceGap({ characters, characterName: charName });
-    if (refGap) {
-      require('./runMetrics').forJob(storyData?.id || jobId).count('char_repair_skip_no_reference');
-      log.warn(`🚫 [CHAR-FIX] p${pageNumber}: ${refGap.message}`);
-      return { pageNumber, imageData: null, error: `char-fix skipped: ${refGap.message}`, referenceGap: refGap.reason };
-    }
-    // Same comparison the gap check just made, so the two can never disagree:
-    // a canonical match that passed the gap must resolve to a character here.
-    const { canonicalName } = require('./castResolver');
-    const character = characters.find(c => c && c.name === charName)
-      || characters.find(c => c && c.name && canonicalName(c.name) === canonicalName(charName));
-
-    // The outfit the character was RENDERED in: the page's own per-character
-    // clothing, else the cover brief / cover hint / pageClothing. One resolver
-    // with the manual repair route and the Lab stage, so the reference sheet
-    // and the clothing text below come from the same category.
-    // NO DEFAULT (owner, 2026-08-07): the resolved category picks the styled
-    // avatar this repair paints the character to match, so a guessed 'standard'
-    // repaints the story outfit into a wardrobe from an unrelated story.
-    const clothingCategory = require('./clothingCategories')
-      .resolveRenderedClothingCategory(storyData, pageNumber, charName, img);
-    if (!clothingCategory) {
-      return { pageNumber, imageData: null, error: `no clothing category for ${charName} (page record, cover brief and pageClothing all empty) — refusing to repair into a guessed outfit` };
-    }
-    // WARDROBE STATE — the third repair entry point gets the same sheet the
-    // page was generated against. Without it a character repair repaints the
-    // garment the brief took off straight back onto the body, because the only
-    // reference it holds shows it worn.
-    const wardrobeLookupCategory = (() => {
-      try {
-        const { wornResolvedForPage } = require('./storyAvatars');
-        const { offIdsForCharacter, buildOffCategory } = require('./wardrobeVariants');
-        const worn = wornResolvedForPage(storyData?.visualBible || null, img.sceneMetadata, img.sceneCharacters, pageNumber);
-        const offIds = offIdsForCharacter(charName, worn);
-        return offIds.length > 0 ? buildOffCategory(clothingCategory, offIds) : clothingCategory;
-      } catch (err) {
-        log.warn(`👕 [UNIFIED PIPELINE] Char-fix ${charName} p${pageNumber}: wardrobe-state lookup failed (${err.message}) — using the base sheet`);
-        return clothingCategory;
-      }
-    })();
-    const styledAvatar = await getStyledAvatarForClothing(character, artStyle, wardrobeLookupCategory);
-    const avatarPhoto = styledAvatar || getFacePhoto(character);
-    const avatarPhotoType = styledAvatar
-      ? (clothingCategory.startsWith('costumed') ? `costumed-${clothingCategory.split(':')[1] || 'default'}` : `styled-${clothingCategory}`)
-      : 'face';
-    if (!avatarPhoto) {
-      return { pageNumber, imageData: null, error: `no avatar photo for ${charName}` };
-    }
-
-    // Repair axes resolved by the ONE central rule (resolveRepairAxes) against
-    // the ACTUAL detected face box — replaces the old inline useFaceOnly
-    // derivation. Prefer the intent the decision already emitted (repairParams),
-    // but finalise faceOnly here since only now do we know a face box exists.
-    const { resolveRepairAxes } = require('./faceRepair');
-    // A figure repainted INTO another character is a whole-figure redraw, never
-    // a face patch.
-    const repairAxes = resolveRepairAxes({ hasFaceBbox: !!faceBbox, issueTypes: decision.issueTypes || null, ...(byFigure ? { forceTarget: 'body' } : {}) });
-    const useFaceOnly = repairAxes.faceOnly;
-    // THE FIGURE BOX, for a face repair too — the face goes separately as
-    // `faceBbox`, and the face crop is built from that. Passing the face box
-    // here made it the "body" box downstream, so the large-face-box guard
-    // (face area / body area >= 0.6) saw face == body on every face repair and
-    // turned it into a full-figure crosshatch confined to the face box + 10%:
-    // the hatch and the paste ended in straight crop lines through the torso
-    // (job_1790100385959 p14: a hard horizontal seam across the jacket and a
-    // blocky patch at the shoulder). The manual endpoint, the entity repair and
-    // the Lab already pass the body box here.
-    const repairBbox = bodyBbox || faceBbox;
-
-    // The figure's declared facing picks the sheet CELL (the resolveCellPose
-    // every generation path uses). Which cell — face alone for a face repair,
-    // body alone for a body repair — is decided inside the repair spine by
-    // charRepairReference.js, after face vs body is final.
-    const referencePose = require('./charRepairReference').referencePoseFor(img, charName);
-
-    // Protection list: same helper, iterated over sceneCharacters so
-    // protection draws from the same source as the target lookup. If a
-    // character has no bbox in any tier we skip them (can't protect what we
-    // can't locate) rather than abort the repair.
-    const protectedFaces = [];
-    const protectedBodies = [];
-    const protectedNames = [];
-    const otherChars = (img.sceneCharacters || []).filter(c =>
-      c?.name && c.name.toLowerCase() !== charName.toLowerCase()
-    );
-    for (const otherChar of otherChars) {
-      const r = resolveCharBbox(otherChar.name, {
-        bestEval, entityReport: currentEntityReport, pageNumber, imageData: currentImageData,
-      });
-      if (r.faceBbox) protectedFaces.push(r.faceBbox);
-      if (r.bodyBbox) protectedBodies.push(r.bodyBbox);
-      if (r.faceBbox || r.bodyBbox) protectedNames.push(otherChar.name);
-    }
+    if (call.failure) return { pageNumber, ...call.failure, imageData: null };
+    const { targetResolved, faceBbox, repairBbox, useFaceOnly, protectedNames } = call;
     log.info(`🛡️ [CHAR-FIX] Round ${roundNum} char-fix ${charName} on p${pageNumber}: target bbox source=${targetResolved.source}, protection bboxes for: ${protectedNames.length ? protectedNames.join(', ') : '(none)'}`);
-
-    // Detection's silhouette for the ORIGINAL figure: in-memory on this run,
-    // else the stored figure_mask. Body mode only — the detection mask is a
-    // full-figure silhouette, not a head mask.
-    // Face repairs included: the treatments clip the silhouette to the DINO
-    // face box, so the stored full-figure mask yields the head mask.
-    const figureMaskPng = await require('./charRepairTarget')
-      .resolveFigureMask(charName, targetResolved, { storyId: storyData?.id || jobId || null, pageNumber });
-
-    // Per-story clothingRequirements is the source of truth (correct for THIS
-    // story); avatars.clothing is character-level metadata that persists
-    // across stories and can carry stale colours from a previous run. Without
-    // this preference, the repair Grok prompt sends stale clothing text while
-    // the eval (driven by the new story's requirements) keeps flagging the
-    // colour mismatch — repair runs N times for nothing. Same priority as
-    // storyHelpers.resolveClothingDescription.
-    const clothingDesc = (() => {
-      const reqs = require('./clothingCategories').resolveCharacterReqs(storyData?.clothingRequirements, charName);
-      if (reqs && reqs[clothingCategory]) {
-        const cat = reqs[clothingCategory];
-        if (cat.signature && cat.signature !== 'none') return cat.signature;
-        if (cat.description) return cat.description;
-      }
-      return character.avatars?.clothing?.[clothingCategory] || '';
-    })();
-    const sceneDesc = img.sceneDescription || img.text || '';
-    // …and then THIS PAGE's worn state on top (2026-09-15). A repaint dresses
-    // the character the way the page did, through the same one resolver the
-    // image prompt and every judge use — otherwise it paints the story-level
-    // contract back onto a page that took a garment off or swapped it.
-    const pageClothingDesc = require('./wornItems')
-      .resolveOutfitForStoryPage(clothingDesc, charName, storyData, pageNumber, sceneDesc);
-    const pageTextPosition = (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.textPosition || null;
-    // Appearance text for the repair prompt (face/hair/build). The Lab passed
-    // this; PRODUCTION did not, so every live repair rendered the appearance
-    // slot empty and identity rested on the avatar alone (found while auditing
-    // story job_1786024729214_zrjgzqiey, 4 char-fix rounds).
-    const charDescForPrompt = (() => {
-      const d = img.bboxDetection?.characterDescriptions?.[charName]
-        ?? (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.bboxDetection?.characterDescriptions?.[charName];
-      const txt = (typeof d === 'string' ? d : d?.richDescription) || '';
-      return txt || (character?.description || '');
-    })();
-
     log.info(`👤 [UNIFIED PIPELINE] Round ${roundNum} char-fix ${charName} on p${pageNumber}: ${useFaceOnly ? 'FACE' : 'BODY'} bbox=[${(useFaceOnly ? faceBbox : repairBbox).map(v => Math.round(v * 100) + '%').join(', ')}] (${decision.severity})`);
     require('./runMetrics').forJob(storyData?.id || jobId).count('consistency_regen');
     let repairResult;
     try {
-      // ONE contract, shared with the Test Lab stage (charRepairRequest.js).
-      // Assembling this by hand in two places is what let the Lab drift from
-      // production and hid the missing artStyle from both.
-      const { buildCharRepairRequest } = require('./charRepairRequest');
-      repairResult = await images().repairCharacterMismatch(currentImageData, avatarPhoto, repairBbox, charName, buildCharRepairRequest({
-        imageBackend: 'grok',
-        // Structured type only — the prompt never carries the judge's sentence.
-        defectTypes: decision.issueTypes || null,
-        clothingDescription: pageClothingDesc,
-        characterDescription: charDescForPrompt,
-        photoType: avatarPhotoType,
-        referencePose,
-        sceneDescription: sceneDesc,
-        faceBbox,
-        protectedFaces,
-        protectedBodies,
-        whiteoutTarget: useFaceOnly ? 'face' : 'body',
-        // Detection's silhouette for the ORIGINAL figure, so SAM is not re-run
-        // on the same pixels. Face mode included — the treatment clips it to
-        // the face box. Null → a reported re-segmentation.
-        detectionBodyMask: figureMaskPng,
-        textPosition: pageTextPosition,
-        // The repair prompt builds an "Art style — match this medium and
-        // rendering exactly: <full descriptor>" block from this, and falls back
-        // to NOTHING when it is absent. Every production character repair ran
-        // without it: the model was told to "match the surrounding style"
-        // without ever being told what that style is, while holding a portrait
-        // reference. Measured on a shipped page, 4 of 5 full-figure repairs came
-        // back in a different rendering from the page they were painted into.
-        artStyle: storyData?.artStyle || artStyle || null,
-        includeDebug: true,
-        // Pose lines name other figures by sight, never by name.
-        repairNames: require('./repairLogic').buildPageRepairNameMap({
-          storyData, sceneDescription: sceneDesc, pageNumber, artStyle,
-          detectedFigures: img?.sharedBboxDetection?.figures || img?.bboxDetection?.figures || null,
-        }),
-      }));
+      repairResult = await images().repairCharacterMismatch(currentImageData, call.avatarPhoto, repairBbox, charName, call.request);
     } catch (err) {
       // Literal, not a bare `method`: this closure has no such binding (the
       // round runner destructures one from pageStrategies, a different scope),

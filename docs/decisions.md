@@ -62863,3 +62863,80 @@ estimate ($0.0074 per character) is low by roughly 5–7×.
 
 **Touched:** server/lib/charRepairReference.js, server/lib/entityConsistency.js,
 tests/unit/entity-judge-reference-faces.test.ts.
+
+
+## 2026-09-27 — The Lab runs production code; params are the only difference
+
+**Context:** the owner, 2026-09-27: "The Lab must use 100% identical code to production." Five
+Lab/prod divergences had been found and fixed that day one at a time: the edit tier instead of
+`pageRenderImage` (7c9129c82), plate QC skipped on text-below stories (e8dca2d19), plate style from
+`resolveArtStyleForEmptyScene` (19ed3d5fe), the plate prompt wrapped twice, and char-repair clothing
+(27cd9de6d). An audit of every stage in `STAGE_RUNNERS`, `STORY_STAGES` and `AVATAR_STAGES`
+(`docs/testlab-prod-parity.md`) found that no stage was class A. Every one either built its own
+inputs for a production function (B) or re-implemented production logic (C). The two stages used
+most for decisions were among the worst:
+- **image**: `inputData` had no `layout`, so `buildImagePrompt` read text-in-image. The grid
+  selection ignored the brief's `objects[]` and the id fallback. The route's reference mode was
+  never applied. A text mask was attached on plateless and vantage pages. `artStyle` was sent as
+  a render option.
+- **char_repair**: its own box ladder and its own clothing text (`buildClothingDescription`
+  instead of the requirement signature plus the page's worn state). No wardrobe-state sheet.
+  Forced `blended` mode and `face` target. No borrowed-label or reference-gap guard, no
+  face-integrity gate. Covers were never restamped.
+
+**Decision:** production's own input building becomes one exported builder, and both the run and
+the Lab call it. The Lab reconstructs only what exists solely in a live run's memory, from stored
+data, with the same builders. With no `params`, a stage sends production's call. Each `params.*`
+knob is an explicit override applied on top. The only intended difference is where the result is
+saved (a Lab test version).
+- **Page render** → `server/lib/pageRenderCall.js`. It holds `selectPageElementRefs`,
+  `keepPageGridElements`, `pageRenderModel`, `makePageImagePrompt`, `pageTextAreaMask` and
+  `pageRenderOptions`. `storyJobPipeline.js` preparePageData, Phase 5a-pre, 5a-pre-grid and
+  Phase 5a call them, and so does `runImageStage`.
+- **Repair round** → `server/lib/charFixCall.js` `buildCharFixCall`. It holds
+  `executeCharFixAction`'s input building, moved verbatim. `runCharRepairStage` calls it, then
+  `repairCharacterMismatch`, the face-integrity gate, and for a cover
+  `coverEvalLayer.restampRepairedCover`.
+  - The decision is reconstructed from the stored entity report through
+    `repairLogic.charFixEntityFindings`, the filter `decideRepairMethod` now uses.
+  - `bestEval` comes from the stored detection. When that detection does not locate the character,
+    the page is re-detected with `charRepairTarget.detectPageForRepair`, the manual route's
+    detector call, now shared.
+- **Plate derive** (`edit_image`, source `empty_scene`) passes the layout aspect as the run does.
+- **Guard:** `tests/unit/lab-prod-call-parity.test.ts` stubs only the network and DB. It runs
+  each stage on a stored-page fixture, compares its call (model, prompt, references, options)
+  with production's builders, and checks by source scan that the run still calls those builders.
+  Sibling sets `lab-vs-prod-page-render` and `lab-vs-prod-char-fix` block a one-sided change.
+
+**Rationale:** a Lab result is evidence about production only if it ran production's code. Every
+divergence fixed so far had silently changed what an experiment measured.
+
+**Validation:** free replays on staging stored pages. `job_1790446348343_z3fw660ie` p16: the Lab
+prompt is byte-identical to production's builders, at 10,024 chars. The same story's p7 and p-2:
+the char-fix call is identical to `buildCharFixCall`'s for every character with a routable
+finding. The stored run prompt differs only by prompt-builder changes made since the story was
+generated (distinctive features, DEPTH/COUNTS blocks, light wording), not by Lab code.
+
+**Past experiments this affects** (staging, 2026-09-26/27):
+- `image` #1501, #1502, #1512, #1516, #1518, #1520, #1523, #1536: grid selection and the
+  reference mode differed from production. On these text-below stories no page has a text
+  position, so no COPY SPACE block was added. #1523 also rendered on the edit tier (fixed in
+  7c9129c82).
+- `char_repair` #1554, #1555, #1557, #1561: forced blended mode and face target, Lab clothing
+  text, no wardrobe-state sheet, no face gate, cover saved without restamp.
+- `edit_image` #1504, #1519: the plate derive was run at aspect null.
+- Still open (backlog): `beats_replan` #1537/#1550/#1553/#1556/#1558, `scene_review_replay` #1551,
+  `arc_panel_replay` #1540, and the `judge_fixture` plate-QC and eval branches (#1525–#1549,
+  #1559, #1562).
+
+**Constraint:** some production inputs are not stored — `availableLandmarks`, `modelOverrides`,
+the pre-review bible and the route overrides — so the stages that need them cannot yet be
+exact. Persisting them is listed in the backlog.
+
+**Touched:** server/lib/pageRenderCall.js (new), server/lib/charFixCall.js (new),
+storyJobPipeline.js, server/lib/repairPipeline.js, server/lib/repairLogic.js,
+server/lib/charRepairTarget.js, server/routes/regeneration.js, server/lib/testlab.js,
+tests/unit/lab-prod-call-parity.test.ts (new), scripts/admin/sibling-registry.json,
+docs/testlab-prod-parity.md (new), docs/lab-divergences.md, tasks/BACKLOG.md.
+
+**Status:** ✅ staging.

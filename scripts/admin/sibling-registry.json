@@ -171,7 +171,9 @@
       ],
       "severity": "block",
       "parity": {
-        "anchors": ["clampApparentAge("]
+        "anchors": [
+          "clampApparentAge("
+        ]
       }
     },
     {
@@ -851,7 +853,7 @@
     {
       "id": "cover-page-render-vs-iterate",
       "axis": "full-story cover first render vs full-story cover iterate",
-      "reason": "A full-story cover is a page (2026-09-24): its first render (storyJobPipeline.js preparePageData / Phase 5a) and its iterate (images.js iteratePageCore, reached from the repair pipeline, the cover routes and the Lab via coverRender.iterateFullStoryCover) must apply the SAME cover-only options — coverRenderOptions (aspect, text always in the image, baked-title model, text contract, usage bucket) and withBakedTitle (the REQUIRED TEXT tail). An option honoured on one side only renders or judges the cover differently the first time and after every repair.",
+      "reason": "A full-story cover is a page (2026-09-24): its first render (storyJobPipeline.js preparePageData / Phase 5a) and its iterate (images.js iteratePageCore, reached from the repair pipeline, the cover routes and the Lab via coverRender.iterateFullStoryCover) must apply the SAME cover-only options — coverRenderOptions (aspect, text always in the image, baked-title model, text contract, usage bucket) and withBakedTitle (the REQUIRED TEXT tail). An option honoured on one side only renders or judges the cover differently the first time and after every repair. Since 2026-09-27 the first render applies withBakedTitle through the shared page-render builder (server/lib/pageRenderCall.js makePageImagePrompt, also the Test Lab image stage) — pinned by the sibling set cover-page-render-baked-title.",
       "members": [
         "storyJobPipeline.js",
         "server/lib/images.js"
@@ -859,7 +861,21 @@
       "severity": "block",
       "parity": {
         "anchors": [
-          "coverRenderOptions",
+          "coverRenderOptions"
+        ]
+      }
+    },
+    {
+      "id": "cover-page-render-baked-title",
+      "axis": "full-story cover first render (shared page-render builder) vs full-story cover iterate",
+      "reason": "The REQUIRED TEXT tail of a baked-title cover (withBakedTitle) is appended by pageRenderCall.makePageImagePrompt on the first render (story run Phase 5a and the Test Lab image stage) and by images.js iteratePageCore on every iterate/repair. A cover that gets the tail on one path only renders its title the first time and loses it after a repair, or the reverse.",
+      "members": [
+        "server/lib/pageRenderCall.js",
+        "server/lib/images.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
           "withBakedTitle"
         ]
       }
@@ -888,6 +904,41 @@
         "server/routes/storyIdeas.js"
       ],
       "severity": "block"
+    },
+    {
+      "id": "lab-vs-prod-page-render",
+      "axis": "Lab vs prod",
+      "reason": "The Test Lab image stage and the story run page render (storyJobPipeline.js Phase 5a) build the render call through the SAME builders in server/lib/pageRenderCall.js (owner 2026-09-27: the Lab must use 100% identical code to production). A change to how production selects grid cells, filters them, picks the model, builds the prompt, masks the copy space or sets the render options must land in pageRenderCall.js, where both read it; tests/unit/lab-prod-call-parity.test.ts compares the two calls.",
+      "members": [
+        "storyJobPipeline.js",
+        "server/lib/testlab.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "selectPageElementRefs",
+          "keepPageGridElements",
+          "pageRenderModel",
+          "makePageImagePrompt",
+          "pageTextAreaMask",
+          "pageRenderOptions"
+        ]
+      }
+    },
+    {
+      "id": "lab-vs-prod-char-fix",
+      "axis": "Lab vs prod",
+      "reason": "The Test Lab char_repair stage and the repair round (repairPipeline.js executeCharFixAction) build the char-fix call with the SAME builder, server/lib/charFixCall.js buildCharFixCall (owner 2026-09-27). Inputs production derives (target box, guards, outfit, wardrobe-state sheet, axes, protection, clothing text) change there, never in one caller.",
+      "members": [
+        "server/lib/repairPipeline.js",
+        "server/lib/testlab.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "buildCharFixCall"
+        ]
+      }
     }
   ],
   "withinFile": [

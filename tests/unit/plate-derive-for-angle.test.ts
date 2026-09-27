@@ -149,7 +149,9 @@ describe('the pipeline honours it', () => {
   });
   it('the derive is sent with the plate-derive template, not illustration-edit', () => {
     expect(src).toMatch(/plateImage, instruction, MODEL_DEFAULTS\.emptyScenePlateModel, \[\], inputData\.artStyle \|\| null, layoutAspect, \{ plateDerive: true \}\)/);
-    expect(SRC('server/lib/testlab.js')).toMatch(/MODEL_DEFAULTS\.emptyScenePlateModel, \[\], ctx\.artStyle, null, \{ plateDerive: true \}\)/);
+    // The Lab replays the derive at the run's aspect (the layout's), never null
+    // (2026-09-27; tests/unit/lab-prod-call-parity.test.ts runs it).
+    expect(SRC('server/lib/testlab.js')).toMatch(/MODEL_DEFAULTS\.emptyScenePlateModel, \[\], ctx\.artStyle \|\| null,\s*ctx\.layout\?\.imageAspect \|\| MODEL_DEFAULTS\.pageAspect, \{ plateDerive: true \}\)/);
   });
   it('a derived plate is QC-judged at its own camera', () => {
     expect(src).toMatch(/validateEmptyScene\(derivedImage, null, `vantage-\$\{vantageId\}-\$\{cls\}`, derivedQcOpts\)/);

@@ -92,7 +92,10 @@ describe('char repair reference by target', () => {
 
   it('every repair caller hands over the pose and no caller crops a cell itself', () => {
     const read = (p: string) => fs.readFileSync(path.join(process.cwd(), p), 'utf8');
-    const callers = ['server/lib/repairPipeline.js', 'server/lib/testlab.js', 'server/routes/regeneration.js', 'server/lib/entityConsistency.js'];
+    // The repair round's call is built in charFixCall.js (shared with the Lab stage).
+    // The Lab char_repair stage builds through charFixCall.js as well.
+    const callers = ['server/lib/charFixCall.js', 'server/routes/regeneration.js', 'server/lib/entityConsistency.js'];
+    expect(read('server/lib/testlab.js')).toContain("require('./charFixCall')");
     for (const f of callers) expect(read(f), f).toMatch(/referencePose[:,]/);
     // The spine picks the cell from the FINAL face/body axis.
     expect(read('server/lib/faceRepair.js')).toMatch(/normalizeAvatar\(avatarInput, opts, faceOnly \? 'face' : 'body'\)/);

@@ -74,6 +74,7 @@ async function loadSceneContext(storyId, pageNumber) {
               data->>'storyTheme' AS story_theme,
               data->>'storyTopic' AS story_topic,
               data->>'title' AS title,
+              data->>'dedication' AS dedication,
               data->'layout' AS layout,
               (data->'visualBible')::text AS visual_bible,
               (data->'clothingRequirements')::text AS clothing_reqs,
@@ -93,6 +94,7 @@ async function loadSceneContext(storyId, pageNumber) {
               data->>'storyTheme' AS story_theme,
               data->>'storyTopic' AS story_topic,
               data->>'title' AS title,
+              data->>'dedication' AS dedication,
               data->'layout' AS layout,
               (data->'visualBible')::text AS visual_bible,
               (data->'clothingRequirements')::text AS clothing_reqs,
@@ -164,6 +166,7 @@ async function loadSceneContext(storyId, pageNumber) {
     storyTheme: rows[0].story_theme || null,
     storyTopic: rows[0].story_topic || null,
     title: rows[0].title || null,
+    dedication: rows[0].dedication || null,
     clothingRequirements,
     pageClothing,
     coverHints,
@@ -536,45 +539,54 @@ function evalReferencePhotos(ctx) {
 async function runImageStage(ctx, { promptOverride, experimentId, autoEval = true, params = {} }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
-  const { buildImagePrompt } = require('./storyHelpers');
   const { generateImageOnly } = require('./images');
-  const { buildPageCompositeRefs } = require('./referenceSheets');
-  const { getTextAreaMask } = require('./textMasks');
+  const { buildVisualBibleGrid } = require('./referenceSheets');
   const { MODEL_DEFAULTS, IMAGE_MODELS } = require('../config/models');
+  // THE PRODUCTION PAGE RENDER, built by the SAME builders the story run's
+  // Phase 5a uses (pageRenderCall.js, owner 2026-09-27: "The Lab must use 100%
+  // identical code to production"). With no params this stage sends the model,
+  // prompt, references and options production sends for the stored page; every
+  // params.* below is an explicit A/B override on top of that. Pinned by
+  // tests/unit/lab-prod-call-parity.test.ts.
+  const pageRender = require('./pageRenderCall');
+  const { applyReferenceMode } = require('./clothingResolve');
+  const { decidePageRoute } = require('./imageRouter');
+  const { pageNeedsPlate } = require('./landmarkScene');
 
+  // A cover renders through the page path with its cover options, rebuilt from
+  // the stored story exactly as the run built them (coverRender.js).
+  const coverOpts = require('./coverRender').coverRenderOptions(ctx.pageNumber, {
+    title: ctx.title || '', dedication: ctx.dedication || null,
+  });
   // artStyleOverride: render the page in a different art style than the story's
   // (style-matrix benchmark runs). Caveat: reference photos stay the story's
   // original styled avatars — the style prompt dominates rendering.
   const artStyle = params.artStyleOverride || ctx.artStyle;
+  // The fields of the job's inputData the page prompt reads (buildImagePrompt:
+  // artStyle, language, languageLevel, layout) — from the stored story, which
+  // carries the job's values. `layout` decides textInImage: without it the
+  // prompt defaulted to text-in-image and sent a COPY SPACE block on every
+  // text-below story (2026-09-27).
   const inputData = {
     artStyle,
     language: ctx.language,
-    ageFrom: 3,
-    ageTo: 8,
     languageLevel: ctx.languageLevel,
+    layout: ctx.layout,
   };
+  // aboardOverride is the empty_scene stage's knob for stories whose stored
+  // metadata predates the field; it reaches the grid filter the same way.
+  const sceneMetadata = params.aboardOverride !== undefined
+    ? { ...(ctx.scene.sceneMetadata || {}), aboard: params.aboardOverride }
+    : (ctx.scene.sceneMetadata || null);
+  const page = { pageNumber: ctx.pageNumber, sceneMetadata, sceneCharacters: ctx.scene.sceneCharacters || null };
 
-  // THE PAGE RENDER TIER, as production renders a page (2026-09-26). This
-  // stage passed `params.imageModel || null`, and a null override resolves to
-  // generateImageOnly's default — MODEL_DEFAULTS.pageImage, the EDIT/INPAINT
-  // tier (Standard, grok-imagine-image) — while every production page renders
-  // on MODEL_DEFAULTS.pageRenderImage (Imagine 2.0 since 2026-09-06). Lab 1523
-  // (p16 of staging job_1790446348343_z3fw660ie) reported grok-imagine-image
-  // against a stored page painted by grok-imagine-image-2.0. An explicit
-  // params.imageModel is still the A/B lever.
-  const pageModelKey = params.imageModel || MODEL_DEFAULTS.pageRenderImage;
-  // Same VB-text rule as production: Grok's 8000-char limit means the VB prose
-  // is skipped and the grid image carries the references instead.
-  const isGrokImage = IMAGE_MODELS[pageModelKey]?.backend === 'grok';
-
-  // THE PLATE AND THE GRID ARE RESOLVED BEFORE THE PROMPT (2026-09-18), because
-  // the prompt has to know which references the call actually carries. This is
-  // the same ordering production settled on 2026-09-15 (storyJobPipeline.js
-  // `makeImagePrompt` + the 5a-pre-grid rebuild) and that images.js `iterate`
-  // already had: build the grid, then build the prompt from the cells that are
-  // in it. Nothing else moved — the reference-photo knobs (avatarSheets,
-  // refCrop) still run after the prompt, exactly as before, because they change
-  // the PIXELS of a character card and nothing the prompt reads.
+  // The page model tier, as the run resolves it. params.imageModel is the A/B lever.
+  const tier = pageRender.pageRenderModel({ sceneMetadata, coverOpts, pageNumber: ctx.pageNumber });
+  const pageImageModel = params.imageModel || tier.pageImageModel;
+  const pageImageBackend = params.imageModel ? (IMAGE_MODELS[params.imageModel]?.backend || null) : tier.pageImageBackend;
+  // The route (cast size → reference mode), decided by the run's router.
+  const route = decidePageRoute(page, {}, MODEL_DEFAULTS);
+  const refMode = route.refMode || MODEL_DEFAULTS.referenceMode || 'strict';
 
   // backgroundRef: use a specific (test) empty-scene version as the background
   // anchor — style-matrix runs chain empty_scene(style) → image(style, that bg).
@@ -590,70 +602,54 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
   } else {
     emptyScene = await loadEmptyScene(ctx.storyId, ctx.pageNumber);
   }
-  const textInImage = ctx.layout?.textInImage !== false;
-  const textAreaMask = textInImage && ctx.textPosition ? getTextAreaMask(ctx.textPosition, ctx.languageLevel) : null;
+  const textInImage = coverOpts ? true : ctx.layout?.textInImage !== false;
+  const renderAspect = coverOpts ? coverOpts.aspectRatio : (ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect);
+  // The mask the page's plate was rendered with, which the render then attaches:
+  // a per-page plate carries the page's copy-space mask, a vantage plate none
+  // (storyJobPipeline.js Phase 5a-pre-vantage stores textAreaMask: null), and
+  // a plateless page none.
+  const plateTextAreaMask = (emptyScene && !ctx.scene.vantageId)
+    ? pageRender.pageTextAreaMask({
+      textInImage,
+      rawTextPosition: coverOpts?.textPosition || sceneMetadata?.textPosition || null,
+      pageNumber: ctx.pageNumber,
+      languageLevel: ctx.languageLevel,
+    })
+    : null;
 
-  // Visual Bible grid + landmark refs — production's shared helper (a plate
-  // background drops plate-borne elements and landmarks).
-  let visualBibleGrid = null;
-  let genLandmarkPhotos = ctx.landmarkPhotos;
-  if (ctx.visualBible) {
-    try {
-      const refs = await buildPageCompositeRefs(ctx.visualBible, ctx.pageNumber, ctx.landmarkPhotos, {
-        hasBackground: !!emptyScene,
-        logTag: 'TESTLAB',
-        // aboardOverride is the empty_scene stage's knob for stories whose
-        // stored metadata predates the field; honour it here too so a Lab page
-        // render matches production's grid exactly.
-        aboardId: params.aboardOverride ?? ctx.scene?.sceneMetadata?.aboard ?? null,
-        sceneMetadata: ctx.scene?.sceneMetadata ?? null,
-      });
-      visualBibleGrid = refs.visualBibleGrid;
-      genLandmarkPhotos = refs.landmarkPhotos;
-    } catch (err) {
-      log.warn(`[TESTLAB] VB grid build failed (continuing without): ${err.message}`);
-    }
-  }
+  // The grid, as Phase 5a-pre-grid builds it: select, drop what the SENT plate
+  // carries (the route's reference mode decides whether the plate is sent),
+  // then build from the cells kept.
+  const hasPlate = !!applyReferenceMode({ mode: refMode, sceneBackground: emptyScene, sceneMetadata }).sceneBackground;
+  const kept = pageRender.keepPageGridElements(
+    pageRender.selectPageElementRefs(ctx.visualBible, ctx.pageNumber, sceneMetadata), { hasPlate, sceneMetadata });
+  const visualBibleGrid = kept.length > 0 ? await buildVisualBibleGrid(kept, []) : null;
 
+  // The prompt closure production uses, rebuilt from the cells actually sent.
   // buildImagePrompt reads PROMPT_TEMPLATES.imageGeneration internally and is
   // SYNCHRONOUS — swap the key only around this call (no await inside the
   // window, so concurrent generations can never observe the override).
+  const makePrompt = pageRender.makePageImagePrompt({
+    // sceneDescriptionOverride: test a corrected scene brief without
+    // regenerating the story.
+    sceneDescription: params.sceneDescriptionOverride || ctx.scene.sceneDescription,
+    inputData,
+    sceneCharacters: ctx.scene.sceneCharacters || null,
+    visualBible: ctx.visualBible,
+    pageNumber: ctx.pageNumber,
+    characterPhotos: ctx.referencePhotos,
+    pageImageModel,
+    coverOpts,
+    // pageScaleScope (TEST LAB ONLY, 2026-09-26): narrows which elements'
+    // REQUIRED OBJECTS lines gain a yardstick against the figures in frame.
+    // Unset = production.
+    extraOptions: params.pageScaleScope ? { pageScaleScope: params.pageScaleScope } : null,
+  });
   let prompt;
   const origTemplate = PROMPT_TEMPLATES.imageGeneration;
   if (promptOverride) PROMPT_TEMPLATES.imageGeneration = promptOverride;
   try {
-    prompt = buildImagePrompt(
-      // sceneDescriptionOverride: test a corrected scene brief (e.g. removing a
-      // duplicated object) without regenerating the story's unified outline.
-      params.sceneDescriptionOverride || ctx.scene.sceneDescription,
-      inputData,
-      ctx.scene.sceneCharacters || null,
-      ctx.visualBible,
-      ctx.pageNumber,
-      ctx.referencePhotos,
-      {
-        textPositionOverride: ctx.textPosition || undefined,
-        skipVisualBible: isGrokImage,
-        // THE ELEMENTS WHOSE REFERENCE RENDER RIDES WITH THIS CALL — the cells
-        // the grid above actually holds, and nothing else. `rawElements` is set
-        // by buildVisualBibleGrid from the cells whose bytes loaded, so an
-        // element that was selected but has no usable render is correctly
-        // absent. Without this the Lab's REQUIRED OBJECTS block claimed no
-        // attached reference for any element while production's named them
-        // ("The attached reference images include a rough image of X — match
-        // its look"), so every Lab measurement of that block was made against a
-        // prompt production never sends. Empty grid → empty set, which is the
-        // honest answer, not a missing argument.
-        vbRefElementIds: (visualBibleGrid?.rawElements || []).map(e => e.id).filter(Boolean),
-        // pageScaleScope (TEST LAB ONLY, 2026-09-26): narrows which elements'
-        // REQUIRED OBJECTS lines gain a yardstick against the figures in frame
-        // ({types?: ['animal'|'object'|'vehicle'], bands?: [scaleClass...]});
-        // the rest keep the band phrase. `{types:['animal'], bands:
-        // ['adult-height','twice-adult-height']}` reproduces the creature-only
-        // build of 7e767c9d9 as an A/B arm. Unset = production.
-        pageScaleScope: params.pageScaleScope || null,
-      }
-    );
+    prompt = makePrompt(kept.map(e => e.id).filter(Boolean));
   } finally {
     PROMPT_TEMPLATES.imageGeneration = origTemplate;
   }
@@ -763,32 +759,36 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
   }
 
   const t0 = Date.now();
-  const result = await generateImageOnly(prompt, ctx.referencePhotos, {
-    aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
-    // params.imageModel: A/B the page render model (grok-imagine vs
-    // gemini-2.5-flash-image) — style-adherence routing tests. Unset = the
-    // production page render tier (pageModelKey above).
-    imageModelOverride: pageModelKey,
-    landmarkPhotos: genLandmarkPhotos,
-    // Plate or fail, as in production: only a cast-0 page may render on its
-    // landmark photo; any other landmark page needs the plate (emptyScene).
-    landmarkScene: require('./landmarkScene').pageLandmarkScene({ sceneMetadata: ctx.scene?.sceneMetadata || null }),
+  // The route's reference mode over the page's stored references (after any
+  // Lab reference knob above), exactly as the run applies it before rendering.
+  const refApplied = applyReferenceMode({
+    mode: refMode,
+    characterPhotos: ctx.referencePhotos,
     visualBibleGrid,
-    artStyle,
+    landmarkPhotos: ctx.landmarkPhotos,
     sceneBackground: emptyScene,
-    textAreaMask,
-    pageNumber: ctx.pageNumber,
+    sceneMetadata,
+  });
+  // PLATE OR FAIL, as the run: a landmark page with no plate is not rendered on
+  // the raw photo.
+  if (pageNeedsPlate(page, refApplied.landmarkPhotos) && !refApplied.sceneBackground) {
+    throw new Error(`page ${ctx.pageNumber} has a landmark photo and no plate — production refuses this render too`);
+  }
+  const result = await generateImageOnly(prompt, refApplied.characterPhotos, {
+    ...pageRender.pageRenderOptions({
+      page, renderAspect, pageImageModel, pageImageBackend, refApplied, textInImage, plateTextAreaMask, coverOpts,
+    }),
+    // Lab MECHANIC, not a behaviour difference: the gen-only cache would hand
+    // back the stored render instead of rendering.
     skipCache: true,
     // maxRefSlots: raise Grok's reference-slot budget above the production
-    // default of 3 (xAI's documented edit cap is 5, re-verified 2026-09-02) —
-    // e.g. give each of 4 characters their own slot instead of pairing 2-per-slot.
-    maxRefSlots: params.maxRefSlots || null,
+    // default (xAI's documented edit cap is 5). Unset = production.
+    ...(params.maxRefSlots ? { maxRefSlots: params.maxRefSlots } : {}),
     // vbColumnFraction: the ONE variable of the 2026-09-19 cell-geometry
-    // experiment - how wide the VB element column is, i.e. how large an
-    // element is DRAWN. Character cards are height-limited and narrower than
-    // either column width, so they render identically in both arms.
-    vbColumnFraction: params.vbColumnFraction || null,
+    // experiment - how wide the VB element column is. Unset = production.
+    ...(params.vbColumnFraction ? { vbColumnFraction: params.vbColumnFraction } : {}),
   });
+
   const elapsedMs = Date.now() - t0;
   if (!result?.imageData) throw new Error('Image generation returned no image');
 
@@ -846,7 +846,10 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
     }
   }
 
-  return { imageType: 'scene', versionIndex, promptUsed: prompt, modelId: result.modelId || null, elapsedMs, scores, artStyle: params.artStyleOverride || undefined, ...(steps.length ? { steps } : {}) };
+  // promptUsed is the string the model RECEIVED (post-shrink), the value the
+  // run stores on the page (storyJobPipeline.js `genResult.prompt || pageData.prompt`),
+  // so a Lab prompt is byte-comparable with the stored production one.
+  return { imageType: 'scene', versionIndex, promptUsed: result.prompt || prompt, modelId: result.modelId || null, elapsedMs, scores, artStyle: params.artStyleOverride || undefined, ...(steps.length ? { steps } : {}) };
 }
 
 /**
@@ -2062,168 +2065,144 @@ async function runCharRepairStage(ctx, opts) {
     return { ...r, backend: params.backend, repairMode: `${params.backend}-insert` };
   }
 
+  // THE RUN'S CHAR-FIX, on the stored page (owner, 2026-09-27: "The Lab must use
+  // 100% identical code to production"). Every input — target box, borrowed-
+  // label and reference-gap guards, the rendered outfit and its wardrobe-state
+  // sheet, the axes (face vs body from the finding types), protection, clothing
+  // text, the request — comes from the builder the repair round calls
+  // (charFixCall.js); after the repaint the same face-integrity gate runs, and a
+  // cover is restamped as the manual route restamps it. With no params the call
+  // equals production's; every params.* below is an explicit override on top,
+  // listed in docs/lab-divergences.md. The only other difference is WHERE the
+  // result goes: a Lab test version, never the story.
+  //
   // target.versionIndex pins a stored version — repairing the ORIGINAL render
   // rather than whatever is active is how a repair is re-run under the same
-  // conditions production saw. Null keeps the active version (previous default).
+  // conditions production saw. Null keeps the active version. A cover loads its
+  // textless art layer (loadActivePageImage), as production repairs it.
   const pinnedVersion = pinnedVersionIndex(ctx.target?.versionIndex);
   const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, pinnedVersion);
-  // IDENTITY-TRANSFER TEST: params.referenceCharacter sends a DIFFERENT character's
-  // avatar while still targeting charName's box. If the repair returns the original
-  // character, identity is being copied from the page instead of the reference —
-  // the sharpest test there is for a treatment (owner, 2026-08-05).
-  const refName = params.referenceCharacter || charName;
-  let ref = ctx.referencePhotos.find(p => (p.name || '').toLowerCase() === refName.toLowerCase());
-  if (!ref && params.referenceCharacter) ref = await resolveSwapReference(ctx, refName, params.artStyleOverride);
-  if (!ref) {
-    const avail = ctx.referencePhotos.map(p => p.name).filter(Boolean).join(', ');
-    throw new Error(`No reference photo for character "${refName}" on this page (available: ${avail || 'none'})`);
+  const coverLayer = getLastPageLoad()?.coverLayer || null;
+  const { storyData: storedStory } = await loadStoryDataFull(ctx.storyId, { rehydrate: false });
+  const artStyle = params.artStyleOverride || storedStory.artStyle || ctx.artStyle || 'pixar';
+  const storyData = params.artStyleOverride ? { ...storedStory, artStyle } : storedStory;
+  const characters = storyData.characters || [];
+  const img = { ...ctx.scene, pageNumber: ctx.pageNumber };
+  // THE DECISION the run's repair round would hand this character: the finding
+  // types of its routable entity finding on this page, through the filter
+  // decideRepairMethod uses (repairLogic.charFixEntityFindings). The run only
+  // char-fixes a CRITICAL one; a Lab run may target a major/minor finding and is
+  // told so (productionWouldRepair). params.issueTypes / whiteoutTarget override.
+  const { charFixEntityFindings } = require('./repairLogic');
+  const { canonicalName } = require('./castResolver');
+  const routable = charFixEntityFindings(ctx.pageNumber, storyData.finalChecksReport?.entity || null, { severities: ['critical', 'major', 'minor'] })
+    .filter(f => canonicalName(f.charName) === canonicalName(charName));
+  const productionWouldRepair = routable.some(f => f.severity === 'critical');
+  const finding = routable.find(f => f.severity === 'critical') || routable[0] || null;
+  const decision = {
+    charName,
+    issueTypes: Array.isArray(params.issueTypes) ? params.issueTypes
+      : (finding ? [finding.issue.subType || finding.issue.type].filter(Boolean) : null),
+    ...(params.whiteoutTarget === 'face' || params.whiteoutTarget === 'body' ? { forceTarget: params.whiteoutTarget } : {}),
+    ...(params.targetFigure != null ? { targetFigure: params.targetFigure } : {}),
+  };
+  if (!decision.issueTypes && !decision.forceTarget && decision.targetFigure == null) {
+    throw new Error(`No entity finding on page ${ctx.pageNumber} for "${charName}" whose type decides face vs full figure — the run would not char-fix it. Pass params.issueTypes (e.g. ["face_mismatch"]) or params.whiteoutTarget ("face"|"body").`);
   }
+  const { buildCharFixCall } = require('./charFixCall');
+  const buildCall = (bestEval, entityReport) => buildCharFixCall({
+    storyData, characters, artStyle, img, decision, currentImageData: imageData, bestEval, entityReport, jobKey: ctx.storyId,
+  });
+
+  // The evaluation of the bytes being repaired. The run holds it in memory; a
+  // stored page carries its detection and matches (fingerprint-checked against
+  // the bytes by the ladder). When they do not locate the character — a pinned
+  // older version, a stale stamp — the page is detected afresh with the manual
+  // route's detector call (charRepairTarget.detectPageForRepair), which is the
+  // detection the run would have held for these bytes.
+  // Lab knobs: params.detection (a chained experiment's detection, authoritative)
+  // and params.freshDetection (skip the stored one).
+  let call = null;
+  let boxSource;
+  let freshDetection = null;
+  if (params.detection) {
+    call = await buildCall({ bboxDetection: params.detection }, null);
+    boxSource = 'chained-detection';
+  } else if (!params.freshDetection) {
+    call = await buildCall({ bboxDetection: ctx.scene.bboxDetection, matches: ctx.scene.matches }, storyData.finalChecksReport?.entity || null);
+    boxSource = 'stored';
+  }
+  if (!call || call.failure?.noBox) {
+    if (params.detection) throw new Error(`"${charName}" not located by the chained detection — refusing the stored generation-time box, it can point at the wrong figure.`);
+    const { detectPageForRepair } = require('./charRepairTarget');
+    ({ detection: freshDetection } = await detectPageForRepair({
+      storyData, sceneImage: img, imageData, characterName: charName, pageNumber: ctx.pageNumber, artStyle, label: 'testlab',
+    }));
+    call = await buildCall({ bboxDetection: freshDetection }, null);
+    boxSource = 'fresh-detection';
+  }
+  if (call.failure) {
+    // The run refuses this repair too — that refusal IS the result.
+    const err = new Error(`char-fix refused (as in production): ${call.failure.error}`);
+    err.partialResult = { characterName: charName, boxSource, failure: call.failure };
+    throw err;
+  }
+  boxSource = `${boxSource}:${call.targetResolved.source}`;
+
+  // ── Lab overrides (explicit A/B knobs; none set = production) ──────────────
+  const overrides = {};
+  let avatarPhoto = call.avatarPhoto;
+  let avatarPhotoType = call.avatarPhotoType;
+  let bbox = call.repairBbox;
+  let faceBbox = call.faceBbox;
+  // IDENTITY-TRANSFER TEST: params.referenceCharacter sends a DIFFERENT
+  // character's avatar (and outfit/appearance text) while still targeting
+  // charName's box. If the repair returns the original character, identity is
+  // being copied from the page instead of the reference (owner, 2026-08-05).
+  const refName = params.referenceCharacter || charName;
   if (params.referenceCharacter) {
+    const { getStyledAvatarForClothing, buildClothingDescription } = require('./entityConsistency');
+    const refChar = characters.find(c => (c.name || '').toLowerCase() === refName.toLowerCase()) || null;
+    const styled = refChar ? await getStyledAvatarForClothing(refChar, artStyle, call.clothingCategory).catch(() => null) : null;
+    avatarPhoto = (styled && await toDataUri(styled)) || (await resolveSwapReference(ctx, refName, artStyle)).photoUrl;
+    avatarPhotoType = `swap-${refName}`;
+    overrides.clothingDescription = refChar ? (buildClothingDescription(refChar, call.clothingCategory, artStyle, storyData.clothingRequirements) || '') : '';
+    const d = ctx.scene.bboxDetection?.characterDescriptions?.[refName];
+    overrides.characterDescription = (typeof d === 'string' ? d : d?.richDescription) || refChar?.description || '';
     log.info(`[TESTLAB] IDENTITY SWAP: repairing ${charName}'s region with ${refName}'s reference`);
   }
-
-  // Bbox: explicit param → stored detection → fresh detection on the image.
-  // params.freshDetection skips the stored box (stale/misattributed names on
-  // older stories) and always re-detects.
-  let bbox = params.bbox || null;
-  let faceBbox = params.faceBbox || null;
-  let boxSource = bbox ? 'param' : null;
-  if (!bbox) {
-    if (params.freshDetection) ctx._skipStoredBox = true;
-    const resolved = await resolveCharacterBox(ctx, imageData, charName, { detection: params.detection || null });
-    delete ctx._skipStoredBox;
-    if (resolved) { bbox = resolved.bbox; faceBbox = faceBbox || resolved.faceBbox; boxSource = resolved.source; }
+  if (params.bbox?.length === 4) { bbox = params.bbox; boxSource = 'param'; }
+  if (params.faceBbox?.length === 4) { faceBbox = params.faceBbox; overrides.faceBbox = faceBbox; }
+  if (params.treatment) overrides.treatment = params.treatment;
+  if (params.regionSource) overrides.regionSource = params.regionSource;
+  if (params.faceOnly !== undefined) overrides.faceOnly = !!params.faceOnly;
+  const backend = params.backend || 'grok';
+  if (!['grok', 'gemini'].includes(backend)) throw new Error(`Unknown backend "${backend}" — use grok|gemini|qwen`);
+  if (backend !== 'grok') overrides.imageBackend = backend;
+  // The Gemini path is a single full-image repaint — it consumes NONE of the
+  // mode flags. Refuse a mode request it would silently ignore.
+  if (backend === 'gemini' && params.repairMode && params.repairMode !== 'auto') {
+    throw new Error(`backend "gemini" ignores repairMode — it always does a full-image repaint. Use grok for blended/cutout/fullscene.`);
   }
-  if (!bbox || bbox.length !== 4) {
-    throw new Error(`"${charName}" not found on the page image (stored detection AND fresh detection both missed) — is the character actually visible?`);
-  }
-
-  // Mode mapping — the real repair options are the useBlended/useCutout/
-  // useFullScene flags; 'auto' passes none and lets whiteoutTarget pick the
-  // default exactly as the automatic pipeline does.
-  const repairMode = params.repairMode || 'blended';
+  // Legacy mode flags pick the method through the SAME adapter production
+  // reads. Production passes none, so unset/'auto' = production.
+  const repairMode = params.repairMode || 'auto';
   const modeFlags = {};
   if (repairMode === 'blended') modeFlags.useBlended = true;
   else if (repairMode === 'cutout') modeFlags.useCutout = true;
   else if (repairMode === 'fullscene') modeFlags.useFullScene = true;
   else if (repairMode !== 'auto') throw new Error(`Unknown repairMode "${repairMode}" — use blended|cutout|fullscene|auto`);
-
-  const backend = params.backend || 'grok';
-  if (!['grok', 'gemini'].includes(backend)) throw new Error(`Unknown backend "${backend}" — use grok|gemini|qwen`);
-  // The Gemini path is a single full-image repaint — it consumes NONE of the
-  // mode flags / whiteoutTarget / faceBbox. Refuse a mode request it would
-  // silently ignore instead of reporting it as honored.
-  if (backend === 'gemini' && params.repairMode && params.repairMode !== 'auto') {
-    throw new Error(`backend "gemini" ignores repairMode — it always does a full-image repaint. Use grok for blended/cutout/fullscene.`);
-  }
-
-  // Face repair with no face box: recover (zoom into the known body box,
-  // re-run face detection) or fail loudly — never silently repair the body.
-  const whiteoutTarget = params.whiteoutTarget || 'face';
-  if (backend === 'grok' && whiteoutTarget === 'face' && !(faceBbox?.length === 4)) {
-    const { recoverFaceBox } = require('./figureDetection');
-    faceBbox = await recoverFaceBox(imageData, bbox, `testlab-P${ctx.pageNumber} ${charName}: `);
-    if (faceBbox) boxSource = `${boxSource} + face-recovered`;
-    else throw new Error(`Face repair requested for "${charName}" but no face box — full-page detection AND body-crop zoom recovery both found no face. Use whiteoutTarget "body" explicitly if a body repair is intended.`);
-  }
-
-  // Production-parity inputs — same as the automatic char-fix path: the
-  // clothing-scoped styled avatar, the story's resolved clothing description
-  // (clothingRequirements is canonical, avatars.clothing can be stale), and
-  // protection boxes for every OTHER named character on the page.
-  const { resolveRenderedClothingCategory } = require('./clothingCategories');
-  const { getStyledAvatarForClothing, buildClothingDescription } = require('./entityConsistency');
-  // The styled avatar must follow the REFERENCE, not the target region — looking
-  // it up by charName silently replaced a swapped reference with the original
-  // character's avatar, so the identity-swap test ran with the wrong image and
-  // its result was meaningless (owner caught this on exp #320).
-  const character = (ctx.characters || []).find(c => (c.name || '').toLowerCase() === refName.toLowerCase()) || null;
-  // The outfit the TARGET was rendered in, through the one resolver production
-  // uses. A cover has no sceneCharacterClothing; reading only that fell to
-  // 'standard', so the text described the everyday outfit while the avatar
-  // lookup sent the costume (Lab 1554).
-  const { COVER_PAGE_NUMBERS } = require('./coverKeys');
-  const coverKey = Object.keys(COVER_PAGE_NUMBERS).find(k => COVER_PAGE_NUMBERS[k] === Number(ctx.pageNumber)) || null;
-  const clothingCategory = resolveRenderedClothingCategory({
-    pageClothing: ctx.pageClothing,
-    coverHints: ctx.coverHints,
-    coverImages: coverKey ? { [coverKey]: ctx.scene } : null,
-    characters: ctx.characters,
-    visualBible: ctx.visualBible,
-  }, ctx.pageNumber, charName, ctx.scene);
-  if (!clothingCategory) {
-    throw new Error(`No clothing category for "${charName}" on page ${ctx.pageNumber} (page record, cover brief and pageClothing all empty) — refusing to repair into a guessed outfit`);
-  }
-  let avatarPhoto = ref.photoUrl;
-  let avatarPhotoType = 'reference';
-  if (character) {
-    try {
-      const styled = await getStyledAvatarForClothing(character, ctx.artStyle, clothingCategory);
-      if (styled) {
-        avatarPhoto = (await toDataUri(styled)) || avatarPhoto;
-        avatarPhotoType = clothingCategory.startsWith('costumed')
-          ? `costumed-${clothingCategory.split(':')[1] || 'default'}` : `styled-${clothingCategory}`;
-      }
-    } catch (err) {
-      log.warn(`[TESTLAB] styled avatar lookup failed for ${charName} (${err.message}) — using page reference photo`);
-    }
-  }
-
-  // Same reference as production's char-fix: the figure's pose picks the sheet
-  // cell, and the spine sends the face cell alone for a face repair, the body
-  // cell alone for a body repair (charRepairReference.js). The pose follows the
-  // TARGET figure on the page — the reference character's sheet is drawn in the
-  // pose the target figure holds.
-  const referencePose = require('./charRepairReference').referencePoseFor(ctx.scene, charName);
-
-  // Follows the REFERENCE character: during an identity swap the prompt must
-  // not keep demanding the TARGET's outfit, or the model is told to paint the
-  // original clothing onto the swapped person and nothing changes (owner:
-  // "neither changed the clothing", exp #326). Canonical clothing text:
-  // buildClothingDescription, story clothingRequirements first.
-  const clothingDescription = character
-    ? (buildClothingDescription(character, clothingCategory, ctx.artStyle, ctx.clothingRequirements) || '')
-    : '';
-  const detFigures = params.detection?.figures
-    || ctx.scene.bboxDetection?.figures || ctx.scene.bboxDetection?.characters || [];
-  const protectedFaces = [];
-  const protectedBodies = [];
-  const protectedNames = [];
-  for (const f of detFigures) {
-    const n = (f?.name || '').trim();
-    // Named characters only — mirrors production, which protects sceneCharacters.
-    if (!n || n.toUpperCase() === 'UNKNOWN' || n.toLowerCase() === charName.toLowerCase()) continue;
-    const fb = f.faceBox || f.faceBbox;
-    const bb = f.bodyBox || f.bbox || f.box_2d;
-    if (fb?.length === 4) protectedFaces.push(fb);
-    if (bb?.length === 4) protectedBodies.push(bb);
-    if (fb?.length === 4 || bb?.length === 4) protectedNames.push(n);
-  }
-
   // LAB DIVERGENCE (indexed): protectTargetFace adds the TARGET's own face box
-  // to the protected set, so a body repaint keeps the original head pixels
-  // instead of repainting them. Tests the two-pass idea — fix the body first,
-  // then the face — against the measured failure where a full-figure repaint
-  // returns a head in the wrong medium and proportion 7 times in 8. Production
-  // does not have this option yet; promote or reject per docs/lab-divergences.md.
+  // to the protected set, so a body repaint keeps the original head pixels.
+  // Production does not have this option; promote or reject per
+  // docs/lab-divergences.md.
+  const protectedNames = [...call.protectedNames];
   if (params.protectTargetFace && faceBbox?.length === 4) {
-    protectedBodies.push(faceBbox);
+    overrides.protectedBodies = [...(call.request.protectedBodies || []), faceBbox];
     protectedNames.push(`${charName}'s own face (protected)`);
   }
-
-  // Route through the unified spine (server/lib/faceRepair.js). Legacy
-  // repairMode flags + whiteoutTarget + backend → axes via legacyFlagsToAxes;
-  // the spine blends INTERNALLY through samUnionBlend, so the old post-hoc
-  // re-blend is gone. That re-blend was the testlab↔prod divergence — it stacked
-  // a SECOND samUnionBlend on TOP of the production repair's own composite, so
-  // the lab never saw what prod actually ships. Now both use the one spine.
-  // Axes are NOT resolved here. The stage calls the same entry point the story
-  // pipeline calls (images.repairCharacterMismatch), which owns bbox validation,
-  // the face-box union expansion — "if a separate face box pokes outside the
-  // body box, expand the body box so the treatment mask doesn't miss half the
-  // face" — the char_repair_run metric, and legacyFlagsToAxes itself. Resolving
-  // axes here meant the Lab skipped all of that and repaired a different region
-  // than production would have.
+  const { buildCharRepairRequest } = require('./charRepairRequest');
+  const request = buildCharRepairRequest(call.request, { overrides });
 
   // Intermediates saved as tl_step versions so the UI shows the full chain. The
   // spine emits its SAM round-1/2 views through this addStep (threaded into
@@ -2234,7 +2213,8 @@ async function runCharRepairStage(ctx, opts) {
     const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, dataUri, experimentId);
     steps.push({ label, imageType: 'tl_step', versionIndex: v });
   };
-  await addStep(`input: character sheet (${avatarPhotoType})`, avatarPhoto);
+  const avatarUri = String(avatarPhoto).startsWith('data:') ? avatarPhoto : ((await toDataUri(avatarPhoto)) || avatarPhoto);
+  await addStep(`input: character sheet (${avatarPhotoType})`, avatarUri);
 
   // Replay support for the crosshatch/blur spine: params.reuseModelOutput is a
   // tl_step version index (or a data URI) holding a previous 'model raw output'.
@@ -2243,105 +2223,62 @@ async function runCharRepairStage(ctx, opts) {
     const v = params.reuseModelOutput;
     if (typeof v === 'string' && v.startsWith('data:image')) reuseCandidateUri = v;
     else {
-      const img = await loadTestImage(ctx.storyId, 'tl_step', ctx.pageNumber, Number(v));
-      if (!img?.imageData) throw new Error(`reuseModelOutput: tl_step v${v} not found on this page`);
-      reuseCandidateUri = img.imageData;
+      const stepImg = await loadTestImage(ctx.storyId, 'tl_step', ctx.pageNumber, Number(v));
+      if (!stepImg?.imageData) throw new Error(`reuseModelOutput: tl_step v${v} not found on this page`);
+      reuseCandidateUri = stepImg.imageData;
     }
     log.info(`[TESTLAB] spine replay: reusing stored model output ${typeof v === 'number' ? 'tl_step v' + v : '(data URI)'}`);
   }
 
   const t0 = Date.now();
-  // The SHARED production contract (charRepairRequest.js). Built from the same
-  // field list the unified pipeline uses, so a Lab run sends what production
-  // sends; anything this stage deliberately does differently is an override or
-  // a Lab-only mechanic below, and every one is indexed in
-  // docs/lab-divergences.md.
-  const { buildCharRepairRequest } = require('./charRepairRequest');
-  const sharedRequest = buildCharRepairRequest({
-    imageBackend: backend,
-    defectTypes: Array.isArray(params.issueTypes) ? params.issueTypes : null,
-    clothingDescription,
-    // Face/hair/build text for the prompt. Follows refName so an identity swap
-    // describes the person we actually want painted.
-    characterDescription: (() => {
-      const d = ctx.scene.bboxDetection?.characterDescriptions?.[refName];
-      return (typeof d === 'string' ? d : d?.richDescription) || '';
-    })(),
-    photoType: avatarPhotoType,
-    referencePose,
-    sceneDescription: ctx.scene.sceneDescription || ctx.scene.text || '',
-    artStyle: params.artStyleOverride || ctx.artStyle || null,
-    faceBbox: faceBbox || null,
-    bodyBbox: bbox,
-    whiteoutTarget,
-    // SAME AS PRODUCTION: reuse the stored detection silhouette. This was
-    // hardcoded null on the grounds that "a Lab run has no detection pass" —
-    // true before masks were persisted, false now that detection writes
-    // figure_mask rows. Left as null the Lab re-segmented on a crop while
-    // production reused, so a Lab result was not evidence about production.
-    // Resolves to null for a story with no stored mask, which is the old
-    // behaviour and is reported as a miss.
-    detectionBodyMask: await require('./charRepairTarget').resolveFigureMask(
-      // sourceImageFp along for the ride: fp-guarded mask rows refuse an
-      // unstamped lookup (migration 034), and the Lab must reuse exactly what
-      // production reuses or its result is not evidence about production.
-      charName, { figures: ctx.scene.bboxDetection?.figures || [], sourceImageFp: ctx.scene.bboxDetection?.sourceImageFp || null },
-      { storyId: ctx.storyId, pageNumber: ctx.pageNumber },
-    ),
-    protectedFaces,
-    protectedBodies,
-    textPosition: ctx.textPosition,
-    includeDebug: true,
-    // SAME AS PRODUCTION: pose lines name other figures by sight.
-    repairNames: labRepairNames(ctx),
-    // Axis overrides — omitted unless the experiment names one, so an unset run
-    // resolves exactly as production does. This is what lets the Lab A/B a
-    // treatment (blur vs whiteout on a face) instead of only a legacy mode.
-    ...(params.treatment ? { treatment: params.treatment } : {}),
-    ...(params.regionSource ? { regionSource: params.regionSource } : {}),
-    ...(params.faceOnly !== undefined ? { faceOnly: !!params.faceOnly } : {}),
-  });
   const { repairCharacterMismatch } = require('./images');
   const result = await repairCharacterMismatch(imageData, avatarPhoto, bbox, charName, {
-    ...sharedRequest,
-    // The A/B knob: legacy mode flags are what production's adapter reads to
-    // pick the method, so forcing a mode here goes through the SAME resolution
-    // production uses instead of bypassing it.
+    ...request,
     ...modeFlags,
     // Lab-only MECHANICS (not behaviour deviations): per-step image capture and
     // deterministic replay of a stored model output.
     addStep,
     ...(reuseCandidateUri ? { reuseCandidate: reuseCandidateUri } : {}),
     // FULL identity swap: the prompt must NAME the reference character, or the
-    // text keeps ordering the target back (exp #329: Roger's avatar + 'paint one
-    // Lukas' = no change). Region/pose stay the target's.
+    // text keeps ordering the target back (exp #329). Region/pose stay the target's.
     ...(params.referenceCharacter ? { promptName: refName } : {}),
     ...(params.blurStrength ? { blurStrength: params.blurStrength } : {}),
     ...(params.r2Prompt ? { r2Prompt: params.r2Prompt } : {}),
-    // Crosshatch carries a blurred head by default (body pose from the hatch,
-    // identity from the avatar). params.blurFace=false A/Bs the plain hatch.
     ...(params.blurFace !== undefined ? { blurFace: params.blurFace } : {}),
   });
   const elapsedMs = Date.now() - t0;
   // What the spine actually sent as the reference (face cell or body cell,
   // upscaled and padded to the call's aspect).
   if (result?.croppedAvatar) await addStep('reference sent to model', result.croppedAvatar);
-  const finalImage = result?.imageData;
-  if (!finalImage) {
+  let finalImage = result?.imageData;
+  // The run's failure test and its reason (repairLogic.describeCharFixFailure).
+  let rejectedReason = null;
+  let gateMessage = null;
+  if (!finalImage || finalImage.length < 1000) {
+    rejectedReason = result?.rejectedReason || 'unknown';
+    gateMessage = require('./repairLogic').describeCharFixFailure(result);
+  } else {
+    // FACE-INTEGRITY GATE — the run refuses a repair that left the face
+    // unreadable (faceIntegrityGate.js); so does the Lab.
+    const faceGate = await require('./faceIntegrityGate').checkFaceIntegrity(
+      imageData, finalImage, charName, { log, jobKey: ctx.storyId, context: `TESTLAB char_repair p${ctx.pageNumber} ${charName}` });
+    if (!faceGate.ok) { rejectedReason = 'face_integrity'; gateMessage = `face not intact after repair (${faceGate.reason})`; }
+  }
+  if (rejectedReason) {
     // A GATE rejection is a result, not a void: show WHY and what the model
-    // produced. Previously the card said only "returned no image (blend_gate)"
-    // with zero steps, so a rejected treatment was undiagnosable (exp #306 blur).
+    // produced (exp #306 blur).
     if (result?.blackoutImage) await addStep('sent to model (treated input)', result.blackoutImage);
     if (result?.grokRawResult) await addStep('model raw output (REJECTED)', result.grokRawResult);
-    const err = new Error(`Character repair REJECTED by the ${result?.rejectedReason || 'unknown'} gate: ${result?.gateMessage || 'no detail'}`);
+    if (rejectedReason === 'face_integrity' && finalImage) await addStep('repaired image (REJECTED by face gate)', finalImage);
+    const err = new Error(`Character repair REJECTED by the ${rejectedReason} gate: ${gateMessage || 'no detail'}`);
     err.partialResult = {
       steps,
       characterName: charName,
       bbox,
       faceBbox: faceBbox || undefined,
       descriptor: result?.descriptor,
-      rejectedReason: result?.rejectedReason || 'unknown',
-      gateMessage: result?.gateMessage || null,
+      rejectedReason,
+      gateMessage,
       promptUsed: result?.promptSent || null,
       elapsedMs,
     };
@@ -2350,7 +2287,8 @@ async function runCharRepairStage(ctx, opts) {
 
   await addStep('sent to model (whiteout/crosshatch)', result.blackoutImage);
   await addStep('model raw output', result.grokRawResult);
-
+  const detFigures = freshDetection?.figures || params.detection?.figures
+    || ctx.scene.bboxDetection?.figures || ctx.scene.bboxDetection?.characters || [];
   // PER-FIGURE SAM AFTER THE REPAIR. One silhouette per detected character,
   // segmented from the FINAL image: the direct way to see whether a repair
   // damaged a neighbour or absorbed part of them (owner request). Diagnostic
@@ -2384,11 +2322,32 @@ async function runCharRepairStage(ctx, opts) {
     log.warn(`[TESTLAB] per-figure SAM diagnostic failed (${err.message}) — skipped`);
   }
 
-  const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, finalImage, experimentId);
+  // WHERE IT GOES — the one deliberate difference from production. A cover was
+  // repaired on its textless art and is restamped exactly as the manual repair
+  // route restamps it (coverEvalLayer.restampRepairedCover), then stored as a
+  // Lab cover version (served + art pair); a page is a Lab scene version.
+  let versionIndex;
+  let imageType = 'scene';
+  const coverKey = ctx.pageNumber < 0 ? COVER_KEY_BY_PAGE[String(ctx.pageNumber)] : null;
+  if (coverKey) {
+    const { restampRepairedCover } = require('./coverEvalLayer');
+    const { servedImageData, artImageData } = await restampRepairedCover(storyData, coverKey, finalImage, {
+      restamp: coverLayer === 'art', figures: detFigures,
+    });
+    versionIndex = await saveTestCoverVersion(ctx.storyId, coverKey, servedImageData, artImageData || finalImage, experimentId);
+    imageType = coverKey;
+    if (artImageData) await addStep('cover restamped (served)', servedImageData);
+  } else {
+    versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, finalImage, experimentId);
+  }
   return {
-    imageType: 'scene', versionIndex, characterName: charName, bbox, faceBbox: faceBbox || undefined, boxSource, backend,
+    imageType, versionIndex, characterName: charName, bbox, faceBbox: faceBbox || undefined, boxSource, backend,
     repairMode: backend === 'grok' ? repairMode : null,
-    clothingCategory, avatarPhotoType,
+    clothingCategory: call.clothingCategory, avatarPhotoType,
+    whiteoutTarget: request.whiteoutTarget,
+    // Whether the run itself would char-fix this character here (a CRITICAL
+    // routable entity finding) — a Lab run may target a lesser one.
+    productionWouldRepair,
     protectedCharacters: protectedNames.length ? protectedNames : undefined,
     samBlend: true,
     blendRule: BLEND_RULE_VERSION,
@@ -5875,7 +5834,11 @@ async function runEditImageStage(ctx, { experimentId, promptOverride, params = {
 
   const t0 = Date.now();
   const result = onPlate
-    ? await editImageWithPrompt(imageData, instruction, MODEL_DEFAULTS.emptyScenePlateModel, [], ctx.artStyle, null, { plateDerive: true })
+    // The derive's aspect is the book layout's, as the run passes it
+    // (storyJobPipeline.js Phase 5a-pre-vantage `layoutAspect`); null let the
+    // edit fall to the input's own aspect.
+    ? await editImageWithPrompt(imageData, instruction, MODEL_DEFAULTS.emptyScenePlateModel, [], ctx.artStyle || null,
+      ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect, { plateDerive: true })
     : await editImageWithPrompt(imageData, instruction, null, [], ctx.artStyle);
   const elapsedMs = Date.now() - t0;
   const edited = result?.imageData || null;
@@ -11038,6 +11001,11 @@ module.exports = {
   runQualityEvalStage,
   runEmptySceneStage,
   runEditImageStage,
+  // The page render and the char-fix, exported so "with no params the Lab sends
+  // what production sends" is pinned against the shared production builders
+  // with the network and DB stubbed (tests/unit/lab-prod-call-parity.test.ts).
+  runImageStage,
+  runCharRepairStage,
   // Judge regression fixtures — the dispatch and its scoring, pinned with the
   // judges stubbed (tests/unit/judge-fixtures.test.ts).
   runJudgeFixtureStage,

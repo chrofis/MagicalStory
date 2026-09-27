@@ -5858,7 +5858,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           // own cast builder and its own three-tier ladder; that divergence is
           // what let "Sarah" land on a Visual Bible secondary and a face repair
           // white out the wrong person's head.
-          const { buildPageCast, findBorrowedLabel, resolveCharBbox } = require('../lib/charRepairTarget');
+          const { findBorrowedLabel, resolveCharBbox } = require('../lib/charRepairTarget');
           const { buildCharRepairRequest } = require('../lib/charRepairRequest');
 
           let resolved = resolveCharBbox(characterName, {
@@ -5879,24 +5879,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           // Nothing stored → detect now, with the SAME cast the pipeline builds.
           if (!resolved.faceBbox && !resolved.bodyBbox) {
             log.info(`🔍 [CHAR REPAIR] No stored bbox for ${characterName} on page ${pageNumber}, running fresh detection...`);
-            const expectedCharacters = buildPageCast({
-              storyData,
-              sceneCharacters: sceneImage.sceneCharacters || [],
-              sceneMetadata: sceneImage.sceneMetadata || {},
-              clothingByName: sceneImage.sceneCharacterClothing || null,
-              outlineCharacters: sceneImage.outlineCharacters || [],
-              artStyle,
-              visualBible: storyData.visualBible || null,
-              requiredName: characterName,
-              label: `p${pageNumber} manual-repair `,
-            });
-            const detection = await detectAllBoundingBoxes(sceneImage.imageData, {
-              expectedCharacters,
-              expectedObjects: Array.isArray(sceneImage.sceneMetadata?.objects)
-                ? sceneImage.sceneMetadata.objects.filter(x => typeof x === 'string') : [],
-              sceneContext: sceneImage.description || sceneImage.sceneDescription || null,
-              pageContext: `PAGE ${pageNumber} manual-repair`,
-              artStyle,
+            // One implementation with the Test Lab char_repair stage.
+            const { detection, expectedCharacters } = await require('../lib/charRepairTarget').detectPageForRepair({
+              storyData, sceneImage, imageData: sceneImage.imageData, characterName, pageNumber, artStyle, label: 'manual-repair',
             });
             freshDetection = detection;
             boxDiag.boxSource = 'fresh-detection';

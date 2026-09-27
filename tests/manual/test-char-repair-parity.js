@@ -43,26 +43,28 @@ try {
   if (req.artStyle !== 'watercolor') fail('builder dropped a supplied value');
 }
 
-// ── 3. Both call sites build through the builder ───────────────────────────
+// ── 3. Both call sites build through the ONE char-fix builder ──────────────
+// Since 2026-09-27 the repair round and the Lab stage build the whole call —
+// not only the options object — with charFixCall.buildCharFixCall, which builds
+// the options through the shared contract.
 for (const [file, label] of [
   ['server/lib/repairPipeline.js', 'production pipeline'],
   ['server/lib/testlab.js', 'Test Lab stage'],
 ]) {
   const src = fs.readFileSync(path.join(ROOT, file), 'utf8');
-  if (src.includes('buildCharRepairRequest(')) pass(`${label} builds through the shared contract`);
-  else fail(`${label} assembles the char-repair options by hand — it will drift`);
+  if (src.includes('buildCharFixCall(')) pass(`${label} builds through the shared char-fix builder`);
+  else fail(`${label} assembles the char-repair call by hand — it will drift`);
 }
+{
+  const src = fs.readFileSync(path.join(ROOT, 'server/lib/charFixCall.js'), 'utf8');
+  if (src.includes('buildCharRepairRequest(')) pass('the char-fix builder builds through the shared contract');
+  else fail('the char-fix builder assembles the char-repair options by hand — it will drift');
 
-// ── 4. artStyle actually reaches the call in both ──────────────────────────
-for (const [file, label] of [
-  ['server/lib/repairPipeline.js', 'production pipeline'],
-  ['server/lib/testlab.js', 'Test Lab stage'],
-]) {
-  const src = fs.readFileSync(path.join(ROOT, file), 'utf8');
+  // ── 4. artStyle actually reaches the call ────────────────────────────────
   const call = src.slice(src.indexOf('buildCharRepairRequest({'));
   const block = call.slice(0, call.indexOf('});') + 3);
-  if (/artStyle:/.test(block)) pass(`${label} passes artStyle`);
-  else fail(`${label} does not pass artStyle — the repair prompt's art-style block will be empty`);
+  if (/artStyle:/.test(block)) pass('the char-fix builder passes artStyle');
+  else fail('the char-fix builder does not pass artStyle — the repair prompt\'s art-style block will be empty');
 }
 
 // ── 5. Declared Lab divergences are indexed ────────────────────────────────

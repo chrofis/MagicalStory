@@ -167,34 +167,29 @@ describe('the image prompt claims a reference only for elements the call carries
 });
 
 describe('runImageStage passes the set it actually sends', () => {
-  it('derives vbRefElementIds from the grid it attaches, built before the prompt', () => {
-    const call = callBody(TESTLAB, 'buildImagePrompt', 1);
-    // The Lab's page-render stage claims references for the grid's own cells.
-    expect(call).toMatch(/vbRefElementIds:\s*\(visualBibleGrid\?\.rawElements\s*\|\|\s*\[\]\)/);
-    // …and the grid must exist by then. The prompt used to be built first, so
-    // the set could not have been known — production settled the same ordering
-    // on 2026-09-15 (storyJobPipeline's makeImagePrompt + 5a-pre-grid rebuild).
-    const stage = TESTLAB.slice(TESTLAB.indexOf('async function runImageStage'));
-    const gridAt = stage.indexOf('buildPageCompositeRefs(');
-    const promptAt = stage.indexOf('buildImagePrompt(');
+  // Since 2026-09-27 the stage builds its call with the run's own builders
+  // (server/lib/pageRenderCall.js); the full call — model, prompt, references,
+  // options — is compared with production's in tests/unit/lab-prod-call-parity.test.ts.
+  it('derives vbRefElementIds from the cells it keeps, selected before the prompt', () => {
+    const stage = TESTLAB.slice(TESTLAB.indexOf('async function runImageStage'), TESTLAB.indexOf('async function runEmptySceneStage'));
+    expect(stage).toMatch(/prompt = makePrompt\(kept\.map\(e => e\.id\)\.filter\(Boolean\)\)/);
+    const gridAt = stage.indexOf('keepPageGridElements(');
+    const promptAt = stage.indexOf('makePrompt(kept');
     expect(gridAt).toBeGreaterThan(-1);
     expect(gridAt).toBeLessThan(promptAt);
   });
 
   it('renders on the production page tier unless the run names another model', () => {
-    // A null override fell through to generateImageOnly's default, the
-    // edit/inpaint tier (Standard), while production pages render on
-    // pageRenderImage (Imagine 2.0) — Lab 1523 vs its stored page.
     const stage = TESTLAB.slice(TESTLAB.indexOf('async function runImageStage'), TESTLAB.indexOf('async function runEmptySceneStage'));
-    expect(stage).toMatch(/const pageModelKey = params\.imageModel \|\| MODEL_DEFAULTS\.pageRenderImage;/);
-    expect(callBody(stage, 'generateImageOnly', 1)).toMatch(/imageModelOverride:\s*pageModelKey,/);
+    expect(stage).toMatch(/const pageImageModel = params\.imageModel \|\| tier\.pageImageModel;/);
     const { MODEL_DEFAULTS, IMAGE_MODELS } = nodeRequire('../../server/config/models.js');
+    expect(MODEL_DEFAULTS.simplePageImage).toBe(MODEL_DEFAULTS.pageRenderImage);
     expect(IMAGE_MODELS[MODEL_DEFAULTS.pageRenderImage].modelId).toBe('grok-imagine-image-2.0');
   });
 
   it('the composite stage states an EMPTY set rather than omitting it', () => {
     // It hands its prompt to the blend pass, which attaches no element cells.
-    const call = callBody(TESTLAB, 'buildImagePrompt', 2);
+    const call = callBody(TESTLAB, 'buildImagePrompt', 1);
     expect(call).toMatch(/vbRefElementIds:\s*\[\]/);
   });
 });

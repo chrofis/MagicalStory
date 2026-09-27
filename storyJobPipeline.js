@@ -4408,11 +4408,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // no code-side enforcement of the budget — it is a prompt rule for the
         // Art Director and a scene-review fault, nothing more). One Grok slot,
         // cell size 1/n, a face below VB_CELL_FLOOR_PX gets replaced by a prior.
-        const { VB_SLOT_MAX_ELEMENTS } = require('./server/lib/grok');
-        // sceneMetadata rides along for the removable-worn-item dedupe: an item
-        // the page declares WORN is already on the avatar reference, so its
-        // standalone plate is dropped from the grid (server/lib/wornItems.js).
-        let elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, VB_SLOT_MAX_ELEMENTS, sceneMetadata?.objects || null, sceneMetadata);
+        // Selection: the page's elements (objects[] + worn-item dedupe) plus the
+        // ids the brief cites — the ONE selector the Test Lab image stage uses
+        // too (server/lib/pageRenderCall.js).
+        let elementReferences = require('./server/lib/pageRenderCall').selectPageElementRefs(visualBible, pageNum, sceneMetadata);
         // NOTE: the plate-aware filter does NOT live here. `sceneBackgrounds` is
         // populated by Phase 5a-pre / 5a-pre-vantage, both of which run AFTER
         // this pageData map (they iterate the pageDataArray it produces), so at
@@ -4422,60 +4421,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // cards despite every page having a plate. Selection happens here;
         // filtering + grid construction happen in Phase 5a-pre-grid below, once
         // we know which pages actually got a plate.
-        // Fallback: also match by IDs found in scene hint (covers page mismatch between VB and scene)
-        if (sceneMetadata?.fullData) {
-          const sceneIds = [];
-          // Extract CHR IDs from characters
-          for (const char of sceneMetadata.fullData.characters || []) {
-            if (char.id && char.id !== 'null') sceneIds.push(char.id);
-          }
-          // Extract ART/OBJ IDs from objects
-          for (const obj of sceneMetadata.fullData.objects || []) {
-            const id = typeof obj === 'string' ? obj.match(/((?:ART|OBJ|CHR|VEH)\d+)/i)?.[1] : obj?.id;
-            if (id && !id.startsWith('LOC')) sceneIds.push(id);
-          }
-          if (sceneIds.length > 0) {
-            const idBasedRefs = getElementReferenceImagesByIds(visualBible, sceneIds, pageNum);
-            const existingIds = new Set(elementReferences.map(r => r.id));
-            const newRefs = idBasedRefs.filter(r => !existingIds.has(r.id));
-            if (newRefs.length > 0) {
-              log.info(`🔗 [VB-MATCH] Page ${pageNum}: Added ${newRefs.length} element(s) by scene hint ID: ${newRefs.map(r => r.id).join(', ')}`);
-              elementReferences = [...elementReferences, ...newRefs].slice(0, 4);
-            }
-          }
-        }
         const secondaryLandmarks = pageLandmarkPhotos.slice(1);
-        // Determine per-page image model based on scene complexity
-        const sceneComplexity = sceneMetadata?.sceneComplexity || 'simple';
-        const sceneRouting = modelOverrides.sceneRouting || 'auto';
-        let pageImageModel, pageImageBackend;
-
-        if (sceneRouting === 'auto') {
-          pageImageModel = sceneComplexity === 'complex'
-            ? MODEL_DEFAULTS.complexPageImage
-            : MODEL_DEFAULTS.simplePageImage;
-          pageImageBackend = IMAGE_MODELS[pageImageModel]?.backend || 'gemini';
-          log.info(`🎯 [ROUTING] Page ${pageNum}: ${sceneComplexity} → ${pageImageModel} (${pageImageBackend})`);
-        } else if (sceneRouting === 'grok') {
-          pageImageModel = MODEL_DEFAULTS.simplePageImage;
-          pageImageBackend = IMAGE_MODELS[pageImageModel]?.backend || 'grok';
-        } else if (sceneRouting === 'gemini') {
-          pageImageModel = MODEL_DEFAULTS.complexPageImage;
-          pageImageBackend = IMAGE_MODELS[pageImageModel]?.backend || 'gemini';
-        } else {
-          pageImageModel = modelOverrides.imageModel;
-          pageImageBackend = modelOverrides.imageBackend;
-        }
-        // The baked front cover renders on the typography-aware model
-        // (runtime coverTitleBakedModel), whatever the page tier is.
-        if (coverOpts?.imageModel) {
-          pageImageModel = coverOpts.imageModel;
-          pageImageBackend = IMAGE_MODELS[pageImageModel]?.backend || pageImageBackend;
-        }
-
-        // Skip Visual Bible text when using Grok (8000 char limit; VB grid sent as reference image)
-        const imageModelConfig = IMAGE_MODELS[pageImageModel];
-        const isGrokImage = imageModelConfig?.backend === 'grok';
+        // The page model tier and the prompt closure — the ONE implementation the
+        // Test Lab image stage calls too (server/lib/pageRenderCall.js).
+        const pageRender = require('./server/lib/pageRenderCall');
+        const { pageImageModel, pageImageBackend, sceneComplexity } = pageRender.pageRenderModel({
+          sceneMetadata, modelOverrides, coverOpts, pageNumber: pageNum,
+        });
         // ORDERING BUG, fixed 2026-09-15. `vbRefElementIds` decides whether the
         // prompt says "the attached reference images include a rough image of
         // <X>" (promptBuilders REQUIRED OBJECTS). It used to be computed HERE,
@@ -4485,16 +4437,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // in 5a-pre-grid from the cells actually sent, which is what the trial
         // path (`trialVbGrid.rawElements`) and the iterate path (images.js)
         // already do.
-        const makeImagePrompt = (vbRefElementIds) => require('./server/lib/promptBuilders').withBakedTitle(buildImagePrompt(
-          scene.sceneDescription, inputData, sceneCharacters, visualBible, pageNum, pagePhotos, {
-            skipVisualBible: isGrokImage,
-            // Elements whose reference render rides with this call: grid cells,
-            // or (for a plate-filtered vehicle in 5a-pre-grid) the plate itself.
-            vbRefElementIds,
-            // A cover's copy space is its beat's (coverRender.js).
-            ...(coverOpts ? { textPositionOverride: coverOpts.textPosition } : {}),
-          }
-        ), coverOpts?.bakeTitle || '');
+        const makeImagePrompt = pageRender.makePageImagePrompt({
+          sceneDescription: scene.sceneDescription, inputData, sceneCharacters, visualBible,
+          pageNumber: pageNum, characterPhotos: pagePhotos, pageImageModel, coverOpts,
+        });
         const imagePrompt = makeImagePrompt(elementReferences.map(r => r.id).filter(Boolean));
         // Extract emptyScenePrompt from outline hint (Sonnet-generated, high quality)
         // Falls back to scene expansion's emptyScenePrompt via sceneMetadata
@@ -5180,8 +5126,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const layoutAspect = pageData.renderAspect;
             // Load pre-built text area mask (black=text zone ~20%, white=scene ~80%).
             // Sent as a reference slot so the model sees the shape directly.
-            const { getTextAreaMask } = require('./server/lib/textMasks');
-            const textAreaMask = layoutTextInImage ? getTextAreaMask(textPos, langLevel) : null;
+            // One builder, shared with the Test Lab image stage (pageRenderCall.js).
+            const textAreaMask = require('./server/lib/pageRenderCall').pageTextAreaMask({
+              textInImage: layoutTextInImage, rawTextPosition: sonnetTextPos, pageNumber: pageData.pageNumber, languageLevel: langLevel,
+            });
 
             // Calm-zone instruction for the empty-scene generator. Story text is
             // WHITE and overlaid at textPos, so the zone must render as a saturated,
@@ -5505,12 +5453,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // objects[] names it, so the same brief gates the drop. Without this
           // the two gates disagree and the element is rendered with no
           // reference and no STRUCTURES line at all.
-          const pageSceneObjectsForDrop = pageData.sceneMetadata?.objects || null;
-          const { isPlateBorneElement } = require('./server/lib/visualBible');
-          const kept = (hasPlate
-            ? refs.filter(e => !isPlateBorneElement(e, pageSceneObjectsForDrop))
-            : refs
-          ).filter(e => !aboardId || e.id !== aboardId);
+          // One filter, shared with the Test Lab image stage (pageRenderCall.js).
+          const kept = require('./server/lib/pageRenderCall').keepPageGridElements(refs, { hasPlate, sceneMetadata: pageData.sceneMetadata });
           if (kept.length < refs.length) {
             filteredPages++;
             droppedCells += refs.length - kept.length;
@@ -5642,28 +5586,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               log.error(`❌ [UNIFIED] Page ${pageData.pageNumber}: landmark "${refApplied.landmarkPhotos[0]?.name || 'unknown'}" has no plate — not rendered on the raw photo`);
               throw new Error(`page ${pageData.pageNumber} has a landmark photo and no plate`);
             }
+            // The render options — one builder, shared with the Test Lab image
+            // stage (server/lib/pageRenderCall.js).
             const genResult = await generateImageOnly(
               pageData.prompt,
               refApplied.characterPhotos,
-              {
-                // THE CAST-0 EXEMPTION: a page with no named cast renders on its
-                // landmark photo (owner ruling 2026-09-02).
-                landmarkScene: pageLandmarkScene(pageData),
-                aspectRatio: pageData.renderAspect,
-                imageModelOverride: pageData.pageImageModel,
-                imageBackendOverride: pageData.pageImageBackend,
-                landmarkPhotos: refApplied.landmarkPhotos,
-                visualBibleGrid: refApplied.visualBibleGrid,
-                pageNumber: pageData.pageNumber,
-                sceneBackground: refApplied.sceneBackground,
-                // Text-zone mask only attached when text is overlaid on image
-                // (textInImage=true; always on a cover). For square+below layout
-                // this is null — the model is free to fill the whole frame.
-                textAreaMask: pageData.textInImage
-                  ? (sceneBackgrounds[pageData.pageNumber]?.textAreaMask || null)
-                  : null,
-                ...(pageData.coverOpts ? { captureLabel: pageData.coverOpts.captureLabel } : {}),
-              }
+              require('./server/lib/pageRenderCall').pageRenderOptions({
+                page: pageData,
+                renderAspect: pageData.renderAspect,
+                pageImageModel: pageData.pageImageModel,
+                pageImageBackend: pageData.pageImageBackend,
+                refApplied,
+                textInImage: pageData.textInImage,
+                plateTextAreaMask: sceneBackgrounds[pageData.pageNumber]?.textAreaMask || null,
+                coverOpts: pageData.coverOpts,
+              })
             );
 
             // Track usage
