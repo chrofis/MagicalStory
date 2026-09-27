@@ -128,7 +128,7 @@ const NEGATIVES = [
   { text: 'jim ist mies drauf', match: 'PHRASE' }, { text: 'gewünschteste wunschkind', match: 'PHRASE' },
   'conni', 'bobo', 'elsa', 'globi', 'librio', 'wonderbly', 'kindsgut',
   // products that are not a book
-  'schnullerkette', 'nuggikette', 'schnullerbaum', 'spielzeug', 'zahnpasta', 'zahnspange', 'nachtlicht', 'kuscheltier',
+  'schnullerkette', 'nuggikette', 'schnullerbaum', 'spielzeug', 'kinderspielzeug', 'zahnpasta', 'zahnspange', 'nachtlicht', 'kuscheltier',
   // institutional buyers
   'krippe', 'grundschule', 'kita team', 'kindergarten team',
 ];
@@ -136,6 +136,9 @@ const NEGATIVES = [
 const SPEC = {
   name: 'Search-LifeChallenge-CH',
   budgetName: 'Search-LifeChallenge-CH-Budget',
+  // BROAD since 2026-09-27 (owner): 6 days on PHRASE, 1 impression; Schnuller and Buch-Gefuehle had no eligible
+  // auctions at all. The adult/clinical and professional negatives above are what make broad safe here.
+  matchType: 'BROAD',
   dailyBudgetMicros: CHF(2),
   maxCpcMicros: CHF(0.20),
   geoSource: 'Search-Deutschschweiz-v1',

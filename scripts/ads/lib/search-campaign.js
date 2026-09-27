@@ -7,13 +7,19 @@
  * dry-run by default, idempotent by name, campaign created PAUSED.
  *
  * A spec is: { name, budgetName, dailyBudgetMicros, maxCpcMicros, geoSource, languageConstant,
- *              site, utm, adGroups: [{ name, lp, path:[p1,p2], copy:{headlines[15],descriptions[4]}, keywords[] }],
+ *              site, utm, matchType?, adGroups: [{ name, lp, path:[p1,p2], copy:{headlines[15],descriptions[4]}, keywords[] }],
  *              negatives: [string | {text,match}] }
+ *
+ * matchType ('PHRASE' default | 'BROAD') applies to every keyword of the spec. Google does not allow
+ * changing an existing keyword's match type, so when a spec's match type changes the engine ADDS the
+ * keyword in the new type and REMOVES the same text in the old type in that ad group - a replacement, never
+ * both side by side. Keywords the spec does not name are left alone.
  */
 const { getClient } = require('./client');
 const { enums } = require('google-ads-api');
 
 const CHF = n => Math.round(n * 1e6);
+const MATCH_TYPES = ['PHRASE', 'BROAD'];
 const LIMITS = { headline: 30, description: 90, path: 15 };
 
 function normaliseNegatives(list) {
@@ -48,6 +54,8 @@ function validate(spec) {
 
 async function run(spec, APPLY) {
   spec.negatives = normaliseNegatives(spec.negatives);
+  const MATCH = spec.matchType || 'PHRASE';
+  if (!MATCH_TYPES.includes(MATCH)) throw new Error(`matchType must be one of ${MATCH_TYPES.join('/')}, got ${MATCH}`);
   validate(spec);
 
   const MODE = APPLY ? 'LIVE' : 'DRY';
@@ -83,15 +91,16 @@ async function run(spec, APPLY) {
   console.log(`Geo (from ${spec.geoSource}, ${geos.length} regions): ${geos.map(g => nameOf.get(g) || g).join(', ')}\n`);
 
   // -- Existing state (idempotency) --
-  const camps = await customer.query(`SELECT campaign.id, campaign.resource_name, campaign.status FROM campaign WHERE campaign.name='${q(spec.name)}' AND campaign.status != 'REMOVED'`);
+  const camps = await customer.query(`SELECT campaign.id, campaign.resource_name, campaign.status, campaign.campaign_budget FROM campaign WHERE campaign.name='${q(spec.name)}' AND campaign.status != 'REMOVED'`);
   const budgets = await customer.query(`SELECT campaign_budget.resource_name FROM campaign_budget WHERE campaign_budget.name='${q(spec.budgetName)}' AND campaign_budget.status != 'REMOVED'`);
   let campaignRn = camps[0] && camps[0].campaign.resource_name;
-  const existing = { adGroups: new Map(), keywords: new Set(), rsas: new Set(), negatives: new Set(), geos: new Set(), lang: false };
+  // keywords: "adGroup|text|MATCH" -> criterion resource name
+  const existing = { adGroups: new Map(), keywords: new Map(), rsas: new Set(), negatives: new Set(), geos: new Set(), lang: false };
   if (campaignRn) {
     const cid = camps[0].campaign.id;
     for (const r of await customer.query(`SELECT campaign.id, ad_group.name, ad_group.resource_name FROM ad_group WHERE campaign.id=${cid} AND ad_group.status != 'REMOVED'`)) existing.adGroups.set(r.ad_group.name, r.ad_group.resource_name);
-    for (const r of await customer.query(`SELECT campaign.id, ad_group.name, ad_group_criterion.keyword.text, ad_group_criterion.keyword.match_type FROM ad_group_criterion WHERE campaign.id=${cid} AND ad_group_criterion.type='KEYWORD' AND ad_group_criterion.negative=false AND ad_group_criterion.status != 'REMOVED'`))
-      existing.keywords.add(`${r.ad_group.name}|${r.ad_group_criterion.keyword.text.toLowerCase()}|${enumName('KeywordMatchType', r.ad_group_criterion.keyword.match_type)}`);
+    for (const r of await customer.query(`SELECT campaign.id, ad_group.name, ad_group_criterion.resource_name, ad_group_criterion.keyword.text, ad_group_criterion.keyword.match_type FROM ad_group_criterion WHERE campaign.id=${cid} AND ad_group_criterion.type='KEYWORD' AND ad_group_criterion.negative=false AND ad_group_criterion.status != 'REMOVED'`))
+      existing.keywords.set(`${r.ad_group.name}|${r.ad_group_criterion.keyword.text.toLowerCase()}|${enumName('KeywordMatchType', r.ad_group_criterion.keyword.match_type)}`, r.ad_group_criterion.resource_name);
     for (const r of await customer.query(`SELECT campaign.id, ad_group.name FROM ad_group_ad WHERE campaign.id=${cid} AND ad_group_ad.status != 'REMOVED' AND ad_group_ad.ad.type='RESPONSIVE_SEARCH_AD'`)) existing.rsas.add(r.ad_group.name);
     for (const r of await customer.query(`SELECT campaign.id, campaign_criterion.type, campaign_criterion.negative, campaign_criterion.keyword.text, campaign_criterion.location.geo_target_constant, campaign_criterion.language.language_constant FROM campaign_criterion WHERE campaign.id=${cid} AND campaign_criterion.status != 'REMOVED'`)) {
       const c = r.campaign_criterion;
@@ -103,7 +112,11 @@ async function run(spec, APPLY) {
 
   // -- 1. Budget + campaign --
   console.log('=== 1. Budget + campaign');
-  let budgetRn = budgets[0] && budgets[0].campaign_budget.resource_name;
+  // An existing campaign's budget is read FROM THE CAMPAIGN. Google renames a non-shared budget to its
+  // campaign's name (verified 2026-09-27: Search-Cheap-Age-CH-Budget is now "Search-Cheap-Age-CH"), so the
+  // name lookup misses it and a re-run would create an orphan budget. The name lookup only covers a
+  // half-finished run where the budget was created but the campaign was not.
+  let budgetRn = (camps[0] && camps[0].campaign.campaign_budget) || (budgets[0] && budgets[0].campaign_budget.resource_name);
   if (budgetRn) skip(`campaign_budgets.create ${spec.budgetName}`, `exists (${budgetRn})`);
   else budgetRn = (await op(`campaign_budgets.create ${spec.budgetName}`, [`amount_micros=${spec.dailyBudgetMicros} (CHF ${(spec.dailyBudgetMicros / 1e6).toFixed(2)}/day) delivery_method=STANDARD explicitly_shared=false`],
     () => customer.campaignBudgets.create([{ name: spec.budgetName, amount_micros: spec.dailyBudgetMicros, delivery_method: enums.BudgetDeliveryMethod.STANDARD, explicitly_shared: false }]))) || `[NEW budget ${spec.budgetName}]`;
@@ -137,10 +150,13 @@ async function run(spec, APPLY) {
     else agRn = (await op(`ad_groups.create ${g.name}`, [`campaign=${campaignRn} status=ENABLED type=SEARCH_STANDARD cpc_bid_micros=${spec.maxCpcMicros} (CHF ${(spec.maxCpcMicros / 1e6).toFixed(2)})`],
       () => customer.adGroups.create([{ name: g.name, campaign: campaignRn, status: enums.AdGroupStatus.ENABLED, type: enums.AdGroupType.SEARCH_STANDARD, cpc_bid_micros: spec.maxCpcMicros }]))) || `[NEW ad_group ${g.name}]`;
 
-    const kwOps = g.keywords.filter(k => !existing.keywords.has(`${g.name}|${k}|PHRASE`)).map(text => ({ ad_group: agRn, status: enums.AdGroupCriterionStatus.ENABLED, keyword: { text, match_type: enums.KeywordMatchType.PHRASE } }));
+    const kwOps = g.keywords.filter(k => !existing.keywords.has(`${g.name}|${k}|${MATCH}`)).map(text => ({ ad_group: agRn, status: enums.AdGroupCriterionStatus.ENABLED, keyword: { text, match_type: enums.KeywordMatchType[MATCH] } }));
     const kwSkipped = g.keywords.length - kwOps.length;
     if (kwSkipped) skip(`ad_group_criteria.create x${kwSkipped} keywords in ${g.name}`, 'exist');
-    if (kwOps.length) await op(`ad_group_criteria.create x${kwOps.length} keywords in ${g.name}`, kwOps.map(o => `[PHRASE] "${o.keyword.text}"`), () => customer.adGroupCriteria.create(kwOps));
+    if (kwOps.length) await op(`ad_group_criteria.create x${kwOps.length} keywords in ${g.name}`, kwOps.map(o => `[${MATCH}] "${o.keyword.text}"`), () => customer.adGroupCriteria.create(kwOps));
+    // Match-type change: the same text in another match type is replaced, not kept alongside.
+    const stale = g.keywords.flatMap(k => MATCH_TYPES.filter(m => m !== MATCH).map(m => [k, m, existing.keywords.get(`${g.name}|${k}|${m}`)])).filter(([, , rn]) => rn);
+    if (stale.length) await op(`ad_group_criteria.remove x${stale.length} keywords in ${g.name} (replaced by ${MATCH})`, stale.map(([k, m]) => `[${m}] "${k}"`), () => customer.adGroupCriteria.remove(stale.map(([, , rn]) => rn)));
 
     const finalUrl = `${spec.site}${g.lp}?${spec.utm}`;
     if (existing.rsas.has(g.name)) skip(`ad_group_ads.create RSA in ${g.name}`, 'an RSA exists');
