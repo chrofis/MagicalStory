@@ -90,6 +90,8 @@ Last full sweep: **2026-09-06**.
 
 ## Image quality — unresolved render defects
 
+- [ ] identity_swap misses the motivating page: the entity grid judge still reads Fiona on staging job_1790446348343_z3fw660ie's initial page (-2) as the same woman (Lab #1559, #1562; fixture entity-fiona-z3f-initialpage-identity-swap is FN) while catching the three other swaps. Two prompt attempts spent; next options are the owner's (judge model, a face-only comparison cell) → docs/decisions.md (2026-09-27 "An identity swap …", Validation)
+
 - [ ] The beats planner (story-beats.txt) is not given GROUP_STAGING_RULE: it chose `medium` for five characters on both pages that motivated the group check (Fiona p1, p6), and the scene review now overrides a planned medium. Owner call whether the planner gets the rule too → docs/decisions.md (2026-09-27 "A group of more than three is checked", Open)
 - [ ] Scene-review 6d [group_staging] did not name Fiona p16 (five facing out, `looksAt` a ship deep behind them, no back view) in Lab #1551; a sharper facing clause (Lab #1552 override) was killed by a deploy and never measured → docs/decisions.md (2026-09-27 "A group of more than three is checked", Evidence rung 2)
 

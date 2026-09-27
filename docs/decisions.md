@@ -62735,7 +62735,26 @@ different shade or wave, same face).
    route decision on a declared type, not a reading of the finding's text. The owner did not approve
    a general change to rule 2, so every other entity finding still goes through the model unchanged.
 
-**Validation:** see the addendum below (entity grid replay, consolidator replay, judge fixtures).
+**Validation:**
+- *Entity grid replay (rung 2, Test Lab, entity fixtures, staging).* Lab #1559 (first wording):
+  identity_swap CRITICAL on Julian p17, Levin p7, Max p15; Fiona's initial page MISSED (hair_change
+  MAJOR on cell B again, face read as the same woman); the Lukas p7 negative control was an FP because
+  the Lab's rebuilt grid cropped the girl beside him as Lukas — that fixture was replaced. Lab #1562
+  (face check naming shape, eyes, nose, mouth, age; `314075395`): **4 TP, 1 FN, 3 TN, 0 FP** — the three
+  swaps again, both hair-only negatives (Julian 25b p7, Levin 1dp back cover) stay hair_change MAJOR,
+  Fiona's initial page still missed. Two paid prompt attempts on it; stopped there (burn-loop rule).
+  Side effects seen: a crop that caught a ship's mast instead of the character (Fiona/Lorena p5) is now
+  filed `identity_swap` CRITICAL where the 2026-09-26 baseline filed `face_mismatch` CRITICAL — same
+  route either way; Fiona p16 (laughing, same hair) was filed `identity_swap` in #1562 where #1559
+  filed `age_shift` CRITICAL — also a CRITICAL char-fix either way. Cost ≈ $0.11 for both runs.
+- *Consolidator + router replay (rung 1, stored inputs, real consolidator model).* Initial page v0 of
+  z3fw660ie with Fiona's stored finding re-typed as the new judge files it: `deduped_issues` =
+  `facial_hair/MAJOR/Facundo | identity_swap/CRITICAL/Fiona`; the model's own not-a-defect drops
+  touched other findings only; `findBadPages` → `[-2]`; `decideRepairMethod` → char-fix on Fiona,
+  types `["identity_swap"]`, face patch.
+- Unit: `tests/unit/identity-swap-critical.test.ts` (10), full unit suite green.
+
+**Open:** the motivating page itself is not caught by the judge (see BACKLOG).
 
 **Touched:** prompts/entity-consistency-check.txt, server/lib/evalBuckets.js, server/lib/scoring.js,
 server/lib/repairLogic.js, server/lib/faceRepair.js, server/lib/feedbackConsolidator.js,
