@@ -637,6 +637,13 @@ async function resizeGrokToSceneDims(grokBuffer, sceneWidth, sceneHeight) {
  * @returns {Promise<{buffer: Buffer|null, grokResult: object, aspectStr: string}>}
  *          buffer is at exactly sceneW×sceneH.
  */
+// THE SLOT ORDER this round-trip sends: every reference first, the scene to
+// edit LAST. A prompt that names its images by number reads its labels from
+// this constant (faceRepair.repairImageOrder), so the words and the send order
+// cannot drift apart — they did, and the face repair told Grok the scene crop
+// was the reference (Lab 1554, 2026-09-27).
+const SCENE_EXACT_IMAGE_ORDER = Object.freeze(['reference', 'edit']);
+
 async function grokEditSceneExact(prompt, referenceUris, sceneBuf, sceneW, sceneH, opts = {}) {
   const { encode = 'jpeg', ...grokOptions } = opts;
   const aspectStr = closestGrokAspect(sceneW, sceneH);
@@ -666,7 +673,8 @@ async function grokEditSceneExact(prompt, referenceUris, sceneBuf, sceneW, scene
   }
   const mime = encode === 'png' ? 'image/png' : 'image/jpeg';
   const sceneUri = `data:${mime};base64,${paddedBuf.toString('base64')}`;
-  const grokResult = await editWithGrok(prompt, [...referenceUris, sceneUri], { aspectRatio: aspectStr, skipOutputCrop: true, ...grokOptions });
+  const byRole = { reference: referenceUris, edit: [sceneUri] };
+  const grokResult = await editWithGrok(prompt, SCENE_EXACT_IMAGE_ORDER.flatMap(role => byRole[role]), { aspectRatio: aspectStr, skipOutputCrop: true, ...grokOptions });
   if (!grokResult.imageData) return { buffer: null, grokResult, aspectStr };
   // Same-aspect proportional resize (no crop), then strip the padding.
   let out = Buffer.from(r2Lib.stripDataUriPrefix(grokResult.imageData), 'base64');
@@ -787,6 +795,7 @@ module.exports = {
   correctColorShift,
   resizeGrokToSceneDims,
   grokEditSceneExact,
+  SCENE_EXACT_IMAGE_ORDER,
   sanitizeIssueForInpaint,
   stripCharacterNames,
   measureRegionSharpness,

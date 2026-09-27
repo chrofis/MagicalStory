@@ -528,18 +528,68 @@ async function buildBlurTreatment({ cropBuf, crop, bodyBoxInCrop, boxInCrop, fac
 }
 
 // ---------------------------------------------------------------------------
+// IMAGE ORDER — which slot holds the image to edit and which the reference.
+//
+// A repair prompt names its images by number ("IMAGE 1 = …"), so the numbers
+// must be the slots the call actually fills. They were hand-written in every
+// template as "IMAGE 1 = reference, IMAGE 2 = scene" — true for the box path
+// (grokEditSceneExact sends references first, the scene last) and false for
+// callModel, which sends the treated crop first: every face repair and every
+// cutout repair told the model the scene was the reference (Lab 1554,
+// 2026-09-27, Grok log slot 1 = crop). The labels are now BUILT from the
+// constant each send site builds its image array from, so they cannot drift.
+// ---------------------------------------------------------------------------
+const CALL_MODEL_IMAGE_ORDER = Object.freeze(['edit', 'reference']);
+
+function repairImageOrder({ regionSource, model }) {
+  // Box + grok is the one path that sends through grokEditSceneExact; box with
+  // any other model, and every cutout, go through callModel.
+  if (regionSource === 'box' && model === 'grok') return require('./imageCompositing').SCENE_EXACT_IMAGE_ORDER;
+  return CALL_MODEL_IMAGE_ORDER;
+}
+
+const SLOT_ORDINALS = ['first', 'second'];
+function imageSlotLabels(order) {
+  const slot = (role) => {
+    const i = order.indexOf(role);
+    if (i < 0) throw new Error(`imageSlotLabels: no "${role}" slot in [${order.join(', ')}]`);
+    return i;
+  };
+  return {
+    EDIT_IMAGE: `IMAGE ${slot('edit') + 1}`,
+    REFERENCE_IMAGE: `IMAGE ${slot('reference') + 1}`,
+    editOrdinal: SLOT_ORDINALS[slot('edit')],
+    referenceOrdinal: SLOT_ORDINALS[slot('reference')],
+  };
+}
+
+// A character-repair template names its images ONLY through {EDIT_IMAGE} and
+// {REFERENCE_IMAGE}. A hard-coded "IMAGE 1" is exactly the drift this exists
+// to stop, and fillTemplate strips an unfilled placeholder silently — so a
+// template that breaks the contract throws instead of shipping.
+function assertImageSlotTemplate(tpl, key) {
+  const literal = String(tpl).match(/\bIMAGE [0-9]\b/);
+  if (literal) throw new Error(`${key}: hard-coded "${literal[0]}" — name images only through {EDIT_IMAGE} / {REFERENCE_IMAGE}`);
+  for (const ph of ['{EDIT_IMAGE}', '{REFERENCE_IMAGE}']) {
+    if (!String(tpl).includes(ph)) throw new Error(`${key}: missing ${ph} — the prompt would not say which image is which`);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Model dispatch — the ONLY axis-3 difference. Same treated input, same refs.
 // grok edit coerces output to the slot-0 (treated crop / scene) aspect, so the
 // output geometry matches qwen's rw×rh; everything downstream (SAM re-detect,
-// union blend) is shared.
+// union blend) is shared. Slot order: CALL_MODEL_IMAGE_ORDER.
 // ---------------------------------------------------------------------------
 async function callModel({ model, prompt, treatedUri, avatarUri, aspect, cropW, cropH }) {
+  const byRole = { edit: treatedUri, reference: avatarUri };
+  const images = CALL_MODEL_IMAGE_ORDER.map(role => byRole[role]);
   if (model === 'grok') {
     const { editWithGrok } = require('./grok');
     // skipOutputCrop: the output geometry must stay the treated crop's (rw×rh)
     // so the SAM re-detect and union blend below run in the same coordinate
     // space as the input. A drift crop would shift every mask.
-    const r = await editWithGrok(prompt, [treatedUri, avatarUri], { aspectRatio: aspect || '1:1', resolution: '1k', skipOutputCrop: true });
+    const r = await editWithGrok(prompt, images, { aspectRatio: aspect || '1:1', resolution: '1k', skipOutputCrop: true });
     if (!r?.imageData) throw new Error('Grok returned no image');
     return { imageData: r.imageData, usage: r.usage };
   }
@@ -547,7 +597,7 @@ async function callModel({ model, prompt, treatedUri, avatarUri, aspect, cropW, 
     const { editWithQwen } = require('./runware');
     // Runware dims must be multiples of 64 in [512,2048]; render ~2x for detail.
     const snap = v => Math.max(512, Math.min(2048, Math.round(v / 64) * 64));
-    const r = await editWithQwen(prompt, [treatedUri, avatarUri], { width: snap(cropW * 2), height: snap(cropH * 2) });
+    const r = await editWithQwen(prompt, images, { width: snap(cropW * 2), height: snap(cropH * 2) });
     if (!r?.imageData) throw new Error('Qwen returned no image');
     return { imageData: r.imageData, usage: { model: r.modelId, cost: r.cost } };
   }
@@ -687,8 +737,13 @@ async function buildPrompt(args) {
   return lightLine ? `${core}\n\n${lightLine}` : core;
 }
 
-async function buildPromptCore({ treatment, regionSource, faceOnly, charName, opts, sceneBuffer, faceBbox, sceneW, sceneH }) {
+async function buildPromptCore({ treatment, regionSource, faceOnly, model, charName, opts, sceneBuffer, faceBbox, sceneW, sceneH }) {
   const { PROMPT_TEMPLATES, fillTemplate, repairStyleGuard, isPhotographicArtStyle } = require('../services/prompts');
+  // Which slot is which, from the order THIS call sends them. The model axis
+  // picks the send path, so it is required — a guessed one could name the
+  // images backwards.
+  if (!model) throw new Error('buildPrompt: model is required — it decides the order the images are sent in');
+  const slots = imageSlotLabels(repairImageOrder({ regionSource, model }));
   // IDENTITY vs REGION. Every "paint <name>" / "match <name>'s clothing" line must
   // name the person we WANT (opts.promptName), while scene-state lookups stay keyed
   // on the character who is actually IN the scene (charName). Without this an
@@ -727,12 +782,12 @@ async function buildPromptCore({ treatment, regionSource, faceOnly, charName, op
       const p = await describeHeadPose(`data:image/jpeg;base64,${faceCrop.toString('base64')}`);
       poseText = [p.facing ? `facing ${p.facing}` : null, p.headTilt ? `head ${p.headTilt}` : null, p.gaze ? `gaze ${p.gaze}` : null, p.expression ? `expression: ${p.expression}` : null, p.mouth ? `mouth ${p.mouth}` : null].filter(Boolean).join('; ');
     } catch (e) { log.warn(`[FACE REPAIR] head-pose failed (${e.message}) — omitting pose facts`); }
-    let styleLine = ' Match the visual style and lighting of the first image.';
+    let styleLine = ` Match the visual style and lighting of the ${slots.editOrdinal} image.`;
     try {
       const { ART_STYLES } = require('./storyHelpers');
       const raw = ART_STYLES[opts.artStyle];
       const txt = typeof raw === 'string' ? raw : (raw && raw.default) || '';
-      if (txt) styleLine = ` Match the exact visual style, medium and rendering of the first image: ${txt}`;
+      if (txt) styleLine = ` Match the exact visual style, medium and rendering of the ${slots.editOrdinal} image: ${txt}`;
     } catch { /* generic */ }
     const rich = (typeof opts.characterDescription === 'string' ? opts.characterDescription : opts.richDescription) || '';
     const faceFacts = rich ? ` The person: ${rich.split(/Wearing:/i)[0].replace(/\s+/g, ' ').trim().slice(0, 380)}` : '';
@@ -741,7 +796,7 @@ async function buildPromptCore({ treatment, regionSource, faceOnly, charName, op
     const poseClause = poseText
       ? ` HEAD POSE AND EXPRESSION (from the original scene; directions are from the viewer's perspective): ${poseText}. Paint the head in exactly this pose — never turn it toward the camera unless stated.`
       : '';
-    return `Paint the FACE and head of the person from the second image into the white area of the first image. The white area shows the head's exact position and scale. IDENTITY comes from the second image: exact same facial features, age, hair style and hair color${glassesClause}.${faceFacts}${poseClause} Keep everything outside the white area exactly unchanged: same body, same clothing, same pose, same background, same other people.${styleLine}`;
+    return `Paint the FACE and head of the person from the ${slots.referenceOrdinal} image into the white area of the ${slots.editOrdinal} image. The white area shows the head's exact position and scale. IDENTITY comes from the ${slots.referenceOrdinal} image: exact same facial features, age, hair style and hair color${glassesClause}.${faceFacts}${poseClause} Keep everything outside the white area exactly unchanged: same body, same clothing, same pose, same background, same other people.${styleLine}`;
   }
 
   // Body / crosshatch / blur — use the matching character-repair template.
@@ -775,8 +830,12 @@ async function buildPromptCore({ treatment, regionSource, faceOnly, charName, op
     return `\n\nArt style: ${opts.artStyle}`;
   })();
   if (treatment === 'blur') {
-    const tpl = !faceOnly && PROMPT_TEMPLATES.characterRepairBodyBlended ? PROMPT_TEMPLATES.characterRepairBodyBlended : PROMPT_TEMPLATES.characterRepairBlended;
-    if (tpl) return fillTemplate(tpl, { charName: identityName, identityName, appearanceContext, clothingContext, actionContext, issueContext, textPositionContext, sceneMediumLine, REPAIR_STYLE_GUARD: styleGuard });
+    const key = !faceOnly && PROMPT_TEMPLATES.characterRepairBodyBlended ? 'characterRepairBodyBlended' : 'characterRepairBlended';
+    const tpl = PROMPT_TEMPLATES[key];
+    if (tpl) {
+      assertImageSlotTemplate(tpl, key);
+      return fillTemplate(tpl, { charName: identityName, identityName, appearanceContext, clothingContext, actionContext, issueContext, textPositionContext, sceneMediumLine, REPAIR_STYLE_GUARD: styleGuard, EDIT_IMAGE: slots.EDIT_IMAGE, REFERENCE_IMAGE: slots.REFERENCE_IMAGE });
+    }
   }
   if (treatment === 'crosshatch') {
     // Box mode sends the FULL SCENE, so it needs the scene template: the cutout
@@ -786,10 +845,14 @@ async function buildPromptCore({ treatment, regionSource, faceOnly, charName, op
     // the template the pre-spine fullScene branch used (d68bd8815); the Stage-3
     // refactor collapsed both region sources onto the cutout template and
     // orphaned it.
-    const tpl = (regionSource === 'box' && PROMPT_TEMPLATES.characterRepairInpaint)
-      ? PROMPT_TEMPLATES.characterRepairInpaint
-      : PROMPT_TEMPLATES.characterRepairCutout;
-    if (tpl) return fillTemplate(tpl, { charName: identityName, identityName, appearanceContext, clothingContext, actionContext, issueContext, artStyleContext, textPositionContext, REPAIR_STYLE_GUARD: styleGuard });
+    const key = (regionSource === 'box' && PROMPT_TEMPLATES.characterRepairInpaint)
+      ? 'characterRepairInpaint'
+      : 'characterRepairCutout';
+    const tpl = PROMPT_TEMPLATES[key];
+    if (tpl) {
+      assertImageSlotTemplate(tpl, key);
+      return fillTemplate(tpl, { charName: identityName, identityName, appearanceContext, clothingContext, actionContext, issueContext, artStyleContext, textPositionContext, REPAIR_STYLE_GUARD: styleGuard, EDIT_IMAGE: slots.EDIT_IMAGE, REFERENCE_IMAGE: slots.REFERENCE_IMAGE });
+    }
   }
   // Medium named from the story, not assumed. "This is a children's book
   // illustration" was hardcoded here, so the template-less fallback told the
@@ -798,7 +861,7 @@ async function buildPromptCore({ treatment, regionSource, faceOnly, charName, op
   const mediumLine = isPhotographicArtStyle(opts.artStyle)
     ? 'This is a photograph.'
     : "This is a children's book illustration.";
-  return `${mediumLine} Redraw the marked figure to look like ${identityName} from the reference photo. Match face, hair, skin tone, build and clothing exactly. Preserve the original pose, expression and gaze. Keep art style and background unchanged. ${styleGuard}${clothingContext}${actionContext}${issueContext}${artStyleContext}`;
+  return `${mediumLine} Redraw the marked figure in the ${slots.editOrdinal} image to look like ${identityName} from the reference in the ${slots.referenceOrdinal} image. Match face, hair, skin tone, build and clothing exactly. Preserve the original pose, expression and gaze. Keep art style and background unchanged. ${styleGuard}${clothingContext}${actionContext}${issueContext}${artStyleContext}`;
 }
 
 // ===========================================================================
@@ -1067,7 +1130,7 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
   const treatmentInfo = { treatment, regionSource, faceOnly, faceBlur: treated.faceBlur || null, hatchClipped: treated.hatchClipped !== false };
 
   // --- Prompt + model call ---------------------------------------------------
-  const prompt = opts.prompt || await buildPrompt({ treatment, regionSource, faceOnly, charName, opts, sceneBuffer, faceBbox, sceneW: W, sceneH: H });
+  const prompt = opts.prompt || await buildPrompt({ treatment, regionSource, faceOnly, model, charName, opts, sceneBuffer, faceBbox, sceneW: W, sceneH: H });
 
   let candidateCrop;      // model output resized to crop dims (the paste source)
   let usage;
@@ -1488,6 +1551,10 @@ module.exports = {
   applyGeometryGuards,
   buildActionContext,
   buildPrompt,
+  repairImageOrder,
+  imageSlotLabels,
+  CALL_MODEL_IMAGE_ORDER,
+  callModel,
   CHAR_FIX_DEFECT_PHRASES,
   charFixDefectContext,
 };

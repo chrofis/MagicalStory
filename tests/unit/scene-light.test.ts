@@ -266,9 +266,9 @@ describe('every repair that repaints pixels carries the declared light', () => {
       { treatment: 'crosshatch', regionSource: 'box', faceOnly: false },
       { treatment: 'crosshatch', regionSource: 'cutout', faceOnly: false },
     ]) {
-      const p = await faceRepair.buildPrompt({ ...axes, charName: 'Mira', opts: { sceneDescription: NIGHT_FOG, artStyle: 'watercolor', repairNames: NAMES } });
+      const p = await faceRepair.buildPrompt({ model: 'grok', ...axes, charName: 'Mira', opts: { sceneDescription: NIGHT_FOG, artStyle: 'watercolor', repairNames: NAMES } });
       expect(p, JSON.stringify(axes)).toContain('**LIGHT:** night: dark, the scene lit only by');
-      const none = await faceRepair.buildPrompt({ ...axes, charName: 'Mira', opts: { sceneDescription: UNDECLARED, artStyle: 'watercolor', repairNames: NAMES } });
+      const none = await faceRepair.buildPrompt({ model: 'grok', ...axes, charName: 'Mira', opts: { sceneDescription: UNDECLARED, artStyle: 'watercolor', repairNames: NAMES } });
       expect(none, JSON.stringify(axes)).not.toContain('**LIGHT:**');
     }
   });

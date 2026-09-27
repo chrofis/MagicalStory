@@ -35,7 +35,7 @@ async function build(axes: Record<string, unknown>, fields: Record<string, unkno
     artStyle: 'watercolor',
     ...fields,
   });
-  return faceRepair.buildPrompt({ ...axes, charName: 'Julian', opts });
+  return faceRepair.buildPrompt({ model: 'grok', ...axes, charName: 'Julian', opts });
 }
 
 describe('char-fix prompt carries no judge text', () => {
@@ -57,13 +57,16 @@ describe('char-fix prompt carries no judge text', () => {
     });
   }
 
-  it('every template keeps its match-IMAGE-1 identity line', async () => {
+  // The identity line names the REFERENCE by the slot it is sent in: second on
+  // the cutout paths (callModel sends the crop first), first on the grok box
+  // path (grokEditSceneExact sends references first). See repairImageOrder.
+  it('every template keeps its match-the-reference identity line, in the sent slot', async () => {
     const cut = await build(AXES[0], { defectTypes: ['face_mismatch'] });
-    expect(cut).toContain('Face, hair, skin tone and build: from IMAGE 1.');
+    expect(cut).toContain('Face, hair, skin tone and build: from IMAGE 2.');
     const box = await build(AXES[1], { defectTypes: ['face_mismatch'] });
     expect(box).toContain('Face: match IMAGE 1');
     const face = await build(AXES[2], { defectTypes: ['face_mismatch'] });
-    expect(face).toContain('to look like Julian from IMAGE 1');
+    expect(face).toContain('to look like Julian from IMAGE 2');
     const body = await build(AXES[3], { defectTypes: ['face_mismatch'] });
     expect(body).toContain('to match IMAGE 1');
   });

@@ -2,6 +2,18 @@
   "_readme": "CLEAR-BUG REGISTRY. A bug the owner reported, or one confirmed from stored evidence, goes here the moment it is confirmed - and the pre-push gate (scripts/admin/check-open-bugs.js) BLOCKS every push while any entry is open. That is the point: a reported bug is fixed immediately, not backlogged. Only CLEAR bugs belong here (reproduced, or owner-reported with evidence); design questions and improvements go to the task list instead. Close an entry by setting status to 'fixed' with the commit hash IN THE SAME COMMIT as the fix. Emergency escape: PUSH_WITH_OPEN_BUGS=1 git push (documented, visible, deliberate).",
   "bugs": [
     {
+      "id": "char-repair-image-labels-reversed",
+      "title": "Character-repair prompts named the images in the wrong order on every cutout / face repair: 'IMAGE 1 = REFERENCE' while the scene crop was sent first",
+      "reportedAt": "2026-09-27",
+      "source": "Owner-approved fix 2026-09-27. Lab 1554/1557 on staging job_1790446348343_z3fw660ie initialPage (Fiona): the Grok log shows slot 1 = the blurred scene crop, slot 2 = the avatar, while the prompt (character-repair-blended.txt) said IMAGE 1 = REFERENCE PORTRAIT, IMAGE 2 = THE SCENE TO EDIT.",
+      "rootCause": "The four character-repair templates hard-coded 'IMAGE 1 = reference, IMAGE 2 = scene'. That is the order grokEditSceneExact sends (references first, scene last) on the grok box path, but faceRepair.callModel — every cutout repair, the production face repair (grok:cutout:blur:face), the scene-composite charRepair, and any qwen/gemini box repair — sends [treated crop, avatar]. The whiteout prompt said first/second in code and happened to match.",
+      "impact": "Every face repair and every cutout repair told the model the scene was the reference and the avatar was the image to edit.",
+      "status": "fixed",
+      "fixedAt": "2026-09-27",
+      "fixedIn": "",
+      "fix": "faceRepair.repairImageOrder returns the order constant each send site builds its image array from (CALL_MODEL_IMAGE_ORDER in callModel, imageCompositing.SCENE_EXACT_IMAGE_ORDER in grokEditSceneExact); buildPrompt fills {EDIT_IMAGE}/{REFERENCE_IMAGE} (and the whiteout/fallback ordinals) from it, and a template with a hard-coded 'IMAGE n' or without both placeholders throws. Send order unchanged. Test: tests/unit/char-repair-image-order.test.ts captures the images actually sent and checks the slot the prompt calls REFERENCE carries the avatar, for every axis combination."
+    },
+    {
       "id": "calm-zone-rerender-drops-to-edit-tier",
       "title": "The calm-zone re-render (text-space gate, POST-REPAIR-TEXT, Lab text_zone) rendered on the Standard edit tier instead of the page render tier",
       "reportedAt": "2026-09-26",
