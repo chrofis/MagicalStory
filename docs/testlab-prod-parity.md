@@ -46,7 +46,7 @@ Audit date: 2026-09-27 (staging `c76dac6fc`). Every B/C divergence still open ha
 | repair_round | `decideRepairMethod` + round dispatch | B+C | No `characters` / `failedMethods`; dispatches to the Lab stages. |
 | artifact_repair / repair_verify | `gridBasedRepair` / `verifyRepairWithGemini` | no live production path | The production route `POST artifact-repair` throws "outputDir is required" (reported, not fixed). |
 | scale_repair / style_transfer | admin routes only | B | Missing plate, background descriptions and style / `targetModel` options. |
-| pick_best | `pickBestVersionIndex` | B | Tie-break is `'latest'`; the pipeline uses `'earliest'`. |
+| pick_best | the repair round's pick, `repairPipeline.selectBestVersion` (`pickBestVersionIndex` with the pipeline's `earliest` tie-break) | **A** (2026-09-27) | none |
 | scene_expansion / _ab / scene_variant | beats all-pages Art Director (`buildSceneExpansionAllPrompt`); per-page only as fallback | B | Per-page builder, wrong model (global `TEXT_MODEL`), no plan line, no `story` / `clothingRequirements` / `maxCharactersPerScene`. |
 | scene_description | `/regenerate/scene-description` | B | No `previousScenes`; clothing hard-coded to 'standard'; model fallback. |
 | rewrite_blocked | `rewriteBlockedScene` | C | Rebuilds the template itself and uses the wrong model. |

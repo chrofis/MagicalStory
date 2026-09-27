@@ -63226,3 +63226,76 @@ tests re-pointed at the moved code, docs/testlab-prod-parity.md, docs/lab-diverg
 tasks/BACKLOG.md.
 
 **Status:** ✅ staging.
+
+## 2026-09-27 — Lab parity, batch 2 (continued): the beats replays run the pipeline's own steps; the run stores its replay inputs
+
+**Context:** the second half of batch 2 (entry above). The four beats replays re-implemented the
+steps they measure:
+- **beats_replan** rebuilt the plan check and one re-plan round. It dropped the CAST table on
+  the stored path and rebuilt the division from `briefsIn` instead of the planner's stored reply.
+  It had no invented or commissioned figures from the arc and no PEOPLELESS pick. It used its own
+  guard instead of the run's review of declared changes, and ran one round where the run runs up
+  to two.
+- **scene_review_replay** built the review prompt itself over the FINAL briefs. It had no covers,
+  no `keepDeclaredLight`, no truncation guard and no worn-state round.
+- **arc_panel_replay** sent no landmark section (the run's list was never stored). The
+  re-telling drew a fresh challenge set and made one call with no retry.
+- **beats_scenes** copied the Art Director's recovery and the review merge. It reviewed on the
+  beats reviewer's model (`outlineReviewModel`, grok-4.6) instead of the scene reviewer
+  (`sceneReviewModel`, deepseek-v4-pro), with no clothing findings.
+- **pick_best** ranked with the interactive `latest` tie-break. The repair round uses
+  `earliest`.
+
+**Decision:** same rule. The pipeline steps move verbatim into exported functions in
+`beatsPipeline.js`, and the run calls them where the inline code stood:
+- Step 2: `makePlanReader`, `planCheckInputs`, `createPlanCheckRunner`, `recheckRecord`,
+  `runReplanRounds`.
+- The arc creator call: `makeArcCreatorCall`, `arcTempFor`.
+- Step 4: `runArtDirector` and `runSceneReview`.
+
+Each Lab stage calls them on the inputs the run held. The Lab copies are deleted:
+`collectAllPagesBriefs`, `applyReviewerPages`, the stage-local bible parse, check and review
+prompt. pick_best calls `repairPipeline.selectBestVersion`.
+
+**The run now stores what a replay needs** (a production change, text only):
+- `stories.data.replayInputs = { availableLandmarks, modelOverrides }`. The landmark list is
+  stored through `landmarksForReplay`, which drops image bytes. It sits under its own key: a
+  top-level `availableLandmarks` would change every post-generation path that hands
+  `stories.data` to a prompt builder. `resolveReplayInputData` restores it for a replay.
+- `sceneReviewReport.visualBibleIn`: the bible the reviewer was handed, stored only when the
+  review corrected it.
+
+**Approximate for OLD stories** (stored before this commit): no landmark list (the arc, planner
+and review replays have no landmark section; `beats_scenes` rebuilds the list with the run's
+resolver, unshuffled). The default models stand in for `modelOverrides`. A review that corrected
+the bible replays against the corrected bible. A story stored before `plannerReply` (2026-09-23)
+replays its `briefsIn` with no CAST table.
+
+**Lab-only knobs** stay explicit and are never passed by the run: `labPromptOptions` (the
+planner's `mayAddDeeds`, the review's `template`), `labCallOptions` (the Art Director's
+reasoning off), `labForcePerPage` (the per-page comparison, through the run's own per-page path)
+and `onCall` (cost reporting). `params.coverBeats: false` is gone: the run always briefs the
+covers.
+
+**Validation (free):** each stage's parity test compares the Lab's model-call sequence with the
+shared functions on the same stored inputs, and each fails on the pre-fix Lab.
+`generateStoryViaBeats` was executed through Step 2 and through the Art Director and the review,
+with every model call mocked. On staging `job_1790446348343_z3fw660ie`:
+- The plan-check prompt carries the stored CAST table.
+- The review replay reviews 19 briefs (16 pages and 3 covers) on deepseek-v4-pro. The prompt is
+  98,231 chars against the stored 94,439. The differences are cover-beat wording changed since
+  the run, plus the one bible correction.
+
+**Past experiments this affects** (staging):
+- `beats_replan` #1326–#1332, #1488–#1498, #1537, #1550, #1553, #1556, #1558.
+- `scene_review_replay` #1278, #1283, #1424, #1429, #1433, #1435, #1551, #1552.
+- `arc_panel_replay` #1330, #1331, #1406, #1414, #1439, #1444, #1522, #1540.
+- `beats_scenes` #1262–#1275, #1430–#1477, #1514, #1515, #1524. Every review arm in these ran on
+  the wrong reviewer.
+
+**Touched:** server/lib/beatsPipeline.js, server/lib/beatsReplayInputs.js, storyJobPipeline.js,
+server/lib/promptBuilders.js (`buildSceneReviewPrompt` accepts a template), server/lib/clothingCheck.js
+(exports `REVIEWABLE`), server/lib/testlab.js, scripts/admin/sibling-registry.json, the parity
+and source-scan tests, docs/testlab-prod-parity.md, docs/lab-divergences.md, tasks/BACKLOG.md.
+
+**Status:** ✅ staging.

@@ -5756,7 +5756,7 @@ async function runStyleTransferStage(ctx, { experimentId, params = {} }) {
  * qualityScore). Pinning lives in stories.image_version_meta, not on the scene.
  */
 async function runPickBestStage(ctx, { experimentId }) {
-  const { computeFinalScore, pickBestVersionIndex } = require('./scoring');
+  const { computeFinalScore } = require('./scoring');
   const { dbQuery } = require('../services/database');
 
   const raw = ctx.scene.imageVersions || [];
@@ -5769,7 +5769,11 @@ async function runPickBestStage(ctx, { experimentId }) {
   if (versions.length === 0) {
     return { versions: [], winner: null, note: 'Page has no imageVersions entries — nothing to rank', elapsedMs: 0 };
   }
-  const winnerIdx = pickBestVersionIndex(raw, { tieBreak: 'latest' });
+  // THE RUN'S PICK (repairPipeline.selectBestVersion: the canonical ranking
+  // with the pipeline's 'earliest' tie-break — on a full tie the least-mangled
+  // original wins). The stage used the interactive 'latest' rule (2026-09-27).
+  const { selectBestVersion } = require('./repairPipeline');
+  const winnerIdx = raw.indexOf(selectBestVersion(raw));
   const metaRows = await dbQuery('SELECT image_version_meta FROM stories WHERE id = $1', [ctx.storyId]);
   const pageMeta = metaRows[0]?.image_version_meta?.[String(ctx.pageNumber)] || null;
   return {
@@ -10718,6 +10722,7 @@ module.exports = {
   runSceneReviewReplayStage,
   runArcPanelReplayStage,
   runBeatsScenesStage,
+  runPickBestStage,
   runEmptySceneStage,
   runEditImageStage,
   // The page render and the char-fix, exported so "with no params the Lab sends

@@ -943,6 +943,20 @@ describe('beats_scenes (stored plan lines): the run\'s Art Director and review c
   });
 });
 
+// ── pick_best: the run's pick on a full tie ──────────────────────────────────
+describe('pick_best: no params = the run\'s version pick', () => {
+  it('a full tie goes to the earliest version, as the repair pipeline picks it', async () => {
+    const versions = [
+      { type: 'original', finalScore: 60, generatedAt: '2026-09-27T08:00:00Z' },
+      { type: 'inpaint', finalScore: 60, generatedAt: '2026-09-27T09:00:00Z' },
+    ];
+    const r = await testlab.runPickBestStage({ ...ctxFor(storedScene({ imageVersions: versions }), { textInImage: false }), storyId: 'job_parity' }, { experimentId: 1 });
+    const { selectBestVersion } = req('../../server/lib/repairPipeline');
+    expect(r.winner.index).toBe(versions.indexOf(selectBestVersion(versions)));
+    expect(r.winner.index).toBe(0);                                                  // pre-fix: 1 ('latest')
+  });
+});
+
 describe('the run still calls the shared builders (source scan)', () => {
   const pipeline = read('storyJobPipeline.js');
   const repair = read('server/lib/repairPipeline.js');
