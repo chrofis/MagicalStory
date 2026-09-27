@@ -326,7 +326,41 @@ function unresolvedFindings(ledger = []) {
 const GRAMMAR_EDIT_MAX_WORDS = 4;
 
 const DIFF_FIX_RE = /^(?:[-*]\s*)?PAGE\s+(\d+)\s+FIX\s+A(\d+)\s*:\s*(.+)$/i;
-const DIFF_RESTORE_RE = /^(?:[-*]\s*)?PAGE\s+(\d+)\s+RESTORE\s+B(\d+)\s+AFTER\s+A(\d+)\s*\.?\s*$/i;
+/**
+ * A RESTORE NAMES WHAT IT REMOVES (2026-09-27). It used to be `RESTORE B<j>
+ * AFTER A<k>`, a pure insertion, so a writer sentence the rewrite had REPLACED
+ * came back next to its replacement: staging job_1790508305061_dka3jpog9 p2
+ * shipped «Es war eine Schuppe. Julian musste sie mit beiden Händen halten. Es
+ * war eine Schuppe, so gross, …» — the restore put B4 back and left the A4-A5
+ * that had taken its place. Now every restore says which AFTER sentences it
+ * replaces (`REPLACING A<k>` or `A<k>-A<m>`), or `REPLACING NONE AFTER A<k>` for
+ * a sentence the rewrite dropped with nothing in its place. The old bare form
+ * is unreadable, never guessed at.
+ */
+const DIFF_RESTORE_RE = /^(?:[-*]\s*)?PAGE\s+(\d+)\s+RESTORE\s+B(\d+)\s+REPLACING\s+(?:A(\d+)(?:\s*-\s*A(\d+))?|NONE\s+AFTER\s+A(\d+))\s*\.?\s*$/i;
+
+/** Lower-case word tokens, punctuation ignored — the unit every counting guard here uses. */
+function wordTokens(s) {
+  return String(s || '').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean);
+}
+
+/** True when `inner`'s words stand, in order and unbroken, inside `outer`'s. */
+function containsWordRun(outer, inner) {
+  const o = wordTokens(outer);
+  const i = wordTokens(inner);
+  if (!i.length || i.length > o.length) return false;
+  for (let s = 0; s + i.length <= o.length; s++) {
+    if (i.every((w, k) => o[s + k] === w)) return true;
+  }
+  return false;
+}
+
+/**
+ * The shortest AFTER sentence the duplicate guard compares. A two-word
+ * sentence («Er nickte.») can stand inside a long one by chance; three words
+ * of the writer's sentence standing again beside it cannot.
+ */
+const RESTORE_DUPLICATE_MIN_WORDS = 3;
 
 /**
  * Parse the grammar check's reply. A line that starts like an edit and fits
@@ -348,7 +382,13 @@ function parseDiffEdits(raw) {
     }
     m = line.match(DIFF_RESTORE_RE);
     if (m) {
-      edits.push({ kind: 'restore', pageNumber: Number(m[1]), beforeIndex: Number(m[2]), afterIndex: Number(m[3]) });
+      edits.push(m[5] !== undefined
+        ? { kind: 'restore', pageNumber: Number(m[1]), beforeIndex: Number(m[2]), replaceFrom: null, replaceTo: null, afterIndex: Number(m[5]) }
+        : { kind: 'restore', pageNumber: Number(m[1]), beforeIndex: Number(m[2]), replaceFrom: Number(m[3]), replaceTo: Number(m[4] ?? m[3]) });
+      continue;
+    }
+    if (/^(?:[-*]\s*)?PAGE\s+\d+\s+RESTORE\b/i.test(line)) {
+      unparsed.push({ line, reason: 'a RESTORE must name what it replaces (REPLACING A<k>, A<k>-A<m>, or NONE AFTER A<k>)' });
       continue;
     }
     if (/^(?:[-*]\s*)?PAGE\s+\d+/i.test(line)) unparsed.push({ line, reason: 'not a FIX or RESTORE line' });
@@ -358,9 +398,8 @@ function parseDiffEdits(raw) {
 
 /** Word-level edit distance, case and punctuation ignored. */
 function wordEditDistance(a, b) {
-  const tok = s => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean);
-  const x = tok(a);
-  const y = tok(b);
+  const x = wordTokens(a);
+  const y = wordTokens(b);
   let prev = Array.from({ length: y.length + 1 }, (_, j) => j);
   for (let i = 1; i <= x.length; i++) {
     const cur = [i];
@@ -397,26 +436,51 @@ function applyDiffEdits(pages = [], beforeByPage = new Map(), edits = []) {
     const after = pageSentences(page.text);
     const before = pageSentences(beforeByPage.get(pageNumber) || '');
     const ops = [];
-    const fixed = new Set();
+    // AFTER sentence numbers an applied edit already owns: a fix rewrites one, a
+    // restore removes the ones it replaces. A second edit on any of them is an overlap.
+    const touched = new Set();
     for (const e of list) {
       if (e.kind === 'fix') {
         const target = after[e.afterIndex - 1];
         if (!target) { drop(e, 'no-such-sentence', `A${e.afterIndex}`, e.text); continue; }
-        if (fixed.has(e.afterIndex)) { drop(e, 'overlap', target.text, e.text); continue; }
+        if (touched.has(e.afterIndex)) { drop(e, 'overlap', target.text, e.text); continue; }
         if (e.text === target.text) { drop(e, 'unchanged', target.text, e.text); continue; }
         if (pageSentences(e.text).length !== 1) { drop(e, 'not-one-sentence', target.text, e.text); continue; }
         if (wordEditDistance(target.text, e.text) > GRAMMAR_EDIT_MAX_WORDS) { drop(e, 'rewrites-the-sentence', target.text, e.text); continue; }
-        fixed.add(e.afterIndex);
+        touched.add(e.afterIndex);
         ops.push({ at: target.start, end: target.end, insert: e.text });
         applied.push({ pageNumber, kind: 'fix', quote: target.text, correction: e.text, restored: [] });
       } else {
         const source = before[e.beforeIndex - 1];
         if (!source) { drop(e, 'no-such-sentence', `B${e.beforeIndex}`); continue; }
-        if (e.afterIndex < 0 || e.afterIndex > after.length) { drop(e, 'no-such-sentence', `A${e.afterIndex}`, source.text); continue; }
         if (after.some(a => a.text === source.text)) { drop(e, 'already-present', '', source.text); continue; }
-        const at = e.afterIndex === 0 ? (after[0] ? after[0].start : 0) : after[e.afterIndex - 1].end;
-        ops.push({ at, end: at, insert: e.afterIndex === 0 ? `${source.text} ` : ` ${source.text}` });
-        applied.push({ pageNumber, kind: 'restore', quote: '', correction: source.text, restored: [source.text] });
+        const replacing = e.replaceFrom != null;
+        if (replacing) {
+          if (e.replaceFrom < 1 || e.replaceTo < e.replaceFrom || e.replaceTo > after.length) {
+            drop(e, 'no-such-sentence', `A${e.replaceFrom}-A${e.replaceTo}`, source.text); continue;
+          }
+        } else if (e.afterIndex < 0 || e.afterIndex > after.length) {
+          drop(e, 'no-such-sentence', `A${e.afterIndex}`, source.text); continue;
+        }
+        const removed = replacing
+          ? Array.from({ length: e.replaceTo - e.replaceFrom + 1 }, (_, i) => e.replaceFrom + i)
+          : [];
+        const quote = removed.map(i => after[i - 1].text).join(' ');
+        if (removed.some(i => touched.has(i))) { drop(e, 'overlap', quote, source.text); continue; }
+        // THE PASS CAN NEVER LEAVE BOTH (2026-09-27). Whatever the reply names,
+        // a restore whose sentence would stand beside AFTER text it repeats word
+        // for word is refused: the rewrite's version of it is still on the page.
+        const kept = after.map((a, i) => ({ ...a, n: i + 1 })).filter(a => !removed.includes(a.n));
+        const dup = kept.find(a => wordTokens(a.text).length >= RESTORE_DUPLICATE_MIN_WORDS && containsWordRun(source.text, a.text));
+        if (dup) { drop(e, `duplicates-A${dup.n}`, dup.text, source.text); continue; }
+        for (const i of removed) touched.add(i);
+        if (replacing) {
+          ops.push({ at: after[e.replaceFrom - 1].start, end: after[e.replaceTo - 1].end, insert: source.text });
+        } else {
+          const at = e.afterIndex === 0 ? (after[0] ? after[0].start : 0) : after[e.afterIndex - 1].end;
+          ops.push({ at, end: at, insert: e.afterIndex === 0 ? `${source.text} ` : ` ${source.text}` });
+        }
+        applied.push({ pageNumber, kind: 'restore', quote, correction: source.text, restored: [source.text] });
       }
     }
     let text = page.text;

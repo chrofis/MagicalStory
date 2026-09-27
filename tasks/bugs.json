@@ -2415,6 +2415,18 @@
       "fixedAt": "2026-09-27",
       "fixedIn": "b5bc1866c",
       "fix": "syncVisualBibleSection projects landmarkPhoto (location + each vantage by id), text (set or withdrawn) and states whenever the parsed copy has them. The review site verifies the write-back by RE-PARSING the transcript (bibleCorrectionsMissingFromTranscript) and logs an ERROR (gl.error beats_vb_sync_failed) naming each correction the transcript lacks; report.bibleCorrections.unsynced records them. A throw in the correction step is an error, not a warn. The citation compare goes through parseLandmarkPhotoCitation. Test: tests/unit/review-bible-writeback.test.ts. Replay over stored z3fw660ie transcript + Lab 1574 corrections: 3 corrections missing before, 0 after."
+    },
+    {
+      "id": "diff-restore-leaves-replacement-beside-writer-sentence",
+      "title": "The grammar check's RESTORE put a writer sentence back next to the rewrite sentence that had replaced it, shipping the same fact twice",
+      "reportedAt": "2026-09-27",
+      "source": "Owner-approved fix task 2026-09-27. Staging job_1790508305061_dka3jpog9 textRefineReport: the repair replaced p2 B4 «Es war eine Schuppe, so gross, dass sie genau in seine beiden Handflächen passte.» with A4-A5 «Es war eine Schuppe. Julian musste sie mit beiden Händen halten.»; the diff pass answered «PAGE 2 RESTORE B4 AFTER A5» and the page shipped «Es war eine Schuppe. Julian musste sie mit beiden Händen halten. Es war eine Schuppe, so gross, …». Ledger: rewrite-restored. Scan of every stored diff RESTORE (staging 3 stories / 5 applied restores; production 0): 1 duplicate (this one).",
+      "rootCause": "server/lib/textRefine.js applyDiffEdits (restore branch, was lines 413-419) and the RESTORE contract in prompts/story-text-diff.txt: `RESTORE B<j> AFTER A<k>` was a pure insertion (ops.push({at, end: at, ...})). Nothing in the contract or the applier named or removed the AFTER sentences that had taken the restored sentence's place, and the only guard (`already-present`) matched the writer sentence verbatim, which a paraphrase never does.",
+      "impact": "A restored page reads the same fact twice to the child. Any page the repair REWORDED (rather than dropped a sentence from) and the grammar check then restored was exposed.",
+      "status": "fixed",
+      "fixedAt": "2026-09-27",
+      "fixedIn": "(pending)",
+      "fix": "A RESTORE names what it removes: `RESTORE B<j> REPLACING A<k>` / `A<k>-A<m>` replaces that run of AFTER sentences; `REPLACING NONE AFTER A<k>` is the insertion, only for a sentence dropped with nothing in its place. The old bare form is unparsed (loud). The applier also refuses any restore that would stand beside a kept AFTER sentence (>= 3 words) whose words stand unbroken inside it (`duplicates-A<k>`), whatever the reply named, and a restore whose run overlaps another edit (`overlap`). Tests: tests/unit/text-stage-counter-and-specs.test.ts (p2 replay), text-chain-hints-and-ledger.test.ts. Replay: the stored p2 edit as an insertion is now dropped `duplicates-A4`."
     }
   ]
 }
