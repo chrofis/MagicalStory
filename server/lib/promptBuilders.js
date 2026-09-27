@@ -18,7 +18,7 @@ const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = requi
 // exported from visualBible.js for coverIterate.js, which still uses it.
 const { REQUIRED_TEXT_AUTHORING_RULE, declaredText } = require('./requiredText');
 const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote, withScaleNote } = require('./visualBible');
-const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE, GROUP_STAGING_RULE } = require('./shotVocabulary');
+const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, PLAN_SHOT_PLACEHOLDER, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE, GROUP_STAGING_RULE } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { SLOP_RULES } = require('./proseSlop');
 const { castCoverage, castCoverageRule, castActionRule, castTableSpec, castTableFormat, castTableBlock, groupPageBudget, groupPageRule } = require('./castCoverage');
@@ -7611,9 +7611,9 @@ function buildChallengeIdeasSection(inputData, count = 25) {
 // joined as must-fix: it names a picture the book needs, the same kind of
 // finding as Q4 and Q8.
 //
-// Q14 (over-the-shoulder page on a contact beat, owner 2026-09-24) joined as
-// must-fix: it asks only for another shot word on the named page, never for a
-// page to be spent or moved.
+// Q14 (over-the-shoulder page on a contact beat, owner 2026-09-24) was
+// must-fix; RETIRED 2026-09-27 with the planner's shot word — code assigns the
+// shot after the check (jevDecisions), so no plan line carries one here.
 //
 // Q15 (the exciting start) and Q16 (the ending's cast safe and together)
 // joined as must-fix (owner, 2026-09-25): each names a picture the book owes,
@@ -7626,12 +7626,12 @@ function buildChallengeIdeasSection(inputData, count = 25) {
 // asks for one shared action on that same page — a relabel of the instant,
 // never a page spent or moved. On staging job_1790446348343_z3fw660ie p16 the
 // advisory reading let a posed row facing the viewer ship.
-const REPLAN_MUST_FIX_CHECKS = new Set([4, 8, 12, 14, 15, 16, 17]);
+const REPLAN_MUST_FIX_CHECKS = new Set([4, 8, 12, 15, 16, 17]);
 
 /**
- * THE SHOT-DISTRIBUTION BLOCK, declared ONCE (2026-09-20).
+ * THE CHEAP-RELABEL BLOCK, declared ONCE (2026-09-20; shot codes removed 2026-09-27).
  *
- * These six codes are must-fix — the re-plan is obliged to answer them — but
+ * These codes are must-fix — the re-plan is obliged to answer them — but
  * they are EXEMPT from the convergence test that decides whether a re-plan
  * round is kept or thrown away. The two things are not the same question:
  *
@@ -7649,13 +7649,14 @@ const REPLAN_MUST_FIX_CHECKS = new Set([4, 8, 12, 14, 15, 16, 17]);
  * loss the REPLAN_MUST_FIX_CHECKS header records for the rejected Q5
  * experiment, arriving through the total instead of through the mandate.
  *
- * This is the ONE list of which codes are shot codes on the re-plan side:
+ * This is the ONE list of the cheap-relabel codes on the re-plan side:
  * REPLAN_MUST_FIX_CODES below spreads it rather than repeating it, so the two
  * cannot drift.
  */
+// The shot codes that used to lead this set (SHOT_MEDIUM_WIDE_EXCESS,
+// SHOT_*_COUNT, SHOT_NO_CAMERA_POSITION) are DELETED (2026-09-27): code writes
+// every shot after the re-plan (jevDecisions), so no shot finding exists.
 const REPLAN_CONVERGENCE_EXEMPT_CODES = new Set([
-  'SHOT_MEDIUM_WIDE_EXCESS', 'SHOT_CLOSEUP_COUNT', 'SHOT_ULTRAWIDE_COUNT',
-  'SHOT_OTS_COUNT', 'SHOT_NO_CAMERA_POSITION',
   // A figure the instant names and the who column leaves out (2026-09-23). It
   // is cleared by writing one name into one column, or deleting it from the
   // instant — cheap like a shot relabel, so it may not buy a lost picture.
@@ -7712,44 +7713,11 @@ const REPLAN_MUST_FIX_CODES = new Set([
   // convergence (not in REPLAN_CONVERGENCE_EXEMPT_CODES): a round that leaves
   // the book further over its budget is discarded by replanRoundRegressed.
   'GROUP_PAGES_OVER_BUDGET',
-  // THE SHOT DISTRIBUTION JOINED 2026-09-20 (owner), the whole block of it:
-  // SHOT_MEDIUM_WIDE_EXCESS, SHOT_CLOSEUP_COUNT, SHOT_ULTRAWIDE_COUNT,
-  // SHOT_OTS_COUNT and SHOT_NO_CAMERA_POSITION (SHOT_AERIAL_COUNT retired 2026-09-23 with the aerial floor).
-  //
-  // MEASURED, 11 staging books / 180 pages over the 14 days to 2026-09-20:
-  // medium 76 (42%), wide 54 (30%), close-up 37 (21%), ultra-wide 10 (5.6%),
-  // high-angle 2, over-the-shoulder 1, aerial 0. Medium plus wide is 72% of
-  // every page shipped and a camera position appears on 3 pages in 180 — the
-  // state the paragraph below predicted would persist while these reported as
-  // "also noted". It did: on job_1789853503332_riqncqg1i SHOT_ULTRAWIDE_COUNT
-  // was raised in BOTH plan-check rounds and the book shipped without one.
-  // A finding nothing is obliged to answer is not a finding, which is the same
-  // reasoning that promoted NO_PEOPLELESS_PAGE above.
-  //
-  // The prompt side moved FIRST and is the actual fix: story-beats.txt asked
-  // for "about two close-ups and two ultra-wides, the rest medium or wide",
-  // which on an 18-page book is an explicit request for ~78% medium-or-wide.
-  // The planner was complying. It now states the same tiered table these
-  // counters measure (shotVocabulary.SHOT_FLOOR_TIERS), so a must-fix round is
-  // spent on a spread the planner was actually asked for.
-  //
-  // They are spread from REPLAN_CONVERGENCE_EXEMPT_CODES above, which is the
-  // single declaration of the block: must-fix for the MANDATE, exempt from the
-  // CONVERGENCE test (2026-09-20 — see that header for the measured instance).
+  // The cheap relabels (REPLAN_CONVERGENCE_EXEMPT_CODES): must-fix for the
+  // MANDATE, exempt from the CONVERGENCE test. The shot-distribution block
+  // that joined here 2026-09-20 is gone with the planner's shot word
+  // (2026-09-27, jevDecisions.decideShots).
   ...REPLAN_CONVERGENCE_EXEMPT_CODES,
-  // THE HISTORY THAT DECISION REVERSES, kept rather than deleted:
-  // NOT HERE, DELIBERATELY: SHOT_NO_CAMERA_POSITION (owner, 2026-09-19). Camera
-  // position became expressible on a page only today, and the measured baseline
-  // is that every stored book is eye level on every page — 6 of 1,504 stored
-  // shot values carry a position at all. As a must-fix it would spend a re-plan
-  // round on every book in flight until the planner adapts, which is a cost paid
-  // per story for a preference. It reports as "also noted", like the other shot
-  // counters, whose own header calls shot distribution "a preference next to
-  // these". Revisit when stored plans show the planner reaching for a position
-  // unprompted, so the finding is the exception rather than the rule.
-  // REVISITED 2026-09-20, as that last sentence asked: the planner did not
-  // reach for one unprompted (3 pages in 180), because nothing asked it to.
-  // The prompt now does, and the code above enforces the floor.
 ]);
 
 /**
@@ -8516,23 +8484,12 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     SIZE_LOOK_RULE,
     // The fourth field's contract, shared with plan-check.txt check 9.
     PAGE_CHANGE: PAGE_CHANGE_DEF,
-    // The camera positions, from the one vocabulary the counters read — the
-    // planner is the only stage that sees the whole book, so a spread of them
-    // can only be decided here. See server/lib/shotVocabulary.js.
-    SHOT_POSITIONS,
-    // WHAT A GOOD SPREAD OF SHOTS IS, stated to the planner from the same table
-    // server/lib/planCounters.js measures it against (shotVocabulary's
-    // SHOT_FLOOR_TIERS). The planner is the only stage that sees the whole book,
-    // so the spread can only be decided here — and it is page-count aware, so a
-    // six-page trial is never asked for two over-the-shoulder pages.
-    SHOT_DISTRIBUTION: shotDistributionPhrase(pageCount),
-    // No over-the-shoulder on a page whose near figure touches what they face —
-    // the same sentence the Art Director templates carry inside OTS_NEAR_FIGURE.
-    OTS_NO_CONTACT: OTS_NO_CONTACT_RULE,
-    // The same below-waist verb list the Art Director templates are given and
-    // planCounters.SHOT_CLOSEUP_BELOW_WAIST measures — the generator/critic pair
-    // for the waist-up rule is one constant, not two hand-kept sentences.
-    CLOSEUP_BELOW_WAIST: CLOSEUP_BELOW_WAIST_PHRASE,
+    // Field 0 of every plan line is this placeholder: the shot is chosen
+    // after the re-plan by the Jev decision layer and written by code
+    // (owner, 2026-09-27; jevDecisions.decideShots). The planner's shot rules
+    // (SHOT_DISTRIBUTION, SHOT_POSITIONS, OTS_NO_CONTACT, the close-up waist
+    // sentence) went with the authorship.
+    PLAN_SHOT_PLACEHOLDER,
     PAGE_COUNT: pageCount,
     // HOW MUCH OF THE BOOK EACH COMMISSIONED CHARACTER GETS (owner,
     // 2026-09-23): a focal page each when the book has room, 3-4 pages in
@@ -8552,11 +8509,6 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // GROUP_PAGES_OVER_BUDGET measures, on the same ceiling the pipeline
     // passes the counters (IMAGE_MODELS maxCharactersPerScene).
     GROUP_PAGE_BUDGET: groupPageRule(groupPageBudget({ pageCount, castCount: (inputData?.characters || []).filter(c => c && c.name).length, maxCharactersPerScene: ctx.MAX_CHARACTERS_PER_SCENE })),
-    // STAGING A GROUP (owner, 2026-09-27): the Art Director's rule 4 and the
-    // scene review's [group_staging] read this constant; the planner picks the
-    // shot, so it reads it too — a page of more than three planned `medium`
-    // left the review to override the plan (z3fw660ie p1, p6).
-    GROUP_STAGING: GROUP_STAGING_RULE,
     // The output scope follows the mode. A first plan (no replan section)
     // owes every page; a re-plan owes only the pages it changes under RE-DIVIDE
     // — the merge in beatsPipeline restores every other page from the division
@@ -9077,7 +9029,7 @@ const HAPPY_ENDING_DEF = 'The last page shows the commissioned characters safe a
  * in the MIDDLE and the recheck, on a nearly unchanged plan, put a different
  * picture there. Q4 is must-fix, so the answer drove a forced edit that
  * overwrote another key page. The acts are now the arc's numbered sentences in
- * thirds, computed here and stated identically to the planner (question 6) and
+ * thirds, computed here and stated identically to the planner (question 5) and
  * the checker (question 4); the model only picks the picture inside each act.
  *
  * @param {string} finalArc the numbered arc
@@ -10920,7 +10872,7 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHi
     EXCITING_START_DEF,
     HAPPY_ENDING_DEF,
     WANTED_PICTURE_DEF,
-    // Question 4's acts, by sentence number — the planner's question 6 gets the same line.
+    // Question 4's acts, by sentence number — the planner's question 5 gets the same line.
     ACT_SPANS: arcActSpans(arc),
     // Question 12: the ACTION half of the page plan's cast rule — the same
     // sentence the planner is told (castActionRule, owner 2026-09-23). The
@@ -10941,11 +10893,12 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHi
     // builder (owner, 2026-09-26). A page that breaks a stated fact could not
     // be judged by a checker never shown the facts.
     STORY_LOGIC_SECTION: buildStoryLogicSection(storyLogic),
-    // Question 14: the planner's over-the-shoulder contact rule (story-beats.txt
-    // {OTS_NO_CONTACT}), the same constant. The planner ignored it on
-    // job_1790277448294_5herh01j7 p12 (an ear pressed to what the near figure
-    // faced) and the checker, never given it, could not raise it.
-    OTS_NO_CONTACT: OTS_NO_CONTACT_RULE,
+    // Question 14 (over-the-shoulder on contact) is RETIRED with the planner's
+    // shot word (2026-09-27): no page has a shot while the plan is checked. The
+    // contact rule rides in the Jev over-the-shoulder question and the Art
+    // Director / iterate templates. The numbering keeps its gap so stored
+    // CHECK[n] rows stay comparable.
+    PLAN_SHOT_PLACEHOLDER,
     // THE CAST TABLE the planner wrote before its plan lines (2026-09-25). The
     // checker reads it beside the plan; every answer still comes from the plan
     // lines, and the counters hold each line to the table (CAST_PROMISE_BROKEN).
@@ -11794,8 +11747,8 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
     // ONE authoring contract for readable in-image lettering, shared with the
     // two Visual Bible authoring templates — see REQUIRED_TEXT_AUTHORING_RULE.
     REQUIRED_TEXT_AUTHORING: REQUIRED_TEXT_AUTHORING_RULE,
-    // Check 7b, from the one constant the six generator sites are given and
-    // planCounters.SHOT_CLOSEUP_BELOW_WAIST measures. It was the last site
+    // Check 7b, from the one constant the brief-authoring sites are given (the
+    // planner's copy and the plan counter went 2026-09-27). It was the last site
     // still spelling the list out by hand, which is how the critic went on
     // naming poses after the rule stopped forbidding them.
     CLOSEUP_BELOW_WAIST: CLOSEUP_BELOW_WAIST_PHRASE,

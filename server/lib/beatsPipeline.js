@@ -3,6 +3,8 @@
 const { runPlanCounters, collectPlaceNames, castLostByReplan, reviewPlanChanges, refreshPlanShot } = require('./planCounters');
 const { commissionedCast, castCoverage, parsePlanCastBlock } = require('./castCoverage');
 const { arcRepairFindingsWithCastCheck } = require('./jevAudit');
+const jevDecisions = require('./jevDecisions');
+const { JevDecisionError } = jevDecisions;
 const { lookupByName } = require('./castResolver');
 const { textZoneRulesActive } = require('../config/runtime');
 const { commissionedChildBand, applySecondaryAgeBand } = require('./inventedAgeBand');
@@ -1200,7 +1202,10 @@ function recheckRecord(c) {
  *
  * @returns {Promise<{beats: Array, pagePlan: string}>}
  */
-async function runReplanRounds({ inputData, pageCount, plan, check1, replanRounds, approvedArc, arcHints, arcStoryLogic, arcCentralFigure, castTable, commission, commissionedNames, maxCast, planModel, readPlan, runCheck, onChunk, gl, stage, checkCancellation, labPromptOptions = {}, onCall = null, beats, pagePlan }) {
+async function runReplanRounds({ inputData, pageCount, plan, check1, replanRounds, approvedArc, arcHints, arcStoryLogic, arcCentralFigure, castTable, commission, commissionedNames, maxCast, planModel, readPlan, runCheck, onChunk, gl, stage, checkCancellation, labPromptOptions = {}, onCall = null, beats, pagePlan, jevReport = null }) {
+  // The check whose roster describes the division that ships — the head count
+  // the shot assignment reads (jevDecisions.decideShots).
+  let bestCheck = check1;
   try {
     // RE-PLAN ROUNDS (2026-09-09). The loop used to be check → re-plan →
     // recheck → ship: a fault the RE-PLAN ITSELF introduced was named by the
@@ -1531,6 +1536,7 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
       }
       bestBeats = beats;
       bestPagePlan = pagePlan;
+      bestCheck = check2;
       if (stillMustFix.length === 0) break;
       // A FURTHER ROUND MUST BE MOPPING UP, NOT RE-ROLLING (2026-09-21).
       //
@@ -1579,6 +1585,10 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
       pendingCheck = check2;
     }
   } catch (err) {
+    // A Jev decision failure is NOT a failed re-plan: the cut instructions have
+    // no second author, so the step fails loudly (docs/decisions.md 2026-09-27
+    // "Jev decision layer wired").
+    if (err instanceof JevDecisionError) throw err;
     // Never block a story on the check: the first division is a complete plan.
     log.warn(`🚨 [BEATS] Re-plan failed (${err.message}) — the first division ships`);
     gl.warn('beats_replan_failed', `Re-plan failed: ${err.message} — the first division ships`);
@@ -1591,8 +1601,37 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
       r.kept = false;
       r.discardReason = `re-plan failed after this round (${err.message}) — the first division ships`;
     }
+    return { beats, pagePlan, check: check1 };
   }
-  return { beats, pagePlan };
+  return { beats, pagePlan, check: bestCheck };
+}
+
+/**
+ * THE SHOT OF EVERY PAGE — the Jev decision layer's Part 1 (owner, 2026-09-27).
+ * The planner writes the placeholder; after the re-plan, Jev scores each shot's
+ * fit per page and code assigns them under the budget (jevDecisions.decideShots),
+ * then writes the word into field 0 of every plan line. The head count is the
+ * `present` list of the check whose roster describes the shipped division —
+ * never a name regex. No roster, no shots: the step fails loudly.
+ *
+ * Production and the Test Lab beats_replan stage call this same function.
+ *
+ * @returns {Promise<{beats: Array, pagePlan: string, report: object}>}
+ */
+async function finalizePlanShots({ approvedArc, beats, check, gl, callImpl }) {
+  const perPage = check && check.counters && check.counters.stats && check.counters.stats.castPerPage;
+  if (!Array.isArray(perPage) || !perPage.length) {
+    throw new JevDecisionError(`no head count for the shipped division (${check && check.counters && check.counters.skipped ? `plan counters skipped: ${check.counters.skipped}` : 'the plan check gave no roster'}) — the shot assignment cannot apply the group rule, so no page gets a shot`);
+  }
+  const present = new Map(perPage.map(r => [Number(r.pageNumber), r.names || []]));
+  const t0 = Date.now();
+  const d = await jevDecisions.decideShots({ arc: approvedArc, pages: beats, present }, callImpl ? { callImpl } : {});
+  const shotBeats = jevDecisions.applyShots(beats, d.shots);
+  const pagePlan = shotBeats.map(pg => `Page ${pg.pageNumber}: ${pg.planLine || ''}`).join(String.fromCharCode(10));
+  const report = { ...d, elapsedMs: Date.now() - t0 };
+  gl.info('beats_jev_shots', `Shots by Jev + code: ${d.shots.map((x, i) => `p${beats[i].pageNumber} ${x}`).join(', ')} (${d.stats.calls} Jev calls, $${d.stats.costUsd}, ${(report.elapsedMs / 1000).toFixed(1)}s)${d.unmet ? ` — UNMET: ${d.unmet.join(', ')}` : ''}`, null, { shots: d.shots, violations: d.violations, unmet: d.unmet, stats: d.stats });
+  if (d.unmet) gl.error('beats_jev_shots_unmet', `The shot assignment could not meet ${d.unmet.join(', ')}`, null, { unmet: d.unmet });
+  return { beats: shotBeats, pagePlan, report };
 }
 
 /**
@@ -3354,13 +3393,30 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // canonical fields are derived from it by shippedReplanState() so they can
   // only ever describe the division that shipped.
   const replanRounds = [];
+  // THE JEV DECISION LAYER'S REPORT (owner, 2026-09-27): every decision the
+  // layer makes on this story — cast cuts per re-plan round, shots, light, VB
+  // citations, aboard, population — stored as `stories.data.jevDecisions` so a
+  // run can be replayed. docs/decisions.md "Jev decision layer wired".
+  const jevReport = { castCuts: [], shots: null, light: null, vb: null, population: null, fixedChanges: null };
+  // The check whose roster describes the shipped division: the head count the
+  // shot assignment reads.
+  let shippedCheck = check1;
   if (check1.lines.length > 0) {
-    ({ beats, pagePlan } = await runReplanRounds({
+    ({ beats, pagePlan, check: shippedCheck } = await runReplanRounds({
       inputData, pageCount, plan, check1, replanRounds, approvedArc, arcHints, arcStoryLogic, arcCentralFigure, castTable,
-      commission, commissionedNames, maxCast, planModel, readPlan, runCheck, onChunk, gl, stage, checkCancellation, beats, pagePlan,
+      commission, commissionedNames, maxCast, planModel, readPlan, runCheck, onChunk, gl, stage, checkCancellation, beats, pagePlan, jevReport,
     }));
   }
   meta.timings.planCheckMs = Date.now() - t;
+  // ── Step 2b: THE SHOTS — Jev picks, code assigns and writes field 0 ───────
+  await checkCancellation();
+  {
+    const shot = await finalizePlanShots({ approvedArc, beats, check: shippedCheck, gl });
+    beats = shot.beats;
+    pagePlan = shot.pagePlan;
+    jevReport.shots = shot.report;
+    meta.timings.jevShotsMs = shot.report.elapsedMs;
+  }
 
   {
     // Stored under the beatsReviewReport key on purpose: the persistence in
@@ -4054,7 +4110,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // trimmed, age-clamped, landmark-linked. The caller prefers it over a
   // re-parse of rawOutline so the two can never diverge (the transcript is
   // kept in step by syncVisualBibleSection; the re-parse is the fallback).
-  return { title, titleJudge, beats, pages, scenes, coverScenes, rawOutline, visualBible, meta, challengeDrawIds, challengeTakenIds, challengeDraw, arcReviewReport, beatsReviewReport, storyBibleReport, clothingReviewReport, wardrobeBibleReport, sceneExpansionReport, sceneReviewReport };
+  return { title, titleJudge, beats, pages, scenes, coverScenes, rawOutline, visualBible, meta, challengeDrawIds, challengeTakenIds, challengeDraw, arcReviewReport, beatsReviewReport, jevDecisions: jevReport, storyBibleReport, clothingReviewReport, wardrobeBibleReport, sceneExpansionReport, sceneReviewReport };
 }
 
-module.exports = { generateStoryViaBeats, runArtDirector, arcTempFor, makeArcCreatorCall, runSceneReview, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, bibleCorrectionsMissingFromTranscript, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };
+module.exports = { generateStoryViaBeats, finalizePlanShots, runArtDirector, arcTempFor, makeArcCreatorCall, runSceneReview, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, bibleCorrectionsMissingFromTranscript, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };

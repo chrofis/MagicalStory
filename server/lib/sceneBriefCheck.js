@@ -1070,10 +1070,10 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
   // whose plan line is a pure waist-up holding beat.
   //
   // A widening the PLAN caused is legitimate here and is not reported: the
-  // planner is the one that has to answer it, and planCounters raises
-  // SHOT_CLOSEUP_BELOW_WAIST against the same verb list for exactly that case.
-  // Reporting it twice would have the Art Director rewrite around a fault it
-  // did not author.
+  // plan line's own words put the subject below the frame line, which
+  // CLOSEUP_KEPT_RULE lets the Art Director answer with `medium` (the shot is
+  // code's since 2026-09-27, and the Jev close-up question carries the same
+  // waist rule).
   const planLine = String((page && page.planLine) || '');
   if (planLine) {
     const planSegs = planSegments(planLine);

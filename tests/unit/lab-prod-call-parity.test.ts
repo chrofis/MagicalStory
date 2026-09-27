@@ -711,17 +711,29 @@ describe('beats_replan: no params = the run\'s plan check and re-plan rounds', (
     'ROSTER 4: people=Mira, Tobias',
   ].join('\n');
   let modelCalls: any[] = [];
+  let jevCalls: any[] = [];
   let savedStream: any;
+  let savedJev: any;
+  const jevAuditMod = req('../../server/lib/jevAudit');
   beforeEach(() => {
     modelCalls = [];
+    jevCalls = [];
     savedStream = textModelsMod.callTextModelStreaming;
     textModelsMod.callTextModelStreaming = async (prompt: string, _s: any, _c: any, model: string, opts: any) => {
       modelCalls.push({ prompt, model, label: opts?.usageLabel });
       const text = /replan/.test(opts?.usageLabel || '') && !/recheck/.test(opts?.usageLabel || '') ? REPLY : CHECK_REPLY;
       return { text, modelId: model, usage: { input_tokens: 1, output_tokens: 1 } };
     };
+    // The Jev decision layer (Step 2b, the shots): stubbed at the one client.
+    savedJev = jevAuditMod.callJev;
+    jevAuditMod.callJev = async ({ state, questions }: any) => {
+      jevCalls.push({ state, questions });
+      const answers: any = {};
+      Object.keys(questions).forEach((id, k) => { answers[id] = { noul: ((k * 37) % 10) / 10 }; });
+      return { answers, cost: 0, model: 'stub', usage: {} };
+    };
   });
-  afterEach(() => { textModelsMod.callTextModelStreaming = savedStream; });
+  afterEach(() => { textModelsMod.callTextModelStreaming = savedStream; jevAuditMod.callJev = savedJev; });
 
   it('sends the calls generateStoryViaBeats sends, with the CAST table and the arc\'s figures', async () => {
     STORY = STORED();
@@ -741,17 +753,23 @@ describe('beats_replan: no params = the run\'s plan check and re-plan rounds', (
     const check1 = await runCheck('plan_check', plan.pages, plan.pagePlan);
     expect(check1.lines.length).toBeGreaterThan(0);
     const rounds: any[] = [];
-    await BP.runReplanRounds({
+    const shipped = await BP.runReplanRounds({
       inputData: STORY, pageCount: 4, plan, check1, replanRounds: rounds, approvedArc: ARC, arcHints: '', arcStoryLogic: LOGIC,
       arcCentralFigure: ['Mira'], castTable, commission: inputs.commission, commissionedNames: inputs.commissionedNames, maxCast: inputs.maxCast,
       planModel: MODEL_DEFAULTS.outline, readPlan, runCheck, onChunk: null, gl, stage: async () => {}, checkCancellation: async () => {},
-      beats: plan.pages, pagePlan: plan.pagePlan,
+      beats: plan.pages, pagePlan: plan.pagePlan, jevReport: { castCuts: [] },
     });
+    const prodShots = await BP.finalizePlanShots({ approvedArc: ARC, beats: shipped.beats, check: shipped.check, gl });
     const prodCalls = modelCalls.splice(0);
+    const prodJev = jevCalls.splice(0);
+    expect(prodJev.length).toBe(4);                                            // one A1 call per page
     expect(prodCalls.length).toBeGreaterThanOrEqual(3);                        // check, re-plan, recheck
     // THE LAB, no params.
     const r = await testlab.runBeatsReplanStage({ storyId: 'job_parity' }, { params: {} });
     expect(modelCalls.map(c => [c.label, c.model, c.prompt])).toEqual(prodCalls.map(c => [c.label, c.model, c.prompt]));
+    // …and the same Jev questions over the same states, and the same shots written.
+    expect(jevCalls).toEqual(prodJev);
+    expect(r.appliedPlan.map((p: any) => p.planLine)).toEqual(prodShots.beats.map((p: any) => p.planLine));
     expect(r.report.castTable).toEqual(castTable);                             // pre-fix: dropped
     expect(r.report.rounds.length).toBe(rounds.length);
     expect(modelCalls[0].prompt).toContain('lifts the lantern out of the net'); // the table reaches the check
@@ -762,7 +780,8 @@ describe('beats_replan: no params = the run\'s plan check and re-plan rounds', (
     expect(src).toContain('const readPlan = makePlanReader(expected, approvedArc);');
     expect(src).toMatch(/planCheckInputs\(inputData, \{ arcPremiseNames, modelOverrides \}\)/);
     expect(src).toMatch(/const runCheck = createPlanCheckRunner\(\{/);
-    expect(src).toMatch(/\(\{ beats, pagePlan \} = await runReplanRounds\(\{/);
+    expect(src).toMatch(/\(\{ beats, pagePlan, check: shippedCheck \} = await runReplanRounds\(\{/);
+    expect(src).toMatch(/await finalizePlanShots\(\{ approvedArc, beats, check: shippedCheck, gl \}\)/);
   });
 });
 

@@ -4329,6 +4329,14 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     plainStoredBeats = stored;
   }
 
+  // A FRESH PLAN HAS NO SHOTS (2026-09-27). Field 0 is the placeholder until
+  // the plan check's roster exists and the Jev shot assignment writes it
+  // (beatsPipeline.finalizePlanShots, run by beats_replan). The Art Director
+  // is never handed a placeholder in production, so it is not handed one here.
+  if (!plainStoredBeats && params.expandScenes !== false) {
+    throw new Error('beats_scenes: a fresh plan carries no shot (field 0 is the placeholder until the plan check and the Jev shot assignment run) — run beats_scenes with plainStoredBeats, or beats_replan for the plan');
+  }
+
   // ── Step 1: plan ────────────────────────────────────────────────────────
   // plainStoredBeats skips planning and review — the beats are the frozen input.
   let plannerPrompt = null;
@@ -10101,7 +10109,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
   // STORY LOGIC. The stage used to rebuild the check, one round and its guard
   // itself — no CAST table on the re-plan, no invented / commissioned figures,
   // no PEOPLELESS pick, no review of declared changes, one round only.
-  const { makePlanReader, planCheckInputs, createPlanCheckRunner, runReplanRounds, shippedReplanState } = require('./beatsPipeline');
+  const { makePlanReader, planCheckInputs, createPlanCheckRunner, runReplanRounds, shippedReplanState, finalizePlanShots } = require('./beatsPipeline');
 
   // The run's inputData: the stored landmark list the planner and the check
   // read, and the run's model overrides (resolveReplayInputData, 2026-09-27).
@@ -10288,13 +10296,18 @@ async function runBeatsReplanStage(target, { params = {} }) {
 
   // ── the re-plan rounds, as the run runs them ──────────────────────────────
   const replanRounds = [];
+  // The run's Jev decision report (castCuts per round), as production keeps it.
+  const jevReport = { castCuts: [], shots: null };
   const shippedDivision = await runReplanRounds({
     inputData: storyData, pageCount, plan, check1, replanRounds, approvedArc, arcHints, arcStoryLogic: storyLogic,
     arcCentralFigure: centralFigure, castTable, commission, commissionedNames, maxCast, planModel, readPlan, runCheck,
     onChunk: null, gl, stage: async () => {}, checkCancellation: async () => {}, labPromptOptions, onCall,
-    beats: plan.pages, pagePlan,
+    beats: plan.pages, pagePlan, jevReport,
   });
   const shipped = shippedReplanState(replanRounds);
+  // THE RUN'S STEP 2b (2026-09-27): the shots, by the function production calls.
+  const shot = await finalizePlanShots({ approvedArc, beats: shippedDivision.beats, check: shippedDivision.check, gl });
+  jevReport.shots = shot.report;
 
   // THE LAB'S COMPLIANCE READING of round 1 (research, no production
   // counterpart): how the round's reply kept the re-plan contract, read off
@@ -10340,7 +10353,8 @@ async function runBeatsReplanStage(target, { params = {} }) {
       recheckFindings: shippedCheck ? shippedCheck.lines : null,
       castSummary, castFindings, recheckCastSummary,
     },
-    appliedPlan: shippedDivision.beats.map(pg => ({ pageNumber: Number(pg.pageNumber), planLine: pg.planLine })),
+    appliedPlan: shot.beats.map(pg => ({ pageNumber: Number(pg.pageNumber), planLine: pg.planLine })),
+    jevDecisions: jevReport,
     replanPrompt: round1 ? round1.replanPrompt : null,
     replanRawResponse: round1 ? (round1.replanReply || '').slice(0, 40000) : null,
     recheckRawResponse: shippedCheck ? (shippedCheck.reply || '').slice(0, 40000) : null,

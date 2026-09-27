@@ -2,13 +2,13 @@
  * SHOT VOCABULARY — one definition of the camera-framing words, for every stage
  * that writes, counts, or acts on one.
  *
- * A shot word is PRODUCED by the beats planner (prompts/story-beats.txt, which
- * states the distribution shotDistributionPhrase below builds), COUNTED here by
- * planCounters
- * (SHOT_VARIETY / SHOT_CLOSEUP_COUNT / SHOT_ULTRAWIDE_COUNT), carried through
- * the Art Director's `shot` field (prompts/scene-expansion.txt,
- * scene-expansion-all.txt) and finally ACTED ON by the illustrator
- * (prompts/image-generation.txt).
+ * A shot word is CHOSEN by the Jev decision layer and WRITTEN by code into
+ * field 0 of every plan line (server/lib/jevDecisions.js: the SHOTS definitions
+ * below are the questions, shotFloors the budget the assignment holds; owner,
+ * 2026-09-27 — the planner no longer authors a shot and writes
+ * PLAN_SHOT_PLACEHOLDER), carried through the Art Director's `shot` field
+ * (prompts/scene-expansion.txt, scene-expansion-all.txt) and finally ACTED ON
+ * by the illustrator (prompts/image-generation.txt).
  *
  * It was declared separately at each of those stops and the sets did not match:
  * the planner asks for `ultra-wide` pages, while the Art Director enum offered
@@ -249,21 +249,19 @@ function buildShotDefinitions(shotHint, sceneText = null) {
 }
 
 /**
- * HOW MANY PAGES OF EACH — the one declaration of the distribution, read by the
- * planner that WRITES the shots (prompts/story-beats.txt, via
- * shotDistributionPhrase) and by the counters that MEASURE them
- * (server/lib/planCounters.js, via shotFloors). One table, so the book is never
- * marked down against a spread nobody asked it for.
+ * HOW MANY PAGES OF EACH — the one declaration of the distribution. Since
+ * 2026-09-27 it is the BUDGET the Jev shot assignment holds by construction
+ * (jevDecisions.assign via shotFloors): code writes every page's shot, so no
+ * counter measures it afterwards and no planner is told it.
  *
  * MEASURED, 11 staging books / 180 pages over the 14 days to 2026-09-20:
  * medium 76 (42%), wide 54 (30%), close-up 37 (21%), ultra-wide 10 (5.6%),
  * high-angle 2 (1.1%), over-the-shoulder 1 (0.6%), aerial 0. Medium plus wide
  * is 72% of every page shipped, and a camera position appears on 3 pages in 180.
  *
- * The planner was COMPLYING. The prompt asked for "about two close-ups and two
- * ultra-wides, the rest medium or wide", which on an 18-page book is an explicit
- * request for ~78% medium-or-wide. The fix is therefore the prompt first — it
- * now states this table — and the counters second (owner, 2026-09-20).
+ * The planner was COMPLYING with a prompt that asked for ~78% medium-or-wide;
+ * the table fixed that (owner, 2026-09-20), and the planner still broke it
+ * (72 rule violations over 17 books, 0 clean) — which is why code now assigns.
  *
  * Why a SHARE and not a count: the cap scales to any book length with no
  * threshold to maintain. Why TIERED floors: a 6-page trial must not be asked for
@@ -275,57 +273,13 @@ function buildShotDefinitions(shotHint, sceneText = null) {
 const MAX_MEDIUM_WIDE_SHARE = 0.5;
 
 /**
- * The two middle distances the cap is about — the default framings a book falls
- * back on when no page earns anything else. Declared here so the counters read a
- * name instead of spelling the two words out for themselves.
+ * FIELD 0 OF A PLAN LINE BEFORE CODE WRITES IT (owner, 2026-09-27). The beats
+ * planner divides the book and writes this literal word where the shot goes;
+ * after the re-plan, jevDecisions.decideShots picks each page's shot under the
+ * budget below and code writes the word in (jevDecisions.applyShots). One
+ * author, one constant — the planner prompt fills it from here.
  */
-const MID_DISTANCE_SHOTS = ['medium', 'wide'];
-
-/**
- * THE PEOPLELESS PAGE MAY BE THE ULTRA-WIDE PAGE (owner, 2026-09-20).
- *
- * "Books of 10 page allow a bit of freedom, for example put ultra-wide and no
- * person together as 1, so only 5 or so are spoken for."
- *
- * A short book had NO slack. At 9-13 pages the floors mandate close-up 2 +
- * ultra-wide 1 + aerial 1 + over-the-shoulder 1 = 5 shot pages, and
- * `NO_PEOPLELESS_PAGE` (must-fix) demands a sixth page with no cast in it,
- * against a medium/wide ceiling of 4 at nine pages and 5 at ten. Six mandated
- * pages plus a ceiling of 5 needs an 11-page book; 9 and 10 were therefore
- * UNSATISFIABLE, and the planner could only ship one finding or the other.
- *
- * The two demands are orthogonal and always were: `shot` is a camera word, and
- * peopleless is a property of the CAST. An ultra-wide landscape with nobody in
- * it is the natural page to be both, so one page discharges both.
- *
- * AT EVERY LENGTH, not below a threshold. Joint satisfaction is only NEEDED at
- * 9-10 pages (see the arithmetic in tests/unit/shot-distribution-floors.test.ts,
- * which walks 4-40), but it is a PERMISSION, not a quota. A permission that is
- * legal at ten pages and illegal at eighteen would be an arbitrary threshold
- * with nothing behind it and one more number to maintain; at the longer lengths
- * it simply buys slack the book is free not to spend.
- *
- * ONLY THE CAST PROPERTY COMBINES. `shot` is one-of, so aerial, over-the-
- * shoulder, close-up and ultra-wide can never share a page with each other, and
- * nothing here lets them.
- */
-const PEOPLELESS_SHARED_SHOT = 'ultra-wide';
-
-if (!SHOT_TYPES.includes(PEOPLELESS_SHARED_SHOT)) {
-  throw new Error('shotVocabulary: PEOPLELESS_SHARED_SHOT names an unknown shot');
-}
-
-/**
- * id → the finding code planCounters raises when a book is short of that shot.
- * One code per floored shot, so a re-plan is told WHICH shot is missing rather
- * than that the spread is wrong. `ultra-wide` is a DISTANCE and `aerial` a
- * POSITION: different shots on different axes, never folded together.
- */
-const SHOT_FLOOR_CODE = {
-  'close-up': 'SHOT_CLOSEUP_COUNT',
-  'ultra-wide': 'SHOT_ULTRAWIDE_COUNT',
-  'over-the-shoulder': 'SHOT_OTS_COUNT',
-};
+const PLAN_SHOT_PLACEHOLDER = 'SHOT';
 
 /**
  * Tightest tier first; a book takes the first tier whose `maxPages` it fits.
@@ -358,9 +312,6 @@ for (const tier of SHOT_FLOOR_TIERS) {
     if (!SHOT_TYPES.includes(id)) {
       throw new Error(`shotVocabulary: SHOT_FLOOR_TIERS floors an unknown shot \`${id}\``);
     }
-    if (!SHOT_FLOOR_CODE[id]) {
-      throw new Error(`shotVocabulary: no finding code for the floored shot \`${id}\` — a floor nothing can report is not enforceable`);
-    }
   }
 }
 
@@ -385,9 +336,7 @@ function shotFloors(pageCount) {
   const maxMediumWide = Math.floor(pages * MAX_MEDIUM_WIDE_SHARE);
   // THE PAGES THE BOOK OWES, counted once here so no caller re-derives it.
   // Every floor costs a page, plus any position pages the tier's TOTAL asks for
-  // beyond the per-shot position floors. The mandatory people-free page costs
-  // NOTHING: it rides the ultra-wide page (PEOPLELESS_SHARED_SHOT), which is
-  // already in `floors` wherever it is floored at all.
+  // beyond the per-shot position floors.
   const mandatedPages = Object.values(floors).reduce((n, v) => n + Number(v), 0)
     + Math.max(0, positionsTotal - positionFloorSum);
   return {
@@ -398,30 +347,6 @@ function shotFloors(pageCount) {
     mandatedPages,
     slack: pages - mandatedPages - maxMediumWide,
   };
-}
-
-/**
- * The same table as one sentence for the planner. Built from shotFloors, so the
- * words the planner reads and the numbers the counters enforce cannot drift.
- */
-function shotDistributionPhrase(pageCount) {
-  const { floors, requiredPositions, maxMediumWide } = shotFloors(pageCount);
-  const list = SHOT_TYPES
-    .filter(id => floors[id])
-    .map(id => `${floors[id]} ${id} page${floors[id] === 1 ? '' : 's'}`)
-    .join(', ');
-  // A short book is asked for no angle, but it is still SHOWN the words — the
-  // page that earns one may take it at any length.
-  const positions = requiredPositions
-    ? ` ${requiredPositions} page${requiredPositions === 1 ? '' : 's'} in total leave eye level for a camera position (${SHOT_POSITIONS}).`
-    : ` A page may leave eye level for a camera position (${SHOT_POSITIONS}) where it earns one.`;
-  // The permission is stated only where the shot it rides is actually floored;
-  // a short book that owes no ultra-wide is not told to put its people-free
-  // page on one.
-  const shared = floors[PEOPLELESS_SHARED_SHOT]
-    ? ` The page with no people in frame may BE the ${PEOPLELESS_SHARED_SHOT} page — a landscape with nobody in it answers both at once, and that is one page spoken for, not two. No two shot words ever share a page.`
-    : '';
-  return `Across the ${pageCount} pages: at most ${maxMediumWide} of them medium or wide — half the book at most, and never only two camera distances across the book. At least ${list}.${positions} These are floors, not targets: spend the remaining pages on whichever of the eight words each page earns, and keep the angled pages few enough that an angle still reads as one.${shared}`;
 }
 
 /**
@@ -814,14 +739,11 @@ module.exports = {
   buildShotDefinitions,
   resolveShotId,
   MAX_MEDIUM_WIDE_SHARE,
-  MID_DISTANCE_SHOTS,
-  PEOPLELESS_SHARED_SHOT,
-  SHOT_FLOOR_CODE,
+  PLAN_SHOT_PLACEHOLDER,
   SHOT_FLOOR_TIERS,
   CLOSEUP_BELOW_WAIST_VERBS,
   CLOSEUP_KEPT_RULE,
   CLOSEUP_BELOW_WAIST_PHRASE,
   closeUpBelowWaistVerbs,
   shotFloors,
-  shotDistributionPhrase,
 };

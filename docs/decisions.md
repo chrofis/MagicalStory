@@ -64274,3 +64274,64 @@ itself (Opus) writes the action list. Re-run `scripts/analysis/eval-jev-arc-dire
 **Touched:** scripts/analysis/eval-jev-arc-direct.js (new),
 evals/datasets/jev-arc-direct-v1/reading_labels.json, evals/runs/2026-09-27_jev-arc-direct/metrics.json.
 No production code.
+## 2026-09-27 — Jev decision layer wired, Part 1: code writes every page's shot (Jev picks, code holds the budget); the planner writes the placeholder `SHOT`
+
+**Context:** owner approval 2026-09-27 (AskUserQuestion, framed as reversals) to wire the decision
+layer measured in "Jev as the plan's DECISION layer" and "Jev picks the shot, code holds the budget"
+(both above). Plan: tasks/jev-decision-layer-2026-09-27.md. This entry is Part 1 (shots); the cast
+cuts, VB citations, light/place and gaze follow as their own entries. Module:
+`server/lib/jevDecisions.js` — one call helper (`jevAudit.callJev`), a bounded pool (8 in flight),
+cost booked to the job's usage sink (`openRouterUsage` + `direct_cost`, labels `jev_decisions_*`),
+latency per call, every decision returned for `stories.data.jevDecisions`.
+
+**Decision:**
+1. The planner no longer authors a shot. Field 0 of every plan line is `{PLAN_SHOT_PLACEHOLDER}`
+   (`shotVocabulary.PLAN_SHOT_PLACEHOLDER` = `SHOT`); story-beats.txt lost question 5 (where
+   close-ups / ultra-wides / angles land), `{SHOT_DISTRIBUTION}`, the camera-position and
+   low-angle sentences, `{OTS_NO_CONTACT}`, the "looks INTO it" rule, the close-up waist sentence
+   and `{GROUP_STAGING}`. No second author (NO FALLBACKS).
+2. After the re-plan (`runReplanRounds` now returns the check of the division that ships),
+   `beatsPipeline.finalizePlanShots` asks Jev A1 per page — 8 nouls, "The picture of the page to
+   judge is best told as a <shot> shot, better than by any other camera shot. <SHOTS definition>"
+   (+ `OTS_NO_CONTACT_RULE` on over-the-shoulder), ONE call per page (owner) — over the arc and the
+   whole plan with field 0 stripped, the page marked. `jevDecisions.assign` (the eval's Hungarian
+   assignment + consecutive repair, MOVED from scripts/analysis/eval-jev-shot-budget.js, which now
+   imports it) holds `shotFloors`, the medium/wide cap, the group rule (head count = the shipped
+   check's planCounters `present`) and the consecutive rule by construction; code writes the shot
+   into field 0. No roster → `JevDecisionError`, the story fails.
+3. Deleted, since they can no longer fire: planCounters SHOT_VARIETY, SHOT_MEDIUM_WIDE_EXCESS,
+   SHOT_CLOSEUP_COUNT / ULTRAWIDE_COUNT / OTS_COUNT, SHOT_NO_CAMERA_POSITION,
+   SHOT_CLOSEUP_BELOW_WAIST, CONSECUTIVE_SAME_SHOT_CAST; their REPLAN_CONVERGENCE_EXEMPT /
+   MUST_FIX entries; plan-check Q14 (numbering keeps its gap so stored CHECK[n] stay comparable;
+   "seventeen" questions); `shotDistributionPhrase`, `SHOT_FLOOR_CODE`, `PEOPLELESS_SHARED_SHOT`,
+   `MID_DISTANCE_SHOTS`; the NO_PEOPLELESS "may be the ultra-wide page" sentence and plan-check
+   Q6's twin; the focal-page "or named first in a close-up" clause (no shot exists at check time).
+4. Kept where code cannot check: over-the-shoulder on contact, close-up below the waist, low angle
+   over a child — in the SHOTS definitions the A1 questions carry and in the Art Director / iterate
+   templates (unchanged). `refreshPlanShot` still moves the plan's shot to the brief's after the AD.
+5. Lab: `beats_replan` runs `finalizePlanShots` after its re-plan rounds (parity test pins the same
+   Jev calls and the same written lines); `beats_scenes` refuses a FRESH plan with scene expansion
+   (a placeholder plan never reaches the AD in production) — use stored beats.
+
+**Failure policy (NO FALLBACKS):** a transient Jev error (HTTP 429 / 5xx / network — the evals'
+own retry) is retried up to 3 times; anything else, or a spent retry budget, throws
+`JevDecisionError`; `runReplanRounds`' "first division ships" catch rethrows it. The story fails
+with that message.
+
+**Evidence (rung 1, $0.035, no paid model call):** `scripts/analysis/replay-jev-decision-layer.js
+shots` — the production `decideShots` on the 17 stored books of the shot eval, head count from the
+reading's group flag: acceptable **0.935** (eval 0.938 with a correct head count), best 0.615,
+**0 rule violations, 17/17 books clean, 0/53 group pages not wider**; 291 calls, 0 errors,
+0 retries, 13 s for 17 books.
+
+**Reverses:** the planner authoring shot words (story-beats.txt item 5 + SHOT_DISTRIBUTION since
+2026-09-20; decisions.md 2026-09-20 shot table; plan-check Q14 2026-09-24).
+
+**Touched:** server/lib/jevDecisions.js (new), server/lib/beatsPipeline.js, server/lib/planCounters.js,
+server/lib/shotVocabulary.js, server/lib/promptBuilders.js, server/lib/sceneBriefCheck.js (comment),
+server/lib/testlab.js, storyJobPipeline.js, prompts/story-beats.txt, prompts/plan-check.txt,
+scripts/analysis/eval-jev-shot-budget.js, scripts/analysis/replay-jev-decision-layer.js (new),
+tests (jev-decision-layer.test.ts new; plan-counters, shot-*, camera-position-guards,
+closeup-below-waist, plan-replan-ranking, stage2-cast-coverage, plan-check-question-count,
+plan-shared-definitions, planner-group-pages, ots-near-figure-crop, lab-prod-call-parity),
+docs/prompt-inventory.md.

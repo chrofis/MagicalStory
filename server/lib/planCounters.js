@@ -31,10 +31,7 @@ const SEGMENT_SPLIT = /\s+[—–]\s+|\s+--\s+/;
  * stages can define. Anything unrecognised counts as 'other' and is reported
  * rather than silently folded into medium.
  */
-const {
-  SHOT_PATTERNS, SHOT_AXIS, POSITION_SHOTS, MID_DISTANCE_SHOTS, SHOT_FLOOR_CODE,
-  shotFloors, MAX_MEDIUM_WIDE_SHARE, closeUpBelowWaistVerbs, PEOPLELESS_SHARED_SHOT,
-} = require('./shotVocabulary');
+const { SHOT_PATTERNS } = require('./shotVocabulary');
 const { castCoverage, groupPageBudget, underCoveredFix, noFocalFix } = require('./castCoverage');
 
 /** Words that look like names but never are, in the who-column's grammar. */
@@ -660,13 +657,6 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
       planLine: String(p.planLine || ''),
       complete,
       segments: segs.length,
-      shot: segs.length >= 1 ? classifyShot(segs[0]) : 'other',
-      // Every segment EXCEPT the shot column — what the page stages, wherever
-      // the planner put it. The below-waist verb is not reliably in the instant:
-      // over the stored corpus the planner writes three-segment lines that carry
-      // the pose in the who column ("close-up — <name> sitting on the ground —
-      // …"), and probing the instant alone missed one of the two worst cases.
-      staging: segs.slice(1).join(' — '),
       who,
       present,
       covered,
@@ -683,99 +673,14 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
       'the plan line does not carry all four of shot, who, the instant, and what is true after');
   }
 
-  // 2. Shot distribution, against the tiered table in shotVocabulary: a cap on
-  //    the medium/wide share, a floor per shot, a floor on camera positions
-  //    together, and never only two camera DISTANCES across the book.
-  //
-  //    The `shot` field carries two axes since 1b53f4d0f (2026-09-19) — four
-  //    words for how close the camera is, four for where it stands — and it is
-  //    one-of, so a page declaring `high-angle` has spent its word and states
-  //    no distance. Counting all eight together, as this block did when every
-  //    value was a distance, mis-reads the new ones in BOTH directions:
-  //    medium/wide/aerial would have passed SHOT_VARIETY on two distances, and
-  //    an angled page reads as "not a close-up" against the close-up floor although
-  //    it never had the chance to be one. Each counter is scoped to the axis it
-  //    is actually about, off the vocabulary's own `axis` — never a second list
-  //    of which words are angles.
-  const shotCounts = rows.reduce((acc, r) => { acc[r.shot] = (acc[r.shot] || 0) + 1; return acc; }, {});
-  const usedShots = Object.keys(shotCounts).filter(k => k !== 'other');
-  const onAxis = (axis) => rows.filter(r => SHOT_AXIS[r.shot] === axis);
-  const distancesUsed = usedShots.filter(k => SHOT_AXIS[k] === 'distance');
-  const angledPages = onAxis('position');
-  if (distancesUsed.length <= 2) {
-    add('SHOT_VARIETY', [], `the book uses only ${distancesUsed.length} camera distance(s) (${distancesUsed.join(', ') || 'none recognised'}) across ${pageCount} pages`);
-  }
-
-  // THE FLOORS AND THE CAP COME FROM THE TABLE THE PLANNER WAS GIVEN.
-  // shotVocabulary.SHOT_FLOOR_TIERS is one declaration: shotDistributionPhrase
-  // states it in prompts/story-beats.txt, shotFloors measures it here. Nothing
-  // below re-lists which words are angles or how many of each a book owes.
-  const policy = shotFloors(pageCount);
-
-  // The ratio, not a count — it scales to any book length with no threshold to
-  // maintain. Measured over 11 staging books / 180 pages to 2026-09-20, medium
-  // plus wide was 72% of every page shipped, because the prompt asked for it.
-  // The pages list is empty: any page could be the one that changes, exactly as
-  // SHOT_VARIETY reports.
-  const mediumWide = MID_DISTANCE_SHOTS.reduce((n, id) => n + (shotCounts[id] || 0), 0);
-  if (pageCount > 0 && mediumWide / pageCount > MAX_MEDIUM_WIDE_SHARE) {
-    add('SHOT_MEDIUM_WIDE_EXCESS', [],
-      `${mediumWide}/${pageCount} pages are medium or wide; at most ${policy.maxMediumWide} may be`);
-  }
-
-  // Per-shot floors. `ultra-wide` is a DISTANCE and `aerial` a POSITION — two
-  // different shots on two different axes, each with its own floor and its own
-  // code, so a re-plan is told WHICH shot the book is short of rather than that
-  // it is short of something.
-  for (const [shot, floor] of Object.entries(policy.floors)) {
-    const code = SHOT_FLOOR_CODE[shot];
-    const have = shotCounts[shot] || 0;
-    if (have < floor) {
-      add(code, rows.filter(r => r.shot === shot).map(r => r.pageNumber),
-        `${have} ${shot} page(s); the plan asks for at least ${floor} across ${pageCount} pages`);
-    }
-  }
-
-  // The position axis TAKEN TOGETHER. The per-shot floors above say which
-  // angles; this says how many pages leave eye level at all, which is the
-  // number a long book can satisfy in more than one way. The tier decides:
-  // a short book is asked for none, so a six-page trial never raises this.
-  if (policy.requiredPositions > 0 && angledPages.length < policy.requiredPositions) {
-    add('SHOT_NO_CAMERA_POSITION', angledPages.map(r => r.pageNumber),
-      angledPages.length === 0
-        ? `every page of the book is shot from eye level; ${policy.requiredPositions} page(s) should declare a camera position (${POSITION_SHOTS.join(', ')})`
-        : `${angledPages.length}/${pageCount} pages declare a camera position (${POSITION_SHOTS.join(', ')}); the plan asks for at least ${policy.requiredPositions}`);
-  }
-
-  // 2b. A close-up page whose SUBJECT is below the frame line. The planner is
-  //     told (prompts/story-beats.txt) that a close-up page is a waist-up
-  //     moment and nothing checked, so the Art Director silently answered the
-  //     contradiction by widening the page to `medium` — the plan asked for the
-  //     close-up, the book shipped without it.
-  //
-  //     NARROWED 2026-09-20 with the rule it enforces (owner: "a child can sit
-  //     in a close up that is fine"). It no longer counts a POSE the frame
-  //     crops away — sitting, kneeling, crouching, stepping — only an action
-  //     whose visible subject lies below the frame line and so cannot be in
-  //     shot at all. Re-measured over the same 24 staging books / 73 planned
-  //     close-ups: 13 plan lines flagged before, 8 after, and the five dropped
-  //     are cropped poses on a read of all 13.
-  //
-  //     The patterns come from shotVocabulary.CLOSEUP_BELOW_WAIST_VERBS, the
-  //     same constant the six brief/planner sites and scene-review check 7b
-  //     state as the rule — never a second list here, and never a reading of
-  //     what the prose means. Advisory ("also noted"): the planner can answer
-  //     it two legitimate ways, by restaging the beat waist-up OR by making the
-  //     page a `medium`, and which one is right is the planner's call.
-  const belowWaist = rows
-    .map(r => ({ page: r.pageNumber, verbs: r.shot === 'close-up' ? closeUpBelowWaistVerbs(r.staging) : [] }))
-    .filter(r => r.verbs.length);
-  if (belowWaist.length) {
-    add('SHOT_CLOSEUP_BELOW_WAIST', belowWaist.map(r => r.page),
-      `${belowWaist.map(r => `page ${r.page} (${[...new Set(r.verbs)].join(', ')})`).join('; ')}: a close-up frame ends at the waist, so a page whose SUBJECT is below that line cannot be drawn as one. `
-      + `A sitting or kneeling pose is fine in a close-up — the legs are simply cropped — so the fix is usually to drop the below-frame detail, not the pose. `
-      + `Either restage the moment waist-up — holding, reaching, reacting — or give the page a wider shot; leaving both as they are means the page is drawn wider and the close-up is lost.`);
-  }
+  // 2. NO SHOT COUNTER (2026-09-27). The planner writes the placeholder
+  //    shotVocabulary.PLAN_SHOT_PLACEHOLDER; code assigns every page's shot
+  //    after the re-plan (jevDecisions.decideShots), holding the floors, the
+  //    medium/wide cap, the group rule and the consecutive rule by
+  //    construction. SHOT_VARIETY, SHOT_MEDIUM_WIDE_EXCESS, the SHOT_*_COUNT
+  //    floors, SHOT_NO_CAMERA_POSITION, SHOT_CLOSEUP_BELOW_WAIST and
+  //    CONSECUTIVE_SAME_SHOT_CAST could no longer fire here and are deleted.
+  //    see docs/decisions.md 2026-09-27 "Jev decision layer wired".
 
   // 3. Cast per page, against the CONFIGURED ceiling — never a literal.
   //    There were two counters here: CAST_OVER_3 (hardcoded 3, "needs a
@@ -832,8 +737,7 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
     const pick = peoplelessPick && Number.isFinite(Number(peoplelessPick.page))
       ? Number(peoplelessPick.page) : null;
     add('NO_PEOPLELESS_PAGE', pick ? [pick] : [],
-      `no page shows only a thing or a place, with no people in frame — ${pick ? `page ${pick}` : 'one page'} gives up its cast (${PEOPLELESS_ANSWER_VERB}), and it is a page whose subject is already a thing or a place seen alone, never a moment between people. `
-      + `That page may be the \`${PEOPLELESS_SHARED_SHOT}\` page the shot floors already ask for: a landscape with nobody in it answers both, and a short book has no page to spare for two`);
+      `no page shows only a thing or a place, with no people in frame — ${pick ? `page ${pick}` : 'one page'} gives up its cast (${PEOPLELESS_ANSWER_VERB}), and it is a page whose subject is already a thing or a place seen alone, never a moment between people.`);
   }
   // 4b. …but the book may not spend that page on its interpersonal drama.
   //     Measured on job_1789420511893_zly5rcdej: the planner put the mandatory
@@ -990,12 +894,13 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
   }
 
   // 7. Every commissioned character earns at least one focal page: in frame
-  //    with at most one companion, or named first in a close-up. Solo is not
-  //    required (owner, 2026-09-04) — two people sharing one action carry a
-  //    focal page; the visible-action requirement lives in the prompt.
+  //    with at most one companion. Solo is not required (owner, 2026-09-04) —
+  //    two people sharing one action carry a focal page; the visible-action
+  //    requirement lives in the prompt. The "or named first in a close-up"
+  //    half went with the planner's shot word (2026-09-27): no shot exists
+  //    when the plan is checked.
   const focalOf = (name) => rows
-    .filter(r => (r.present.length <= 2 && r.present.includes(name))
-      || (r.shot === 'close-up' && r.present[0] === name))
+    .filter(r => r.present.length <= 2 && r.present.includes(name))
     .map(r => r.pageNumber);
   //
   //    THE NUMBERS ARE THE PLANNER'S (owner, 2026-09-23). Whether every
@@ -1074,19 +979,6 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
       `the central figure (${gap.names.join(' / ')}) is in frame on no page of the ${gap.third} (pages ${gap.pages[0]}-${gap.pages[gap.pages.length - 1]}); stage it on one of them`);
   }
 
-  // 9. Consecutive pages differ: never the same shot AND the same number of
-  //    named characters twice in a row. Pairs whose shot did not classify, or
-  //    whose plan line is incomplete, are skipped rather than compared.
-  for (let i = 1; i < rows.length; i++) {
-    const prev = rows[i - 1];
-    const cur = rows[i];
-    if (!prev.complete || !cur.complete) continue;
-    if (prev.shot === 'other' || cur.shot === 'other') continue;
-    if (prev.shot !== cur.shot || prev.present.length !== cur.present.length) continue;
-    add('CONSECUTIVE_SAME_SHOT_CAST', [prev.pageNumber, cur.pageNumber],
-      `both pages are a ${prev.shot} shot with ${prev.present.length} named character(s) in frame`);
-  }
-
   const lines = findings.map(f =>
     `PLAN[${f.code}]${f.pages && f.pages.length ? ` page ${f.pages.join(', ')}` : ''}: ${f.detail}`);
 
@@ -1096,10 +988,6 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
     cast,
     stats: {
       pageCount,
-      shotCounts,
-      shotTypesUsed: usedShots,
-      distancesUsed,
-      angledPages: angledPages.map(r => r.pageNumber),
       soloPages,
       peoplelessPages: emptyPages,
       // `covered` rides along only when the roster declared one, so a stored
@@ -1326,9 +1214,8 @@ function castLostByReplan(standing, returned, castNames = [], aliases = {}, decl
  * plan-check Q3 — the two findings a removal is the natural answer to — with no
  * answer available at all, and an over-crowded page could only get more crowded.
  *
- * Deliberately absent: `NO_FOCAL_PAGE` (a focal page is at most two in frame OR
- * a close-up, so either direction can answer it), `CONSECUTIVE_SAME_SHOT_CAST`
- * (satisfied by changing the shot, adding or removing), `ARC_INVENTED_OVER_ALLOWANCE`
+ * Deliberately absent: `NO_FOCAL_PAGE` (a page can become focal by losing a
+ * companion or by the character joining a small page), `ARC_INVENTED_OVER_ALLOWANCE`
  * (a finding against the ARC, which names no page and no division edit repairs)
  * and plan-check Q2 (an entrance is a staging question, not a headcount). An
  * unlisted finding leaves the change unreviewed by direction — the span,
@@ -1471,12 +1358,10 @@ function reviewPlanChanges({ changes = [], standing = [], returned = [], castNam
   const beforeSpan = spanIn(beforeWho);
   const afterSpan = spanIn(afterWho);
   // A focal page, read the way the NO_FOCAL_PAGE counter reads it: at most two
-  // in frame, or first named in a close-up.
+  // in frame (no shot exists while the plan is re-divided, 2026-09-27).
   const focalPagesIn = (pages, who, name) => (pages || []).filter((p) => {
     const w = who.get(Number(p.pageNumber)) || [];
-    if (!w.includes(name)) return false;
-    const shot = classifyShot(planSegments(p.planLine)[0] || '');
-    return w.length <= 2 || (shot === 'close-up' && w[0] === name);
+    return w.includes(name) && w.length <= 2;
   }).map(p => Number(p.pageNumber));
   const focalSet = new Set((Array.isArray(focalNames) ? focalNames : []).flatMap(n => namesIn(String(n || ''), names, aliases)));
   const actionPageOf = new Map();

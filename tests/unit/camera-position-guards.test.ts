@@ -30,33 +30,12 @@ describe('a low angle never looks up at someone standing over a child', () => {
     expect(SHOT_DEFINITIONS).toContain('Look up at a thing, a height, a tree or a sky');
   });
 
-  it('the planner carries it too — it is the stage that picks the angle', () => {
-    const p = pb.buildBeatsPrompt(input(), 18, { finalArc: '1. A story.', arcHints: '' });
-    expect(p).toContain('A page looking UP at a grown-up or a creature standing over a child is not one of them');
-  });
 });
 
 /**
  * A floor with no ceiling is how a correction overshoots: the measured baseline
  * is every page eye level, and the answer to that is not every page angled.
  */
-describe('angles are the exception the book earns, not the default', () => {
-  beforeAll(async () => { await loadPromptTemplates(); });
-
-  it('the planner is given both a floor and a ceiling', () => {
-    const p = pb.buildBeatsPrompt(input(), 18, { finalArc: '1. A story.', arcHints: '' });
-    // The floor is a COUNT since 2026-09-20 and scales with the book (an
-    // 18-page book owes three), and the ceiling is what keeps an angle rare.
-    expect(p).toContain('3 pages in total leave eye level');
-    expect(p).toContain('keep the angled pages few enough that an angle still reads as one');
-  });
-
-  it('it is offered the positions by name, injected not hand-typed', () => {
-    const p = pb.buildBeatsPrompt(input(), 18, { finalArc: '1. A story.', arcHints: '' });
-    for (const id of POSITION_SHOTS) expect(p).toContain(`\`${id}\``);
-    expect(p).not.toContain('{SHOT_POSITIONS}');
-  });
-});
 
 /**
  * C4 is the anti-repetition rule. It named all eight words "camera distance" and
@@ -92,16 +71,3 @@ describe('C4 names the two axes for what they are', () => {
  * table the counters measure, so the round a must-fix spends is spent on a
  * spread the planner was actually asked for.
  */
-describe('the camera-position counter is must-fix since the prompt asks for the spread', () => {
-  it('SHOT_NO_CAMERA_POSITION is must-fix', () => {
-    expect(pb.replanRank({ kind: 'counter', code: 'SHOT_NO_CAMERA_POSITION' })).toBe('must');
-  });
-
-  it('and the reason is written where someone would go to change it', () => {
-    const lf = (x: string) => x.split(String.fromCharCode(13) + String.fromCharCode(10)).join(String.fromCharCode(10));
-    const src = lf(require('fs').readFileSync(require('path').join(__dirname, '../..', 'server', 'lib', 'promptBuilders.js'), 'utf-8'));
-    const block = src.slice(src.indexOf('const REPLAN_MUST_FIX_CODES'), src.indexOf('function replanRank'));
-    expect(block).toContain('NOT HERE, DELIBERATELY: SHOT_NO_CAMERA_POSITION');
-    expect(block).toContain('6 of 1,504');
-  });
-});

@@ -73,7 +73,9 @@ describe('the planner is told the budget and the group rule, first division and 
     });
     for (const [site, p] of [['first', first], ['replan', replan]] as const) {
       expect(p, site).toContain(rule);
-      expect(p, site).toContain(GROUP_STAGING_RULE);
+      // The staging rule (a wider shot, one depth) left the planner 2026-09-27:
+      // code picks the shot and holds the group rule (jevDecisions.assign).
+      expect(p, site).not.toContain(GROUP_STAGING_RULE);
       expect(p, site).not.toMatch(/\{GROUP_PAGE_BUDGET\}|\{GROUP_STAGING\}/);
     }
   });

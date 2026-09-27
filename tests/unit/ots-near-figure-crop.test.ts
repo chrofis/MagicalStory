@@ -132,9 +132,14 @@ describe('the over-the-shoulder near figure is drawn as a crop', () => {
 });
 
 describe('one rule reaches the planner and every brief-authoring template', () => {
-  it('story-beats carries the no-contact rule, filled', () => {
+  // The planner no longer picks a shot (2026-09-27): the rule rides in the Jev
+  // over-the-shoulder question that chooses the shot, and leaves the planner.
+  it('the Jev shot question carries the no-contact rule; the planner no longer does', () => {
+    const qs = require('../../server/lib/jevDecisions').shotFitQuestions();
+    const ots = Object.values(qs).find((q: any) => /over-the-shoulder shot, better/.test(q.instructions)) as any;
+    expect(ots.instructions).toContain(OTS_NO_CONTACT_RULE);
     const beats = String(PB.buildBeatsPrompt(inputData, 12, { finalArc: 'An arc.' }));
-    expect(beats).toContain(OTS_NO_CONTACT_RULE);
+    expect(beats).not.toContain(OTS_NO_CONTACT_RULE);
     expect(beats).not.toContain('{OTS_NO_CONTACT}');
   });
 

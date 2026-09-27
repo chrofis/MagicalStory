@@ -4128,6 +4128,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // captured inside generateStoryViaBeats at each rewrite; null on the
     // unified path, which has no beats or scene review.
     const beatsReviewReport = beatsResult?.beatsReviewReport || null;
+    // The Jev decision layer's report (2026-09-27): cast cuts, shots, light,
+    // VB citations, aboard, population, gaze — every decision per page, so a
+    // run can be replayed. docs/decisions.md "Jev decision layer wired".
+    const jevDecisions = beatsResult?.jevDecisions || null;
     // Drafted arc + the arc reviewer's analysis, so a shipped story can be read
     // back against the arc it promised.
     const arcReviewReport = beatsResult?.arcReviewReport || null;
@@ -6848,6 +6852,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         modelOverrides: modelOverrides || null,
       },
       beatsReviewReport, // per-page before/after from the beats review (beats mode)
+      jevDecisions, // the Jev decision layer's per-page decisions (beats mode)
       storyBibleReport, // wardrobe contract call: prompt + raw reply (beats mode)
       clothingReviewReport, // per-outfit before/after from the wardrobe review (beats mode)
       wardrobeBibleReport, // wardrobe contract vs Visual Bible: adopt / conflict findings (beats mode)

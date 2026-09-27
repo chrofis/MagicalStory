@@ -142,7 +142,7 @@ describe('plan-check Q6 nominates the peopleless page, and the planner is told',
     expect(g).toContain('At least one page in the book earns this');
     expect(g).toContain('never a page whose drama is between people');
     // The clause the checker grades and the planner previously lacked.
-    expect(g).toContain('so does every picture question 6 names as most wanted');
+    expect(g).toContain('so does every picture question 5 names as most wanted');
   });
 
   it('the re-plan tells the planner a named page is a candidate it may refuse', () => {
@@ -208,20 +208,21 @@ describe('the re-plan block carries the whole-cast definition the check grades b
  * checker's question 14. Before 2026-09-24 only the planner had it, and an OTS
  * page on a contact beat passed the check (job_1790277448294_5herh01j7 p12).
  */
-describe('the over-the-shoulder contact rule reaches planner and checker from one constant', () => {
+// RETIRED from planner and checker 2026-09-27: no plan line carries a shot while
+// the plan is written and checked; the rule rides in the Jev over-the-shoulder
+// question (jevDecisions.shotFitQuestions) and the Art Director templates.
+describe('the over-the-shoulder contact rule left the planner and the checker with the shot word', () => {
   beforeAll(async () => { await loadPromptTemplates(); });
   const { OTS_NO_CONTACT_RULE } = require('../../server/lib/shotVocabulary');
-  const count = (hay: string, needle: string) => hay.split(needle).length - 1;
 
-  it('the built plan check carries it exactly once, with no unfilled placeholder', () => {
+  it('the built plan check carries it nowhere, with no unfilled placeholder', () => {
     const p = String(checker());
-    expect(count(p, OTS_NO_CONTACT_RULE)).toBe(1);
-    expect(p).not.toContain('{OTS_NO_CONTACT}');
+    expect(p).not.toContain(OTS_NO_CONTACT_RULE);
     expect(p).not.toMatch(/\{[A-Z_]{3,}\}/);
   });
 
-  it('the built planner carries the same constant', () => {
-    expect(String(planner())).toContain(OTS_NO_CONTACT_RULE);
+  it('the built planner carries it nowhere', () => {
+    expect(String(planner())).not.toContain(OTS_NO_CONTACT_RULE);
   });
 });
 

@@ -89,51 +89,6 @@ describe('closeUpBelowWaistVerbs', () => {
   });
 });
 
-describe('SHOT_CLOSEUP_BELOW_WAIST', () => {
-  const page = (n: number, planLine: string) => ({ pageNumber: n, planLine, beat: '' });
-
-  it('flags a close-up page whose plan line puts the ground in frame', () => {
-    const p = [page(13, 'close-up — Levin — Levin sits down alone in the dark leaves, head bowed, the silent egg resting on the ground before him — the low point')];
-    expect(codes(p)).toContain('SHOT_CLOSEUP_BELOW_WAIST');
-    expect(finding(p, 'SHOT_CLOSEUP_BELOW_WAIST').pages).toEqual([13]);
-    // The egg on the ground is the fault, never the sitting.
-    expect(finding(p, 'SHOT_CLOSEUP_BELOW_WAIST').detail).toContain('on the ground or floor');
-  });
-
-  it('reads the staging wherever the planner put it, not only in the instant column', () => {
-    // A three-segment line: the staging rides in the who column. Probing the
-    // instant alone missed this page on the stored corpus.
-    const p = [page(4, 'close-up — Kiaan — Kiaan holds both palms flat on the shell and speaks, the dragon-picture-book visible in his open bag at his feet — the stake is named')];
-    expect(codes(p)).toContain('SHOT_CLOSEUP_BELOW_WAIST');
-  });
-
-  it('LEAVES A SITTING OR STEPPING CLOSE-UP ALONE (reversed 2026-09-20)', () => {
-    // Both verbatim stored close-ups that the old rule flagged. The sitting one
-    // is a head-and-shoulders low point; the stepping one is a cropped movement.
-    expect(codes([page(15, 'close-up — Levin — Levin sitting on the cold summit rock, head dropped, hands on his knees — the promise looks broken')]))
-      .not.toContain('SHOT_CLOSEUP_BELOW_WAIST');
-    expect(codes([page(2, 'close-up — Levin, Julian — Levin lifts the egg while Julian steps back, hands behind him — the egg exists')]))
-      .not.toContain('SHOT_CLOSEUP_BELOW_WAIST');
-  });
-
-  it('leaves a waist-up close-up and a below-waist WIDE page alone', () => {
-    expect(codes([page(17, 'close-up — Julian — the cracked shell in Julian’s arms, the small dragon pressing into his jacket — it has hatched')]))
-      .not.toContain('SHOT_CLOSEUP_BELOW_WAIST');
-    expect(codes([page(6, 'wide — Levin, Julian — Levin kneels, one hand pressed flat on the cold ground — the egg is safe')]))
-      .not.toContain('SHOT_CLOSEUP_BELOW_WAIST');
-  });
-
-  it('is advisory, and says the pose is not what has to change', () => {
-    const detail = finding(
-      [page(6, 'close-up — Fiona — Fiona holds a tin cup, the dark bilge visible below the grating at her feet — half rations')],
-      'SHOT_CLOSEUP_BELOW_WAIST',
-    ).detail;
-    expect(detail).toMatch(/restage/i);
-    expect(detail).toMatch(/wider shot/i);
-    expect(detail).toMatch(/sitting or kneeling pose is fine/i);
-  });
-});
-
 describe('shot_widened', () => {
   const brief = (shot: string | null, prose = 'Julian sits facing the camera, his arms wrapped around the shell.') =>
     `${prose}\n---METADATA---\n{"characters":[{"name":"Julian"}]${shot ? `,"shot":"${shot}"` : ''}}`;
@@ -184,11 +139,10 @@ describe('shot_widened', () => {
 
 describe('the waist-up rule is one constant, not five sentences', () => {
   const root = path.join(__dirname, '..', '..');
-  // Every template that AUTHORS or REWRITES a page brief, plus the planner that
-  // writes the shot word. They each used to spell the verb list out by hand and
-  // the two pairs had already drifted apart.
+  // Every template that AUTHORS or REWRITES a page brief. They each used to
+  // spell the verb list out by hand and the two pairs had already drifted
+  // apart. The planner left this list 2026-09-27: it no longer writes a shot.
   const templates = [
-    'prompts/story-beats.txt',
     'prompts/scene-expansion.txt',
     'prompts/scene-expansion-all.txt',
     'prompts/scene-iteration.txt',
