@@ -21,6 +21,46 @@ superseded and link forward.
 
 ---
 
+## 2026-09-27 — A figure shown in part is in the picture; a story page cites the bible figures its who column names (and the plan-line name match stays deleted)
+
+**Context.** Staging `job_1790508305061_dka3jpog9` p11: the instant stood the children "before
+<the creature>'s great wing stretched across the path", the who column listed only the children,
+and `PLAN_LINE_CAST_RULE` told the Art Director to stage what such a clause shows "without the
+person". It did exactly that: the wing in the prose, ANI001 nowhere in the brief, so the page
+prompt had no reference image and no size line, and the render had no creature. p15 the same
+(the gap in its chest) until the scene review cited ANI001.2. The owner's report also named p13
+and p16 — the stored briefs cite ANI001.1 / ANI001.3 there and both page prompts carry the size
+line (`several adults high, the size of a house`) and the reference: p13's child-sized creature is
+the model ignoring a size line it was given, not a missing citation.
+
+**Measured.** Over 59 stored staging stories (887 story pages, Art Director briefs): a Visual
+Bible figure named ANYWHERE in the plan line and uncited — the check the owner asked for — fires on
+67 pages: 5 real (both dka3jpog9 pages among them), 5 unclear, 57 false; 32 of the false are an
+egg the story calls by the creature's name, most of the rest a possessive of a figure off the page
+("the scale belongs to <name>", "<name>'s bench"). That is the `element_uncited` shape deleted on
+2026-09-18 at 75% false, and it is not rebuilt. The same figure named in the WHO COLUMN (field 2,
+matched whole against the authored `name`/`label`) and uncited: 0 of the Art Director's briefs, 1
+final brief (`z3fw660ie` p12, a later rewrite dropping the dog).
+
+**Decision.** (1) One sentence, `FIGURE_PART_IN_FRAME_RULE` — a figure the picture shows only in
+part is in that picture exactly as if shown whole; only a name without a body is context — inside
+both existing shared constants: the planner's `PLAN_LINE_FIELD_CONTRACT` (who column) and the
+readers' `PLAN_LINE_CAST_RULE` (both Art Director templates, both iterate templates, scene-review
+5a). The plan check's UNLISTED definition names parts beyond hand/face ("a wing, a tail").
+(2) `sceneBriefCheck.checkPlanCastCited` → `plan_cast_uncited`, the story-page half of
+`checkCoverCast`'s figure rule: structured only (comma list vs authored name/label, never the
+instant), sent to the scene review, and an iterate rewrite that introduces it is caught
+(`INTRODUCED_TYPES`). It cannot see p11 by construction; the prompt rule is what puts the figure in
+the who column, and this check then holds the brief to it.
+
+**Rationale.** Classification belongs to the prompt; code compares authored structured strings.
+The one shape that caught p11 in code is the one the owner already measured and deleted.
+
+**Touched.** `server/lib/promptBuilders.js`, `server/lib/sceneBriefCheck.js`,
+`server/lib/iterateBeat.js`, `prompts/plan-check.txt`, `tests/unit/figure-part-in-frame.test.ts`.
+
+**Status.** ✅ active (staging).
+
 ## 2026-09-27 — HUMAN verify checks are reviewed on one generated local HTML page per run; its verdicts are applied with --apply
 
 **Context:** Owner, 2026-09-27: for a given story, one page listing every pending HUMAN registry entry the

@@ -2,6 +2,18 @@
   "_readme": "CLEAR-BUG REGISTRY. A bug the owner reported, or one confirmed from stored evidence, goes here the moment it is confirmed - and the pre-push gate (scripts/admin/check-open-bugs.js) BLOCKS every push while any entry is open. That is the point: a reported bug is fixed immediately, not backlogged. Only CLEAR bugs belong here (reproduced, or owner-reported with evidence); design questions and improvements go to the task list instead. Close an entry by setting status to 'fixed' with the commit hash IN THE SAME COMMIT as the fix. Emergency escape: PUSH_WITH_OPEN_BUGS=1 git push (documented, visible, deliberate).",
   "bugs": [
     {
+      "id": "creature-staged-in-part-uncited",
+      "title": "A Visual Bible creature staged only in part (a wing across the path) was written into the brief without its id: no reference image, no size line, no creature drawn",
+      "reportedAt": "2026-09-27",
+      "source": "Owner-approved fix task 2026-09-27. Staging job_1790508305061_dka3jpog9 (48c00fdff) p11: plan line 'wide — Levin, Julian, Max, Kiaan — the four stand at the summit before Sura's great wing stretched across the path like a wall …'; the AD brief's prose describes 'a great grey scaled wing … like a solid wall', objects[] = [LOC004.3, ART001]; the page prompt has no REQUIRED OBJECTS line for Sura and no Sura reference; v0 has no dragon. p15 the same at the Art Director (the review then cited ANI001.2). p13 and p16, also in the report, DO cite ANI001.1/.3 and carry the size line and the reference in their page prompts — not this bug.",
+      "rootCause": "server/lib/promptBuilders.js PLAN_LINE_CAST_RULE told every reader of the plan line that a figure named outside the who column is context, and to 'stage what such a clause makes visible … without the person' — the Art Director drew the wing and left the creature uncited, exactly as instructed. The planner's PLAN_LINE_FIELD_CONTRACT covered only a 'person' the instant stages, so it never put the creature into the who column. The existing code checks could not see it: vb_page_uncited reads the bible's page table (ANI001 did not claim p11 or p15), and plan-check's UNLISTED counted names 'on their hand, face or clothing' only.",
+      "impact": "The page renders the creature from nothing (p11 v0: no dragon; the iterate v1 drew one and scored 31). Scope: over 59 stored staging stories a bible figure named in the plan line outside the who column and uncited is 67 pages, of which 5 are this shape (dka3jpog9 p11/p15, kc2joi4ax p18, i9ah2221i p7/p15) — the rest are names without a body.",
+      "status": "fixed",
+      "fixedAt": "2026-09-27",
+      "fixedIn": "see the next entry-update commit",
+      "fix": "FIGURE_PART_IN_FRAME_RULE ('a figure the picture shows only in part … is in that picture exactly as if it were shown whole; only a name without a body is context') inside PLAN_LINE_FIELD_CONTRACT (planner) and PLAN_LINE_CAST_RULE (both AD templates, both iterate templates, scene-review 5a); plan-check UNLISTED names parts beyond hand/face. Code: sceneBriefCheck.checkPlanCastCited → plan_cast_uncited (who column comma list vs authored name/label, never the instant), sent to the scene review and caught on an iterate rewrite. The plan-line name match the task proposed is NOT built: measured 57 false of 67 (docs/decisions.md 2026-09-27). Test: tests/unit/figure-part-in-frame.test.ts."
+    },
+    {
       "id": "review-bible-correction-rejects-cover-pages",
       "title": "A scene-review Visual Bible correction whose states carry a cover page (-1/-2/-3) was rejected whole as 'pages outside the book'",
       "reportedAt": "2026-09-27",
@@ -10,7 +22,7 @@
       "impact": "The whole entry's correction was dropped: on dka3jpog9 the 'missing scale' state kept no pages at the review, so p15 (the page the gap is pointed at) had no state of its own until the later usage rebuild. In the 30 days to 2026-09-27, 2 of 57 staging stories with a scene review logged this rejection reason (dka3jpog9 confirmed a cover page; 3kxqshifx predates covers-as-pages, raw correction not stored).",
       "status": "fixed",
       "fixedAt": "2026-09-27",
-      "fixedIn": "see the next entry-update commit",
+      "fixedIn": "970742e2d",
       "fix": "A state page is valid when it is a cover page (coverBeats.isCoverPage) or 1..pageCount. Test: tests/unit/review-bible-writeback.test.ts (dka3jpog9 shape: applied, written back, re-parsed, p15 resolves to ANI001.2; 0 / pageCount+1 / -4 still rejected). Replay of the stored dka3jpog9 transcript + review-time ANI001 through applyReviewBibleCorrections + syncVisualBibleSection + re-parse: applied, 0 missing from the transcript, p14/p15/p16 -> ANI001.1/.2/.3."
     },
     {

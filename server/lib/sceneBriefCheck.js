@@ -186,6 +186,66 @@ function checkCoverCast(page, metadata, visualBible) {
 }
 
 /**
+ * A STORY PAGE CITES THE BIBLE FIGURES ITS WHO COLUMN NAMES (2026-09-27) — the
+ * story-page half of checkCoverCast's figure rule. Structured only, like it:
+ * the plan line's who column (second field, `planSegments`) split on commas,
+ * each item compared WHOLE and case-insensitively against a Visual Bible
+ * figure's authored `name` or `label` — an identity match between two authored
+ * strings, never a word looked for in prose (the removed `element_uncited`
+ * matched head nouns anywhere in the line and was 75% false). A match whose id
+ * `objects[]` does not cite is a page built without that figure's reference
+ * image and size line. A figure on `characters[]` counts as present.
+ *
+ * MEASURED over 59 stored staging stories (887 story pages): 0 of the Art
+ * Director's briefs, 1 final brief (job_1790446348343_z3fw660ie p12, a later
+ * rewrite that dropped the dog its who column names). It guards the contract;
+ * the measured miss is the next paragraph.
+ *
+ * What it does NOT see: a figure the planner left out of the who column while
+ * the instant stages it — staging job_1790508305061_dka3jpog9 p11, the
+ * creature's wing across the path. Matching the creature's name anywhere in
+ * the line would, and over 59 stored staging stories that match named 67
+ * uncited pages: 5 real, 5 unclear, 57 false — 32 of them an egg the story calls by
+ * the creature's name, most of the rest a possessive of a figure off the page. That
+ * shape is closed where classification belongs — FIGURE_PART_IN_FRAME_RULE
+ * puts a figure shown in part into the who column (planner) and into the cast
+ * (Art Director, iterate, scene review 5a) — and this check then holds the
+ * brief to it.
+ */
+function checkPlanCastCited(page, metadata, visualBible) {
+  const n = Number(page && page.pageNumber);
+  if (!Number.isFinite(n) || n <= 0) return [];
+  const castField = planSegments(String((page && page.planLine) || '').replace(/^\s*PLAN:\s*/i, ''))[1] || '';
+  const named = castField.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  if (named.length === 0) return [];
+  const vb = visualBible || {};
+  const cited = citedBaseIds(metadata);
+  // A figure on the roster is in the frame already, as in checkBiblePageTable.
+  const onCast = ((metadata && Array.isArray(metadata.characters)) ? metadata.characters : [])
+    .map(c => String(typeof c === 'string' ? c : (c && c.name) || '').trim()).filter(Boolean);
+  const missing = [];
+  for (const key of ['animals', 'secondaryCharacters']) {
+    const list = Array.isArray(vb[key]) ? vb[key] : Object.values(vb[key] || {});
+    for (const e of list) {
+      if (!e || !e.id) continue;
+      const id = String(e.id).trim().toUpperCase().split('.')[0];
+      const handles = [e.name, e.label].map(s => String(s || '').trim().toLowerCase()).filter(Boolean);
+      if (!handles.some(h => named.includes(h)) || cited.has(id)) continue;
+      if (onCast.some(name => isSameFigureName(name, e.name))) continue;
+      missing.push(`${e.name || e.label} (${id})`);
+    }
+  }
+  if (missing.length === 0) return [];
+  return [{
+    pageNumber: n,
+    type: 'plan_cast_uncited',
+    detail: `The plan line's who column names ${missing.join(' and ')}, and this page's objects[] does not cite ${missing.length > 1 ? 'them' : 'it'}. `
+      + `A Visual Bible figure in the picture is cited by its id — the id is what gives the page its reference image and its size. `
+      + `Cite ${missing.length > 1 ? 'each' : 'it'} and stage ${missing.length > 1 ? 'them' : 'it'} in the prose, even when only part of ${missing.length > 1 ? 'them is' : 'it is'} in the frame.`,
+  }];
+}
+
+/**
  * EACH COVER ITS OWN PLACE (2026-09-25; coverBeats.COVER_OWN_PLACE is the rule
  * the beat states). Structured only: the first location id each cover brief
  * cites in `objects[]`. A cover repeats a place when an EARLIER cover cites the
@@ -852,6 +912,7 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
   const metadata = (page && page.metadata) || extractSceneMetadata(brief);
   findings.push(...checkCoverBrief(page, metadata));
   findings.push(...checkCoverCast(page, metadata, visualBible));
+  findings.push(...checkPlanCastCited(page, metadata, visualBible));
 
   // A — cast the prose describes, `characters[]` omits. Possessive-aware by
   // construction: `Hans's attic` and `Daniel's phone torch` name a place and a
@@ -1317,7 +1378,7 @@ function checkScenes(pages, castNames = [], visualBible = null, opts = {}) {
 //     never produces it, so the iterate path cannot see it.
 //   - the `textzone_*` family is not run there: `opts.textZoneRules` is off on
 //     that call, and a repaired page usually has its text position locked.
-const REVIEWABLE = new Set(['cover_cast_dropped', 'cover_location_repeated', 'cast_unlisted', 'cast_id_unresolved', 'interaction_multiple_actions', 'interaction_object_shared_hands', 'interaction_actor_unknown',
+const REVIEWABLE = new Set(['cover_cast_dropped', 'plan_cast_uncited', 'cover_location_repeated', 'cast_unlisted', 'cast_id_unresolved', 'interaction_multiple_actions', 'interaction_object_shared_hands', 'interaction_actor_unknown',
   'vb_element_overflow', 'vb_state_contradicted', 'vb_state_no_base',
   'vb_page_uncited', 'vb_cite_offpage',
   // The scene review already has the brief and the plan line in front of it and
@@ -1381,7 +1442,7 @@ module.exports = {
   checkPage, checkScenes, renderFindingsBlock, knownIds, REVIEWABLE,
   checkObjectStateContradiction, checkObjectStateBase, statedEntries,
   checkBiblePageTable, bibleEntries, citedBaseIds, CITABLE_POOLS,
-  checkTextZoneDistribution, checkTextZoneCollision, parseTextPosition, checkCoverBrief, checkCoverCast, checkCoverLocations,
+  checkTextZoneDistribution, checkTextZoneCollision, parseTextPosition, checkCoverBrief, checkCoverCast, checkCoverLocations, checkPlanCastCited,
   checkPopulationContradiction,
   checkShotOffPlate,
   checkLightDeclared,

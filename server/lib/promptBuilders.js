@@ -9106,7 +9106,26 @@ const COUNTING_RULE = 'Counting rule: an exact number for a group of like things
  * closes both channels. The VB-authoring consequence (which pages such an
  * entry may claim) lives generator-side in the pages-is-earned rule.
  */
-const PLAN_LINE_CAST_RULE = "The plan line's second field is the complete cast of that picture. A person named anywhere else in the line — as the owner of a prop, or in a clause that places them behind, beyond or outside the action — is context for the staging and never becomes a character: no `characters[]` entry, no appearance, no expression, no place in the frame. Stage what such a clause makes visible, the prop or the aftermath, without the person. A tracked animal — one with a Visual Bible entry — counts as a character for this rule: it is in a page's frame only when that page's plan line names it, whichever way it enters — `characters[]`, `objects[]` or the prose — and its entry's `pages` never claims a page whose plan line leaves it out.";
+/**
+ * A FIGURE SHOWN IN PART IS IN THE PICTURE (2026-09-27) — one sentence for the
+ * planner that writes the cast field (PLAN_LINE_FIELD_CONTRACT, story-beats.txt)
+ * and for every reader of it (PLAN_LINE_CAST_RULE: both Art Director templates,
+ * both iterate templates, scene-review check 5a).
+ *
+ * Staging job_1790508305061_dka3jpog9 p11: the instant stood the children
+ * "before <the creature>'s great wing stretched across the path like a wall"
+ * while the cast field listed only the children. The cast rule told the Art
+ * Director to stage what such a clause shows "without the person", and it did
+ * exactly that — the wing in the prose, the creature's id nowhere in the brief,
+ * so the page prompt carried no reference image and no size line, and the page
+ * rendered no creature at all. p15 the same (the gap in its chest). Over 59
+ * stored staging stories the Art Director never left a Visual Bible figure the
+ * cast field names uncited (0 pages) — the misses are all figures the cast
+ * field left out, which is why the rule has to reach the planner too.
+ */
+const FIGURE_PART_IN_FRAME_RULE = 'A figure the picture shows only in part — a wing, a tail, a head or a hand reaching into the frame, a flank or a chest filling it — is in that picture exactly as if it were shown whole. Only a name without a body is context: the owner of a prop, someone behind, beyond or outside what the picture shows.';
+
+const PLAN_LINE_CAST_RULE = `The plan line's second field is the complete cast of that picture. A person named anywhere else in the line — as the owner of a prop, or in a clause that places them behind, beyond or outside the action — is context for the staging and never becomes a character: no \`characters[]\` entry, no appearance, no expression, no place in the frame. Stage what such a clause makes visible, the prop or the aftermath, without the person. ${FIGURE_PART_IN_FRAME_RULE} A tracked animal — one with a Visual Bible entry — counts as a character for this rule: it is in a page's frame only when that page's plan line names it, whichever way it enters — \`characters[]\`, \`objects[]\` or the prose — and its entry's \`pages\` never claims a page whose plan line leaves it out.`;
 
 /**
  * The same contract stated generator-side, for the planner that WRITES the
@@ -9127,7 +9146,7 @@ const PLAN_LINE_CAST_RULE = "The plan line's second field is the complete cast o
  * cast, and the producer must not write one. Either alone leaves the other
  * side's behaviour undefined.
  */
-const PLAN_LINE_FIELD_CONTRACT = "The second field is the complete cast of that picture. Every person the instant stages — including one named only as the owner of a prop, or one watching from the background — belongs in that field, or is not written into the instant at all. A figure named only in what is true after this page is not in the picture either: put them in that field or leave them off the page. A figure the previous page staged does not carry into the next one as background.";
+const PLAN_LINE_FIELD_CONTRACT = `The second field is the complete cast of that picture. Every figure the instant stages — a person, or a creature the story tracks — including one named only as the owner of a prop, or one watching from the background — belongs in that field, or is not written into the instant at all. ${FIGURE_PART_IN_FRAME_RULE} A figure named only in what is true after this page is not in the picture either: put them in that field or leave them off the page. A figure the previous page staged does not carry into the next one as background.`;
 
 /**
  * ONE contract for an object that shows a different picture on different
@@ -12809,6 +12828,7 @@ module.exports = {
   PLACE_SEPARATE_RULE,
   PLACE_INSIDE_OUTSIDE_RULE,
   PLAN_LINE_FIELD_CONTRACT,
+  FIGURE_PART_IN_FRAME_RULE,
   PAGE_CHANGE_DEF,
   // The five definitions story-beats.txt and plan-check.txt share — one
   // constant each, filled into the rule AND the audit (sibling set
