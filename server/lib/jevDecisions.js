@@ -26,6 +26,8 @@
  *                  known ids, the page's state, the element budget
  *   aboard         per page and vehicle, 0.5
  *   population     per LOCATION: PUBLIC / CROWD nouls → code maps
+ *   gaze           per character: a choice over code-listed targets "what are X's
+ *                  eyes and hands on?" (3 calls averaged) → code writes looksAt
  *
  * State: the arc and the plan (the page text does not exist when these run —
  * it is written after the scene review), the page marked.
@@ -70,6 +72,7 @@ const JEV_DECISIONS = {
   vb: { reps: 1, creature: 0.7, vehicle: 0.5, secondary: 0.5, object: 0.7, objectBand: 0.5 },
   aboard: { reps: 1, at: 0.5 },     // 9/10 on the one ship book
   population: { reps: 1, publicAt: 0.5, crowdAt: 0.5 }, // 13/13
+  gaze: { reps: 3 },                // G2 128/139 averaged (owner: 3 calls for this field)
 };
 
 // ───────────────────────── the plan line ─────────────────────────
@@ -711,8 +714,244 @@ async function decidePopulation({ arc, pages, visualBible, locOf }, opts = {}) {
   return { byLocation: byLoc, stats: summarise(stats) };
 }
 
+// ───────────────────────── GAZE (looksAt) ─────────────────────────
+// Wording and candidate builder verbatim from scripts/analysis/eval-jev-extra-fields.js
+// (G2, "Gaze, depth, story relevance asked as fit", e3c329da1).
+
+const GAZE_AWAY = 'away';
+const GAZE_AWAY_LABEL = 'nothing in the picture: away, into the distance, or at nothing in particular';
+const GAZE_AWAY_OPTION = 'nothing in the picture: away, into the distance';
+
+/**
+ * The page's gaze targets as the eval indexed the Visual Bible: kind + name +
+ * short description per id, a vantage id carrying its vantage name.
+ */
+function gazeIndex(visualBible) {
+  const out = {};
+  const kinds = { animals: 'creature', secondaryCharacters: 'figure', artifacts: 'thing', genericObjects: 'thing', vehicles: 'vehicle', locations: 'place', clothing: 'thing' };
+  for (const [k, kind] of Object.entries(kinds)) {
+    for (const e of (Array.isArray(visualBible?.[k]) ? visualBible[k] : Object.values(visualBible?.[k] || {}))) {
+      if (!e?.id) continue;
+      const name = e.properName || e.name || e.label || e.id;
+      const desc = String(e.description || [e.species, e.coloring, e.features, e.setting].filter(Boolean).join(', ')).replace(/\s+/g, ' ').slice(0, 160);
+      out[e.id] = { id: e.id, kind, name, desc };
+      for (const v of e.vantages || []) if (v && v.id) out[v.id] = { id: e.id, kind, name, desc, vantage: v.name };
+    }
+  }
+  return out;
+}
+
+const esc = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const namedIn = (name, text) => new RegExp(`(^|[^\\p{L}])${esc(name)}($|[^\\p{L}])`, 'iu').test(text);
+
+/**
+ * The page's gaze candidates' raw material (the eval's extract): the elements
+ * the page cites — objects[] and the interaction rows' objects, clothing
+ * excluded as in the eval EXCEPT a garment an interaction row acts on (build
+ * note) — and the creatures / figures the plan line names that the page does
+ * not cite.
+ */
+function gazePageMaterial({ objects = [], interactions = [], planLine = '', index }) {
+  const clothingActedOn = interactions.map(x => x && x.object).filter(o => o && /^CLO/i.test(String(o)));
+  const cited = [...new Set([...objects, ...interactions.map(x => x && x.object)].filter(o => o && !/^CLO/i.test(String(o))).map(baseId))];
+  const elements = [...cited, ...new Set(clothingActedOn.map(baseId))].map(id => (index[id] ? { id, kind: index[id].kind, name: index[id].name, desc: index[id].desc } : null)).filter(Boolean);
+  const named = Object.values(index).filter(e => (e.kind === 'creature' || e.kind === 'figure') && !e.vantage && !cited.includes(e.id)
+    && namedIn(e.name, stripPlanShot(planLine))).map(e => ({ id: e.id, kind: e.kind, name: e.name, desc: e.desc }));
+  return { elements, named };
+}
+
+/** Gaze candidates, enumerated in code: { target, label } (target = a name, an element id, or 'away'). */
+function gazeCandidates({ roster, elements, named }, name) {
+  const out = [];
+  roster.filter(o => o !== name).forEach(o => out.push({ target: o, label: o }));
+  const rosterSet = new Set(roster);
+  [...elements, ...(named || [])].filter(e => !rosterSet.has(e.name)).forEach(e => out.push({ target: e.id, label: e.kind === 'place' ? `the place itself: ${e.name}` : `${e.name} (${e.desc.slice(0, 80)})` }));
+  out.push({ target: GAZE_AWAY, label: GAZE_AWAY_LABEL });
+  return out;
+}
+
+/**
+ * Per page, what each character's eyes and hands are on: one choice per
+ * character over the code-listed candidates, one call per page carrying every
+ * character, 3 calls with the choice probabilities averaged (owner). Code
+ * writes the top candidate into `looksAt`.
+ *
+ * @param {{arc:string, pages:Array<{pageNumber:number, planLine:string}>,
+ *          perPage:Array<{pageNumber:number, roster:string[], elements:Array, named:Array}>}} input
+ */
+async function decideGaze({ arc, pages, perPage }, opts = {}) {
+  const stats = newStats();
+  const byNum = new Map(pages.map(p => [Number(p.pageNumber), p]));
+  const plans = perPage.filter(p => p.roster && p.roster.length && byNum.has(Number(p.pageNumber))).map(p => ({
+    ...p, cands: p.roster.map(n => gazeCandidates(p, n)),
+  }));
+  const reqs = plans.flatMap(p => {
+    const qs = {};
+    p.roster.forEach((n, i) => {
+      qs[`EYES${i}`] = { type: 'choice', instructions: `In the instant of the page to judge, what are ${n}'s eyes and hands on?`,
+        criteria: Object.fromEntries(p.cands[i].map((k, j) => [`t${j}`, k.target === GAZE_AWAY ? GAZE_AWAY_OPTION : k.label])) };
+    });
+    return repeat({ key: `gaze:p${p.pageNumber}`, state: pageState(arc, pages, byNum.get(Number(p.pageNumber))), questions: qs }, JEV_DECISIONS.gaze.reps);
+  });
+  const ans = reqs.length ? await runJevRequests(reqs, { ...opts, usageLabel: 'jev_decisions_gaze', stats }) : new Map();
+  const out = plans.map(p => {
+    const a = ans.get(`gaze:p${p.pageNumber}`) || [];
+    const characters = p.roster.map((n, i) => {
+      const cand = p.cands[i];
+      const probs = cand.map((k, j) => mean(a.map(x => {
+        const q = x[`EYES${i}`];
+        if (!q || !q.probabilities) throw new JevDecisionError(`Jev gaze answer EYES${i} on page ${p.pageNumber} carries no probabilities`);
+        return Number(q.probabilities[`t${j}`] || 0);
+      })));
+      const top = probs.indexOf(Math.max(...probs));
+      return { name: n, looksAt: cand[top].target, p: +probs[top].toFixed(3),
+        candidates: Object.fromEntries(cand.map((k, j) => [k.target, +probs[j].toFixed(3)])) };
+    });
+    return { pageNumber: Number(p.pageNumber), characters };
+  });
+  log.info(`👀 [JEV/gaze] ${out.map(r => `p${r.pageNumber}:${r.characters.map(c => `${c.name}→${c.looksAt}`).join(',')}`).join(' ')} (${stats.calls} calls)`);
+  return { pages: out, stats: summarise(stats) };
+}
+
+// ───────────────────────── the FIXED fields in the brief ─────────────────────────
+
+/**
+ * The fields the decision layer owns, stated once to every brief author and to
+ * the scene review (generator ↔ critic from one constant). `timeOfDay` and
+ * indoors reach the Art Director as the page's FIXED line; the cited elements,
+ * `population`, `aboard` and `looksAt` are written by code after the Art
+ * Director and handed to the review as `jev_fixed_field` lines.
+ */
+const JEV_FIXED_FIELDS_RULE = 'Fields decided upstream are FIXED: a page whose plan carries a FIXED line takes its `timeOfDay` from it exactly, and its `weather` is `none` when the line says indoors and never `none` when it says outdoors. After the briefs are written, code sets each story page\'s cited Visual Bible elements in `objects[]` (locations excepted), its `population`, its `aboard` and every character\'s `looksAt`; the prose renders those values and no rewrite changes them.';
+
+/** The FIXED line under a page's PLAN line in the Art Director's plan block. */
+function fixedLine(fixed) {
+  if (!fixed || !fixed.timeOfDay) return '';
+  return `FIXED: timeOfDay ${fixed.timeOfDay}; ${fixed.indoor ? 'indoors (weather none)' : 'outdoors'}`;
+}
+
+/**
+ * Write the decided fields into one brief's metadata. Pure: returns the new
+ * brief and what changed. `fixed`:
+ *   timeOfDay, indoor              — the light (weather: `none` indoors; an
+ *                                    outdoor `none` is reported, never guessed)
+ *   cites, decidedIds              — the element citations Jev decided and the
+ *                                    base ids it was asked about: any decided id
+ *                                    not in `cites` leaves objects[]; everything
+ *                                    else (locations, undecided ids) stays
+ *   population                     — the page's location's value
+ *   aboard, aboardIds              — the vehicle the camera is on (or null); an
+ *                                    `aboard` outside `aboardIds` (a structure) stays
+ *   looksAt                        — { characterName: target }
+ */
+function pinBrief(brief, fixed) {
+  const { parseProseMetadataFormat } = require('./sceneMetadata');
+  const parsed = parseProseMetadataFormat(String(brief || ''));
+  if (!parsed) return { brief, changes: [], unparsed: true };
+  const m = { ...parsed.metadata };
+  const changes = [];
+  const set = (field, to, extra = {}) => {
+    const from = m[field] === undefined ? null : m[field];
+    if (JSON.stringify(from) === JSON.stringify(to)) return;
+    if (to === null) delete m[field]; else m[field] = to;
+    changes.push({ field, from, to, ...extra });
+  };
+  if (fixed.timeOfDay) set('timeOfDay', fixed.timeOfDay);
+  if (fixed.indoor === true) set('weather', 'none');
+  else if (fixed.indoor === false && (!m.weather || m.weather === 'none')) changes.push({ field: 'weather', from: m.weather || null, to: null, problem: 'outdoors' });
+  if (Array.isArray(fixed.cites)) {
+    const decided = new Set((fixed.decidedIds || []).map(baseId));
+    const before = Array.isArray(m.objects) ? m.objects.map(String) : [];
+    const kept = before.filter(o => !decided.has(baseId(o)));
+    const next = [...kept, ...fixed.cites.filter(c => !kept.some(k => baseId(k) === baseId(c)))];
+    const added = fixed.cites.filter(c => !before.includes(c));
+    const removed = before.filter(o => decided.has(baseId(o)) && !fixed.cites.includes(o));
+    if (added.length || removed.length) { m.objects = next; changes.push({ field: 'objects', from: before, to: next, added, removed }); }
+  }
+  if (fixed.population) set('population', fixed.population);
+  if (fixed.aboard !== undefined) {
+    const own = new Set((fixed.aboardIds || []).map(baseId));
+    const cur = m.aboard ? String(m.aboard) : null;
+    if (fixed.aboard) set('aboard', fixed.aboard);
+    else if (cur && own.has(baseId(cur))) set('aboard', null);
+  }
+  if (fixed.looksAt && Array.isArray(m.characters)) {
+    m.characters = m.characters.map((c) => {
+      if (!c || typeof c !== 'object' || !(c.name in fixed.looksAt)) return c;
+      const to = fixed.looksAt[c.name];
+      if (c.looksAt === to) return c;
+      changes.push({ field: 'looksAt', name: c.name, from: c.looksAt ?? null, to });
+      return { ...c, looksAt: to };
+    });
+  }
+  if (!changes.some(c => !c.problem)) return { brief, changes };
+  return { brief: `${parsed.prose}\n\n---METADATA---\n${JSON.stringify(m, null, 2)}`, changes };
+}
+
+/**
+ * The review line for a page whose fixed fields differ from what its brief
+ * was written with: what code set, so the prose can follow. Null when nothing
+ * the prose must follow changed.
+ */
+function fixedFieldFinding(pageNumber, changes, labelOf = id => id) {
+  const parts = [];
+  for (const c of changes) {
+    if (c.field === 'objects') {
+      if (c.added.length) parts.push(`objects[] now cites ${c.added.map(id => `${id} (${labelOf(id)})`).join(', ')} — stage ${c.added.length > 1 ? 'them' : 'it'} in the prose, even where only part is in frame`);
+      if (c.removed.length) parts.push(`objects[] no longer cites ${c.removed.map(id => `${id} (${labelOf(id)})`).join(', ')} — take ${c.removed.length > 1 ? 'them' : 'it'} out of the prose`);
+    } else if (c.field === 'timeOfDay') parts.push(`timeOfDay is ${c.to} — the prose's light is that hour's`);
+    else if (c.field === 'weather' && c.problem === 'outdoors') parts.push('the page is outdoors — `weather` is one of the outdoor values, never `none`; choose the story\'s sky and write it into the prose');
+    else if (c.field === 'weather') parts.push('the page is indoors — `weather` is `none` and the prose shows no sky weather except through a window');
+    else if (c.field === 'population') parts.push(`population is ${c.to} — ${c.to === 'cast_only' ? 'no one but the listed figures is in the prose' : c.to === 'crowd' ? 'the prose is written around unnamed background people' : 'the prose shows a few distant, unnamed passers-by'}`);
+    else if (c.field === 'aboard') parts.push(c.to ? `the camera is aboard ${c.to} (${labelOf(c.to)}) — its deck, floor or interior is the ground the picture is taken from (rule 11d)` : `the camera is not aboard ${c.from} — it is seen from outside`);
+    else if (c.field === 'looksAt') parts.push(`${c.name} looks at ${c.to === GAZE_AWAY ? 'nothing in particular (away)' : `${c.to}${c.to !== labelOf(c.to) ? ` (${labelOf(c.to)})` : ''}`}`);
+  }
+  if (!parts.length) return null;
+  return { pageNumber, type: 'jev_fixed_field', detail: `Code set this page's fixed fields; rewrite the prose to render them and leave the fields as they are: ${parts.join('; ')}.` };
+}
+
+/**
+ * The Visual Bible's `pages` for the elements Jev decided, made to agree with
+ * the briefs' citations (story pages only; a cover's negative page stays), and
+ * a state's `pages` gains a page cited in that state.
+ */
+function applyVbPages(visualBible, citesByPage, decidedIds) {
+  const decided = new Set(decidedIds.map(baseId));
+  const cols = ['animals', 'secondaryCharacters', 'artifacts', 'vehicles'];
+  let changed = 0;
+  for (const k of cols) {
+    for (const e of (Array.isArray(visualBible?.[k]) ? visualBible[k] : [])) {
+      if (!e || !decided.has(baseId(e.id))) continue;
+      const own = [...citesByPage.entries()].filter(([, cs]) => cs.some(c => baseId(c) === baseId(e.id))).map(([n]) => n).sort((a, b) => a - b);
+      const keep = (Array.isArray(e.pages) ? e.pages : []).filter(n => Number(n) <= 0);
+      const next = [...keep, ...own];
+      if (JSON.stringify(next) !== JSON.stringify(e.pages || [])) { e.pages = next; changed++; }
+      if (Array.isArray(e.states)) {
+        for (const [n, cs] of citesByPage) {
+          const cite = cs.find(c => baseId(c) === baseId(e.id) && c.includes('.'));
+          if (!cite) continue;
+          const i = Number(cite.split('.')[1]) - 1;
+          const st = e.states[i];
+          if (st && Array.isArray(st.pages) && !st.pages.map(Number).includes(n)) { st.pages = [...st.pages, n].sort((a, b) => a - b); changed++; }
+        }
+      }
+    }
+  }
+  return changed;
+}
+
 module.exports = {
   JevDecisionError,
+  JEV_FIXED_FIELDS_RULE,
+  fixedLine,
+  pinBrief,
+  fixedFieldFinding,
+  applyVbPages,
+  gazeIndex,
+  gazePageMaterial,
+  gazeCandidates,
+  decideGaze,
+  GAZE_AWAY,
   JEV_DECISIONS,
   JEV_DECISION_CONCURRENCY,
   PLAN_SHOT_PLACEHOLDER,

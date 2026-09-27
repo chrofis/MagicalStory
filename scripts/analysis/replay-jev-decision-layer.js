@@ -113,8 +113,173 @@ async function cuts() {
     measuredEval: { togetherInBudget: '7/7 reading-cut pages', neededBelow05: '51 cuts, 0 wrong' }, rows: out };
 }
 
+/** Stored eval answers (the text-state run), for "did dropping the text change Jev's answer". */
+function evalAnswers() {
+  if (!argv.answers) return null;
+  const by = new Map();
+  for (const a of fs.readFileSync(argv.answers, 'utf8').trim().split('\n').map(JSON.parse)) {
+    const k = `${a.id}|${a.variant}`; if (!by.has(k)) by.set(k, []); by.get(k).push(a.answers);
+  }
+  return by;
+}
+const modal = xs => { const c = {}; for (const x of xs) if (x != null) c[x] = (c[x] || 0) + 1; return Object.entries(c).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null; };
+
+/** The page plans of a story, from its per-page items (final plan lines, field 0 → placeholder). */
+function storyPages(its) {
+  const { parsePlanLine } = require('./eval-jev-decision-layer');
+  return its.map(i => { const p = parsePlanLine(i.planLine); return { pageNumber: i.page, planLine: `${P} — ${p.who} — ${p.instant} — ${p.after}` }; })
+    .sort((a, b) => a.pageNumber - b.pageNumber);
+}
+
+/** timeOfDay / indoor / weather on the four books whose briefs carry the fields. */
+async function light() {
+  const L = labelsOf('evals/datasets/jev-decision-layer-v1/reading_labels.json');
+  const EA = evalAnswers();
+  const meta = loadItems().filter(i => i.kind === 'meta' && (!only || only.has(i.story)));
+  const T = { time: { n: 0, agreeAd: 0, read: 0, jevRight: 0, adRight: 0, agreeEvalJev: 0, evalN: 0 }, indoor: { n: 0, agreeAd: 0, agreeEvalJev: 0, evalN: 0 }, weather: { n: 0, agreeAd: 0, agreeEvalJev: 0, evalN: 0 } };
+  const rows = [];
+  for (const sid of [...new Set(meta.map(i => i.story))]) {
+    const its = meta.filter(i => i.story === sid);
+    const pages = storyPages(its);
+    const d = await JD.decideLight({ arc: its[0].arc, pages });
+    addStats(d.stats);
+    for (const r of d.pages) {
+      const it = its.find(i => i.page === r.pageNumber);
+      const ad = it.ad; const adIndoor = ad.weather ? ad.weather === 'none' : null;
+      const readT = L[hash(`md:${it.id}:timeOfDay`)];
+      T.time.n++; if (r.timeOfDay === ad.timeOfDay) T.time.agreeAd++;
+      if (readT != null) { T.time.read++; const ok = v => (Array.isArray(readT) ? readT.includes(v) : readT === v); if (ok(r.timeOfDay)) T.time.jevRight++; if (ok(ad.timeOfDay)) T.time.adRight++; }
+      if (adIndoor != null) { T.indoor.n++; if (r.indoor === adIndoor) T.indoor.agreeAd++; }
+      T.weather.n++; if (r.weatherAdvice === ad.weather) T.weather.agreeAd++;
+      const e = EA && EA.get(`${it.id}|q`);
+      if (e) {
+        const et = modal(e.map(a => a.TIME?.choice)); T.time.evalN++; if (et === r.jevTime) T.time.agreeEvalJev++;
+        const ew = modal(e.map(a => a.WEATHER?.choice)); T.weather.evalN++; if (ew === r.weatherAdvice) T.weather.agreeEvalJev++;
+        const ei = e.reduce((s, a) => s + a.INDOOR.noul, 0) / e.length >= 0.5; T.indoor.evalN++; if (ei === r.indoor) T.indoor.agreeEvalJev++;
+      }
+      rows.push({ story: sid, page: r.pageNumber, jev: r.jevTime, time: r.timeOfDay, ad: ad.timeOfDay, indoor: r.indoor, adWeather: ad.weather, weatherAdvice: r.weatherAdvice });
+    }
+    console.log(`${sid}: ${d.pages.map(r => `p${r.pageNumber}:${r.timeOfDay}${r.indoor ? '/in' : ''}/${r.weatherAdvice}`).join(' ')} | held ${d.clockHeld.length}`);
+    console.log(`   AD: ${its.sort((a, b) => a.page - b.page).map(i => `p${i.page}:${i.ad.timeOfDay}/${i.ad.weather}`).join(' ')}`);
+  }
+  return { mode: 'light', pages: T.time.n, tally: T, measuredEval: { timeAgreeAd: 0.83, indoorAgreeAd: '69/70', weatherAgreeAd: 0.70 }, rows };
+}
+
+/** VB membership + aboard on the four books (arc + plan state, no text). */
+async function vb() {
+  const L = labelsOf('evals/datasets/jev-decision-layer-v1/reading_labels.json');
+  const all = loadItems().filter(i => i.kind === 'vbentity' && (!only || only.has(i.story)));
+  const T = {}; const rows = [];
+  const tally = (type) => (T[type] = T[type] || { n: 0, tp: 0, fp: 0, fn: 0, tn: 0, adTp: 0, adFp: 0, adFn: 0 });
+  for (const sid of [...new Set(all.map(i => i.story))]) {
+    const its = all.filter(i => i.story === sid).sort((a, b) => a.page - b.page);
+    const pages = storyPages(its);
+    const coll = { creature: 'animals', secondary: 'secondaryCharacters', object: 'artifacts', vehicle: 'vehicles' };
+    const visualBible = { animals: [], secondaryCharacters: [], artifacts: [], vehicles: [] };
+    for (const e of its[0].ents) if (coll[e.type]) visualBible[coll[e.type]].push({ id: e.id, name: e.name, label: e.label, species: e.species, description: e.desc });
+    const adCited = new Map(its.map(i => [i.page, new Set(i.ents.filter(e => e.adCited).map(e => e.id))]));
+    const d = await JD.decideVbAndAboard({ arc: its[0].arc, pages, visualBible, adCited });
+    addStats(d.stats);
+    for (const r of d.pages) {
+      const it = its.find(i => i.page === r.pageNumber);
+      const chosen = new Set([...r.elements.map(e => e.id), ...r.overBudget]);
+      for (const e of it.ents.filter(x => coll[x.type])) {
+        const read = L[hash(`vb:${it.id}:${e.id}`)];
+        if (typeof read !== 'boolean') continue;
+        const t = tally(e.type); t.n++;
+        const j = chosen.has(e.id);
+        if (j && read) t.tp++; else if (j && !read) t.fp++; else if (!j && read) t.fn++; else t.tn++;
+        if (e.adCited && read) t.adTp++; else if (e.adCited && !read) t.adFp++; else if (!e.adCited && read) t.adFn++;
+        if (j !== read) rows.push({ story: sid, page: r.pageNumber, id: e.id, name: e.name, type: e.type, read, jev: j, p: r.scores[e.id], ad: e.adCited });
+      }
+    }
+    console.log(`${sid}: ${d.pages.map(r => `p${r.pageNumber}:[${r.elements.map(e => e.cite).join(',')}]${r.aboard ? `@${r.aboard}` : ''}`).join(' ')}`);
+  }
+  return { mode: 'vb', tally: T, measuredEval: 'creatures 31/31 at 0.7, vehicles 10/10 at 0.5, secondaries 7/9 at 0.5, objects precision 0.97 recall 0.72 at 0.7 (text state)', misses: rows };
+}
+
+/** aboard (per page × vehicle) and population per LOCATION, on the shot eval's field items. */
+async function place() {
+  const L = labelsOf('evals/datasets/jev-shot-budget-v1/reading_labels.json');
+  const items = loadItems();
+  const fields = items.filter(i => i.kind === 'fields' && (!only || only.has(i.story)));
+  const locs = items.filter(i => i.kind === 'location' && (!only || only.has(i.story)));
+  const out = { aboard: { n: 0, jevRight: 0, adRight: 0 }, population: { n: 0, jevRight: 0, adModalRight: 0 }, rows: [] };
+  for (const sid of [...new Set([...fields, ...locs].map(i => i.story))]) {
+    const its = fields.filter(i => i.story === sid).sort((a, b) => a.page - b.page);
+    if (!its.length) continue;
+    const { parsePlanLine } = require('./eval-jev-decision-layer');
+    const pages = its.map(i => { const p = parsePlanLine(i.planLine); return { pageNumber: i.page, planLine: `${P} — ${p.who} — ${p.instant} — ${p.after}` }; });
+    const arc = (locs.find(l => l.story === sid) || {}).arc || '';
+    if (its[0].vehicles.length) {
+      const visualBible = { vehicles: its[0].vehicles.map(v => ({ id: v.id, name: v.name, description: v.desc })) };
+      const d = await JD.decideVbAndAboard({ arc, pages, visualBible });
+      addStats(d.stats);
+      for (const r of d.pages) {
+        const it = its.find(i => i.page === r.pageNumber);
+        for (const v of it.vehicles) {
+          const read = L[hash(`fld:${it.id}:aboard:${v.id}`)];
+          if (typeof read !== 'boolean') continue;
+          out.aboard.n++; if ((r.aboard === v.id) === read) out.aboard.jevRight++; if ((it.ad.aboard === v.id) === read) out.aboard.adRight++;
+          out.rows.push({ kind: 'aboard', story: sid, page: r.pageNumber, v: v.id, read, jev: r.aboard, p: r.aboardScores[v.id], ad: it.ad.aboard });
+        }
+      }
+    }
+    const storyLocs = locs.filter(l => l.story === sid);
+    if (storyLocs.length) {
+      const allPages = pages.length ? pages : [];
+      const locOf = new Map();
+      for (const l of storyLocs) for (const n of l.loc.pages) locOf.set(n, l.loc.id);
+      const visualBible = { locations: storyLocs.map(l => ({ id: l.loc.id, name: l.loc.name, description: l.loc.desc, setting: l.loc.setting })) };
+      const d = await JD.decidePopulation({ arc: storyLocs[0].arc, pages: allPages, visualBible, locOf });
+      addStats(d.stats);
+      for (const l of storyLocs) {
+        const got = d.byLocation[l.loc.id];
+        const read = L[hash(`loc:${l.id}`)];
+        if (!got || !Array.isArray(read)) continue;
+        out.population.n++; if (read.includes(got.population)) out.population.jevRight++;
+        const adModal = modal(l.adPop.map(x => x.pop)); if (read.includes(adModal)) out.population.adModalRight++;
+        out.rows.push({ kind: 'population', story: sid, loc: l.loc.id, name: l.loc.name, read, jev: got.population, publicP: got.publicP, crowdP: got.crowdP, adModal });
+      }
+    }
+  }
+  return { mode: 'place', ...out, measuredEval: { aboard: '9/10', populationPerLocation: '13/13' } };
+}
+
+/** looksAt on the extra-fields items (the AD's roster and cited elements, arc + plan state). */
+async function gaze() {
+  const L = labelsOf('evals/datasets/jev-extra-fields-v1/reading_labels.json');
+  const all = loadItems().filter(i => (!only || only.has(i.story)));
+  const t = { n: 0, jevRight: 0, adRight: 0 }; const rows = [];
+  const adGaze = (it, v) => {
+    if (v == null) return null; const s = String(v).trim();
+    if (it.ad.characters.some(c => c.name === s)) return s;
+    if (/^(away|ahead|down|forward|off|nothing|distance|into the)/i.test(s)) return JD.GAZE_AWAY;
+    if (/viewer|camera|reader/i.test(s)) return 'viewer';
+    return s.split('.')[0];
+  };
+  for (const sid of [...new Set(all.map(i => i.story))]) {
+    const its = all.filter(i => i.story === sid).sort((a, b) => a.page - b.page);
+    const pages = storyPages(its);
+    const perPage = its.map(i => ({ pageNumber: i.page, roster: i.ad.characters.map(c => c.name), elements: i.elements, named: i.named || [] }));
+    const d = await JD.decideGaze({ arc: its[0].arc, pages, perPage });
+    addStats(d.stats);
+    for (const r of d.pages) {
+      const it = its.find(i => i.page === r.pageNumber);
+      for (const c of r.characters) {
+        const truth = L[hash(`gaze:${it.id}:${c.name}`)]; if (!truth) continue;
+        const ad = adGaze(it, (it.ad.characters.find(x => x.name === c.name) || {}).looksAt);
+        t.n++; if (truth.includes(c.looksAt)) t.jevRight++; if (truth.includes(ad)) t.adRight++;
+        if (!truth.includes(c.looksAt)) rows.push({ id: it.id, name: c.name, truth, jev: c.looksAt, p: c.p, ad });
+      }
+    }
+    console.log(`${sid}: ${t.jevRight}/${t.n} so far`);
+  }
+  return { mode: 'gaze', ...t, measuredEval: { G2: '128/139 (text state)', AD: '111/139' }, misses: rows };
+}
+
 async function main() {
-  const fn = { shots, cuts }[mode];
+  const fn = { shots, cuts, light, vb, place, gaze }[mode];
   if (!fn) { console.log('usage: shots | cuts | light | vb | pop | gaze  --items=<items.jsonl>'); return; }
   const t0 = Date.now();
   const res = await fn();

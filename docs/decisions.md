@@ -64388,3 +64388,92 @@ trims cast by design" for group pages.
 server/lib/promptBuilders.js (buildReplanSection), server/lib/planCounters.js (finding text, 8c),
 scripts/analysis/replay-jev-decision-layer.js, tests/unit/jev-group-cuts.test.ts (new),
 tests/unit/beats-replan-cast-lost.test.ts.
+
+## 2026-09-27 — Jev decision layer wired, Parts 3-5: VB citations, light + place fields and gaze are decided by Jev and written by code; the Art Director and the review render them
+
+**Context:** Parts 3 (VB citations), 4 (light + place) and 5 (gaze, added mid-task with the owner's
+approval relayed by the coordinator) of the decision layer (plan tasks/jev-decision-layer-2026-09-27.md;
+measurements "Jev as the plan's DECISION layer", "Jev picks the shot…" and "Gaze, depth, story
+relevance asked as fit"). Constraint that shaped the wiring: the page TEXT is written after the scene
+review, and the Visual Bible is authored by the Art Director in the same call as the briefs. So:
+- timeOfDay / indoors are decided BEFORE the Art Director, from the arc + the plan;
+- the VB citations, `aboard`, `population` and `looksAt` are decided AFTER it, on the bible it wrote,
+  from the arc + the plan — every decision runs on the arc + plan state with the page marked, never
+  on story text (the evals had the text; the replays below measure the production state).
+
+**Decision:**
+1. **Light (Part 4a).** `runArtDirector` first runs `jevDecisions.decideLight` per story page: TIME
+   (choice over `TIMES_OF_DAY`, 1 call, owner), INDOOR (noul ≥ 0.5), WEATHER (choice, ADVISORY).
+   Code enforces the enums and a clock that never runs backwards: an earlier hour than the page
+   before is held at the page before, except evening/dusk/night → dawn/morning/midday (a new day).
+   Each page gets a `FIXED: timeOfDay <t>; indoors (weather none) | outdoors` line under its PLAN
+   line (all-pages `planBlocks` and the per-page fallback). The Art Director authors `weather`
+   (`none` exactly when indoors); Jev's weather is logged beside it (`beats_jev_weather_advice`).
+2. **After the Art Director** (`beatsPipeline.applyJevBriefDecisions`, inside `runArtDirector`):
+   - **VB citations (Part 3):** per story page one call over every creature / secondary / object /
+     vehicle of the bible ("X is in the picture of the page to judge, wholly or in part…", the
+     evaluated wording). Creatures ≥ 0.7, vehicles ≥ 0.5, secondaries ≥ 0.5, objects ≥ 0.7 — and
+     0.5–0.7 only where the Art Director cited it (the measured band). Code: known ids only, the
+     dotted state for the page (the state whose pages hold it, else the one begun before it),
+     top-P within `VB_ELEMENT_BUDGET` (the rest reported `overBudget`). Clothing stays code (the
+     wearer); locations stay the Art Director's (the vantage). The bible's `pages` for the decided
+     elements are made to agree and the transcript is re-synced.
+   - **aboard (4b):** per page and vehicle, "the camera stands on or inside X", ≥ 0.5; an `aboard`
+     naming a structure (not a vehicle) stays the Art Director's.
+   - **population (4c):** per LOCATION the brief cites, PUBLIC / CROWD nouls → crowd ≥ 0.5 →
+     `crowd`, else public ≥ 0.5 → `ambient`, else `cast_only`. A page citing no location keeps the
+     Art Director's value and logs an error.
+   - **gaze (Part 5):** per character one CHOICE "In the instant of the page to judge, what are X's
+     eyes and hands on?" over candidates listed in code (the eval's `gazeCandidates`: the others on
+     the page, every element the page cites — now the pinned citations — interaction objects,
+     creatures the plan line names; `away`; never `viewer` on a story page; plus a garment an
+     interaction row acts on, the build note). 3 calls, probabilities averaged (owner). "Objects the
+     page text names" is NOT built: no page text exists at this stage. Covers are not decided
+     (their gaze is code-owned: viewer).
+   Code writes all of it into the brief's METADATA (`jevDecisions.pinBrief`; the prose is never
+   touched) and records per page what changed.
+3. **The review renders, never re-decides.** Each changed page gets one `jev_fixed_field` line in
+   the scene review's BRIEF FAULTS ("objects[] now cites ANI001 (…) — stage it in the prose…";
+   `JEV_FIXED_FIELDS_RULE` is the one constant in both Art Director templates and the review). After
+   the review and its worn-state round, `pinJevFixedFields` re-writes the decided fields
+   (`beats_jev_fields_repinned` warns when a rewrite had moved one). The critics (semantic DECLARED
+   LIGHT, plate LIGHT, population N-09, the eyes lines, `group_facing_viewer`) already read the
+   brief's fields, so they read the decided values — no critic change.
+4. **`plan_cast_uncited`:** kept, because it still guards the ITERATE path (a post-render rewrite
+   dropping a who-column figure). On a Jev-decided page in the scene review it cannot be answered
+   (code owns objects[]), so it is withheld from the reviewer and logged as the disagreement it is
+   (`beats_jev_vb_vs_who_column`, error).
+5. The Art Director still writes `objects[]`, `population`, `aboard` and `looksAt` as its STAGING
+   DRAFT: it is what tells code which pages' prose must change (the draft's difference from the
+   decision is the `jev_fixed_field` line) and it is never what ships. The iterate rewrites
+   (post-render repair) do not re-run the decisions — out of scope, stated.
+
+**Evidence (rung 1, $0.04, no paid model call)** — `replay-jev-decision-layer.js` running the
+production functions on the eval datasets with the PRODUCTION state (arc + plan, no text):
+- light (70 pages, 4 books): timeOfDay agrees with the AD 55/70 (0.79; with text 0.83); on the 12
+  adjudicated pages Jev 9 / AD 11; indoor 69/70; Jev's weather matches the eval's text-state Jev on
+  60/70. The dragon book: `fog` on p1-12 where the AD wrote `storm` on 9, 11-15 (the owner's fog
+  complaint) — Jev storm on 13-14 only.
+- VB membership (4 books, labelled items): creatures **31/31, 0 false** (AD 29/31 + 1 false — the
+  dragon p11 and the parrot p12 found); secondaries 7/9, 0 false (AD 6/9); vehicles 8/10, 0 false
+  (with text 10/10; AD 7/10); objects 43 TP / 2 FP / 10 FN (recall 0.81, precision 0.96) vs the
+  AD's 46 / 1 / 7 — **objects are slightly WORSE than the AD without the text**, flagged.
+- aboard 9/10 (AD 4/10); population per location **13/13** (AD modal 9/13).
+- gaze 124/139 (0.89; with text 0.92) vs the AD 109/139.
+- 0 errors, 0 retries over 431 calls (all five replays together).
+
+**Reverses (owner sign-off 2026-09-27):** SETTLED "the VB element budget is a PROMPT rule … do not
+re-add a code enforcer" (for story pages); SETTLED light line and population line — the AUTHOR of
+`timeOfDay` / `population` moves from the Art Director to Jev + code (the field principle stays);
+SETTLED "eval judges run at temperature 0" — Jev has no temperature (flip rate + 3-call averaging);
+the Art Director authoring `looksAt` (new SETTLED line). All four SETTLED lines updated.
+
+**Touched:** server/lib/jevDecisions.js (decideLight, decideVbAndAboard, decidePopulation,
+decideGaze, pinBrief, fixedFieldFinding, applyVbPages, JEV_FIXED_FIELDS_RULE),
+server/lib/beatsPipeline.js (runArtDirector, applyJevBriefDecisions, runSceneReview,
+pinJevFixedFields), server/lib/promptBuilders.js (planBlocks, three fills),
+server/lib/sceneBriefCheck.js (REVIEWABLE), server/lib/testlab.js (beats_scenes report),
+prompts/scene-expansion-all.txt, prompts/scene-expansion.txt, prompts/scene-review.txt,
+scripts/analysis/replay-jev-decision-layer.js, tests (jev-brief-fields.test.ts new,
+helpers/jev-stub.ts new, lab-prod-call-parity, testlab-beats-scenes-recovery,
+iterate-rewrite-checked-like-authored), docs/SETTLED.md, docs/prompt-inventory.md.

@@ -17,7 +17,8 @@
  * model stubbed. They pin BEHAVIOUR (which briefs count, what is retried),
  * never prompt wording.
  */
-import { describe, it, expect, beforeAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest';
+import { makeJevStub } from '../helpers/jev-stub';
 import { createRequire } from 'node:module';
 
 const require_ = createRequire(import.meta.url);
@@ -53,8 +54,12 @@ const BIBLE = ['---VISUAL BIBLE---', '```json', JSON.stringify({
 }, null, 2), '```', ''].join('\n');
 
 const saved = textModels.callTextModelStreaming;
+// The Jev decision layer runs inside runArtDirector (light before, fields after).
+const jevAudit = require_('../../server/lib/jevAudit');
+const savedJev = jevAudit.callJev;
 afterEach(() => { textModels.callTextModelStreaming = saved; });
-beforeAll(async () => { await loadPromptTemplates(); });
+beforeAll(async () => { await loadPromptTemplates(); jevAudit.callJev = makeJevStub().impl; });
+afterAll(() => { jevAudit.callJev = savedJev; });
 
 /** Run the Art Director on pages 1-2 plus the front cover with scripted replies. */
 async function run(batchReplies: (string | Error)[]) {

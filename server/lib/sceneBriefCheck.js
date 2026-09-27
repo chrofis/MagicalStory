@@ -1407,7 +1407,11 @@ const REVIEWABLE = new Set(['cover_cast_dropped', 'plan_cast_uncited', 'cover_lo
   'group_shot_too_close', 'group_facing_viewer',
   'textzone_character_collision', 'textzone_fullwidth_floor', 'textzone_top_floor', 'textzone_bottom_floor', 'textzone_half_streak',
   // A cover page's two mechanical beat facts (checkCoverBrief, 2026-09-24).
-  'cover_gaze_not_viewer', 'cover_text_zone_mismatch']);
+  'cover_gaze_not_viewer', 'cover_text_zone_mismatch',
+  // The fields the Jev decision layer set on a story page after the Art
+  // Director (beatsPipeline.applyJevBriefDecisions, 2026-09-27): the review
+  // rewrites the prose to render them; code re-pins the fields after it.
+  'jev_fixed_field']);
 
 // Reserved `action` labels for characters who are present but not acting. They
 // are values rather than an omitted field on purpose: when the field was

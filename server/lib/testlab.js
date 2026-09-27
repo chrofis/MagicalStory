@@ -4404,6 +4404,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   let allPagesCost = null;
   let allPagesModelId = null;
   let landmarkPhotoCitations = null;
+  let labJevReport = null;
   const events = [];
   if (params.expandScenes !== false) {
     // THE RUN'S OWN ART DIRECTOR AND SCENE REVIEW (owner 2026-09-27: "The Lab
@@ -4435,6 +4436,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     if (params.landmarks === false) storyData.availableLandmarks = undefined;
     const sceneModel = params.sceneModel || storyData.modelOverrides.sceneDescriptionModel || MODEL_DEFAULTS.sceneDescription;
     const adCalls = [];
+    labJevReport = { light: null, vb: null, population: null, gaze: null, fixedChanges: null };
     const expStart = Date.now();
     const meta = { timings: {}, labelRound: null };
     const ad = await runArtDirector({
@@ -4446,6 +4448,9 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       labCallOptions: params.sceneNoReasoning ? { reasoning: { enabled: false } } : {},
       labForcePerPage: params.perPageExpansion === true,
       onCall: (res) => adCalls.push(res),
+      // The run's Jev decision report (light before the AD; elements, aboard,
+      // population and gaze after it) — the same function, the same fields.
+      jevReport: labJevReport,
     });
     const costOfCall = (r) => r.usage?.direct_cost ?? textCost(r.modelId || '', r.usage || {});
     allPagesCost = adCalls.reduce((a, r) => a + costOfCall(r), 0);
@@ -4564,6 +4569,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   return {
     stageKind: 'beats_scenes',
     sceneExpansions,
+    jevDecisions: labJevReport,
     events,
     replayInputsStored: storyData.replayInputsStored,
     sceneExpansionIncomplete,

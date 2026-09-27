@@ -27,6 +27,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import { createRequire } from 'node:module';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { makeJevStub } from '../helpers/jev-stub';
 
 const req = createRequire(import.meta.url);
 const ROOT = path.join(__dirname, '..', '..');
@@ -919,6 +920,8 @@ describe('beats_scenes (stored plan lines): the run\'s Art Director and review c
     JSON.stringify({ sceneIntent: 'the cover', characters: [{ name: 'Mira' }, { name: 'Tobias' }], objects: ['LOC001'], shot: 'medium' }), '',
   ].join('\n');
   let modelCalls: any[] = []; let savedStream: any;
+  const jevAuditMod2 = req('../../server/lib/jevAudit');
+  let jevStub: any; let savedJev2: any;
   beforeEach(() => {
     modelCalls = [];
     savedStream = textModelsMod.callTextModelStreaming;
@@ -927,8 +930,13 @@ describe('beats_scenes (stored plan lines): the run\'s Art Director and review c
       const text = /scene_expansion/.test(opts?.usageLabel || '') ? AD_REPLY : 'ANALYSIS:\nFAULTED PAGES: none\n';
       return { text, modelId: model, usage: { input_tokens: 1, output_tokens: 5 } };
     };
+    // The Jev decision layer runs inside runArtDirector (light before the AD,
+    // elements / aboard / population / gaze after it): stubbed at the one client.
+    savedJev2 = jevAuditMod2.callJev;
+    jevStub = makeJevStub();
+    jevAuditMod2.callJev = jevStub.impl;
   });
-  afterEach(() => { textModelsMod.callTextModelStreaming = savedStream; });
+  afterEach(() => { textModelsMod.callTextModelStreaming = savedStream; jevAuditMod2.callJev = savedJev2; });
 
   it('briefs and reviews as the run does: the run\'s Art Director call, then the SCENE reviewer', async () => {
     STORY = {
@@ -937,6 +945,7 @@ describe('beats_scenes (stored plan lines): the run\'s Art Director and review c
     };
     const r = await testlab.runBeatsScenesStage({ storyId: 'job_parity' }, { params: { plainStoredBeats: true } });
     const labCalls = modelCalls.splice(0);
+    const labJev = jevStub.calls.splice(0);
     // PRODUCTION, on the inputs generateStoryViaBeats holds at that point.
     const gl = { info() {}, warn() {}, error() {}, debug() {} };
     const inputData = { ...STORY, availableLandmarks: undefined, modelOverrides: {}, replayInputsStored: false, pageClothing: null };
@@ -952,6 +961,10 @@ describe('beats_scenes (stored plan lines): the run\'s Art Director and review c
     });
     const prodCalls = modelCalls.splice(0);
     expect(labCalls.map(c => [c.label, c.model, c.prompt])).toEqual(prodCalls.map(c => [c.label, c.model, c.prompt]));
+    // The same Jev questions over the same states, and the Lab reports them.
+    expect(labJev.length).toBeGreaterThan(0);
+    expect(labJev).toEqual(jevStub.calls);
+    expect(r.jevDecisions && r.jevDecisions.light).toBeTruthy();
     const review = labCalls.find(c => c.label === 'beats_scene_review');
     expect(review.model).toBe(MODEL_DEFAULTS.sceneReviewModel);                 // pre-fix: the beats reviewer's model
     expect(r.sceneExpansions.map((x: any) => x.pageNumber)).toEqual([1, -1]);

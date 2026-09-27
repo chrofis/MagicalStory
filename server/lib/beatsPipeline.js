@@ -1718,6 +1718,137 @@ async function finalizePlanShots({ approvedArc, beats, check, gl, callImpl }) {
 }
 
 /**
+ * THE DECISION LAYER AFTER THE ART DIRECTOR — Parts 3-5 (owner, 2026-09-27).
+ * The Visual Bible is authored in the same call as the briefs, so the element
+ * decisions run here, on the bible the Art Director wrote:
+ *   - VB citations per story page (creatures 0.7, vehicles 0.5, secondaries
+ *     0.5, objects 0.7 — 0.5–0.7 only where the brief cited it), the page's
+ *     state id, the element budget (top-P);
+ *   - `aboard` per page and vehicle; `population` per LOCATION (the LOC each
+ *     brief cites);
+ *   - `looksAt` per character, over code-listed targets (after the citations,
+ *     which are among the targets).
+ * Code writes each into the brief's metadata (jevDecisions.pinBrief), makes the
+ * bible's `pages` agree, and records per page what changed: the scene review
+ * gets a `jev_fixed_field` line for it and code re-pins the fields after the
+ * review (pinJevFixedFields). The timeOfDay/indoor decision ran before the Art
+ * Director (its FIXED line) and is pinned here with the rest.
+ *
+ * Mutates `expansions` (briefs), `beats` (b.jevFixed / b.jevChanges) and
+ * `visualBible`; returns the synced bibleSections and the report. A Jev failure
+ * throws JevDecisionError — the story step fails.
+ */
+async function applyJevBriefDecisions({ expansions, beats, visualBible, bibleSections, approvedArc, inputData, gl }) {
+  const { isCoverPage } = require('./coverBeats');
+  const { extractSceneMetadata: meta } = require('./sceneMetadata');
+  const t0 = Date.now();
+  const storyBeats = beats.filter(b => !isCoverPage(b.pageNumber));
+  const byPage = new Map(expansions.filter(x => !isCoverPage(x.pageNumber)).map(x => [Number(x.pageNumber), x]));
+  const metaOf = n => (byPage.has(n) ? (meta(byPage.get(n).brief) || {}) : {});
+  const fullOf = n => { const m = metaOf(n); return m.fullData || m; };
+  const commissioned = (inputData.characters || []).map(c => c && c.name).filter(Boolean);
+  const els = jevDecisions.vbElements(visualBible || {}, commissioned);
+  const decidedIds = els.map(e => e.id);
+  const vehicleIds = els.filter(e => e.type === 'vehicle').map(e => e.id);
+  const baseOf = id => String(id || '').trim().toUpperCase().split('.')[0];
+  const adCited = new Map(storyBeats.map(b => [Number(b.pageNumber), new Set((fullOf(Number(b.pageNumber)).objects || []).map(baseOf))]));
+  // Decide the elements and aboard, and the population of each cited location.
+  const vb = await jevDecisions.decideVbAndAboard({ arc: approvedArc, pages: storyBeats, visualBible: visualBible || {}, commissionedNames: commissioned, adCited });
+  const locOf = new Map();
+  for (const b of storyBeats) {
+    const loc = (fullOf(Number(b.pageNumber)).objects || []).map(String).find(o => /^LOC\d+/i.test(o));
+    if (loc) locOf.set(Number(b.pageNumber), baseOf(loc));
+    else gl.error('beats_jev_population_no_location', `Page ${b.pageNumber}'s brief cites no location — its population stays as the Art Director wrote it`, null, { pageNumber: b.pageNumber });
+  }
+  const pop = await jevDecisions.decidePopulation({ arc: approvedArc, pages: storyBeats, visualBible: visualBible || {}, locOf });
+  // Pin elements / population / aboard / light first — the gaze targets read the pinned citations.
+  const vbByPage = new Map(vb.pages.map(r => [r.pageNumber, r]));
+  for (const b of storyBeats) {
+    const n = Number(b.pageNumber);
+    const x = byPage.get(n);
+    if (!x) continue;
+    const r = vbByPage.get(n);
+    const locId = locOf.get(n);
+    b.jevFixed = {
+      ...(b.fixed ? { timeOfDay: b.fixed.timeOfDay, indoor: b.fixed.indoor } : {}),
+      cites: r ? r.elements.map(e => e.cite) : [], decidedIds,
+      ...(locId && pop.byLocation[locId] ? { population: pop.byLocation[locId].population } : {}),
+      aboard: r ? r.aboard : null, aboardIds: vehicleIds,
+    };
+  }
+  const gIndex = jevDecisions.gazeIndex(visualBible || {});
+  const perPage = [];
+  for (const b of storyBeats) {
+    const n = Number(b.pageNumber);
+    const x = byPage.get(n);
+    if (!x || !b.jevFixed) continue;
+    const pinned = jevDecisions.pinBrief(x.brief, b.jevFixed);
+    const f = (meta(pinned.brief) || {}).fullData || meta(pinned.brief) || {};
+    const roster = (f.characters || []).map(c => c && c.name).filter(Boolean);
+    const material = jevDecisions.gazePageMaterial({ objects: f.objects || [], interactions: f.interactions || [], planLine: b.planLine, index: gIndex });
+    perPage.push({ pageNumber: n, roster, ...material });
+  }
+  const gaze = await jevDecisions.decideGaze({ arc: approvedArc, pages: storyBeats, perPage });
+  for (const g of gaze.pages) {
+    const b = storyBeats.find(s => Number(s.pageNumber) === g.pageNumber);
+    b.jevFixed.looksAt = Object.fromEntries(g.characters.map(c => [c.name, c.looksAt]));
+  }
+  // Write every decided field into the briefs, and the bible's pages to agree.
+  const labelOf = (id) => { const e = gIndex[id] || gIndex[baseOf(id)]; return e ? e.name : id; };
+  const citesByPage = new Map();
+  const fixedChanges = [];
+  for (const b of storyBeats) {
+    const n = Number(b.pageNumber);
+    const x = byPage.get(n);
+    if (!x || !b.jevFixed) continue;
+    const pinned = jevDecisions.pinBrief(x.brief, b.jevFixed);
+    if (pinned.unparsed) {
+      gl.error('beats_jev_brief_unparsed', `Page ${n}: the brief carries no parseable METADATA — the decided fields could not be written`, null, { pageNumber: n });
+      continue;
+    }
+    x.brief = pinned.brief;
+    b.jevChanges = pinned.changes;
+    const finding = jevDecisions.fixedFieldFinding(n, pinned.changes, labelOf);
+    b.jevFinding = finding;
+    citesByPage.set(n, b.jevFixed.cites);
+    if (pinned.changes.length) fixedChanges.push({ pageNumber: n, changes: pinned.changes });
+  }
+  if (visualBible) {
+    const moved = jevDecisions.applyVbPages(visualBible, citesByPage, decidedIds);
+    if (moved && bibleSections) {
+      const synced = syncVisualBibleSection(bibleSections, visualBible);
+      if (synced === bibleSections) gl.warn('beats_vb_sync_failed', 'The decided element pages could not be written back into the transcript');
+      else bibleSections = synced;
+    }
+  }
+  const report = { vb, population: pop, gaze, fixedChanges, elapsedMs: Date.now() - t0 };
+  const nChanged = fixedChanges.length;
+  gl.info('beats_jev_brief_fields', `Jev decided the cited elements, aboard, population and gaze of ${storyBeats.length} page(s); ${nChanged} brief(s) changed by code (${vb.stats.calls + pop.stats.calls + gaze.stats.calls} Jev calls, ${(report.elapsedMs / 1000).toFixed(1)}s)`, null, {
+    changedPages: fixedChanges.map(c => c.pageNumber), stats: { vb: vb.stats, population: pop.stats, gaze: gaze.stats },
+  });
+  return { bibleSections, report };
+}
+
+/**
+ * Re-write the decided fields after a pass that rewrites briefs (the scene
+ * review and its worn-state round): a rewrite may never change them.
+ */
+function pinJevFixedFields(expansions, briefBeats, gl, pass) {
+  const moved = [];
+  for (const x of expansions) {
+    const b = (briefBeats || []).find(bb => bb && bb.pageNumber === x.pageNumber);
+    if (!b || !b.jevFixed) continue;
+    const pinned = jevDecisions.pinBrief(x.brief, b.jevFixed);
+    if (pinned.brief !== x.brief) { x.brief = pinned.brief; moved.push({ pageNumber: x.pageNumber, fields: [...new Set(pinned.changes.filter(c => !c.problem).map(c => c.field))] }); }
+  }
+  if (moved.length) {
+    log.warn(`📌 [BEATS] the ${pass} changed decided fields on ${moved.length} page(s) — re-pinned: ${moved.map(m => `p${m.pageNumber} ${m.fields.join('/')}`).join(', ')}`);
+    gl.warn('beats_jev_fields_repinned', `The ${pass} changed decided fields on ${moved.length} page(s); code re-wrote them`, null, { pass, pages: moved });
+  }
+  return moved;
+}
+
+/**
  * STEP 4 OF THE BEATS PIPELINE — the all-pages Art Director: the page and
  * cover briefs and the Visual Bible in one call (two attempts), the bible's
  * adoption (label round, the invented-child age clamp, the transcript sync),
@@ -1733,7 +1864,7 @@ async function finalizePlanShots({ approvedArc, beats, check, gl, callImpl }) {
  *
  * @returns {Promise<{expansions: Array, visualBible: object|null, bibleSections: string|null, wardrobeBibleReport: object|null, sceneExpansionReport: object, briefBeats: Array, coverBeats: Array}>}
  */
-async function runArtDirector({ inputData, modelOverrides, clothingRequirements, visualBible, bibleSections, sceneModel, onChunk, gl, meta, stage, beats, arcCentralFigure, approvedArc, onVisualBible = null, wardrobeBibleReport = null, labCallOptions = {}, labForcePerPage = false, onCall = null }) {
+async function runArtDirector({ inputData, modelOverrides, clothingRequirements, visualBible, bibleSections, sceneModel, onChunk, gl, meta, stage, beats, arcCentralFigure, approvedArc, onVisualBible = null, wardrobeBibleReport = null, labCallOptions = {}, labForcePerPage = false, onCall = null, jevReport = null }) {
   const lang = inputData.language || 'en';
   const imgModelConfig = IMAGE_MODELS[modelOverrides.imageModel || inputData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageRenderImage];
   const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters || [], clothingRequirements);
@@ -1746,7 +1877,9 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
   async function expandOnePage(b) {
     // The PLAN line stands in for page.text: in a beats-first run the text
     // does not exist yet, so the Art Director works from the locked plan.
-    const pageContent = `PLAN: ${b.planLine || ''}`;
+    // The FIXED line (the decided time of day / indoors) rides under the plan
+    // line exactly as in the all-pages plan block (promptBuilders.planBlocks).
+    const pageContent = [`PLAN: ${b.planLine || ''}`, jevDecisions.fixedLine(b.fixed)].filter(Boolean).join(String.fromCharCode(10));
     const prompt = buildSceneExpansionPrompt(
       b.pageNumber, pageContent, inputData.characters || [], lang,
       visualBible, availableAvatars, null,
@@ -1803,6 +1936,21 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
   }
 
   let t = Date.now();
+  // THE LIGHT IS DECIDED BEFORE THE ART DIRECTOR WRITES (owner, 2026-09-27,
+  // Part 4): Jev's timeOfDay (the clock held forward in code) and indoors per
+  // story page, from the arc and the plan. Each reaches the Art Director as the
+  // page's FIXED line; weather stays the Art Director's, Jev's answer logged
+  // beside it. A Jev failure throws — no second author for the light.
+  {
+    const light = await jevDecisions.decideLight({ arc: approvedArc, pages: beats });
+    const byNum = new Map(light.pages.map(r => [r.pageNumber, r]));
+    for (const b of beats) {
+      const r = byNum.get(Number(b.pageNumber));
+      if (r) b.fixed = { timeOfDay: r.timeOfDay, indoor: r.indoor, weatherAdvice: r.weatherAdvice };
+    }
+    if (jevReport) jevReport.light = light;
+    gl.info('beats_jev_light', `Light by Jev + code: ${light.pages.map(r => `p${r.pageNumber} ${r.timeOfDay}${r.indoor ? '/in' : ''}`).join(', ')}${light.clockHeld.length ? ` — clock held on ${light.clockHeld.map(h => `p${h.pageNumber} (${h.jev}→${h.held})`).join(', ')}` : ''}`, null, { pages: light.pages, clockHeld: light.clockHeld, stats: light.stats });
+  }
   // COVERS ARE PAGES (owner, 2026-09-24). Each cover the job renders is a page
   // whose BEAT code writes (coverBeats.js: purpose, cast, costumes, the landmark
   // rule, the element budget, gaze and the copy space), briefed by the Art
@@ -2096,6 +2244,22 @@ ${bibleBody}` : bibleBody;
   }
   meta.timings.sceneExpansionMs = Date.now() - t;
 
+  // ── The decision layer after the Art Director (Parts 3-5) ────────────────
+  {
+    const decided = await applyJevBriefDecisions({ expansions, beats, visualBible, bibleSections, approvedArc, inputData, gl });
+    bibleSections = decided.bibleSections;
+    if (jevReport) Object.assign(jevReport, { vb: decided.report.vb, population: decided.report.population, gaze: decided.report.gaze, fixedChanges: decided.report.fixedChanges });
+    // Jev's weather is an ADVICE: a disagreement with the Art Director's own
+    // weather is logged, never written.
+    const { extractSceneMetadata: m } = require('./sceneMetadata');
+    const disagree = beats.filter(b => b.fixed && b.fixed.weatherAdvice).map((b) => {
+      const x = expansions.find(e => e.pageNumber === b.pageNumber);
+      const f = x ? ((m(x.brief) || {}).fullData || m(x.brief) || {}) : {};
+      return f.weather && f.weather !== b.fixed.weatherAdvice ? `p${b.pageNumber} AD ${f.weather} / Jev ${b.fixed.weatherAdvice}` : null;
+    }).filter(Boolean);
+    if (disagree.length) gl.info('beats_jev_weather_advice', `Weather, Art Director vs Jev (advisory): ${disagree.join(', ')}`, null, { disagree });
+  }
+
   // THE PROMPT THAT WROTE THE BRIEFS (2026-09-19).
   //
   // `sceneReviewReport.prompt` is the REVIEWER's prompt. The Art Director's own
@@ -2266,6 +2430,25 @@ async function runSceneReview({ inputData, expansions, clothingRequirements, vis
       visualBible,
       { textZoneRules: textZoneRulesActive(inputData) }
     );
+    // THE DECIDED FIELDS (Jev decision layer, 2026-09-27): each page whose
+    // brief code changed after the Art Director gets one `jev_fixed_field`
+    // line — what code set, so the prose follows. A `plan_cast_uncited` on
+    // such a page cannot be answered here (code owns objects[] and re-pins
+    // it after the review), so it is withheld from the reviewer and logged as
+    // the disagreement it is: the who column names a figure Jev did not put
+    // in the picture.
+    for (const b of (briefBeats || [])) {
+      if (!b || !b.jevFixed) continue;
+      const list = res.byPage.get(b.pageNumber) || [];
+      const uncited = list.filter(f => f.type === 'plan_cast_uncited');
+      if (uncited.length) {
+        gl.error('beats_jev_vb_vs_who_column', `Page ${b.pageNumber}: the who column names a figure Jev did not put in the picture — ${uncited.map(f => f.detail.split('.')[0]).join('; ')}`, null, { pageNumber: b.pageNumber });
+      }
+      const next = list.filter(f => f.type !== 'plan_cast_uncited');
+      if (b.jevFinding) next.push(b.jevFinding);
+      if (next.length) res.byPage.set(b.pageNumber, next); else res.byPage.delete(b.pageNumber);
+      res.findings = [...res.findings.filter(f => !(f.pageNumber === b.pageNumber && f.type === 'plan_cast_uncited')), ...(b.jevFinding ? [b.jevFinding] : [])];
+    }
     for (const [pn, list] of res.byPage) briefBeforeByPage.set(pn, new Set(list.map(f => f.type)));
     // The findings THEMSELVES, not only their types: the post-review verdict is
     // briefCorrection.judgeCorrection, the same partition the rewrite path now
@@ -2839,6 +3022,9 @@ async function runSceneReview({ inputData, expansions, clothingRequirements, vis
     }
   }
 
+  // The review (and its worn-state round) may not change a decided field.
+  const repinned = pinJevFixedFields(expansions, briefBeats, gl, 'scene review');
+  if (sceneReviewReport) sceneReviewReport.jevRepinned = repinned;
   return { sceneReviewReport, sceneReviewAnalysis, sceneReviewFailed, bibleSections, clothingBefore };
 }
 
@@ -3806,7 +3992,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   await checkCancellation();
   const ad = await runArtDirector({
     inputData, modelOverrides, clothingRequirements, visualBible, bibleSections, sceneModel, onChunk, gl, meta, stage,
-    beats, arcCentralFigure, approvedArc, onVisualBible, wardrobeBibleReport,
+    beats, arcCentralFigure, approvedArc, onVisualBible, wardrobeBibleReport, jevReport,
   });
   let expansions = ad.expansions;
   visualBible = ad.visualBible;
@@ -4196,4 +4382,4 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   return { title, titleJudge, beats, pages, scenes, coverScenes, rawOutline, visualBible, meta, challengeDrawIds, challengeTakenIds, challengeDraw, arcReviewReport, beatsReviewReport, jevDecisions: jevReport, storyBibleReport, clothingReviewReport, wardrobeBibleReport, sceneExpansionReport, sceneReviewReport };
 }
 
-module.exports = { generateStoryViaBeats, finalizePlanShots, runArtDirector, arcTempFor, makeArcCreatorCall, runSceneReview, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, bibleCorrectionsMissingFromTranscript, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };
+module.exports = { generateStoryViaBeats, finalizePlanShots, applyJevBriefDecisions, pinJevFixedFields, runArtDirector, arcTempFor, makeArcCreatorCall, runSceneReview, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, bibleCorrectionsMissingFromTranscript, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };

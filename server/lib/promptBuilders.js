@@ -3208,6 +3208,9 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // The page's declared light (sceneLight.js) — one rule for every brief author
     // and the scene review's check (sibling set scene-light-generator-vs-critic).
     SCENE_LIGHT_FIELD: SCENE_LIGHT_FIELD_RULE,
+    // The Jev decision layer's fixed fields (2026-09-27) — one constant for the
+    // brief authors and the scene review (jevDecisions.JEV_FIXED_FIELDS_RULE).
+    JEV_FIXED_FIELDS: require('./jevDecisions').JEV_FIXED_FIELDS_RULE,
     // No TEXT_NOT_A_CHECKLIST: the page text is written AFTER these briefs, so
     // this call never sees it and a rule about it cannot apply (owner,
     // 2026-09-23). The per-page Art Director and both iterate templates see
@@ -3539,6 +3542,9 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // The page's declared light (sceneLight.js) — one rule for every brief author
     // and the scene review's check (sibling set scene-light-generator-vs-critic).
     SCENE_LIGHT_FIELD: SCENE_LIGHT_FIELD_RULE,
+    // The Jev decision layer's fixed fields (2026-09-27) — one constant for the
+    // brief authors and the scene review (jevDecisions.JEV_FIXED_FIELDS_RULE).
+    JEV_FIXED_FIELDS: require('./jevDecisions').JEV_FIXED_FIELDS_RULE,
     // ONE rule for every template that authors or judges a page against its
     // text — see TEXT_NOT_A_CHECKLIST_RULE. The brief author's half is the
     // PERMISSION: the page text may name more than the frame stages.
@@ -8640,9 +8646,12 @@ function parsePlanResponse(raw, expectedPages = []) {
  * Art Director and the writer can never be shown different divisions.
  */
 function planBlocks(pages = []) {
+  // A story page's FIXED line (the Jev decision layer's time of day and
+  // indoors, 2026-09-27) rides under its plan line; covers carry none.
+  const { fixedLine } = require('./jevDecisions');
   return (pages || [])
     .filter(p => p && p.pageNumber != null)
-    .map(p => `## Page ${p.pageNumber}\nPLAN: ${String(p.planLine || '').trim()}`)
+    .map(p => [`## Page ${p.pageNumber}`, `PLAN: ${String(p.planLine || '').trim()}`, fixedLine(p.fixed)].filter(Boolean).join('\n'))
     .join('\n\n');
 }
 
@@ -11767,6 +11776,9 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
     GROUP_STAGING: GROUP_STAGING_RULE,
     // Check 3a, from the one rule every brief author is given (sceneLight.js).
     SCENE_LIGHT_FIELD: SCENE_LIGHT_FIELD_RULE,
+    // The Jev decision layer's fixed fields (2026-09-27) — one constant for the
+    // brief authors and the scene review (jevDecisions.JEV_FIXED_FIELDS_RULE).
+    JEV_FIXED_FIELDS: require('./jevDecisions').JEV_FIXED_FIELDS_RULE,
   });
 }
 

@@ -3692,6 +3692,25 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "jev-decision-layer-wired",
+      "title": "The Jev decision layer decides shots, group-page cast cuts, VB citations, light/place fields and gaze; code writes them and the review renders them",
+      "commits": [
+        "00552f02b",
+        "cb6a76538"
+      ],
+      "addedAt": "2026-09-27",
+      "claim": "On the next full staging beats story: stories.data.jevDecisions holds shots (every plan line field 0 a vocabulary shot, 0 violations), castCuts per re-plan round when the group budget was over (the shipped division holds at most budget group pages, no code-cut page names a removed character), light (every story brief timeOfDay = the decided one, weather none exactly on indoor pages), vb (every creature the reading puts in a page is cited), population per location and gaze (every story brief looksAt = the decided target). The scene review got jev_fixed_field lines for the changed pages and code re-pinned any field it moved. No JevDecisionError. The pixels show the cited creatures, the declared light and the gaze.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "stories.data.jevDecisions; sceneImages[].sceneMetadata fields vs jevDecisions; sceneReviewReport.briefFindings (jev_fixed_field) and jevRepinned; per-page pixels. Replays: scripts/analysis/replay-jev-decision-layer.js (shots 0.935 / 0 violations; cuts 5/5 budget, 7/7; VB creatures 31/31; light indoor 69/70; population 13/13; aboard 9/10; gaze 124/139). Lab 1577 (beats_replan, dragon book)."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

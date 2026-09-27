@@ -173,7 +173,7 @@ Then a single-line JSON object:
 
 **`sceneIntent`** (required): {SCENE_INTENT_FIELD}
 
-**`timeOfDay` / `weather`** (required): {SCENE_LIGHT_FIELD}
+**`timeOfDay` / `weather`** (required): {SCENE_LIGHT_FIELD} {JEV_FIXED_FIELDS}
 
 **`characters[]`**
 - One entry per main or primary character in the scene. Secondary characters never appear here — they have no avatar, so no clothing category can apply to them.
