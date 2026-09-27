@@ -3804,6 +3804,25 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "page-prompt-fixed-blocks-fit",
+      "title": "The page prompt's fixed blocks are compact: a full scene fits the Grok cap and no page ships without an image for prompt length",
+      "commits": [
+        "9c897bc16"
+      ],
+      "addedAt": "2026-09-27",
+      "claim": "On the next staging story no page or cover logs prompt_fit_failed, and the pages with worn items, ambient passers-by and cited objects render them as the (shorter) lines say: each worn row on or off as listed, the passers-by small and far behind, every cited object present, the declared light.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "pagePromptsFit"
+      },
+      "status": "pending",
+      "evidence": [],
+      "backlog": "tasks/BACKLOG.md 'Verification pending' — FAILED verify jev-decision-layer-wired smoke p1/p4 line"
     }
   ],
   "runs": [
