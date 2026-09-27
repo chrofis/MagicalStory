@@ -2,8 +2,11 @@
  * The verification registry's one engine: load a stored run, judge entries
  * against it, and write verdicts back into the registry object.
  *
- * Used by scripts/admin/verify-run.js (CLI: --write, --mark, --unrecorded).
- * No dotenv, no pool creation, no git: callers pass those in.
+ * Used by scripts/admin/verify-run.js (CLI: --write, --pull, --mark,
+ * --unrecorded) and by server/lib/verifyAutoCheck.js (the staging server judges
+ * every story it completes). One module so the two can never disagree about
+ * what a verdict means. No dotenv, no pool creation, no git: callers pass those
+ * in, so the server (no .git in the container) can require it.
  *
  * WRITE-BACK RULES (applyVerdicts):
  *   CONFIRMED    appended to evidence[]; status -> confirmed
@@ -102,6 +105,36 @@ function judgeAll(entries, ctx, contains) {
     .sort((a, b) => RESULTS.indexOf(a.j.result) - RESULTS.indexOf(b.j.result));
 }
 
+/** Every commit taken as present — for a caller without git (the server). --pull re-checks with git. */
+const ASSUME_CONTAINED = () => true;
+
+/**
+ * A server-stored report re-read with git: a verdict for an entry whose commit
+ * the run's build lacks becomes NOT COVERED — the server cannot tell, git can.
+ * Entries the report does not hold (registered after that build) are skipped:
+ * their commits cannot be in it. Returns [{ e, v }] like judgeAll + verdictOf.
+ */
+function verdictsFromReport(report, entries, contains) {
+  const byId = new Map((report?.verdicts || []).map(v => [v.id, v]));
+  const out = [];
+  for (const e of entries) {
+    const v = byId.get(e.id);
+    if (!v) continue;
+    if (!report.build) { out.push({ e, v: { id: e.id, result: 'NOT COVERED', why: 'run has no recorded build commit' } }); continue; }
+    const missing = [];
+    let unknown = null;
+    for (const c of e.commits || []) {
+      const has = contains(c, report.build);
+      if (has === null) { unknown = c; break; }
+      if (!has) missing.push(c);
+    }
+    if (unknown) out.push({ e, v: { id: e.id, result: 'NOT COVERED', why: `cannot resolve ${unknown} or build ${report.build.slice(0, 9)} locally (git fetch?)` } });
+    else if (missing.length) out.push({ e, v: { id: e.id, result: 'NOT COVERED', why: `build ${report.build.slice(0, 9)} lacks ${missing.join(', ')}`, oldCode: true, detail: v.detail } });
+    else out.push({ e, v });
+  }
+  return out.sort((a, b) => RESULTS.indexOf(a.v.result) - RESULTS.indexOf(b.v.result));
+}
+
 function noteOf(v) {
   return [v.why, v.detail, v.human ? `LOOK: ${v.human}` : null].filter(Boolean).join(' | ').slice(0, NOTE_MAX);
 }
@@ -164,6 +197,6 @@ function markVerdict(reg, run, { id, verdict, note, by }, { checkedAt }) {
 }
 
 module.exports = {
-  RESULTS,
-  loadRun, judge, verdictOf, judgeAll, applyVerdicts, recordedStoryIds, markVerdict, noteOf,
+  RESULTS, ASSUME_CONTAINED,
+  loadRun, judge, verdictOf, judgeAll, verdictsFromReport, applyVerdicts, recordedStoryIds, markVerdict, noteOf,
 };

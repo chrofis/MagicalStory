@@ -57,9 +57,11 @@ Fresh timestamped account, generated family photos, full character creation, all
 - **Never launch unprompted** — showcases and story runs only when the user asked for validation.
 - **Don't push while a run is in flight** — a deploy kills it (the pre-push hook checks, but don't lean on it).
 - **"Orchestrator exited 0" ≠ story done** — check `story_jobs.status='completed'`, then look at EVERY page image and report per-page issues.
-- **Write the verdicts back — every run, no exceptions** (owner, 2026-09-27). Once the job is completed:
+- **Write the verdicts back — every run, no exceptions** (owner, 2026-09-27). The staging server judges
+  every story it completes into `story_verify_reports` by itself; it cannot commit, so once the job is completed:
   ```bash
-  node scripts/admin/verify-run.js <storyId> [--env=prod] --write
+  node scripts/admin/verify-run.js --pull                       # staging: every stored report not yet recorded
+  node scripts/admin/verify-run.js <storyId> --env=prod --write  # a prod run (no server report there)
   git commit -m "chore(verify): verdicts from <storyId>" -- tasks/verify.json
   ```
   CONFIRMED and FAILED are appended as evidence and set the entry's status; HUMAN and NOT COVERED stay

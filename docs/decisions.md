@@ -21,6 +21,37 @@ superseded and link forward.
 
 ---
 
+## 2026-09-27 — The staging server judges every story it completes against the verification registry; --pull writes it into git
+
+**Context:** Owner, 2026-09-27: the code-checkable verify checks should run by themselves after every
+staging story, so a run is never left unjudged because nobody ran `verify-run.js`.
+
+**Decision:**
+- `server/lib/verifyAutoCheck.js` runs after the completion write in `storyJobPipeline.js`, in a guarded
+  `setImmediate` next to the story-metrics collector: it loads the story, judges every non-superseded entry
+  of the deployed `tasks/verify.json` with the SAME engine (`scripts/admin/verify-core.js`, no copy), and
+  upserts one row per story into `story_verify_reports` (migration 043: story_id, env, build, counts,
+  report JSONB). FAILED verdicts are logged at error level. It never throws; its own failure is logged.
+- Staging only: `runtime('verifyAutoCheck')` = perEnvironment `{ default: false, staging: true }` — the
+  second deliberate environment difference (pinned by tests/unit/inventory-model-unified.test.ts).
+- The container has no `.git`, so the server takes every entry commit as present (`ASSUME_CONTAINED`);
+  `verify-run.js --pull` reads the rows the registry has not recorded, re-checks each entry's commits against
+  the run's build with git (`verdictsFromReport`: a commit the build lacks turns the verdict into NOT
+  COVERED), and writes through the same `applyVerdicts`. Entries registered after a run's build are not in
+  its report — their commits cannot be in that build.
+- Its own table, not `stories.data`: `upsertStory` rewrites `data` whole, and a post-completion write must
+  neither race nor bloat it.
+
+**Validation:** replayed against staging job_1790446348343_z3fw660ie with the INSERT captured (the table
+does not exist until deploy): 83 entries judged in 2.2 s, 22.7 KB report; the --pull view (2 FAILED,
+37 HUMAN, 30 NOT COVERED over the 69 pending) equals `verify-run.js z3fw660ie`'s own dry run.
+
+**Touched:** server/lib/verifyAutoCheck.js (new), migrations/043_story_verify_reports.sql, server/config/runtime.js,
+storyJobPipeline.js, scripts/admin/verify-core.js, scripts/admin/verify-run.js (--pull),
+tests/unit/verify-auto-check.test.ts, tests/unit/inventory-model-unified.test.ts,
+.claude/skills/running-validation-stories/SKILL.md.
+**Status:** ✅ staging.
+
 ## 2026-09-27 — Every verification run writes its verdicts back into tasks/verify.json; an auto FAILED now sets status failed
 
 **Context:** Owner, 2026-09-27: triage the 69 pending registry entries and make it a rule, enforced by

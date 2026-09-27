@@ -34,8 +34,14 @@
  * Usage:
  *   node scripts/admin/verify-run.js <storyId> [--env=staging|prod] [--write] [--all]
  *   node scripts/admin/verify-run.js <storyId> --mark=<entryId>:confirmed|failed --note="what you saw" [--by=claude|owner] [--env=...]
+ *   node scripts/admin/verify-run.js --pull [--all]     # write the reports the staging server stored
  *   node scripts/admin/verify-run.js --unrecorded       # staging runs not yet judged into the registry (warns)
  *   node scripts/admin/verify-run.js --list
+ *
+ * AUTO-CHECK (2026-09-27): the staging server judges every story it completes
+ * (server/lib/verifyAutoCheck.js, same engine) into story_verify_reports. It
+ * has no git, so --pull re-checks each entry's commits against the run's build
+ * before writing — a report verdict for a commit the build lacks is NOT COVERED.
  *
  *   --write  record the verdicts (rules above).
  *   --all    also judge entries that are already confirmed or failed (regression read).
@@ -127,6 +133,44 @@ async function unrecorded(pool, reg) {
   return r.rows.filter(x => !seen.has(`staging:${x.id}`));
 }
 
+/**
+ * --pull: write the reports the staging server stored (story_verify_reports,
+ * server/lib/verifyAutoCheck.js) for every run the registry has not recorded.
+ * Containment is re-checked here with git — the server cannot.
+ */
+async function pull(env) {
+  const reg = loadRegistry();
+  const pool = openPool(env);
+  let rows;
+  try {
+    rows = (await pool.query('SELECT story_id, build, report, created_at FROM story_verify_reports ORDER BY created_at')).rows;
+  } finally { await pool.end(); }
+  const seen = core.recordedStoryIds(reg);
+  const fresh = rows.filter(r => !seen.has(`${env}:${r.story_id}`));
+  if (!fresh.length) { console.log(`verify-run --pull: all ${rows.length} stored ${env} report(s) are already recorded in tasks/verify.json`); return; }
+  const checkedAt = ch(new Date());
+  const allFailed = [];
+  for (const r of fresh) {
+    const report = typeof r.report === 'string' ? JSON.parse(r.report) : r.report;
+    const targets = reg.entries.filter(e => e.status === 'pending' || (arg('all') && ['confirmed', 'failed'].includes(e.status)));
+    const verdicts = core.verdictsFromReport(report, targets, buildContains);
+    const run = { storyId: r.story_id, env, build: report.build || null, runDate: report.runAt ? ch(new Date(report.runAt)) : null };
+    console.log(`\n${r.story_id} (${env}) — run ${run.runDate || '?'}, build ${run.build ? run.build.slice(0, 9) : 'UNRECORDED'}`);
+    for (const { e, v } of verdicts) if (v.result !== 'NOT COVERED') printRow(e, v);
+    const { counts, flipped } = core.applyVerdicts(reg, run, verdicts, { checkedAt, via: 'pull' });
+    console.log(`  ${counts.CONFIRMED} CONFIRMED, ${counts.FAILED} FAILED, ${counts.HUMAN} HUMAN, ${counts['NOT COVERED']} NOT COVERED`
+      + `${flipped.length ? ` — status changed: ${flipped.map(f => `${f.id} ${f.from}->${f.to}`).join(', ')}` : ''}`);
+    for (const { e, v } of verdicts) if (v.result === 'FAILED') allFailed.push(`${e.id} on ${r.story_id}`);
+  }
+  saveRegistry(reg);
+  if (allFailed.length) {
+    console.log(`\n!!! ${allFailed.length} FAILED: ${allFailed.join(', ')}`);
+    console.log('!!! Investigate each, and add a tasks/BACKLOG.md line for it.');
+  }
+  console.log(`\n${fresh.length} run(s) written to tasks/verify.json. Next: look at the HUMAN entries, then`);
+  console.log('commit it: git commit -m "chore(verify): verdicts from <storyIds>" -- tasks/verify.json');
+}
+
 async function main() {
   if (process.argv.includes('--list')) {
     const reg = loadRegistry();
@@ -150,13 +194,19 @@ async function main() {
       console.log('');
       console.log(`verify-registry: WARNING — ${rows.length} staging run(s) not yet judged into tasks/verify.json:`);
       for (const x of rows) console.log(`  ${x.id}  ${ch(fromPgNaive(x.created_at))}  build ${String(x.build).slice(0, 9)}${x.trial === 'true' ? '  (trial)' : ''}`);
-      console.log('  Record each: node scripts/admin/verify-run.js <storyId> --write   then commit tasks/verify.json');
+      console.log('  Record them: node scripts/admin/verify-run.js --pull (the reports the staging server stored)');
+      console.log('           or: node scripts/admin/verify-run.js <storyId> --write — then commit tasks/verify.json');
       console.log('  (a warning only — this does not block the push)');
     } catch (e) {
       console.log(`verify-registry: unrecorded-run check skipped (${e.message})`);
     } finally {
       if (pool) await pool.end().catch(() => {});
     }
+    return;
+  }
+
+  if (process.argv.includes('--pull')) {
+    await pull(arg('env') || 'staging');
     return;
   }
 

@@ -7275,6 +7275,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           log.warn(`⚠️ [METRICS] collector unavailable: ${err.message}`);
         }
       });
+      // Verification registry auto-check (staging only, runtime verifyAutoCheck):
+      // judges this story against tasks/verify.json and stores the verdicts in
+      // story_verify_reports. Same fire-and-forget contract as the metrics above —
+      // runVerifyAutoCheck never throws and logs its own failure.
+      setImmediate(() => {
+        try {
+          require('./server/lib/verifyAutoCheck').runVerifyAutoCheck(storyId, { pool: dbPool });
+        } catch (err) {
+          log.error(`❌ [VERIFY] auto-check unavailable for ${storyId}: ${err.message}`);
+        }
+      });
     }
 
     // Clean up checkpoints ONLY when this run really flipped the job to

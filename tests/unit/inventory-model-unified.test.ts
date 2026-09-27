@@ -97,8 +97,8 @@ describe('stage-1 inventory model', () => {
 });
 
 describe('remaining per-environment differences', () => {
-  it('repairMaxPasses is the only one left', async () => {
-    // runtime.js:118 claims this in a comment. Pin it, so the comment cannot
+  it('repairMaxPasses and verifyAutoCheck are the only ones left', async () => {
+    // runtime.js:119 claims this in a comment. Pin it, so the comment cannot
     // quietly become false the way the inventory split made it false.
     const perEnvKeys: string[] = [];
     const { SETTINGS } = await loadRuntimeFor('staging');
@@ -107,6 +107,6 @@ describe('remaining per-environment differences', () => {
         perEnvKeys.push(name);
       }
     }
-    expect(perEnvKeys).toEqual(['repairMaxPasses']);
+    expect(perEnvKeys).toEqual(['repairMaxPasses', 'verifyAutoCheck']);
   });
 });
