@@ -10,7 +10,7 @@
       "impact": "The page renders the creature from nothing (p11 v0: no dragon; the iterate v1 drew one and scored 31). Scope: over 59 stored staging stories a bible figure named in the plan line outside the who column and uncited is 67 pages, of which 5 are this shape (dka3jpog9 p11/p15, kc2joi4ax p18, i9ah2221i p7/p15) — the rest are names without a body.",
       "status": "fixed",
       "fixedAt": "2026-09-27",
-      "fixedIn": "see the next entry-update commit",
+      "fixedIn": "3a65d887e",
       "fix": "FIGURE_PART_IN_FRAME_RULE ('a figure the picture shows only in part … is in that picture exactly as if it were shown whole; only a name without a body is context') inside PLAN_LINE_FIELD_CONTRACT (planner) and PLAN_LINE_CAST_RULE (both AD templates, both iterate templates, scene-review 5a); plan-check UNLISTED names parts beyond hand/face. Code: sceneBriefCheck.checkPlanCastCited → plan_cast_uncited (who column comma list vs authored name/label, never the instant), sent to the scene review and caught on an iterate rewrite. The plan-line name match the task proposed is NOT built: measured 57 false of 67 (docs/decisions.md 2026-09-27). Test: tests/unit/figure-part-in-frame.test.ts."
     },
     {
@@ -22,7 +22,7 @@
       "impact": "The whole entry's correction was dropped: on dka3jpog9 the 'missing scale' state kept no pages at the review, so p15 (the page the gap is pointed at) had no state of its own until the later usage rebuild. In the 30 days to 2026-09-27, 2 of 57 staging stories with a scene review logged this rejection reason (dka3jpog9 confirmed a cover page; 3kxqshifx predates covers-as-pages, raw correction not stored).",
       "status": "fixed",
       "fixedAt": "2026-09-27",
-      "fixedIn": "970742e2d",
+      "fixedIn": "edbd4b4a5",
       "fix": "A state page is valid when it is a cover page (coverBeats.isCoverPage) or 1..pageCount. Test: tests/unit/review-bible-writeback.test.ts (dka3jpog9 shape: applied, written back, re-parsed, p15 resolves to ANI001.2; 0 / pageCount+1 / -4 still rejected). Replay of the stored dka3jpog9 transcript + review-time ANI001 through applyReviewBibleCorrections + syncVisualBibleSection + re-parse: applied, 0 missing from the transcript, p14/p15/p16 -> ANI001.1/.2/.3."
     },
     {

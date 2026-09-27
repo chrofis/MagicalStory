@@ -2,6 +2,24 @@
   "_readme": "VERIFICATION REGISTRY. A behaviour change whose proof needs a story run gets an entry here in the same push (pre-push gate scripts/admin/check-verify-coupling.js; escape: a `Verify: none (<reason>)` or `Verify: <entry-id>` commit trailer). RULE (owner, 2026-09-27): after EVERY verification run, `node scripts/admin/verify-run.js <storyId> [--env=prod] --write` and commit this file; the pre-push hook warns (never blocks) while a staging run since 2026-09-24 is unrecorded (`verify-run.js --unrecorded`). The checker judges every pending entry against the stored run: CONFIRMED / FAILED / HUMAN / NOT COVERED. A run is evidence only for commits its recorded build (stories.data.analytics.build.commitFull) contains; an absent run shape (no over-the-shoulder page, no iterate repair ...) is NOT COVERED, never a pass. --write (rules in scripts/admin/verify-core.js applyVerdicts): CONFIRMED appends evidence and sets status confirmed; FAILED appends evidence and sets status failed (add a tasks/BACKLOG.md line); HUMAN and NOT COVERED leave the status alone and overwrite lastChecked {storyId, env, build, runDate, checkedAt, result, note}; the run is logged once in runs[]. The staging server judges every completed story into story_verify_reports; `verify-run.js --pull` writes those reports here (containment re-checked with git). HUMAN entries a run exercises: `node scripts/admin/verify-review.js <storyId>` writes one local HTML page with the images, the claim and a verdict control; its downloaded verdicts file is recorded with `verify-run.js <storyId> --apply=<file>`. A person's verdict (Claude or the owner, after looking): `--mark=<id>:confirmed|failed --note=\"what was seen\" --by=claude|owner`. Fields: id; title; commits (every one must be in the run's build); addedAt; claim (what a new run must show, one sentence); runShape (all must hold: any | full-story | trial | age-band:N (or N|M) | needs-shot:<shot> | needs-iterate-repair | needs-char-fix | needs-inpaint | needs-fresh-idea | needs-worn-off | needs-fresh-avatar-sheet | needs-composite | lab-stage — defined in scripts/admin/verify-checks.js SHAPES); check ({kind:'auto', fn} names a function in verify-checks.js, {kind:'human', what} says what to look at; optional images: [pages | versions | plates | covers | sheets] names what the review page shows); status (pending | confirmed | failed | superseded); evidence[] (appended by --write or --mark; never edited by hand, never deleted); lastChecked (the last run a HUMAN / NOT COVERED verdict was read against); triage (a hand-recorded status decision made from stored data outside the checker: {date, status, note}). Entries are never deleted: a change that is replaced becomes superseded with a note.",
   "entries": [
     {
+      "id": "creature-part-in-who-column",
+      "title": "A Visual Bible creature the instant shows only in part is in the plan line's who column and cited in the brief",
+      "commits": [
+        "3a65d887e"
+      ],
+      "addedAt": "2026-09-27",
+      "claim": "On a story whose Visual Bible has a creature (animals[]), every page whose plan-line instant stages part of that creature (its wing, head, tail, chest) lists it in the who column, and the page brief cites its id in objects[], so the page prompt carries its REQUIRED OBJECTS size line and reference; no page brief ships plan_cast_uncited.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read data.beatsReviewReport.pagePlan: for each page whose instant names a creature entry's name with a body part, confirm the who column carries it; then for those pages confirm sceneImages[].sceneDescription objects[] cites the ANI id and imageVersions[0].prompt has the creature's REQUIRED OBJECTS line; sceneReviewReport.briefFindings has no plan_cast_uncited left in briefUnfixed."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
       "id": "aerial-not-owed",
       "title": "The aerial shot is allowed, never owed; the camera-position total is unchanged",
       "commits": [
