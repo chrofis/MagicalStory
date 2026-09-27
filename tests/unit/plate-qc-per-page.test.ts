@@ -26,9 +26,10 @@ describe('the text position a page plate is judged with', () => {
 });
 
 describe('the story run judges every per-page plate', () => {
-  const src = fs.readFileSync(path.join(process.cwd(), 'storyJobPipeline.js'), 'utf8').replace(/\r\n/g, '\n');
-  const start = src.indexOf('const renderPagePlate = async');
-  const end = src.indexOf('const storePagePlate = ', start);
+  // The run's per-page plate lives in platePipeline.js since 2026-09-27 (shared with the Lab).
+  const src = fs.readFileSync(path.join(process.cwd(), 'server/lib/platePipeline.js'), 'utf8').replace(/\r\n/g, '\n');
+  const start = src.indexOf('async function renderPagePlate(');
+  const end = src.indexOf('module.exports', start);
   const body = src.slice(start, end);
 
   it('runs the QC on every rendered plate, not only on text-in-image layouts', () => {
@@ -50,16 +51,16 @@ describe('the story run judges every per-page plate', () => {
 });
 
 describe('every story-run plate QC gets its inputs whole, and the STRUCTURES the author got (2026-09-26)', () => {
-  const src = fs.readFileSync(path.join(process.cwd(), 'storyJobPipeline.js'), 'utf8').replace(/\r\n/g, '\n');
-  const perPage = src.slice(src.indexOf('const renderPagePlate = async'), src.indexOf('const storePagePlate = '));
-  const vantage = src.slice(src.indexOf('const repPlate = resolvePagePlate({'), src.indexOf('const renderPagePlate = async'));
+  const src = fs.readFileSync(path.join(process.cwd(), 'server/lib/platePipeline.js'), 'utf8').replace(/\r\n/g, '\n');
+  const perPage = src.slice(src.indexOf('async function renderPagePlate('), src.indexOf('module.exports'));
+  const vantage = src.slice(src.indexOf('const repPlate = resolvePagePlate({'), src.indexOf('async function renderPagePlate('));
 
   it('per-page: EXPECTED SCENE is the SHOT line beside the whole plate text, never both copies', () => {
     expect(perPage).toContain('sceneDescription: expandedEmptyPrompt ? shotPrefix.trim() : emptySceneDesc,');
     expect(perPage).toContain('framing: expandedEmptyPrompt || null,');
   });
   it('per-page: the STRUCTURES text from the plate builder\'s own function, and the grid the call carried', () => {
-    expect(perPage).toMatch(/structures: require\('\.\/server\/services\/prompts'\)\.buildPlateStructuresText\(\{ visualBible, pageNumber: pageData\.pageNumber, aboardId: pageAboardId, sceneObjects: pageSceneObjects \}\)/);
+    expect(perPage).toMatch(/structures: require\('\.\.\/services\/prompts'\)\.buildPlateStructuresText\(\{ visualBible, pageNumber: pageData\.pageNumber, aboardId: pageAboardId, sceneObjects: pageSceneObjects \}\)/);
     expect(perPage).toContain('structureGrid: emptySceneVbGrid || null,');
   });
   it('vantage: the setting text the prompt carries, the FRAMING apart; derived: the setting, no FRAMING, the base\'s structures', () => {
@@ -79,9 +80,10 @@ describe('every story-run plate QC gets its inputs whole, and the STRUCTURES the
   });
 });
 
-describe('the Lab judges its plate with the same rule', () => {
-  it('runEmptySceneStage takes its QC text position from plateQcTextPosition', () => {
+describe('the Lab judges its plate with the same code', () => {
+  it('runEmptySceneStage renders through the run\'s own plate functions', () => {
     const lab = fs.readFileSync(path.join(process.cwd(), 'server/lib/testlab.js'), 'utf8');
-    expect(lab).toContain("require('./plateQc').plateQcTextPosition(wantsTextZone, ctx.textPosition)");
+    expect(lab).toContain('plates.renderPagePlate(target, env)');
+    expect(lab).toContain('plates.renderVantagePlates(route.vantageId, route.group, env)');
   });
 });

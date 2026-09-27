@@ -606,7 +606,7 @@ Owner: "The Lab must use 100% identical code to production." Fixed on 2026-09-27
 char_repair, and the edit_image plate derive (decisions.md 2026-09-27). The remaining divergences
 are listed stage by stage in the audit table.
 
-- [ ] empty_scene: build the mask with `pageTextAreaMask`; render a vantage page's plate from the representative page → docs/testlab-prod-parity.md:31
+- [x] empty_scene: build the mask with `pageTextAreaMask`; render a vantage page's plate from the representative page — fixed 2026-09-27 (`server/lib/platePipeline.js`, shared with the run) → docs/testlab-prod-parity.md:31
 - [ ] inpaint / consolidate: pass the page's real entity issues, `sceneClothing` and `readerFindings` to the consolidator; use an eval with `requiredTexts` → docs/testlab-prod-parity.md:34
 - [ ] quality_eval / semantic_eval / eval_variance: `pagePrompt`, the whole-cast refs (`composeEvalReferencePhotos`), full `storyData`, `resolveEvalSceneHint`, the post-eval batch steps (share `buildEvalInputs`) → docs/testlab-prod-parity.md:36
 - [ ] bbox: build the cast with the run's identity cast / `buildPageCast`, pass `expectedObjects`, drop the 2000-char cap and the own retry loop → docs/testlab-prod-parity.md:38

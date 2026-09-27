@@ -9,6 +9,10 @@
  * edit_image on a plate replays the plate derive and never ran the QC the run
  * gives a derived plate either.
  *
+ * Since 2026-09-27 the stage runs the run's own plate code (platePipeline.js),
+ * so a failed first verdict is followed by the run's one fed-back retry, judged
+ * the same way.
+ *
  * Only the network and DB boundaries are stubbed. No paid call is made.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -30,7 +34,8 @@ images.validateEmptyScene = async (img: string, textPosition: any, label: string
 };
 database.getNextVersionIndex = async () => 7;
 database.saveStoryImage = async () => {};
-database.dbQuery = async () => [{ image_data: PX, image_url: null }];
+// The story's pages: none besides the target (ctx.scene).
+database.dbQuery = async (sql: string) => (/jsonb_array_elements/.test(sql) ? [] : [{ image_data: PX, image_url: null }]);
 database.getActiveVersion = async () => 0;
 database.getStoryImage = async () => ({ image_data: PX, image_url: null, version_index: 0 });
 referenceSheets.buildEmptySceneVbGrid = async () => null;
@@ -42,6 +47,7 @@ const ctx = (over: any = {}) => ({
   scene: {
     sceneDescription: 'The hero crosses the courtyard toward the gate.',
     sceneMetadata: {
+      textPosition: 'top-left',
       emptyScenePrompt: 'A cobbled courtyard with a stone gate at the back.',
       era: 'present day',
       fullData: { shot: 'wide', characters: [{ name: 'Hero', position: 'left', depth: 'midground' }] },
@@ -60,8 +66,10 @@ beforeEach(() => { qcCalls = []; });
 describe('empty_scene stage runs the plate QC on a text-below story', () => {
   it('judges the plate with a null text position and reports the real verdict', async () => {
     const r = await runEmptySceneStage(ctx(), { experimentId: 1, params: {} });
-    expect(qcCalls).toHaveLength(1);
-    expect(qcCalls[0].textPosition).toBeNull();
+    // The failed first attempt is retried once with its feedback, as in the run.
+    expect(qcCalls).toHaveLength(2);
+    expect(qcCalls.map(q => q.textPosition)).toEqual([null, null]);
+    expect(r.qc.attempts).toHaveLength(2);
     expect(r.qc.pass).toBe(false);
     expect(r.qc.issues).toEqual(['stub issue']);
     expect(r.qc.skipped).toBeUndefined();

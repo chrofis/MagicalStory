@@ -946,137 +946,162 @@ async function labDerivedPlateQcOptions(ctx) {
   return { ...opts, characterPlacements: null, mainScenePrompt: null };
 }
 
-async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = {} }) {
-  const { loadPromptTemplates, buildEmptyScenePrompt } = require('../services/prompts');
-  await loadPromptTemplates();
-  const { buildTextZoneInstruction, buildEraGuard, buildLandmarkFidelityBlock, resolveArtStyle } = require('./storyHelpers');
-  const { generateImageOnly } = require('./images');
-  const { getTextAreaMask } = require('./textMasks');
-  const { MODEL_DEFAULTS, emptyScenePlateRouting } = require('../config/models');
-  const { buildPlateSurfaceNote } = require('./shotVocabulary');
-
-  const meta = ctx.scene.sceneMetadata || {};
-  // descriptionOverride: test a corrected empty-scene brief (e.g. fixing a
-  // contradictory exterior/interior description, or a stair-direction) without
-  // regenerating the whole story. Otherwise the plate text production uses
-  // (resolvePagePlate: outline, then the vantage's own plate, then the brief's)
-  // under the page's SHOT line, as the per-page plate path builds it. It used
-  // to take the stored page's `emptyScenePrompt` and then its full scene
-  // description, neither of which is plate text; staging
-  // job_1790277448294_5herh01j7 p1 built an 11,684-char plate prompt (Lab 1478,
-  // refused by the plate fit — before the fit it would have gone to Gemini).
-  // No outline plate: ctx.scene is the STORED page record, whose
-  // `emptyScenePrompt` is the fully BUILT plate prompt of the run, not plate
-  // text — wrapping it in the template again doubled it (Lab 1482: 11,761 chars).
-  const { pagePlate, pageShot, shotLine, description: storedDescription } = labPagePlateText(ctx);
-  const description = params.descriptionOverride || storedDescription;
-  if (!description) throw new Error('No plate text for this page: the vantage and the brief carry no emptyScenePrompt (pass params.descriptionOverride)');
-
-  // Text zone only when this story overlays text on the image AND the scene
-  // has a position — production omits it for text-below layouts.
-  const wantsTextZone = ctx.layout?.textInImage !== false && !!ctx.textPosition;
-  // aboardOverride: test the aboard fix on a story whose stored AD metadata
-  // predates the `aboard` field.
-  const aboardId = params.aboardOverride ?? meta.aboard ?? null;
-  // Production attaches the VB element grid to every plate call
-  // (buildEmptySceneVbGrid); the Lab stage did not, so a plate rendered here
-  // saw only the text channel and a prompt change that fixes the image channel
-  // was invisible to the Lab. Same helper, same aboard filter.
-  // Built BEFORE the prompt: which reference family is attached decides the
-  // REFERENCE line (referenceKind below), exactly as at the production call
-  // sites (storyJobPipeline.js Phase 5a-pre-vantage and the trial plate).
-  const { buildEmptySceneVbGrid } = require('./referenceSheets');
-  const emptySceneVbGrid = await buildEmptySceneVbGrid(
-    ctx.visualBible, ctx.pageNumber, ctx.landmarkPhotos, aboardId, meta.objects || null
+/**
+ * The run's `pageDataArray`, as far as the plate functions read it, rebuilt
+ * from the stored story with the run's own builders (coverRender,
+ * pageRenderCall.pageRenderModel, platePipeline.outlineEmptyScenePromptOf).
+ * Every stored story page, plus the target when it is a cover. The target
+ * carries the context's landmark bytes; the other pages' photos are only read
+ * for a page's own plate, which the Lab never renders for them.
+ *
+ * Not stored, so the defaults stand in: `modelOverrides` (the page tier's
+ * sceneRouting) and the job's route overrides.
+ */
+async function labPlatePageDataArray(ctx, inputData) {
+  const { dbQuery } = require('../services/database');
+  const { coverRenderOptions } = require('./coverRender');
+  const { pageRenderModel } = require('./pageRenderCall');
+  const { outlineEmptyScenePromptOf } = require('./platePipeline');
+  const { MODEL_DEFAULTS } = require('../config/models');
+  const rows = await dbQuery(
+    `SELECT (s)::text AS scene_text FROM stories, jsonb_array_elements(data->'sceneImages') s WHERE stories.id = $1`,
+    [ctx.storyId]
   );
+  const scenes = rows.map(r => JSON.parse(r.scene_text)).filter(s => s && s.pageNumber !== ctx.pageNumber);
+  scenes.push({ ...ctx.scene, pageNumber: ctx.pageNumber });
+  return scenes.map((scene) => {
+    const pageNumber = scene.pageNumber;
+    const coverOpts = coverRenderOptions(pageNumber, { title: ctx.title || '', dedication: ctx.dedication || null, coverTitleMode: null });
+    const sceneMetadata = scene.sceneMetadata || null;
+    const { pageImageBackend } = pageRenderModel({ sceneMetadata, modelOverrides: {}, coverOpts, pageNumber });
+    return {
+      pageNumber,
+      scene: { sceneDescription: scene.sceneDescription },
+      sceneMetadata,
+      sceneCharacters: scene.sceneCharacters || null,
+      emptyScenePrompt: outlineEmptyScenePromptOf(scene),
+      pageImageBackend,
+      coverOpts,
+      landmarkPhotos: pageNumber === ctx.pageNumber ? (ctx.landmarkPhotos || []) : [],
+      renderAspect: coverOpts ? coverOpts.aspectRatio : (inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect),
+      textInImage: coverOpts ? true : (inputData?.layout?.textInImage !== false),
+    };
+  }).sort((a, b) => a.pageNumber - b.pageNumber);
+}
 
-  // One style string for the plate prompt and its QC, and the SAME one
-  // production sends: the book's full style (storyJobPipeline.js plate call
-  // sites use resolveArtStyle). The stripped "empty-scene" variant collapsed
-  // pixar to "Never photographic." and dropped "watercolor" (2026-09-25).
-  const plateStyle = resolveArtStyle(params.artStyleOverride || ctx.artStyle || 'pixar') || '';
-  const prompt = buildEmptyScenePrompt({
-    template: promptOverride || undefined,
-    style: plateStyle,
-    description,
-    // The band note production sends (shotVocabulary.buildPlateSurfaceNote):
-    // a vantage's plate gets the shared all-bands note, a page's own plate the
-    // bands its characters stand in — surfaces only, never a character. The
-    // Lab read a `meta.characterSpace` no brief carries, so it sent none.
-    characterSpace: pagePlate.source === 'vantage'
-      ? buildPlateSurfaceNote(null)
-      : buildPlateSurfaceNote(meta.fullData?.characters || [], pageShot),
-    textAreaInstruction: wantsTextZone
-      ? buildTextZoneInstruction(ctx.textPosition, meta.textZoneDescription || null, 'a quarter of the frame', { isEmptyScene: true })
-      : '',
-    eraGuard: buildEraGuard(meta.era),
-    landmarkFidelity: buildLandmarkFidelityBlock(ctx.landmarkPhotos[0] || null, { era: meta.era }),
-    // Tells the model what the attached reference IS. Without it the Lab tested
-    // a DIFFERENT prompt than production, which passes it at every plate call
-    // site (storyJobPipeline.js vantage plate + retry, the per-page 5a-pre path,
-    // and the trial plate — every one of them passes it).
-    referenceKind: (ctx.landmarkPhotos?.length > 0) ? 'landmark' : (emptySceneVbGrid ? 'element' : null),
-    visualBible: ctx.visualBible,
-    pageNumber: ctx.pageNumber ?? null,
-    aboardId,
-    // AD objects[] gates which vehicles enter the plate prompt + grid — same
-    // gate production runs (AD is the authority on vehicle presence).
-    sceneObjects: meta.objects || null,
-    // The page's declared time of day and weather — the plate's LIGHT line, as
-    // at every production plate call site (sceneLight.js).
-    light: require('./sceneLight').declaredLight(meta),
-    // The geometry facts the plate is GRADED on (validateEmptyScene reads the
-    // same scene prose). Production passes these at every page/vantage plate
-    // call site; without them the Lab renders a plate blind to the geometry and
-    // measures a different prompt than production runs.
-    mainScenePrompt: ctx.scene.sceneDescription || null,
-    castNames: (meta.fullData?.characters || meta.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
-  });
+/**
+ * Which plate the run gives this page, decided by the run's own rules
+ * (storyJobPipeline.js Phase 5a-pre-vantage / 5a-pre): the page's vantage
+ * canvas when its vantage group renders one, else its own per-page plate,
+ * else none (a cast-0 page, or plates off).
+ */
+function labPlateRoute(pageDataArray, pageNumber, visualBible, inputData) {
+  const { MODEL_DEFAULTS } = require('../config/models');
+  const { decidePageRoute } = require('./imageRouter');
+  const { groupPagesByVantage } = require('./storyHelpers');
+  const { pageNeedsPlate } = require('./landmarkScene');
+  const platelessByRoute = (pn) => decidePageRoute(pageDataArray.find(pd => pd.pageNumber === pn), inputData, MODEL_DEFAULTS).emptyScene === 'skip';
+  // modelOverrides are not stored: the run's defaults.
+  const runSinglePassScene = MODEL_DEFAULTS.singlePassScene === true;
+  const platesOn = !runSinglePassScene;
+  const target = pageDataArray.find(pd => pd.pageNumber === pageNumber);
+  if (platesOn && visualBible?.locations?.length > 0 && !target.coverOpts) {
+    const groups = groupPagesByVantage(pageDataArray.filter(pd => !pd.coverOpts), visualBible);
+    for (const [vantageId, group] of groups) {
+      if (vantageId === '__unassigned__' || !group.pageNumbers.includes(pageNumber)) continue;
+      if (group.pageNumbers.some(pn => !platelessByRoute(pn))) return { kind: 'vantage', vantageId, group };
+    }
+  }
+  if (!(platesOn || pageNeedsPlate(target, target.landmarkPhotos))) return { kind: 'none', reason: 'plates are off for this page' };
+  if (platelessByRoute(pageNumber)) return { kind: 'none', reason: 'cast=0 → the run renders no plate (the render is the scene)' };
+  return { kind: 'page' };
+}
 
-  const t0 = Date.now();
-  const result = await generateImageOnly(prompt, [], {
-    // Plates stay on the plate tier regardless of the page tier — same pinned
-    // routing as every production plate call site (docs/image-routing.md).
-    ...emptyScenePlateRouting(),
-    aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
-    landmarkPhotos: ctx.landmarkPhotos,
-    visualBibleGrid: emptySceneVbGrid,
-    textAreaMask: wantsTextZone ? getTextAreaMask(ctx.textPosition, ctx.languageLevel) : null,
-    pageNumber: ctx.pageNumber,
-    skipCache: true,
-  });
-  const elapsedMs = Date.now() - t0;
-  if (!result?.imageData) throw new Error('Empty-scene generation returned no image');
+async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = {} }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const plates = require('./platePipeline');
+  // THE RUN'S OWN PLATE CODE (owner 2026-09-27: "The Lab must use 100%
+  // identical code to production"). The plate is rendered by the functions
+  // Phase 5a-pre-vantage and 5a-pre call (platePipeline.js), on the run's
+  // pageDataArray rebuilt from the stored pages: a vantage page gets the
+  // canvas painted from its vantage's representative page (and its derived
+  // plate when its camera or light earns one), a page off every vantage its
+  // own plate with the run's spread-rule text mask, both judged and retried
+  // once with the feedback exactly as in the run. Every params.* below is an
+  // explicit A/B override on top. Pinned by tests/unit/lab-prod-call-parity.test.ts.
+  const inputData = {
+    artStyle: params.artStyleOverride || ctx.artStyle,
+    language: ctx.language,
+    languageLevel: ctx.languageLevel,
+    layout: ctx.layout,
+  };
+  const pageDataArray = await labPlatePageDataArray(ctx, inputData);
+  const route = labPlateRoute(pageDataArray, ctx.pageNumber, ctx.visualBible, inputData);
+  if (route.kind === 'none') throw new Error(`Page ${ctx.pageNumber} gets no plate in the story run: ${route.reason}`);
 
-  // Same QC the pipeline runs (pixel + Gemini vision) — report-only here, no
-  // retry loop: the point is seeing whether a prompt variant passes the gate.
-  // It runs on EVERY plate. A text-below layout has no calm zone, so the text
-  // position is null — exactly as the story run's vantage plates are judged
-  // (storyJobPipeline.js validateEmptyScene(plate, null, …)) and, since
-  // 2026-09-26, the run's per-page plates (plateQc.plateQcTextPosition). It used to be
-  // skipped for text-below and reported a fake pass on every Lab plate since
-  // text-below became every level's layout (2026-09-05).
-  let qc = null;
-  try {
-    const { validateEmptyScene } = require('./images');
-    const qcTextPos = require('./plateQc').plateQcTextPosition(wantsTextZone, ctx.textPosition);
-    const qcRes = await validateEmptyScene(result.imageData, qcTextPos, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
-      labPlateQcOptions(ctx, {
-        // The plate text rides whole as FRAMING; EXPECTED SCENE is what the
-        // author got besides it (the SHOT line), as in the story run.
-        sceneDescription: params.descriptionOverride ? null : shotLine,
-        framing: params.descriptionOverride || pagePlate.text,
-        shot: pageShot || meta.setting?.camera || 'wide shot', artStyle: plateStyle,
-        ...(await labPlateStructureInputs(ctx, { aboardId, grid: emptySceneVbGrid })),
-      }));
-    qc = { pass: qcRes.pass, issues: qcRes.issues || [], findings: qcRes.findings || [], visionFeedback: qcRes.visionFeedback || null, textPosition: qcTextPos };
-  } catch (err) {
-    log.warn(`[TESTLAB] empty-scene QC failed: ${err.message}`);
-    qc = { error: err.message };
+  // descriptionOverride: test a corrected plate text without regenerating the
+  // story — it stands in as the outline plate (resolvePagePlate's first
+  // choice) of every page whose text can frame this plate. aboardOverride:
+  // test the aboard gate on a story whose stored metadata predates the field.
+  const framingPages = route.kind === 'vantage' ? route.group.pageNumbers : [ctx.pageNumber];
+  for (const pd of pageDataArray) {
+    if (!framingPages.includes(pd.pageNumber)) continue;
+    if (params.descriptionOverride) pd.emptyScenePrompt = params.descriptionOverride;
+    if (params.aboardOverride !== undefined) pd.sceneMetadata = { ...(pd.sceneMetadata || {}), aboard: params.aboardOverride };
   }
 
-  const versionIndex = await saveTestVersion(ctx.storyId, 'empty_scene', ctx.pageNumber, result.imageData, experimentId);
-  return { imageType: 'empty_scene', versionIndex, promptUsed: prompt, modelId: result.modelId || null, elapsedMs, qc, artStyle: params.artStyleOverride || undefined };
+  const qcRuns = [];
+  const models = [];
+  const events = [];
+  const record = (level) => (event, message) => { events.push({ level, event, message }); };
+  const env = {
+    visualBible: ctx.visualBible,
+    inputData,
+    pageDataArray,
+    addUsage: (provider, usage, fn, modelId) => { models.push(modelId || usage?.model || null); },
+    imageGenHeartbeat: () => {},
+    genLog: { info: record('info'), warn: record('warn'), error: record('error'), debug: record('debug') },
+    onQc: (q) => qcRuns.push({ label: q.label, textPosition: q.textPosition, pass: q.qc.pass, issues: q.qc.issues || [], findings: q.qc.findings || [], visionFeedback: q.qc.visionFeedback || null }),
+    plateTemplate: promptOverride || null,
+    // One page replayed: derive only its plate.
+    derivePages: [ctx.pageNumber],
+  };
+
+  const t0 = Date.now();
+  const target = pageDataArray.find(pd => pd.pageNumber === ctx.pageNumber);
+  let plate = null;
+  let plateSource = 'page';
+  if (route.kind === 'vantage') {
+    const vantagePlates = await plates.renderVantagePlates(route.vantageId, route.group, env);
+    plate = vantagePlates.get(ctx.pageNumber) || null;
+    plateSource = 'vantage';
+  }
+  // A vantage canvas that failed leaves the slot empty, and the run's
+  // Phase 5a-pre then renders the page's own plate — the same sequence here.
+  if (!plate) {
+    plate = await plates.renderPagePlate(target, env);
+    plateSource = 'page';
+  }
+  const elapsedMs = Date.now() - t0;
+  if (!plate?.imageData) {
+    throw new Error(`Empty-scene generation returned no image${events.length ? ` (${events.map(e => `${e.event}: ${e.message}`).join('; ')})` : ''}`);
+  }
+
+  // The verdict of the plate that shipped: its first attempt's, or the
+  // retry's when the retry was kept. Every attempt's verdict is in qcRuns.
+  const baseLabels = plateSource === 'vantage' ? [`vantage-${plate.vantageId}`, `vantage-${plate.vantageId}-retry`] : null;
+  const shippedRuns = !baseLabels ? qcRuns
+    : plate.plateDerivedFor ? qcRuns.filter(q => !baseLabels.includes(q.label)) : qcRuns.filter(q => baseLabels.includes(q.label));
+  const kept = plate.keptAttempt === 'retry' ? shippedRuns[1] : shippedRuns[0];
+  const qc = kept ? { ...kept, attempts: qcRuns } : null;
+  const versionIndex = await saveTestVersion(ctx.storyId, 'empty_scene', ctx.pageNumber, plate.imageData, experimentId);
+  return {
+    imageType: 'empty_scene', versionIndex, promptUsed: plate.prompt, modelId: models.find(Boolean) || null, elapsedMs, qc,
+    plateSource, vantageId: plate.vantageId || null, plateDerivedFor: plate.plateDerivedFor || null, plateLight: plate.plateLight || null,
+    keptAttempt: plate.keptAttempt || null, events,
+    artStyle: params.artStyleOverride || undefined,
+  };
 }
 
 async function runQualityEvalStage(ctx, { promptOverride, experimentId, params = {} }) {

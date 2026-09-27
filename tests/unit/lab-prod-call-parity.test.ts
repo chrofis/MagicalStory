@@ -23,7 +23,7 @@
  *
  * Pins behaviour and the mechanism, never prompt wording.
  */
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import { createRequire } from 'node:module';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -83,6 +83,7 @@ database.getStoryImage = async () => ({ image_data: PX, image_url: null, version
 database.imgBytesAsync = async (row: any) => row.image_data || null;
 database.dbQuery = async (sql: string) => {
   if (/FROM stories WHERE id/.test(sql)) return [{ data: STORY, user_id: 'u1' }];
+  if (/jsonb_array_elements\(data->'sceneImages'\) s WHERE/.test(sql)) return (STORY?.sceneImages || []).map((s: any) => ({ scene_text: JSON.stringify(s) }));
   if (/image_type = 'empty_scene'/.test(sql)) return [{ image_data: PX, image_url: null }];
   return [];
 };
@@ -356,16 +357,133 @@ describe('edit_image on a plate: the derive call the run makes', () => {
   });
 });
 
+// ── empty_scene: the run's own plate code on the run's page data ──────────────
+const plates = req('../../server/lib/platePipeline');
+const { outlineEmptyScenePromptOf } = plates;
+
+/** The fields of the run's pageData the plate functions read, as preparePageData sets them. */
+function productionPlatePageData(scene: any, layout: any) {
+  const coverOpts = req('../../server/lib/coverRender').coverRenderOptions(scene.pageNumber, { title: 'The Lantern', dedication: 'For M.', coverTitleMode: null });
+  const { pageImageBackend } = PR.pageRenderModel({ sceneMetadata: scene.sceneMetadata, modelOverrides: {}, coverOpts, pageNumber: scene.pageNumber });
+  return {
+    pageNumber: scene.pageNumber, scene: { sceneDescription: scene.sceneDescription }, sceneMetadata: scene.sceneMetadata,
+    sceneCharacters: scene.sceneCharacters, emptyScenePrompt: outlineEmptyScenePromptOf(scene), pageImageBackend, coverOpts,
+    landmarkPhotos: [], renderAspect: layout.imageAspect || MODEL_DEFAULTS.pageAspect, textInImage: layout.textInImage !== false,
+  };
+}
+const plateEnv = (pageDataArray: any[], layout: any, extra: any = {}) => ({
+  visualBible: STORY.visualBible, inputData: { artStyle: 'watercolor', language: 'en', languageLevel: 'standard', layout }, pageDataArray,
+  addUsage: () => {}, imageGenHeartbeat: () => {}, genLog: { info() {}, warn() {}, error() {}, debug() {} }, ...extra,
+});
+const plateCallsOf = (calls: any[]) => calls.map(c => ({ prompt: c.prompt, photos: c.photos, opts: c.opts }));
+
+describe('empty_scene stage: no params = the run\'s plate for the stored page', () => {
+  const qcCalls: any[] = [];
+  const editCalls: any[] = [];
+  let savedQc: any; let savedEdit: any;
+  beforeEach(() => {
+    qcCalls.length = 0; editCalls.length = 0;
+    savedQc = images.validateEmptyScene; savedEdit = images.editImageWithPrompt;
+    // A first attempt that fails with feedback: the run retries once with it.
+    images.validateEmptyScene = async (img: string, textPosition: any, label: string, opts: any) => {
+      qcCalls.push({ textPosition, label, opts });
+      return { pass: false, issues: ['stub issue'], findings: [{ check: 'people', issue: 'stub issue' }], visionFeedback: 'a figure stands on the quay' };
+    };
+    images.editImageWithPrompt = async (...a: any[]) => { editCalls.push(a); return { imageData: PX, usage: { model: 'stub-edit' } }; };
+  });
+  afterEach(() => { images.validateEmptyScene = savedQc; images.editImageWithPrompt = savedEdit; });
+
+  // A page off every vantage, on a text-in-image story. The stored page's
+  // `textPosition` is the one text-region detection settled on after the
+  // render; the plate was masked with the brief's own position, spread-rule
+  // enforced — which the pre-fix Lab never used (getTextAreaMask(ctx.textPosition)).
+  it('per-page plate: identical prompt, mask, grid, QC options and the fed-back retry', async () => {
+    const layout = { mode: 'a4-overlay', imageAspect: '3:4', textInImage: true };
+    const scene = storedScene({
+      textPosition: 'bottom-right',
+      sceneMetadata: { ...META, textPosition: 'top-left', emptyScenePrompt: 'An empty granite quay under a grey sky.', fullData: { ...META.fullData, shot: 'medium' } },
+    });
+    STORY = { ...storyFor(scene, layout), visualBible: { ...VISUAL_BIBLE, locations: [] } };
+    const env = plateEnv([productionPlatePageData(scene, layout)], layout);
+    const prod = await plates.renderPagePlate(productionPlatePageData(scene, layout), env);
+    const prodGen = plateCallsOf(genCalls); const prodQc = qcCalls.splice(0);
+    genCalls = [];
+    const ctx = { ...ctxFor(scene, layout), visualBible: STORY.visualBible };
+    const r = await testlab.runEmptySceneStage(ctx, { experimentId: 1, params: {} });
+    expect(genCalls).toHaveLength(2);
+    expect(plateCallsOf(genCalls)).toEqual(prodGen);
+    expect(qcCalls).toEqual(prodQc);
+    expect(genCalls[0].opts.textAreaMask).toBe(prod.textAreaMask);
+    expect(genCalls[0].opts.textAreaMask).toBeTruthy();
+    expect(genCalls[1].prompt).toContain('a figure stands on the quay');
+    expect(r.promptUsed).toBe(prod.prompt);
+    expect(r.plateSource).toBe('page');
+    expect(r.qc.attempts).toHaveLength(2);
+  });
+
+  // Three pages share one vantage; the target is its aerial page. The run
+  // paints the base canvas from the representative (eye-level) page and
+  // DERIVES the aerial page's plate from it. The pre-fix Lab painted a fresh
+  // plate from the aerial page's own text.
+  it('vantage page: the canvas from the representative page, then the derive the run makes for this page', async () => {
+    const layout = { mode: 'square-below', imageAspect: '1:1', textInImage: false };
+    const vb = {
+      ...VISUAL_BIBLE,
+      locations: [{
+        id: 'LOC001', name: 'the harbour wall', description: 'a low granite sea wall', appearsInPages: [2, 3, 4],
+        vantages: [{ id: 'LOC001.1', name: 'quay view', pages: [2, 3, 4], shot: 'medium', description: 'Along the quay.', emptyScenePrompt: 'A granite quay running away from the viewer, moored boats on the right.' }],
+      }],
+    };
+    const page = (pn: number, shot: string) => storedScene({
+      pageNumber: pn, vantageId: 'LOC001.1',
+      sceneMetadata: { ...META, objects: ['LOC001.1', 'ART001'], fullData: { ...META.fullData, shot } },
+    });
+    const scenes = [page(2, 'wide'), page(3, 'medium'), page(4, 'aerial')];
+    STORY = { ...storyFor(scenes[2], layout), sceneImages: scenes, visualBible: vb };
+    const pdas = scenes.map(s => productionPlatePageData(s, layout));
+    const { groupPagesByVantage } = req('../../server/lib/storyHelpers');
+    const group = groupPagesByVantage(pdas, vb).get('LOC001.1');
+    expect(group.pageNumbers).toEqual([2, 3, 4]);
+    const prodPlates = await plates.renderVantagePlates('LOC001.1', group, plateEnv(pdas, layout));
+    const prodGen = plateCallsOf(genCalls); const prodQc = qcCalls.splice(0); const prodEdits = editCalls.splice(0);
+    genCalls = [];
+    const r = await testlab.runEmptySceneStage({ ...ctxFor(scenes[2], layout), visualBible: vb }, { experimentId: 1, params: {} });
+    expect(plateCallsOf(genCalls)).toEqual(prodGen);
+    expect(editCalls).toEqual(prodEdits);
+    expect(qcCalls).toEqual(prodQc);
+    expect(editCalls.length).toBeGreaterThan(0);
+    const prodPage4 = prodPlates.get(4);
+    expect(r.plateSource).toBe('vantage');
+    expect(r.plateDerivedFor).toBe(prodPage4.plateDerivedFor);
+    expect(r.promptUsed).toBe(prodPage4.prompt);
+    // The canvas is painted from the representative page (the first eye-level page), not the target.
+    expect(genCalls[0].opts.pageNumber).toBe(2);
+  });
+
+  it('a cast-0 page off every vantage gets no plate in the run, and the Lab says so', async () => {
+    const layout = { mode: 'square-below', imageAspect: '1:1', textInImage: false };
+    const scene = storedScene({ sceneCharacters: [], sceneMetadata: { ...META, characters: [], fullData: { ...META.fullData, characters: [] } } });
+    STORY = { ...storyFor(scene, layout), visualBible: { ...VISUAL_BIBLE, locations: [] } };
+    await expect(testlab.runEmptySceneStage({ ...ctxFor(scene, layout), visualBible: STORY.visualBible }, { experimentId: 1, params: {} }))
+      .rejects.toThrow(/no plate/);
+    expect(genCalls).toHaveLength(0);
+  });
+});
+
 describe('the run still calls the shared builders (source scan)', () => {
   const pipeline = read('storyJobPipeline.js');
   const repair = read('server/lib/repairPipeline.js');
   const lab = read('server/lib/testlab.js');
 
   it('page render: selection, grid filter, model, prompt, plate mask and options come from pageRenderCall', () => {
-    for (const fn of ['selectPageElementRefs', 'keepPageGridElements', 'pageRenderModel', 'makePageImagePrompt', 'pageTextAreaMask', 'pageRenderOptions']) {
+    for (const fn of ['selectPageElementRefs', 'keepPageGridElements', 'pageRenderModel', 'makePageImagePrompt', 'pageRenderOptions']) {
       expect(pipeline, `storyJobPipeline.js must call ${fn}`).toContain(`.${fn}(`);
       expect(lab, `testlab.js must call ${fn}`).toContain(`.${fn}(`);
     }
+    // The plate's copy-space mask, which the page render attaches, is built by
+    // the run's per-page plate (platePipeline.js) and rebuilt by the Lab stage.
+    expect(read('server/lib/platePipeline.js')).toContain('.pageTextAreaMask(');
+    expect(lab).toContain('.pageTextAreaMask(');
     // No inline second copy of the model routing on the page path.
     expect(pipeline).not.toMatch(/pageImageModel = sceneComplexity === 'complex'/);
   });

@@ -920,8 +920,23 @@
           "keepPageGridElements",
           "pageRenderModel",
           "makePageImagePrompt",
-          "pageTextAreaMask",
           "pageRenderOptions"
+        ]
+      }
+    },
+    {
+      "id": "lab-vs-prod-plate",
+      "axis": "Lab vs prod",
+      "reason": "The Test Lab empty_scene stage and the story run's plates (storyJobPipeline.js Phase 5a-pre-vantage and 5a-pre) run the SAME functions in server/lib/platePipeline.js (owner 2026-09-27: the Lab must use 100% identical code to production). A change to how a plate's prompt, mask, references, QC, retry or derive is built must land in platePipeline.js, where both call it; tests/unit/lab-prod-call-parity.test.ts compares the two calls.",
+      "members": [
+        "storyJobPipeline.js",
+        "server/lib/testlab.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "renderPagePlate",
+          "renderVantagePlates"
         ]
       }
     },

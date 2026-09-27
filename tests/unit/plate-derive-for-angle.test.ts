@@ -127,7 +127,8 @@ describe('the derived plate is edited from the base, not generated fresh', () =>
 });
 
 describe('the pipeline honours it', () => {
-  const src = SRC('storyJobPipeline.js');
+  // The vantage plates live in platePipeline.js since 2026-09-27 (shared with the Lab).
+  const src = SRC('storyJobPipeline.js') + SRC('server/lib/platePipeline.js');
 
   it('picks a plate-sharing page as the vantage representative', () => {
     // Taking pageNumbers[0] blindly could paint the base from a high-angle page
