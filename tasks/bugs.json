@@ -2449,7 +2449,7 @@
       "impact": "Every over-cap page that reached step 7: the log and the prompt_shrink event reported a block dropped that was still (headless) in the prompt; the age bullets lost the \"render each character at their real age\" instruction.",
       "status": "fixed",
       "fixedAt": "2026-09-27",
-      "fixedIn": null,
+      "fixedIn": "f1d7c57a8",
       "fix": "AGE & PROPORTIONS left PROMPT_CUT_ORDER and joined PROMPT_NEVER_CUT: heading and bullets always ship whole. Replay of 226 staging pages: all fit, worst floor 7,559 (margin 341). Test: tests/unit/page-prompt-fixed-blocks-fit.test.ts."
     }
   ]
