@@ -91,6 +91,7 @@ Last full sweep: **2026-09-06**.
 ## Image quality — unresolved render defects
 
 - [ ] The beats planner (story-beats.txt) is not given GROUP_STAGING_RULE: it chose `medium` for five characters on both pages that motivated the group check (Fiona p1, p6), and the scene review now overrides a planned medium. Owner call whether the planner gets the rule too → docs/decisions.md (2026-09-27 "A group of more than three is checked", Open)
+- [ ] Scene-review 6d [group_staging] did not name Fiona p16 (five facing out, `looksAt` a ship deep behind them, no back view) in Lab #1551; a sharper facing clause (Lab #1552 override) was killed by a deploy and never measured → docs/decisions.md (2026-09-27 "A group of more than three is checked", Evidence rung 2)
 
 - [ ] An eye-level page grouped into an angled vantage (`shot_off_plate` with the page's shot = the plan's): the fault is the vantage's `shot`, which the scene review cannot edit — needs an Art-Director / bible-side fix (e.g. vantage shot = base class when any of its pages is eye level). Lab 1433 p16 → docs/decisions.md (2026-09-24 entry, item 3)
 - [ ] Plate QC misses a photograph made to look painted: Lab 1505 and 1503 still pass the medium check after the 2026-09-26 prompt fix (2/4 photographic plates caught). Options not yet measured: a stronger judge model, or the medium asked of the plate alone in its own call (latency/cost) → docs/decisions.md (2026-09-26 "The plate QC sees people and a photograph")

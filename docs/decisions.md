@@ -62552,6 +62552,16 @@ with a score): 1 → 77.7 (n 91), 2 → 66.6 (n 96), 3 → 55.6 (n 27), 4+ → 4
 average 47.5 against 44.3 for the unflagged, so the check does not by itself separate the low scorers —
 cast size does.
 
+**Evidence (rung 2, Lab #1551, scene_review_replay on job_1790446348343_z3fw660ie, deepseek-v4-pro,
+$0.125):** BRIEF FAULTS carried the group findings; the review named `[group_staging] pages 1, 6` and
+rewrote both: p1 `medium` → `wide`, all five `perspective: back view` walking toward the entrance
+(check clean after); p6 `medium` → `wide` (Herr Brunner stays below on the steps, as the plan line
+places him; check clean after). p16 was rewritten for other checks but NOT for 6d: still five facing
+out, `looksAt` the ship in the deep background, no back view. A second replay with a sharper 6d
+facing clause (Lab #1552, prompt override) was killed by a concurrent staging deploy before it
+finished and was not repeated (spend cap). p16 stays open; the planner-side change 93df21cb9 (Lab #1553,
+"p16 walks away together") addresses the same page from the plan line.
+
 **Open:** the planner (story-beats.txt) chooses the shot and put five on a `medium` on both motivating
 pages; it is not told this rule. `tasks/BACKLOG.md`.
 
