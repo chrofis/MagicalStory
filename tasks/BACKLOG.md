@@ -628,6 +628,7 @@ are listed stage by stage in the audit table.
 - [ ] Manual char-repair route (`regeneration.js` character-repair) still builds its own inputs: `buildClothingDescription`, no wardrobe-state sheet, and a mode default of blended/fullScene where the round passes none. Move it onto `charFixCall` (owner call: it changes the user-facing button) → docs/testlab-prod-parity.md:33
 - [ ] The run's page-retry render ("retrying once") skips `applyReferenceMode` and the shared options builder; `pageRenderOptions` fits it (a production behaviour change, not done unasked) → docs/testlab-prod-parity.md:30
 - [ ] Production route `POST /repair-workflow/artifact-repair` calls `gridBasedRepair(scene, {retryHistory})` against the `(imageData, pageNum, evalResults, {outputDir})` signature, so it always throws "outputDir is required" (code-read 2026-09-27, not reproduced from logs) → server/routes/regeneration.js:6636
+- [ ] scene_review_replay: `runSceneReview` is called with `bibleSections: ''`, so every bible correction the replay applies is reported `unsynced` (a false `beats_vb_sync_failed` error) and the write-back is never exercised — Lab 1575 on dka3jpog9 applied ANI001/LOC001.1/LOC003.1 and listed all three as missing from a transcript it was never given. Pass the stored transcript (`data.outline`'s bible section) → server/lib/testlab.js:7563
 
 ---
 
@@ -667,6 +668,8 @@ are listed stage by stage in the audit table.
 
 ## Verification pending (code shipped, proof not taken)
 Run verifications now live in **`tasks/verify.json`** (judge a stored run: `node scripts/admin/verify-run.js <storyId> --write`); the lines below point at their registry ids. Non-run chores (UI, admin, SEO, state files) stay here only.
+
+- [ ] `creature-part-in-who-column` (3a65d887e): the figure-shown-in-part rule is in the planner, Art Director, iterate and scene-review prompts; Lab 1575 (scene_review_replay on dka3jpog9, stored plan lines) still left p11 uncited — the reviewer does not add a creature the who column omits, so the fix rests on the planner writing it there. Needs a full-story run (planner first division) → `tasks/verify.json` creature-part-in-who-column
 
 ### Failed on a stored run — registry triage 2026-09-27 (evidence in each entry's `evidence[]`)
 - [ ] `ots-crop-no-contact` + `plan-check-ots-contact`: an over-the-shoulder page still ships a near figure with a `hands:true` interaction — z3fw660ie p12 (Facundo grips the rope; the PLAN line only said "bracing at the rail", the Art Director added the grip, so plan-check Q14 had nothing to flag) and 5herh01j7 p12 (Kiaan presses his ear to the egg) → `tasks/verify.json` ots-crop-no-contact
