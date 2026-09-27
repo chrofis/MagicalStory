@@ -6195,6 +6195,7 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     DO_NOT_WRITE_SECTION: doNotWriteSection,
     STYLE_RULEBOOK,
     MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
+    CLOSING_MOMENT: CLOSING_MOMENT_RULE,
     PAYOFF_KEEP: PAYOFF_KEEP_RULE,
     MECHANISM_FIX: MECHANISM_FIX_RULE,
   });
@@ -9689,6 +9690,32 @@ const PAGE_OPENING_VARIETY_RULE = "Vary how each page begins: not always with a 
 const SIZE_LOOK_RULE = 'A size or a look is stated only where the plot turns on it: a thing too heavy for one child to lift, too big to hide, small enough to pocket. It is stated as that plot fact, never as a comparison with another thing ("as big as a …", "the size of a …"). Every other size and look is left to the pictures, which size everything themselves; leaving it out drops no fact.';
 
 /**
+ * THE CLOSING MOMENT (owner, 2026-09-27). A story's main relationship ends on
+ * the page: staging job_1790508305061_dka3jpog9 (a dragon story) never let the
+ * creature speak after p5, had no farewell, and closed on the children racing
+ * home to a shouted «Dann lauft schneller!». HAPPY_ENDING_DEF (who is on the
+ * last page) and ENDING_EVENT_DEF (which instant it stages) never asked for the
+ * relationship to close. ONE string, both sides: the arc creator and re-teller
+ * (TELLING_RULES), the arc panel's ENDING lens, the beats and trial writers and
+ * the text repair ({CLOSING_MOMENT}), and the ENDING question of both text
+ * audits. It is SHOWN, so it never collides with the rulebook's no-summary
+ * ending; SHOWN_CALLBACK_RULE says what separates the two.
+ */
+const CLOSING_MOMENT_RULE = "The story's main relationship, between the main character or characters and the figure the story is about with them (a creature, a helper, a friend), gets a closing moment near the end where the story has such a figure: a goodbye, a thanks or a moment of warmth between them, shown as an act or a spoken line. The story never ends on getting somewhere, a race home or an order to hurry, or on a narrator's summary.";
+
+/**
+ * A SHOWN CALLBACK IS NOT A RECAP (owner, 2026-09-27). On the same dragon run
+ * the blind audit filed the p18 payoff as a recap (FAULT[ENDING] "sums up what
+ * the character has become") and the repair cut it, leaving the logistics
+ * line as the book's last. The payoff was told as a pluperfect recollection,
+ * which IS a summary; the rule says what the ending does instead — the act
+ * again, in the moment — so the writer writes the callback and the critics
+ * stop filing it. In the rulebook's last-page line (every prose pass) and in
+ * both audits' ENDING question.
+ */
+const SHOWN_CALLBACK_RULE = 'A callback shown as it happens, a character doing, holding or saying again in the moment what an earlier page set up, is an act and never a summary; a sentence retelling what happened earlier or what it meant is a summary.';
+
+/**
  * THE STYLE RULEBOOK (owner, 2026-09-23): one block for every pass that
  * writes page prose, filled into the {STYLE_RULEBOOK} placeholder each
  * declares — the beats writer, the trial writer, the text repair
@@ -9719,7 +9746,7 @@ const STYLE_RULEBOOK = [
   'The narrator never justifies, excuses or explains an action to the reader ("he had given his share, so now he could eat too"). A reason the story needs comes through a character\'s words, thoughts or feelings in the moment.',
   SIZE_LOOK_RULE,
   'Each named character who speaks has a voice of their own: word choice and rhythm a listener could tell apart without the name.',
-  'The last page ends on the concrete act or spoken line the story ends with and lands one feeling, plainly and warmly. A string of short solemn sentences is not an ending, and neither is a closing sentence that sums up the story.',
+  `The last page ends on the concrete act or spoken line the story ends with and lands one feeling, plainly and warmly. A string of short solemn sentences is not an ending, and neither is a closing sentence that sums up the story. ${SHOWN_CALLBACK_RULE}`,
   ...SLOP_RULES,
 ].map(r => `- ${r}`).join('\n');
 
@@ -10019,6 +10046,7 @@ function buildTellingRulesSection(inputData = {}) {
     RISK_FRAMING_RULE,
     `- ${ANIMAL_FATE_RULE}`,
     '- The story ends with the children safe and together, one of them feeling something a child can name. A container or reveal the story promises opens before the end, and a story that enters through a doorway, portal or frame returns through it.',
+    `- ${CLOSING_MOMENT_RULE}`,
     `- ${ARC_QUESTIONS_ANSWERED_RULE} What resolves the conflict has an origin — an earlier setup or a rule the story logic states. A figure singled out — the only one who can help, waited for, chosen — has a stated reason.`,
     noSplit
       ? '- The cast stays together on one path — never two groups going separate ways; where the commission itself splits them, keep them together and justify it in one line.'
@@ -10232,6 +10260,8 @@ function buildArcPanelPrompt(inputData, committedBlock) {
     ARC_GIVEN_RULE,
     ARC_SENSE_RULE,
     ARC_PLACE_RULE,
+    // The ENDING lens reads the creator's own TELLING_RULES line (2026-09-27).
+    ARC_CLOSING_MOMENT_RULE: CLOSING_MOMENT_RULE,
     // The STAKES lens reads the rules the creator's TELLING_RULES carry, for
     // this band (2026-09-26).
     ARC_STAKES_RULES: arcStakesRules(inputData).join(' '),
@@ -11161,7 +11191,8 @@ function numberedSentences(text, prefix) {
  * 2026-09-23: "No new sentences, the last pass is a grammar check." Each
  * rewritten page is rendered as its BEFORE and AFTER as NUMBERED SENTENCES,
  * and the pass answers in edits against those numbers only — FIX A<k> (the
- * same sentence, corrected) or RESTORE B<j> AFTER A<k> (a writer sentence put
+ * same sentence, corrected) or RESTORE B<j> REPLACING A<k>[-A<m>] | NONE AFTER
+ * A<k> (a writer sentence put
  * back word for word). parseDiffEdits / applyDiffEdits (textRefine.js) apply
  * them; the lector's free quote/correction contract is no longer shared.
  *
@@ -11222,7 +11253,7 @@ function buildTextAuditBlindPrompt(inputData, pages = []) {
   // so a rulebook breach the writer made survived the chain unless an audit
   // filed it. The blind reader files it, against the SAME constant the writer
   // and the repair were given — never a hand copy.
-  return fillTemplate(template, { PAGES: body, STYLE_RULEBOOK });
+  return fillTemplate(template, { PAGES: body, STYLE_RULEBOOK, CLOSING_MOMENT: CLOSING_MOMENT_RULE, SHOWN_CALLBACK: SHOWN_CALLBACK_RULE });
 }
 
 /**
@@ -11292,6 +11323,9 @@ function buildTextAuditPrompt(inputData, pages = [], arc = '', { arcHints = '' }
     HINT_QUESTION: String(arcHints || '').trim()
       ? '15. HINT: is every hint under HINTS applied on the pages it concerns? Name each hint no page follows, on the page where it belongs.'
       : '',
+    // The ENDING question reads the writer's own strings (2026-09-27).
+    CLOSING_MOMENT: CLOSING_MOMENT_RULE,
+    SHOWN_CALLBACK: SHOWN_CALLBACK_RULE,
     PAGES: body,
   });
 }
@@ -11880,6 +11914,7 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     PAGE_OPENING_VARIETY: PAGE_OPENING_VARIETY_RULE,
     STYLE_RULEBOOK,
     MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
+    CLOSING_MOMENT: CLOSING_MOMENT_RULE,
   });
 }
 
@@ -12137,6 +12172,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       PAGE_OPENING_VARIETY: PAGE_OPENING_VARIETY_RULE,
       STYLE_RULEBOOK,
       MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
+      CLOSING_MOMENT: CLOSING_MOMENT_RULE,
       // Trial has no Art Director either: the scene-hint composition rules
       // reach a trial page only through the writer prompt.
       AD_COMPOSITION: AD_COMPOSITION_RULE,
@@ -12892,6 +12928,8 @@ module.exports = {
   STYLE_RULEBOOK,
   MOTIVE_AT_THE_ACT_RULE,
   PAYOFF_KEEP_RULE,
+  CLOSING_MOMENT_RULE,
+  SHOWN_CALLBACK_RULE,
   MECHANISM_FIX_RULE,
   AD_COMPOSITION_RULE,
   parseArcHints,

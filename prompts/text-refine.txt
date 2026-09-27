@@ -81,6 +81,8 @@ A STYLE finding quotes one sentence that breaks one of these rules. One you acce
 
 A fault that a character acts on a reason the page has not given is closed this way: {MOTIVE_AT_THE_ACT}.
 
+An ENDING fault is closed by what the ending owes, never by cutting what the ending shows: {CLOSING_MOMENT}
+
 A sentence longer than the reading level allows, a subordinate clause inside another subordinate clause, or a word a child at that level does not already use: recast it for that level.
 
 Judge the text as a reader who has only the pages in front of them. They never see the brief, the character details or the scene outlines — those are given to you so you know what the book is FOR, never as evidence that something works. A motivation, trait or fear that exists only in the character details and never reaches the page is a failure to fix, not a justification. Never resolve a weakness by citing the brief.

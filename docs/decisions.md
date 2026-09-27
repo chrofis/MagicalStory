@@ -63776,3 +63776,87 @@ TOGETHER wording changes (re-run `run --only=chardrop,grouppage`).
 **Touched:** scripts/analysis/eval-jev-decision-layer.js (new),
 evals/datasets/jev-decision-layer-v1/reading_labels.json (new),
 evals/runs/2026-09-27_jev-decision-layer/metrics.json (new), docs/decisions.md, tasks/BACKLOG.md.
+
+## 2026-09-27 — A grammar-check RESTORE names what it replaces; it can never leave both
+
+**Context:** staging `job_1790508305061_dka3jpog9` p2. The repair rewrote writer sentence B4
+(«Es war eine Schuppe, so gross, dass sie genau in seine beiden Handflächen passte.») into
+A4-A5 («Es war eine Schuppe. Julian musste sie mit beiden Händen halten.»). The grammar check
+answered `PAGE 2 RESTORE B4 AFTER A5`, and the page shipped both versions of the fact. The
+RESTORE contract (2026-09-23) was a pure insertion: `applyDiffEdits` spliced B<j> in after A<k>
+and removed nothing, and its only guard (`already-present`) matched the writer sentence
+verbatim, which a rewrite never is. The ledger marked the page `rewrite-restored`, correctly,
+but nothing stopped the duplicate. Scan of every stored RESTORE: staging 3 stories / 5 applied
+restores, production 0; 1 duplicate (this one). One more (`job_1790373080139_vnx5l8iy7` p11)
+restored a sentence about the same place as a kept one, but it states a different fact — not a
+duplicate.
+
+**Decision:** a restore says what it removes. `PAGE n RESTORE B<j> REPLACING A<k>` or
+`REPLACING A<k>-A<m>` puts B<j> where that run stood and removes it; `REPLACING NONE AFTER A<k>`
+is the insertion, only for a sentence the rewrite dropped with nothing in its place. The bare
+`RESTORE B<j> AFTER A<k>` is unparsed and logged, never guessed at. The applier also refuses,
+whatever the reply named, a restore that would stand beside a kept AFTER sentence of at least
+`RESTORE_DUPLICATE_MIN_WORDS` (3) words whose words stand unbroken inside the restored one
+(`duplicates-A<k>`) — text repeated word for word, a count and not a reading of meaning — and a
+restore whose run overlaps a sentence another edit already owns (`overlap`).
+
+**Rationale:** the model was never asked what the writer sentence replaces, so it could not
+say; asking makes the replacement explicit and the applier can then remove it. The duplicate
+guard is the "can never leave both" backstop for a reply that names the wrong run: dropping the
+restore keeps the repair's text, a page one sentence shorter, never a doubled one.
+
+**Validated:** replay of the stored p2 edit through the new applier (as the old insertion): dropped
+`duplicates-A4`; as `REPLACING A4-A5`: the page reads the writer's sentence once. Unit tests pin
+both (tests/unit/text-stage-counter-and-specs.test.ts).
+
+**Touched:** server/lib/textRefine.js (`DIFF_RESTORE_RE`, `parseDiffEdits`, `applyDiffEdits`,
+`wordTokens`, `containsWordRun`), prompts/story-text-diff.txt, tests, docs/prompt-inventory.md,
+tasks/bugs.json.
+
+## 2026-09-27 — The story's main relationship gets a closing moment; a shown callback is not a recap
+
+**Context:** the same dragon run (`job_1790508305061_dka3jpog9`). The creature never speaks after
+p5, there is no farewell, and the book ends on the children racing home to «Dann lauft
+schneller!». The committed arc already ended that way (its last sentence: they run home together
+and the main character feels proud), so no later stage could add what the arc did not carry. And
+the blind audit filed the p18 payoff (the call that did not fail him) as FAULT[ENDING] "recap …
+sums up what he has become"; the repair cut it and the logistics line became the book's last.
+The payoff was written as a pluperfect recollection, which IS a summary — the writer was never
+told the alternative, and the critics were never told that the callback as an act is not one.
+HAPPY_ENDING_DEF (who is on the last page) and ENDING_EVENT_DEF (which instant it stages) say
+nothing about the relationship closing.
+
+**Decision (owner-approved 2026-09-27):** two constants in promptBuilders.js.
+- `CLOSING_MOMENT_RULE`: the main relationship — the main character(s) and the figure the story
+  is about with them (creature, helper, friend) — gets a closing moment near the end where the
+  story has such a figure: a goodbye, a thanks or warmth between them, shown as an act or a
+  spoken line; the story never ends on getting somewhere or on a narrator's summary. Generator:
+  `{TELLING_RULES}` (arc create + re-tell), `{CLOSING_MOMENT}` in story-text-from-beats.txt,
+  story-trial.txt and text-refine.txt. Critic: the arc panel's new ENDING lens
+  (`{ARC_CLOSING_MOMENT_RULE}`), and the ENDING question of both text audits.
+- `SHOWN_CALLBACK_RULE`: a callback shown as it happens (doing, holding, saying again in the
+  moment what an earlier page set up) is an act, never a summary; retelling what happened or what
+  it meant is a summary. In the STYLE_RULEBOOK last-page line (every prose pass) and both audits'
+  ENDING question.
+
+The audits' ENDING question was "on the last page only"; it now asks the last-page questions of
+the last page and the closing moment "over the last pages", filed on the last page. The repair is
+told an ENDING fault is closed by what the ending owes, never by cutting what it shows.
+
+**Compatibility:** HAPPY_ENDING_DEF, ENDING_EVENT_DEF and the arc's "ends with the children safe
+and together … returns through the doorway" all stand: the return may happen, it is only not
+where the story ends. PAYOFF_KEEP_RULE is unchanged and now agrees with the audits instead of
+losing to a finding that asked for the cut. The rulebook's no-summary ending is sharpened, not
+relaxed: the closing moment is shown, never summarised. The planner (story-beats.txt) and
+plan-check are NOT given the rule: the arc now carries the moment as a sentence, and the plan
+divides the arc — revisit if a plan drops it.
+
+**Validated (rung 1, free):** the arc create / re-tell / panel, repair, both audits, diff and lector
+prompts rebuilt for the stored dragon story with the new builders: CLOSING_MOMENT_RULE exactly once
+in arc create, re-tell, panel, repair and both audits; SHOWN_CALLBACK_RULE in every prose pass
+through the rulebook and in both ENDING questions; no unfilled placeholder. Lab result: see the
+follow-up line below.
+
+**Touched:** server/lib/promptBuilders.js, prompts/arc-panel.txt, prompts/story-text-from-beats.txt,
+prompts/story-trial.txt, prompts/text-refine.txt, prompts/story-text-audit.txt,
+prompts/story-text-audit-blind.txt, tests/unit/text-style-rulebook.test.ts.

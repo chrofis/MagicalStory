@@ -17,6 +17,7 @@ SHORT story — {PAGES} scenes. Keep it focused:
 - {PAGE_OPENING_VARIETY}
 {STYLE_RULEBOOK}
 - {MOTIVE_AT_THE_ACT}
+- {CLOSING_MOMENT}
 - The text never asserts a position, an action or an object the scene hint does not stage: a figure the hint leaves out of frame does nothing visible on that page, and an action the hint stages as its aftermath is told as its aftermath
 - Show character personality through actions
 - A character who refuses, gives up or discards a thing stays done with it; where a later scene has them want it back or take it up again, that scene says what changed
