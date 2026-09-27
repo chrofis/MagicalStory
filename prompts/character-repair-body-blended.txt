@@ -1,17 +1,17 @@
 TWO IMAGES ATTACHED.
-- IMAGE 1 = REFERENCE PORTRAIT of {charName}. Use it ONLY to copy face, hair, skin tone, eye color, body build, and clothing. NEVER return this image. NEVER reproduce its background, framing, or composition.
-- IMAGE 2 = THE SCENE TO EDIT. {sceneMediumLine} with {charName}'s entire figure blurred (face, hair, body, clothing). Other characters' faces or full bodies may also be blurred to prevent trait bleed. Your output MUST be an edited copy of IMAGE 2 — same dimensions, same background, same other characters, same composition, same art style. Only the blurred regions inside IMAGE 2 are repainted.
+- {REFERENCE_IMAGE} = REFERENCE BODY AND OUTFIT of {charName} (the full figure). Use it ONLY to copy face, hair, skin tone, eye color, body build, and clothing. NEVER return this image. NEVER reproduce its background, framing, or composition.
+- {EDIT_IMAGE} = THE SCENE TO EDIT. {sceneMediumLine} with {charName}'s entire figure blurred (face, hair, body, clothing). Other characters' faces or full bodies may also be blurred to prevent trait bleed. Your output MUST be an edited copy of {EDIT_IMAGE} — same dimensions, same background, same other characters, same composition, same art style. Only the blurred regions inside {EDIT_IMAGE} are repainted.
 
-If you are tempted to return anything that looks like IMAGE 1, stop — return IMAGE 2 with the blurred areas repainted instead.
+If you are tempted to return anything that looks like {REFERENCE_IMAGE}, stop — return {EDIT_IMAGE} with the blurred areas repainted instead.
 
-Redraw the entire blurred figure of {charName} inside IMAGE 2 to match IMAGE 1: face, hair color and style, skin tone, eye color, body build, and clothing. Every blurred pixel inside the figure must be repainted as {charName}.
+Redraw the entire blurred figure of {charName} inside {EDIT_IMAGE} to match {REFERENCE_IMAGE}: face, hair color and style, skin tone, eye color, body build, and clothing. Every blurred pixel inside the figure must be repainted as {charName}.
 
-Preserve the original pose and action from IMAGE 2 exactly. Match the body language visible in the surrounding scene — shoulders, posture, head tilt, limbs. Do not reposition the character.
+Preserve the original pose and action from {EDIT_IMAGE} exactly. Match the body language visible in the surrounding scene — shoulders, posture, head tilt, limbs. Do not reposition the character.
 
 Match the expression from scene context (worried, surprised, focused, determined, etc.). Do not default to a generic smile.
 
 Match the gaze direction. Do not make the character face the camera unless they already were.
 
-Do not change the camera angle, composition, or background of IMAGE 2. Non-blurred characters stay exactly the same. {REPAIR_STYLE_GUARD} Keep the same lighting and color palette so the repainted figure blends seamlessly.{clothingContext}{actionContext}{issueContext}{textPositionContext}
+Do not change the camera angle, composition, or background of {EDIT_IMAGE}. Non-blurred characters stay exactly the same. {REPAIR_STYLE_GUARD} Keep the same lighting and color palette so the repainted figure blends seamlessly.{clothingContext}{actionContext}{issueContext}{textPositionContext}
 
 {REPAIR_TEXT_GUARD}

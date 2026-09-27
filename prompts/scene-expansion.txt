@@ -18,7 +18,7 @@
 1b. **A setting carries its own detail.** When the hint's location is a fantastical or strongly-themed world (a magical realm, undersea, outer space, an enchanted forest, an ancient ruin, and the like), or a real place the story's premise has transformed into one, fill the SETTING with a lot of that world's characteristic environmental elements even when only the bare place is named. An everyday interior — a kitchen, a living room, a bedroom, a workshop, a classroom, a shop — does the same with its lived-in detail: worn surfaces, crockery and cookware, appliances and fittings, textiles, things standing on shelves and hanging on walls. An unfurnished box room is a fault. This describes the location, it is not added plot: keep it to the environment and background, never add characters and never change the hint's action. Such furnishing stays ambient — unnamed and uncounted, outside rule 12e, which governs the page's named plot-critical props.
 2. **Plain concrete words.** Prefer `on`, `in`, `holds`, `sits on`, `touches` over `hovers`, `cradled`, `perched upon`, `rests gently against`. Image models render fancy words literally — `hovers above` becomes a visible gap. Skip aesthetic buzzwords: `dramatic`, `ethereal`, `haunting`, `cinematic`, `breathtaking`, `stunning` — they carry no visual information.
 3. **Only characters from the hint.** The scene hint's `characters` array and `background` field define who is visible. Do not add characters from the story text that are not in the hint. {PLAN_LINE_CAST} If the hint's `background` field describes unnamed figures (soldiers, villagers, crowd), weave them into the prose with the same size impression, role and placement — they anchor the story moment and must appear. Never give such a group an exact number above three (see the Counting rule); a group that appears again on a later page keeps that same size impression, role and placement. Unnamed figures get an appearance of their own: varied hair colours and lengths, more than one garment shape, several garment colours, and a mix of heights and ages across the group. `anonymous`, `generic` and `unnamed` name a role, never a look — a group given no appearance is drawn as copies of the nearest described character. A group in matching uniform, kit or livery keeps the shared garments and varies hair, height and age instead.
-4. **Staging a group.** Preserve every character the hint lists — don't drop characters silently. When more than three share the frame, keep the group together at one depth in a wider shot, or show them from behind as they move away — never five detailed close foreground faces.
+4. **Staging a group.** Preserve every character the hint lists — don't drop characters silently. {GROUP_STAGING}
 5. **One moment, one focal point.** Stage the given instant as written, without hidden limbs. One main action draws the eye, drawn at its peak of motion — mid-leap, mid-swing, mid-throw — not the static pose that follows.
 5b. **One centre of action.** Never two vehicles or vessels in frame each with a crew doing its own thing — one carries the moment, and a second is distant, partly cut by the frame edge, or empty.
 5c. **One instant, no history.** {ONE_INSTANT}
@@ -149,7 +149,6 @@ Then a single-line JSON object:
   "shot": "medium",
   "population": "cast_only",
   "aboard": "VEH001",
-  "landmarkView": "exterior",
   "era": "present day",
   "timeOfDay": "midday",
   "weather": "none",
@@ -191,7 +190,6 @@ Then a single-line JSON object:
   - `"ambient"` — a public place that simply has people in it: a city square, a park, a promenade, a quay, a playground, a station concourse, a shop. Distant passers-by, someone on a bench, a figure by a wall belong in the picture and are not cast.
   - `"cast_only"` — nobody but the listed figures: a private room, a garden, a forest clearing, an empty night street.
   Omit it and the page is read as `"cast_only"`. Choose `"ambient"` over `"cast_only"` whenever the location is one the public can walk into; a square with nobody on it reads as abandoned. The prose then must NOT claim the place is empty — never write "no other people are present" about an `ambient` or `crowd` setting. Describe background people the way the setting holds them, in this page's own prose ("a few distant passers-by cross the far side of the square") and never in a plate, which holds no people; keep them unnamed, distant and small. The page render draws them. The rule runs both ways: prose that puts unnamed figures in the frame — people crossing the square, riders passing, adults at the tables, onlookers — is a setting with people in it, so `population` is `ambient` or `crowd` on that page, never `cast_only`.
-- `landmarkView` is required on every page citing a real landmark — how the page sees it: `exterior` (from outside), `distant` (skyline or backdrop), `close` (a detail of the structure), `interior` (inside it), `view-from` (looking out from it, structure not visible), or `underwater` / `none` when no photograph of the place could show this scene. It selects the reference photo; a view with no matching photo attaches none and your prose carries the place.
 - A `close-up` frame ends at the waist. A pose the frame simply crops — sitting, kneeling, crouching — is fine there: the legs fall below the bottom edge, which is what a close-up IS, and a crouch or a kneel brings the head DOWN to what it is looking at. What a close-up cannot show is an action whose subject lies below the frame line — no {CLOSEUP_BELOW_WAIST}, and nothing placed behind the character. The outfit list still names all garments including footwear. A beat whose point is below the waist is a `medium` shot, not a close-up.
 
 **`objects[]`**
@@ -201,7 +199,7 @@ Then a single-line JSON object:
 - A NAME IS NOT A PRESENCE. An element named only to say whose it is — a character's bag, a creature's egg — puts THAT element in the scene, not its owner. Cite the owner only on a page where the owner is in the picture. On the page an owner arrives, or a creature comes out of its egg, both are in the picture and both are cited.
 - At most {VB_ELEMENT_BUDGET} Visual Bible elements per page — secondary characters, animals, artifacts and vehicles count; a LOC does not, real or invented. Keep the ones the page is about and leave the rest out of `objects[]` and out of the prose.
 - An object listed with `States:` is cited with the dotted form `ART###.N` — the state whose `pages` include this page. An object with no states keeps the bare `ART###`. An object WITH states is always cited dotted, the pages before its first change included — those pages are its first state. Never two states of one object on one page.
-- Real-landmark LOCs are cited by their bare id (`LOC003`); the page's `landmarkView` decides which reference photo is attached.
+- Real-landmark LOCs are cited by their bare id (`LOC003`); the page's reference photo is the one its vantage cites in `landmarkPhoto`.
 - Invented LOCs (`isRealLandmark: false`) use the bare id `LOC001`, or the dotted form `LOC001.2` when the Visual Bible gives that location `vantages[]` — cite the vantage whose `pages` list contains this page.
 - {PLACE_INSIDE_OUTSIDE}
 
@@ -265,7 +263,7 @@ Distance rule: an action across a gap is framed by rule 11 and its `where` carri
 **Backdrop plate**
 - You do not write one. The page is drawn on the plate of the vantage its LOC cites, already in the Visual Bible. A page whose backdrop that vantage cannot hold cites a different vantage of the same location.
 
-**Landmark accuracy:** Read all photo variant descriptions before writing. Use the most common structural features across variants. If characters are inside an enclosed landmark, describe the scene from inside.
+**Landmark accuracy:** A real landmark's plate cites a photo in its Visual Bible entry (Plate photos). Draw the structures that photo shows the way it shows them; a plate citing none carries the place in words. If characters are inside an enclosed landmark, describe the scene from inside.
 
 **Prop placement vs landmark.** When a separate prop shares a depth band with the landmark, position the prop relative to the landmark (in front of, beside, between camera and landmark) — not by an unanchored frame slot.
 

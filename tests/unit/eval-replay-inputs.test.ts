@@ -25,8 +25,8 @@ const {
 const { buildEvalClothingContract } = require('../../server/lib/evalPipeline');
 
 const ROOT = path.resolve(__dirname, '../..');
-const testlabSrc = fs.readFileSync(path.join(ROOT, 'server/lib/testlab.js'), 'utf8');
-const imagesSrc = fs.readFileSync(path.join(ROOT, 'server/lib/images.js'), 'utf8');
+const testlabSrc = fs.readFileSync(path.join(ROOT, 'server/lib/testlab.js'), 'utf8').replace(/\r\n/g, '\n');
+const imagesSrc = fs.readFileSync(path.join(ROOT, 'server/lib/images.js'), 'utf8').replace(/\r\n/g, '\n');
 
 // ── REAL STORED SHAPES (staging job_1789348171785_9oxos7dwv, page 13) ───────
 const VISUAL_BIBLE = {
@@ -278,12 +278,22 @@ describe('the defect this fixes — experiment #1272', () => {
 describe('wiring guards — no Lab eval site may hand-roll its options again', () => {
   const evalCalls = testlabSrc.split('evaluateImageQuality(').slice(1);
 
-  it('every Lab evaluateImageQuality call passes a replay.options, not an object literal', () => {
-    expect(evalCalls.length).toBeGreaterThanOrEqual(5);
+  it('every Lab evaluateImageQuality call passes a built option set, not an object literal', () => {
+    // replay.options (buildEvalReplayOptions) or, since 2026-09-27, the run's
+    // own batch call (labEvalCall → images.batchEvalQualityCall).
+    expect(evalCalls.length).toBeGreaterThanOrEqual(3);
     for (const call of evalCalls) {
       const args = call.slice(0, call.indexOf('\n    );') >= 0 ? call.indexOf('\n    );') : 1800);
-      expect(args).toMatch(/replay\.options/);
+      expect(args).toMatch(/replay\.options|evalCall\.evalOptions/);
     }
+  });
+
+  it('the Lab image, quality_eval and eval_variance stages judge through the run\'s batch eval call', () => {
+    // evaluateImageBatch on repairPipeline.buildEvalInput's input (quality_eval,
+    // the image stage's auto-eval), or the batch's own per-page call (variance).
+    expect((testlabSrc.match(/\.evaluateImageBatch\(\[input\], options\)/g) || []).length).toBeGreaterThanOrEqual(2);
+    expect(testlabSrc).toContain("require('./images').batchEvalQualityCall(evalInput, evalBatchOptions)");
+    expect(testlabSrc).toMatch(/const input = buildEvalInput\(entry, orig, allCharacterPhotos\)/);
   });
 
   it('no Lab eval site re-derives the art style, the era or the cover contract inline', () => {
@@ -304,20 +314,29 @@ describe('wiring guards — no Lab eval site may hand-roll its options again', (
   it('the Lab semantic stage passes the sixth argument production passes', () => {
     const idx = testlabSrc.indexOf('async function runSemanticEvalStage');
     expect(idx).toBeGreaterThan(0);
-    const body = testlabSrc.slice(idx, idx + 3500);
-    expect(body).toMatch(/evaluateSemanticFidelity\([\s\S]*?semanticOpts/);
-    expect(body).toMatch(/buildEvalClothingContract/);
-    expect(body).toMatch(/buildExpectedCastBlock/);
+    // The function body up to the next top-level function, not a fixed char
+    // window: a window sized to the function's length at one commit fails on
+    // the next comment line (and sooner in a CRLF checkout).
+    const rest = testlabSrc.slice(idx + 1);
+    const body = testlabSrc.slice(idx, idx + 1 + (rest.search(/\n(async )?function /) + 1 || rest.length));
+    // The run's own judge inputs (2026-09-27): prepareEvalJudgeInputs builds
+    // the contract, roster, landmark and text blocks for every judge, and
+    // semanticFidelityOptions is what evaluateImageQuality hands this one.
+    expect(body).toMatch(/prepareEvalJudgeInputs\(\{/);
+    expect(body).toMatch(/evaluateSemanticFidelity\([\s\S]*?semanticFidelityOptions\(judgeInputs, evalCall\.evalOptions\)/);
+    expect(body).toMatch(/labEvalCall\(ctx/);
   });
 
   it('PRODUCTION still passes everything the replay mirrors — if it grows a key, this breaks', () => {
     // The production batch eval's evalOptions literal (images.js). This guard is
     // the whole point: a new production option must be added to the mirror, not
     // silently left out of it.
-    const start = imagesSrc.indexOf('img.imageData,');
-    expect(start, 'production batch eval call site moved — re-point this guard').toBeGreaterThan(0);
-    expect(imagesSrc.slice(Math.max(0, start - 200), start)).toContain('await evaluateImageQuality(');
-    const block = imagesSrc.slice(start, start + 4200);
+    // Since 2026-09-27 the batch builds the call in batchEvalQualityCall, which
+    // evaluateImageBatch hands to evaluateImageQuality as evalCall.evalOptions.
+    const start = imagesSrc.indexOf('function batchEvalQualityCall(');
+    expect(start, 'production batch eval call builder moved — re-point this guard').toBeGreaterThan(0);
+    expect(imagesSrc).toContain('evalCall.evalOptions\n      );');
+    const block = imagesSrc.slice(start, imagesSrc.indexOf('\n}\n', start));
     for (const key of MIRRORED_EVAL_OPTION_KEYS) {
       expect(block, `production no longer passes ${key} — the mirror is now wrong`)
         .toMatch(new RegExp(`\\b${key}\\b`));

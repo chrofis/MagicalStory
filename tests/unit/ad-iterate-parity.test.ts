@@ -226,7 +226,7 @@ describe('the rewrite emits the fields the brief it replaces carried', () => {
   const free = declaredFields(read('prompts/scene-iteration-free.txt'));
 
   it('the per-page Art Director still declares the page-brief schema', () => {
-    for (const f of ['sceneIntent', 'characters', 'shot', 'landmarkView', 'objects', 'interactions', 'wornItems']) {
+    for (const f of ['sceneIntent', 'characters', 'shot', 'objects', 'interactions', 'wornItems']) {
       expect(adFields.has(f), `the Art Director no longer declares ${f}`).toBe(true);
     }
   });

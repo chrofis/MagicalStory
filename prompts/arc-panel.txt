@@ -26,6 +26,7 @@ The critique above lists what the creator already sees; find what the creator MI
 - REPLACEABLE — a turn that takes, breaks or blocks something the characters need, where the arc never says what stops them simply getting another, going round it, or doing without.
 - SENSE — the rule: {ARC_SENSE_RULE}
 - PLACE — the rule: {ARC_PLACE_RULE} An action that moves between inside and outside in a way the places forbid breaks it.
+- STAKES — the rules: {ARC_STAKES_RULES}
 - PROMISE — where a TOPIC PROMISE is given, the arc breaks it. That issue quotes the promise and the arc words where it should have been kept.
 - LANDMARK — the arc names a real place the REAL LANDMARKS list does not carry, or places a listed one at a vantage none of its photos shows and the commission's own words do not describe. A place the arc invents for its own world is not one.
 - ORPHAN — a plant that never pays off, or a payoff that traces to no plant.

@@ -1,0 +1,91 @@
+/**
+ * verify-run --write: what a judged run writes back into tasks/verify.json.
+ *
+ * WHY — owner, 2026-09-27: after every verification run the checker's verdicts
+ * go back into the registry. CONFIRMED / FAILED become evidence and set the
+ * status; HUMAN / NOT COVERED leave the entry pending with a pointer to the run
+ * they were checked against; every run is logged once so the pre-push warning
+ * can tell which staging runs were never recorded.
+ */
+import { describe, it, expect } from 'vitest';
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const core = require('../../scripts/admin/verify-core.js');
+
+const entry = (id: string, status = 'pending'): any => ({ id, title: id, claim: 'c', commits: [], runShape: ['any'], check: { kind: 'human', what: 'w' }, status, evidence: [] });
+const run = { storyId: 'job_1', env: 'staging', build: 'f'.repeat(40), runDate: '2026-09-27 10:00:00 CH' };
+const opts = { checkedAt: '2026-09-27 11:00:00 CH', via: 'write' };
+
+describe('applyVerdicts', () => {
+  it('CONFIRMED appends evidence and confirms; FAILED appends evidence and fails', () => {
+    const reg: any = { entries: [entry('a'), entry('b')] };
+    const { flipped } = core.applyVerdicts(reg, run, [
+      { e: reg.entries[0], v: { id: 'a', result: 'CONFIRMED', detail: 'ok' } },
+      { e: reg.entries[1], v: { id: 'b', result: 'FAILED', detail: 'p12 touches' } },
+    ], opts);
+    expect(reg.entries[0].status).toBe('confirmed');
+    expect(reg.entries[0].evidence).toEqual([{ ...run, checkedAt: opts.checkedAt, result: 'CONFIRMED', note: 'ok' }]);
+    expect(reg.entries[1].status).toBe('failed');
+    expect(reg.entries[1].evidence[0].result).toBe('FAILED');
+    expect(flipped.map((f: any) => `${f.id}:${f.to}`)).toEqual(['a:confirmed', 'b:failed']);
+  });
+
+  it('HUMAN and NOT COVERED stay pending, add no evidence, and point at the run', () => {
+    const reg: any = { entries: [entry('h'), entry('n')] };
+    core.applyVerdicts(reg, run, [
+      { e: reg.entries[0], v: { id: 'h', result: 'HUMAN', detail: 'look', human: 'view p3' } },
+      { e: reg.entries[1], v: { id: 'n', result: 'NOT COVERED', why: 'no ots page' } },
+    ], opts);
+    for (const e of reg.entries) {
+      expect(e.status).toBe('pending');
+      expect(e.evidence).toEqual([]);
+      expect(e.lastChecked.storyId).toBe('job_1');
+    }
+    expect(reg.entries[0].lastChecked.note).toMatch(/LOOK: view p3/);
+    expect(reg.entries[1].lastChecked.result).toBe('NOT COVERED');
+  });
+
+  it('logs the run once, and never appends the same story+result twice', () => {
+    const reg: any = { entries: [entry('a')] };
+    const v = [{ e: reg.entries[0], v: { id: 'a', result: 'CONFIRMED', detail: 'ok' } }];
+    core.applyVerdicts(reg, run, v, opts);
+    core.applyVerdicts(reg, run, v, opts);
+    expect(reg.entries[0].evidence).toHaveLength(1);
+    expect(reg.runs).toHaveLength(1);
+    expect(reg.runs[0]).toMatchObject({ storyId: 'job_1', env: 'staging', via: 'write', counts: { CONFIRMED: 1, FAILED: 0 } });
+  });
+
+  it('recordedStoryIds sees runs, evidence and lastChecked', () => {
+    const reg: any = { entries: [entry('a'), entry('b')], runs: [{ storyId: 's1', env: 'staging' }] };
+    reg.entries[0].evidence.push({ storyId: 's2', env: 'prod' });
+    reg.entries[1].lastChecked = { storyId: 's3', env: 'staging' };
+    expect([...core.recordedStoryIds(reg)].sort()).toEqual(['prod:s2', 'staging:s1', 'staging:s3']);
+  });
+});
+
+describe('markVerdict', () => {
+  it('records a person\'s verdict with who looked, and sets the status', () => {
+    const reg: any = { entries: [entry('h')] };
+    core.markVerdict(reg, run, { id: 'h', verdict: 'failed', note: 'p4 sheet head row bare arms', by: 'claude' }, { checkedAt: opts.checkedAt });
+    expect(reg.entries[0].status).toBe('failed');
+    expect(reg.entries[0].evidence[0]).toMatchObject({ result: 'HUMAN-FAILED', by: 'claude', storyId: 'job_1' });
+  });
+
+  it('refuses a verdict without a note, an unknown id, or another word', () => {
+    const reg: any = { entries: [entry('h')] };
+    expect(() => core.markVerdict(reg, run, { id: 'h', verdict: 'confirmed', note: ' ' }, opts)).toThrow(/note/);
+    expect(() => core.markVerdict(reg, run, { id: 'x', verdict: 'confirmed', note: 'n' }, opts)).toThrow(/no entry/);
+    expect(() => core.markVerdict(reg, run, { id: 'h', verdict: 'maybe', note: 'n' }, opts)).toThrow(/confirmed or failed/);
+  });
+});
+
+describe('judge + verdictOf', () => {
+  it('a judged run turns into the storable verdict the write-back reads', () => {
+    const e = { id: 'e', commits: ['abc'], runShape: ['any'], check: { kind: 'human', what: 'look at p1' } };
+    const ctx = { build: 'f'.repeat(40), data: {} };
+    const [{ j }] = core.judgeAll([e], ctx, () => true);
+    expect(core.verdictOf(e, j)).toEqual({ id: 'e', result: 'HUMAN', detail: 'human check', human: 'look at p1' });
+    const [{ j: j2 }] = core.judgeAll([e], ctx, () => false);
+    expect(core.verdictOf(e, j2)).toMatchObject({ result: 'NOT COVERED', why: expect.stringMatching(/lacks abc/), oldCode: true });
+  });
+});

@@ -54,6 +54,10 @@ describe('re-plan ranking', () => {
     expect(replanRank({ kind: 'check', check: 9 })).toBe('also');
     // Q14 (over-the-shoulder on a contact beat) is must-fix, owner 2026-09-24.
     expect(replanRank({ kind: 'check', check: 14 })).toBe('must');
+    // Q17 (a whole-cast page names one shared action) is must-fix, owner
+    // 2026-09-26 — narrower than Q5: it names only the page whose roster holds
+    // every commissioned character.
+    expect(replanRank({ kind: 'check', check: 17 })).toBe('must');
     expect(replanRank({ kind: 'counter', code: 'NO_FOCAL_PAGE' })).toBe('must');
     expect(replanRank({ kind: 'counter', code: 'SHOT_VARIETY' })).toBe('also');
     expect(replanRank('a legacy string')).toBe('also');
@@ -73,6 +77,20 @@ describe('re-plan ranking', () => {
     // Every finding survives the ranking — nothing is dropped.
     expect(section).toContain('NO_FOCAL_PAGE');
     expect(section).toContain('SHOT_VARIETY');
+  });
+
+  it('a parsed Q17 finding lands under MUST FIX with its page', () => {
+    const [f] = parsePlanCheck('17 Page 16 — the six only stand together on the landing; no shared action.');
+    expect(f.check).toBe(17);
+    const finding = { kind: 'check', check: f.check, line: `CHECK[${f.check}]: ${f.text}` };
+    expect(replanRank(finding)).toBe('must');
+    expect(findingPages(finding)).toEqual([16]);
+    const section = buildReplanSection('Page 16: wide — ...', [
+      { kind: 'counter', code: 'SHOT_VARIETY', line: 'PLAN[SHOT_VARIETY]: only two shot types' },
+      finding,
+    ]);
+    expect(section.indexOf('## MUST FIX')).toBeLessThan(section.indexOf('CHECK[17]'));
+    expect(section.indexOf('CHECK[17]')).toBeLessThan(section.indexOf('## ALSO NOTED'));
   });
 
   it('is empty with no findings, and tolerates legacy plain strings', () => {

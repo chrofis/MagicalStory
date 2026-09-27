@@ -1021,9 +1021,10 @@ function extractSceneMetadata(sceneDescription) {
       // Story era for buildEraGuard (anachronism guard) — restored 2026-08-11;
       // lost in the metadata-format migration like `shot`.
       era: metadata.era || null,
-      // Which view of a cited real landmark this page shows — selects the
-      // reference photo by kind (landmarkPhotos.pickVariantForView).
-      landmarkView: metadata.landmarkView || null,
+      // A page's OWN landmark photo citation — written only by an iterate
+      // rewrite that authors a fresh plate (reuseEmptyScene: false); every
+      // other page takes its vantage's citation (storyHelpers.landmarkPhotoCitation).
+      landmarkPhoto: metadata.landmarkPhoto ?? null,
       imageSummary: prose,
       setting: null, // Setting details are in the prose, not structured
       sceneComplexity,
@@ -1042,9 +1043,10 @@ function extractSceneMetadata(sceneDescription) {
       textPosition: metadata.textPosition || null,
       textZoneDescription: metadata.textZoneDescription || null,
       era: metadata.era || null,
-      // Which view of a cited real landmark this page shows — selects the
-      // reference photo by kind (landmarkPhotos.pickVariantForView).
-      landmarkView: metadata.landmarkView || null,
+      // A page's OWN landmark photo citation — written only by an iterate
+      // rewrite that authors a fresh plate (reuseEmptyScene: false); every
+      // other page takes its vantage's citation (storyHelpers.landmarkPhotoCitation).
+      landmarkPhoto: metadata.landmarkPhoto ?? null,
       sceneIntent: metadata.sceneIntent || null,
       timeOfDay: normaliseTimeOfDay(metadata.timeOfDay),
       weather: normaliseWeather(metadata.weather),
@@ -1120,7 +1122,7 @@ function extractSceneMetadata(sceneDescription) {
 
     // Also extract location from setting.location (e.g., "Kurpark [LOC001]")
     // This ensures landmark photos are passed to image generation. The photo
-    // itself is picked by the scene's `landmarkView` (getLandmarkPhotosForScene).
+    // itself is the one the plate's author cited (storyHelpers.landmarkPhotoCitation).
     if (parsedData.setting?.location) {
       if (/\[LOC\d+(?:\.\d+)?\]/i.test(parsedData.setting.location)) {
         objectIds.push(parsedData.setting.location);
@@ -2029,6 +2031,32 @@ function resolvePagePlate({ pageNumber = null, sceneMetadata = null, visualBible
 }
 
 /**
+ * A vantage plate's SETTING text: the LOCATION and VANTAGE lines and the
+ * vantage's description, which its author gets above the FRAMING paragraph.
+ * The description is left out when it IS the plate text (the Art Director
+ * writes one text per vantage since 2026-09-17, so it would go out twice).
+ * One builder for the vantage plate prompt and its QC's EXPECTED SCENE, which
+ * reads the setting and the FRAMING as two fields (decisions.md 2026-09-26
+ * "The plate QC reads its inputs whole").
+ *
+ * @param {object} v - a getPrimaryVantageForPage result
+ * @param {string} [plateText] - the vantage's FRAMING paragraph
+ * @returns {string}
+ */
+function vantageSettingText(v, plateText = '') {
+  const { englishLocationRef } = require('./visualBible');
+  // English-only: the bare VB location name is story-language and carries no
+  // visual info, so it goes out with the entry's English visual fields
+  // inlined (same rule as covers / sanitizeVbIdsInPrompt; decisions.md 2026-07-31).
+  const locationRef = englishLocationRef(v?.location) || v?.locationName || '';
+  const description = String(v?.description || '').trim();
+  return [
+    `**LOCATION:** ${locationRef}\n**VANTAGE:** ${v?.name || ''}`,
+    description && description !== String(plateText || '').trim() ? description : '',
+  ].filter(Boolean).join('\n\n');
+}
+
+/**
  * Group page numbers by primary vantage ID. Pages without a primary vantage
  * are returned in the special `__unassigned__` bucket.
  *
@@ -2794,6 +2822,7 @@ module.exports = {
   extractPageClothing,
   getPrimaryVantageForPage,
   resolvePagePlate,
+  vantageSettingText,
   groupPagesByVantage,
   groupTrialPlatePagesByVantage,
   normalizePositionToLCR,

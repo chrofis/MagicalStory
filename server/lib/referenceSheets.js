@@ -14,6 +14,7 @@ const { photoAnalyzerUrl } = require('./photoAnalyzerClient');
 
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
+const { geminiUsage } = require('./providerUsage');
 const r2Lib = require('./r2');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { guardPromptString } = require('../services/prompts');
@@ -92,7 +93,7 @@ async function identifySheetCellsImpl(buffer, cells, elements) {
   const usage = j?.usageMetadata;
   if (usage) {
     const { recordTextUsage } = require('./usageContext');
-    recordTextUsage('gemini_text', { input_tokens: usage.promptTokenCount || 0, output_tokens: usage.candidatesTokenCount || 0 }, 'vb_sheet_cell_id', cfg.modelId);
+    recordTextUsage('gemini_text', geminiUsage(usage), 'vb_sheet_cell_id', cfg.modelId);
   }
   const raw = String(j?.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
   return parseCellIdentification(raw, elements.length, cells.length);
@@ -855,7 +856,7 @@ async function askCellGate(cellsBase64, prompt) {
   const usage = j?.usageMetadata;
   if (usage) {
     const { recordTextUsage } = require('./usageContext');
-    recordTextUsage('gemini_text', { input_tokens: usage.promptTokenCount || 0, output_tokens: usage.candidatesTokenCount || 0 }, 'vb_cell_gate', cfg.modelId);
+    recordTextUsage('gemini_text', geminiUsage(usage), 'vb_cell_gate', cfg.modelId);
   }
   const raw = String(j?.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
   // flash-lite occasionally emits two JSON objects back-to-back despite

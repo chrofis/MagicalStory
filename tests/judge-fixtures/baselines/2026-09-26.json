@@ -1,0 +1,1182 @@
+{
+  "base": "https://staging.magicalstory.ch",
+  "experiments": [
+    1525,
+    1526,
+    1527,
+    1528,
+    1529,
+    1530,
+    1534,
+    1535,
+    1538,
+    1539
+  ],
+  "scoredAt": "2026-09-26T21:11:09.658Z",
+  "costUsd": 0.3184,
+  "summary": {
+    "judges": {
+      "plate_qc": {
+        "fixtures": 18,
+        "runs": 54,
+        "tp": 27,
+        "fn": 9,
+        "tn": 15,
+        "fp": 3,
+        "errors": 0,
+        "flipped": 2,
+        "repeated": 18,
+        "recall": 0.75,
+        "precision": 0.9,
+        "falseAlarmRate": 0.16666666666666666,
+        "flipRate": 0.1111111111111111
+      },
+      "semantic": {
+        "fixtures": 10,
+        "runs": 30,
+        "tp": 9,
+        "fn": 6,
+        "tn": 15,
+        "fp": 0,
+        "errors": 0,
+        "flipped": 0,
+        "repeated": 10,
+        "recall": 0.6,
+        "precision": 1,
+        "falseAlarmRate": 0,
+        "flipRate": 0
+      },
+      "quality": {
+        "fixtures": 3,
+        "runs": 3,
+        "tp": 1,
+        "fn": 1,
+        "tn": 1,
+        "fp": 0,
+        "errors": 0,
+        "flipped": 0,
+        "repeated": 0,
+        "recall": 0.5,
+        "precision": 1,
+        "falseAlarmRate": 0,
+        "flipRate": null
+      },
+      "lettering": {
+        "fixtures": 1,
+        "runs": 1,
+        "tp": 1,
+        "fn": 0,
+        "tn": 0,
+        "fp": 0,
+        "errors": 0,
+        "flipped": 0,
+        "repeated": 0,
+        "recall": 1,
+        "precision": 1,
+        "falseAlarmRate": null,
+        "flipRate": null
+      },
+      "entity": {
+        "fixtures": 1,
+        "runs": 1,
+        "tp": 0,
+        "fn": 1,
+        "tn": 0,
+        "fp": 0,
+        "errors": 0,
+        "flipped": 0,
+        "repeated": 0,
+        "recall": 0,
+        "precision": null,
+        "falseAlarmRate": null,
+        "flipRate": null
+      },
+      "book_audit": {
+        "fixtures": 1,
+        "runs": 1,
+        "tp": 0,
+        "fn": 0,
+        "tn": 1,
+        "fp": 0,
+        "errors": 0,
+        "flipped": 0,
+        "repeated": 0,
+        "recall": null,
+        "precision": null,
+        "falseAlarmRate": 0,
+        "flipRate": null
+      }
+    },
+    "overall": {
+      "fixtures": 34,
+      "runs": 90,
+      "tp": 38,
+      "fn": 17,
+      "tn": 32,
+      "fp": 3,
+      "errors": 0,
+      "flipped": 2,
+      "repeated": 28,
+      "recall": 0.6909090909090909,
+      "precision": 0.926829268292683,
+      "falseAlarmRate": 0.08571428571428572,
+      "flipRate": 0.07142857142857142
+    }
+  },
+  "entries": [
+    {
+      "fixtureId": "plate-dragon-p1-photographic",
+      "judge": "plate_qc",
+      "experimentId": 1525,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|medium] The image is a photograph, not a bold, expressive traditional watercolor painting with visible brushstrokes, wet-on-wet washes, pigment pooling, granulation, and cold-press paper texture."
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p1-lab1505-photographic",
+      "judge": "plate_qc",
+      "experimentId": 1525,
+      "outcome": "FN",
+      "expected": "flag",
+      "said": [
+        "[-|figures] There are faint human figures visible near the benches and in the distant background."
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p1-lab1503-photographic",
+      "judge": "plate_qc",
+      "experimentId": 1525,
+      "outcome": "FN",
+      "expected": "flag",
+      "said": [],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p1-lab1484-people",
+      "judge": "plate_qc",
+      "experimentId": 1525,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|figures] Three distant passers-by are visible at the top of the stairs."
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p10-picture-in-picture",
+      "judge": "plate_qc",
+      "experimentId": 1525,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|unclassified] The painted scene does not reach all four sides of the frame; there is an unpainted paper margin around the picture, and a glowing white border creates a smaller picture set inside the frame."
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p11-signature",
+      "judge": "plate_qc",
+      "experimentId": 1525,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|unclassified] a signature is present in the bottom-right corner"
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p13-signature",
+      "judge": "plate_qc",
+      "experimentId": 1525,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|text] A signature is present in the bottom-right corner."
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p8-people",
+      "judge": "plate_qc",
+      "experimentId": 1525,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|figures] distant pedestrians are visible on both sides of the square"
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p8-edges-clean",
+      "judge": "plate_qc",
+      "experimentId": 1525,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [
+        "[-|figures] Distant pedestrians are visible in the midground and background.",
+        "[-|light] The sky is blue, not a flat dark grey haze, and the overall light does not convey heavy fog or dusk.",
+        "[-|light] The sky is clear blue, not covered as expected for fog."
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p18-people",
+      "judge": "plate_qc",
+      "experimentId": 1525,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|figures] faint human figures are present near the left edge, right edge, and in the mid-distance"
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p3-aux-people",
+      "judge": "plate_qc",
+      "experimentId": 1525,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|figures] faint human figures are visible in the distance on both the left and right sides of the frame"
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p4-clean",
+      "judge": "plate_qc",
+      "experimentId": 1525,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p14-clean",
+      "judge": "plate_qc",
+      "experimentId": 1525,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-lukas-p7-concrete-tower-is-right",
+      "judge": "plate_qc",
+      "experimentId": 1525,
+      "outcome": "FP",
+      "expected": "pass",
+      "said": [
+        "[-|landmark] the tower's shaft is solid, not a lattice structure as shown in the reference photo"
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-lukas-p9-aux-photographic",
+      "judge": "plate_qc",
+      "experimentId": 1525,
+      "outcome": "FN",
+      "expected": "flag",
+      "said": [
+        "[-|figures] Multiple people are visible in the scene: a man sitting on a wall at the far left, a woman sitting on a white chair at mid-left, a man standing in the mid-background, a woman bending over the chess board at mid-right, and two people sitting on a bench in the far background.",
+        "[-|camera] The plate is a wide shot of a town square, not a close-up shot as specified.",
+        "[-|framing] The frame is filled by the interior of the town square with an outdoor chess set and buildings, instead of the 'exterior boundary of a town square featuring a tall fence of heavy iron bars set into a low stone wall' and a 'closed gate'.",
+        "[-|geometry] The Lindenhof gate, which is meant to fill the background behind the character, is entirely missing from the scene. The foreground ground cover is gravel with scattered leaves, not a 'deep pile of wet, copper-coloured autumn leaves'."
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-lukas-p9-aux-people",
+      "judge": "plate_qc",
+      "experimentId": 1525,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|figures] multiple people are visible throughout the frame, including two men on a bench, a man standing in the background, a woman playing chess, and two people sitting on a distant bench"
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-fiona-p11-modern-city-not-anachronism",
+      "judge": "plate_qc",
+      "experimentId": 1525,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [
+        "[-|figures] Small, indistinct figures are visible on the bridge/balcony in the mid-ground."
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-fiona-p8-modern-crane-not-anachronism",
+      "judge": "plate_qc",
+      "experimentId": 1525,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [
+        "[-|figures] Small, indistinct figures are visible on the distant bridge/walkway through the arch."
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "sem-lukas-p10-day-on-night-page",
+      "judge": "semantic",
+      "experimentId": 1526,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[MAJOR|setting] The scene is described as taking place 'at night' in the SCENE_HINT, but the illustration clearly depicts a daytime scene with bright natural light and a blue sky."
+      ],
+      "costUsd": 0.0029934000000000002,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-fiona-p9-no-eiffel-tower",
+      "judge": "semantic",
+      "experimentId": 1526,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [
+        "[MAJOR|setting] The scene is described as being wrapped in 'Pale fog' that 'obscures the heavy stone arch of the low bridge'. The image shows a clear, bright day with no fog, and the bridge and background city are clearly visible, not obscured."
+      ],
+      "costUsd": 0.0028255999999999997,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-fiona-p6-sun-on-fog-page",
+      "judge": "semantic",
+      "experimentId": 1526,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[MAJOR|setting] The scene depicts a bright, sunny afternoon with clear skies and visible sun, contradicting the declared weather of 'thick fog rolling across the dark water' and 'sky a flat pale grey-white, no sun disc'."
+      ],
+      "costUsd": 0.0043067,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-fiona-p7v1-sun-on-fog-page",
+      "judge": "semantic",
+      "experimentId": 1526,
+      "outcome": "FN",
+      "expected": "flag",
+      "said": [],
+      "costUsd": 0.0030289,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-fiona-p5-fog-rendered-clean",
+      "judge": "semantic",
+      "experimentId": 1526,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0021818000000000002,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-dragon-p13-clear-moon-on-fog-night",
+      "judge": "semantic",
+      "experimentId": 1526,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[MAJOR|setting] A prominent moon is visible in the sky, which contradicts the 'no moon' instruction in the DECLARED LIGHT."
+      ],
+      "costUsd": 0.0035602,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-dragon-p16-no-fog-on-fog-night",
+      "judge": "semantic",
+      "experimentId": 1526,
+      "outcome": "FN",
+      "expected": "flag",
+      "said": [],
+      "costUsd": 0.0024286,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-dragon-p8-fog-rendered-clean",
+      "judge": "semantic",
+      "experimentId": 1526,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0024331,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-dragon-p4-clear-afternoon-clean",
+      "judge": "semantic",
+      "experimentId": 1526,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0023707,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-dragon-p6-clear-afternoon-clean",
+      "judge": "semantic",
+      "experimentId": 1526,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [
+        "[MODERATE|viewer_address] Levin is looking directly at the viewer, despite having a declared interaction (listening to the egg) that requires his attention and the prompt stating he 'stares forward in focus'."
+      ],
+      "costUsd": 0.0025738000000000002,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "qual-lukas-p7-invented-children",
+      "judge": "quality",
+      "experimentId": 1527,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[CRITICAL|extra_character] figure 1 matches no EXPECTED CAST entry and every cast member is already in the frame (EXPECTED CAST 0).",
+        "[CRITICAL|extra_character] figure 2 matches no EXPECTED CAST entry and every cast member is already in the frame (EXPECTED CAST 0)."
+      ],
+      "costUsd": 0.021863599999999997,
+      "costBasis": "measured quality+P1 tokens + semantic estimate"
+    },
+    {
+      "fixtureId": "qual-fiona-backcover-painted-caption",
+      "judge": "quality",
+      "experimentId": 1527,
+      "outcome": "FN",
+      "expected": "flag",
+      "said": [],
+      "costUsd": 0.024106299999999997,
+      "costBasis": "measured quality+P1 tokens + semantic estimate"
+    },
+    {
+      "fixtureId": "qual-dragon-backcover-no-text-clean",
+      "judge": "quality",
+      "experimentId": 1527,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.023453599999999998,
+      "costBasis": "measured quality+P1 tokens + semantic estimate"
+    },
+    {
+      "fixtureId": "letter-fiona-backcover-painted-caption",
+      "judge": "lettering",
+      "experimentId": 1528,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[CRITICAL|rendered_text] A caption \"THE FIVE FRIENDS STAND TOGETHER\" is laid over the picture (overlay text at bottom center, bottom-center); nothing on the page asks for it."
+      ],
+      "costUsd": 0.0235287,
+      "costBasis": "measured quality+P1 tokens + semantic estimate"
+    },
+    {
+      "fixtureId": "entity-fiona-lorena-vitiligo",
+      "judge": "entity",
+      "experimentId": 1529,
+      "outcome": "FN",
+      "expected": "flag",
+      "said": [
+        "[CRITICAL|face_mismatch] Cell B (page 5) shows a ship mast object instead of the character Lorena.",
+        "[CRITICAL|face_mismatch] The character in Cell C (page 6) has a distinctly different face shape and facial features (eyes, nose, mouth) compared to the reference Lorena (Cell R) and other consistent cells (A, D, E).",
+        "[MAJOR|hair_change] Lorena's hair is down and loose in Cell C (page 6), but it should be dark, wavy hair pulled back in a ponytail as described and shown in Cell R, A, D, E.",
+        "[MAJOR|skin_tone] The skin tone in Cell C (page 6) is significantly lighter than Lorena's canonical medium-dark, warm skin tone as seen in Cell R, A, D, E."
+      ],
+      "costUsd": 0.00735,
+      "costBasis": "flat estimate per character grid call"
+    },
+    {
+      "fixtureId": "audit-lukas-p7-manuel-not-cast",
+      "judge": "book_audit",
+      "experimentId": 1530,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [
+        "[MINOR|action_interaction] FAULT[IMG][MINOR][action_interaction]: p1 — The nutcracker is shown in front of Lukas, not pushed aside as the text describes.",
+        "[MAJOR|object_presence] FAULT[IMG][MAJOR][object_presence]: p2 — The lead lantern is described as hexagonal in the text, but it is depicted as square or rectangular.",
+        "[CRITICAL|setting] FAULT[IMG][CRITICAL][setting]: p5 — The picture shows the children looking into a small cabinet-like structure, not through a gap under a full-sized reading-room door as described in the text.",
+        "[MAJOR|missing_element] FAULT[IMG][MAJOR][missing_element]: p5 — The text describes \"crusted hinge pins\" protruding on their side, which are not clearly visible or emphasized in the picture."
+      ],
+      "costUsd": 0.024480000000000002,
+      "costBasis": "measured (stage cost)"
+    },
+    {
+      "fixtureId": "sem-lukas-p10-day-on-night-page",
+      "judge": "semantic",
+      "experimentId": 1534,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[MAJOR|setting] The scene is described as taking place 'at night' in the SCENE_HINT, but the illustration clearly depicts a daytime scene with bright natural light and a blue sky."
+      ],
+      "costUsd": 0.0031112999999999996,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-fiona-p9-no-eiffel-tower",
+      "judge": "semantic",
+      "experimentId": 1534,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [
+        "[MAJOR|setting] The scene lacks the described pale fog that should wrap entirely around the ship and obscure the background bridge and distant forms. The background is clear and distinct, not faded out by fog."
+      ],
+      "costUsd": 0.0028176,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-fiona-p6-sun-on-fog-page",
+      "judge": "semantic",
+      "experimentId": 1534,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[MAJOR|setting] The lighting and sky contradict the declared weather and time of day. The scene should have a 'flat pale grey-white' sky with 'no sun disc' and 'no hard shadows' due to 'thick fog'. The image shows a bright, warm sky with a visible sun/bright spot and clear shadows."
+      ],
+      "costUsd": 0.0038722999999999995,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-fiona-p7v1-sun-on-fog-page",
+      "judge": "semantic",
+      "experimentId": 1534,
+      "outcome": "FN",
+      "expected": "flag",
+      "said": [
+        "[MAJOR|action_interaction] Facundo's left hand is closed and gripping the sash, but the SCENE_HINT states it should be 'open and reaching urgently across the frame'.",
+        "[MAJOR|action_interaction] Facundo's right hand is on Fiona's shoulder/back, but the SCENE_HINT states it should be 'free and visible at his side'.",
+        "[MAJOR|action_interaction] Fiona's right hand pulls the sash, but the SCENE_HINT specifies she pulls it 'away from his reaching fingers'. Facundo's fingers are gripping, not just reaching, which changes the dynamic of the interaction."
+      ],
+      "costUsd": 0.0038829,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-fiona-p5-fog-rendered-clean",
+      "judge": "semantic",
+      "experimentId": 1534,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0023278999999999995,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-dragon-p13-clear-moon-on-fog-night",
+      "judge": "semantic",
+      "experimentId": 1534,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[MAJOR|setting] The scene shows a prominent moon in the sky, which contradicts the 'no moon' requirement for the declared 'fog' weather."
+      ],
+      "costUsd": 0.0037533,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-dragon-p16-no-fog-on-fog-night",
+      "judge": "semantic",
+      "experimentId": 1534,
+      "outcome": "FN",
+      "expected": "flag",
+      "said": [],
+      "costUsd": 0.0024286,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-dragon-p8-fog-rendered-clean",
+      "judge": "semantic",
+      "experimentId": 1534,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.002507,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-dragon-p4-clear-afternoon-clean",
+      "judge": "semantic",
+      "experimentId": 1534,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0024151,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-dragon-p6-clear-afternoon-clean",
+      "judge": "semantic",
+      "experimentId": 1534,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [
+        "[MODERATE|viewer_address] Levin is looking directly at the viewer, despite having a declared interaction (listening to the egg) that requires his attention and focus within the scene. The scene intent describes him staring forward in intense concentration, listening."
+      ],
+      "costUsd": 0.0025598,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-lukas-p10-day-on-night-page",
+      "judge": "semantic",
+      "experimentId": 1535,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[MAJOR|setting] The scene is described as taking place 'at night' in the SCENE_HINT, but the illustration clearly depicts a daytime scene with bright natural light and a blue sky."
+      ],
+      "costUsd": 0.0029934000000000002,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-fiona-p9-no-eiffel-tower",
+      "judge": "semantic",
+      "experimentId": 1535,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [
+        "[MAJOR|setting] The scene is described as being wrapped in 'Pale fog' that 'obscures the heavy stone arch of the low bridge'. The image shows a clear, bright day with no fog, and the bridge and background city are clearly visible, not obscured."
+      ],
+      "costUsd": 0.0028255999999999997,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-fiona-p6-sun-on-fog-page",
+      "judge": "semantic",
+      "experimentId": 1535,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[MAJOR|setting] The scene depicts a bright, sunny afternoon with clear skies and visible sun, contradicting the declared weather of 'thick fog rolling across the dark water' and 'sky a flat pale grey-white, no sun disc'."
+      ],
+      "costUsd": 0.0043067,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-fiona-p7v1-sun-on-fog-page",
+      "judge": "semantic",
+      "experimentId": 1535,
+      "outcome": "FN",
+      "expected": "flag",
+      "said": [
+        "[MAJOR|action_interaction] Facundo's left hand is closed and gripping the sash, but the SCENE_HINT states it should be 'open and reaching urgently across the frame'.",
+        "[MAJOR|action_interaction] Facundo's right hand is on Fiona's shoulder/back, but the SCENE_HINT states it should be 'free and visible at his side'.",
+        "[MAJOR|action_interaction] Fiona's right hand pulls the sash, but the SCENE_HINT specifies she pulls it 'away from his reaching fingers'. Facundo's fingers are gripping, not just reaching, which changes the dynamic of the interaction."
+      ],
+      "costUsd": 0.0038829,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-fiona-p5-fog-rendered-clean",
+      "judge": "semantic",
+      "experimentId": 1535,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0021818000000000002,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-dragon-p13-clear-moon-on-fog-night",
+      "judge": "semantic",
+      "experimentId": 1535,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[MAJOR|setting] The scene shows a prominent moon in the sky, which contradicts the 'no moon' requirement for the declared 'fog' weather."
+      ],
+      "costUsd": 0.0037533,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-dragon-p16-no-fog-on-fog-night",
+      "judge": "semantic",
+      "experimentId": 1535,
+      "outcome": "FN",
+      "expected": "flag",
+      "said": [
+        "[MINOR|setting] The fog effect is not as pronounced as described. The prompt specifies 'flat dark grey haze, distant forms fading out into it', but the background trees are relatively clear and the overall scene is quite bright for a foggy night."
+      ],
+      "costUsd": 0.0026075,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-dragon-p8-fog-rendered-clean",
+      "judge": "semantic",
+      "experimentId": 1535,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0024331,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-dragon-p4-clear-afternoon-clean",
+      "judge": "semantic",
+      "experimentId": 1535,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0023707,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "sem-dragon-p6-clear-afternoon-clean",
+      "judge": "semantic",
+      "experimentId": 1535,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [
+        "[MODERATE|viewer_address] Levin is looking directly at the viewer, despite having a declared interaction (listening to the egg) that requires his attention and the prompt stating he 'stares forward in focus'."
+      ],
+      "costUsd": 0.0025738000000000002,
+      "costBasis": "measured total tokens, output share estimated"
+    },
+    {
+      "fixtureId": "plate-dragon-p1-photographic",
+      "judge": "plate_qc",
+      "experimentId": 1538,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|medium] The image is a photograph, not a bold, expressive traditional watercolor painting. It shows photographic grain, sharp detail, and optical depth, lacking visible brushstrokes, wet-on-wet washes, pigment pooling, granulating, or paper texture."
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p1-lab1505-photographic",
+      "judge": "plate_qc",
+      "experimentId": 1538,
+      "outcome": "FN",
+      "expected": "flag",
+      "said": [],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p1-lab1503-photographic",
+      "judge": "plate_qc",
+      "experimentId": 1538,
+      "outcome": "FN",
+      "expected": "flag",
+      "said": [],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p1-lab1484-people",
+      "judge": "plate_qc",
+      "experimentId": 1538,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|figures] Three distant passers-by are visible at the top of the stairs."
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p10-picture-in-picture",
+      "judge": "plate_qc",
+      "experimentId": 1538,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|unclassified] The painted scene does not reach all four sides of the frame; there is an unpainted paper margin around the picture."
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p11-signature",
+      "judge": "plate_qc",
+      "experimentId": 1538,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|text] The image contains a signature in the bottom-right corner."
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p13-signature",
+      "judge": "plate_qc",
+      "experimentId": 1538,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|text] A signature is present in the bottom-right corner."
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p8-people",
+      "judge": "plate_qc",
+      "experimentId": 1538,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|figures] Distant pedestrians are present in the midground and background."
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p8-edges-clean",
+      "judge": "plate_qc",
+      "experimentId": 1538,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [
+        "[-|figures] Distant pedestrians are visible in the background.",
+        "[-|light] The sky is blue and clear, not a flat dark grey haze, and distant forms are not fading into fog.",
+        "[-|light] The sky is clear blue, not covered.",
+        "[-|light] Distant towers are clear, not softened by fog."
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p18-people",
+      "judge": "plate_qc",
+      "experimentId": 1538,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|figures] faint human figures are visible on the left and right sides of the square"
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p3-aux-people",
+      "judge": "plate_qc",
+      "experimentId": 1538,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|figures] faint figures are visible in the background on both the left and right sides"
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p4-clean",
+      "judge": "plate_qc",
+      "experimentId": 1538,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p14-clean",
+      "judge": "plate_qc",
+      "experimentId": 1538,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-lukas-p7-concrete-tower-is-right",
+      "judge": "plate_qc",
+      "experimentId": 1538,
+      "outcome": "FP",
+      "expected": "pass",
+      "said": [
+        "[-|landmark] The tower in the plate does not resemble the Fernsehturm Uetliberg reference photo. It is a thick, solid tower with a large spherical observation deck mid-shaft, and the red-and-white stripes cover the main shaft, not a slender lattice structure with a small observation deck near the base of a striped antenna mast."
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-lukas-p9-aux-photographic",
+      "judge": "plate_qc",
+      "experimentId": 1538,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|medium] the image appears photographic or a stylized photograph, not a pure 3D animated children's illustration"
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-lukas-p9-aux-people",
+      "judge": "plate_qc",
+      "experimentId": 1538,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|figures] multiple people are present in the scene"
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-fiona-p11-modern-city-not-anachronism",
+      "judge": "plate_qc",
+      "experimentId": 1538,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [
+        "[-|figures] Faint, indistinct figures are visible on the bridge/walkway in the mid-ground."
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-fiona-p8-modern-crane-not-anachronism",
+      "judge": "plate_qc",
+      "experimentId": 1538,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [
+        "[-|figures] faint figures are visible on the distant walkway"
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p1-photographic",
+      "judge": "plate_qc",
+      "experimentId": 1539,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|medium] The image is a photograph, not a watercolor painting. It shows photographic grain, sharp detail, and optical depth of field instead of visible brushstrokes and watercolor effects."
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p1-lab1505-photographic",
+      "judge": "plate_qc",
+      "experimentId": 1539,
+      "outcome": "FN",
+      "expected": "flag",
+      "said": [],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p1-lab1503-photographic",
+      "judge": "plate_qc",
+      "experimentId": 1539,
+      "outcome": "FN",
+      "expected": "flag",
+      "said": [],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p1-lab1484-people",
+      "judge": "plate_qc",
+      "experimentId": 1539,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|figures] There are three distant figures at the top of the stairs."
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p10-picture-in-picture",
+      "judge": "plate_qc",
+      "experimentId": 1539,
+      "outcome": "FN",
+      "expected": "flag",
+      "said": [
+        "[-|text] a signature is present in the bottom-right corner"
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p11-signature",
+      "judge": "plate_qc",
+      "experimentId": 1539,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|text] signature in the bottom-right corner"
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p13-signature",
+      "judge": "plate_qc",
+      "experimentId": 1539,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|unclassified] a signature is present in the bottom-right corner"
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p8-people",
+      "judge": "plate_qc",
+      "experimentId": 1539,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|figures] Distant pedestrians are visible in the midground and background."
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p8-edges-clean",
+      "judge": "plate_qc",
+      "experimentId": 1539,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [
+        "[-|figures] Distant pedestrians are visible in the midground on both the left and right sides.",
+        "[-|light] The sky is blue, not a flat dark grey haze, and does not clearly show dusk or heavy fog.",
+        "[-|light] The sky is blue and clear, not covered as expected for fog."
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p18-people",
+      "judge": "plate_qc",
+      "experimentId": 1539,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|figures] faint human figures are visible on the left and right sides of the square"
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p3-aux-people",
+      "judge": "plate_qc",
+      "experimentId": 1539,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|figures] faint figures are visible on the left and right sides of the midground"
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p4-clean",
+      "judge": "plate_qc",
+      "experimentId": 1539,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-dragon-p14-clean",
+      "judge": "plate_qc",
+      "experimentId": 1539,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-lukas-p7-concrete-tower-is-right",
+      "judge": "plate_qc",
+      "experimentId": 1539,
+      "outcome": "FP",
+      "expected": "pass",
+      "said": [
+        "[-|landmark] The tower's shaft is a solid cylinder, not a lattice structure as shown in the reference photograph of Fernsehturm Uetliberg."
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-lukas-p9-aux-photographic",
+      "judge": "plate_qc",
+      "experimentId": 1539,
+      "outcome": "FN",
+      "expected": "flag",
+      "said": [
+        "[-|setting] The plate shows the interior of a town square with an outdoor chess set, not the exterior boundary featuring a tall fence of heavy iron bars set into a low stone wall with a closed gate.",
+        "[-|figures] Multiple people are visible in the scene: a man sitting on a bench at the far left, a woman sitting on a white chair at the mid-left, a man standing near the wall in the mid-background, a woman bending over the chess board in the mid-right, and two people sitting on a bench in the far right background.",
+        "[-|camera] The camera is a wide shot of the square, not a close-up as specified.",
+        "[-|framing] The frame is filled by the interior of the town square, not the exterior boundary featuring a tall fence of heavy iron bars set into a low stone wall and a closed gate."
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-lukas-p9-aux-people",
+      "judge": "plate_qc",
+      "experimentId": 1539,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|figures] multiple people are visible in the scene"
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-fiona-p11-modern-city-not-anachronism",
+      "judge": "plate_qc",
+      "experimentId": 1539,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [
+        "[-|figures] Small, indistinct figures are visible on the bridge/promenade in the mid-ground."
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    },
+    {
+      "fixtureId": "plate-fiona-p8-modern-crane-not-anachronism",
+      "judge": "plate_qc",
+      "experimentId": 1539,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [
+        "[-|figures] faint human figures are visible on the distant walkway/bridge"
+      ],
+      "costUsd": 0.00195,
+      "costBasis": "flat estimate (validateEmptyScene returns no usage)"
+    }
+  ]
+}

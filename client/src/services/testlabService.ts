@@ -602,6 +602,11 @@ export const TESTLAB_STAGES = [
   // only variable is the prompt (or the models). params.retell also re-tells
   // against the new panel output, answering "does it help" end to end.
   { id: 'arc_panel_replay', label: 'Arc panel replay (frozen arc → what does the panel catch?)', producesImage: false, overridable: true, storyLevel: true },
+  // Judge regression fixtures: one stored input + the verdict a judge must
+  // return, replayed through the current production judge. Run as the
+  // "Judge fixtures · <judge>" sets (scripts/admin/judge-fixtures.js; doc
+  // docs/judge-fixtures.md); each card's `verdict` says TP/FN/TN/FP.
+  { id: 'judge_fixture', label: 'Judge fixture (stored input → expected verdict; run the Judge fixtures sets)', producesImage: false, overridable: false, storyLevel: true },
   // One Visual Bible element's reference cell(s) + the cell gate's verdict.
   // params: elementId (required), gateOnly, text, model, description.
   { id: 'vb_element_cell', label: 'VB element cell (render + cell gate; params.elementId)', producesImage: true, overridable: true, storyLevel: true },

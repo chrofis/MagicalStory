@@ -63,6 +63,25 @@ describe('the brief line', () => {
     expect(p.sceneMetadata.sceneIntent).toBe('i');
     expect(p.outlineCharacters).toEqual(['A']);
   });
+  // The picture the reader sees was drawn from the PICKED version's brief. An
+  // iterate rewrite ships with its own cast and metadata (30 of 471 shipped
+  // staging pages, 2026-09-26); the audit read the page's original brief.
+  it('buildAuditPages reads the picked version\'s own brief when it has one', () => {
+    const page = { pageNumber: 2, text: 't', imageData: 'x', sceneCharacters: ['A', 'B'], sceneMetadata: { sceneIntent: 'old moment', objects: ['ART001'] } };
+    const rewrite = { imageData: 'y', sceneCharacters: ['B'], sceneMetadata: { sceneIntent: 'new moment', objects: ['ART002'] } };
+    const [p] = bookAudit.buildAuditPages([page], () => rewrite);
+    expect(p.imageData).toBe('y');
+    expect(p.sceneCharacters).toEqual(['B']);
+    expect(p.sceneMetadata.sceneIntent).toBe('new moment');
+    expect(p.citedIds).toEqual(['ART002']);
+    // A declared empty cast is a decision, and it wins.
+    const [e] = bookAudit.buildAuditPages([page], () => ({ ...rewrite, sceneCharacters: [] }));
+    expect(e.sceneCharacters).toEqual([]);
+    // An inpaint or char-fix keeps the page's contract.
+    const [k] = bookAudit.buildAuditPages([page], () => ({ imageData: 'z' }));
+    expect(k.sceneCharacters).toEqual(['A', 'B']);
+    expect(k.sceneMetadata.sceneIntent).toBe('old moment');
+  });
 });
 
 describe('the closed type list is one list', () => {

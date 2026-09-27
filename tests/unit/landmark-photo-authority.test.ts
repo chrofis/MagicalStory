@@ -34,8 +34,8 @@ async function noisePng(w = 256, h = 256, seed = 1): Promise<string> {
 
 describe('plate judge: the landmark photo is the authority', () => {
   it('names the landmark, carries the shared authority sentence and judges against the photo', () => {
-    const p = build({ sceneDescription: 'A forest path below a tall tower.', landmarkName: 'Old Town Tower', storyEra: 'medieval' });
-    expect(p).toContain('LANDMARK REFERENCE PHOTO: the second attached image is a real photograph of Old Town Tower');
+    const p = build({ sceneDescription: 'A forest path below a tall tower.', landmarkName: 'Old Town Tower', era: 'medieval' });
+    expect(p).toContain('LANDMARK REFERENCE PHOTO: the image labelled [Landmark reference photo] is a real photograph of Old Town Tower');
     // stated before the checks, so every check reads it
     expect(p.indexOf('LANDMARK REFERENCE PHOTO')).toBeLessThan(p.indexOf('\nCheck:'));
     expect(p).toContain(pb.LANDMARK_PHOTO_AUTHORITY);
@@ -56,7 +56,7 @@ describe('plate judge: the landmark photo is the authority', () => {
     expect(pb.buildLandmarkFidelityBlock({ name: 'Old Town', photoType: 'distant' })).toContain(pb.LANDMARK_PHOTO_AUTHORITY);
   });
 
-  it('validateEmptyScene sends the landmark photo as the second image with the landmark check', async () => {
+  it('validateEmptyScene sends the landmark photo after the plate and its detail views, with the landmark check', async () => {
     const plate = await noisePng(256, 256, 7);
     const photo = await noisePng(64, 64, 3);
     const bodies: any[] = [];
@@ -72,15 +72,17 @@ describe('plate judge: the landmark photo is the authority', () => {
     expect(res.pass).toBe(true);
     expect(bodies.length).toBe(1);
     const parts = bodies[0].contents[0].parts;
-    expect(parts.length).toBe(5);
+    // plate label + plate, seven labelled detail views, photo label + photo, prompt
+    expect(parts.length).toBe(19);
     expect(parts[0].text).toBe('[Background plate to judge]:');
     expect(parts[1].inline_data.data).toBe(plate.replace(/^data:image\/\w+;base64,/, ''));
-    expect(parts[2].text).toBe('[Landmark reference photo: Old Town Tower]:');
-    expect(parts[3].inline_data.data).toBe(photo.replace(/^data:image\/\w+;base64,/, ''));
-    expect(parts[4].text).toContain('real photograph of Old Town Tower');
+    expect(parts[2].text).toMatch(/^\[Detail view of the plate/);
+    expect(parts[16].text).toBe('[Landmark reference photo: Old Town Tower]:');
+    expect(parts[17].inline_data.data).toBe(photo.replace(/^data:image\/\w+;base64,/, ''));
+    expect(parts[18].text).toContain('real photograph of Old Town Tower');
   });
 
-  it('without a landmark photo the judge gets the plate alone and no landmark check', async () => {
+  it('without a landmark photo the judge gets the plate and its detail views, and no landmark check', async () => {
     const plate = await noisePng(256, 256, 9);
     const bodies: any[] = [];
     vi.stubEnv('GEMINI_API_KEY', 'test-key');
@@ -90,7 +92,8 @@ describe('plate judge: the landmark photo is the authority', () => {
     }));
     await validateEmptyScene(plate, null, 'unit', { sceneDescription: 'A forest path.' });
     const parts = bodies[0].contents[0].parts;
-    expect(parts.length).toBe(2);
-    expect(parts[1].text).not.toContain('LANDMARK REFERENCE PHOTO');
+    expect(parts.length).toBe(17);
+    expect(parts[16].text).not.toContain('LANDMARK REFERENCE PHOTO');
+    expect(parts.some((p: any) => /Landmark reference photo/.test(p.text || ''))).toBe(false);
   });
 });

@@ -33,7 +33,6 @@ const { MODEL_DEFAULTS } = require('../config/models');
  * @param {string} charName - the repaired character
  * @param {Object} opts
  * @param {Object} opts.log - logger (required)
- * @param {Function} [opts.usageTracker] - (provider, usage, label, modelId)
  * @param {string} [opts.jobKey] - run-metrics key (story or job id)
  * @param {string} [opts.context] - log prefix, e.g. 'CHAR-FIX Page 9'
  * @returns {Promise<{ok: boolean, available: boolean, reason: string|null}>}
@@ -64,9 +63,9 @@ async function checkFaceIntegrity(beforeImage, afterImage, charName, opts = {}) 
       MODEL_DEFAULTS.repairFaceCheck,
       { images: [beforeImage, afterImage], usageLabel: 'repair_face_check' }
     );
-    if (res?.usage && opts.usageTracker) {
-      opts.usageTracker('openrouter', res.usage, 'repair_face_check', res.modelId);
-    }
+    // No usage booking here: callTextModel records every call itself (the
+    // usageContext chokepoint, provider key from the model's real vendor). This
+    // used to book it again as 'openrouter' although the gate runs on Gemini.
     const json = String(res?.text || '').match(/\{[\s\S]*\}/);
     const verdict = json ? JSON.parse(json[0]) : null;
     if (!verdict || typeof verdict.intact !== 'boolean') {

@@ -8,14 +8,73 @@ const { log } = require('../utils/logger');
 const { TEXT_MODELS, MODEL_DEFAULTS, GROK_VISION_FALLBACK } = require('../config/models');
 const { withAnthropic, withGemini, withGrok } = require('./aiConcurrency');
 const apiHealth = require('./apiHealth');
-const { stripDataUriPrefix } = require('./r2');
 const { recordTextUsage } = require('./usageContext');
+const { geminiUsage, xaiUsage, openRouterUsage } = require('./providerUsage');
 const { guardPromptString } = require('../services/prompts');
 
 // Map a text-model provider to its tokenUsage accounting key. Text Gemini
 // calls bill to gemini_text (image/quality Gemini are tracked on their own
 // paths); xAI text bills to grok.
 const USAGE_PROVIDER_KEY = { anthropic: 'anthropic', google: 'gemini_text', xai: 'grok', openrouter: 'openrouter' };
+
+// ─── Image inputs (options.images) ──────────────────────────────────────────
+// ONE resolver for every provider entry point. Until 2026-09-27 the Gemini text
+// path logged "images were ignored" and answered blind, and the xAI and
+// streaming paths dropped images without a word — the char-fix face gate
+// (gemini-2.5-flash) judged "is the face intact" without ever seeing a face for
+// twelve days. An image input is now either delivered or the call throws.
+
+function sniffImageMime(buf) {
+  if (!buf || buf.length < 12) return null;
+  if (buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF) return 'image/jpeg';
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) return 'image/png';
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46) return 'image/gif';
+  if (buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') return 'image/webp';
+  return null;
+}
+
+/**
+ * Resolve one image input to { mimeType, data } (data = bare base64).
+ * Accepts a data URI, bare base64, an http(s) URL (fetched), or a Buffer.
+ * Anything else — or an image whose bytes are not JPEG/PNG/GIF/WebP — throws.
+ */
+async function resolveImageInput(img, where) {
+  let buf;
+  if (Buffer.isBuffer(img)) {
+    buf = img;
+  } else if (typeof img !== 'string' || img.length === 0) {
+    throw new Error(`${where}: image input is ${img === '' ? 'an empty string' : typeof img} — expected a data URI, base64, http(s) URL or Buffer`);
+  } else if (img.startsWith('data:')) {
+    const m = img.match(/^data:([^;,]+);base64,/);
+    if (!m) throw new Error(`${where}: unsupported data URI "${img.slice(0, 40)}…" — only base64 image data URIs are accepted`);
+    buf = Buffer.from(img.slice(m[0].length), 'base64');
+  } else if (/^https?:\/\//i.test(img)) {
+    buf = await require('./r2').fetchImageBytes(img);
+    if (!buf) throw new Error(`${where}: could not fetch image ${img.slice(0, 120)}`);
+  } else if (/^[a-z][a-z0-9+.-]*:/i.test(img)) {
+    throw new Error(`${where}: unsupported image reference "${img.slice(0, 40)}…"`);
+  } else {
+    buf = Buffer.from(img, 'base64');
+  }
+  const mimeType = sniffImageMime(buf);
+  if (!mimeType) throw new Error(`${where}: image input is not a JPEG/PNG/GIF/WebP (${buf.length} bytes)`);
+  return { mimeType, data: buf.toString('base64') };
+}
+
+/** Resolve options.images (possibly absent) to [{ mimeType, data }]. */
+async function resolveImageInputs(options, where) {
+  const images = options && options.images;
+  if (images == null) return [];
+  if (!Array.isArray(images)) throw new Error(`${where}: options.images must be an array`);
+  return Promise.all(images.map((img, i) => resolveImageInput(img, `${where} image ${i + 1}`)));
+}
+
+/** For entry points that cannot carry images: refuse them loudly, never drop them. */
+function refuseImageInputs(options, where) {
+  if (options && Array.isArray(options.images) && options.images.length) {
+    throw new Error(`${where} cannot send image inputs (${options.images.length} given) — use the non-streaming callTextModel`);
+  }
+}
 
 // Get active model from environment (legacy - prefer MODEL_DEFAULTS)
 const TEXT_MODEL = process.env.TEXT_MODEL || 'claude-sonnet';
@@ -197,17 +256,16 @@ async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
   // Anthropic bills it at ~10% on cache hits (5-min TTL). Prompt caching is
   // GA; no beta header needed on anthropic-version 2023-06-01.
   let userContent;
-  if (options.images && options.images.length > 0) {
+  const images = await resolveImageInputs(options, 'callAnthropicAPI');
+  if (images.length > 0) {
     userContent = [];
     if (options.cachePrefix) {
       userContent.push({ type: 'text', text: options.cachePrefix, cache_control: { type: 'ephemeral' } });
     }
-    for (const img of options.images) {
-      const base64 = stripDataUriPrefix(img);
-      const mimeType = img.match(/^data:(image\/\w+);base64,/) ? img.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+    for (const img of images) {
       userContent.push({
         type: 'image',
-        source: { type: 'base64', media_type: mimeType, data: base64 }
+        source: { type: 'base64', media_type: img.mimeType, data: img.data }
       });
     }
     userContent.push({ type: 'text', text: prompt });
@@ -225,7 +283,7 @@ async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
     messages.push({ role: 'assistant', content: options.prefill });
   } else if (options.prefill) {
     effectivePrompt = prompt + `\n\nIMPORTANT: Start your response EXACTLY with: ${options.prefill}`;
-    messages[0] = { role: 'user', content: options.images ? [...userContent.slice(0, -1), { type: 'text', text: effectivePrompt }] : effectivePrompt };
+    messages[0] = { role: 'user', content: images.length ? [...userContent.slice(0, -1), { type: 'text', text: effectivePrompt }] : effectivePrompt };
   }
 
   const data = await withAnthropic(() => withRetry(async () => {
@@ -268,7 +326,7 @@ async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
 
   if (inputTokens > 0 || outputTokens > 0 || cacheReadTokens > 0) {
     const cacheStr = cacheReadTokens > 0 || cacheCreationTokens > 0 ? ` (cache: ${cacheReadTokens.toLocaleString()} read / ${cacheCreationTokens.toLocaleString()} write)` : '';
-    log.debug(`📊 [ANTHROPIC] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}${cacheStr}`);
+    log.debug(`📊 [ANTHROPIC] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}${cacheStr}, stop_reason=${data.stop_reason || 'none'}`);
   }
 
   // Prepend prefill to response only for models that support assistant prefill.
@@ -304,6 +362,7 @@ async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
  */
 async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk, options = {}) {
   prompt = guardPromptString(prompt, 'textModels.callAnthropicAPIStreaming');
+  refuseImageInputs(options, 'callAnthropicAPIStreaming');
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
@@ -436,7 +495,7 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk, op
     }
 
     // Always log token usage for debugging, even if 0
-    log.debug(`📊 [ANTHROPIC STREAM] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+    log.debug(`📊 [ANTHROPIC STREAM] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}, stop_reason=${stopReason || 'none'}`);
     if (inputTokens === 0 && outputTokens === 0) {
       log.warn(`⚠️ [ANTHROPIC STREAM] No token usage captured! Buffer remaining: ${buffer.length} chars`);
     }
@@ -471,6 +530,7 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk, op
  */
 async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk, options = {}) {
   prompt = guardPromptString(prompt, 'textModels.callGeminiTextAPIStreaming');
+  refuseImageInputs(options, 'callGeminiTextAPIStreaming');
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
@@ -524,9 +584,7 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk, o
     const decoder = new TextDecoder();
     let fullText = '';
     let buffer = '';
-    let inputTokens = 0;
-    let outputTokens = 0;
-    let thinkingTokens = 0;
+    let usage = geminiUsage(null);
     let finishReason = null;
     let firstChunkTime = null;
     resetInactivity(); // Start inactivity timer after connection established
@@ -577,11 +635,8 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk, o
             if (event.candidates?.[0]?.finishReason) finishReason = event.candidates[0].finishReason;
 
             // Extract usage metadata (usually in the last chunk)
-            if (event.usageMetadata) {
-              inputTokens = event.usageMetadata.promptTokenCount || inputTokens;
-              outputTokens = event.usageMetadata.candidatesTokenCount || outputTokens;
-              thinkingTokens = event.usageMetadata.thoughtsTokenCount || thinkingTokens;
-            }
+            // Each event carries the cumulative totals; the last one wins.
+            if (event.usageMetadata) usage = geminiUsage(event.usageMetadata);
           } catch {
             // Skip malformed JSON
           }
@@ -592,20 +647,16 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk, o
     }
 
     // Always log token usage for debugging, even if 0
-    const thinkingInfo = thinkingTokens > 0 ? `, thinking: ${thinkingTokens.toLocaleString()}` : '';
-    log.debug(`📊 [GEMINI STREAM] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}${thinkingInfo}`);
-    if (inputTokens === 0 && outputTokens === 0) {
+    const thinkingInfo = usage.thinking_tokens > 0 ? `, thinking: ${usage.thinking_tokens.toLocaleString()}` : '';
+    log.debug(`📊 [GEMINI STREAM] Token usage - input: ${usage.input_tokens.toLocaleString()}, output: ${usage.output_tokens.toLocaleString()}${thinkingInfo}, finishReason=${finishReason || 'none'}`);
+    if (usage.input_tokens === 0 && usage.output_tokens === 0) {
       log.warn(`⚠️ [GEMINI STREAM] No token usage captured! Buffer remaining: ${buffer.length} chars`);
     }
 
     return {
       text: fullText,
       stop_reason: finishReason,
-      usage: {
-        input_tokens: inputTokens,
-        output_tokens: outputTokens,
-        thinking_tokens: thinkingTokens
-      },
+      usage,
       modelId,
       ttft: firstChunkTime ? firstChunkTime - startTime : null
     };
@@ -628,19 +679,21 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId, options = {}) {
     throw new Error('Gemini API key not configured (GEMINI_API_KEY)');
   }
 
-  // PIPE-9: options used to be silently dropped on the google branch. Support the
-  // common ones (system, prefill) additively; warn loudly for image inputs which
-  // this text path cannot carry (callers must use the vision path instead).
+  // PIPE-9: options used to be silently dropped on the google branch. system and
+  // prefill are carried; image inputs go as inline_data parts ahead of the text
+  // (they used to be dropped with a warning — see resolveImageInputs).
   const prefill = options && options.prefill;
-  if (options && Array.isArray(options.images) && options.images.length) {
-    log.warn('⚠️ [GEMINI TEXT] image options are not supported by callGeminiTextAPI — use the vision path; images were ignored');
-  }
+  const images = await resolveImageInputs(options, 'callGeminiTextAPI');
+  const userParts = [
+    ...images.map(img => ({ inline_data: { mime_type: img.mimeType, data: img.data } })),
+    { text: prompt }
+  ];
 
   const callAPI = async (model) => {
     return withGemini(() => withRetry(async () => {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
       const reqBody = {
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        contents: [{ role: 'user', parts: userParts }],
         generationConfig: {
           maxOutputTokens: maxTokens,
           temperature: options?.temperature ?? 0.7
@@ -674,13 +727,11 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId, options = {}) {
   let data = await response.json();
 
   // Extract token usage (including thinking tokens for Gemini 2.5)
-  const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-  const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
-  const thinkingTokens = data.usageMetadata?.thoughtsTokenCount || 0;
+  const usage = geminiUsage(data.usageMetadata);
 
-  if (inputTokens > 0 || outputTokens > 0) {
-    const thinkingInfo = thinkingTokens > 0 ? `, thinking: ${thinkingTokens.toLocaleString()}` : '';
-    log.debug(`📊 [GEMINI] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}${thinkingInfo}`);
+  if (usage.input_tokens > 0 || usage.output_tokens > 0) {
+    const thinkingInfo = usage.thinking_tokens > 0 ? `, thinking: ${usage.thinking_tokens.toLocaleString()}` : '';
+    log.debug(`📊 [GEMINI] Token usage - input: ${usage.input_tokens.toLocaleString()}, output: ${usage.output_tokens.toLocaleString()}${thinkingInfo}, finishReason=${data.candidates?.[0]?.finishReason || 'none'}`);
   }
 
   // Check for empty/blocked response and retry with fallback model
@@ -700,7 +751,12 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId, options = {}) {
       if (grokFallbackModel && process.env.XAI_API_KEY) {
         log.warn(`⚠️  [GEMINI] No text response (${blockReason}), retrying with ${GROK_VISION_FALLBACK}...`);
         try {
-          const grokResult = await callXaiAPI(prompt, maxTokens, grokFallbackModel.modelId, prefill ? { prefill } : {});
+          // The images go too — a vision fallback that answers without them is
+          // the blind judge this path used to be.
+          const grokResult = await callXaiAPI(prompt, maxTokens, grokFallbackModel.modelId, {
+            ...(prefill ? { prefill } : {}),
+            ...(images.length ? { images: options.images } : {}),
+          });
           return { ...grokResult, modelId: grokFallbackModel.modelId };
         } catch (grokErr) {
           log.warn(`⚠️  [GEMINI] Grok fallback also failed: ${grokErr.message}, trying ${LAST_RESORT_GEMINI}...`);
@@ -727,11 +783,7 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId, options = {}) {
   return {
     text: prefill ? prefill + geminiText : geminiText,
     stop_reason: data.candidates[0].finishReason || null,
-    usage: {
-      input_tokens: inputTokens,
-      output_tokens: outputTokens,
-      thinking_tokens: thinkingTokens
-    }
+    usage
   };
 }
 
@@ -773,7 +825,12 @@ async function callXaiAPI(prompt, maxTokens, modelId, options = {}) {
 
   const timeoutMs = Math.max(300000, 180000 + Math.ceil(maxTokens / 1000) * 3000);
 
-  const messages = [{ role: 'user', content: prompt }];
+  // Vision goes as OpenAI-style image_url parts (data URIs) ahead of the text.
+  const images = await resolveImageInputs(options, 'callXaiAPI');
+  const userContent = images.length
+    ? [...images.map(img => ({ type: 'image_url', image_url: { url: `data:${img.mimeType};base64,${img.data}` } })), { type: 'text', text: prompt }]
+    : prompt;
+  const messages = [{ role: 'user', content: userContent }];
   if (options.prefill) {
     // xAI supports assistant prefill like OpenAI
     messages.push({ role: 'assistant', content: options.prefill });
@@ -804,11 +861,10 @@ async function callXaiAPI(prompt, maxTokens, modelId, options = {}) {
     return res.json();
   }, { maxRetries: 2, baseDelay: 2000 }));
 
-  const inputTokens = data.usage?.prompt_tokens || 0;
-  const outputTokens = data.usage?.completion_tokens || 0;
+  const usage = xaiUsage(data.usage);
 
-  if (inputTokens > 0 || outputTokens > 0) {
-    log.debug(`📊 [XAI] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+  if (usage.input_tokens > 0 || usage.output_tokens > 0) {
+    log.debug(`📊 [XAI] Token usage - input: ${usage.input_tokens.toLocaleString()}, output: ${usage.output_tokens.toLocaleString()}, reasoning: ${usage.thinking_tokens.toLocaleString()}, finish_reason=${data.choices?.[0]?.finish_reason || 'none'}`);
   }
 
   const responseText = data.choices?.[0]?.message?.content || '';
@@ -819,10 +875,7 @@ async function callXaiAPI(prompt, maxTokens, modelId, options = {}) {
     text: fullText,
     // OpenAI-compatible finish_reason: 'length' = cut at max_tokens.
     stop_reason: data.choices?.[0]?.finish_reason || null,
-    usage: {
-      input_tokens: inputTokens,
-      output_tokens: outputTokens
-    }
+    usage
   };
 }
 
@@ -831,6 +884,7 @@ async function callXaiAPI(prompt, maxTokens, modelId, options = {}) {
  */
 async function callXaiAPIStreaming(prompt, maxTokens, modelId, onChunk, options = {}) {
   prompt = guardPromptString(prompt, 'textModels.callXaiAPIStreaming');
+  refuseImageInputs(options, 'callXaiAPIStreaming');
   const apiKey = process.env.XAI_API_KEY;
 
   if (!apiKey) {
@@ -887,10 +941,10 @@ async function callXaiAPIStreaming(prompt, maxTokens, modelId, onChunk, options 
       const decoder = new TextDecoder();
       let fullText = '';
       let buffer = '';
-      let inputTokens = 0;
-      let outputTokens = 0;
+      let usage = xaiUsage(null);
       let firstChunkTime = null;
       let finishReason = null;
+
       resetInactivity();
 
       try {
@@ -935,10 +989,7 @@ async function callXaiAPIStreaming(prompt, maxTokens, modelId, onChunk, options 
               if (event.choices?.[0]?.finish_reason) finishReason = event.choices[0].finish_reason;
 
               // Usage info (may come in the final chunk)
-              if (event.usage) {
-                inputTokens = event.usage.prompt_tokens || inputTokens;
-                outputTokens = event.usage.completion_tokens || outputTokens;
-              }
+              if (event.usage) usage = xaiUsage(event.usage);
             } catch {
               // Skip malformed JSON
             }
@@ -948,17 +999,14 @@ async function callXaiAPIStreaming(prompt, maxTokens, modelId, onChunk, options 
         reader.releaseLock();
       }
 
-      log.debug(`📊 [XAI STREAM] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+      log.debug(`📊 [XAI STREAM] Token usage - input: ${usage.input_tokens.toLocaleString()}, output: ${usage.output_tokens.toLocaleString()}, reasoning: ${usage.thinking_tokens.toLocaleString()}, finish_reason=${finishReason || 'none'}`);
 
       const responseText = options.prefill ? options.prefill + fullText : fullText;
 
       return {
         text: responseText,
         stop_reason: finishReason,
-        usage: {
-          input_tokens: inputTokens,
-          output_tokens: outputTokens
-        },
+        usage,
         modelId,
         ttft: firstChunkTime ? firstChunkTime - startTime : null
       };
@@ -991,10 +1039,11 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
   // content (OpenRouter just can't discount it), and vision goes as image_url parts.
   const fullPrompt = (options.cachePrefix || '') + prompt;
   let userContent;
-  if (options.images && options.images.length > 0) {
-    userContent = options.images.map(img => ({
+  const images = await resolveImageInputs(options, 'callOpenRouterAPIStreaming');
+  if (images.length > 0) {
+    userContent = images.map(img => ({
       type: 'image_url',
-      image_url: { url: img.startsWith('data:') ? img : `data:image/jpeg;base64,${stripDataUriPrefix(img)}` }
+      image_url: { url: `data:${img.mimeType};base64,${img.data}` }
     }));
     userContent.push({ type: 'text', text: fullPrompt });
   } else {
@@ -1158,10 +1207,11 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
               if (event.usage) {
                 usageEvents++;
                 rawUsage = event.usage;
-                inputTokens = event.usage.prompt_tokens || inputTokens;
-                outputTokens = event.usage.completion_tokens || outputTokens;
-                reasoningTokens = event.usage.completion_tokens_details?.reasoning_tokens || reasoningTokens;
-                cachedInputTokens = event.usage.prompt_tokens_details?.cached_tokens || cachedInputTokens;
+                const u = openRouterUsage(event.usage);
+                inputTokens = u.input_tokens || inputTokens;
+                outputTokens = u.output_tokens || outputTokens;
+                reasoningTokens = u.reasoning_tokens || reasoningTokens;
+                cachedInputTokens = u.cached_input_tokens || cachedInputTokens;
                 totalTokens = event.usage.total_tokens || totalTokens;
                 if (typeof event.usage.cost === 'number') actualCost = event.usage.cost;
               }
@@ -1185,7 +1235,10 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
         `, out ${outputTokens.toLocaleString()}` +
         (reasoningTokens > 0 ? ` (${reasoningTokens.toLocaleString()} reasoning)` : '') +
         `, ${elapsedSec.toFixed(1)}s (${tps} tok/s)` +
-        (actualCost !== null ? `, $${actualCost.toFixed(4)} actual` : '')
+        (actualCost !== null ? `, $${actualCost.toFixed(4)} actual` : '') +
+        // WHY IT STOPPED, on every call: an empty or cut reply is otherwise
+        // undiagnosable after the fact (which upstream, which reason).
+        `, finish_reason=${finishReason || 'none'}, native_finish_reason=${nativeFinishReason || 'none'}`
       );
       // The billed prompt is larger than the prompt we sent by more than any
       // tokenizer accounts for (~1 token per 2 chars is already pessimistic for

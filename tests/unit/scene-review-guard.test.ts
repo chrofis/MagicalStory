@@ -6,8 +6,10 @@ import path from 'node:path';
 const require = createRequire(import.meta.url);
 const { assessSceneReview, assertReviewedArtifactUsable, pickReviewedBrief } = require('../../server/lib/sceneReviewGuard.js');
 
-// Same shape as testlab.js's applyReviewerPages (kept in sync by the
-// source-level test below, which pins the function body).
+// Builds a stored beats_scenes result in the shape the stage writes (the first
+// reviewer on `reviewedBrief`, further ones under `reviewedBriefs[model]`) — the
+// shape pickReviewedBrief reads. Since 2026-09-27 the stage fills it from the
+// run's own review (beatsPipeline.runSceneReview).
 function applyReviewerPages(sceneExpansions: any[], sceneReviews: any[]) {
   sceneReviews.forEach((r, i) => {
     if (!r || r.ok === false || !Array.isArray(r._pages)) return;
@@ -133,15 +135,12 @@ describe('testlab.js source — no hard numeric output caps, guard wired', () =>
     expect(calls).toEqual([]);
   });
   it('scene review call is uncapped and runs the guard; hazard count uses the selector', () => {
-    expect(src).toMatch(/callStream\(srPrompt, null, null, srModel/);
-    expect(src).toMatch(/assessSceneReview\(\{/);
+    // The review is the run's own (runSceneReview: uncapped, its own truncation guard).
+    expect(src).toMatch(/await runSceneReview\(\{/);
     expect(src).toMatch(/assertReviewedArtifactUsable\(out, expId\)/);
     expect(src).toMatch(/pickReviewedBrief\(x, out, reviewer, expId\)/);
   });
-  it('applyReviewerPages in testlab.js matches the copy under test', () => {
-    const body = src.match(/function applyReviewerPages\(sceneExpansions, sceneReviews\) \{[\s\S]*?\n\}/)![0];
-    expect(body).toContain("if (!r || r.ok === false || !Array.isArray(r._pages)) return;");
-    expect(body).toContain("if (i === 0) { x.reviewedBrief = fixed; x.reviewRewrote = true; }");
-    expect(body).toContain("else { (x.reviewedBriefs = x.reviewedBriefs || {})[r.modelKey] = fixed; }");
+  it('beats_scenes stores each reviewer\'s briefs in the shape pickReviewedBrief reads', () => {
+    expect(src).toContain('if (i === 0) { x.reviewedBrief = reviewed.brief; x.reviewRewrote = true; } else { (x.reviewedBriefs = x.reviewedBriefs || {})[r.modelKey] = reviewed.brief; }');
   });
 });

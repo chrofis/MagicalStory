@@ -137,6 +137,8 @@ const SHAPES = {
     ? { ok: true } : { ok: false, why: 'no 2x4 avatar sheet was generated (saved styled avatars reused)' },
   'needs-composite': (ctx) => pages(ctx).some(p => p.compositeOutcome && p.compositeOutcome.status !== 'disabled')
     ? { ok: true } : { ok: false, why: 'scene composite did not run (disabled)' },
+  // Proved by a Test Lab stage, never by a story run: record it with --mark on the Lab evidence.
+  'lab-stage': () => ({ ok: false, why: 'proved by a Test Lab stage, not a story run — --mark it from the Lab result' }),
 };
 
 /** runShape: array of "name" or "name:arg"; every one must hold. */

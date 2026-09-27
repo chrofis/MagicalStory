@@ -99,6 +99,8 @@ describe('resolveCoverTextContract — one rule for pipeline and iterate covers'
   it('a textless app-side cover tells the judge the text is an overlay', () => {
     const c = resolveCoverTextContract('frontCover', { titleBaked: false, title: 'The Lantern Keeper' });
     if (appSide) {
+      // No app string rides the contract: every judge reads the textless art
+      // (coverEvalLayer.js), so none is excused.
       expect(c).toEqual({ textMode: 'appOverlay', expectedText: null });
     } else {
       expect(c).toEqual({ textMode: 'painted', expectedText: 'The Lantern Keeper' });

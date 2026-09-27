@@ -80,7 +80,12 @@ async function iterateFullStoryCover(coverKey, storyData, options = {}) {
   const record = storyData.coverImages[coverKey];
   if (!record.imageData) throw new Error(`${coverKey}: no cover image to iterate`);
   const pageNumber = COVER_PAGE_NUMBERS[coverKey];
-  const result = await require('./images').iteratePage(record.imageData, pageNumber, storyData, options);
+  // The iterate reads the current cover (its image analysis feeds the rewrite,
+  // and it can serve as a reference render) — the TEXTLESS art of the active
+  // version, never the served bytes with the app's title / dedication /
+  // "magicalstory.ch" stamped on. A stamped cover with no art layer throws.
+  const { imageData: currentArt } = await require('./coverEvalLayer').resolveCoverEvalImage(storyData.id, coverKey, null);
+  const result = await require('./images').iteratePage(currentArt, pageNumber, storyData, options);
   if (result.previewOnly) return result;
   const opts = coverRenderOptions(pageNumber, {
     title: storyData.title || storyData.storyTitle || '',

@@ -118,7 +118,9 @@ describe('every brief-reply parser passes the terminator', () => {
 
   it('names BRIEF_TRAILING_MARKERS at every SCENES call site', () => {
     const seen: string[] = [];
-    for (const rel of ['server/lib/beatsPipeline.js', 'server/lib/testlab.js']) {
+    // The Lab runs the run's own Art Director and review since 2026-09-27; the
+    // parses live in beatsPipeline.js alone.
+    for (const rel of ['server/lib/beatsPipeline.js']) {
       const src = fs.readFileSync(path.join(root, rel), 'utf8');
       // The Lab aliases the import as `parseAll`; both spellings count.
       const calls = src.match(/(?:parseRefinedText|parseAll)\([^;]*?'SCENES'[^;]*?\)/g) || [];
@@ -129,7 +131,9 @@ describe('every brief-reply parser passes the terminator', () => {
       }
     }
     // A call site deleted without replacement would pass the loop above.
-    expect(seen.length).toBeGreaterThanOrEqual(6);
+    // The scene-review replay's own parse went with its reimplementation on
+    // 2026-09-27: it runs beatsPipeline.runSceneReview, whose parses are counted above.
+    expect(seen.length).toBeGreaterThanOrEqual(3);
   });
 
   it('the constant names the block the two brief templates actually emit', () => {

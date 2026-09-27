@@ -241,9 +241,12 @@ describe('Phase 5a-pre-grid rebuilds the claim from the kept cells', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', '..', 'storyJobPipeline.js'), 'utf8');
 
   it('routes large elements to the plate through the shared predicate', () => {
-    expect(src).toContain('isPlateBorneElement');
+    // The filter lives in the shared page-render builder (pageRenderCall.js,
+    // also the Test Lab's) and the pipeline's 5a-pre-grid calls it.
+    expect(src).toMatch(/keepPageGridElements\(refs, \{ hasPlate, sceneMetadata: pageData\.sceneMetadata \}\)/);
+    const shared = fs.readFileSync(path.join(__dirname, '..', '..', 'server/lib/pageRenderCall.js'), 'utf8');
     // conditional on a plate being sent — the no-plate fallback
-    expect(src).toContain('? refs.filter(e => !isPlateBorneElement(e, pageSceneObjectsForDrop))');
+    expect(shared).toContain('(hasPlate ? (refs || []).filter(e => !isPlateBorneElement(e, sceneObjects)) : (refs || []))');
   });
 
   it('recomputes the prompt from the kept set, not from the selection', () => {

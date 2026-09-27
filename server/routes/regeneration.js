@@ -17,7 +17,8 @@ const { imageRegenerationLimiter } = require('../middleware/rateLimit');
 
 // Config
 const { CREDIT_CONFIG, CREDIT_COSTS } = require('../config/credits');
-const { calculateImageCost, formatCostSummary, MODEL_DEFAULTS, MODEL_PRICING, REPAIR_DEFAULTS, IMAGE_MODELS, TEXT_MODELS } = require('../config/models');
+const { calculateImageCost, calculateTextCost, formatCostSummary, MODEL_DEFAULTS, MODEL_PRICING, REPAIR_DEFAULTS, IMAGE_MODELS, TEXT_MODELS } = require('../config/models');
+const { sumUsage } = require('../lib/providerUsage');
 
 // Services
 const { log } = require('../utils/logger');
@@ -64,6 +65,8 @@ async function stampCanonicalScore(version, imageResult, opts = {}) {
     threeStageResult: imageResult.threeStageResult || null,
     // The required lettering the judges saw — the consolidator must see it too.
     requiredTexts: imageResult.requiredTexts || [],
+    // The scene the judges scored — the consolidator reads this, not the brief.
+    judgedPrompt: imageResult.judgedPrompt || null,
   } : null;
   const entityResult = (opts.entityIssues || opts.entityPenalty != null)
     ? { issues: opts.entityIssues || [], penalty: opts.entityPenalty || 0 }
@@ -165,6 +168,7 @@ const { hasPhotos: hasCharacterPhotos, getStandardAvatar } = require('../lib/cha
 const { isGrokConfigured } = require('../lib/grok');
 const { coverKeyToType, coverTypeToKey, coverLabel, COVER_PAGE_NUMBERS } = require('../lib/coverKeys');
 const { buildStoryEvalOptions } = require('../lib/evalReplayInputs');
+const { resolveCoverEvalImage, applyCoverEvalView, loadCoverArtForRepair, restampRepairedCover } = require('../lib/coverEvalLayer');
 const r2 = require('../lib/r2');
 
 // Cover type ↔ virtual page number mapping
@@ -270,12 +274,6 @@ async function rehydrateActivePageImage(storyId, storyData, pageNumber) {
   return storyData;
 }
 
-// Calculate token-based API cost for Gemini models
-function calculateTokenCost(modelId, inputTokens, outputTokens) {
-  const pricing = MODEL_PRICING[modelId] || { input: 0.10, output: 0.40 };
-  if (pricing.perImage) return 0; // Image models use per-image pricing
-  return ((inputTokens / 1_000_000) * pricing.input) + ((outputTokens / 1_000_000) * pricing.output);
-}
 
 // Atomically add repair cost to story analytics
 async function addRepairCost(storyId, cost, stepName) {
@@ -1683,10 +1681,13 @@ router.post('/:id/style-check', authenticateToken, async (req, res) => {
     const story = storyResult.rows[0];
     let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
     storyData = await rehydrateStoryImages(id, storyData);
+    // Covers are judged on their textless art (coverEvalLayer.js); a stamped
+    // cover with no art layer is left out and named in the response.
+    const { notEvaluated: coversNotEvaluated } = await applyCoverEvalView(id, storyData);
 
     const { checkStoryStyleConsistency } = require('../lib/styleConsistency');
     const result = await checkStoryStyleConsistency(storyData);
-    res.json({ success: true, ...result });
+    res.json({ success: true, ...result, coversNotEvaluated });
   } catch (err) {
     log.error('Error in style-check:', err);
     res.status(500).json({ error: 'Style check failed: ' + err.message });
@@ -4176,7 +4177,20 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
       try {
         // Get image data - look up active version from DB, then fallback to scene.imageData
         let imageData = scene.imageData;
-        if (scene.imageVersions?.length > 0) {
+        if (evaluationType === 'cover') {
+          // A cover is judged on the TEXTLESS art of its active version, never
+          // on the served bytes with the app's title / dedication /
+          // "magicalstory.ch" stamped on (coverEvalLayer.js). A stamped cover
+          // with no art layer is not judged.
+          try {
+            imageData = (await resolveCoverEvalImage(id, versionType, null)).imageData;
+          } catch (layerErr) {
+            if (layerErr.code !== 'NO_ART_LAYER') throw layerErr;
+            log.error(`❌ [REPAIR-WORKFLOW] ${pageLabel}: ${layerErr.message}`);
+            pages[pageNumber] = { qualityScore: null, fixableIssues: [], error: layerErr.message };
+            return;
+          }
+        } else if (scene.imageVersions?.length > 0) {
           const activeDbIndex = await getActiveVersion(id, versionKey);
           const activeVersion = scene.imageVersions?.[arrayIndexForDb(scene.imageVersions, activeDbIndex, versionType)];
           if (activeVersion?.imageData) {
@@ -4396,15 +4410,8 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
     })));
 
     // Calculate cost before responding
-    let totalInput = 0, totalOutput = 0;
-    for (const pageData of Object.values(pages)) {
-      if (pageData.usage) {
-        totalInput += pageData.usage.input_tokens || 0;
-        totalOutput += pageData.usage.output_tokens || 0;
-      }
-    }
     const evalModel = qualityModelOverride || 'gemini-2.5-flash';
-    const apiCost = calculateTokenCost(evalModel, totalInput, totalOutput);
+    const apiCost = calculateTextCost(evalModel, sumUsage(Object.values(pages).map(p => p.usage)));
 
     log.info(`✅ [REPAIR-WORKFLOW] Re-evaluation complete for ${Object.keys(pages).length} pages`);
     const badPages = findBadPages(pages, scoreThreshold ? { scoreThreshold } : {});
@@ -4486,9 +4493,19 @@ router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res)
       return res.status(404).json({ error: `Page ${pageNumber} not found` });
     }
 
-    // Get active version's image data
+    // Get active version's image data. A cover: the TEXTLESS art of its active
+    // version (coverEvalLayer.js) — every judge below reads this one image, so
+    // none of them sees the app's stamped title / dedication / brand line.
     let imageData = scene.imageData;
-    if (scene.imageVersions?.length > 0) {
+    if (evaluationType === 'cover') {
+      try {
+        imageData = (await resolveCoverEvalImage(id, versionType, null)).imageData;
+      } catch (layerErr) {
+        if (layerErr.code !== 'NO_ART_LAYER') throw layerErr;
+        log.error(`❌ [EVAL-SINGLE] ${pageLabel}: ${layerErr.message}`);
+        return res.status(409).json({ error: layerErr.message });
+      }
+    } else if (scene.imageVersions?.length > 0) {
       const activeDbIndex = await getActiveVersion(id, versionKey);
       const activeVersion = scene.imageVersions?.[arrayIndexForDb(scene.imageVersions, activeDbIndex, versionType)];
       if (activeVersion?.imageData) {
@@ -5200,10 +5217,15 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (
 
     // Rehydrate image data into a COPY for crop extraction (don't modify original)
     const rehydratedData = await rehydrateStoryImages(id, JSON.parse(JSON.stringify(storyData)));
+    // Covers are judged on their textless art (coverEvalLayer.js), on this
+    // eval-only copy. A stamped cover with no art layer is left out of the
+    // check (logged) and named in the response.
+    const { notEvaluated: coversNotEvaluated, servedByKey: coverServedBytes } = await applyCoverEvalView(id, rehydratedData);
 
     // Run entity consistency check with rehydrated data
     const characters = rehydratedData.characters || [];
     const report = await runEntityConsistencyChecks(rehydratedData, characters);
+    if (coversNotEvaluated.length) report.coversNotEvaluated = coversNotEvaluated;
 
     // Save any newly-generated bboxDetection back to the original storyData
     // so it's cached in retryHistory for next time (avoids redundant API calls)
@@ -5215,6 +5237,13 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (
         for (const [coverType, bbox] of Object.entries(report.coverBboxDetections)) {
           const cover = storyData.coverImages[coverType];
           if (!cover) continue;
+          // This detection ran on the textless art; the stored one pairs with
+          // the SERVED (stamped) bytes. The stamp moves no figure, so re-point
+          // its fingerprint (the cover-text exception of
+          // restampDetectionForCoverText).
+          if (coverServedBytes[coverType]) {
+            require('../lib/bboxDetection').restampDetectionForCoverText(bbox, coverServedBytes[coverType]);
+          }
           cover.bboxDetection = bbox;
           if (cover.imageVersions?.length > 0) {
             // Active version from image_version_meta (single source of truth).
@@ -5302,8 +5331,8 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (
       report.overallConsistent !== false && (report.totalIssues || 0) + legacyIssues === 0;
 
     // Calculate cost before responding
-    const { inputTokens = 0, outputTokens = 0, model: checkModel } = report.tokenUsage || {};
-    const apiCost = calculateTokenCost(checkModel || 'gemini-2.5-flash', inputTokens, outputTokens);
+    const { inputTokens = 0, outputTokens = 0, thinkingTokens = 0, model: checkModel } = report.tokenUsage || {};
+    const apiCost = calculateTextCost(checkModel || 'gemini-2.5-flash', { input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: thinkingTokens });
 
     log.info(`✅ [REPAIR-WORKFLOW] Consistency check complete: ${report.totalIssues} issues found`);
     res.json({ report, apiCost });
@@ -5526,7 +5555,6 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
 
     const results = [];
     let totalGeminiRepairs = 0, totalMagicApiRepairs = 0, totalGrokRepairs = 0;
-    let totalVerifyTokensIn = 0, totalVerifyTokensOut = 0;
     const artStyle = storyData.artStyle || 'pixar';
 
     // Flatten all (character, page) pairs into parallel repair tasks
@@ -5617,6 +5645,33 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
     const multiCharPages = [...tasksByPage.values()].filter(t => t.length > 1).length;
     log.info(`🔧 [REPAIR-WORKFLOW] Running ${repairTasks.length} repair tasks across ${tasksByPage.size} pages (${multiCharPages} pages with multiple characters — sequential within page)...`);
 
+    // A COVER IS REPAIRED ON ITS TEXTLESS ART, THEN RESTAMPED (owner,
+    // 2026-09-26). The served cover carries the app's title / dedication /
+    // "magicalstory.ch"; repairing those pixels bakes the stamp into a version
+    // that then gets no art row and no restamp. Every repair method below reads
+    // the cover through findSceneOrCover, so the in-memory cover takes the art
+    // of its active version here (the top-level bytes of a stored story are
+    // never persisted, and Phase 2 re-reads the story anyway). Its detection is
+    // re-pointed at the art on a clone (the stamp moves no figure). A stamped
+    // cover without its art layer is refused.
+    const coverRepair = new Map();   // coverKey -> { restamp }
+    const coverRefused = new Map();  // pageNumber -> reason
+    for (const pageNumber of tasksByPage.keys()) {
+      if (pageNumber >= 0) continue;
+      const coverKey = getCoverType(pageNumber);
+      const cover = storyData.coverImages?.[coverKey];
+      if (!cover) continue;
+      try {
+        const prep = await loadCoverArtForRepair(id, coverKey, cover);
+        coverRepair.set(coverKey, prep);
+        log.info(`🅰️ [CHAR REPAIR] ${coverKey}: repairing v${prep.versionIndex} ${prep.restamp ? 'textless art layer (restamped after)' : 'unstamped render'}`);
+      } catch (layerErr) {
+        if (layerErr.code !== 'NO_ART_LAYER') throw layerErr;
+        log.error(`❌ [CHAR REPAIR] ${layerErr.message}`);
+        coverRefused.set(pageNumber, layerErr.message);
+      }
+    }
+
     const repairLimit = pLimit(50);
     // Each "unit" is one page — characters on that page run sequentially
     const apiResults = (await Promise.all([...tasksByPage.entries()].map(([pageNumber, pageTasks]) => repairLimit(async () => {
@@ -5640,6 +5695,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
         }
         const result = await (async () => {
       const { characterName, character, pageNumber, charIssues } = task;
+      if (coverRefused.has(pageNumber)) {
+        return { task, error: true, failReason: coverRefused.get(pageNumber), rejectedReason: 'no_art_layer' };
+      }
       try {
         log.info(`🔧 [REPAIR-WORKFLOW] Repairing ${characterName} on page ${pageNumber} with ${repairMethod}`);
 
@@ -5759,45 +5817,15 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             return { task, error: true, failReason: 'No scene image data for this page' };
           }
 
-          // Determine clothing for this character on this page.
-          // Priority: sceneCharacterClothing (persisted from generation — source of truth)
-          //         > scene metadata > clothingRequirements > 'standard'
-          // sceneCharacterClothing was set by the unified pipeline at generation time and
-          // holds the actual perCharClothing used to render the page, so the styled avatar
-          // we pick to repair will match the avatar that drew the page.
-          let pageClothing = 'standard';
-          const persistedClothing = sceneImage.sceneCharacterClothing || sceneImage.characterClothing || null;
-          if (persistedClothing && persistedClothing[characterName]) {
-            pageClothing = persistedClothing[characterName];
-            log.info(`👕 [CHAR REPAIR] ${characterName} on page ${pageNumber}: using persisted clothing "${pageClothing}" (from generation)`);
-          } else {
-            const sceneMetadata = sceneImage.sceneMetadata || (sceneImage.description ? extractSceneMetadata(sceneImage.description) : null);
-            if (sceneMetadata?.characterClothing?.[characterName]) {
-              pageClothing = sceneMetadata.characterClothing[characterName];
-            } else if (storyData.clothingRequirements?.[characterName]) {
-              const charReqs = storyData.clothingRequirements[characterName];
-              if (charReqs?.costumed?.used && charReqs.costumed.costume) {
-                pageClothing = `costumed:${charReqs.costumed.costume}`;
-              } else {
-                // Covers have no persisted per-page clothing, so this chain
-                // used to fall through to 'standard' — the repair then sent
-                // the standard avatar and Grok redressed the character out
-                // of the story outfit (staging back-cover, 2026-07-11).
-                // Resolve like cover generation does: parse the description,
-                // else take the single category the story actually uses.
-                const parsed = parseClothingCategory(sceneImage.description || '', false);
-                const usedCats = ['winter', 'summer', 'standard'].filter(k => charReqs?.[k]?.used);
-                if (parsed) {
-                  pageClothing = parsed;
-                } else if (usedCats.length === 1) {
-                  pageClothing = usedCats[0];
-                }
-                if (pageClothing !== 'standard') {
-                  log.info(`👕 [CHAR REPAIR] ${characterName} on page ${pageNumber}: no persisted clothing — resolved "${pageClothing}" (${parsed ? 'parsed from description' : 'single used category'})`);
-                }
-              }
-            }
-          }
+          // The outfit this character was RENDERED in on this page or cover —
+          // the page's persisted per-character clothing, else the cover brief /
+          // cover hint / pageClothing. One resolver with the Lab and the in-run
+          // char-fix. This chain used to default to 'standard' and read only
+          // sceneCharacterClothing, which a cover never has; the repair then
+          // described one outfit while its reference showed another (Lab 1554).
+          // null → the NO DEFAULT refusal below.
+          const pageClothing = require('../lib/clothingCategories')
+            .resolveRenderedClothingCategory(storyData, pageNumber, characterName, sceneImage);
 
           // Stored boxes are only usable with the bytes they were computed on
           // (sourceImageFp stamp) — a stale box repaints the wrong region of a
@@ -5817,7 +5845,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           // own cast builder and its own three-tier ladder; that divergence is
           // what let "Sarah" land on a Visual Bible secondary and a face repair
           // white out the wrong person's head.
-          const { buildPageCast, findBorrowedLabel, resolveCharBbox } = require('../lib/charRepairTarget');
+          const { findBorrowedLabel, resolveCharBbox } = require('../lib/charRepairTarget');
           const { buildCharRepairRequest } = require('../lib/charRepairRequest');
 
           let resolved = resolveCharBbox(characterName, {
@@ -5838,24 +5866,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           // Nothing stored → detect now, with the SAME cast the pipeline builds.
           if (!resolved.faceBbox && !resolved.bodyBbox) {
             log.info(`🔍 [CHAR REPAIR] No stored bbox for ${characterName} on page ${pageNumber}, running fresh detection...`);
-            const expectedCharacters = buildPageCast({
-              storyData,
-              sceneCharacters: sceneImage.sceneCharacters || [],
-              sceneMetadata: sceneImage.sceneMetadata || {},
-              clothingByName: sceneImage.sceneCharacterClothing || null,
-              outlineCharacters: sceneImage.outlineCharacters || [],
-              artStyle,
-              visualBible: storyData.visualBible || null,
-              requiredName: characterName,
-              label: `p${pageNumber} manual-repair `,
-            });
-            const detection = await detectAllBoundingBoxes(sceneImage.imageData, {
-              expectedCharacters,
-              expectedObjects: Array.isArray(sceneImage.sceneMetadata?.objects)
-                ? sceneImage.sceneMetadata.objects.filter(x => typeof x === 'string') : [],
-              sceneContext: sceneImage.description || sceneImage.sceneDescription || null,
-              pageContext: `PAGE ${pageNumber} manual-repair`,
-              artStyle,
+            // One implementation with the Test Lab char_repair stage.
+            const { detection, expectedCharacters } = await require('../lib/charRepairTarget').detectPageForRepair({
+              storyData, sceneImage, imageData: sceneImage.imageData, characterName, pageNumber, artStyle, label: 'manual-repair',
             });
             freshDetection = detection;
             boxDiag.boxSource = 'fresh-detection';
@@ -5913,17 +5926,15 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             clothing: resolved.clothing || pageClothing,
           };
 
-          const { normalizeClothingCategory, resolvePageClothingCategory } = require('../lib/clothingCategories');
+          const { normalizeClothingCategory } = require('../lib/clothingCategories');
           // NO DEFAULT (owner, 2026-08-07): this category picks the styled
-          // avatar the repair paints the character to match.
+          // avatar the repair paints the character to match. pageClothing above
+          // already ran the full rendered-outfit chain, so null here is final.
           const clothingCategory = storedAppearance.clothing
             ? normalizeClothingCategory(storedAppearance.clothing)
-            : resolvePageClothingCategory(storyData, pageNumber, characterName);
+            : null;
           if (!clothingCategory) {
-            return res.status(422).json({ error: `${characterName} p${pageNumber}: no clothing category (stored appearance and pageClothing both empty) — refusing to repair into a guessed outfit` });
-          }
-          if (!storedAppearance.clothing) {
-            log.warn(`⚠️ [CHAR REPAIR] ${characterName} p${pageNumber}: no stored appearance clothing — resolved "${clothingCategory}" from pageClothing`);
+            return res.status(422).json({ error: `${characterName} p${pageNumber}: no clothing category (stored appearance, page record, cover brief and pageClothing all empty) — refusing to repair into a guessed outfit` });
           }
           const styledAvatar = await getStyledAvatarForClothing(character, artStyle, clothingCategory);
           const avatarData = styledAvatar || character.avatars?.standard || character.avatarUrl;
@@ -6082,6 +6093,10 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
                 whiteoutTarget: whiteoutTarget || (useFaceOnly ? 'face' : 'body'),
                 includeDebug: req.user.role === 'admin',
                 photoType: avatarPhotoType,
+                // The figure's pose picks the sheet cell; the spine sends the
+                // face cell alone for a face repair, the body cell alone for a
+                // body repair — this route used to send the whole 2x4 sheet.
+                referencePose: require('../lib/charRepairReference').referencePoseFor(sceneImage, characterName),
                 artStyle,
                 // LAB/BUTTON PARITY (2026-09-06). The automatic pipeline
                 // (repairPipeline.js) and the Test Lab stage both send this;
@@ -6307,11 +6322,6 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
       } else {
         totalGeminiRepairs++;
       }
-      // Track verify tokens (only for non-Grok methods — Grok returns direct_cost, not token counts)
-      if (repairResult.usage && !repairResult.method?.startsWith('grok_')) {
-        totalVerifyTokensIn += repairResult.usage.promptTokenCount || 0;
-        totalVerifyTokensOut += repairResult.usage.candidatesTokenCount || 0;
-      }
 
       if (!repairResult.success) {
         const reason = repairResult.reason || repairResult.error || 'Unknown error';
@@ -6369,11 +6379,34 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             }];
           }
 
+          // A cover was repaired on its textless art (above): that art is this
+          // version's `${coverType}Art` row, and the served bytes get the app's
+          // text restamped on it (coverTypography.restampCover). The new
+          // version takes the next free DB index, so its art row pairs with it.
+          let servedImageData = update.imageData;
+          let coverArtData = null;
+          let coverVersionIndex = null;
+          if (isCover) {
+            coverVersionIndex = await getNextVersionIndex(id, coverType, null);
+            if (coverRepair.get(coverType)?.restamp) {
+              try {
+                ({ servedImageData, artImageData: coverArtData } = await restampRepairedCover(storyData, coverType, update.imageData, {
+                  restamp: true, figures: carryForwardBbox?.figures || [],
+                }));
+              } catch (stampErr) {
+                log.error(`❌ [CHAR REPAIR] ${coverType}: restamp failed (${stampErr.message}) — repair not saved`);
+                charResult.pagesFailed.push({ pageNumber: update.pageNumber, reason: `restamp failed: ${stampErr.message}` });
+                continue;
+              }
+            }
+          }
+
           const isMagicApiMethod = repairResult.method === 'magicapi';
           const isGrokMethod = repairResult.method?.startsWith('grok_');
           const repairModelId = isMagicApiMethod ? 'magicapi-faceswap-hair' : isGrokMethod ? `grok-imagine (${repairResult.method})` : 'gemini-2.0-flash-preview-image-generation';
           existingImage.imageVersions.push({
-            imageData: update.imageData,
+            imageData: servedImageData,
+            ...(coverVersionIndex !== null ? { dbVersionIndex: coverVersionIndex } : {}),
             description: existingImage.description,
             prompt: existingImage.prompt,
             modelId: repairModelId,
@@ -6383,7 +6416,11 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             qualityScore: null,
             entityRepairedFor: characterName,
             clothingCategory: repairResult.clothingCategory,
-            bboxDetection: carryForwardBbox,
+            // The stamp moves no figure: a restamped cover's boxes are re-pointed
+            // at its served bytes (restampDetectionForCoverText), on a clone.
+            bboxDetection: coverArtData && carryForwardBbox
+              ? require('../lib/bboxDetection').restampDetectionForCoverText({ ...carryForwardBbox }, servedImageData)
+              : carryForwardBbox,
             // Per-version char-repair pipeline artifacts — dev panel uses these
             // to show what Grok was given, what it returned BEFORE feathering,
             // and the soft-edge blend mask used to composite back. Without
@@ -6407,6 +6444,8 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             const evalType = isCover ? 'cover' : 'scene';
             const evalPrompt = existingImage.description || existingImage.prompt || '';
             const pageLabel = isCover ? `[${coverType}]` : `[Page ${update.pageNumber}]`;
+            // update.imageData is the repair output BEFORE any restamp — a cover
+            // is judged on its textless art (coverEvalLayer.js).
             log.info(`🔍 [CHAR REPAIR] ${pageLabel} Evaluating repaired image (before: ${beforeScore}%)...`);
             // The page text and the brief, as /evaluate-single resolves them, so
             // the semantic judge runs and judges the repaired version's light
@@ -6460,6 +6499,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           if (!isCover) {
             storyData.sceneImages = sceneImages;
           }
+          if (coverArtData) {
+            await saveStoryImage(id, `${coverType}Art`, null, coverArtData, { versionIndex: coverVersionIndex });
+          }
           await saveStoryData(id, storyData);
           // Active version is picked by recomputeAllActiveVersions inside
           // saveStoryData. Char-repair's new version has a qualityScore from
@@ -6469,7 +6511,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           const comparison = repairResult.comparison || null;
           charResult.pagesRepaired.push({
             pageNumber: update.pageNumber,
-            imageData: update.imageData,
+            imageData: servedImageData,
             versionIndex: newDbVersionIndex,
             comparison,
             verification: repairResult.verification || null,
@@ -6501,8 +6543,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
     const perImageCost = MODEL_PRICING['gemini-2.5-flash-image']?.perImage ?? 0.04;
     const grokPerImageCost = MODEL_PRICING['grok-imagine-image']?.perImage ?? 0.02;
     const imageGenCost = totalGeminiRepairs * perImageCost + totalGrokRepairs * grokPerImageCost;
-    const verifyTokenCost = calculateTokenCost('gemini-2.5-flash', totalVerifyTokensIn, totalVerifyTokensOut);
-    const apiCost = imageGenCost + verifyTokenCost;
+    // No verify-token term: repairSinglePage returns usage only from its Grok
+    // path (priced per image above); the Gemini-shaped reader here never fired.
+    const apiCost = imageGenCost;
     const totalAttempts = totalGeminiRepairs + totalMagicApiRepairs + totalGrokRepairs;
     // Deduct credits: 5 per page actually repaired
     const totalPagesRepaired = results.reduce((sum, r) => sum + (r.pagesRepaired?.length || 0), 0);
@@ -6724,32 +6767,23 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
     const previousReasoning = prevVersionEntry?.qualityReasoning ?? (typeof existingCover === 'object' ? existingCover.qualityReasoning || null : null);
     log.debug(`✏️ [COVER EDIT] Capturing previous image (score: ${previousScore})`);
 
-    // Edit the TEXTLESS art layer, not the titled served image — Grok re-renders
-    // the raster and mangles/drops the baked title/dedication/branding. Load the
-    // ${coverKey}Art for the active version; fall back to the titled image only
-    // for legacy covers with no Art row. The text is re-composited after editing.
-    const { dbQuery } = require('../services/database');
-    let editBaseSrc = currentImageData;   // fallback: titled served image
-    let editedTextless = false;
+    // Edit the TEXTLESS art layer of the ACTIVE version, never the titled
+    // served image — Grok re-renders the raster and mangles/drops the stamped
+    // title/dedication/branding; the text is re-composited after editing
+    // (coverEvalLayer.resolveCoverEvalImage). A cover the app never stamped
+    // (baked title, pre-typography story) is its own art and gets no restamp. A
+    // stamped cover whose active version has no art row is refused: it used to
+    // fall back to the LATEST art row, i.e. edit a different render.
+    let editBaseSrc;
+    let editedTextless;
     try {
-      const meta = (await dbQuery('SELECT image_version_meta FROM stories WHERE id=$1', [id]))[0]?.image_version_meta || {};
-      const activeIdx = meta[coverKey]?.activeVersion ?? 0;
-      // Prefer the textless art for the ACTIVE version; fall back to the latest
-      // ${key}Art (legacy versions repainted before this fix have no lockstep
-      // art row), then to the titled image for truly legacy covers.
-      let artRows = await dbQuery(
-        "SELECT image_url, image_data FROM story_images WHERE story_id=$1 AND image_type=$2 AND version_index=$3 AND NOT is_test LIMIT 1",
-        [id, `${coverKey}Art`, activeIdx]);
-      if (!artRows.length) {
-        artRows = await dbQuery(
-          "SELECT image_url, image_data FROM story_images WHERE story_id=$1 AND image_type=$2 AND NOT is_test ORDER BY version_index DESC LIMIT 1",
-          [id, `${coverKey}Art`]);
-      }
-      const artRow = artRows[0];
-      const artSrc = artRow ? (artRow.image_url || (artRow.image_data ? 'data:image/jpeg;base64,' + artRow.image_data.toString('base64') : null)) : null;
-      if (artSrc) { editBaseSrc = artSrc; editedTextless = true; }
-    } catch (e) {
-      log.warn(`✏️ [COVER EDIT] could not load ${coverKey}Art (${e.message}) — editing the titled image`);
+      const layer = await resolveCoverEvalImage(id, coverKey, null);
+      editBaseSrc = layer.imageData;
+      editedTextless = layer.layer === 'art';
+    } catch (layerErr) {
+      if (layerErr.code !== 'NO_ART_LAYER') throw layerErr;
+      log.error(`❌ [COVER EDIT] ${layerErr.message}`);
+      return res.status(409).json({ error: layerErr.message });
     }
 
     // Edit the cover image (pure text/instruction based - no character photos to avoid regeneration artifacts)
@@ -6769,6 +6803,10 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
     // image again and editedArt holds the new textless source. Mutating
     // editResult.imageData keeps every downstream use (eval / version / save /
     // response) on the titled bytes with no further changes.
+    // The edit's own output, before any text is stamped on it: the image the
+    // judge reads below (coverEvalLayer.js — covers are evaluated first, the
+    // app's text is added after).
+    const editedUnstamped = editResult.imageData;
     let editedArt = null;
     if (editedTextless) {
       try {
@@ -6794,7 +6832,7 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
       // resolvers as every other cover eval site.
       const coverPageNumber = COVER_PAGE_NUMBERS[coverKey];
       const evaluation = await evaluateImageQuality(
-        editResult.imageData,
+        editedUnstamped,
         coverPrompt,
         buildWholeCastReferencePhotos(
           storyData.characters || [],

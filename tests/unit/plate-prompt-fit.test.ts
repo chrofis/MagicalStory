@@ -1,6 +1,7 @@
 /**
- * A plate prompt is fitted by its own cut order with the worst-case magenta
- * prefix reserved, and a prompt that cannot fit is OUR bug: it fails loudly and
+ * A plate prompt is fitted by its own cut order against the full cap (a plate
+ * carries no magenta prefix since 2026-09-26: its landmark photo is
+ * centre-cropped), and a prompt that cannot fit is OUR bug: it fails loudly and
  * never falls back to Gemini (owner, 2026-09-25).
  *
  * Staging job_1790277448294_5herh01j7: the p1/p11 landmark plate prompts (7,552
@@ -34,7 +35,8 @@ const { loadPromptTemplates, buildEmptyScenePrompt } = require_('../../server/se
 const { GenerationLogger, setCurrentLogger, clearCurrentLogger } = require_('../../server/lib/generationLogger');
 
 const CAP = 7900;
-const PFX = grok.MAX_MAGENTA_EXTENSION_PREFIX_LENGTH;
+// The magenta-extension prefix a padded plate used to carry (616 chars).
+const OLD_PREFIX = 616;
 const realFetch = global.fetch;
 let genLog: any;
 let fetchCalls = 0;
@@ -113,17 +115,26 @@ describe('fitPlatePrompt', () => {
   });
 });
 
-describe('the dispatcher fits a plate with the worst-case prefix reserved', () => {
-  it('a landmark plate between cap-prefix and cap is fitted before Grok, and Grok gets <= cap - prefix', async () => {
+describe('the dispatcher fits a plate against the full cap', () => {
+  it('a landmark plate between cap-616 and cap is sent untouched, with no prefix', async () => {
     let p = platePrompt(100);
-    p = platePrompt(100 + (CAP - PFX + 50 - p.length));
-    expect(p.length).toBeGreaterThan(CAP - PFX);
+    p = platePrompt(100 + (CAP - OLD_PREFIX + 50 - p.length));
+    expect(p.length).toBeGreaterThan(CAP - OLD_PREFIX);
     expect(p.length).toBeLessThan(CAP);
     await renderPlate(p);
-    expect(sentPrompts).toHaveLength(1);
-    expect(sentPrompts[0].length).toBeLessThanOrEqual(CAP - PFX);
-    expect(sentPrompts[0]).toContain('**ART STYLE:**');
+    expect(sentPrompts).toEqual([p]);
     expect(genLog.entries.some((e: any) => e.event === 'image_provider_fallback')).toBe(false);
+  }, 30000);
+
+  it('a landmark plate over the cap is fitted to <= cap by the plate cut order', async () => {
+    let p = platePrompt(100);
+    p = platePrompt(100 + (CAP + 50 - p.length));
+    expect(p.length).toBeGreaterThan(CAP);
+    await renderPlate(p);
+    expect(sentPrompts).toHaveLength(1);
+    expect(sentPrompts[0].length).toBeLessThanOrEqual(CAP);
+    expect(sentPrompts[0]).toContain('**ART STYLE:**');
+    expect(sentPrompts[0]).not.toContain('**ABOUT THE LANDMARK REFERENCE PHOTO');
   }, 30000);
 });
 
@@ -173,8 +184,12 @@ describe('a prompt that does not fit fails loudly and never reaches Gemini', () 
 
 describe('the vantage plate states its Art Director prose once', () => {
   it('drops the vantage description when FRAMING carries the same text', () => {
-    const src = fs.readFileSync(path.join(__dirname, '..', '..', 'storyJobPipeline.js'), 'utf8');
-    expect(src).toContain("vantageDescription && vantageDescription !== String(adEmptyPrompt || '').trim() ? vantageDescription : ''");
-    expect(src).not.toMatch(/\*\*VANTAGE:\*\* \$\{v\.name \|\| ''\}`,\s*\n\s*v\.description \|\| '',/);
+    // One builder since 2026-09-26 (the plate prompt and its QC's EXPECTED SCENE).
+    const src = fs.readFileSync(path.join(__dirname, '..', '..', 'server/lib/platePipeline.js'), 'utf8');
+    expect(src).toContain('const vantageSetting = vantageSettingText(v, adEmptyPrompt);');
+    const { vantageSettingText } = require_('../../server/lib/sceneMetadata');
+    const v = { locationName: 'Quay', name: 'low landing', description: 'Looking up at the wall.' };
+    expect(vantageSettingText(v, 'Looking up at the wall.')).toBe('**LOCATION:** Quay\n**VANTAGE:** low landing');
+    expect(vantageSettingText(v, 'Another plate.')).toContain('Looking up at the wall.');
   });
 });

@@ -172,8 +172,10 @@ describe('wiring — the Lab replay stages call through the resolver', () => {
   });
 
   it('every Lab call to the all-pages Art Director builds its options through the resolver', () => {
+    // beats_scenes runs the run's own Art Director (beatsPipeline.runArtDirector)
+    // since 2026-09-27; any other Lab call site must use the resolver.
+    expect(testlabSrc).toMatch(/await runArtDirector\(\{/);
     const calls = testlabSrc.match(/buildSceneExpansionAllPrompt\([\s\S]{0,1400}?\n\s*\);/g) || [];
-    expect(calls.length).toBeGreaterThan(0);
     // Inline, or through a local the resolver assigns — the Lab's beats stage
     // hoists one `buildReplaySceneOptions` call and hands it to BOTH the
     // all-pages builder and the per-page `expandOnePage` fallback, which is
@@ -232,8 +234,16 @@ describe('wiring — production still passes what the resolver mirrors', () => {
     expect(call).toContain('maxCharactersPerScene');
   });
 
-  it('production hands the beats planner the approved arc, arcHints and the central figure', () => {
-    expect(beatsSrc).toContain('buildBeatsPrompt(inputData, pageCount, { finalArc: approvedArc, arcHints, centralFigure: arcCentralFigure })');
+  it('production hands the beats planner the approved arc, arcHints, the story logic and the central figure', () => {
+    expect(beatsSrc).toContain('buildBeatsPrompt(inputData, pageCount, { finalArc: approvedArc, arcHints, storyLogic: arcStoryLogic, centralFigure: arcCentralFigure })');
+  });
+
+  it('the replay resolves the story logic the arc stored, and nothing for an older story', () => {
+    const { resolveReplayStoryLogic, buildReplayTextArgs } = require('../../server/lib/beatsReplayInputs');
+    const LOGIC = 'Facts:\n- a fact';
+    expect(resolveReplayStoryLogic({ arcReviewReport: { logic: `  ${LOGIC}  ` } })).toBe(LOGIC);
+    expect(resolveReplayStoryLogic({ arcReviewReport: { finalArc: '1. x' } })).toBe('');
+    expect(buildReplayTextArgs({ arcReviewReport: { logic: LOGIC } }, []).storyLogic).toBe(LOGIC);
   });
 
   it('the replay resolves the central figure the arc stored, and nothing for an older story', () => {

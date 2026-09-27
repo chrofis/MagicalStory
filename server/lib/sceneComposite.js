@@ -39,6 +39,7 @@ const { photoAnalyzerUrl } = require('./photoAnalyzerClient');
 
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
+const { geminiUsage } = require('./providerUsage');
 const { generateWithGrok, editWithGrok, GROK_MODELS } = require('./grok');
 const { renderCharacterInPhantomPose } = require('./phantomPoseRender');
 const { stripDataUriPrefix, bytesFromAnyImage } = require('./r2');
@@ -2092,7 +2093,7 @@ async function judgePopulatedPlate(plateBase64, castLines, styleDescription = ''
   const usage = j?.usageMetadata;
   if (usage) {
     const { recordTextUsage } = require('./usageContext');
-    recordTextUsage('gemini_text', { input_tokens: usage.promptTokenCount || 0, output_tokens: usage.candidatesTokenCount || 0 }, 'composite_plate_judge', cfg.modelId);
+    recordTextUsage('gemini_text', geminiUsage(usage), 'composite_plate_judge', cfg.modelId);
   }
   const raw = String(j?.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
   let parsed;

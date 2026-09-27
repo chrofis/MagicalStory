@@ -62,7 +62,7 @@ describe('char-fix page state', () => {
 
   it('the state reaches the built repair prompt', async () => {
     const prompt = await faceRepair.buildPrompt({
-      treatment: 'crosshatch', regionSource: 'box', faceOnly: false, charName: 'CharA',
+      treatment: 'crosshatch', regionSource: 'box', faceOnly: false, model: 'grok', charName: 'CharA',
       opts: { sceneDescription: BRIEF, artStyle: 'watercolor', repairNames: NAMES },
     });
     expect(prompt).toContain('holds one roasted chestnut up and bites into it');

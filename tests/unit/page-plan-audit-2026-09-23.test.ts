@@ -169,7 +169,7 @@ describe('storage: the stage keeps what the models were sent and what they wrote
     expect(src).toContain('plannerReply,');
     expect(src).toContain('replanReplies: shipped.replanReplies');
     for (const m of src.matchAll(/replanRounds\.push\(\{ round,[^)]*\)/g)) expect(m[0]).toContain('replanReply');
-    const rec = src.slice(src.indexOf('const recheckRecord'), src.indexOf('} : null);', src.indexOf('const recheckRecord')));
+    const rec = src.slice(src.indexOf('function recheckRecord(c) {'), src.indexOf('} : null);', src.indexOf('function recheckRecord(c) {')));
     expect(rec).toContain("prompt: c.prompt || ''");
   });
 

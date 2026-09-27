@@ -244,9 +244,15 @@ const MAX_SEVERITY_TYPES = {
 // is also what puts the page into character repair under the settled
 // critical-only routing (2026-09-04). Deliberately NOT in ZERO_POINT_TYPES and
 // NOT capped.
+//
+// `identity_swap` (owner, 2026-09-27, reversing the 2026-09-04 critical-only
+// ruling for this one case): hair AND face both differ from the reference, so
+// the figure reads as another person. The entity prompt defines it as always
+// CRITICAL; the floor keeps a MAJOR slip from billing it as a hair change.
 const MIN_SEVERITY_TYPES = {
   composite_seam: 'catastrophic',
   face_destroyed: 'critical',
+  identity_swap: 'critical',
 };
 
 // NO TEXT MATCHING IN SCORING. Owner rule, 2026-08-09: "you can not build this
@@ -773,10 +779,14 @@ function _buildBreakdownFromEvalResult(evalResult, entityResult) {
     issues: Array.isArray(evalResult.fixableIssues)
       ? evalResult.fixableIssues.filter(i => i?.source !== 'three-stage')
       : [],
-  } : { score: 0, reasoning: null, issues: [] };
+    // Landmark-guard casualties, same sibling-not-member contract as
+    // threeStage.suppressedIssues below (2026-09-26).
+    suppressedIssues: Array.isArray(evalResult.suppressedIssues) ? evalResult.suppressedIssues : [],
+  } : { score: 0, reasoning: null, issues: [], suppressedIssues: [] };
   const semantic = evalResult?.semanticResult ? {
     score: typeof evalResult.semanticResult.score === 'number' ? evalResult.semanticResult.score : 0,
     issues: Array.isArray(evalResult.semanticResult.semanticIssues) ? evalResult.semanticResult.semanticIssues : [],
+    suppressedIssues: Array.isArray(evalResult.semanticResult.suppressedIssues) ? evalResult.semanticResult.suppressedIssues : [],
   } : null;
   const threeStage = evalResult?.threeStageResult ? {
     score: typeof evalResult.threeStageResult.score === 'number' ? evalResult.threeStageResult.score : 0,

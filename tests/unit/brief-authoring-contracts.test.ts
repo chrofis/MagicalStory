@@ -548,7 +548,7 @@ describe('the non-hand contact contract reaches every site that writes or rewrit
  * obeyed and rejected (it reads as asleep), so the contract is that the face is
  * stated, never what it states.
  */
-describe('the face block exists exactly when the brief declares a face', () => {
+describe('the face block states what the brief declares, and the viewer rule for every figure', () => {
   beforeAll(async () => { await loadPromptTemplates(); });
 
   const briefWith = (charExtra: Record<string, unknown>) => `Levin has laid his head sideways onto the egg. Both hands in his lap, off it.
@@ -566,9 +566,14 @@ ${JSON.stringify({
     }],
   })}`;
 
-  it('a character with no expression and no gaze gets no face block at all', () => {
+  // 2026-09-26: the viewer rule rides every figure's EYES line (the pose fill
+  // line that used to carry it skipped a figure with an interaction row — this
+  // very brief). A character with no expression and no gaze gets that rule and
+  // no invented face.
+  it('a character with no expression and no gaze gets the viewer rule and no face', () => {
     const prompt = String(PB.buildImagePrompt(briefWith({}), inputData, [ROSTER[0]], VISUAL_BIBLE, 4, null, {}));
-    expect(prompt).not.toContain('EXPRESSIONS AND EYES');
+    const line = protectedTail(prompt).split('\n').find(l => l.startsWith('- Levin: eyes')) || '';
+    expect(line).toBe('- Levin: eyes off into the scene, face turned the same way, never to the viewer');
   });
 
   it('the declared face rides the protected tail, verbatim, beside the pose', () => {

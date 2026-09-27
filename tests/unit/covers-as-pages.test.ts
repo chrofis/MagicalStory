@@ -244,8 +244,8 @@ describe('a portrait gaze is not contradicted by the pose fill line', () => {
   it('a figure sent to the viewer gets no "not at the viewer" line; one without a gaze keeps it', () => {
     const { buildExactPosesBlock } = require_('../../server/lib/promptBuilders');
     const block = String(buildExactPosesBlock([], [{ name: 'Child1', looksAt: 'viewer' }, { name: 'Child2' }], null));
-    expect(block).not.toMatch(/Child1: looking off into the scene/);
-    expect(block).toMatch(/Child2: looking off into the scene, not at the viewer/);
-    expect(block).toMatch(/Child1: eyes on the viewer/);
+    expect(block).not.toMatch(/Child1:.*never to the viewer/);
+    expect(block).toMatch(/Child2: eyes off into the scene, face turned the same way, never to the viewer/);
+    expect(block).toMatch(/Child1: eyes on the viewer$/m);
   });
 });

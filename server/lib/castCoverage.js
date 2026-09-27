@@ -35,6 +35,8 @@
  * are not the children this rule is about and owe the book no page.
  */
 
+const { GROUP_STAGING_MAX } = require('./shotVocabulary');
+
 /** Named characters a page carries best (story-beats.txt: "Two or three named characters carry a page best"; "Stage a page with two people rather than three when two carry it"). */
 const PAGE_CAST_TYPICAL = 2;
 /** The owner's target: "ideally each one is on 3-4 images". */
@@ -66,6 +68,65 @@ function castCoverage({ pageCount, castCount } = {}) {
 }
 
 const pagesWord = n => `${n} page${n === 1 ? '' : 's'}`;
+
+/**
+ * HOW MANY PAGES MAY HOLD A GROUP (owner, 2026-09-27).
+ *
+ * The planner was told "Two or three named characters carry a page best" and
+ * given the image model's ceiling (6 for Grok) in the same sentence; nothing
+ * counted the preference. Measured over the 17 staging books of the 14 days to
+ * 2026-09-27 (docs/decisions.md): 27 of 241 shipped plan pages held more than
+ * three characters, 22 of them whole-cast pages, up to 4 in one 18-page book —
+ * and those pages score worst (by the Art Director's cast: 1 → 79.4, 2 → 66.7,
+ * 3 → 53.6, 4+ → 49.6).
+ *
+ * The budget is one page in six — three in a 16-18-page book: the opening
+ * gathering, the climax and the ending, the three places the story brings
+ * everyone together — and at least one.
+ *
+ * It never fights the coverage floor above. That floor is computed from two
+ * characters a page (PAGE_CAST_TYPICAL), so pages of one to three always hold
+ * it; only when a cast is too large for the book to reach the floor on pages
+ * of three does the budget rise, by exactly the group pages the floor needs at
+ * the image model's ceiling (`forced`).
+ *
+ * One object, two readers: the planner is told `groupPageRule(budget)`
+ * (story-beats.txt {GROUP_PAGE_BUDGET}) and planCounters GROUP_PAGES_OVER_BUDGET
+ * counts against `budget.max`.
+ *
+ * @param {{pageCount:number, castCount:number, maxCharactersPerScene:number}} args
+ * @returns {null | {max:number, base:number, forced:number, over:number}}
+ *   null when the book has no pages, or the image model cannot hold a group at
+ *   all (its ceiling is the cap then, and CAST_OVER_CEILING counts it).
+ */
+const GROUP_PAGE_SHARE = 6;
+const NUMBER_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six'];
+function groupPageBudget({ pageCount, castCount, maxCharactersPerScene } = {}) {
+  const P = Math.floor(Number(pageCount));
+  const ceiling = Math.floor(Number(maxCharactersPerScene));
+  if (!(P > 0) || !(ceiling > GROUP_STAGING_MAX)) return null;
+  const base = Math.max(1, Math.round(P / GROUP_PAGE_SHARE));
+  const cov = castCoverage({ pageCount: P, castCount });
+  let forced = 0;
+  if (cov && cov.castCount > 1) {
+    const need = Math.ceil(P / 2) + (cov.castCount - 1) * cov.appearances.min;
+    const onSmallPages = GROUP_STAGING_MAX * Math.max(1, P - 1);
+    if (need > onSmallPages) forced = Math.ceil((need - onSmallPages) / (ceiling - GROUP_STAGING_MAX));
+  }
+  return { max: Math.min(P, Math.max(base, forced)), base, forced, over: GROUP_STAGING_MAX };
+}
+
+/**
+ * The budget as the planner is told it. Generic on purpose: the three example
+ * moments are structural, never a story's.
+ * @param {ReturnType<typeof groupPageBudget>} budget
+ * @returns {string} '' when there is no budget
+ */
+function groupPageRule(budget) {
+  if (!budget) return '';
+  const over = NUMBER_WORDS[budget.over] || String(budget.over);
+  return `At most ${pagesWord(budget.max)} of this book hold more than ${over} named characters, and only where the story brings them together — an opening gathering, the climax, the ending. Every other page carries one to ${over}, and each character's pages in frame come from those.`;
+}
 
 /**
  * The ACTION half of the page plan's cast rule — the link to the arc's own rule
@@ -313,6 +374,8 @@ module.exports = {
   parsePlanCastBlock,
   commissionedCast,
   castCoverage,
+  groupPageBudget,
+  groupPageRule,
   castActionRule,
   ADDED_DEED_RULE,
   centralFigureActionRule,

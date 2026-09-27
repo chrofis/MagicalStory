@@ -53,6 +53,9 @@ const PAGE_TEXT = 'The lamp guttered twice and then went out, and nobody said a 
 const BEFORE_TEXT = 'The lamp guttered and went out.';
 const ARC_LINE = 'The keeper must relight the lamp before the tide turns.';
 const PLAN_LINE = 'wide — the main character on the pier — she lifts the lantern — the lamp is lit';
+const LOGIC_FACT = 'the old ropes are brittle and only the tarred line will hold a weight';
+const STORY_LOGIC = `Facts:
+- ${LOGIC_FACT}.`;
 const BRIEF_PROSE = `The main character stands on ${PLACE}, lifting a brass lantern above her head.`;
 const STYLE = 'Soft watercolour with visible paper grain. Never photographic.';
 // The landmark block, from the ONE builder all three judges are filled from.
@@ -197,6 +200,18 @@ const CASES: Case[] = [
     probe: PLAN_LINE,
     build: () => PB.buildPlanCheckPrompt(inputData, BEATS, ARC_LINE, ''),
     blind: () => PB.buildPlanCheckPrompt(inputData, [{ pageNumber: 1, planLine: 'close — she walks home' }], ARC_LINE, ''),
+  },
+  {
+    name: 'buildBeatsPrompt (page planner) — the story logic',
+    probe: LOGIC_FACT,
+    build: () => PB.buildBeatsPrompt(inputData, 4, { finalArc: ARC_LINE, storyLogic: STORY_LOGIC }),
+    blind: () => PB.buildBeatsPrompt(inputData, 4, { finalArc: ARC_LINE }),
+  },
+  {
+    name: 'buildPlanCheckPrompt — the story logic (question 18)',
+    probe: LOGIC_FACT,
+    build: () => PB.buildPlanCheckPrompt(inputData, BEATS, ARC_LINE, '', { storyLogic: STORY_LOGIC }),
+    blind: () => PB.buildPlanCheckPrompt(inputData, BEATS, ARC_LINE, ''),
   },
   {
     name: 'buildArcCreatePrompt (the arc machine)',

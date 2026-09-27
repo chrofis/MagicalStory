@@ -570,7 +570,7 @@ function missingGarments(clothingDescription, prose, requiredSlots = ['top', 'bo
  *     tricorn hat" is one hat, described twice).
  */
 
-const { WORN_SLOTS, SLOT_NOUNS, parseWornAs, deriveSlotFromName, slotFromType, indexOfElementAmong, sameName, spliceClause, CLAUSE_LEAD_RE, outfitVersionOf } = require('./wornItems');
+const { WORN_SLOTS, SLOT_NOUNS, parseWornAs, deriveSlotFromName, slotFromType, indexOfElementAmong, sameName, spliceClause, CLAUSE_LEAD_RE, outfitVersionOf, DEPENDENT_OPENER_RE } = require('./wornItems');
 
 // The slots this check arbitrates. See the scope note above.
 const ARBITRATED_SLOTS = ['headwear', 'footwear', 'outer layer'];
@@ -578,13 +578,36 @@ const ARBITRATED_SLOTS = ['headwear', 'footwear', 'outer layer'];
 // VB pools whose entries can be worn on a body.
 const WEARABLE_POOLS = ['artifacts', 'clothing'];
 
-/** The outfit description as garment clauses (semicolon shape, comma fallback). */
+/**
+ * The outfit description as garment clauses: split at every top-level `;` AND
+ * `,`, and a segment that opens as a dependent (wornItems.DEPENDENT_OPENER_RE —
+ * "worn open", "with a hood") rejoins the clause before it.
+ *
+ * This used to take commas only when the text had no semicolon at all. An
+ * outfit written as a comma list with ONE semicolon tail — "a blouse, a coat, a
+ * skirt, boots; scissors hang from the sash" — came back as two clauses, the
+ * first of them the whole garment list, so an `adopt` wrote the entire outfit
+ * into one garment's Visual Bible description (staging
+ * job_1790446348343_z3fw660ie CLO001: the coat's description became blouse +
+ * coat + skirt + sash + boots + jewellery, and every "NOT wearing" line quoted
+ * the whole costume). wornItems.splitClauses is not used here: it merges a
+ * segment whose garment is outside its closed noun vocabulary into the one
+ * before it ("white sneakers, and a purple hooded sweatshirt"), and this check
+ * must see every listed garment as its own clause.
+ */
 function outfitClauses(description) {
   const raw = String(description || '').trim();
   if (!raw) return [];
-  let parts = raw.split(/\s*;\s*/).map(s => s.trim()).filter(Boolean);
-  if (parts.length < 2) parts = raw.split(/\s*,\s*/).map(s => s.trim()).filter(Boolean);
-  return parts.map(s => s.replace(/\.\s*$/, '').trim()).filter(Boolean);
+  const clauses = [];
+  for (const part of raw.split(/\s*;\s*/)) {
+    for (const seg of part.split(/\s*,\s*/)) {
+      const s = seg.replace(/\.\s*$/, '').trim();
+      if (!s) continue;
+      if (clauses.length > 0 && DEPENDENT_OPENER_RE.test(s)) clauses[clauses.length - 1] += `, ${s}`;
+      else clauses.push(s);
+    }
+  }
+  return clauses;
 }
 
 /** Garment nouns of one slot present in a piece of text. */
@@ -796,4 +819,4 @@ function applyWardrobeBibleCorrections(clothingRequirements, visualBible, opts =
 // slotStated + missingGarments are exported so the image-prompt clothing check
 // (storyHelpers buildImagePrompt) uses THIS definition of "is this garment in
 // the prose" rather than growing a second one.
-module.exports = { GARMENT_NOUNS, checkPage, checkWardrobeAgainstBible, applyWardrobeBibleCorrections, outfitClauses, checkScenes, renderFindingsBlock, splitSlots, slotStated, missingGarments, characterProse, characterWindow, tokens, contractPairs, colourBefore };
+module.exports = { REVIEWABLE, GARMENT_NOUNS, checkPage, checkWardrobeAgainstBible, applyWardrobeBibleCorrections, outfitClauses, checkScenes, renderFindingsBlock, splitSlots, slotStated, missingGarments, characterProse, characterWindow, tokens, contractPairs, colourBefore };

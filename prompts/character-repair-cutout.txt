@@ -1,10 +1,10 @@
 TWO IMAGES ATTACHED.
-- IMAGE 1 = REFERENCE PORTRAIT of {charName}. Use it only to copy face, hair, skin tone, build, and clothing. Don't return this image. Don't reproduce its background or composition.
-- IMAGE 2 = THE CUTOUT TO EDIT. A scene region with the figure marked by a magenta crosshatch. Your output must be an edited copy of IMAGE 2 — same dimensions, same edges, same surrounding pixels. Only the crosshatched area is repainted.
+- {REFERENCE_IMAGE} = REFERENCE BODY AND OUTFIT of {charName} (the full figure). Use it only to copy face, hair, skin tone, build, and clothing. Don't return this image. Don't reproduce its background or composition.
+- {EDIT_IMAGE} = THE CUTOUT TO EDIT. A scene region with the figure marked by a magenta crosshatch. Your output must be an edited copy of {EDIT_IMAGE} — same dimensions, same edges, same surrounding pixels. Only the crosshatched area is repainted.
 
-If you are tempted to return anything that looks like IMAGE 1, stop — return IMAGE 2 with the crosshatch repainted instead.
+If you are tempted to return anything that looks like {REFERENCE_IMAGE}, stop — return {EDIT_IMAGE} with the crosshatch repainted instead.
 
-Inpaint task: repaint the area covered by the magenta crosshatch in IMAGE 2 as {charName} from IMAGE 1. The crosshatch marks the figure that needs to be replaced — remove the crosshatch entirely and paint one {charName} underneath.
+Inpaint task: repaint the area covered by the magenta crosshatch in {EDIT_IMAGE} as {charName} from {REFERENCE_IMAGE}. The crosshatch marks the figure that needs to be replaced — remove the crosshatch entirely and paint one {charName} underneath.
 
 Keep the original pose, body language, hand positions, held items, facial expression, and gaze direction — infer these from the surrounding scene and from the figure still faintly visible through the crosshatch. Do not default to a smile or make the character face the camera.
 
@@ -17,6 +17,6 @@ Only one figure should appear in the result. If a partial figure is visible just
 The background outside the crosshatch area should stay the same.{issueContext}{textPositionContext}
 
 --- {charName} — everything to match ---
-Face, hair, skin tone and build: from IMAGE 1.{appearanceContext}{clothingContext}{actionContext}
+Face, hair, skin tone and build: from {REFERENCE_IMAGE}.{appearanceContext}{clothingContext}{actionContext}
 
 {REPAIR_TEXT_GUARD}

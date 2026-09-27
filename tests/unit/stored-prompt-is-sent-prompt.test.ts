@@ -76,7 +76,11 @@ describe('the stored page prompt is the prompt the model received', () => {
     // block drops. If it ever calls a text model again this blows up.
     textModels.callTextModel = async () => { throw new Error('the shrinker made a paid call'); };
 
-    const built = buildPrompt(CAP + 4000);
+    // Over the cap by less than the DEPTH AND SIZE paragraph it carries: the
+    // scene itself is never cut (2026-09-26), only a ranked block.
+    const depth: string = require_('fs').readFileSync(require_('path').join(process.cwd(), 'prompts', 'image-generation.txt'), 'utf-8')
+      .split(/\n{2,}/).map((x: string) => x.trim()).find((x: string) => x.startsWith('**DEPTH AND SIZE:**'));
+    const built = `${buildPrompt(CAP - 400)}\n\n${depth}`;
     expect(built.length).toBeGreaterThan(CAP);
 
     const res = await images.generateImageOnly(built, [], genOpts);

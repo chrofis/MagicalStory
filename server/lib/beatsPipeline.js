@@ -427,8 +427,11 @@ function applyReviewBibleCorrections(raw, visualBible, pageCount, citedHandles) 
         out.applied.push({ id, name: '(text)', oldText: before, newText: after });
       }
     }
+    // LANDMARK PHOTO (check [landmark_photo_mismatch]): a location row may
+    // carry only a corrected `landmarkPhoto` citation.
+    const photoCorrected = applyLandmarkPhotoCorrection(row, entry, id, out);
     if (!Array.isArray(row.states) || row.states.length === 0) {
-      if (!Object.prototype.hasOwnProperty.call(row, 'text')) {
+      if (!Object.prototype.hasOwnProperty.call(row, 'text') && !photoCorrected) {
         out.rejected.push({ id, reason: 'correction carries no states[] and no text' });
       }
       continue;
@@ -513,6 +516,50 @@ function applyReviewBibleCorrections(raw, visualBible, pageCount, citedHandles) 
   return out;
 }
 
+/**
+ * The scene review's [landmark_photo_mismatch] correction: a location row
+ * carrying `landmarkPhoto` (on the entry, or on `vantages[]` rows by id).
+ * Taken only for a real landmark and only when the value is a servable photo
+ * number or "none"; anything else is rejected and the authored citation stands.
+ */
+function applyLandmarkPhotoCorrection(row, entry, id, out) {
+  const { servablePhotos, parseLandmarkPhotoCitation } = require('./landmarkPhotos');
+  const touches = Object.prototype.hasOwnProperty.call(row, 'landmarkPhoto')
+    || (Array.isArray(row.vantages) && row.vantages.some(v => v && Object.prototype.hasOwnProperty.call(v, 'landmarkPhoto')));
+  if (!touches) return false;
+  if (!entry.isRealLandmark) { out.rejected.push({ id, reason: 'landmarkPhoto on a location that is not a real landmark' }); return true; }
+  const photos = servablePhotos(entry.photoVariants).map(v => v.variantNumber);
+  const allowed = photos.length === 0 && (entry.referencePhotoUrl || entry.referencePhotoData) ? [1] : photos;
+  const valid = (raw) => { const c = parseLandmarkPhotoCitation(raw); return c === 'none' || (c != null && allowed.includes(c)) ? c : null; };
+  const set = (target, raw, label) => {
+    const c = valid(raw);
+    if (c == null) { out.rejected.push({ id: label, reason: `landmarkPhoto ${JSON.stringify(raw)} is not one of its photos (${allowed.join(',') || 'none'}) or "none"` }); return; }
+    // Compare as citations: the Art Director may have authored "1" where the
+    // review writes 1 — the same photo, not a correction (Lab 1574 LOC004.3).
+    if (parseLandmarkPhotoCitation(target.landmarkPhoto) === c) return;
+    out.applied.push({ id: label, name: '(landmarkPhoto)', oldPhoto: target.landmarkPhoto ?? null, newPhoto: c });
+    target.landmarkPhoto = c;
+  };
+  const rowId = String(row.id || '').trim().toUpperCase();
+  const rowVantage = rowId.includes('.')
+    ? (entry.vantages || []).find(v => String(v?.id || '').trim().toUpperCase() === rowId) : null;
+  if (Object.prototype.hasOwnProperty.call(row, 'landmarkPhoto') && rowVantage) {
+    set(rowVantage, row.landmarkPhoto, rowId); // a vantage row filed at the top level
+  } else if (Object.prototype.hasOwnProperty.call(row, 'landmarkPhoto')) {
+    if (Array.isArray(entry.vantages) && entry.vantages.length > 0) {
+      out.rejected.push({ id, reason: 'landmarkPhoto on a location with vantages — cite it per vantage' });
+    } else set(entry, row.landmarkPhoto, id);
+  }
+  for (const rv of (Array.isArray(row.vantages) ? row.vantages : [])) {
+    if (!rv || !Object.prototype.hasOwnProperty.call(rv, 'landmarkPhoto')) continue;
+    const vid = String(rv.id || '').trim().toUpperCase();
+    const target = (entry.vantages || []).find(v => String(v?.id || '').trim().toUpperCase() === vid);
+    if (!target) { out.rejected.push({ id: vid || id, reason: 'no vantage has that id' }); continue; }
+    set(target, rv.landmarkPhoto, vid);
+  }
+  return true;
+}
+
 const SYNCED_COLLECTIONS = ['secondaryCharacters', 'animals', 'artifacts', 'vehicles', 'locations', 'clothing'];
 function syncVisualBibleSection(bibleSections, visualBible) {
   const text = String(bibleSections || '');
@@ -537,7 +584,12 @@ function syncVisualBibleSection(bibleSections, visualBible) {
       const mem = byId.get(String(entry.id).trim().toUpperCase());
       if (!mem) continue;
       entry.pages = pageList(mem.appearsInPages);
-      if (Array.isArray(entry.states) && Array.isArray(mem.states)) {
+      // States are projected whenever the parsed copy has them — including
+      // an entry the Art Director authored WITHOUT states[] that a later step
+      // (the scene review's bible correction) gave looks to. Gated on the
+      // authored entry already carrying states, the new looks never reached
+      // the transcript (staging job_1790446348343_z3fw660ie, ART003).
+      if (Array.isArray(mem.states) && (Array.isArray(entry.states) || mem.states.length > 0)) {
         entry.states = mem.states.map(st => ({
           name: st.name,
           delta: st.delta,
@@ -555,11 +607,77 @@ function syncVisualBibleSection(bibleSections, visualBible) {
         entry.age = mem.age;
         entry.secondaryAgeClamped = mem.secondaryAgeClamped;
       }
+      // The scene review's `text` correction (check 9g): a withdrawn
+      // declaration is null in the parsed copy and leaves the transcript too.
+      if (Object.prototype.hasOwnProperty.call(mem, 'text')) {
+        if (typeof mem.text === 'string' && mem.text) entry.text = mem.text;
+        else delete entry.text;
+      }
+      // The landmark photo citation — on the location and on each vantage. The
+      // plates are painted from the photo it cites (b881cd2c1); the review's
+      // [landmark_photo_mismatch] correction lands here.
+      if (key === 'locations') {
+        if (Object.prototype.hasOwnProperty.call(mem, 'landmarkPhoto')) entry.landmarkPhoto = mem.landmarkPhoto;
+        const memVantages = new Map((Array.isArray(mem.vantages) ? mem.vantages : [])
+          .filter(v => v && v.id).map(v => [String(v.id).trim().toUpperCase(), v]));
+        for (const v of (Array.isArray(entry.vantages) ? entry.vantages : [])) {
+          const mv = v && v.id ? memVantages.get(String(v.id).trim().toUpperCase()) : null;
+          if (mv && Object.prototype.hasOwnProperty.call(mv, 'landmarkPhoto')) v.landmarkPhoto = mv.landmarkPhoto;
+        }
+      }
     }
   }
 
   const body = '```json\n' + JSON.stringify(json, null, 2) + '\n```\n\n';
   return text.replace(sectionRe, (_m, marker) => `${marker}${body}`);
+}
+
+/**
+ * Which of the scene review's applied bible corrections a re-parse of the
+ * transcript does NOT carry. The transcript is what storyJobPipeline's resume
+ * path, the Lab and every later `extractVisualBible()` read, so a correction
+ * missing from it is a correction lost. Checked by re-parsing — never by
+ * comparing strings — so a write-back that rewrote the section but dropped
+ * the corrected field is caught too.
+ *
+ * @param {string} bibleSections the transcript after write-back
+ * @param {object} visualBible the parsed copy the corrections were applied to
+ * @param {Array<{id: string, name: string, newText?: *, newPhoto?: *}>} applied
+ * @returns {Array<{id: string, field: string, expected: *, found: *}>}
+ */
+function bibleCorrectionsMissingFromTranscript(bibleSections, visualBible, applied) {
+  const { parseLandmarkPhotoCitation } = require('./landmarkPhotos');
+  const reparsed = new UnifiedStoryParser(String(bibleSections || '')).extractVisualBible() || {};
+  const find = (vb, baseId) => {
+    for (const key of SYNCED_COLLECTIONS) {
+      const e = (Array.isArray(vb[key]) ? vb[key] : []).find(x => x && String(x.id || '').trim().toUpperCase() === baseId);
+      if (e) return e;
+    }
+    return null;
+  };
+  const statesOf = (e) => JSON.stringify((Array.isArray(e && e.states) ? e.states : [])
+    .filter(Boolean).map(st => [st.name, (st.pages || []).map(Number)]));
+  const missing = [];
+  for (const a of (Array.isArray(applied) ? applied : [])) {
+    const fullId = String(a.id || '').trim().toUpperCase();
+    const baseId = fullId.split('.')[0];
+    const got = find(reparsed, baseId);
+    if (a.name === '(landmarkPhoto)') {
+      const target = fullId.includes('.')
+        ? (got && Array.isArray(got.vantages) ? got.vantages.find(v => v && String(v.id || '').trim().toUpperCase() === fullId) : null)
+        : got;
+      const found = target ? parseLandmarkPhotoCitation(target.landmarkPhoto) : null;
+      if (found !== a.newPhoto) missing.push({ id: fullId, field: 'landmarkPhoto', expected: a.newPhoto, found });
+    } else if (a.name === '(text)') {
+      const found = got && typeof got.text === 'string' ? got.text : null;
+      if (found !== a.newText) missing.push({ id: fullId, field: 'text', expected: a.newText, found });
+    } else {
+      const want = statesOf(find(visualBible, baseId));
+      const found = statesOf(got);
+      if (found !== want) missing.push({ id: fullId, field: 'states', expected: want, found });
+    }
+  }
+  return missing;
 }
 
 /**
@@ -828,6 +946,1773 @@ function shippedReplanState(rounds = []) {
   return { changedPages: [...changed].sort((a, b) => a - b), recheck, discardedRounds, declaredChanges, changeRefusals, replanPrompts, replanReplies };
 }
 
+// ── THE ARC CREATOR'S CALL, SHARED WITH THE TEST LAB ───────────────────────
+// Moved out of generateStoryViaBeats on 2026-09-27 so the Lab's arc replays
+// make the creator call the run makes (one retry, a truncated reply is a failed
+// attempt). `onCall` hands the Lab each reply; the run passes none.
+
+/** OpenRouter/xAI take a temperature; the Anthropic path sends none. */
+function arcTempFor(model, temp) {
+  return (temp == null || TEXT_MODELS[model]?.provider === 'anthropic') ? {} : { temperature: temp };
+}
+
+/** Creator-side call: one retry, then throw — the creator is not advisory. */
+// `model` and `effort` are this call's (MODEL_DEFAULTS.arcCreateModel +
+// arcCreateEffort, or arcRetellModel + arcRetellEffort); null max_tokens =
+// the model's own ceiling.
+function makeArcCreatorCall(onChunk, onCall = null) {
+  return async (prompt, label, model, temp, effort) => {
+    let lastErr = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const res = await textModels.callTextModelStreaming(prompt, null, onChunk, model, { usageLabel: label, ...arcTempFor(model, temp), ...(effort ? { effort } : {}) });
+        if (onCall) onCall(res);
+        if (!String(res?.text || '').trim()) throw new Error('empty response');
+        // A cut arc parses as a shorter arc (missing critique lines, a short
+        // chain) — treat it as a failed attempt, never as the creator's answer.
+        if (res.truncation?.suspected) throw new Error(`reply ${textModels.describeTruncation(res.truncation)}`);
+        return res;
+      } catch (err) {
+        lastErr = err;
+        log.warn(`⚠️ [ARC] ${label} attempt ${attempt} failed: ${err.message}`);
+      }
+    }
+    throw new Error(`${label} failed after retry: ${lastErr?.message || 'unknown error'}`);
+  };
+}
+
+// ── STEP 2 OF THE BEATS PIPELINE, SHARED WITH THE TEST LAB ─────────────────
+// The plan check (counters + the one model call) and the re-plan rounds, moved
+// verbatim out of generateStoryViaBeats on 2026-09-27 so the Lab's
+// beats_replan stage runs the rounds production runs (owner: "The Lab must use
+// 100% identical code to production"). The stage used to rebuild the check,
+// one round and its guard itself — without the CAST table on the re-plan, the
+// arc's invented / commissioned figures, the checker's PEOPLELESS pick, the
+// review of declared changes and the second round.
+// `labPromptOptions` carries a Test Lab A/B prompt knob (plannerMayAddDeeds)
+// and `onCall` hands the Lab each model reply (its cost report); the run
+// passes neither.
+
+/**
+ * One planner response -> its PAGE PLAN text and its parsed beats, for the
+ * first division and every re-plan alike (shared with the Test Lab).
+ */
+function makePlanReader(expected, approvedArc) {
+  return (raw) => {
+    const parsed = parsePlanResponse(String(raw || ''), expected);
+    // The approved arc is the story; the planner does not author one.
+    parsed.arc = approvedArc || '';
+    return { parsed, pagePlan: parsed.pagePlan };
+  };
+}
+
+/**
+ * The counter inputs of the plan check: the commissioned cast (the character
+ * list plus the figures the arc tagged commissioned), the place names that
+ * can never be cast, the page cast ceiling and the check model.
+ */
+function planCheckInputs(inputData, { arcPremiseNames = [], modelOverrides = {} } = {}) {
+  // The character list PLUS the figures the premise supplied (the arc reports
+  // them; see `arcPremiseNames`). A pet the commission named is commissioned.
+  //
+  // ONE definition, shared with the Test Lab replay (castCoverage.commissionedCast):
+  // `listed` is the character list — the characters that owe the book a focal
+  // page and the castCoverage() appearance floor — and `all` adds the figures
+  // the commission supplied elsewhere, which are never invented.
+  const commission = commissionedCast(inputData, arcPremiseNames);
+  const commissionedNames = commission.all;
+  if (arcPremiseNames.length) log.info(`👪 [BEATS] Figures the arc tagged (commissioned), counted as commissioned: ${arcPremiseNames.join(', ')}`);
+  // The counters must never read a PLACE as a person. The names come from the
+  // same authoritative data the planner itself was given — the resolved
+  // landmark list, the family's town, and (historical stories) the canonical
+  // locations and period objects — never from a word list or a prose pattern.
+  // Story job_1788614817116_vxnu60yjg entered "Uetliberg" and "Aussichtsturm
+  // Uetliberg" into the invented cast and manufactured six INVENTED_DOMINANT
+  // pages off it (docs/decisions.md, 2026-09-05).
+  const placeNames = collectPlaceNames(inputData, [
+    ...(inputData?.storyCategory === 'historical'
+      ? [...getHistoricalLocations(inputData.storyTopic), ...getHistoricalObjects(inputData.storyTopic)].map(e => e && e.name)
+      : []),
+  ]);
+  if (placeNames.length) log.debug(`[BEATS] plan counters know ${placeNames.length} place name(s) that can never be cast`);
+  const maxCast = IMAGE_MODELS[inputData?.modelOverrides?.imageModel || MODEL_DEFAULTS.pageImage]?.maxCharactersPerScene || 3;
+  const planCheckModel = modelOverrides.planCheckModel || MODEL_DEFAULTS.planCheckModel;
+  return { commission, commissionedNames, placeNames, maxCast, planCheckModel };
+}
+
+/**
+ * Counters (free, deterministic) + the one model call. Never throws: the
+ * model half is advisory, and a lost call leaves the counters standing alone
+ * rather than skipping the check entirely.
+ */
+// MODEL FIRST, COUNTERS SECOND (2026-09-11). The counters used to run first
+// and their lines were shown to the model for reference. They cannot run
+// first any more: who is on a page is a question about English, the model
+// call answers it as a ROSTER, and the counters do arithmetic on that answer
+// instead of re-deriving the cast from the prose with a grammar heuristic.
+function createPlanCheckRunner({ inputData, approvedArc, arcHints, arcStoryLogic, arcCentralFigure, castTable, commission, commissionedNames, placeNames, maxCast, arcInventedNames, arcInventedLimit, mainName, planCheckModel, onChunk, gl, labPromptOptions = {}, onCall = null }) {
+  return async (label, pages, planText) => {
+    let modelFindings = [];
+    let roster = null;
+    // The check's OBSTACLES block: per page, the character whose action that
+    // page's instant works against (plan-check Q11). It is the declared
+    // evidence a re-plan's removal is judged against — a figure the arc gives a
+    // moment of their own is not a figure a page may quietly drop — so it is
+    // read as DATA here, never re-derived from a finding's prose.
+    let obstacles = null;
+    // The check's PEOPLELESS line (Q6): the page the checker nominates to give
+    // up its cast, emitted only when no page is people-free. Read as DATA, the
+    // same way the OBSTACLES block is — picking the page in code was built and
+    // rejected on measurement (docs/decisions.md, 2026-09-20).
+    let peoplelessPick = null;
+    // The check's WANTED (Q4) and ACTION (Q12) lines: the pictures the next
+    // round must keep, read as DATA like OBSTACLES (2026-09-23).
+    let wanted = [];
+    let actions = [];
+    // The check's CENTRAL line: the pages whose picture shows the central
+    // figure, answered for the name Q12 gives it (2026-09-25). null = no line.
+    let centralPages = null;
+    let checkModelId = null;
+    let prompt = null;
+    // THE REPLY IS EVIDENCE, NOT A BYPRODUCT (2026-09-19).
+    //
+    // `modelFindings: []` has two readings — the checker found nothing, or it
+    // answered badly — and until this was kept the row could not tell them
+    // apart. On staging job_1789759147125_p08djwhbl the eleven-check call
+    // returned zero findings against a plan that breaks four of the planner's
+    // own rules on page 5 alone, and the only reason we know the call arrived
+    // at all is that `cast` happens to be derived from its roster.
+    //
+    // Text only, no images, and the arc stage already keeps the creator's full
+    // reply (`arcReviewReport.create`) for exactly this reason.
+    let reply = '';
+    let rosterLines = [];
+    try {
+      // No counter findings ride in: they do not exist yet. See the builder's
+      // header — the counters read this call's ROSTER, so they run below.
+      prompt = buildPlanCheckPrompt(inputData, pages, approvedArc, planText, { arcHints, storyLogic: arcStoryLogic, centralFigure: arcCentralFigure, castTable, ...labPromptOptions });
+      if (!prompt) throw new Error('plan-check template unavailable');
+      const res = await textModels.callTextModelStreaming(prompt, null, onChunk, planCheckModel, {
+        usageLabel: label,
+        // Judges run at temperature 0 (settled); the Anthropic path sends none.
+        ...(TEXT_MODELS[planCheckModel]?.provider === 'anthropic' ? {} : { temperature: 0 }),
+      });
+      if (onCall) onCall(res);
+      checkModelId = res.modelId || planCheckModel;
+      reply = String(res.text || '');
+      modelFindings = parsePlanCheck(res.text || '');
+      roster = parsePlanCheckRoster(res.text || '');
+      obstacles = parsePlanCheckObstacles(res.text || '');
+      peoplelessPick = parsePlanCheckPeoplelessPick(res.text || '');
+      wanted = parsePlanCheckWanted(res.text || '');
+      actions = parsePlanCheckActions(res.text || '');
+      centralPages = parsePlanCheckCentralPages(res.text || '');
+      // The roster AS PARSED, page by page. The raw reply above carries the
+      // same lines verbatim; this is the form every counter actually reasons
+      // on, so a reader can see what the arithmetic was given — including a
+      // `covers` that expanded nobody, which is how "all four boys" reached
+      // the cast count as two names on that same job.
+      rosterLines = [...roster.entries()]
+        .sort((a, b) => a[0] - b[0])
+        .map(([pageNumber, r]) => ({ pageNumber, people: r.people, things: r.things, covers: r.covers }));
+    } catch (err) {
+      // LOUD, NEVER FATAL. A lost plan check takes the ENTIRE counter layer
+      // with it (the counters do arithmetic on its roster), so this is an
+      // ERROR in the run log and in the generation log — not a WARN that two
+      // days of beats runs scrolled past (2026-09-13, the undefined
+      // `parsePlanCheckRoster` binding). It still never aborts a paid run:
+      // quality gates ship with a warning (feedback_gates_are_guidelines).
+      log.error(`❌ [BEATS] Plan check (${label}) failed (${err.message}) — NO ROSTER, so the entire plan-counter layer is skipped this round`);
+      gl.error(`${label}_failed`, `Plan check failed: ${err.message} — no roster, so every plan counter (cast, invented cast, shot variety, focal pages) is skipped this round`, null, { error: err.message, model: planCheckModel });
+    }
+    const counters = runPlanCounters({ pages, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit, roster, peoplelessPick, centralFigure: arcCentralFigure, centralPages, mainName, castTable, actions });
+    // The central-figure counter counts on the CENTRAL line alone; a check
+    // that named no pages for a named figure leaves it uncounted — loudly.
+    if (counters.stats?.centralFigure?.unanswered) {
+      log.error(`❌ [BEATS] Plan check (${label}) gave no CENTRAL line for the central figure (${arcCentralFigure.join(' / ')}) — CENTRAL_FIGURE_ABSENT_THIRD did not run`);
+      gl.error(`${label}_no_central_line`, 'The plan check named no pages for the central figure (CENTRAL line absent); the per-third presence counter did not run', null, { model: checkModelId || planCheckModel, centralFigure: arcCentralFigure });
+    }
+    // NO FALLBACK, NO SYNTHESIS. The finding degrades to its page-less
+    // sentence when Q6 nominated nothing; code never picks the page itself.
+    // The miss is loud so a checker that stops answering Q6 is visible.
+    if (!peoplelessPick && counters.findings.some(f => f.code === 'NO_PEOPLELESS_PAGE')) {
+      log.error(`❌ [BEATS] Plan check (${label}) fired NO_PEOPLELESS_PAGE but emitted no PEOPLELESS line — the finding names no page, and the planner picks blind`);
+      gl.error(`${label}_no_peopleless_nomination`, 'The plan check found no people-free page but nominated none either (Q6 PEOPLELESS line absent); the finding degrades to naming no page', null, { model: checkModelId || planCheckModel });
+    }
+    if (counters.skipped) {
+      const got = roster ? roster.size : 0;
+      log.error(`❌ [BEATS] Plan counters (${label}) SKIPPED (${counters.skipped}) — the roster covers ${got} of ${pages.length} page(s); no cast, invented-cast, shot-variety or focal-page counting ran`);
+      gl.error(`${label}_counters_skipped`, `Plan counters did not run (${counters.skipped}): the check's roster covers ${got} of ${pages.length} page(s)`, null, { reason: counters.skipped, rosterPages: got, pages: pages.length });
+    }
+    // Findings travel STRUCTURED to the re-plan: a counter keeps its code, a
+    // model finding the check number it answered, so buildReplanSection can rank
+    // them without reading their prose. `lines` stays the flat rendering the
+    // report and the logs have always carried.
+    const structured = [
+      ...counters.findings.map((f, i) => ({ kind: 'counter', code: f.code, line: counters.lines[i] })),
+      ...modelFindings.map(f => ({ kind: 'check', check: f.check, line: `CHECK[${f.check}]: ${f.text}` })),
+    ];
+    const all = structured.map(f => f.line);
+    gl.info(label, `Plan check by ${checkModelId || planCheckModel}: ${counters.lines.length} counter finding(s), ${modelFindings.length} model finding(s)`, null, {
+      counterFindings: counters.lines, modelFindings, model: checkModelId, stats: counters.stats, cast: counters.cast,
+    });
+    return { counters, modelFindings, findings: structured, lines: all, checkModelId, prompt, obstacles, reply, rosterLines, wanted, actions };
+  };
+}
+
+function recheckRecord(c) {
+  // ONE shape for a recheck wherever it is recorded — the canonical `recheck`
+  // and a discarded round's sit side by side in the stored report and a reader
+  // must be able to compare them without learning two layouts.
+  return (c ? {
+    counterFindings: c.counters.lines,
+    counterStats: c.counters.stats,
+    modelFindings: c.modelFindings,
+    // The flat rendering (counter lines + `CHECK[n]: …`) the summary prose and
+    // the log line both read, so the record is self-contained and no reader
+    // re-derives it.
+    lines: c.lines,
+    // Same evidence as the first check: an empty `modelFindings` on a RECHECK
+    // is the same two-way ambiguity, and a discarded round's record is where
+    // one would most want to see what the model actually said.
+    reply: c.reply || '',
+    rosterLines: c.rosterLines || [],
+    // THE RECHECK'S OWN PROMPT (2026-09-23). Only the first check's prompt was
+    // stored, so a recheck could be read only by rebuilding it at the run's
+    // commit — a reconstruction, not the bytes sent.
+    prompt: c.prompt || '',
+    wanted: c.wanted || [],
+    actions: c.actions || [],
+  } : null);
+}
+
+/**
+ * The re-plan rounds for a division whose first check raised findings. Pushes
+ * every round onto `replanRounds` (kept and discarded alike) and returns the
+ * division that ships.
+ *
+ * @returns {Promise<{beats: Array, pagePlan: string}>}
+ */
+async function runReplanRounds({ inputData, pageCount, plan, check1, replanRounds, approvedArc, arcHints, arcStoryLogic, arcCentralFigure, castTable, commission, commissionedNames, maxCast, planModel, readPlan, runCheck, onChunk, gl, stage, checkCancellation, labPromptOptions = {}, onCall = null, beats, pagePlan }) {
+  try {
+    // RE-PLAN ROUNDS (2026-09-09). The loop used to be check → re-plan →
+    // recheck → ship: a fault the RE-PLAN ITSELF introduced was named by the
+    // recheck and never fixed. Measured on the dragon story: the first
+    // division buried the spring's release inside a four-action page; the
+    // re-plan correctly split it out and left the new page holding the deed
+    // AND its effect ("rams the branch into the crack, water shoots out").
+    // The recheck said so in those words and the story shipped that way.
+    // A second round runs only when a MUST-FIX finding survives — the
+    // ranking `replanRank` already computes, so an "also noted" line can
+    // never spend a round. Bounded at two re-plans; the plan model is the
+    // cheapest call in the stage and a third round has never been needed.
+    const MAX_REPLAN_ROUNDS = 2;
+    let pendingCheck = check1;
+    // A round must EARN its keep. Measured 2026-09-09 on
+    // job_1788903616404_iqvhj4l8m: round 2 re-wrote 17 of 18 pages to clear
+    // three must-fix findings and minted five new ones (findings 26 -> 13 ->
+    // 23). The planner re-emits the whole division each round, so a round
+    // that does not reduce the must-fix count is not converging — it is
+    // rolling the dice on every page at once. Such a round is DISCARDED and
+    // the previous division stands, which makes the loop monotonic.
+    //
+    // THE COUNT IS THE CAST/FOCAL MUST-FIX COUNT, NOT THE RAW TOTAL
+    // (2026-09-20). Shot-distribution findings are must-fix — the re-plan is
+    // obliged to answer them — but they are exempt from THIS measure
+    // (promptBuilders.REPLAN_CONVERGENCE_EXEMPT_CODES). A shot finding is
+    // cleared by relabelling one page's shot word; a cast or focal finding
+    // costs the book a picture, so a raw total lets cheap shot clears pay for
+    // a lost wanted picture. Measured on job_1789853503332_riqncqg1i, whose
+    // round 2 rewrote 17 of 18 pages, took Q4 wanted-picture findings 2 -> 3
+    // and dropped its Q8 ending, yet read 6 -> 5 on the total because one
+    // ultra-wide finding fell.
+    let bestBeats = beats;
+    let bestPagePlan = pagePlan;
+    // The review's refusals from the round before, told to the next round.
+    let lastRefusals = [];
+    const coverageRule = castCoverage({ pageCount: beats.length, castCount: commission.listed.length });
+    for (let round = 1; round <= MAX_REPLAN_ROUNDS; round++) {
+      await checkCancellation();
+      await stage(5, 'Re-dividing the named pages...', { next: 18, ms: 45000 });
+      // WHAT THIS ROUND MUST KEEP (2026-09-23): the last page, the check's
+      // WANTED and ACTION pages, and a character's only focal page — one list
+      // for the prompt and for the review's `protected` rule below.
+      const keep = replanKeepPages({
+        pageCount: beats.length,
+        wanted: pendingCheck.wanted,
+        actions: pendingCheck.actions,
+        focalPages: (pendingCheck.counters.stats && pendingCheck.counters.stats.focalPages) || {},
+      });
+      const replanPrompt = buildBeatsPrompt(inputData, pageCount, {
+        finalArc: approvedArc,
+        arcHints,
+        storyLogic: arcStoryLogic,
+        centralFigure: arcCentralFigure,
+        castTable,
+        ...labPromptOptions,
+        replan: buildReplanSection(pagePlan, pendingCheck.findings, { pageCount: beats.length, keep, refused: lastRefusals, castFloor: coverageRule ? coverageRule.appearances.min : null, castTable }),
+      });
+      if (!replanPrompt) throw new Error('story-beats template unavailable');
+      const rpRes = await textModels.callTextModelStreaming(replanPrompt, null, onChunk, planModel, { usageLabel: 'beats_replan' });
+      if (onCall) onCall(rpRes);
+      const second = readPlan(rpRes.text);
+      if (second.parsed.pages.length === 0) throw new Error('re-plan returned no parseable plan lines');
+      // DECLARE. The round states each structural change it made — a name in
+      // or out of frame, an action moved or dropped, one page's material
+      // joining another's — with the finding it answers and why. `present:
+      // false` is a round that emitted no block at all: every change it made
+      // is then undeclared, which is the behaviour the merge had before
+      // declarations existed (2026-09-18).
+      const declared = parsePlanChanges(rpRes.text);
+      // A TOTAL IS ALWAYS SELF-CERTIFIABLE: the block re-counts its own lines,
+      // and a count that disagrees with the enumeration is the enumeration's
+      // word against an assertion. The lines win; the discrepancy is reported.
+      if (declared.present && declared.declaredCount != null && declared.declaredCount !== declared.counted) {
+        gl.warn('beats_replan_change_count', `Round ${round}: the change block declares ${declared.declaredCount} change(s) and enumerates ${declared.counted} across ${declared.lines} line(s); the enumeration stands`, null, { round, declared: declared.declaredCount, counted: declared.counted, lines: declared.lines });
+      }
+      // ONE LINE, ONE CHANGE — recorded, not re-asked (2026-09-18). The
+      // parser splits a packed line into its clauses rather than mis-reading
+      // it, so a violation costs the round nothing; it is recorded because a
+      // format nobody polices is not a format. A re-ask is deliberately NOT
+      // wired: both planner models broke the contract on the first live
+      // attempt (Lab 1326: 7 of 10 lines; 1327: 1 of 5), so an automatic
+      // re-ask would buy a paid call on most rounds for a fault the parser
+      // already absorbs.
+      if (declared.violations.length) {
+        const detail = declared.violations.map(v => `p${v.pageNumber} (${v.rule})`).join(', ');
+        log.warn(`⚠️ [BEATS] Round ${round}: ${declared.violations.length} declared change(s) break the change-block format (${detail}) - read clause by clause, not refused`);
+        gl.warn('beats_replan_change_format', `Round ${round}: ${declared.violations.length} declared change(s) break the one-line-one-change format — ${detail}; each was read clause by clause rather than refused`, null, { round, violations: declared.violations });
+      }
+      const unreadable = declared.changes.filter(c => c.kind === 'other');
+      if (unreadable.length) {
+        gl.warn('beats_replan_change_unreadable', `Round ${round}: ${unreadable.length} declared change(s) do not use the declared vocabulary, so nothing reviewed them`, null, { round, lines: unreadable.map(c => c.line.slice(0, 160)) });
+      }
+      // MERGE, don't replace. The re-plan is asked for ONLY the pages a
+      // finding names; every other page stands. Until 2026-09-09 it returned
+      // the whole division, and the planner rewrote 15-18 of 18 pages every
+      // round — which is how a story lost the page where its quest object was
+      // put back (job_1788903616404_iqvhj4l8m: check 9 named the page, the
+      // re-plan answered by deleting the moment, and no check noticed it had
+      // gone). Pages no finding named are restored from the division that
+      // stands, so a round can only change what it was asked to change.
+      const namedPages = new Set();
+      for (const nf of (pendingCheck.findings || [])) for (const n of findingPages(nf)) namedPages.add(Number(n));
+      // A DECLARED PAGE IS IN SCOPE. Splitting a page's second action onto a
+      // picture of its own needs two pages rewritten — the one a finding
+      // named and the neighbour whose number now stages the new moment — and
+      // until 2026-09-18 the merge below restored the neighbour, which made
+      // the split the prompt described structurally impossible. A page the
+      // round DECLARES it changed, with the finding it answers and why, is
+      // asked-for work; a page in neither list is still restored.
+      const declaredPages = new Set();
+      for (const c of declared.changes) {
+        if (Number.isFinite(c.pageNumber)) declaredPages.add(Number(c.pageNumber));
+        if (Number.isFinite(c.toPage)) declaredPages.add(Number(c.toPage));
+        if (Number.isFinite(c.fromPage)) declaredPages.add(Number(c.fromPage));
+      }
+      // When NO finding names a page — a whole-book finding, or a finding whose
+      // page reference could not be read — the re-plan is answering for the
+      // whole division, so every returned page is accepted. The merge still
+      // runs: a page the return omits is filled from the division that stands,
+      // which is what keeps a partial answer from failing the page-count guard
+      // below and having the round discarded without a word.
+      const scopeAll = namedPages.size === 0;
+      {
+        const standing = new Map(beats.map(b => [b.pageNumber, b]));
+        const kept = [];
+        const inScope = n => namedPages.has(Number(n)) || declaredPages.has(Number(n));
+        for (const pg of second.parsed.pages) {
+          if (scopeAll || inScope(pg.pageNumber) || !standing.has(pg.pageNumber)) kept.push(pg);
+          else kept.push(standing.get(pg.pageNumber));
+        }
+        for (const [num, pg] of standing) if (!kept.some(k => k.pageNumber === num)) kept.push(pg);
+        kept.sort((a, b) => a.pageNumber - b.pageNumber);
+        const overridden = scopeAll ? 0 : second.parsed.pages.filter(pg => !inScope(pg.pageNumber) && standing.has(pg.pageNumber)).length;
+        if (overridden > 0) {
+          log.warn(`[BEATS] Round ${round}: the re-plan returned ${overridden} page(s) no finding named and no change declared - restored from the standing division`);
+          gl.warn('beats_replan_unnamed_pages', `Round ${round}: the re-plan rewrote ${overridden} page(s) that no finding named and no change declared; those pages were restored from the division that stands`, null, { round, overridden, named: [...namedPages].sort((a, b) => a - b), declared: [...declaredPages].sort((a, b) => a - b) });
+        }
+        second.parsed.pages = kept;
+        second.parsed.missing = [];
+      }
+      // REVIEW, then APPLY (2026-09-18). A removal is judged, never banned
+      // and never waved through.
+      //
+      // What this replaced: the round was told a removal is never a fix and
+      // `castLostByReplan` mechanically restored every name a re-plan took
+      // out. That rule is one-directional — `NO_COMMISSIONED_ON_PAGE` is
+      // answered by adding, `CAST_OVER_CEILING` by writing a justification
+      // into the line, plan-check Q3 likewise — so an over-crowded page could
+      // only ever get more crowded, and the standing division was treated as
+      // always right when it is itself a model output. Owner's verdict: "we
+      // can not say delete only or add only; we must give a fair review and
+      // allow both fix types."
+      //
+      // Two passes, in this order:
+      //   1. DECLARED changes go to `reviewPlanChanges`, which refuses one
+      //      against declared evidence — the check's own OBSTACLES line for
+      //      that page, the figure's span across the book, the cast ceiling,
+      //      and the page-count balance of a merge and a split. A refusal
+      //      restores that page from the division that stands and the finding
+      //      that named it survives to the recheck; it never discards a round.
+      //   2. UNDECLARED removals — a name gone from a who column with no
+      //      change line saying so — are restored exactly as before. A silent
+      //      deletion is unreviewable: the plan line is the brief's authority,
+      //      so the Art Director loses the figure and the scene review strips
+      //      them by the book (`[cast_not_in_plan]`). On staging
+      //      job_1789681157795_wkt20ckod that cost three CRITICAL and one
+      //      MAJOR IMG fault for an antagonist the page text describes and no
+      //      picture shows, and the only way anyone found it was diffing two
+      //      who-columns after the book was finished.
+      let reviewRefusals = [];
+      {
+        const guardCast = (pendingCheck.counters.cast && pendingCheck.counters.cast.all) || commissionedNames;
+        const guardAliases = (pendingCheck.counters.cast && pendingCheck.counters.cast.aliases) || {};
+        const standing = new Map(beats.map(b => [b.pageNumber, b]));
+        const restore = (pageNumbers) => {
+          const want = new Set(pageNumbers.map(Number));
+          second.parsed.pages = second.parsed.pages.map(pg => (
+            want.has(Number(pg.pageNumber)) && standing.has(pg.pageNumber) ? standing.get(pg.pageNumber) : pg
+          ));
+        };
+
+        const review = reviewPlanChanges({
+          changes: declared.changes,
+          standing: beats,
+          returned: second.parsed.pages,
+          castNames: guardCast,
+          aliases: guardAliases,
+          maxCast,
+          obstacles: pendingCheck.obstacles,
+          focalNames: coverageRule && coverageRule.focalEach ? commission.listed : [],
+          protectedPages: new Map(keep.map(k => [Number(k.page), k.why])),
+          actions: pendingCheck.actions,
+          rankOf: replanRank,
+          // The commissioned span floor the re-plan was told (2026-09-25).
+          castFloor: coverageRule ? { names: commission.listed, min: coverageRule.appearances.min } : null,
+        });
+        reviewRefusals = review.refusals;
+        lastRefusals = review.refusals;
+        if (review.notes.length) {
+          gl.info('beats_replan_change_notes', `Round ${round}: ${review.notes.length} declared change(s) could not be tied to a finding or a cast name`, null, { round, notes: review.notes });
+        }
+        if (review.refusals.length) {
+          restore(review.refusals.map(r => r.pageNumber));
+          const detail = review.refusals.map(r => `p${r.pageNumber} (${r.rule}): ${r.detail}`).join('; ');
+          log.warn(`⚠️ [BEATS] Round ${round}: ${review.refusals.length} declared change(s) refused on review - ${detail}`);
+          gl.warn('beats_replan_change_refused', `Round ${round}: the review refused ${review.refusals.length} declared change(s) — ${detail}; ${review.refusals.length === 1 ? 'that page was' : 'those pages were'} restored from the division that stands`, null, { round, refusals: review.refusals });
+        }
+
+        const lost = castLostByReplan(beats, second.parsed.pages, guardCast, guardAliases, review.declaredOut);
+        if (lost.length) {
+          restore(lost.map(l => l.pageNumber));
+          const detail = lost.map(l => `p${l.pageNumber}: ${l.lost.join(', ')}`).join('; ');
+          log.warn(`⚠️ [BEATS] Round ${round}: the re-plan dropped cast from ${lost.length} page(s) without declaring it (${detail}) - restored from the standing division`);
+          gl.warn('beats_replan_cast_lost', `Round ${round}: the re-plan removed ${detail} from the page plan and declared no change for it; an undeclared removal is unreviewable, so ${lost.length === 1 ? 'that page was' : 'those pages were'} restored from the division that stands`, null, { round, pages: lost, declaredBlock: declared.present });
+        }
+      }
+      // A re-plan that answers "this page holds two actions" by copying a
+      // neighbouring page has destroyed the page, not fixed it. Measured
+      // 2026-09-09 on job_1788903616404_iqvhj4l8m: the page staging the
+      // quest object's return came back as a verbatim duplicate of the page
+      // before it, and the story lost its climax with no check firing.
+      // Two pages with the same instant is corruption, so the round is
+      // discarded and the division that stands is kept.
+      {
+        const instants = second.parsed.pages.map(pg => String(pg.planLine || '').toLowerCase().replace(/\s+/g, ' ').trim());
+        const dupe = instants.find((t, k) => t && instants.indexOf(t) !== k);
+        if (dupe) {
+          log.warn(`[BEATS] Round ${round} returned two pages with the same line - discarding it, the previous division stands`);
+          gl.warn('beats_replan_duplicate', `Round ${round} produced two pages with an identical plan line; the round was discarded and the previous division stands`, null, { round, line: dupe.slice(0, 160) });
+          replanRounds.push({ round, changedPages: [], recheck: null, kept: false, replanPrompt, replanReply: String(rpRes.text || ''), discardReason: 'two pages returned with an identical plan line' });
+          beats = bestBeats;
+          pagePlan = bestPagePlan;
+          break;
+        }
+      }
+      // THE PAGE COUNT IS THE ORDER (2026-09-14). The re-plan may move, split
+      // or merge instants, but a round that returns more or fewer pages than
+      // the division that stands is not a re-division of THIS book: on
+      // job_1789337998754_apslnsq1z an 18-page order came back as 19 plan
+      // lines, passed both guards above (no duplicate, nothing omitted), and
+      // shipped as a 19-page book. Same remedy as the duplicate guard: the
+      // round is discarded and the previous division stands.
+      if (second.parsed.pages.length !== beats.length) {
+        log.warn(`[BEATS] Round ${round} returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book - discarding it, the previous division stands`);
+        gl.warn('beats_replan_page_count', `Round ${round} returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book; the round was discarded and the previous division stands`, null, { round, returned: second.parsed.pages.length, expected: beats.length });
+        replanRounds.push({ round, changedPages: [], recheck: null, kept: false, replanPrompt, replanReply: String(rpRes.text || ''), discardReason: `returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book` });
+        beats = bestBeats;
+        pagePlan = bestPagePlan;
+        break;
+      }
+      if (second.parsed.missing.length > 0) {
+        log.warn(`⚠️ [BEATS] Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — previous division kept`);
+        gl.warn('beats_replan_incomplete', `Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — previous division kept`);
+        replanRounds.push({ round, changedPages: [], recheck: null, kept: false, replanPrompt, replanReply: String(rpRes.text || ''), discardReason: `omitted page(s) ${second.parsed.missing.join(', ')}` });
+        break;
+      }
+      const before = new Map(beats.map(p => [p.pageNumber, p.planLine || '']));
+      const changedThisRound = second.parsed.pages
+        .filter(p => (before.get(p.pageNumber) || '') !== (p.planLine || ''))
+        .map(p => p.pageNumber);
+      beats = second.parsed.pages;
+      // Rebuild the plan TEXT from the merged pages. `second.pagePlan` is the
+      // raw re-plan response, so on any page the merge restored, the string
+      // and the array disagreed — and the string is what every report, every
+      // later reader and the recheck see. Measured 2026-09-09: one page of
+      // eighteen, and it was one of the pages a reviewer then judged against
+      // a line that had never been used. Deriving it from the pages makes the
+      // two representations incapable of diverging.
+      pagePlan = beats.map(pg => `Page ${pg.pageNumber}: ${pg.planLine || ''}`).join(String.fromCharCode(10));
+      gl.info('beats_replan', `Round ${round}: planner re-divided ${changedThisRound.length} page(s) for ${pendingCheck.lines.length} finding(s)`, null, {
+        round, replannedPages: changedThisRound, findings: pendingCheck.lines.length,
+      });
+      const check2 = await runCheck(round === 1 ? 'plan_recheck' : `plan_recheck_r${round}`, beats, pagePlan);
+      // Entered KEPT and demoted below if the round is thrown away, so the
+      // ledger records the round whichever way the verdict goes.
+      const roundRecord = {
+        round,
+        changedPages: changedThisRound,
+        findingsIn: pendingCheck.lines.length,
+        // The re-plan request this round was given, verbatim — the only
+        // prompt in the stage that carries the findings (## MUST FIX / ##
+        // ALSO NOTED). Text, additive, read by nothing.
+        replanPrompt,
+        // The re-plan's reply verbatim (2026-09-23): the stored round kept
+        // only the merged pages and the parsed changes.
+        replanReply: String(rpRes.text || ''),
+        recheck: recheckRecord(check2),
+        kept: true,
+        // WHAT THE ROUND SAID IT DID, AND WHAT THE REVIEW MADE OF IT. Before
+        // 2026-09-18 a removal was recorded nowhere at all — the only way to
+        // find one was diffing two who-columns after the book was finished.
+        // `declaredChanges: null` marks a round that emitted no block.
+        declaredChanges: declared.present ? declared.changes.map(c => c.line) : null,
+        changeRefusals: reviewRefusals,
+      };
+      replanRounds.push(roundRecord);
+      // Every surviving must-fix finding — what the NEXT round is mandated to
+      // answer, and what the ships-as-it-stands warning names.
+      const stillMustFix = (check2.findings || []).filter(f => replanRank(f) === 'must');
+      // The subset the round-keeping decision is made on: cast/focal only.
+      const stillConverging = stillMustFix.filter(countsTowardConvergence);
+      const shotOnly = stillMustFix.length - stillConverging.length;
+      // THE GUARD — every round, round 1 included (owner, 2026-09-24). Until
+      // then `&& round > 1` exempted round 1, and 8 of 32 stored books shipped
+      // a round-1 division with MORE cast/focal must-fix findings than the
+      // division it replaced (job_1790100385959_1nitlympp: 5 → 7). A round
+      // that regresses is discarded on any round; a round 2+ must also reduce
+      // (it is bought only to mop up). See `replanRoundRegressed` for the
+      // measure, which sets aside a model verdict that flips on a page the
+      // round never touched.
+      const verdict = replanRoundRegressed(pendingCheck, check2, changedThisRound, { round });
+      if (verdict.discard) {
+        const noiseNote = verdict.noise.length ? `, ${verdict.noise.length} checker verdict(s) on untouched pages set aside` : '';
+        const detail = `cast/focal must-fix ${verdict.before} → ${verdict.after}${noiseNote}`
+          + ` (${stillMustFix.length} must-fix in total, ${shotOnly} of them shot-distribution, which do not count toward convergence)`;
+        const what = verdict.regressed ? 'raised' : 'did not reduce';
+        log.warn(`⚠️ [BEATS] Round ${round} ${what} the cast/focal must-fix count (${detail}) — discarding it, the previous division stands`);
+        gl.warn('beats_replan_discarded', `Round ${round} ${what} the cast/focal must-fix count (${detail}) — the round was discarded and the previous division stands`, null, {
+          round, before: verdict.before, after: verdict.after, noise: verdict.noise.map(f => f.line),
+          totalMustFixAfter: stillMustFix.length, shotMustFixAfter: shotOnly,
+        });
+        roundRecord.kept = false;
+        roundRecord.discardReason = `${what} the cast/focal must-fix count (${detail})`;
+        beats = bestBeats;
+        pagePlan = bestPagePlan;
+        break;
+      }
+      bestBeats = beats;
+      bestPagePlan = pagePlan;
+      if (stillMustFix.length === 0) break;
+      // A FURTHER ROUND MUST BE MOPPING UP, NOT RE-ROLLING (2026-09-21).
+      //
+      // The planner re-emits the whole division each round, so a round is only
+      // worth buying when the one before it was CONVERGING: strictly fewer
+      // cast/focal must-fix findings than it was given, and not one of them
+      // new. A recheck that names a fault the previous check did not is a
+      // round that moved sideways, and the next round is then re-rolling the
+      // same dice at ~$0.09 and ~160s a throw — which is exactly what the
+      // monotonic discard below then throws away.
+      //
+      // Measured by replaying this test over stored staging
+      // `beatsReviewReport` rows (28 books with a recheck in 45 days, zero
+      // paid calls): 6 rechecks are a strict subset and still buy a round; 22
+      // are not, 10 of them because the recheck minted a new cast/focal
+      // must-fix. Exactly 2 books ever ran a round 2 in that window, this test
+      // would have skipped both, and BOTH were discarded by the convergence
+      // rule below after they ran — i.e. no kept round 2 exists in the window.
+      //
+      // The identity of a finding is its code (a counter) or the check number
+      // that produced it (a model finding) plus the pages it names — never its
+      // prose, which this codebase forbids reading for meaning.
+      {
+        const conv = replanRoundConverged(pendingCheck, check2);
+        if (!conv.converged) {
+          const why = conv.minted.length
+            ? `the recheck names ${conv.minted.length} cast/focal must-fix finding(s) the check before it did not`
+            : `cast/focal must-fix ${conv.given} → ${conv.surviving} is not a reduction`;
+          log.warn(`⚠️ [BEATS] Round ${round} did not converge (${why}) — no further round; the division it produced ships`);
+          gl.info('beats_replan_no_further_round', `Round ${round} did not converge (${why}); no further re-plan round was bought and the division that round produced ships`, null, {
+            round, given: conv.given, surviving: conv.surviving,
+            minted: conv.minted.map(f => f.line),
+          });
+          break;
+        }
+      }
+      if (round === MAX_REPLAN_ROUNDS) {
+        // Ships with the fault named. A division is never withheld from a
+        // paid run over a plan finding (gates are guidelines).
+        log.warn(`⚠️ [BEATS] ${stillMustFix.length} must-fix finding(s) survive ${MAX_REPLAN_ROUNDS} re-plan round(s) — the division ships as it stands`);
+        gl.warn('beats_replan_unfixed', `${stillMustFix.length} must-fix finding(s) survive ${MAX_REPLAN_ROUNDS} round(s): ${stillMustFix.map(f => f.line).join(' | ')}`, null, {
+          rounds: MAX_REPLAN_ROUNDS, unfixed: stillMustFix.map(f => f.line),
+        });
+        break;
+      }
+      pendingCheck = check2;
+    }
+  } catch (err) {
+    // Never block a story on the check: the first division is a complete plan.
+    log.warn(`🚨 [BEATS] Re-plan failed (${err.message}) — the first division ships`);
+    gl.warn('beats_replan_failed', `Re-plan failed: ${err.message} — the first division ships`);
+    beats = plan.pages;
+    // The FIRST division ships, so no round describes what shipped any more —
+    // including a round that had been kept before the failure. They stay on
+    // the ledger as discarded rather than being deleted (diagnostics).
+    for (const r of replanRounds) {
+      if (!r.kept) continue;
+      r.kept = false;
+      r.discardReason = `re-plan failed after this round (${err.message}) — the first division ships`;
+    }
+  }
+  return { beats, pagePlan };
+}
+
+/**
+ * STEP 4 OF THE BEATS PIPELINE — the all-pages Art Director: the page and
+ * cover briefs and the Visual Bible in one call (two attempts), the bible's
+ * adoption (label round, the invented-child age clamp, the transcript sync),
+ * the landmark photo link, the wardrobe-vs-bible corrections, the caller's
+ * bible hook and the per-page fallback for pages the batch still owes. Moved
+ * verbatim out of generateStoryViaBeats on 2026-09-27 so the Test Lab
+ * beats_scenes stage runs the Art Director production runs (owner: "The Lab
+ * must use 100% identical code to production"); the stage used to
+ * re-implement the batch retry, the recovery and the bible adoption.
+ *
+ * `labCallOptions` (the Lab's reasoning A/B), `labForcePerPage` (the historical
+ * per-page comparison) and `onCall` are Test Lab knobs; the run passes none.
+ *
+ * @returns {Promise<{expansions: Array, visualBible: object|null, bibleSections: string|null, wardrobeBibleReport: object|null, sceneExpansionReport: object, briefBeats: Array, coverBeats: Array}>}
+ */
+async function runArtDirector({ inputData, modelOverrides, clothingRequirements, visualBible, bibleSections, sceneModel, onChunk, gl, meta, stage, beats, arcCentralFigure, approvedArc, onVisualBible = null, wardrobeBibleReport = null, labCallOptions = {}, labForcePerPage = false, onCall = null }) {
+  const lang = inputData.language || 'en';
+  const imgModelConfig = IMAGE_MODELS[modelOverrides.imageModel || inputData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageRenderImage];
+  const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters || [], clothingRequirements);
+  const maxCharactersPerScene = imgModelConfig?.maxCharactersPerScene || 3;
+
+  /**
+   * Per-page expansion — the fallback for pages the single call omitted, and
+   * the only remaining user of the per-page scene-expansion.txt template here.
+   */
+  async function expandOnePage(b) {
+    // The PLAN line stands in for page.text: in a beats-first run the text
+    // does not exist yet, so the Art Director works from the locked plan.
+    const pageContent = `PLAN: ${b.planLine || ''}`;
+    const prompt = buildSceneExpansionPrompt(
+      b.pageNumber, pageContent, inputData.characters || [], lang,
+      visualBible, availableAvatars, null,
+      {
+        maxCharactersPerScene,
+        artStyleId: inputData.artStyle,
+        imageBackend: imgModelConfig?.backend,
+        // No referencePhotos exist at this stage, so the contract is the only
+        // outfit source — same reason the all-pages builder needs it.
+        clothingRequirements,
+        // Decides whether the text-zone rule family is asked for at all.
+        story: inputData,
+      }
+    );
+    let lastErr = null;
+    // The best incomplete brief seen, kept as the last resort. A page with half
+    // a spec still beats a page with none: this fallback's throw ABORTS the run
+    // (Promise.all over the missing pages), and a contract miss must never end a
+    // paid run (docs/SETTLED.md, gates are guidelines).
+    let salvage = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        // Own usage label (2026-08-31): fallback pages used to book under
+        // 'beats_scene_expansion' like the batch call, so a truncated batch
+        // plus silent per-page recovery was invisible in the usage summary
+        // (job_1788123310558: 6 calls under one label, no way to tell 1
+        // batch + 5 fallbacks from 6 batches).
+        const res = await textModels.callTextModelStreaming(prompt, null, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion_fallback', ...labCallOptions });
+        if (onCall) onCall(res);
+        if (!res || !res.text || !res.text.trim()) throw new Error('empty scene brief');
+        // Same contract as the batch merge above — a recovery that itself comes
+        // back cut is not a recovery. The second attempt is the retry; if both
+        // are cut the throw below names why, instead of storing half a spec.
+        const { assessSceneBrief, describeSceneBrief } = require('./iterateBriefGuard');
+        const verdict = assessSceneBrief(res.text);
+        if (!verdict.usable) {
+          if (!salvage) salvage = { pageNumber: b.pageNumber, brief: res.text, prompt, modelId: res.modelId || sceneModel, verdict };
+          throw new Error(`incomplete scene brief — ${describeSceneBrief(verdict)}`);
+        }
+        return { pageNumber: b.pageNumber, brief: res.text, prompt, modelId: res.modelId || sceneModel };
+      } catch (err) {
+        lastErr = err;
+        log.warn(`⚠️ [BEATS] Scene expansion page ${b.pageNumber} attempt ${attempt} failed: ${err.message}`);
+      }
+    }
+    if (salvage) {
+      const { describeSceneBrief } = require('./iterateBriefGuard');
+      const why = describeSceneBrief(salvage.verdict);
+      log.error(`🚨 [BEATS] Page ${b.pageNumber}: both per-page attempts returned an incomplete brief (${why}) — SHIPPING IT ANYWAY; every metadata-driven supervisor runs blind on this page`);
+      gl.warn('beats_scene_brief_incomplete', `Page ${b.pageNumber} ships with an incomplete brief after two per-page attempts — ${why}`, null, { pages: [b.pageNumber] });
+      return { pageNumber: salvage.pageNumber, brief: salvage.brief, prompt: salvage.prompt, modelId: salvage.modelId };
+    }
+    throw new Error(`Scene expansion failed for page ${b.pageNumber}: ${lastErr?.message || 'unknown error'}`);
+  }
+
+  let t = Date.now();
+  // COVERS ARE PAGES (owner, 2026-09-24). Each cover the job renders is a page
+  // whose BEAT code writes (coverBeats.js: purpose, cast, costumes, the landmark
+  // rule, the element budget, gaze and the copy space), briefed by the Art
+  // Director with every other page and reviewed with them. They ride AFTER the
+  // story pages, so the story's own page order is untouched, and they never
+  // reach the page text writer or the plan counters — `beats` stays the story.
+  const { buildCoverBeats, isCoverPage } = require('./coverBeats');
+  const { coverTypesFor } = require('./coverKeys');
+  const coverBeats = buildCoverBeats(inputData, { coverTypes: coverTypesFor(inputData), clothingRequirements, centralFigure: arcCentralFigure });
+  const briefBeats = [...beats, ...coverBeats];
+  const beatPageNumbers = briefBeats.map(b => b.pageNumber);
+  let expansions = [];
+  // The Visual Bible the Art Director emits ahead of page 1.
+  let adBible = null;
+  // THE REPLY AS RETURNED, one row per all-pages attempt (2026-09-23). Only
+  // parsed parts were stored — the briefs, and the bible after the post-review
+  // usage rebuild and every sync had rewritten it — so the prompt audit of
+  // staging job_1790100385959_1nitlympp compared the checker's page table with
+  // the REBUILT one, took it for the Art Director's, and reported a mutation
+  // that never happened. Stored beside the prompt in sceneExpansionReport.
+  const adReplies = [];
+  // No rulings travel here any more (2026-09-01): the beats reviewer that
+  // produced them is gone, and the plan check never rules on anything — it
+  // counts, and the planner re-divides. CARRY_ROUTES stays for the Lab.
+  // labForcePerPage (Test Lab only): the historical per-page comparison runs
+  // every page through the per-page fallback below. The run never passes it.
+  const allPrompt = labForcePerPage ? null : buildSceneExpansionAllPrompt(inputData, briefBeats, {
+      availableAvatars,
+      maxCharactersPerScene,
+      // The whole story, read-only, for the Art Director's judgment — it
+      // stages only what each page's beat and plan line carry.
+      finalArc: approvedArc,
+      // The Art Director needs the outfit TEXT, not just the category key — see
+      // buildSceneExpansionAllPrompt. In beats mode the visual contract is the
+      // only source, and it is resolved by the time scenes are expanded.
+      clothingRequirements,
+  });
+  if (!allPrompt) {
+    log.error(labForcePerPage ? '🧪 [BEATS] Test Lab per-page comparison — every page expanded per-page' : '🚨 [BEATS] scene-expansion-all template unavailable — falling back to per-page expansion for every page');
+    gl.warn('beats_scene_expansion_fallback', 'All-pages template unavailable — every page expanded per-page (no cross-page continuity)');
+  } else {
+    // Output is `## Page N` + prose + METADATA per page — the same shape the
+    // scene review returns, so the review's parser reads it unchanged.
+    // Two attempts at the full batch (2026-08-31): the call already asks for
+    // the model's full maxOutputTokens (maxTokens=null), but an incomplete
+    // parse — the truncation signature — used to drop straight to the
+    // per-page fallback with no batch retry and no stored warning until the
+    // shortfall guard below. job_1788123310558 lost pages 12-16 that way
+    // (gemini-3.1-pro's configured cap was 16384; raised in models.js).
+    // First attempt's pages win the merge so a retry can only FILL gaps,
+    // never rewrite pages already parsed.
+    let allModelId = sceneModel;
+    const byPage = new Map();
+    await stage(30, 'Writing the visual bible and the scene briefs...', { next: 42, ms: 176000 });
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      let allRaw = '';
+      try {
+        const res = await textModels.callTextModelStreaming(allPrompt, null, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion', ...labCallOptions });
+        if (onCall) onCall(res);
+        allRaw = res?.text || '';
+        allModelId = res?.modelId || sceneModel;
+        adReplies.push({ attempt, modelId: allModelId, text: allRaw });
+      } catch (err) {
+        log.error(`🚨 [BEATS] All-pages scene expansion attempt ${attempt} failed (${err.message}) — falling back to per-page expansion`);
+        gl.warn('beats_scene_expansion_failed', `All-pages call failed on attempt ${attempt}: ${err.message} — falling back to per-page expansion`);
+        break;
+      }
+      // THE BIBLE RIDES IN FRONT of page 1 (2026-09-11). A response is only
+      // whole when BOTH halves parsed: a partial bible must never ship, and
+      // JSON.parse is the completeness test — a reply cut mid-JSON yields null
+      // here, not half a bible, and the retry below is the recovery.
+      if (!adBible) {
+        const sections = extractBibleSections(allRaw, AD_BIBLE_MARKERS);
+        const parsedVb = sections ? new UnifiedStoryParser(sections.body).extractVisualBible() : null;
+        if (sections && parsedVb) {
+          adBible = { body: sections.body, visualBible: parsedVb, found: sections.found, modelId: allModelId };
+        } else if (sections) {
+          log.error(`🚨 [BEATS] All-pages attempt ${attempt}: ---VISUAL BIBLE--- present but its JSON did not parse (${sections.body.length} chars) — treating the bible as MISSING rather than shipping a partial one`);
+        } else {
+          log.error(`🚨 [BEATS] All-pages attempt ${attempt}: response carries no ---VISUAL BIBLE--- section (${allRaw.length} chars)`);
+        }
+      }
+      const parsed = parseRefinedText(allRaw, beatPageNumbers, 'SCENES', BRIEF_TRAILING_MARKERS);
+      // A PAGE IS NOT A BRIEF. parseRefinedText accepts any non-empty run of
+      // text under a `## Page N` heading, so a page the reply cut mid-sentence
+      // counted as delivered: no retry, no fallback, no warning — the generator
+      // rendered half a spec and the eval judged it against that same half.
+      // Measured once in 955 staging pages (job_1789207854566_l43qgl34w p7).
+      // Incomplete pages are simply not merged, which hands them to the retry
+      // above and the per-page fallback below — the recovery that already
+      // exists. The verdict is the one the iterate round already uses
+      // (iterateBriefGuard.js), built from this very page: prose, parseable
+      // metadata, a sceneIntent. Measured over 1035 stored beats briefs / 85
+      // staging stories it rejects 4 — p7, and three August pages that predate
+      // sceneIntent. No current story loses a page to it.
+      const { partitionSceneBriefs, describeSceneBrief } = require('./iterateBriefGuard');
+      const { whole, cut, formatWide } = partitionSceneBriefs(parsed.pages);
+      for (const p of (formatWide ? cut : whole)) {
+        if (!byPage.has(p.pageNumber)) byPage.set(p.pageNumber, p.text);
+      }
+      if (formatWide) {
+        log.error(`🚨 [BEATS] All-pages attempt ${attempt}: not one of the ${cut.length} brief(s) meets the brief contract (${describeSceneBrief(cut[0].verdict)}) — accepting them as written rather than re-expanding the whole book`);
+        gl.warn('beats_scene_brief_contract_missed', `No scene brief in the all-pages reply meets the brief contract (${cut.length} page(s), first: ${describeSceneBrief(cut[0].verdict)}) — briefs ship as written and every metadata-driven supervisor runs blind`);
+      } else if (cut.length > 0) {
+        const detail = cut.sort((a, b) => a.pageNumber - b.pageNumber)
+          .map(p => `p${p.pageNumber} (${describeSceneBrief(p.verdict)})`).join('; ');
+        const pages = cut.map(p => p.pageNumber);
+        log.error(`🚨 [BEATS] All-pages attempt ${attempt}: incomplete brief(s) — ${detail} — treating them as NOT delivered`);
+        gl.warn('beats_scene_brief_incomplete', `Brief(s) for page(s) ${pages.join(', ')} came back incomplete — ${detail}. Not accepted; re-expanded instead`, null, { pages });
+      }
+      if (briefBeats.every(b => byPage.has(b.pageNumber)) && adBible) break;
+      if (attempt === 1) {
+        const missingNow = briefBeats.filter(b => !byPage.has(b.pageNumber)).map(b => b.pageNumber);
+        const what = [
+          missingNow.length ? `missing page(s) ${missingNow.join(', ')}` : null,
+          adBible ? null : 'no parseable Visual Bible',
+        ].filter(Boolean).join(' and ');
+        log.error(`🚨 [BEATS] All-pages expansion incomplete: ${byPage.size}/${briefBeats.length} briefs parsed, ${what} — retrying the batch ONCE at full cap`);
+        gl.warn('beats_scene_expansion_truncated', `All-pages call returned ${byPage.size}/${briefBeats.length} briefs, ${what} — retrying the batch once at full output cap`);
+      }
+    }
+    expansions = briefBeats
+      .filter(b => byPage.has(b.pageNumber))
+      .map(b => ({ pageNumber: b.pageNumber, brief: byPage.get(b.pageNumber), prompt: allPrompt, modelId: allModelId }));
+  }
+
+  // ── Adopt the Art Director's Visual Bible ─────────────────────────────────
+  // Runs BEFORE the per-page fallback below, so a recovered page is expanded
+  // against the same bible the batch wrote, and before the scene review and the
+  // page text, so the landmark-shortfall hook can still abort attempt 1 cheaply.
+  //
+  // With no parseable bible at all the run is degraded exactly as a failed
+  // bible stage used to be — empty VB, no cover hints, blind per-page briefs —
+  // and says so loudly. It is never a kill: a contract miss must not end a paid
+  // run (docs/SETTLED.md, gates are guidelines).
+  if (adBible) {
+    visualBible = adBible.visualBible;
+    let bibleBody = adBible.body;
+
+    // An invented child the bible declares a PEER of the commissioned children
+    // must state an age inside their band. The band went into the prompt above;
+    // this is the deterministic post-check over what came back — no model call,
+    // no classification, it reads the bible's own `peer` field and compares a
+    // number. Fail-soft: clamp to the nearest tolerated edge, flag the entry,
+    // warn. No retry loop and never a kill — an age constraint must not be able
+    // to end a paid run. Evidence: job_1788641639919_mpjwlzkf1, CHR001 "The boy
+    // in the striped scarf" stated ten next to a commissioned 6-year-old,
+    // rendered 11-12 on p5.
+    // ONE authored English label per element, enforced the moment the bible is
+    // adopted — BEFORE the clamp, so the clamp's own sync carries the labels
+    // too. Its own sync below runs regardless, so the projection never depends
+    // on whether the clamp fired.
+    const labelRound = await runVisualBibleLabelRound(visualBible, {
+      model: sceneModel, language: inputData.language, gl, log, stageReport: meta,
+    });
+    if (labelRound.findings > 0) {
+      const synced = syncVisualBibleSection(bibleBody, visualBible);
+      if (synced === bibleBody) {
+        log.warn('⚠️ [BEATS] Element labels could not be written back into the transcript — downstream re-parses will read the UNLABELLED bible');
+        gl.warn('beats_vb_sync_failed', 'Element labels could not be written back into the transcript — stored bible will not reflect them');
+      } else {
+        bibleBody = synced;
+      }
+    }
+
+    const childBand = visualBible?.secondaryCharacters?.length
+      ? commissionedChildBand(inputData.characters || [])
+      : null;
+    if (childBand) {
+      const ageClamps = applySecondaryAgeBand(visualBible.secondaryCharacters, childBand, buildCharacterDescription);
+      for (const a of ageClamps) {
+        log.warn(`⚠️ [BEATS] ${a.detail} — clamped to ${a.clampedTo}`);
+        gl.warn('beats_secondary_age_clamped', `${a.name} was ${a.statedAge} beside commissioned children ${childBand.min}-${childBand.max}; clamped to ${a.clampedTo}`, null, {
+          id: a.id, statedAge: a.statedAge, clampedTo: a.clampedTo, bandLow: childBand.low, bandHigh: childBand.high,
+        });
+      }
+      // ONE SOURCE OF TRUTH. The clamp mutated this module's parsed copy only;
+      // the transcript is what every later reader re-parses (storyJobPipeline,
+      // resume, the Lab). Write the mutated fields back so every
+      // extractVisualBible() from here on agrees.
+      if (ageClamps.length > 0) {
+        const synced = syncVisualBibleSection(bibleBody, visualBible);
+        if (synced === bibleBody) {
+          log.warn('⚠️ [BEATS] Age clamp could not be written back into the transcript — downstream re-parses will read the UNCLAMPED bible');
+          gl.warn('beats_vb_sync_failed', 'Age clamp could not be written back into the transcript — stored bible will not reflect it');
+        } else {
+          bibleBody = synced;
+        }
+      }
+    }
+
+    // Append to the wardrobe transcript: CLOTHING REQUIREMENTS, VISUAL BIBLE.
+    bibleSections = bibleSections ? `${bibleSections.trimEnd()}
+
+${bibleBody}` : bibleBody;
+
+    const vbCount = Object.values(visualBible).reduce((n, v) => n + (Array.isArray(v) ? v.length : 0), 0);
+    gl.info('beats_visual_bible', `Visual Bible by ${adBible.modelId || sceneModel}: ${vbCount} entr(ies), written with the page briefs`, null, {
+      vbEntries: vbCount, sections: adBible.found,
+    });
+  } else if (allPrompt) {
+    log.error('🚨 [BEATS] All-pages call produced NO parseable Visual Bible after both attempts — story ships with an empty bible and blind briefs');
+    gl.warn('beats_visual_bible_missing', 'The Art Director returned no parseable Visual Bible — story ships with an empty bible');
+  }
+
+  // The page images need each real landmark's PHOTO VARIANTS on the bible entry
+  // (the resolver serves the photo a vantage's `landmarkPhoto` cites). The Art
+  // Director already cited its photos from the numbered PHOTOS lists in
+  // {AVAILABLE_LANDMARKS_SECTION}; these two steps link what it chose to the
+  // index rows. Both are cheap (in-memory matching; one DB query) and
+  // idempotent, so the caller repeating them costs nothing.
+  if (visualBible) {
+    try {
+      if (inputData.availableLandmarks?.length) {
+        require('./visualBible').linkPreDiscoveredLandmarks(visualBible, inputData.availableLandmarks);
+      }
+      await require('./landmarkPhotos').loadLandmarkPhotoDescriptions(visualBible);
+      const realLandmarks = (visualBible.locations || []).filter(l => l.isRealLandmark);
+      if (realLandmarks.length > 0) {
+        const withVariants = realLandmarks.filter(l => l.photoVariants?.length).length;
+        log.info(`🌍 [BEATS] Landmark photo variants linked: ${withVariants}/${realLandmarks.length} real landmark(s) carry variants`);
+      }
+    } catch (err) {
+      log.warn(`⚠️ [BEATS] Landmark linking/variants did not load: ${err.message}`);
+    }
+  }
+
+  // ── Wardrobe contract vs Visual Bible ────────────────────────────────────
+  // The two describe the same body and nothing compared them: a costume line
+  // could put a hat on a character the bible already dresses with a different
+  // one, on every page she appears (staging job_1789420511893_zly5rcdej,
+  // ART002). The contract owns garment wording (owner, 2026-09-23): a linked
+  // entry naming the SAME garment takes the contract's words (`adopt`). A
+  // DIFFERENT garment in an occupied slot (`conflict`) becomes a new OUTFIT
+  // VERSION on the bible entry (owner, 2026-09-24) — the contract is never
+  // touched and no avatar is re-rendered; the page that needs the garment
+  // selects the version, which gets its own sheet (wardrobeVariants, after the
+  // scene briefs exist). Contained like every other check: a throw ships the
+  // contradiction rather than killing the run, but never silently.
+  if (visualBible && clothingRequirements && Object.keys(clothingRequirements).length > 0) {
+    try {
+      const { applyWardrobeBibleCorrections } = require('./clothingCheck');
+      const { findings, applied, versions, unresolved } = applyWardrobeBibleCorrections(clothingRequirements, visualBible);
+      // `applied` / `versions` hold RE-DERIVED finding objects (the corrector
+      // re-checks after every change), so identity comparison against
+      // `findings` is always false. Compare on what identifies a finding.
+      const correctionKey = (f) => `${f.character} ${f.category} ${f.slot} ${f.elementId || ''}`;
+      const appliedKeys = new Set([...applied, ...versions].map(correctionKey));
+      if (findings.length > 0) {
+        wardrobeBibleReport = {
+          conflicts: findings.map(f => ({
+            kind: f.kind, character: f.character, category: f.category, slot: f.slot,
+            elementId: f.elementId, elementLabel: f.elementLabel, elementText: f.elementText,
+            wardrobeClause: f.wardrobeClause, corrected: appliedKeys.has(correctionKey(f)),
+          })),
+        };
+        if (versions.length > 0) {
+          wardrobeBibleReport.versions = versions.map(f => ({
+            character: f.character, category: f.category, slot: f.slot, elementId: f.elementId,
+            replaces: f.wardrobeClause, garment: f.elementText, outfit: f.versionOutfit,
+          }));
+        }
+        gl.warn('beats_wardrobe_bible_conflict', `${findings.length} wardrobe/bible disagreement(s): ${findings.map(f => `${f.kind} ${f.character}/${f.slot} "${f.wardrobeClause}" vs ${f.elementId || '?'} "${f.elementLabel}"`).join('; ')}`, null, {
+          conflicts: wardrobeBibleReport.conflicts,
+        });
+        if (unresolved.length > 0) {
+          wardrobeBibleReport.unresolved = unresolved.map(f => ({
+            kind: f.kind, character: f.character, category: f.category, slot: f.slot,
+            elementId: f.elementId, elementLabel: f.elementLabel, wardrobeClause: f.wardrobeClause,
+          }));
+        }
+      }
+    } catch (err) {
+      log.error(`🚨 [BEATS] Wardrobe-vs-bible check failed: ${err.message} — a contract/bible contradiction would ship unnoticed`);
+    }
+  }
+
+  // Deliberately OUTSIDE every try/catch above: a throw from the caller's hook
+  // must abort the run (the landmark-shortfall retry uses exactly that), not be
+  // swallowed into "ships with an empty bible".
+  if (onVisualBible && visualBible) await onVisualBible(visualBible);
+
+  // Page-count guard: a short response must never ship a story with pages that
+  // have no brief. Only the MISSING pages are re-expanded per-page.
+  const missingBriefs = briefBeats.filter(b => !expansions.some(x => x.pageNumber === b.pageNumber));
+  if (missingBriefs.length > 0) {
+    log.error(`🚨 [BEATS] All-pages expansion returned ${expansions.length}/${briefBeats.length} briefs — re-expanding page(s) ${missingBriefs.map(b => b.pageNumber).join(', ')} per-page`);
+    gl.warn('beats_scene_expansion_incomplete', `All-pages call returned ${expansions.length}/${briefBeats.length} briefs — page(s) ${missingBriefs.map(b => b.pageNumber).join(', ')} expanded per-page`);
+    const recovered = await Promise.all(missingBriefs.map(expandOnePage));
+    expansions = expansions.concat(recovered).sort((a, b) => a.pageNumber - b.pageNumber);
+  }
+  meta.timings.sceneExpansionMs = Date.now() - t;
+
+  // THE PROMPT THAT WROTE THE BRIEFS (2026-09-19).
+  //
+  // `sceneReviewReport.prompt` is the REVIEWER's prompt. The Art Director's own
+  // — ~100k chars of rules, the Visual Bible spec, the cover spec and all 18
+  // plan lines — was stored nowhere, so recovering it for
+  // job_1789759147125_p08djwhbl meant a git worktree at the run's commit plus a
+  // rebuild from inputData + finalArc + pagePlan + clothingRequirements +
+  // characterAvatars. Worse, WHICH commit to rebuild at was only decidable by
+  // probing the stored review prompt for a constant a candidate commit had
+  // introduced. The beats planner got `plannerPrompt` the same day; this is the
+  // same gap one stage later.
+  //
+  // Rolled up by DISTINCT prompt rather than one copy per page: the all-pages
+  // call normally covers every page in one row, and a page that fell back to the
+  // per-page template keeps its own prompt in a row of its own. Storing it per
+  // page would mean eighteen copies of the same 100k string.
+  //
+  // Written HERE, not into sceneReviewReport: that object is assigned only
+  // inside the branch where the review template loaded, so a run that shipped
+  // briefs unreviewed — precisely the run worth inspecting — would carry no
+  // prompt at all.
+  // `prompts[]` is NOT built here. The prompt table is one story-wide object
+  // that every page references (server/lib/storyShape.js), so it has exactly
+  // one builder — `rollUpScenePrompts()`, called by the caller over the
+  // assembled scenes, which covers the unified (non-beats) path with the same
+  // code. This report carries only what beats alone knows.
+  const sceneExpansionReport = {
+    durationMs: meta.timings.sceneExpansionMs,
+    fallbackPages: missingBriefs.map(b => b.pageNumber),
+    replies: adReplies,
+  };
+
+  gl.info('beats_scenes', `${expansions.length} scene briefs expanded by ${sceneModel} in one call${missingBriefs.length ? ` (+${missingBriefs.length} per-page fallback)` : ''} (${(meta.timings.sceneExpansionMs / 1000).toFixed(1)}s)`, null, {
+    pages: expansions.length, fallbackPages: missingBriefs.map(b => b.pageNumber), model: sceneModel,
+  });
+
+  return { expansions, visualBible, bibleSections, wardrobeBibleReport, sceneExpansionReport, briefBeats, coverBeats };
+}
+
+/**
+ * STEP 4 OF THE BEATS PIPELINE — the ONE review over all scene briefs (the
+ * covers included), its mechanical clothing and brief checks, the fed-back
+ * worn-state round and every post-review guard. Moved verbatim out of
+ * generateStoryViaBeats on 2026-09-27 so the Test Lab scene_review_replay
+ * stage runs the review production runs (owner: "The Lab must use 100%
+ * identical code to production").
+ *
+ * Mutates `expansions` (each reviewed brief) and `visualBible` (the review's
+ * bible corrections), exactly as the inline code did. `labPromptOptions`
+ * ({ template }) and `onCall` are Test Lab knobs; the run passes neither.
+ *
+ * @returns {Promise<{sceneReviewReport: object|null, sceneReviewAnalysis: string, sceneReviewFailed: string|null, bibleSections: string, clothingBefore: Array}>}
+ */
+async function runSceneReview({ inputData, expansions, clothingRequirements, visualBible, briefBeats, beats, bibleSections, meta, sceneReviewModel, stage, onChunk, gl, labPromptOptions = {}, onCall = null }) {
+  let t = Date.now();
+  let sceneReviewAnalysis = '';
+  // Set when the review reply was truncated (textReplyGuard.js): the briefs
+  // shipped unreviewed and the report says so instead of "rewrote nothing".
+  let sceneReviewFailed = null;
+  // Same contract as beatsReviewReport above: null only when the review never
+  // ran; an object with empty pages[] when it ran and rewrote nothing.
+  let sceneReviewReport = null;
+  // What the review's optional ---VISUAL BIBLE--- section changed, so the next
+  // story proves the channel ran (the labelRound lesson).
+  let bibleCorrections = null;
+  // The bible as the reviewer was handed it, kept only when its corrections
+  // changed it (sceneReviewReport.visualBibleIn) — a replay of the review
+  // needs this bible, and the stored one carries the corrections.
+  let visualBibleIn = null;
+  let castRemovalsDeclared = null;
+  let castRemovalAudit = [];
+  // Mechanical clothing faults, computed here and handed to the review — the
+  // ONE place they get fixed (owner decision 2026-08-08). Free: no API call, no
+  // image. Only the findings measured to carry signal are rendered
+  // (outfit_misattributed, removal_unstated); see clothingCheck.js.
+  let clothingFindings = '';
+  let clothingByPage = null;
+  let clothingBefore = [];
+  let clothingUnfixedList = [];
+  // Worn-item states the fed-back round could not get declared. The pages ship
+  // flagged; wornItems.js then defaults them to "worn" (decisions.md 2026-09-06).
+  let wornUnresolved = [];
+  let wornUnresolvedPages = [];
+  let wornRound = null;
+  let briefUnfixedList = [];
+  let briefIntroducedList = [];
+  // The two REWRITE-UNTIL-ZERO types (owner, 2026-09-08): a page declaring two
+  // actions, and a page over the three-element budget. What this adds is a
+  // VISIBLE verdict when they survive the single review round — page numbers per type,
+  // and for the budget which pages the brief itself could not have fixed
+  // (the bible's `appearsInPages` places elements the brief never cited, and
+  // objectsAsked ≤ 3 means the reviewer had nothing left to withdraw).
+  // Null when both types ended at zero. Never kills the run.
+  let rewriteToZeroUnfixed = null;
+  try {
+    const { checkScenes, renderFindingsBlock } = require('./clothingCheck');
+    const checkPages = expansions.map(x => {
+      const meta = extractSceneMetadata(x.brief) || {};
+      return {
+        pageNumber: x.pageNumber,
+        prose: splitBrief(x.brief).prose,
+        cast: (meta.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
+        perCharClothing: meta.characterClothing || {},
+        // Structured worn-item states (server/lib/wornItems.js) — removal_unstated
+        // is a MISSING-FIELD fault since 2026-09-06, not a prose search.
+        wornItems: meta.wornItems || [],
+      };
+    });
+    const res = checkScenes(checkPages, clothingRequirements, { artifacts: (visualBible || {}).artifacts, visualBible });
+    clothingBefore = res.findings;
+    clothingByPage = res.byPage;
+    clothingFindings = renderFindingsBlock(res.byPage);
+    if (clothingFindings) {
+      const pages = [...res.byPage.keys()].sort((a, b) => a - b).join(', ');
+      log.info(`👕 [BEATS] clothing check: ${res.findings.length} finding(s) on page(s) ${pages} — sent to the scene review`);
+      gl.info('beats_clothing_check', `Clothing check found ${res.findings.length} fault(s) on page(s) ${pages}`, null, { findings: res.findings });
+    }
+  } catch (ccErr) {
+    log.warn(`⚠️ [BEATS] clothing check failed (${ccErr.message}) — review runs without findings`);
+  }
+
+  // Brief contradictions — prose vs the brief's own metadata. Same place, same
+  // deal as the clothing faults above: deterministic, free, and handed to the
+  // review rather than auto-repaired (owner decision 2026-08-11 — the reviewer
+  // authored both halves; we must not invent a figure nobody wrote).
+  let briefFindings = '';
+  // The plan line rides along for the element-coverage check: it is the page's
+  // authority on what is in the picture, and the brief's objects[] is the only
+  // route by which any of it reaches the illustrator. Hoisted — the re-check
+  // after the review must compare against the same lines.
+  const planLineOf = (pageNumber) => (briefBeats.find(b => b && b.pageNumber === pageNumber) || {}).planLine || '';
+  // Hoisted for the post-review re-check below, which needs the same cast list
+  // and the pre-review fault set to tell a SURVIVING fault from an INTRODUCED one.
+  let briefCastNames = [];
+  const briefBeforeByPage = new Map();
+  let briefBefore = [];
+  try {
+    const { checkScenes: checkBriefs, renderFindingsBlock: renderBriefBlock } = require('./sceneBriefCheck');
+    // Secondary characters belong in this list too. `inputData.characters` is the
+    // UPLOADED main cast, so a figure the story invents (a mermaid, a shopkeeper)
+    // could never trigger cast_unlisted, and briefFindings came back empty on
+    // every story we looked at. Verified on staging job_1786743927715_kcx0p939w:
+    // the brief's prose describes Lira in full on p3/p4/p9 while its own
+    // characters[] lists only Emma and Noah — three findings the review never saw.
+    // Secondaries are the likeliest omission, since no avatar pipeline forces
+    // them into metadata. Characters only — animals stay out (owner call
+    // 2026-08-16). NOTE: this does not cover the OTHER shape of the same
+    // symptom — job_1786737619634_d66c7bg9g p4 declared Lira correctly in the
+    // brief, and she was dropped later from the stored per-page cast — so the
+    // visual-bible `pages` fallback is still load-bearing for that case.
+    const secondaryList = Array.isArray(visualBible?.secondaryCharacters)
+      ? visualBible.secondaryCharacters
+      : Object.values(visualBible?.secondaryCharacters || {});
+    const seenCast = new Set();
+    const castNames = [
+      ...(inputData.characters || []).map(c => c && c.name),
+      ...secondaryList.map(c => c && c.name),
+    ].filter(Boolean).filter((n) => {
+      const k = String(n).trim().toLowerCase();
+      if (!k || seenCast.has(k)) return false;
+      seenCast.add(k);
+      return true;
+    });
+    briefCastNames = castNames;
+    const res = checkBriefs(
+      expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief, planLine: planLineOf(x.pageNumber) })),
+      castNames,
+      visualBible,
+      { textZoneRules: textZoneRulesActive(inputData) }
+    );
+    for (const [pn, list] of res.byPage) briefBeforeByPage.set(pn, new Set(list.map(f => f.type)));
+    // The findings THEMSELVES, not only their types: the post-review verdict is
+    // briefCorrection.judgeCorrection, the same partition the rewrite path now
+    // runs, and it keys a finding by (page, type). Page 0 is the whole-book
+    // tally and is reported on its own line, so it stays out of both sides.
+    {
+      const { REVIEWABLE: R } = require('./sceneBriefCheck');
+      briefBefore = res.findings.filter(f => f && R.has(f.type) && f.pageNumber !== 0);
+    }
+    briefFindings = renderBriefBlock(res.byPage);
+    if (briefFindings) {
+      // Count only what the block actually carries — diagnostic-only types stay
+      // out of the log line, or it claims to have sent what it withheld.
+      const { REVIEWABLE } = require('./sceneBriefCheck');
+      const sent = res.findings.filter(fd => REVIEWABLE.has(fd.type));
+      const pages = [...new Set(sent.map(fd => fd.pageNumber))].sort((x, y) => x - y).join(', ');
+      log.info(`🧩 [BEATS] brief check: ${sent.length} contradiction(s) on page(s) ${pages} — sent to the scene review`);
+      gl.info('beats_brief_check', `Brief check found ${sent.length} contradiction(s) on page(s) ${pages}`, null, { findings: sent });
+    }
+  } catch (bcErr) {
+    log.warn(`⚠️ [BEATS] brief check failed (${bcErr.message}) — review runs without brief findings`);
+  }
+
+  const srPrompt = buildSceneReviewPrompt(
+    inputData,
+    expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
+    // Locked beats feed the review's check 5 (character in beat vs brief);
+    // the bible feeds check 9f (a stated object's state page ranges).
+    // clothingRequirements: the reviewer's CHARACTER DETAILS is the same cast
+    // block the Art Director wrote from, outfits included (check 3b/10c).
+    { clothingFindings, briefFindings, beats: briefBeats, visualBible, clothingRequirements, ...labPromptOptions }
+  );
+  if (!srPrompt) {
+    log.warn('⚠️ [BEATS] scene-review template unavailable — scene briefs shipped unreviewed');
+    gl.warn('beats_scene_review_failed', 'Scene review template unavailable — briefs shipped unreviewed');
+  } else {
+    t = Date.now();
+    try {
+      // Snapshot every brief as it was SENT. sceneDiffs only captures pages the
+      // reviewer changed, so a run where it rewrote nothing left the dev panel
+      // with nothing to show — exactly the run we needed to inspect
+      // (job_1786235099497_ytd5c7eek: 3 faults handed over, 0 briefs rewritten).
+      const briefsIn = expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief }));
+      // THE PAYLOAD CONTRACT, asserted on this path too (2026-09-17). A
+      // corrector is shown the text it is correcting — this path always has
+      // been, through {ALL_SCENES}, and the rewrite path was not, which is the
+      // defect that made its re-ask a re-roll. One function answers for both
+      // so neither can lose it silently.
+      // Reported, never fatal: a review that runs is worth more than a story
+      // that dies on its own contract check, and this path's whole ruling is
+      // advisory anyway.
+      for (const pn of briefBeforeByPage.keys()) {
+        const faulted = briefsIn.find(b => b.pageNumber === pn);
+        if (!faulted) continue;
+        try {
+          assertCorrectorSeesText(srPrompt, faulted.brief, `scene review p${pn}`);
+        } catch (seeErr) {
+          log.error(`❌ [BEATS] p${pn}: ${seeErr.message} — the reviewer is being asked to correct a brief it cannot see`);
+          gl.warn('beats_brief_unseen', `The scene review prompt does not carry page ${pn}'s brief — its faults cannot be corrected`, null, { pageNumber: pn });
+        }
+      }
+      await stage(42, 'Reviewing scene briefs...', { next: 51, ms: 132000 });
+      const srRes = await textModels.callTextModelStreaming(srPrompt, null, onChunk, sceneReviewModel, { usageLabel: 'beats_scene_review' });
+      if (onCall) onCall(srRes);
+      // "0 briefs rewritten" has meant three different things: a reviewer that
+      // genuinely found nothing, a reviewer TRUNCATED at its token cap (this
+      // story: out=16000, exactly the old budget), and a provider returning
+      // nothing at all (Lab #450: in=0 out=0 after 50s on an 80k prompt). Only
+      // the first is success — separate them or the log reports failure as a pass.
+      const srOutTok = srRes.usage?.output_tokens ?? null;
+      if (!String(srRes.text || '').trim() || srOutTok === 0) {
+        const why = require('./textReplyGuard').describeStop(srRes.truncation || {});
+        log.error(`❌ [BEATS] Scene review returned an EMPTY response (${srOutTok} output tokens; ${why}) — briefs ship unreviewed`);
+        gl.warn('beats_scene_review_empty', `Scene review returned nothing (${srOutTok} output tokens; ${why}) — provider failure, briefs shipped unreviewed`);
+      }
+      // TRUNCATION (textReplyGuard.js): a review cut at the ceiling rewrote the
+      // EARLIEST pages and never reached the ones it named — adopting the pages
+      // that fit would ship a half-review as a review. Fall back to the raw
+      // briefs (the input), exactly as the Lab guard does; the failure is
+      // recorded on the story (sceneReviewFailed) and in the generation log.
+      const srTruncated = !!srRes.truncation?.suspected;
+      if (srTruncated) {
+        sceneReviewFailed = `scene review ${textModels.describeTruncation(srRes.truncation)} — briefs shipped unreviewed`;
+        log.error(`❌ [BEATS] ${sceneReviewFailed}`);
+        gl.warn('beats_scene_review_truncated', sceneReviewFailed, null, srRes.truncation);
+      }
+      // BRIEF_TRAILING_MARKERS: the reply's optional ---VISUAL BIBLE---
+      // block follows the last page, and without a terminator it was appended
+      // to that page's brief and stored as part of it (p17 of
+      // job_1789759147125_p08djwhbl). The block itself is still read, from the
+      // RAW reply, by applyReviewBibleCorrections below.
+      const parsed = srTruncated ? { analysis: '', pages: [] } : parseRefinedText(srRes.text || '', expansions.map(x => x.pageNumber), 'SCENES', BRIEF_TRAILING_MARKERS);
+      sceneReviewAnalysis = parsed.analysis || '';
+      const byPage = new Map(parsed.pages.map(p => [p.pageNumber, p.text]));
+      const changed = [];
+      // Captured at the overwrite, the only moment both briefs exist.
+      const sceneDiffs = [];
+      for (const x of expansions) {
+        const reviewed = byPage.get(x.pageNumber);
+        if (reviewed && reviewed.trim()) {
+          const fixed = keepDeclaredLight(x.pageNumber,
+            keepDeclaredWornRows(x.pageNumber, reviewed, x.brief, 'scene review', gl),
+            x.brief, 'scene review', gl);
+          if (fixed !== x.brief) sceneDiffs.push({ pageNumber: x.pageNumber, before: x.brief, after: fixed });
+          x.brief = fixed;
+          x.reviewRewrote = true;
+          changed.push(x.pageNumber);
+        }
+      }
+      meta.timings.sceneReviewMs = Date.now() - t;
+
+      // FAULTED-BUT-NOT-REWRITTEN (owner, 2026-08-08). The reviewer is told to
+      // rewrite every page a check faulted, and it does not always comply: on
+      // job_1786193650012_7baiaeftb it named defects on pages 4, 8 and 13 and
+      // rewrote only 1, 2 and 3. Those defects then shipped, unremarked.
+      //
+      // Read the reviewer's OWN "FAULTED PAGES:" line (scene-review.txt output
+      // contract), never the free prose. The first version of this check
+      // regex-matched every "page N" in the analysis, so pages mentioned as
+      // PRAISE ("framing peaks on page 12") were reported as unfixed faults
+      // (job_1786277779744 flagged 1 and 13 that way). No line → the reviewer
+      // predates the contract → skip rather than guess.
+      const faultLine = sceneReviewAnalysis.match(/^\s*FAULTED PAGES?:\s*(.+)\s*$/mi);
+      const namedPages = faultLine
+        ? [...new Set((faultLine[1].match(/-?\d+/g) || [])
+            .map(Number)
+            .filter(n => expansions.some(x => x.pageNumber === n)))]
+        : null;
+      if (!faultLine) {
+        log.debug('[BEATS] Scene review analysis has no FAULTED PAGES line — incompleteness check skipped');
+      }
+      // DECLARED REMOVALS (owner decision 2026-09-13). A rewrite that drops a
+      // character used to be expressible only as an absence — no delta, no
+      // reason, and nothing parsed. `REMOVED CAST:` in the output contract is
+      // that channel; this reads it, then checks it against what actually
+      // happened to `characters[]`, page by page. Mechanical name-set
+      // arithmetic over the brief metadata only — never an inference from
+      // description prose.
+      //
+      // Detected AND REVERTED (2026-09-15, superseding the detect-only ruling
+      // of 2026-09-13). Evidence for the detection:
+      // job_1789207854566_l43qgl34w p7/p15, where five commissioned characters
+      // became "five soaked pirates: one in a blue tricorn…" with
+      // `characters: []` / `["Fiona"]` and nothing said. Evidence for the
+      // revert: job_1789420511893_zly5rcdej p16, where the error fired, the
+      // page rendered on the emptied cast anyway, and the corrupt contract
+      // produced a phantom CRITICAL against a child who IS in the prose — three
+      // repair rounds, and a correct original destroyed by the round-2 inpaint.
+      const castRemovals = parseCastRemovals(sceneReviewAnalysis);
+      const metaOf = (brief) => (extractSceneMetadata(brief) || {});
+      castRemovalsDeclared = castRemovals;
+      castRemovalAudit = diffCastRemovals(
+        sceneDiffs.map(d => {
+          const mb = metaOf(d.before), ma = metaOf(d.after);
+          // CAST UNPARSEABLE IS NOT CAST EMPTIED (2026-09-19). A brief whose
+          // parsers all failed comes back from the recovery path with
+          // `isRecovered: true` and an empty `characters[]`
+          // (sceneMetadata.js, describeDegradedSceneMetadata) — and the name
+          // arithmetic below would read that emptiness as the reviewer having
+          // silently dropped the entire page cast, then "restore" rows into a
+          // roster that in fact still lists them. Skip the page instead; a
+          // degraded brief is a known-recorded input, never a fault verdict.
+          if (ma.isRecovered === true) {
+            log.warn(`⚠️ [BEATS] Page ${d.pageNumber}: reviewed brief came back from the metadata recovery path — cast-removal diff skipped for this page (unparseable is not emptied)`);
+            return null;
+          }
+          // `objects[]` carries the Visual Bible secondaries. A name that moved
+          // there is still commissioned — routing, not removal.
+          return {
+            pageNumber: d.pageNumber,
+            beforeCast: mb.characters || [],
+            afterCast: ma.characters || [],
+            afterObjects: (ma.objects || []).map(o => (typeof o === 'string' ? o : (o && (o.id || o.name)))).filter(Boolean),
+          };
+        }).filter(Boolean),
+        castRemovals
+      );
+      if (castRemovals.malformed.length > 0) {
+        log.warn(`⚠️ [BEATS] Scene review REMOVED CAST line has ${castRemovals.malformed.length} unparseable entr(ies): ${castRemovals.malformed.join(' | ')}`);
+        gl.warn('beats_scene_review_removals_malformed', `REMOVED CAST entries could not be parsed: ${castRemovals.malformed.join(' | ')}`, null, castRemovals.malformed);
+      }
+      for (const r of castRemovalAudit) {
+        if (r.declared.length === 0) continue;
+        const why = (castRemovals.pages.find(p => p.pageNumber === r.pageNumber) || {}).reason || '(no reason given)';
+        log.info(`📣 [BEATS] Scene review DECLARED removal on page ${r.pageNumber}: ${r.declared.join(', ')} — ${why}`);
+        gl.info('beats_scene_review_removal_declared', `Page ${r.pageNumber}: reviewer removed ${r.declared.join(', ')} — ${why}`, null, r);
+      }
+      const undeclaredRemovals = castRemovalAudit.filter(r => r.undeclared.length > 0);
+      if (undeclaredRemovals.length > 0) {
+        const detail = undeclaredRemovals.map(r => `page ${r.pageNumber}: ${r.undeclared.join(', ')}`).join('; ');
+        log.error(`❌ [BEATS] Scene review removed cast WITHOUT declaring it — ${detail}`);
+        gl.error('beats_scene_review_removal_undeclared',
+          `Reviewer dropped character(s) from characters[] with no REMOVED CAST declaration — ${detail}`, null, undeclaredRemovals);
+        // The page does NOT render on a cast the reviewer silently emptied —
+        // but only the DROPPED NAMES come back (owner, 2026-09-17), spliced
+        // verbatim out of the pre-review brief's own `characters[]`. The rest
+        // of the reviewed brief stands. The whole-brief revert it supersedes
+        // cost p18 of job_1789584708605_rts4wqupm every other fix that review
+        // made (shipped at 45; the previous run's reviewed p18 scored 95).
+        // A page whose `characters[]` cannot be located structurally still
+        // falls back to the whole-brief revert — `changed` is trimmed there,
+        // before the faulted-but-not-rewritten check reads it.
+        const { restored, reverted } = restoreUndeclaredRemovals(expansions, sceneDiffs, changed, undeclaredRemovals);
+        if (restored.length > 0) {
+          const detail = restored.map(r => `page ${r.pageNumber}: ${r.names.join(', ')}`).join('; ');
+          log.warn(`↩️ [BEATS] Restored undeclared-removed cast into the reviewed brief — ${detail}`);
+          gl.warn('beats_scene_review_removal_restored',
+            `Dropped character(s) put back into the reviewed brief's characters[]; the rest of the review's fixes stand — ${detail}`,
+            null, restored);
+        }
+        if (reverted.length > 0) {
+          const pages = reverted.map(r => r.pageNumber).join(', ');
+          log.error(`↩️ [BEATS] Page(s) ${pages} reverted to the pre-review brief — the reviewed brief has no locatable characters[] to restore into`);
+          gl.warn('beats_scene_review_removal_reverted',
+            `Page(s) ${pages} shipped the PRE-REVIEW brief: the rewrite dropped cast with no declaration and its characters[] could not be located, so that page's review fixes were discarded with it`,
+            null, reverted);
+        }
+      }
+
+      // BIBLE CORRECTIONS (2026-09-14). The review may return an optional
+      // ---VISUAL BIBLE--- section correcting a stated object's state page
+      // ranges — the fault sceneBriefCheck's vb_state_* findings hand it. The
+      // merge is strict and fail-soft; see applyReviewBibleCorrections.
+      if (visualBible && !srTruncated) {
+        try {
+          // The handles the briefs ALREADY cite: a correction that renames one
+          // of them re-points a page at a different look (Lab 1264).
+          const citedHandles = new Set();
+          for (const ex of (Array.isArray(expansions) ? expansions : [])) {
+            const meta = extractSceneMetadata(ex && ex.brief) || {};
+            const objs = Array.isArray(meta.objects) ? meta.objects : [];
+            for (const o of objs) {
+              const h = typeof o === 'string' ? o.trim().toUpperCase() : '';
+              if (h.includes('.')) citedHandles.add(h);
+            }
+          }
+          const bibleBefore = JSON.parse(JSON.stringify(visualBible));
+          const corr = applyReviewBibleCorrections(srRes.text || '', visualBible, beats.length, citedHandles);
+          bibleCorrections = corr;
+          if (corr.applied.length > 0) visualBibleIn = bibleBefore;
+          for (const r of corr.rejected) {
+            log.warn(`⚠️ [BEATS] Scene review bible correction REJECTED for ${r.id}: ${r.reason}`);
+            gl.warn('beats_scene_review_bible_rejected', `Bible correction for ${r.id} rejected: ${r.reason}`, null, r);
+          }
+          if (corr.applied.length > 0) {
+            for (const e of corr.applied) {
+              log.info(`[VB-STATE] ${e.id} "${e.name}" ${e.oldPages} → ${e.newPages}`);
+            }
+            gl.info('beats_scene_review_bible',
+              `Scene review corrected ${corr.applied.length} stated object(s): `
+              + corr.applied.map(e => `${e.id} ${e.oldPages} → ${e.newPages}`).join('; '), null, corr);
+            // ONE SOURCE OF TRUTH: the transcript is what every later reader
+            // re-parses, exactly as the label round and the age clamp do.
+            // Verified by re-parsing the written transcript: a correction the
+            // re-parse does not carry is LOST for the resume path, the Lab
+            // and every later extractVisualBible() — an error, never a hint.
+            bibleSections = syncVisualBibleSection(bibleSections, visualBible);
+            const lost = bibleCorrectionsMissingFromTranscript(bibleSections, visualBible, corr.applied);
+            corr.unsynced = lost;
+            if (lost.length > 0) {
+              const detail = lost.map(m => `${m.id} ${m.field} expected ${JSON.stringify(m.expected)}, transcript has ${JSON.stringify(m.found)}`).join('; ');
+              log.error(`❌ [BEATS] Scene review bible correction NOT in the transcript — re-parses read the UNCORRECTED bible: ${detail}`);
+              gl.error('beats_vb_sync_failed', `Scene review bible correction(s) missing from the transcript after write-back: ${detail}`, null, lost);
+            }
+          }
+        } catch (bcErr) {
+          log.error(`❌ [BEATS] Scene review bible correction failed (${bcErr.message}) — corrections may be partly applied and not written back`);
+          gl.error('beats_scene_review_bible_failed', `Scene review bible correction threw: ${bcErr.message}`);
+        }
+      }
+
+      const faultedNotFixed = (namedPages || []).filter(n => !changed.includes(n));
+      if (faultedNotFixed.length > 0) {
+        log.warn(`⚠️ [BEATS] Scene review named page(s) ${faultedNotFixed.join(', ')} but rewrote none of them`);
+        gl.warn('beats_scene_review_incomplete',
+          `Reviewer named page(s) ${faultedNotFixed.join(', ')} in its analysis but rewrote only ${changed.length ? changed.join(', ') : 'nothing'} — those findings shipped unfixed`);
+      }
+
+      // RE-CHECK. The clothing findings were handed to the reviewer above;
+      // whether it acted on them is not a matter of trust. The check is free
+      // and deterministic, so run it again on the rewritten briefs and say what
+      // survived instead of shipping it quietly (owner rule: fail loudly).
+      //
+      // ON EVERY REVIEWED RUN, not only when the pre-review check found
+      // something (2026-09-23). A rewrite can INTRODUCE a clothing fault on a
+      // page that was clean when it was handed over — the same failure mode the
+      // brief re-check below documents. Gated on pre-review findings, a
+      // review-introduced `removal_unstated` could never reach the worn-state
+      // round: on staging job_1790100385959_1nitlympp the pre-review check
+      // found nothing, the review deleted declared rows on p11, p12 and p18,
+      // and nothing looked again.
+      {
+        try {
+          const { checkScenes } = require('./clothingCheck');
+          const after = checkScenes(expansions.map(x => {
+            const m2 = extractSceneMetadata(x.brief) || {};
+            return {
+              pageNumber: x.pageNumber,
+              prose: splitBrief(x.brief).prose,
+              cast: (m2.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
+              perCharClothing: m2.characterClothing || {},
+              wornItems: m2.wornItems || [],
+            };
+          }), clothingRequirements, { artifacts: (visualBible || {}).artifacts, visualBible });
+          const REVIEWABLE = new Set(['outfit_misattributed', 'removal_unstated']);
+          const left = after.findings.filter(f => REVIEWABLE.has(f.type));
+          clothingUnfixedList = left;
+          const before = clothingByPage ? [...clothingByPage.values()].flat().filter(f => REVIEWABLE.has(f.type)).length : 0;
+          if (left.length > 0) {
+            const pages = [...new Set(left.map(f => f.pageNumber))].sort((a, b) => a - b).join(', ');
+            log.warn(`⚠️ [BEATS] clothing check after review: ${left.length} fault(s) present on page(s) ${pages} (${before} handed to the review)`);
+            gl.warn('beats_clothing_unfixed',
+              `Clothing faults present after the scene review on page(s) ${pages} (${before} were handed to it): ${left.map(f => `p${f.pageNumber} ${f.type} (${f.character})`).join('; ')}`);
+          } else if (before > 0) {
+            log.info(`👕 [BEATS] clothing check after review: all ${before} fault(s) resolved`);
+          }
+
+          // FED-BACK WORN-STATE ROUND (owner ruling 2026-09-06). The old prose
+          // finding was handed to the review on 9 pages of
+          // job_1788641639919_mpjwlzkf1 and fixed on 0 of them. It is now a
+          // missing FIELD, so the retry can name exactly what to add and the
+          // re-check can verify it — the same shape as the brief second round
+          // below and the landmark minimum-2 retry (cadd4ee72).
+          //
+          // Exactly ONE extra round. Strike two SHIPS: a WARN, a stored
+          // `wornStateUnresolved` flag on the page, and the state defaults to
+          // "worn" because the avatar reference wears the full outfit. A
+          // guideline never kills a paid run.
+          const wornLeft = left.filter(f => f.type === 'removal_unstated');
+          if (wornLeft.length > 0) {
+            const wornPages = new Set(wornLeft.map(f => f.pageNumber));
+            const subset = expansions.filter(x => wornPages.has(x.pageNumber));
+            const subsetByPage = new Map();
+            for (const [pn, list] of after.byPage) {
+              const rows = list.filter(f => f.type === 'removal_unstated');
+              if (rows.length > 0 && wornPages.has(pn)) subsetByPage.set(pn, rows);
+            }
+            const { renderFindingsBlock: renderClothing2 } = require('./clothingCheck');
+            const wrPrompt = buildSceneReviewPrompt(
+              inputData,
+              subset.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
+              { clothingFindings: renderClothing2(subsetByPage), beats, clothingRequirements, ...labPromptOptions },
+            );
+            const label = [...wornPages].sort((a, b) => a - b).join(', ');
+            if (!wrPrompt) {
+              log.warn(`⚠️ [BEATS] worn-state round skipped (no review template) — page(s) ${label} ship flagged`);
+              wornUnresolved = wornLeft;
+            } else {
+              try {
+                log.info(`🎩 [BEATS] worn-state round on page(s) ${label} (${subset.length}/${expansions.length} briefs)`);
+                const wrRes = await textModels.callTextModelStreaming(wrPrompt, null, onChunk, sceneReviewModel, { usageLabel: 'beats_scene_review_worn' });
+                if (onCall) onCall(wrRes);
+                // A cut round is a failed round — the catch below keeps the
+                // briefs as they were and ships the pages flagged.
+                if (wrRes.truncation?.suspected) throw new Error(`reply ${textModels.describeTruncation(wrRes.truncation)}`);
+                const wrParsed = parseRefinedText(wrRes.text || '', subset.map(x => x.pageNumber), 'SCENES', BRIEF_TRAILING_MARKERS);
+                const wrByPage = new Map(wrParsed.pages.map(pg => [pg.pageNumber, pg.text]));
+                for (const x of subset) {
+                  const reworn = wrByPage.get(x.pageNumber);
+                  const fixed = reworn && reworn.trim()
+                    ? keepDeclaredLight(x.pageNumber, keepDeclaredWornRows(x.pageNumber, reworn, x.brief, 'worn-state round', gl), x.brief, 'worn-state round', gl)
+                    : reworn;
+                  if (fixed && fixed.trim() && fixed !== x.brief) {
+                    sceneDiffs.push({ pageNumber: x.pageNumber, before: x.brief, after: fixed, round: 'worn' });
+                    x.brief = fixed;
+                    x.reviewRewrote = true;
+                  }
+                }
+                const after3 = checkScenes(expansions.map(x => {
+                  const m3 = extractSceneMetadata(x.brief) || {};
+                  return {
+                    pageNumber: x.pageNumber,
+                    prose: splitBrief(x.brief).prose,
+                    cast: (m3.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
+                    perCharClothing: m3.characterClothing || {},
+                    wornItems: m3.wornItems || [],
+                  };
+                }), clothingRequirements, { artifacts: (visualBible || {}).artifacts, visualBible });
+                wornUnresolved = after3.findings.filter(f => f.type === 'removal_unstated');
+                clothingUnfixedList = after3.findings.filter(f => REVIEWABLE.has(f.type));
+                wornRound = {
+                  pages: [...wornPages].sort((a, b) => a - b),
+                  before: wornLeft.length,
+                  after: wornUnresolved.length,
+                  usage: wrRes.usage || null,
+                };
+              } catch (wrErr) {
+                log.warn(`⚠️ [BEATS] worn-state round failed (${wrErr.message}) — page(s) ${label} ship flagged`);
+                wornUnresolved = wornLeft;
+              }
+            }
+            if (wornUnresolved.length === 0) {
+              log.info(`🎩 [BEATS] worn-state round resolved all ${wornLeft.length} fault(s)`);
+              gl.info('beats_worn_state_round', `Worn-state round on page(s) ${label} resolved all ${wornLeft.length} fault(s)`);
+            } else {
+              const d = wornUnresolved.map(f => `p${f.pageNumber} ${f.artifactId || ''} (${f.character})`).join('; ');
+              wornUnresolvedPages = [...new Set(wornUnresolved.map(f => f.pageNumber))].sort((a, b) => a - b);
+              log.warn(`⚠️ [BEATS] worn state STILL undeclared on page(s) ${wornUnresolvedPages.join(', ')} — shipping flagged, state defaults to worn: ${d}`);
+              gl.warn('beats_worn_state_unresolved',
+                `Worn-item state undeclared after the fed-back round on page(s) ${wornUnresolvedPages.join(', ')} — pages ship with wornStateUnresolved and the item defaults to worn: ${d}`,
+                null, { findings: wornUnresolved });
+              for (const x of expansions) {
+                if (wornUnresolvedPages.includes(x.pageNumber)) x.wornStateUnresolved = true;
+              }
+            }
+          }
+        } catch (rcErr) {
+          log.warn(`⚠️ [BEATS] clothing re-check failed (${rcErr.message})`);
+        }
+      }
+
+      // RE-CHECK the brief faults — on EVERY page, not only the ones that
+      // faulted before. This check's failure mode runs the opposite way to
+      // clothing's: the reviewer can CREATE a fault while resolving a
+      // different one, on a page that was clean when it was handed over.
+      //
+      // Measured on staging job_1787638394061_hs70901tfsn p1. Pre-review the
+      // page carried one fault, cast_unlisted — the prose described a
+      // secondary character its own characters[] omitted. The reviewer
+      // resolved it exactly as asked, by adding that character to the page —
+      // and gave them an interaction row with a second action. The page
+      // shipped declaring two actions, on the pipeline whose entire purpose is
+      // one, and scored semantic 40. The checks had run once, before the
+      // review, so nothing ever looked at the rewrite.
+      //
+      // Reports, never repairs: the reviewer authored both halves and the
+      // owner's 2026-08-11 decision keeps this side advisory. An INTRODUCED
+      // fault is the louder of the two — it means the fix instruction itself
+      // is producing defects.
+      try {
+        const { checkScenes: checkBriefs, REVIEWABLE } = require('./sceneBriefCheck');
+        const after = checkBriefs(
+          expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief, planLine: planLineOf(x.pageNumber) })),
+          briefCastNames,
+          visualBible,
+          { textZoneRules: textZoneRulesActive(inputData) }
+        );
+        // pageNumber 0 is the whole-book text-position tally, reported on its
+        // own line below rather than mixed into the per-page fault list.
+        const left = after.findings.filter(f => REVIEWABLE.has(f.type) && f.pageNumber !== 0);
+        const bookLevel = after.findings.filter(f => REVIEWABLE.has(f.type) && f.pageNumber === 0);
+        if (bookLevel.length > 0) {
+          const d = bookLevel.map(f => f.type).join('; ');
+          log.warn(`⚠️ [BEATS] text-position distribution after review: ${d}`);
+          gl.warn('beats_textzone_distribution', `Text-position distribution still off after the scene review: ${d}`, null, { findings: bookLevel });
+        }
+        // THE VERDICT IS SHARED (2026-09-17). This partition — introduced vs
+        // survived, keyed by (page, type) — is briefCorrection.judgeCorrection,
+        // and the rewrite path's corrective re-ask now reaches the same
+        // function through correctFindings. It used to hand-roll
+        // `after.length < before.length` instead, which scores a correction
+        // that swaps one fault for another as EQUAL and rejects it; measured
+        // over 11 stored rounds it resolved nothing on any of them.
+        // `advisory` is this path's ruling (owner, 2026-08-11): the reviewer
+        // authored both halves, so its rewrite stands and its faults are
+        // reported.
+        const { introduced, survived } = judgeCorrection({ before: briefBefore, after: left, acceptance: 'advisory' });
+        briefUnfixedList = left;
+        briefIntroducedList = introduced;
+        if (introduced.length > 0) {
+          const d = introduced.map(f => `p${f.pageNumber} ${f.type}`).join('; ');
+          log.warn(`⚠️ [BEATS] brief check after review: ${introduced.length} fault(s) INTRODUCED by the rewrite — ${d}`);
+          gl.warn('beats_brief_introduced',
+            `The scene review introduced ${introduced.length} new brief fault(s) while rewriting: ${d}`, null, { findings: introduced });
+        }
+        if (survived.length > 0) {
+          const d = survived.map(f => `p${f.pageNumber} ${f.type}`).join('; ');
+          log.warn(`⚠️ [BEATS] brief check after review: ${survived.length} fault(s) survived — ${d}`);
+          gl.warn('beats_brief_unfixed', `Brief faults survived the scene review: ${d}`, null, { findings: survived });
+        }
+        if (left.length === 0) log.info('🧩 [BEATS] brief check after review: clean');
+
+        // NO SECOND MODEL ROUND (owner, 2026-09-11). A targeted second
+        // reviewer call used to re-send the faulted pages here. Measured over
+        // two reruns it broke even: on the dragon rerun it cleared
+        // interaction_object_shared_hands and the p12/p13 trough plate but
+        // INTRODUCED interaction_multiple_actions on p1 (it split one action
+        // back into two), and on the pirate rerun it changed nothing at all.
+        // A paid call that trades one fault for another is not worth making.
+        // The deterministic re-check above stays — it costs nothing and is the
+        // diagnostic signal — so faults are reported and ship flagged, which
+        // is the same contract round 2 had on the pages it failed to fix.
+
+        // REWRITE-UNTIL-ZERO verdict for the two one-moment types, after the
+        // single review round. Measured on staging
+        // job_1788816451791_25b31uqlp: 11 of 18 pages shipped over budget after
+        // two rounds, and on every one of them the brief's own objects[] was
+        // already within three — the surplus came from the bible's
+        // appearsInPages, which no rewrite can withdraw. Saying so per page is
+        // the difference between "the reviewer ignored the fault" and "the
+        // fault is not the reviewer's to fix".
+        const ZERO_TYPES = ['interaction_multiple_actions', 'vb_element_overflow'];
+        const zeroLeft = briefUnfixedList.filter(f => ZERO_TYPES.includes(f.type) && f.pageNumber !== 0);
+        if (zeroLeft.length > 0) {
+          const { rankPageElements, VB_ELEMENT_BUDGET } = require('./vbElementBudget');
+          const pagesOf = (type) => [...new Set(zeroLeft.filter(f => f.type === type).map(f => f.pageNumber))].sort((a, b) => a - b);
+          const overflowDetail = pagesOf('vb_element_overflow').map((pn) => {
+            const x = expansions.find(e => e.pageNumber === pn);
+            const meta = x ? (extractSceneMetadata(x.brief) || {}) : {};
+            const ranked = rankPageElements(pn, meta, visualBible);
+            const objectsAsked = ranked.filter(e => e.fromObjects).length;
+            return { pageNumber: pn, elements: ranked.length, objectsAsked, briefFixable: objectsAsked > VB_ELEMENT_BUDGET };
+          });
+          rewriteToZeroUnfixed = {
+            interaction_multiple_actions: pagesOf('interaction_multiple_actions'),
+            vb_element_overflow: pagesOf('vb_element_overflow'),
+            vbOverflowDetail: overflowDetail,
+            rounds: 1,
+          };
+          const parts = [];
+          if (rewriteToZeroUnfixed.interaction_multiple_actions.length) parts.push(`two actions on page(s) ${rewriteToZeroUnfixed.interaction_multiple_actions.join(', ')}`);
+          if (rewriteToZeroUnfixed.vb_element_overflow.length) {
+            const bibleSide = overflowDetail.filter(d => !d.briefFixable).map(d => d.pageNumber);
+            parts.push(`over the ${VB_ELEMENT_BUDGET}-element budget on page(s) ${rewriteToZeroUnfixed.vb_element_overflow.join(', ')}`
+              + (bibleSide.length ? ` (bible-side on ${bibleSide.join(', ')} — the brief cites ≤${VB_ELEMENT_BUDGET}, the surplus is appearsInPages)` : ''));
+          }
+          log.warn(`⚠️ [BEATS] rewrite-until-zero NOT reached after ${rewriteToZeroUnfixed.rounds} round(s): ${parts.join('; ')} — shipping flagged`);
+          gl.warn('beats_one_moment_unfixed', `Briefs still ${parts.join('; ')} after the review's round budget — shipped flagged, never killed`, null, rewriteToZeroUnfixed);
+        }
+      } catch (rcErr) {
+        log.warn(`⚠️ [BEATS] brief re-check failed (${rcErr.message})`);
+      }
+
+      sceneReviewReport = {
+        model: srRes.modelId || sceneReviewModel,
+        durationMs: meta.timings.sceneReviewMs,
+        changedPages: sceneDiffs.map(d => d.pageNumber),
+        namedButNotRewritten: faultedNotFixed,
+        // The reviewer's declared-removals channel and the mechanical audit of
+        // it (2026-09-13). `castRemovalAudit` holds one row per page that lost
+        // a name, split into `declared` / `undeclared`.
+        castRemovals: castRemovalsDeclared,
+        castRemovalAudit,
+        failed: sceneReviewFailed,
+        analysis: sceneReviewAnalysis,
+        // WITHOUT `before`: every one of those strings was byte-identical to
+        // the same page's entry in `briefsIn` below (17/17 pages, 32k of JSONB,
+        // job_1789853503332_riqncqg1i). `briefsIn` is the pre-review snapshot of
+        // EVERY page, changed or not, so it already holds each row's before —
+        // readers resolve it from there (storyMetrics.churnFromReport,
+        // StoryDisplay's diff panel).
+        pages: sceneDiffs.map(({ before, ...row }) => row), // eslint-disable-line no-unused-vars
+        // Dev-mode inspection (owner request 2026-08-09): the exact prompt the
+        // reviewer received, every brief as sent, and the clothing trail — so
+        // "it rewrote nothing" can be diagnosed without the DB.
+        prompt: srPrompt,
+        briefsIn,
+        clothingFindings: clothingFindings || null,
+        briefFindings: briefFindings || null,
+        clothingUnfixed: clothingUnfixedList,
+        wornUnresolved,
+        wornUnresolvedPages,
+        wornRound,
+        // The VB label round writes its outcome to `meta` at adoption time;
+        // without this line it reached no stored report (job_1789337998754_apslnsq1z
+        // had valid labels and a null labelRound everywhere).
+        labelRound: meta.labelRound || null,
+        // {applied, rejected} from the review's ---VISUAL BIBLE--- section.
+        bibleCorrections,
+        ...(visualBibleIn ? { visualBibleIn } : {}),
+        briefUnfixed: briefUnfixedList,
+        briefIntroduced: briefIntroducedList,
+        rewriteToZeroUnfixed,
+      };
+      gl.info('beats_scene_review', `Scene review by ${srRes.modelId || sceneReviewModel}: ${changed.length} brief(s) rewritten (${(meta.timings.sceneReviewMs / 1000).toFixed(1)}s)`, null, {
+        changedPages: changed, model: srRes.modelId || sceneReviewModel,
+      });
+    } catch (err) {
+      log.warn(`🚨 [BEATS] Scene review failed (${err.message}) — proceeding with unreviewed briefs`);
+      gl.warn('beats_scene_review_failed', `Reviewer ${sceneReviewModel} failed: ${err.message} — briefs shipped unreviewed`);
+    }
+  }
+
+  return { sceneReviewReport, sceneReviewAnalysis, sceneReviewFailed, bibleSections, clothingBefore };
+}
+
 /**
  * Run the beats-first pipeline.
  *
@@ -980,6 +2865,10 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // "none", or no arc). The planner, plan-check Q12 and the
   // CENTRAL_FIGURE_ABSENT_THIRD counter read it (owner, 2026-09-24, d4).
   let arcCentralFigure = null;
+  // The final arc's STORY LOGIC block body (parseStoryLogic().text): the facts
+  // it was told from. The planner, the re-plan and plan-check Q18 read it
+  // (owner, 2026-09-26); '' when the arc machine failed.
+  let arcStoryLogic = '';
   // The machine's full trail. Kept under the arcReviewReport key so the
   // storyJobPipeline persistence and the dev-mode wiring stay untouched.
   let arcReviewReport = null;
@@ -988,31 +2877,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // every later stage divides and dresses what this one decided.
   let t = Date.now();
   try {
-    // OpenRouter/xAI take a temperature; the Anthropic path sends none.
-    const tempFor = (model, temp) =>
-      (temp == null || TEXT_MODELS[model]?.provider === 'anthropic') ? {} : { temperature: temp };
-
-    /** Creator-side call: one retry, then throw — the creator is not advisory. */
-    // `model` and `effort` are this call's (MODEL_DEFAULTS.arcCreateModel +
-    // arcCreateEffort, or arcRetellModel + arcRetellEffort); null max_tokens =
-    // the model's own ceiling.
-    const creatorCall = async (prompt, label, model, temp, effort) => {
-      let lastErr = null;
-      for (let attempt = 1; attempt <= 2; attempt++) {
-        try {
-          const res = await textModels.callTextModelStreaming(prompt, null, onChunk, model, { usageLabel: label, ...tempFor(model, temp), ...(effort ? { effort } : {}) });
-          if (!String(res?.text || '').trim()) throw new Error('empty response');
-          // A cut arc parses as a shorter arc (missing critique lines, a short
-          // chain) — treat it as a failed attempt, never as the creator's answer.
-          if (res.truncation?.suspected) throw new Error(`reply ${textModels.describeTruncation(res.truncation)}`);
-          return res;
-        } catch (err) {
-          lastErr = err;
-          log.warn(`⚠️ [ARC] ${label} attempt ${attempt} failed: ${err.message}`);
-        }
-      }
-      throw new Error(`${label} failed after retry: ${lastErr?.message || 'unknown error'}`);
-    };
+    const tempFor = arcTempFor;
+    const creatorCall = makeArcCreatorCall(onChunk);
 
     // CREATE: ONE arc, its STORY LOGIC first (owner, 2026-09-24). A parse miss
     // (no or incomplete logic block, no ARC block) gets one full re-create,
@@ -1306,6 +3172,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // Prompt and raw reply are kept whether or not the pass parses (2026-09-23):
     // the prompt was built and sent but never stored, so a hint could not be
     // traced to what the pass was shown.
+    arcStoryLogic = currentLogic.text;
     let hintsPrompt = null;
     let hintsRaw = null;
     const hintsModel = MODEL_DEFAULTS.arcHintsModel || 'grok-4.6';
@@ -1374,6 +3241,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     approvedArc = '';
     arcWeakPoints = '';
     arcHints = '';
+    arcStoryLogic = '';
   }
 
   // ── Step 1: beats plan ────────────────────────────────────────────────────
@@ -1385,7 +3253,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // 2026-09-02 the stage emits ONE thing per page: the plan line. The beat
   // prose it used to write measured as the lossiest step in the chain
   // (Lab #973) and is gone — see docs/decisions.md.
-  const planPrompt = buildBeatsPrompt(inputData, pageCount, { finalArc: approvedArc, arcHints, centralFigure: arcCentralFigure });
+  const planPrompt = buildBeatsPrompt(inputData, pageCount, { finalArc: approvedArc, arcHints, storyLogic: arcStoryLogic, centralFigure: arcCentralFigure });
   if (!planPrompt) throw new Error('story-beats template unavailable — beats pipeline cannot run');
 
   /**
@@ -1396,12 +3264,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
    * re-division — the second response is read exactly like the first, with no
    * merge path that could leave half a plan behind.
    */
-  const readPlan = (raw) => {
-    const parsed = parsePlanResponse(String(raw || ''), expected);
-    // The approved arc is the story; the planner does not author one.
-    parsed.arc = approvedArc || '';
-    return { parsed, pagePlan: parsed.pagePlan };
-  };
+  const readPlan = makePlanReader(expected, approvedArc);
 
   t = Date.now();
   await stage(3, 'Planning the story beats...', { next: 5, ms: 25000 });
@@ -1469,172 +3332,13 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   await checkCancellation();
   let beats = plan.pages;
   let beatsReviewReport = null;
-  // The character list PLUS the figures the premise supplied (the arc reports
-  // them; see `arcPremiseNames`). A pet the commission named is commissioned.
-  //
-  // ONE definition, shared with the Test Lab replay (castCoverage.commissionedCast):
-  // `listed` is the character list — the characters that owe the book a focal
-  // page and the castCoverage() appearance floor — and `all` adds the figures
-  // the commission supplied elsewhere, which are never invented.
-  const commission = commissionedCast(inputData, arcPremiseNames);
-  const commissionedNames = commission.all;
-  if (arcPremiseNames.length) log.info(`👪 [BEATS] Figures the arc tagged (commissioned), counted as commissioned: ${arcPremiseNames.join(', ')}`);
-  // The counters must never read a PLACE as a person. The names come from the
-  // same authoritative data the planner itself was given — the resolved
-  // landmark list, the family's town, and (historical stories) the canonical
-  // locations and period objects — never from a word list or a prose pattern.
-  // Story job_1788614817116_vxnu60yjg entered "Uetliberg" and "Aussichtsturm
-  // Uetliberg" into the invented cast and manufactured six INVENTED_DOMINANT
-  // pages off it (docs/decisions.md, 2026-09-05).
-  const placeNames = collectPlaceNames(inputData, [
-    ...(inputData?.storyCategory === 'historical'
-      ? [...getHistoricalLocations(inputData.storyTopic), ...getHistoricalObjects(inputData.storyTopic)].map(e => e && e.name)
-      : []),
-  ]);
-  if (placeNames.length) log.debug(`[BEATS] plan counters know ${placeNames.length} place name(s) that can never be cast`);
-  const maxCast = IMAGE_MODELS[inputData?.modelOverrides?.imageModel || MODEL_DEFAULTS.pageImage]?.maxCharactersPerScene || 3;
-  const planCheckModel = modelOverrides.planCheckModel || MODEL_DEFAULTS.planCheckModel;
+  const { commission, commissionedNames, placeNames, maxCast, planCheckModel } = planCheckInputs(inputData, { arcPremiseNames, modelOverrides });
 
-  /**
-   * Counters (free, deterministic) + the one model call. Never throws: the
-   * model half is advisory, and a lost call leaves the counters standing alone
-   * rather than skipping the check entirely.
-   */
-  // MODEL FIRST, COUNTERS SECOND (2026-09-11). The counters used to run first
-  // and their lines were shown to the model for reference. They cannot run
-  // first any more: who is on a page is a question about English, the model
-  // call answers it as a ROSTER, and the counters do arithmetic on that answer
-  // instead of re-deriving the cast from the prose with a grammar heuristic.
-  const runCheck = async (label, pages, planText) => {
-    let modelFindings = [];
-    let roster = null;
-    // The check's OBSTACLES block: per page, the character whose action that
-    // page's instant works against (plan-check Q11). It is the declared
-    // evidence a re-plan's removal is judged against — a figure the arc gives a
-    // moment of their own is not a figure a page may quietly drop — so it is
-    // read as DATA here, never re-derived from a finding's prose.
-    let obstacles = null;
-    // The check's PEOPLELESS line (Q6): the page the checker nominates to give
-    // up its cast, emitted only when no page is people-free. Read as DATA, the
-    // same way the OBSTACLES block is — picking the page in code was built and
-    // rejected on measurement (docs/decisions.md, 2026-09-20).
-    let peoplelessPick = null;
-    // The check's WANTED (Q4) and ACTION (Q12) lines: the pictures the next
-    // round must keep, read as DATA like OBSTACLES (2026-09-23).
-    let wanted = [];
-    let actions = [];
-    // The check's CENTRAL line: the pages whose picture shows the central
-    // figure, answered for the name Q12 gives it (2026-09-25). null = no line.
-    let centralPages = null;
-    let checkModelId = null;
-    let prompt = null;
-    // THE REPLY IS EVIDENCE, NOT A BYPRODUCT (2026-09-19).
-    //
-    // `modelFindings: []` has two readings — the checker found nothing, or it
-    // answered badly — and until this was kept the row could not tell them
-    // apart. On staging job_1789759147125_p08djwhbl the eleven-check call
-    // returned zero findings against a plan that breaks four of the planner's
-    // own rules on page 5 alone, and the only reason we know the call arrived
-    // at all is that `cast` happens to be derived from its roster.
-    //
-    // Text only, no images, and the arc stage already keeps the creator's full
-    // reply (`arcReviewReport.create`) for exactly this reason.
-    let reply = '';
-    let rosterLines = [];
-    try {
-      // No counter findings ride in: they do not exist yet. See the builder's
-      // header — the counters read this call's ROSTER, so they run below.
-      prompt = buildPlanCheckPrompt(inputData, pages, approvedArc, planText, { arcHints, centralFigure: arcCentralFigure, castTable });
-      if (!prompt) throw new Error('plan-check template unavailable');
-      const res = await textModels.callTextModelStreaming(prompt, null, onChunk, planCheckModel, {
-        usageLabel: label,
-        // Judges run at temperature 0 (settled); the Anthropic path sends none.
-        ...(TEXT_MODELS[planCheckModel]?.provider === 'anthropic' ? {} : { temperature: 0 }),
-      });
-      checkModelId = res.modelId || planCheckModel;
-      reply = String(res.text || '');
-      modelFindings = parsePlanCheck(res.text || '');
-      roster = parsePlanCheckRoster(res.text || '');
-      obstacles = parsePlanCheckObstacles(res.text || '');
-      peoplelessPick = parsePlanCheckPeoplelessPick(res.text || '');
-      wanted = parsePlanCheckWanted(res.text || '');
-      actions = parsePlanCheckActions(res.text || '');
-      centralPages = parsePlanCheckCentralPages(res.text || '');
-      // The roster AS PARSED, page by page. The raw reply above carries the
-      // same lines verbatim; this is the form every counter actually reasons
-      // on, so a reader can see what the arithmetic was given — including a
-      // `covers` that expanded nobody, which is how "all four boys" reached
-      // the cast count as two names on that same job.
-      rosterLines = [...roster.entries()]
-        .sort((a, b) => a[0] - b[0])
-        .map(([pageNumber, r]) => ({ pageNumber, people: r.people, things: r.things, covers: r.covers }));
-    } catch (err) {
-      // LOUD, NEVER FATAL. A lost plan check takes the ENTIRE counter layer
-      // with it (the counters do arithmetic on its roster), so this is an
-      // ERROR in the run log and in the generation log — not a WARN that two
-      // days of beats runs scrolled past (2026-09-13, the undefined
-      // `parsePlanCheckRoster` binding). It still never aborts a paid run:
-      // quality gates ship with a warning (feedback_gates_are_guidelines).
-      log.error(`❌ [BEATS] Plan check (${label}) failed (${err.message}) — NO ROSTER, so the entire plan-counter layer is skipped this round`);
-      gl.error(`${label}_failed`, `Plan check failed: ${err.message} — no roster, so every plan counter (cast, invented cast, shot variety, focal pages) is skipped this round`, null, { error: err.message, model: planCheckModel });
-    }
-    const counters = runPlanCounters({ pages, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit, roster, peoplelessPick, centralFigure: arcCentralFigure, centralPages, mainName, castTable, actions });
-    // The central-figure counter counts on the CENTRAL line alone; a check
-    // that named no pages for a named figure leaves it uncounted — loudly.
-    if (counters.stats?.centralFigure?.unanswered) {
-      log.error(`❌ [BEATS] Plan check (${label}) gave no CENTRAL line for the central figure (${arcCentralFigure.join(' / ')}) — CENTRAL_FIGURE_ABSENT_THIRD did not run`);
-      gl.error(`${label}_no_central_line`, 'The plan check named no pages for the central figure (CENTRAL line absent); the per-third presence counter did not run', null, { model: checkModelId || planCheckModel, centralFigure: arcCentralFigure });
-    }
-    // NO FALLBACK, NO SYNTHESIS. The finding degrades to its page-less
-    // sentence when Q6 nominated nothing; code never picks the page itself.
-    // The miss is loud so a checker that stops answering Q6 is visible.
-    if (!peoplelessPick && counters.findings.some(f => f.code === 'NO_PEOPLELESS_PAGE')) {
-      log.error(`❌ [BEATS] Plan check (${label}) fired NO_PEOPLELESS_PAGE but emitted no PEOPLELESS line — the finding names no page, and the planner picks blind`);
-      gl.error(`${label}_no_peopleless_nomination`, 'The plan check found no people-free page but nominated none either (Q6 PEOPLELESS line absent); the finding degrades to naming no page', null, { model: checkModelId || planCheckModel });
-    }
-    if (counters.skipped) {
-      const got = roster ? roster.size : 0;
-      log.error(`❌ [BEATS] Plan counters (${label}) SKIPPED (${counters.skipped}) — the roster covers ${got} of ${pages.length} page(s); no cast, invented-cast, shot-variety or focal-page counting ran`);
-      gl.error(`${label}_counters_skipped`, `Plan counters did not run (${counters.skipped}): the check's roster covers ${got} of ${pages.length} page(s)`, null, { reason: counters.skipped, rosterPages: got, pages: pages.length });
-    }
-    // Findings travel STRUCTURED to the re-plan: a counter keeps its code, a
-    // model finding the check number it answered, so buildReplanSection can rank
-    // them without reading their prose. `lines` stays the flat rendering the
-    // report and the logs have always carried.
-    const structured = [
-      ...counters.findings.map((f, i) => ({ kind: 'counter', code: f.code, line: counters.lines[i] })),
-      ...modelFindings.map(f => ({ kind: 'check', check: f.check, line: `CHECK[${f.check}]: ${f.text}` })),
-    ];
-    const all = structured.map(f => f.line);
-    gl.info(label, `Plan check by ${checkModelId || planCheckModel}: ${counters.lines.length} counter finding(s), ${modelFindings.length} model finding(s)`, null, {
-      counterFindings: counters.lines, modelFindings, model: checkModelId, stats: counters.stats, cast: counters.cast,
-    });
-    return { counters, modelFindings, findings: structured, lines: all, checkModelId, prompt, obstacles, reply, rosterLines, wanted, actions };
-  };
+  const runCheck = createPlanCheckRunner({
+    inputData, approvedArc, arcHints, arcStoryLogic, arcCentralFigure, castTable, commission, commissionedNames, placeNames,
+    maxCast, arcInventedNames, arcInventedLimit, mainName, planCheckModel, onChunk, gl,
+  });
 
-  // ONE shape for a recheck wherever it is recorded — the canonical `recheck`
-  // and a discarded round's sit side by side in the stored report and a reader
-  // must be able to compare them without learning two layouts.
-  const recheckRecord = c => (c ? {
-    counterFindings: c.counters.lines,
-    counterStats: c.counters.stats,
-    modelFindings: c.modelFindings,
-    // The flat rendering (counter lines + `CHECK[n]: …`) the summary prose and
-    // the log line both read, so the record is self-contained and no reader
-    // re-derives it.
-    lines: c.lines,
-    // Same evidence as the first check: an empty `modelFindings` on a RECHECK
-    // is the same two-way ambiguity, and a discarded round's record is where
-    // one would most want to see what the model actually said.
-    reply: c.reply || '',
-    rosterLines: c.rosterLines || [],
-    // THE RECHECK'S OWN PROMPT (2026-09-23). Only the first check's prompt was
-    // stored, so a recheck could be read only by rebuilding it at the run's
-    // commit — a reconstruction, not the bytes sent.
-    prompt: c.prompt || '',
-    wanted: c.wanted || [],
-    actions: c.actions || [],
-  } : null);
 
   t = Date.now();
   await stage(4, 'Checking the page division...', { next: 5, ms: 45000 });
@@ -1644,394 +3348,10 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // only ever describe the division that shipped.
   const replanRounds = [];
   if (check1.lines.length > 0) {
-    try {
-      // RE-PLAN ROUNDS (2026-09-09). The loop used to be check → re-plan →
-      // recheck → ship: a fault the RE-PLAN ITSELF introduced was named by the
-      // recheck and never fixed. Measured on the dragon story: the first
-      // division buried the spring's release inside a four-action page; the
-      // re-plan correctly split it out and left the new page holding the deed
-      // AND its effect ("rams the branch into the crack, water shoots out").
-      // The recheck said so in those words and the story shipped that way.
-      // A second round runs only when a MUST-FIX finding survives — the
-      // ranking `replanRank` already computes, so an "also noted" line can
-      // never spend a round. Bounded at two re-plans; the plan model is the
-      // cheapest call in the stage and a third round has never been needed.
-      const MAX_REPLAN_ROUNDS = 2;
-      let pendingCheck = check1;
-      // A round must EARN its keep. Measured 2026-09-09 on
-      // job_1788903616404_iqvhj4l8m: round 2 re-wrote 17 of 18 pages to clear
-      // three must-fix findings and minted five new ones (findings 26 -> 13 ->
-      // 23). The planner re-emits the whole division each round, so a round
-      // that does not reduce the must-fix count is not converging — it is
-      // rolling the dice on every page at once. Such a round is DISCARDED and
-      // the previous division stands, which makes the loop monotonic.
-      //
-      // THE COUNT IS THE CAST/FOCAL MUST-FIX COUNT, NOT THE RAW TOTAL
-      // (2026-09-20). Shot-distribution findings are must-fix — the re-plan is
-      // obliged to answer them — but they are exempt from THIS measure
-      // (promptBuilders.REPLAN_CONVERGENCE_EXEMPT_CODES). A shot finding is
-      // cleared by relabelling one page's shot word; a cast or focal finding
-      // costs the book a picture, so a raw total lets cheap shot clears pay for
-      // a lost wanted picture. Measured on job_1789853503332_riqncqg1i, whose
-      // round 2 rewrote 17 of 18 pages, took Q4 wanted-picture findings 2 -> 3
-      // and dropped its Q8 ending, yet read 6 -> 5 on the total because one
-      // ultra-wide finding fell.
-      let bestBeats = beats;
-      let bestPagePlan = pagePlan;
-      // The review's refusals from the round before, told to the next round.
-      let lastRefusals = [];
-      const coverageRule = castCoverage({ pageCount: beats.length, castCount: commission.listed.length });
-      for (let round = 1; round <= MAX_REPLAN_ROUNDS; round++) {
-        await checkCancellation();
-        await stage(5, 'Re-dividing the named pages...', { next: 18, ms: 45000 });
-        // WHAT THIS ROUND MUST KEEP (2026-09-23): the last page, the check's
-        // WANTED and ACTION pages, and a character's only focal page — one list
-        // for the prompt and for the review's `protected` rule below.
-        const keep = replanKeepPages({
-          pageCount: beats.length,
-          wanted: pendingCheck.wanted,
-          actions: pendingCheck.actions,
-          focalPages: (pendingCheck.counters.stats && pendingCheck.counters.stats.focalPages) || {},
-        });
-        const replanPrompt = buildBeatsPrompt(inputData, pageCount, {
-          finalArc: approvedArc,
-          arcHints,
-          centralFigure: arcCentralFigure,
-          castTable,
-          replan: buildReplanSection(pagePlan, pendingCheck.findings, { pageCount: beats.length, keep, refused: lastRefusals, castFloor: coverageRule ? coverageRule.appearances.min : null, castTable }),
-        });
-        if (!replanPrompt) throw new Error('story-beats template unavailable');
-        const rpRes = await textModels.callTextModelStreaming(replanPrompt, null, onChunk, planModel, { usageLabel: 'beats_replan' });
-        const second = readPlan(rpRes.text);
-        if (second.parsed.pages.length === 0) throw new Error('re-plan returned no parseable plan lines');
-        // DECLARE. The round states each structural change it made — a name in
-        // or out of frame, an action moved or dropped, one page's material
-        // joining another's — with the finding it answers and why. `present:
-        // false` is a round that emitted no block at all: every change it made
-        // is then undeclared, which is the behaviour the merge had before
-        // declarations existed (2026-09-18).
-        const declared = parsePlanChanges(rpRes.text);
-        // A TOTAL IS ALWAYS SELF-CERTIFIABLE: the block re-counts its own lines,
-        // and a count that disagrees with the enumeration is the enumeration's
-        // word against an assertion. The lines win; the discrepancy is reported.
-        if (declared.present && declared.declaredCount != null && declared.declaredCount !== declared.counted) {
-          gl.warn('beats_replan_change_count', `Round ${round}: the change block declares ${declared.declaredCount} change(s) and enumerates ${declared.counted} across ${declared.lines} line(s); the enumeration stands`, null, { round, declared: declared.declaredCount, counted: declared.counted, lines: declared.lines });
-        }
-        // ONE LINE, ONE CHANGE — recorded, not re-asked (2026-09-18). The
-        // parser splits a packed line into its clauses rather than mis-reading
-        // it, so a violation costs the round nothing; it is recorded because a
-        // format nobody polices is not a format. A re-ask is deliberately NOT
-        // wired: both planner models broke the contract on the first live
-        // attempt (Lab 1326: 7 of 10 lines; 1327: 1 of 5), so an automatic
-        // re-ask would buy a paid call on most rounds for a fault the parser
-        // already absorbs.
-        if (declared.violations.length) {
-          const detail = declared.violations.map(v => `p${v.pageNumber} (${v.rule})`).join(', ');
-          log.warn(`⚠️ [BEATS] Round ${round}: ${declared.violations.length} declared change(s) break the change-block format (${detail}) - read clause by clause, not refused`);
-          gl.warn('beats_replan_change_format', `Round ${round}: ${declared.violations.length} declared change(s) break the one-line-one-change format — ${detail}; each was read clause by clause rather than refused`, null, { round, violations: declared.violations });
-        }
-        const unreadable = declared.changes.filter(c => c.kind === 'other');
-        if (unreadable.length) {
-          gl.warn('beats_replan_change_unreadable', `Round ${round}: ${unreadable.length} declared change(s) do not use the declared vocabulary, so nothing reviewed them`, null, { round, lines: unreadable.map(c => c.line.slice(0, 160)) });
-        }
-        // MERGE, don't replace. The re-plan is asked for ONLY the pages a
-        // finding names; every other page stands. Until 2026-09-09 it returned
-        // the whole division, and the planner rewrote 15-18 of 18 pages every
-        // round — which is how a story lost the page where its quest object was
-        // put back (job_1788903616404_iqvhj4l8m: check 9 named the page, the
-        // re-plan answered by deleting the moment, and no check noticed it had
-        // gone). Pages no finding named are restored from the division that
-        // stands, so a round can only change what it was asked to change.
-        const namedPages = new Set();
-        for (const nf of (pendingCheck.findings || [])) for (const n of findingPages(nf)) namedPages.add(Number(n));
-        // A DECLARED PAGE IS IN SCOPE. Splitting a page's second action onto a
-        // picture of its own needs two pages rewritten — the one a finding
-        // named and the neighbour whose number now stages the new moment — and
-        // until 2026-09-18 the merge below restored the neighbour, which made
-        // the split the prompt described structurally impossible. A page the
-        // round DECLARES it changed, with the finding it answers and why, is
-        // asked-for work; a page in neither list is still restored.
-        const declaredPages = new Set();
-        for (const c of declared.changes) {
-          if (Number.isFinite(c.pageNumber)) declaredPages.add(Number(c.pageNumber));
-          if (Number.isFinite(c.toPage)) declaredPages.add(Number(c.toPage));
-          if (Number.isFinite(c.fromPage)) declaredPages.add(Number(c.fromPage));
-        }
-        // When NO finding names a page — a whole-book finding, or a finding whose
-        // page reference could not be read — the re-plan is answering for the
-        // whole division, so every returned page is accepted. The merge still
-        // runs: a page the return omits is filled from the division that stands,
-        // which is what keeps a partial answer from failing the page-count guard
-        // below and having the round discarded without a word.
-        const scopeAll = namedPages.size === 0;
-        {
-          const standing = new Map(beats.map(b => [b.pageNumber, b]));
-          const kept = [];
-          const inScope = n => namedPages.has(Number(n)) || declaredPages.has(Number(n));
-          for (const pg of second.parsed.pages) {
-            if (scopeAll || inScope(pg.pageNumber) || !standing.has(pg.pageNumber)) kept.push(pg);
-            else kept.push(standing.get(pg.pageNumber));
-          }
-          for (const [num, pg] of standing) if (!kept.some(k => k.pageNumber === num)) kept.push(pg);
-          kept.sort((a, b) => a.pageNumber - b.pageNumber);
-          const overridden = scopeAll ? 0 : second.parsed.pages.filter(pg => !inScope(pg.pageNumber) && standing.has(pg.pageNumber)).length;
-          if (overridden > 0) {
-            log.warn(`[BEATS] Round ${round}: the re-plan returned ${overridden} page(s) no finding named and no change declared - restored from the standing division`);
-            gl.warn('beats_replan_unnamed_pages', `Round ${round}: the re-plan rewrote ${overridden} page(s) that no finding named and no change declared; those pages were restored from the division that stands`, null, { round, overridden, named: [...namedPages].sort((a, b) => a - b), declared: [...declaredPages].sort((a, b) => a - b) });
-          }
-          second.parsed.pages = kept;
-          second.parsed.missing = [];
-        }
-        // REVIEW, then APPLY (2026-09-18). A removal is judged, never banned
-        // and never waved through.
-        //
-        // What this replaced: the round was told a removal is never a fix and
-        // `castLostByReplan` mechanically restored every name a re-plan took
-        // out. That rule is one-directional — `NO_COMMISSIONED_ON_PAGE` is
-        // answered by adding, `CAST_OVER_CEILING` by writing a justification
-        // into the line, plan-check Q3 likewise — so an over-crowded page could
-        // only ever get more crowded, and the standing division was treated as
-        // always right when it is itself a model output. Owner's verdict: "we
-        // can not say delete only or add only; we must give a fair review and
-        // allow both fix types."
-        //
-        // Two passes, in this order:
-        //   1. DECLARED changes go to `reviewPlanChanges`, which refuses one
-        //      against declared evidence — the check's own OBSTACLES line for
-        //      that page, the figure's span across the book, the cast ceiling,
-        //      and the page-count balance of a merge and a split. A refusal
-        //      restores that page from the division that stands and the finding
-        //      that named it survives to the recheck; it never discards a round.
-        //   2. UNDECLARED removals — a name gone from a who column with no
-        //      change line saying so — are restored exactly as before. A silent
-        //      deletion is unreviewable: the plan line is the brief's authority,
-        //      so the Art Director loses the figure and the scene review strips
-        //      them by the book (`[cast_not_in_plan]`). On staging
-        //      job_1789681157795_wkt20ckod that cost three CRITICAL and one
-        //      MAJOR IMG fault for an antagonist the page text describes and no
-        //      picture shows, and the only way anyone found it was diffing two
-        //      who-columns after the book was finished.
-        let reviewRefusals = [];
-        {
-          const guardCast = (pendingCheck.counters.cast && pendingCheck.counters.cast.all) || commissionedNames;
-          const guardAliases = (pendingCheck.counters.cast && pendingCheck.counters.cast.aliases) || {};
-          const standing = new Map(beats.map(b => [b.pageNumber, b]));
-          const restore = (pageNumbers) => {
-            const want = new Set(pageNumbers.map(Number));
-            second.parsed.pages = second.parsed.pages.map(pg => (
-              want.has(Number(pg.pageNumber)) && standing.has(pg.pageNumber) ? standing.get(pg.pageNumber) : pg
-            ));
-          };
-
-          const review = reviewPlanChanges({
-            changes: declared.changes,
-            standing: beats,
-            returned: second.parsed.pages,
-            castNames: guardCast,
-            aliases: guardAliases,
-            maxCast,
-            obstacles: pendingCheck.obstacles,
-            focalNames: coverageRule && coverageRule.focalEach ? commission.listed : [],
-            protectedPages: new Map(keep.map(k => [Number(k.page), k.why])),
-            actions: pendingCheck.actions,
-            rankOf: replanRank,
-            // The commissioned span floor the re-plan was told (2026-09-25).
-            castFloor: coverageRule ? { names: commission.listed, min: coverageRule.appearances.min } : null,
-          });
-          reviewRefusals = review.refusals;
-          lastRefusals = review.refusals;
-          if (review.notes.length) {
-            gl.info('beats_replan_change_notes', `Round ${round}: ${review.notes.length} declared change(s) could not be tied to a finding or a cast name`, null, { round, notes: review.notes });
-          }
-          if (review.refusals.length) {
-            restore(review.refusals.map(r => r.pageNumber));
-            const detail = review.refusals.map(r => `p${r.pageNumber} (${r.rule}): ${r.detail}`).join('; ');
-            log.warn(`⚠️ [BEATS] Round ${round}: ${review.refusals.length} declared change(s) refused on review - ${detail}`);
-            gl.warn('beats_replan_change_refused', `Round ${round}: the review refused ${review.refusals.length} declared change(s) — ${detail}; ${review.refusals.length === 1 ? 'that page was' : 'those pages were'} restored from the division that stands`, null, { round, refusals: review.refusals });
-          }
-
-          const lost = castLostByReplan(beats, second.parsed.pages, guardCast, guardAliases, review.declaredOut);
-          if (lost.length) {
-            restore(lost.map(l => l.pageNumber));
-            const detail = lost.map(l => `p${l.pageNumber}: ${l.lost.join(', ')}`).join('; ');
-            log.warn(`⚠️ [BEATS] Round ${round}: the re-plan dropped cast from ${lost.length} page(s) without declaring it (${detail}) - restored from the standing division`);
-            gl.warn('beats_replan_cast_lost', `Round ${round}: the re-plan removed ${detail} from the page plan and declared no change for it; an undeclared removal is unreviewable, so ${lost.length === 1 ? 'that page was' : 'those pages were'} restored from the division that stands`, null, { round, pages: lost, declaredBlock: declared.present });
-          }
-        }
-        // A re-plan that answers "this page holds two actions" by copying a
-        // neighbouring page has destroyed the page, not fixed it. Measured
-        // 2026-09-09 on job_1788903616404_iqvhj4l8m: the page staging the
-        // quest object's return came back as a verbatim duplicate of the page
-        // before it, and the story lost its climax with no check firing.
-        // Two pages with the same instant is corruption, so the round is
-        // discarded and the division that stands is kept.
-        {
-          const instants = second.parsed.pages.map(pg => String(pg.planLine || '').toLowerCase().replace(/\s+/g, ' ').trim());
-          const dupe = instants.find((t, k) => t && instants.indexOf(t) !== k);
-          if (dupe) {
-            log.warn(`[BEATS] Round ${round} returned two pages with the same line - discarding it, the previous division stands`);
-            gl.warn('beats_replan_duplicate', `Round ${round} produced two pages with an identical plan line; the round was discarded and the previous division stands`, null, { round, line: dupe.slice(0, 160) });
-            replanRounds.push({ round, changedPages: [], recheck: null, kept: false, replanPrompt, replanReply: String(rpRes.text || ''), discardReason: 'two pages returned with an identical plan line' });
-            beats = bestBeats;
-            pagePlan = bestPagePlan;
-            break;
-          }
-        }
-        // THE PAGE COUNT IS THE ORDER (2026-09-14). The re-plan may move, split
-        // or merge instants, but a round that returns more or fewer pages than
-        // the division that stands is not a re-division of THIS book: on
-        // job_1789337998754_apslnsq1z an 18-page order came back as 19 plan
-        // lines, passed both guards above (no duplicate, nothing omitted), and
-        // shipped as a 19-page book. Same remedy as the duplicate guard: the
-        // round is discarded and the previous division stands.
-        if (second.parsed.pages.length !== beats.length) {
-          log.warn(`[BEATS] Round ${round} returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book - discarding it, the previous division stands`);
-          gl.warn('beats_replan_page_count', `Round ${round} returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book; the round was discarded and the previous division stands`, null, { round, returned: second.parsed.pages.length, expected: beats.length });
-          replanRounds.push({ round, changedPages: [], recheck: null, kept: false, replanPrompt, replanReply: String(rpRes.text || ''), discardReason: `returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book` });
-          beats = bestBeats;
-          pagePlan = bestPagePlan;
-          break;
-        }
-        if (second.parsed.missing.length > 0) {
-          log.warn(`⚠️ [BEATS] Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — previous division kept`);
-          gl.warn('beats_replan_incomplete', `Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — previous division kept`);
-          replanRounds.push({ round, changedPages: [], recheck: null, kept: false, replanPrompt, replanReply: String(rpRes.text || ''), discardReason: `omitted page(s) ${second.parsed.missing.join(', ')}` });
-          break;
-        }
-        const before = new Map(beats.map(p => [p.pageNumber, p.planLine || '']));
-        const changedThisRound = second.parsed.pages
-          .filter(p => (before.get(p.pageNumber) || '') !== (p.planLine || ''))
-          .map(p => p.pageNumber);
-        beats = second.parsed.pages;
-        // Rebuild the plan TEXT from the merged pages. `second.pagePlan` is the
-        // raw re-plan response, so on any page the merge restored, the string
-        // and the array disagreed — and the string is what every report, every
-        // later reader and the recheck see. Measured 2026-09-09: one page of
-        // eighteen, and it was one of the pages a reviewer then judged against
-        // a line that had never been used. Deriving it from the pages makes the
-        // two representations incapable of diverging.
-        pagePlan = beats.map(pg => `Page ${pg.pageNumber}: ${pg.planLine || ''}`).join(String.fromCharCode(10));
-        gl.info('beats_replan', `Round ${round}: planner re-divided ${changedThisRound.length} page(s) for ${pendingCheck.lines.length} finding(s)`, null, {
-          round, replannedPages: changedThisRound, findings: pendingCheck.lines.length,
-        });
-        const check2 = await runCheck(round === 1 ? 'plan_recheck' : `plan_recheck_r${round}`, beats, pagePlan);
-        // Entered KEPT and demoted below if the round is thrown away, so the
-        // ledger records the round whichever way the verdict goes.
-        const roundRecord = {
-          round,
-          changedPages: changedThisRound,
-          findingsIn: pendingCheck.lines.length,
-          // The re-plan request this round was given, verbatim — the only
-          // prompt in the stage that carries the findings (## MUST FIX / ##
-          // ALSO NOTED). Text, additive, read by nothing.
-          replanPrompt,
-          // The re-plan's reply verbatim (2026-09-23): the stored round kept
-          // only the merged pages and the parsed changes.
-          replanReply: String(rpRes.text || ''),
-          recheck: recheckRecord(check2),
-          kept: true,
-          // WHAT THE ROUND SAID IT DID, AND WHAT THE REVIEW MADE OF IT. Before
-          // 2026-09-18 a removal was recorded nowhere at all — the only way to
-          // find one was diffing two who-columns after the book was finished.
-          // `declaredChanges: null` marks a round that emitted no block.
-          declaredChanges: declared.present ? declared.changes.map(c => c.line) : null,
-          changeRefusals: reviewRefusals,
-        };
-        replanRounds.push(roundRecord);
-        // Every surviving must-fix finding — what the NEXT round is mandated to
-        // answer, and what the ships-as-it-stands warning names.
-        const stillMustFix = (check2.findings || []).filter(f => replanRank(f) === 'must');
-        // The subset the round-keeping decision is made on: cast/focal only.
-        const stillConverging = stillMustFix.filter(countsTowardConvergence);
-        const shotOnly = stillMustFix.length - stillConverging.length;
-        // THE GUARD — every round, round 1 included (owner, 2026-09-24). Until
-        // then `&& round > 1` exempted round 1, and 8 of 32 stored books shipped
-        // a round-1 division with MORE cast/focal must-fix findings than the
-        // division it replaced (job_1790100385959_1nitlympp: 5 → 7). A round
-        // that regresses is discarded on any round; a round 2+ must also reduce
-        // (it is bought only to mop up). See `replanRoundRegressed` for the
-        // measure, which sets aside a model verdict that flips on a page the
-        // round never touched.
-        const verdict = replanRoundRegressed(pendingCheck, check2, changedThisRound, { round });
-        if (verdict.discard) {
-          const noiseNote = verdict.noise.length ? `, ${verdict.noise.length} checker verdict(s) on untouched pages set aside` : '';
-          const detail = `cast/focal must-fix ${verdict.before} → ${verdict.after}${noiseNote}`
-            + ` (${stillMustFix.length} must-fix in total, ${shotOnly} of them shot-distribution, which do not count toward convergence)`;
-          const what = verdict.regressed ? 'raised' : 'did not reduce';
-          log.warn(`⚠️ [BEATS] Round ${round} ${what} the cast/focal must-fix count (${detail}) — discarding it, the previous division stands`);
-          gl.warn('beats_replan_discarded', `Round ${round} ${what} the cast/focal must-fix count (${detail}) — the round was discarded and the previous division stands`, null, {
-            round, before: verdict.before, after: verdict.after, noise: verdict.noise.map(f => f.line),
-            totalMustFixAfter: stillMustFix.length, shotMustFixAfter: shotOnly,
-          });
-          roundRecord.kept = false;
-          roundRecord.discardReason = `${what} the cast/focal must-fix count (${detail})`;
-          beats = bestBeats;
-          pagePlan = bestPagePlan;
-          break;
-        }
-        bestBeats = beats;
-        bestPagePlan = pagePlan;
-        if (stillMustFix.length === 0) break;
-        // A FURTHER ROUND MUST BE MOPPING UP, NOT RE-ROLLING (2026-09-21).
-        //
-        // The planner re-emits the whole division each round, so a round is only
-        // worth buying when the one before it was CONVERGING: strictly fewer
-        // cast/focal must-fix findings than it was given, and not one of them
-        // new. A recheck that names a fault the previous check did not is a
-        // round that moved sideways, and the next round is then re-rolling the
-        // same dice at ~$0.09 and ~160s a throw — which is exactly what the
-        // monotonic discard below then throws away.
-        //
-        // Measured by replaying this test over stored staging
-        // `beatsReviewReport` rows (28 books with a recheck in 45 days, zero
-        // paid calls): 6 rechecks are a strict subset and still buy a round; 22
-        // are not, 10 of them because the recheck minted a new cast/focal
-        // must-fix. Exactly 2 books ever ran a round 2 in that window, this test
-        // would have skipped both, and BOTH were discarded by the convergence
-        // rule below after they ran — i.e. no kept round 2 exists in the window.
-        //
-        // The identity of a finding is its code (a counter) or the check number
-        // that produced it (a model finding) plus the pages it names — never its
-        // prose, which this codebase forbids reading for meaning.
-        {
-          const conv = replanRoundConverged(pendingCheck, check2);
-          if (!conv.converged) {
-            const why = conv.minted.length
-              ? `the recheck names ${conv.minted.length} cast/focal must-fix finding(s) the check before it did not`
-              : `cast/focal must-fix ${conv.given} → ${conv.surviving} is not a reduction`;
-            log.warn(`⚠️ [BEATS] Round ${round} did not converge (${why}) — no further round; the division it produced ships`);
-            gl.info('beats_replan_no_further_round', `Round ${round} did not converge (${why}); no further re-plan round was bought and the division that round produced ships`, null, {
-              round, given: conv.given, surviving: conv.surviving,
-              minted: conv.minted.map(f => f.line),
-            });
-            break;
-          }
-        }
-        if (round === MAX_REPLAN_ROUNDS) {
-          // Ships with the fault named. A division is never withheld from a
-          // paid run over a plan finding (gates are guidelines).
-          log.warn(`⚠️ [BEATS] ${stillMustFix.length} must-fix finding(s) survive ${MAX_REPLAN_ROUNDS} re-plan round(s) — the division ships as it stands`);
-          gl.warn('beats_replan_unfixed', `${stillMustFix.length} must-fix finding(s) survive ${MAX_REPLAN_ROUNDS} round(s): ${stillMustFix.map(f => f.line).join(' | ')}`, null, {
-            rounds: MAX_REPLAN_ROUNDS, unfixed: stillMustFix.map(f => f.line),
-          });
-          break;
-        }
-        pendingCheck = check2;
-      }
-    } catch (err) {
-      // Never block a story on the check: the first division is a complete plan.
-      log.warn(`🚨 [BEATS] Re-plan failed (${err.message}) — the first division ships`);
-      gl.warn('beats_replan_failed', `Re-plan failed: ${err.message} — the first division ships`);
-      beats = plan.pages;
-      // The FIRST division ships, so no round describes what shipped any more —
-      // including a round that had been kept before the failure. They stay on
-      // the ledger as discarded rather than being deleted (diagnostics).
-      for (const r of replanRounds) {
-        if (!r.kept) continue;
-        r.kept = false;
-        r.discardReason = `re-plan failed after this round (${err.message}) — the first division ships`;
-      }
-    }
+    ({ beats, pagePlan } = await runReplanRounds({
+      inputData, pageCount, plan, check1, replanRounds, approvedArc, arcHints, arcStoryLogic, arcCentralFigure, castTable,
+      commission, commissionedNames, maxCast, planModel, readPlan, runCheck, onChunk, gl, stage, checkCancellation, beats, pagePlan,
+    }));
   }
   meta.timings.planCheckMs = Date.now() - t;
 
@@ -2338,1072 +3658,25 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // in one call. Per-page expansion survives ONLY as the shortfall fallback
   // below — never as the primary path.
   await checkCancellation();
-  const lang = inputData.language || 'en';
-  const imgModelConfig = IMAGE_MODELS[modelOverrides.imageModel || inputData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageRenderImage];
-  const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters || [], clothingRequirements);
-  const maxCharactersPerScene = imgModelConfig?.maxCharactersPerScene || 3;
-
-  /**
-   * Per-page expansion — the fallback for pages the single call omitted, and
-   * the only remaining user of the per-page scene-expansion.txt template here.
-   */
-  async function expandOnePage(b) {
-    // The PLAN line stands in for page.text: in a beats-first run the text
-    // does not exist yet, so the Art Director works from the locked plan.
-    const pageContent = `PLAN: ${b.planLine || ''}`;
-    const prompt = buildSceneExpansionPrompt(
-      b.pageNumber, pageContent, inputData.characters || [], lang,
-      visualBible, availableAvatars, null,
-      {
-        maxCharactersPerScene,
-        artStyleId: inputData.artStyle,
-        imageBackend: imgModelConfig?.backend,
-        // No referencePhotos exist at this stage, so the contract is the only
-        // outfit source — same reason the all-pages builder needs it.
-        clothingRequirements,
-        // Decides whether the text-zone rule family is asked for at all.
-        story: inputData,
-      }
-    );
-    let lastErr = null;
-    // The best incomplete brief seen, kept as the last resort. A page with half
-    // a spec still beats a page with none: this fallback's throw ABORTS the run
-    // (Promise.all over the missing pages), and a contract miss must never end a
-    // paid run (docs/SETTLED.md, gates are guidelines).
-    let salvage = null;
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        // Own usage label (2026-08-31): fallback pages used to book under
-        // 'beats_scene_expansion' like the batch call, so a truncated batch
-        // plus silent per-page recovery was invisible in the usage summary
-        // (job_1788123310558: 6 calls under one label, no way to tell 1
-        // batch + 5 fallbacks from 6 batches).
-        const res = await textModels.callTextModelStreaming(prompt, null, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion_fallback' });
-        if (!res || !res.text || !res.text.trim()) throw new Error('empty scene brief');
-        // Same contract as the batch merge above — a recovery that itself comes
-        // back cut is not a recovery. The second attempt is the retry; if both
-        // are cut the throw below names why, instead of storing half a spec.
-        const { assessSceneBrief, describeSceneBrief } = require('./iterateBriefGuard');
-        const verdict = assessSceneBrief(res.text);
-        if (!verdict.usable) {
-          if (!salvage) salvage = { pageNumber: b.pageNumber, brief: res.text, prompt, modelId: res.modelId || sceneModel, verdict };
-          throw new Error(`incomplete scene brief — ${describeSceneBrief(verdict)}`);
-        }
-        return { pageNumber: b.pageNumber, brief: res.text, prompt, modelId: res.modelId || sceneModel };
-      } catch (err) {
-        lastErr = err;
-        log.warn(`⚠️ [BEATS] Scene expansion page ${b.pageNumber} attempt ${attempt} failed: ${err.message}`);
-      }
-    }
-    if (salvage) {
-      const { describeSceneBrief } = require('./iterateBriefGuard');
-      const why = describeSceneBrief(salvage.verdict);
-      log.error(`🚨 [BEATS] Page ${b.pageNumber}: both per-page attempts returned an incomplete brief (${why}) — SHIPPING IT ANYWAY; every metadata-driven supervisor runs blind on this page`);
-      gl.warn('beats_scene_brief_incomplete', `Page ${b.pageNumber} ships with an incomplete brief after two per-page attempts — ${why}`, null, { pages: [b.pageNumber] });
-      return { pageNumber: salvage.pageNumber, brief: salvage.brief, prompt: salvage.prompt, modelId: salvage.modelId };
-    }
-    throw new Error(`Scene expansion failed for page ${b.pageNumber}: ${lastErr?.message || 'unknown error'}`);
-  }
-
-  t = Date.now();
-  // COVERS ARE PAGES (owner, 2026-09-24). Each cover the job renders is a page
-  // whose BEAT code writes (coverBeats.js: purpose, cast, costumes, the landmark
-  // rule, the element budget, gaze and the copy space), briefed by the Art
-  // Director with every other page and reviewed with them. They ride AFTER the
-  // story pages, so the story's own page order is untouched, and they never
-  // reach the page text writer or the plan counters — `beats` stays the story.
-  const { buildCoverBeats, isCoverPage } = require('./coverBeats');
-  const { coverTypesFor } = require('./coverKeys');
-  const coverBeats = buildCoverBeats(inputData, { coverTypes: coverTypesFor(inputData), clothingRequirements, centralFigure: arcCentralFigure });
-  const briefBeats = [...beats, ...coverBeats];
-  const beatPageNumbers = briefBeats.map(b => b.pageNumber);
-  let expansions = [];
-  // The Visual Bible the Art Director emits ahead of page 1.
-  let adBible = null;
-  // THE REPLY AS RETURNED, one row per all-pages attempt (2026-09-23). Only
-  // parsed parts were stored — the briefs, and the bible after the post-review
-  // usage rebuild and every sync had rewritten it — so the prompt audit of
-  // staging job_1790100385959_1nitlympp compared the checker's page table with
-  // the REBUILT one, took it for the Art Director's, and reported a mutation
-  // that never happened. Stored beside the prompt in sceneExpansionReport.
-  const adReplies = [];
-  // No rulings travel here any more (2026-09-01): the beats reviewer that
-  // produced them is gone, and the plan check never rules on anything — it
-  // counts, and the planner re-divides. CARRY_ROUTES stays for the Lab.
-  const allPrompt = buildSceneExpansionAllPrompt(inputData, briefBeats, {
-      availableAvatars,
-      maxCharactersPerScene,
-      // The whole story, read-only, for the Art Director's judgment — it
-      // stages only what each page's beat and plan line carry.
-      finalArc: approvedArc,
-      // The Art Director needs the outfit TEXT, not just the category key — see
-      // buildSceneExpansionAllPrompt. In beats mode the visual contract is the
-      // only source, and it is resolved by the time scenes are expanded.
-      clothingRequirements,
+  const ad = await runArtDirector({
+    inputData, modelOverrides, clothingRequirements, visualBible, bibleSections, sceneModel, onChunk, gl, meta, stage,
+    beats, arcCentralFigure, approvedArc, onVisualBible, wardrobeBibleReport,
   });
-  if (!allPrompt) {
-    log.error('🚨 [BEATS] scene-expansion-all template unavailable — falling back to per-page expansion for every page');
-    gl.warn('beats_scene_expansion_fallback', 'All-pages template unavailable — every page expanded per-page (no cross-page continuity)');
-  } else {
-    // Output is `## Page N` + prose + METADATA per page — the same shape the
-    // scene review returns, so the review's parser reads it unchanged.
-    // Two attempts at the full batch (2026-08-31): the call already asks for
-    // the model's full maxOutputTokens (maxTokens=null), but an incomplete
-    // parse — the truncation signature — used to drop straight to the
-    // per-page fallback with no batch retry and no stored warning until the
-    // shortfall guard below. job_1788123310558 lost pages 12-16 that way
-    // (gemini-3.1-pro's configured cap was 16384; raised in models.js).
-    // First attempt's pages win the merge so a retry can only FILL gaps,
-    // never rewrite pages already parsed.
-    let allModelId = sceneModel;
-    const byPage = new Map();
-    await stage(30, 'Writing the visual bible and the scene briefs...', { next: 42, ms: 176000 });
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      let allRaw = '';
-      try {
-        const res = await textModels.callTextModelStreaming(allPrompt, null, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion' });
-        allRaw = res?.text || '';
-        allModelId = res?.modelId || sceneModel;
-        adReplies.push({ attempt, modelId: allModelId, text: allRaw });
-      } catch (err) {
-        log.error(`🚨 [BEATS] All-pages scene expansion attempt ${attempt} failed (${err.message}) — falling back to per-page expansion`);
-        gl.warn('beats_scene_expansion_failed', `All-pages call failed on attempt ${attempt}: ${err.message} — falling back to per-page expansion`);
-        break;
-      }
-      // THE BIBLE RIDES IN FRONT of page 1 (2026-09-11). A response is only
-      // whole when BOTH halves parsed: a partial bible must never ship, and
-      // JSON.parse is the completeness test — a reply cut mid-JSON yields null
-      // here, not half a bible, and the retry below is the recovery.
-      if (!adBible) {
-        const sections = extractBibleSections(allRaw, AD_BIBLE_MARKERS);
-        const parsedVb = sections ? new UnifiedStoryParser(sections.body).extractVisualBible() : null;
-        if (sections && parsedVb) {
-          adBible = { body: sections.body, visualBible: parsedVb, found: sections.found, modelId: allModelId };
-        } else if (sections) {
-          log.error(`🚨 [BEATS] All-pages attempt ${attempt}: ---VISUAL BIBLE--- present but its JSON did not parse (${sections.body.length} chars) — treating the bible as MISSING rather than shipping a partial one`);
-        } else {
-          log.error(`🚨 [BEATS] All-pages attempt ${attempt}: response carries no ---VISUAL BIBLE--- section (${allRaw.length} chars)`);
-        }
-      }
-      const parsed = parseRefinedText(allRaw, beatPageNumbers, 'SCENES', BRIEF_TRAILING_MARKERS);
-      // A PAGE IS NOT A BRIEF. parseRefinedText accepts any non-empty run of
-      // text under a `## Page N` heading, so a page the reply cut mid-sentence
-      // counted as delivered: no retry, no fallback, no warning — the generator
-      // rendered half a spec and the eval judged it against that same half.
-      // Measured once in 955 staging pages (job_1789207854566_l43qgl34w p7).
-      // Incomplete pages are simply not merged, which hands them to the retry
-      // above and the per-page fallback below — the recovery that already
-      // exists. The verdict is the one the iterate round already uses
-      // (iterateBriefGuard.js), built from this very page: prose, parseable
-      // metadata, a sceneIntent. Measured over 1035 stored beats briefs / 85
-      // staging stories it rejects 4 — p7, and three August pages that predate
-      // sceneIntent. No current story loses a page to it.
-      const { partitionSceneBriefs, describeSceneBrief } = require('./iterateBriefGuard');
-      const { whole, cut, formatWide } = partitionSceneBriefs(parsed.pages);
-      for (const p of (formatWide ? cut : whole)) {
-        if (!byPage.has(p.pageNumber)) byPage.set(p.pageNumber, p.text);
-      }
-      if (formatWide) {
-        log.error(`🚨 [BEATS] All-pages attempt ${attempt}: not one of the ${cut.length} brief(s) meets the brief contract (${describeSceneBrief(cut[0].verdict)}) — accepting them as written rather than re-expanding the whole book`);
-        gl.warn('beats_scene_brief_contract_missed', `No scene brief in the all-pages reply meets the brief contract (${cut.length} page(s), first: ${describeSceneBrief(cut[0].verdict)}) — briefs ship as written and every metadata-driven supervisor runs blind`);
-      } else if (cut.length > 0) {
-        const detail = cut.sort((a, b) => a.pageNumber - b.pageNumber)
-          .map(p => `p${p.pageNumber} (${describeSceneBrief(p.verdict)})`).join('; ');
-        const pages = cut.map(p => p.pageNumber);
-        log.error(`🚨 [BEATS] All-pages attempt ${attempt}: incomplete brief(s) — ${detail} — treating them as NOT delivered`);
-        gl.warn('beats_scene_brief_incomplete', `Brief(s) for page(s) ${pages.join(', ')} came back incomplete — ${detail}. Not accepted; re-expanded instead`, null, { pages });
-      }
-      if (briefBeats.every(b => byPage.has(b.pageNumber)) && adBible) break;
-      if (attempt === 1) {
-        const missingNow = briefBeats.filter(b => !byPage.has(b.pageNumber)).map(b => b.pageNumber);
-        const what = [
-          missingNow.length ? `missing page(s) ${missingNow.join(', ')}` : null,
-          adBible ? null : 'no parseable Visual Bible',
-        ].filter(Boolean).join(' and ');
-        log.error(`🚨 [BEATS] All-pages expansion incomplete: ${byPage.size}/${briefBeats.length} briefs parsed, ${what} — retrying the batch ONCE at full cap`);
-        gl.warn('beats_scene_expansion_truncated', `All-pages call returned ${byPage.size}/${briefBeats.length} briefs, ${what} — retrying the batch once at full output cap`);
-      }
-    }
-    expansions = briefBeats
-      .filter(b => byPage.has(b.pageNumber))
-      .map(b => ({ pageNumber: b.pageNumber, brief: byPage.get(b.pageNumber), prompt: allPrompt, modelId: allModelId }));
-  }
-
-  // ── Adopt the Art Director's Visual Bible ─────────────────────────────────
-  // Runs BEFORE the per-page fallback below, so a recovered page is expanded
-  // against the same bible the batch wrote, and before the scene review and the
-  // page text, so the landmark-shortfall hook can still abort attempt 1 cheaply.
-  //
-  // With no parseable bible at all the run is degraded exactly as a failed
-  // bible stage used to be — empty VB, no cover hints, blind per-page briefs —
-  // and says so loudly. It is never a kill: a contract miss must not end a paid
-  // run (docs/SETTLED.md, gates are guidelines).
-  if (adBible) {
-    visualBible = adBible.visualBible;
-    let bibleBody = adBible.body;
-
-    // An invented child the bible declares a PEER of the commissioned children
-    // must state an age inside their band. The band went into the prompt above;
-    // this is the deterministic post-check over what came back — no model call,
-    // no classification, it reads the bible's own `peer` field and compares a
-    // number. Fail-soft: clamp to the nearest tolerated edge, flag the entry,
-    // warn. No retry loop and never a kill — an age constraint must not be able
-    // to end a paid run. Evidence: job_1788641639919_mpjwlzkf1, CHR001 "The boy
-    // in the striped scarf" stated ten next to a commissioned 6-year-old,
-    // rendered 11-12 on p5.
-    // ONE authored English label per element, enforced the moment the bible is
-    // adopted — BEFORE the clamp, so the clamp's own sync carries the labels
-    // too. Its own sync below runs regardless, so the projection never depends
-    // on whether the clamp fired.
-    const labelRound = await runVisualBibleLabelRound(visualBible, {
-      model: sceneModel, language: inputData.language, gl, log, stageReport: meta,
-    });
-    if (labelRound.findings > 0) {
-      const synced = syncVisualBibleSection(bibleBody, visualBible);
-      if (synced === bibleBody) {
-        log.warn('⚠️ [BEATS] Element labels could not be written back into the transcript — downstream re-parses will read the UNLABELLED bible');
-        gl.warn('beats_vb_sync_failed', 'Element labels could not be written back into the transcript — stored bible will not reflect them');
-      } else {
-        bibleBody = synced;
-      }
-    }
-
-    const childBand = visualBible?.secondaryCharacters?.length
-      ? commissionedChildBand(inputData.characters || [])
-      : null;
-    if (childBand) {
-      const ageClamps = applySecondaryAgeBand(visualBible.secondaryCharacters, childBand, buildCharacterDescription);
-      for (const a of ageClamps) {
-        log.warn(`⚠️ [BEATS] ${a.detail} — clamped to ${a.clampedTo}`);
-        gl.warn('beats_secondary_age_clamped', `${a.name} was ${a.statedAge} beside commissioned children ${childBand.min}-${childBand.max}; clamped to ${a.clampedTo}`, null, {
-          id: a.id, statedAge: a.statedAge, clampedTo: a.clampedTo, bandLow: childBand.low, bandHigh: childBand.high,
-        });
-      }
-      // ONE SOURCE OF TRUTH. The clamp mutated this module's parsed copy only;
-      // the transcript is what every later reader re-parses (storyJobPipeline,
-      // resume, the Lab). Write the mutated fields back so every
-      // extractVisualBible() from here on agrees.
-      if (ageClamps.length > 0) {
-        const synced = syncVisualBibleSection(bibleBody, visualBible);
-        if (synced === bibleBody) {
-          log.warn('⚠️ [BEATS] Age clamp could not be written back into the transcript — downstream re-parses will read the UNCLAMPED bible');
-          gl.warn('beats_vb_sync_failed', 'Age clamp could not be written back into the transcript — stored bible will not reflect it');
-        } else {
-          bibleBody = synced;
-        }
-      }
-    }
-
-    // Append to the wardrobe transcript: CLOTHING REQUIREMENTS, VISUAL BIBLE.
-    bibleSections = bibleSections ? `${bibleSections.trimEnd()}
-
-${bibleBody}` : bibleBody;
-
-    const vbCount = Object.values(visualBible).reduce((n, v) => n + (Array.isArray(v) ? v.length : 0), 0);
-    gl.info('beats_visual_bible', `Visual Bible by ${adBible.modelId || sceneModel}: ${vbCount} entr(ies), written with the page briefs`, null, {
-      vbEntries: vbCount, sections: adBible.found,
-    });
-  } else if (allPrompt) {
-    log.error('🚨 [BEATS] All-pages call produced NO parseable Visual Bible after both attempts — story ships with an empty bible and blind briefs');
-    gl.warn('beats_visual_bible_missing', 'The Art Director returned no parseable Visual Bible — story ships with an empty bible');
-  }
-
-  // The page images need each real landmark's PHOTO VARIANTS on the bible entry
-  // (the resolver serves the variant a brief's landmarkView asks for). The Art
-  // Director already chose its viewpoints from the PHOTOS lines in
-  // {AVAILABLE_LANDMARKS_SECTION}; these two steps link what it chose to the
-  // index rows. Both are cheap (in-memory matching; one DB query) and
-  // idempotent, so the caller repeating them costs nothing.
-  if (visualBible) {
-    try {
-      if (inputData.availableLandmarks?.length) {
-        require('./visualBible').linkPreDiscoveredLandmarks(visualBible, inputData.availableLandmarks);
-      }
-      await require('./landmarkPhotos').loadLandmarkPhotoDescriptions(visualBible);
-      const realLandmarks = (visualBible.locations || []).filter(l => l.isRealLandmark);
-      if (realLandmarks.length > 0) {
-        const withVariants = realLandmarks.filter(l => l.photoVariants?.length).length;
-        log.info(`🌍 [BEATS] Landmark photo variants linked: ${withVariants}/${realLandmarks.length} real landmark(s) carry variants`);
-      }
-    } catch (err) {
-      log.warn(`⚠️ [BEATS] Landmark linking/variants did not load: ${err.message}`);
-    }
-  }
-
-  // ── Wardrobe contract vs Visual Bible ────────────────────────────────────
-  // The two describe the same body and nothing compared them: a costume line
-  // could put a hat on a character the bible already dresses with a different
-  // one, on every page she appears (staging job_1789420511893_zly5rcdej,
-  // ART002). The contract owns garment wording (owner, 2026-09-23): a linked
-  // entry naming the SAME garment takes the contract's words (`adopt`). A
-  // DIFFERENT garment in an occupied slot (`conflict`) becomes a new OUTFIT
-  // VERSION on the bible entry (owner, 2026-09-24) — the contract is never
-  // touched and no avatar is re-rendered; the page that needs the garment
-  // selects the version, which gets its own sheet (wardrobeVariants, after the
-  // scene briefs exist). Contained like every other check: a throw ships the
-  // contradiction rather than killing the run, but never silently.
-  if (visualBible && clothingRequirements && Object.keys(clothingRequirements).length > 0) {
-    try {
-      const { applyWardrobeBibleCorrections } = require('./clothingCheck');
-      const { findings, applied, versions, unresolved } = applyWardrobeBibleCorrections(clothingRequirements, visualBible);
-      // `applied` / `versions` hold RE-DERIVED finding objects (the corrector
-      // re-checks after every change), so identity comparison against
-      // `findings` is always false. Compare on what identifies a finding.
-      const correctionKey = (f) => `${f.character} ${f.category} ${f.slot} ${f.elementId || ''}`;
-      const appliedKeys = new Set([...applied, ...versions].map(correctionKey));
-      if (findings.length > 0) {
-        wardrobeBibleReport = {
-          conflicts: findings.map(f => ({
-            kind: f.kind, character: f.character, category: f.category, slot: f.slot,
-            elementId: f.elementId, elementLabel: f.elementLabel, elementText: f.elementText,
-            wardrobeClause: f.wardrobeClause, corrected: appliedKeys.has(correctionKey(f)),
-          })),
-        };
-        if (versions.length > 0) {
-          wardrobeBibleReport.versions = versions.map(f => ({
-            character: f.character, category: f.category, slot: f.slot, elementId: f.elementId,
-            replaces: f.wardrobeClause, garment: f.elementText, outfit: f.versionOutfit,
-          }));
-        }
-        gl.warn('beats_wardrobe_bible_conflict', `${findings.length} wardrobe/bible disagreement(s): ${findings.map(f => `${f.kind} ${f.character}/${f.slot} "${f.wardrobeClause}" vs ${f.elementId || '?'} "${f.elementLabel}"`).join('; ')}`, null, {
-          conflicts: wardrobeBibleReport.conflicts,
-        });
-        if (unresolved.length > 0) {
-          wardrobeBibleReport.unresolved = unresolved.map(f => ({
-            kind: f.kind, character: f.character, category: f.category, slot: f.slot,
-            elementId: f.elementId, elementLabel: f.elementLabel, wardrobeClause: f.wardrobeClause,
-          }));
-        }
-      }
-    } catch (err) {
-      log.error(`🚨 [BEATS] Wardrobe-vs-bible check failed: ${err.message} — a contract/bible contradiction would ship unnoticed`);
-    }
-  }
-
-  // Deliberately OUTSIDE every try/catch above: a throw from the caller's hook
-  // must abort the run (the landmark-shortfall retry uses exactly that), not be
-  // swallowed into "ships with an empty bible".
-  if (onVisualBible && visualBible) await onVisualBible(visualBible);
-
-  // Page-count guard: a short response must never ship a story with pages that
-  // have no brief. Only the MISSING pages are re-expanded per-page.
-  const missingBriefs = briefBeats.filter(b => !expansions.some(x => x.pageNumber === b.pageNumber));
-  if (missingBriefs.length > 0) {
-    log.error(`🚨 [BEATS] All-pages expansion returned ${expansions.length}/${briefBeats.length} briefs — re-expanding page(s) ${missingBriefs.map(b => b.pageNumber).join(', ')} per-page`);
-    gl.warn('beats_scene_expansion_incomplete', `All-pages call returned ${expansions.length}/${briefBeats.length} briefs — page(s) ${missingBriefs.map(b => b.pageNumber).join(', ')} expanded per-page`);
-    const recovered = await Promise.all(missingBriefs.map(expandOnePage));
-    expansions = expansions.concat(recovered).sort((a, b) => a.pageNumber - b.pageNumber);
-  }
-  meta.timings.sceneExpansionMs = Date.now() - t;
-
-  // THE PROMPT THAT WROTE THE BRIEFS (2026-09-19).
-  //
-  // `sceneReviewReport.prompt` is the REVIEWER's prompt. The Art Director's own
-  // — ~100k chars of rules, the Visual Bible spec, the cover spec and all 18
-  // plan lines — was stored nowhere, so recovering it for
-  // job_1789759147125_p08djwhbl meant a git worktree at the run's commit plus a
-  // rebuild from inputData + finalArc + pagePlan + clothingRequirements +
-  // characterAvatars. Worse, WHICH commit to rebuild at was only decidable by
-  // probing the stored review prompt for a constant a candidate commit had
-  // introduced. The beats planner got `plannerPrompt` the same day; this is the
-  // same gap one stage later.
-  //
-  // Rolled up by DISTINCT prompt rather than one copy per page: the all-pages
-  // call normally covers every page in one row, and a page that fell back to the
-  // per-page template keeps its own prompt in a row of its own. Storing it per
-  // page would mean eighteen copies of the same 100k string.
-  //
-  // Written HERE, not into sceneReviewReport: that object is assigned only
-  // inside the branch where the review template loaded, so a run that shipped
-  // briefs unreviewed — precisely the run worth inspecting — would carry no
-  // prompt at all.
-  // `prompts[]` is NOT built here. The prompt table is one story-wide object
-  // that every page references (server/lib/storyShape.js), so it has exactly
-  // one builder — `rollUpScenePrompts()`, called by the caller over the
-  // assembled scenes, which covers the unified (non-beats) path with the same
-  // code. This report carries only what beats alone knows.
-  const sceneExpansionReport = {
-    durationMs: meta.timings.sceneExpansionMs,
-    fallbackPages: missingBriefs.map(b => b.pageNumber),
-    replies: adReplies,
-  };
-
-  gl.info('beats_scenes', `${expansions.length} scene briefs expanded by ${sceneModel} in one call${missingBriefs.length ? ` (+${missingBriefs.length} per-page fallback)` : ''} (${(meta.timings.sceneExpansionMs / 1000).toFixed(1)}s)`, null, {
-    pages: expansions.length, fallbackPages: missingBriefs.map(b => b.pageNumber), model: sceneModel,
-  });
+  let expansions = ad.expansions;
+  visualBible = ad.visualBible;
+  bibleSections = ad.bibleSections;
+  wardrobeBibleReport = ad.wardrobeBibleReport;
+  const { sceneExpansionReport, briefBeats, coverBeats } = ad;
+  const { isCoverPage } = require('./coverBeats');
 
   // ── Step 4: ONE review over ALL scene briefs ──────────────────────────────
   await checkCancellation();
-  let sceneReviewAnalysis = '';
-  // Set when the review reply was truncated (textReplyGuard.js): the briefs
-  // shipped unreviewed and the report says so instead of "rewrote nothing".
-  let sceneReviewFailed = null;
-  // Same contract as beatsReviewReport above: null only when the review never
-  // ran; an object with empty pages[] when it ran and rewrote nothing.
-  let sceneReviewReport = null;
-  // What the review's optional ---VISUAL BIBLE--- section changed, so the next
-  // story proves the channel ran (the labelRound lesson).
-  let bibleCorrections = null;
-  let castRemovalsDeclared = null;
-  let castRemovalAudit = [];
-  // Mechanical clothing faults, computed here and handed to the review — the
-  // ONE place they get fixed (owner decision 2026-08-08). Free: no API call, no
-  // image. Only the findings measured to carry signal are rendered
-  // (outfit_misattributed, removal_unstated); see clothingCheck.js.
-  let clothingFindings = '';
-  let clothingByPage = null;
-  let clothingUnfixedList = [];
-  // Worn-item states the fed-back round could not get declared. The pages ship
-  // flagged; wornItems.js then defaults them to "worn" (decisions.md 2026-09-06).
-  let wornUnresolved = [];
-  let wornUnresolvedPages = [];
-  let wornRound = null;
-  let briefUnfixedList = [];
-  let briefIntroducedList = [];
-  // The two REWRITE-UNTIL-ZERO types (owner, 2026-09-08): a page declaring two
-  // actions, and a page over the three-element budget. What this adds is a
-  // VISIBLE verdict when they survive the single review round — page numbers per type,
-  // and for the budget which pages the brief itself could not have fixed
-  // (the bible's `appearsInPages` places elements the brief never cited, and
-  // objectsAsked ≤ 3 means the reviewer had nothing left to withdraw).
-  // Null when both types ended at zero. Never kills the run.
-  let rewriteToZeroUnfixed = null;
-  try {
-    const { checkScenes, renderFindingsBlock } = require('./clothingCheck');
-    const checkPages = expansions.map(x => {
-      const meta = extractSceneMetadata(x.brief) || {};
-      return {
-        pageNumber: x.pageNumber,
-        prose: splitBrief(x.brief).prose,
-        cast: (meta.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
-        perCharClothing: meta.characterClothing || {},
-        // Structured worn-item states (server/lib/wornItems.js) — removal_unstated
-        // is a MISSING-FIELD fault since 2026-09-06, not a prose search.
-        wornItems: meta.wornItems || [],
-      };
-    });
-    const res = checkScenes(checkPages, clothingRequirements, { artifacts: (visualBible || {}).artifacts, visualBible });
-    clothingByPage = res.byPage;
-    clothingFindings = renderFindingsBlock(res.byPage);
-    if (clothingFindings) {
-      const pages = [...res.byPage.keys()].sort((a, b) => a - b).join(', ');
-      log.info(`👕 [BEATS] clothing check: ${res.findings.length} finding(s) on page(s) ${pages} — sent to the scene review`);
-      gl.info('beats_clothing_check', `Clothing check found ${res.findings.length} fault(s) on page(s) ${pages}`, null, { findings: res.findings });
-    }
-  } catch (ccErr) {
-    log.warn(`⚠️ [BEATS] clothing check failed (${ccErr.message}) — review runs without findings`);
-  }
-
-  // Brief contradictions — prose vs the brief's own metadata. Same place, same
-  // deal as the clothing faults above: deterministic, free, and handed to the
-  // review rather than auto-repaired (owner decision 2026-08-11 — the reviewer
-  // authored both halves; we must not invent a figure nobody wrote).
-  let briefFindings = '';
-  // The plan line rides along for the element-coverage check: it is the page's
-  // authority on what is in the picture, and the brief's objects[] is the only
-  // route by which any of it reaches the illustrator. Hoisted — the re-check
-  // after the review must compare against the same lines.
-  const planLineOf = (pageNumber) => (briefBeats.find(b => b && b.pageNumber === pageNumber) || {}).planLine || '';
-  // Hoisted for the post-review re-check below, which needs the same cast list
-  // and the pre-review fault set to tell a SURVIVING fault from an INTRODUCED one.
-  let briefCastNames = [];
-  const briefBeforeByPage = new Map();
-  let briefBefore = [];
-  try {
-    const { checkScenes: checkBriefs, renderFindingsBlock: renderBriefBlock } = require('./sceneBriefCheck');
-    // Secondary characters belong in this list too. `inputData.characters` is the
-    // UPLOADED main cast, so a figure the story invents (a mermaid, a shopkeeper)
-    // could never trigger cast_unlisted, and briefFindings came back empty on
-    // every story we looked at. Verified on staging job_1786743927715_kcx0p939w:
-    // the brief's prose describes Lira in full on p3/p4/p9 while its own
-    // characters[] lists only Emma and Noah — three findings the review never saw.
-    // Secondaries are the likeliest omission, since no avatar pipeline forces
-    // them into metadata. Characters only — animals stay out (owner call
-    // 2026-08-16). NOTE: this does not cover the OTHER shape of the same
-    // symptom — job_1786737619634_d66c7bg9g p4 declared Lira correctly in the
-    // brief, and she was dropped later from the stored per-page cast — so the
-    // visual-bible `pages` fallback is still load-bearing for that case.
-    const secondaryList = Array.isArray(visualBible?.secondaryCharacters)
-      ? visualBible.secondaryCharacters
-      : Object.values(visualBible?.secondaryCharacters || {});
-    const seenCast = new Set();
-    const castNames = [
-      ...(inputData.characters || []).map(c => c && c.name),
-      ...secondaryList.map(c => c && c.name),
-    ].filter(Boolean).filter((n) => {
-      const k = String(n).trim().toLowerCase();
-      if (!k || seenCast.has(k)) return false;
-      seenCast.add(k);
-      return true;
-    });
-    briefCastNames = castNames;
-    const res = checkBriefs(
-      expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief, planLine: planLineOf(x.pageNumber) })),
-      castNames,
-      visualBible,
-      { textZoneRules: textZoneRulesActive(inputData) }
-    );
-    for (const [pn, list] of res.byPage) briefBeforeByPage.set(pn, new Set(list.map(f => f.type)));
-    // The findings THEMSELVES, not only their types: the post-review verdict is
-    // briefCorrection.judgeCorrection, the same partition the rewrite path now
-    // runs, and it keys a finding by (page, type). Page 0 is the whole-book
-    // tally and is reported on its own line, so it stays out of both sides.
-    {
-      const { REVIEWABLE: R } = require('./sceneBriefCheck');
-      briefBefore = res.findings.filter(f => f && R.has(f.type) && f.pageNumber !== 0);
-    }
-    briefFindings = renderBriefBlock(res.byPage);
-    if (briefFindings) {
-      // Count only what the block actually carries — diagnostic-only types stay
-      // out of the log line, or it claims to have sent what it withheld.
-      const { REVIEWABLE } = require('./sceneBriefCheck');
-      const sent = res.findings.filter(fd => REVIEWABLE.has(fd.type));
-      const pages = [...new Set(sent.map(fd => fd.pageNumber))].sort((x, y) => x - y).join(', ');
-      log.info(`🧩 [BEATS] brief check: ${sent.length} contradiction(s) on page(s) ${pages} — sent to the scene review`);
-      gl.info('beats_brief_check', `Brief check found ${sent.length} contradiction(s) on page(s) ${pages}`, null, { findings: sent });
-    }
-  } catch (bcErr) {
-    log.warn(`⚠️ [BEATS] brief check failed (${bcErr.message}) — review runs without brief findings`);
-  }
-
-  const srPrompt = buildSceneReviewPrompt(
-    inputData,
-    expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
-    // Locked beats feed the review's check 5 (character in beat vs brief);
-    // the bible feeds check 9f (a stated object's state page ranges).
-    // clothingRequirements: the reviewer's CHARACTER DETAILS is the same cast
-    // block the Art Director wrote from, outfits included (check 3b/10c).
-    { clothingFindings, briefFindings, beats: briefBeats, visualBible, clothingRequirements }
-  );
-  if (!srPrompt) {
-    log.warn('⚠️ [BEATS] scene-review template unavailable — scene briefs shipped unreviewed');
-    gl.warn('beats_scene_review_failed', 'Scene review template unavailable — briefs shipped unreviewed');
-  } else {
-    t = Date.now();
-    try {
-      // Snapshot every brief as it was SENT. sceneDiffs only captures pages the
-      // reviewer changed, so a run where it rewrote nothing left the dev panel
-      // with nothing to show — exactly the run we needed to inspect
-      // (job_1786235099497_ytd5c7eek: 3 faults handed over, 0 briefs rewritten).
-      const briefsIn = expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief }));
-      // THE PAYLOAD CONTRACT, asserted on this path too (2026-09-17). A
-      // corrector is shown the text it is correcting — this path always has
-      // been, through {ALL_SCENES}, and the rewrite path was not, which is the
-      // defect that made its re-ask a re-roll. One function answers for both
-      // so neither can lose it silently.
-      // Reported, never fatal: a review that runs is worth more than a story
-      // that dies on its own contract check, and this path's whole ruling is
-      // advisory anyway.
-      for (const pn of briefBeforeByPage.keys()) {
-        const faulted = briefsIn.find(b => b.pageNumber === pn);
-        if (!faulted) continue;
-        try {
-          assertCorrectorSeesText(srPrompt, faulted.brief, `scene review p${pn}`);
-        } catch (seeErr) {
-          log.error(`❌ [BEATS] p${pn}: ${seeErr.message} — the reviewer is being asked to correct a brief it cannot see`);
-          gl.warn('beats_brief_unseen', `The scene review prompt does not carry page ${pn}'s brief — its faults cannot be corrected`, null, { pageNumber: pn });
-        }
-      }
-      await stage(42, 'Reviewing scene briefs...', { next: 51, ms: 132000 });
-      const srRes = await textModels.callTextModelStreaming(srPrompt, null, onChunk, sceneReviewModel, { usageLabel: 'beats_scene_review' });
-      // "0 briefs rewritten" has meant three different things: a reviewer that
-      // genuinely found nothing, a reviewer TRUNCATED at its token cap (this
-      // story: out=16000, exactly the old budget), and a provider returning
-      // nothing at all (Lab #450: in=0 out=0 after 50s on an 80k prompt). Only
-      // the first is success — separate them or the log reports failure as a pass.
-      const srOutTok = srRes.usage?.output_tokens ?? null;
-      if (!String(srRes.text || '').trim() || srOutTok === 0) {
-        log.error(`❌ [BEATS] Scene review returned an EMPTY response (${srOutTok} output tokens) — briefs ship unreviewed`);
-        gl.warn('beats_scene_review_empty', `Scene review returned nothing (${srOutTok} output tokens) — provider failure, briefs shipped unreviewed`);
-      }
-      // TRUNCATION (textReplyGuard.js): a review cut at the ceiling rewrote the
-      // EARLIEST pages and never reached the ones it named — adopting the pages
-      // that fit would ship a half-review as a review. Fall back to the raw
-      // briefs (the input), exactly as the Lab guard does; the failure is
-      // recorded on the story (sceneReviewFailed) and in the generation log.
-      const srTruncated = !!srRes.truncation?.suspected;
-      if (srTruncated) {
-        sceneReviewFailed = `scene review ${textModels.describeTruncation(srRes.truncation)} — briefs shipped unreviewed`;
-        log.error(`❌ [BEATS] ${sceneReviewFailed}`);
-        gl.warn('beats_scene_review_truncated', sceneReviewFailed, null, srRes.truncation);
-      }
-      // BRIEF_TRAILING_MARKERS: the reply's optional ---VISUAL BIBLE---
-      // block follows the last page, and without a terminator it was appended
-      // to that page's brief and stored as part of it (p17 of
-      // job_1789759147125_p08djwhbl). The block itself is still read, from the
-      // RAW reply, by applyReviewBibleCorrections below.
-      const parsed = srTruncated ? { analysis: '', pages: [] } : parseRefinedText(srRes.text || '', expansions.map(x => x.pageNumber), 'SCENES', BRIEF_TRAILING_MARKERS);
-      sceneReviewAnalysis = parsed.analysis || '';
-      const byPage = new Map(parsed.pages.map(p => [p.pageNumber, p.text]));
-      const changed = [];
-      // Captured at the overwrite, the only moment both briefs exist.
-      const sceneDiffs = [];
-      for (const x of expansions) {
-        const reviewed = byPage.get(x.pageNumber);
-        if (reviewed && reviewed.trim()) {
-          const fixed = keepDeclaredLight(x.pageNumber,
-            keepDeclaredWornRows(x.pageNumber, reviewed, x.brief, 'scene review', gl),
-            x.brief, 'scene review', gl);
-          if (fixed !== x.brief) sceneDiffs.push({ pageNumber: x.pageNumber, before: x.brief, after: fixed });
-          x.brief = fixed;
-          x.reviewRewrote = true;
-          changed.push(x.pageNumber);
-        }
-      }
-      meta.timings.sceneReviewMs = Date.now() - t;
-
-      // FAULTED-BUT-NOT-REWRITTEN (owner, 2026-08-08). The reviewer is told to
-      // rewrite every page a check faulted, and it does not always comply: on
-      // job_1786193650012_7baiaeftb it named defects on pages 4, 8 and 13 and
-      // rewrote only 1, 2 and 3. Those defects then shipped, unremarked.
-      //
-      // Read the reviewer's OWN "FAULTED PAGES:" line (scene-review.txt output
-      // contract), never the free prose. The first version of this check
-      // regex-matched every "page N" in the analysis, so pages mentioned as
-      // PRAISE ("framing peaks on page 12") were reported as unfixed faults
-      // (job_1786277779744 flagged 1 and 13 that way). No line → the reviewer
-      // predates the contract → skip rather than guess.
-      const faultLine = sceneReviewAnalysis.match(/^\s*FAULTED PAGES?:\s*(.+)\s*$/mi);
-      const namedPages = faultLine
-        ? [...new Set((faultLine[1].match(/-?\d+/g) || [])
-            .map(Number)
-            .filter(n => expansions.some(x => x.pageNumber === n)))]
-        : null;
-      if (!faultLine) {
-        log.debug('[BEATS] Scene review analysis has no FAULTED PAGES line — incompleteness check skipped');
-      }
-      // DECLARED REMOVALS (owner decision 2026-09-13). A rewrite that drops a
-      // character used to be expressible only as an absence — no delta, no
-      // reason, and nothing parsed. `REMOVED CAST:` in the output contract is
-      // that channel; this reads it, then checks it against what actually
-      // happened to `characters[]`, page by page. Mechanical name-set
-      // arithmetic over the brief metadata only — never an inference from
-      // description prose.
-      //
-      // Detected AND REVERTED (2026-09-15, superseding the detect-only ruling
-      // of 2026-09-13). Evidence for the detection:
-      // job_1789207854566_l43qgl34w p7/p15, where five commissioned characters
-      // became "five soaked pirates: one in a blue tricorn…" with
-      // `characters: []` / `["Fiona"]` and nothing said. Evidence for the
-      // revert: job_1789420511893_zly5rcdej p16, where the error fired, the
-      // page rendered on the emptied cast anyway, and the corrupt contract
-      // produced a phantom CRITICAL against a child who IS in the prose — three
-      // repair rounds, and a correct original destroyed by the round-2 inpaint.
-      const castRemovals = parseCastRemovals(sceneReviewAnalysis);
-      const metaOf = (brief) => (extractSceneMetadata(brief) || {});
-      castRemovalsDeclared = castRemovals;
-      castRemovalAudit = diffCastRemovals(
-        sceneDiffs.map(d => {
-          const mb = metaOf(d.before), ma = metaOf(d.after);
-          // CAST UNPARSEABLE IS NOT CAST EMPTIED (2026-09-19). A brief whose
-          // parsers all failed comes back from the recovery path with
-          // `isRecovered: true` and an empty `characters[]`
-          // (sceneMetadata.js, describeDegradedSceneMetadata) — and the name
-          // arithmetic below would read that emptiness as the reviewer having
-          // silently dropped the entire page cast, then "restore" rows into a
-          // roster that in fact still lists them. Skip the page instead; a
-          // degraded brief is a known-recorded input, never a fault verdict.
-          if (ma.isRecovered === true) {
-            log.warn(`⚠️ [BEATS] Page ${d.pageNumber}: reviewed brief came back from the metadata recovery path — cast-removal diff skipped for this page (unparseable is not emptied)`);
-            return null;
-          }
-          // `objects[]` carries the Visual Bible secondaries. A name that moved
-          // there is still commissioned — routing, not removal.
-          return {
-            pageNumber: d.pageNumber,
-            beforeCast: mb.characters || [],
-            afterCast: ma.characters || [],
-            afterObjects: (ma.objects || []).map(o => (typeof o === 'string' ? o : (o && (o.id || o.name)))).filter(Boolean),
-          };
-        }).filter(Boolean),
-        castRemovals
-      );
-      if (castRemovals.malformed.length > 0) {
-        log.warn(`⚠️ [BEATS] Scene review REMOVED CAST line has ${castRemovals.malformed.length} unparseable entr(ies): ${castRemovals.malformed.join(' | ')}`);
-        gl.warn('beats_scene_review_removals_malformed', `REMOVED CAST entries could not be parsed: ${castRemovals.malformed.join(' | ')}`, null, castRemovals.malformed);
-      }
-      for (const r of castRemovalAudit) {
-        if (r.declared.length === 0) continue;
-        const why = (castRemovals.pages.find(p => p.pageNumber === r.pageNumber) || {}).reason || '(no reason given)';
-        log.info(`📣 [BEATS] Scene review DECLARED removal on page ${r.pageNumber}: ${r.declared.join(', ')} — ${why}`);
-        gl.info('beats_scene_review_removal_declared', `Page ${r.pageNumber}: reviewer removed ${r.declared.join(', ')} — ${why}`, null, r);
-      }
-      const undeclaredRemovals = castRemovalAudit.filter(r => r.undeclared.length > 0);
-      if (undeclaredRemovals.length > 0) {
-        const detail = undeclaredRemovals.map(r => `page ${r.pageNumber}: ${r.undeclared.join(', ')}`).join('; ');
-        log.error(`❌ [BEATS] Scene review removed cast WITHOUT declaring it — ${detail}`);
-        gl.error('beats_scene_review_removal_undeclared',
-          `Reviewer dropped character(s) from characters[] with no REMOVED CAST declaration — ${detail}`, null, undeclaredRemovals);
-        // The page does NOT render on a cast the reviewer silently emptied —
-        // but only the DROPPED NAMES come back (owner, 2026-09-17), spliced
-        // verbatim out of the pre-review brief's own `characters[]`. The rest
-        // of the reviewed brief stands. The whole-brief revert it supersedes
-        // cost p18 of job_1789584708605_rts4wqupm every other fix that review
-        // made (shipped at 45; the previous run's reviewed p18 scored 95).
-        // A page whose `characters[]` cannot be located structurally still
-        // falls back to the whole-brief revert — `changed` is trimmed there,
-        // before the faulted-but-not-rewritten check reads it.
-        const { restored, reverted } = restoreUndeclaredRemovals(expansions, sceneDiffs, changed, undeclaredRemovals);
-        if (restored.length > 0) {
-          const detail = restored.map(r => `page ${r.pageNumber}: ${r.names.join(', ')}`).join('; ');
-          log.warn(`↩️ [BEATS] Restored undeclared-removed cast into the reviewed brief — ${detail}`);
-          gl.warn('beats_scene_review_removal_restored',
-            `Dropped character(s) put back into the reviewed brief's characters[]; the rest of the review's fixes stand — ${detail}`,
-            null, restored);
-        }
-        if (reverted.length > 0) {
-          const pages = reverted.map(r => r.pageNumber).join(', ');
-          log.error(`↩️ [BEATS] Page(s) ${pages} reverted to the pre-review brief — the reviewed brief has no locatable characters[] to restore into`);
-          gl.warn('beats_scene_review_removal_reverted',
-            `Page(s) ${pages} shipped the PRE-REVIEW brief: the rewrite dropped cast with no declaration and its characters[] could not be located, so that page's review fixes were discarded with it`,
-            null, reverted);
-        }
-      }
-
-      // BIBLE CORRECTIONS (2026-09-14). The review may return an optional
-      // ---VISUAL BIBLE--- section correcting a stated object's state page
-      // ranges — the fault sceneBriefCheck's vb_state_* findings hand it. The
-      // merge is strict and fail-soft; see applyReviewBibleCorrections.
-      if (visualBible && !srTruncated) {
-        try {
-          // The handles the briefs ALREADY cite: a correction that renames one
-          // of them re-points a page at a different look (Lab 1264).
-          const citedHandles = new Set();
-          for (const ex of (Array.isArray(expansions) ? expansions : [])) {
-            const meta = extractSceneMetadata(ex && ex.brief) || {};
-            const objs = Array.isArray(meta.objects) ? meta.objects : [];
-            for (const o of objs) {
-              const h = typeof o === 'string' ? o.trim().toUpperCase() : '';
-              if (h.includes('.')) citedHandles.add(h);
-            }
-          }
-          const corr = applyReviewBibleCorrections(srRes.text || '', visualBible, beats.length, citedHandles);
-          bibleCorrections = corr;
-          for (const r of corr.rejected) {
-            log.warn(`⚠️ [BEATS] Scene review bible correction REJECTED for ${r.id}: ${r.reason}`);
-            gl.warn('beats_scene_review_bible_rejected', `Bible correction for ${r.id} rejected: ${r.reason}`, null, r);
-          }
-          if (corr.applied.length > 0) {
-            for (const e of corr.applied) {
-              log.info(`[VB-STATE] ${e.id} "${e.name}" ${e.oldPages} → ${e.newPages}`);
-            }
-            gl.info('beats_scene_review_bible',
-              `Scene review corrected ${corr.applied.length} stated object(s): `
-              + corr.applied.map(e => `${e.id} ${e.oldPages} → ${e.newPages}`).join('; '), null, corr);
-            // ONE SOURCE OF TRUTH: the transcript is what every later reader
-            // re-parses, exactly as the label round and the age clamp do.
-            const synced = syncVisualBibleSection(bibleSections, visualBible);
-            if (synced === bibleSections) {
-              log.warn('⚠️ [BEATS] Scene review bible correction could not be written back into the transcript — downstream re-parses will read the UNCORRECTED bible');
-              gl.warn('beats_vb_sync_failed', 'Scene review bible correction could not be written back into the transcript — stored bible will not reflect it');
-            } else {
-              bibleSections = synced;
-            }
-          }
-        } catch (bcErr) {
-          log.warn(`⚠️ [BEATS] Scene review bible correction failed (${bcErr.message}) — bible unchanged`);
-        }
-      }
-
-      const faultedNotFixed = (namedPages || []).filter(n => !changed.includes(n));
-      if (faultedNotFixed.length > 0) {
-        log.warn(`⚠️ [BEATS] Scene review named page(s) ${faultedNotFixed.join(', ')} but rewrote none of them`);
-        gl.warn('beats_scene_review_incomplete',
-          `Reviewer named page(s) ${faultedNotFixed.join(', ')} in its analysis but rewrote only ${changed.length ? changed.join(', ') : 'nothing'} — those findings shipped unfixed`);
-      }
-
-      // RE-CHECK. The clothing findings were handed to the reviewer above;
-      // whether it acted on them is not a matter of trust. The check is free
-      // and deterministic, so run it again on the rewritten briefs and say what
-      // survived instead of shipping it quietly (owner rule: fail loudly).
-      //
-      // ON EVERY REVIEWED RUN, not only when the pre-review check found
-      // something (2026-09-23). A rewrite can INTRODUCE a clothing fault on a
-      // page that was clean when it was handed over — the same failure mode the
-      // brief re-check below documents. Gated on pre-review findings, a
-      // review-introduced `removal_unstated` could never reach the worn-state
-      // round: on staging job_1790100385959_1nitlympp the pre-review check
-      // found nothing, the review deleted declared rows on p11, p12 and p18,
-      // and nothing looked again.
-      {
-        try {
-          const { checkScenes } = require('./clothingCheck');
-          const after = checkScenes(expansions.map(x => {
-            const m2 = extractSceneMetadata(x.brief) || {};
-            return {
-              pageNumber: x.pageNumber,
-              prose: splitBrief(x.brief).prose,
-              cast: (m2.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
-              perCharClothing: m2.characterClothing || {},
-              wornItems: m2.wornItems || [],
-            };
-          }), clothingRequirements, { artifacts: (visualBible || {}).artifacts, visualBible });
-          const REVIEWABLE = new Set(['outfit_misattributed', 'removal_unstated']);
-          const left = after.findings.filter(f => REVIEWABLE.has(f.type));
-          clothingUnfixedList = left;
-          const before = clothingByPage ? [...clothingByPage.values()].flat().filter(f => REVIEWABLE.has(f.type)).length : 0;
-          if (left.length > 0) {
-            const pages = [...new Set(left.map(f => f.pageNumber))].sort((a, b) => a - b).join(', ');
-            log.warn(`⚠️ [BEATS] clothing check after review: ${left.length} fault(s) present on page(s) ${pages} (${before} handed to the review)`);
-            gl.warn('beats_clothing_unfixed',
-              `Clothing faults present after the scene review on page(s) ${pages} (${before} were handed to it): ${left.map(f => `p${f.pageNumber} ${f.type} (${f.character})`).join('; ')}`);
-          } else if (before > 0) {
-            log.info(`👕 [BEATS] clothing check after review: all ${before} fault(s) resolved`);
-          }
-
-          // FED-BACK WORN-STATE ROUND (owner ruling 2026-09-06). The old prose
-          // finding was handed to the review on 9 pages of
-          // job_1788641639919_mpjwlzkf1 and fixed on 0 of them. It is now a
-          // missing FIELD, so the retry can name exactly what to add and the
-          // re-check can verify it — the same shape as the brief second round
-          // below and the landmark minimum-2 retry (cadd4ee72).
-          //
-          // Exactly ONE extra round. Strike two SHIPS: a WARN, a stored
-          // `wornStateUnresolved` flag on the page, and the state defaults to
-          // "worn" because the avatar reference wears the full outfit. A
-          // guideline never kills a paid run.
-          const wornLeft = left.filter(f => f.type === 'removal_unstated');
-          if (wornLeft.length > 0) {
-            const wornPages = new Set(wornLeft.map(f => f.pageNumber));
-            const subset = expansions.filter(x => wornPages.has(x.pageNumber));
-            const subsetByPage = new Map();
-            for (const [pn, list] of after.byPage) {
-              const rows = list.filter(f => f.type === 'removal_unstated');
-              if (rows.length > 0 && wornPages.has(pn)) subsetByPage.set(pn, rows);
-            }
-            const { renderFindingsBlock: renderClothing2 } = require('./clothingCheck');
-            const wrPrompt = buildSceneReviewPrompt(
-              inputData,
-              subset.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
-              { clothingFindings: renderClothing2(subsetByPage), beats, clothingRequirements },
-            );
-            const label = [...wornPages].sort((a, b) => a - b).join(', ');
-            if (!wrPrompt) {
-              log.warn(`⚠️ [BEATS] worn-state round skipped (no review template) — page(s) ${label} ship flagged`);
-              wornUnresolved = wornLeft;
-            } else {
-              try {
-                log.info(`🎩 [BEATS] worn-state round on page(s) ${label} (${subset.length}/${expansions.length} briefs)`);
-                const wrRes = await textModels.callTextModelStreaming(wrPrompt, null, onChunk, sceneReviewModel, { usageLabel: 'beats_scene_review_worn' });
-                // A cut round is a failed round — the catch below keeps the
-                // briefs as they were and ships the pages flagged.
-                if (wrRes.truncation?.suspected) throw new Error(`reply ${textModels.describeTruncation(wrRes.truncation)}`);
-                const wrParsed = parseRefinedText(wrRes.text || '', subset.map(x => x.pageNumber), 'SCENES', BRIEF_TRAILING_MARKERS);
-                const wrByPage = new Map(wrParsed.pages.map(pg => [pg.pageNumber, pg.text]));
-                for (const x of subset) {
-                  const reworn = wrByPage.get(x.pageNumber);
-                  const fixed = reworn && reworn.trim()
-                    ? keepDeclaredLight(x.pageNumber, keepDeclaredWornRows(x.pageNumber, reworn, x.brief, 'worn-state round', gl), x.brief, 'worn-state round', gl)
-                    : reworn;
-                  if (fixed && fixed.trim() && fixed !== x.brief) {
-                    sceneDiffs.push({ pageNumber: x.pageNumber, before: x.brief, after: fixed, round: 'worn' });
-                    x.brief = fixed;
-                    x.reviewRewrote = true;
-                  }
-                }
-                const after3 = checkScenes(expansions.map(x => {
-                  const m3 = extractSceneMetadata(x.brief) || {};
-                  return {
-                    pageNumber: x.pageNumber,
-                    prose: splitBrief(x.brief).prose,
-                    cast: (m3.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
-                    perCharClothing: m3.characterClothing || {},
-                    wornItems: m3.wornItems || [],
-                  };
-                }), clothingRequirements, { artifacts: (visualBible || {}).artifacts, visualBible });
-                wornUnresolved = after3.findings.filter(f => f.type === 'removal_unstated');
-                clothingUnfixedList = after3.findings.filter(f => REVIEWABLE.has(f.type));
-                wornRound = {
-                  pages: [...wornPages].sort((a, b) => a - b),
-                  before: wornLeft.length,
-                  after: wornUnresolved.length,
-                  usage: wrRes.usage || null,
-                };
-              } catch (wrErr) {
-                log.warn(`⚠️ [BEATS] worn-state round failed (${wrErr.message}) — page(s) ${label} ship flagged`);
-                wornUnresolved = wornLeft;
-              }
-            }
-            if (wornUnresolved.length === 0) {
-              log.info(`🎩 [BEATS] worn-state round resolved all ${wornLeft.length} fault(s)`);
-              gl.info('beats_worn_state_round', `Worn-state round on page(s) ${label} resolved all ${wornLeft.length} fault(s)`);
-            } else {
-              const d = wornUnresolved.map(f => `p${f.pageNumber} ${f.artifactId || ''} (${f.character})`).join('; ');
-              wornUnresolvedPages = [...new Set(wornUnresolved.map(f => f.pageNumber))].sort((a, b) => a - b);
-              log.warn(`⚠️ [BEATS] worn state STILL undeclared on page(s) ${wornUnresolvedPages.join(', ')} — shipping flagged, state defaults to worn: ${d}`);
-              gl.warn('beats_worn_state_unresolved',
-                `Worn-item state undeclared after the fed-back round on page(s) ${wornUnresolvedPages.join(', ')} — pages ship with wornStateUnresolved and the item defaults to worn: ${d}`,
-                null, { findings: wornUnresolved });
-              for (const x of expansions) {
-                if (wornUnresolvedPages.includes(x.pageNumber)) x.wornStateUnresolved = true;
-              }
-            }
-          }
-        } catch (rcErr) {
-          log.warn(`⚠️ [BEATS] clothing re-check failed (${rcErr.message})`);
-        }
-      }
-
-      // RE-CHECK the brief faults — on EVERY page, not only the ones that
-      // faulted before. This check's failure mode runs the opposite way to
-      // clothing's: the reviewer can CREATE a fault while resolving a
-      // different one, on a page that was clean when it was handed over.
-      //
-      // Measured on staging job_1787638394061_hs70901tfsn p1. Pre-review the
-      // page carried one fault, cast_unlisted — the prose described a
-      // secondary character its own characters[] omitted. The reviewer
-      // resolved it exactly as asked, by adding that character to the page —
-      // and gave them an interaction row with a second action. The page
-      // shipped declaring two actions, on the pipeline whose entire purpose is
-      // one, and scored semantic 40. The checks had run once, before the
-      // review, so nothing ever looked at the rewrite.
-      //
-      // Reports, never repairs: the reviewer authored both halves and the
-      // owner's 2026-08-11 decision keeps this side advisory. An INTRODUCED
-      // fault is the louder of the two — it means the fix instruction itself
-      // is producing defects.
-      try {
-        const { checkScenes: checkBriefs, REVIEWABLE } = require('./sceneBriefCheck');
-        const after = checkBriefs(
-          expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief, planLine: planLineOf(x.pageNumber) })),
-          briefCastNames,
-          visualBible,
-          { textZoneRules: textZoneRulesActive(inputData) }
-        );
-        // pageNumber 0 is the whole-book text-position tally, reported on its
-        // own line below rather than mixed into the per-page fault list.
-        const left = after.findings.filter(f => REVIEWABLE.has(f.type) && f.pageNumber !== 0);
-        const bookLevel = after.findings.filter(f => REVIEWABLE.has(f.type) && f.pageNumber === 0);
-        if (bookLevel.length > 0) {
-          const d = bookLevel.map(f => f.type).join('; ');
-          log.warn(`⚠️ [BEATS] text-position distribution after review: ${d}`);
-          gl.warn('beats_textzone_distribution', `Text-position distribution still off after the scene review: ${d}`, null, { findings: bookLevel });
-        }
-        // THE VERDICT IS SHARED (2026-09-17). This partition — introduced vs
-        // survived, keyed by (page, type) — is briefCorrection.judgeCorrection,
-        // and the rewrite path's corrective re-ask now reaches the same
-        // function through correctFindings. It used to hand-roll
-        // `after.length < before.length` instead, which scores a correction
-        // that swaps one fault for another as EQUAL and rejects it; measured
-        // over 11 stored rounds it resolved nothing on any of them.
-        // `advisory` is this path's ruling (owner, 2026-08-11): the reviewer
-        // authored both halves, so its rewrite stands and its faults are
-        // reported.
-        const { introduced, survived } = judgeCorrection({ before: briefBefore, after: left, acceptance: 'advisory' });
-        briefUnfixedList = left;
-        briefIntroducedList = introduced;
-        if (introduced.length > 0) {
-          const d = introduced.map(f => `p${f.pageNumber} ${f.type}`).join('; ');
-          log.warn(`⚠️ [BEATS] brief check after review: ${introduced.length} fault(s) INTRODUCED by the rewrite — ${d}`);
-          gl.warn('beats_brief_introduced',
-            `The scene review introduced ${introduced.length} new brief fault(s) while rewriting: ${d}`, null, { findings: introduced });
-        }
-        if (survived.length > 0) {
-          const d = survived.map(f => `p${f.pageNumber} ${f.type}`).join('; ');
-          log.warn(`⚠️ [BEATS] brief check after review: ${survived.length} fault(s) survived — ${d}`);
-          gl.warn('beats_brief_unfixed', `Brief faults survived the scene review: ${d}`, null, { findings: survived });
-        }
-        if (left.length === 0) log.info('🧩 [BEATS] brief check after review: clean');
-
-        // NO SECOND MODEL ROUND (owner, 2026-09-11). A targeted second
-        // reviewer call used to re-send the faulted pages here. Measured over
-        // two reruns it broke even: on the dragon rerun it cleared
-        // interaction_object_shared_hands and the p12/p13 trough plate but
-        // INTRODUCED interaction_multiple_actions on p1 (it split one action
-        // back into two), and on the pirate rerun it changed nothing at all.
-        // A paid call that trades one fault for another is not worth making.
-        // The deterministic re-check above stays — it costs nothing and is the
-        // diagnostic signal — so faults are reported and ship flagged, which
-        // is the same contract round 2 had on the pages it failed to fix.
-
-        // REWRITE-UNTIL-ZERO verdict for the two one-moment types, after the
-        // single review round. Measured on staging
-        // job_1788816451791_25b31uqlp: 11 of 18 pages shipped over budget after
-        // two rounds, and on every one of them the brief's own objects[] was
-        // already within three — the surplus came from the bible's
-        // appearsInPages, which no rewrite can withdraw. Saying so per page is
-        // the difference between "the reviewer ignored the fault" and "the
-        // fault is not the reviewer's to fix".
-        const ZERO_TYPES = ['interaction_multiple_actions', 'vb_element_overflow'];
-        const zeroLeft = briefUnfixedList.filter(f => ZERO_TYPES.includes(f.type) && f.pageNumber !== 0);
-        if (zeroLeft.length > 0) {
-          const { rankPageElements, VB_ELEMENT_BUDGET } = require('./vbElementBudget');
-          const pagesOf = (type) => [...new Set(zeroLeft.filter(f => f.type === type).map(f => f.pageNumber))].sort((a, b) => a - b);
-          const overflowDetail = pagesOf('vb_element_overflow').map((pn) => {
-            const x = expansions.find(e => e.pageNumber === pn);
-            const meta = x ? (extractSceneMetadata(x.brief) || {}) : {};
-            const ranked = rankPageElements(pn, meta, visualBible);
-            const objectsAsked = ranked.filter(e => e.fromObjects).length;
-            return { pageNumber: pn, elements: ranked.length, objectsAsked, briefFixable: objectsAsked > VB_ELEMENT_BUDGET };
-          });
-          rewriteToZeroUnfixed = {
-            interaction_multiple_actions: pagesOf('interaction_multiple_actions'),
-            vb_element_overflow: pagesOf('vb_element_overflow'),
-            vbOverflowDetail: overflowDetail,
-            rounds: 1,
-          };
-          const parts = [];
-          if (rewriteToZeroUnfixed.interaction_multiple_actions.length) parts.push(`two actions on page(s) ${rewriteToZeroUnfixed.interaction_multiple_actions.join(', ')}`);
-          if (rewriteToZeroUnfixed.vb_element_overflow.length) {
-            const bibleSide = overflowDetail.filter(d => !d.briefFixable).map(d => d.pageNumber);
-            parts.push(`over the ${VB_ELEMENT_BUDGET}-element budget on page(s) ${rewriteToZeroUnfixed.vb_element_overflow.join(', ')}`
-              + (bibleSide.length ? ` (bible-side on ${bibleSide.join(', ')} — the brief cites ≤${VB_ELEMENT_BUDGET}, the surplus is appearsInPages)` : ''));
-          }
-          log.warn(`⚠️ [BEATS] rewrite-until-zero NOT reached after ${rewriteToZeroUnfixed.rounds} round(s): ${parts.join('; ')} — shipping flagged`);
-          gl.warn('beats_one_moment_unfixed', `Briefs still ${parts.join('; ')} after the review's round budget — shipped flagged, never killed`, null, rewriteToZeroUnfixed);
-        }
-      } catch (rcErr) {
-        log.warn(`⚠️ [BEATS] brief re-check failed (${rcErr.message})`);
-      }
-
-      sceneReviewReport = {
-        model: srRes.modelId || sceneReviewModel,
-        durationMs: meta.timings.sceneReviewMs,
-        changedPages: sceneDiffs.map(d => d.pageNumber),
-        namedButNotRewritten: faultedNotFixed,
-        // The reviewer's declared-removals channel and the mechanical audit of
-        // it (2026-09-13). `castRemovalAudit` holds one row per page that lost
-        // a name, split into `declared` / `undeclared`.
-        castRemovals: castRemovalsDeclared,
-        castRemovalAudit,
-        failed: sceneReviewFailed,
-        analysis: sceneReviewAnalysis,
-        // WITHOUT `before`: every one of those strings was byte-identical to
-        // the same page's entry in `briefsIn` below (17/17 pages, 32k of JSONB,
-        // job_1789853503332_riqncqg1i). `briefsIn` is the pre-review snapshot of
-        // EVERY page, changed or not, so it already holds each row's before —
-        // readers resolve it from there (storyMetrics.churnFromReport,
-        // StoryDisplay's diff panel).
-        pages: sceneDiffs.map(({ before, ...row }) => row), // eslint-disable-line no-unused-vars
-        // Dev-mode inspection (owner request 2026-08-09): the exact prompt the
-        // reviewer received, every brief as sent, and the clothing trail — so
-        // "it rewrote nothing" can be diagnosed without the DB.
-        prompt: srPrompt,
-        briefsIn,
-        clothingFindings: clothingFindings || null,
-        briefFindings: briefFindings || null,
-        clothingUnfixed: clothingUnfixedList,
-        wornUnresolved,
-        wornUnresolvedPages,
-        wornRound,
-        // The VB label round writes its outcome to `meta` at adoption time;
-        // without this line it reached no stored report (job_1789337998754_apslnsq1z
-        // had valid labels and a null labelRound everywhere).
-        labelRound: meta.labelRound || null,
-        // {applied, rejected} from the review's ---VISUAL BIBLE--- section.
-        bibleCorrections,
-        briefUnfixed: briefUnfixedList,
-        briefIntroduced: briefIntroducedList,
-        rewriteToZeroUnfixed,
-      };
-      gl.info('beats_scene_review', `Scene review by ${srRes.modelId || sceneReviewModel}: ${changed.length} brief(s) rewritten (${(meta.timings.sceneReviewMs / 1000).toFixed(1)}s)`, null, {
-        changedPages: changed, model: srRes.modelId || sceneReviewModel,
-      });
-    } catch (err) {
-      log.warn(`🚨 [BEATS] Scene review failed (${err.message}) — proceeding with unreviewed briefs`);
-      gl.warn('beats_scene_review_failed', `Reviewer ${sceneReviewModel} failed: ${err.message} — briefs shipped unreviewed`);
-    }
-  }
+  const reviewOut = await runSceneReview({
+    inputData, expansions, clothingRequirements, visualBible, briefBeats, beats, bibleSections, meta, sceneReviewModel, stage, onChunk, gl,
+  });
+  const sceneReviewAnalysis = reviewOut.sceneReviewAnalysis;
+  const sceneReviewReport = reviewOut.sceneReviewReport;
+  bibleSections = reviewOut.bibleSections;
 
   // VB ELEMENT BUDGET — REPORTED HERE, NEVER ENFORCED (owner, 2026-09-11).
   // `truncateBriefToBudget` used to cut each brief's `objects[]` down to the
@@ -3777,4 +4050,4 @@ ${bibleBody}` : bibleBody;
   return { title, titleJudge, beats, pages, scenes, coverScenes, rawOutline, visualBible, meta, challengeDrawIds, challengeTakenIds, challengeDraw, arcReviewReport, beatsReviewReport, storyBibleReport, clothingReviewReport, wardrobeBibleReport, sceneExpansionReport, sceneReviewReport };
 }
 
-module.exports = { generateStoryViaBeats, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };
+module.exports = { generateStoryViaBeats, runArtDirector, arcTempFor, makeArcCreatorCall, runSceneReview, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, bibleCorrectionsMissingFromTranscript, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };

@@ -178,7 +178,7 @@ describe('char-fix pose lines (faceRepair.buildActionContext)', () => {
 
   it('the map is part of the one char-repair contract, and every caller sends it', () => {
     expect(CHAR_REPAIR_REQUEST_KEYS).toContain('repairNames');
-    for (const f of ['../../server/lib/repairPipeline.js', '../../server/lib/entityConsistency.js', '../../server/routes/regeneration.js']) {
+    for (const f of ['../../server/lib/charFixCall.js', '../../server/lib/entityConsistency.js', '../../server/routes/regeneration.js']) {
       expect(src(f)).toMatch(/repairNames: require\('\.\.?\/(?:lib\/)?repairLogic'\)\.buildPageRepairNameMap\(/);
     }
     expect(src('../../server/lib/testlab.js')).toContain('repairNames: labRepairNames(ctx)');

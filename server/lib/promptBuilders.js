@@ -18,10 +18,10 @@ const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = requi
 // exported from visualBible.js for coverIterate.js, which still uses it.
 const { REQUIRED_TEXT_AUTHORING_RULE, declaredText } = require('./requiredText');
 const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote, withScaleNote } = require('./visualBible');
-const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE } = require('./shotVocabulary');
+const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE, GROUP_STAGING_RULE } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { SLOP_RULES } = require('./proseSlop');
-const { castCoverage, castCoverageRule, castActionRule, castTableSpec, castTableFormat, castTableBlock } = require('./castCoverage');
+const { castCoverage, castCoverageRule, castActionRule, castTableSpec, castTableFormat, castTableBlock, groupPageBudget, groupPageRule } = require('./castCoverage');
 // REQUIRED IN-IMAGE TEXT: one source for the generator block, the repair
 // clause and the judges' TEXT RULES block. Safe as a top-level require --
 // requiredText.js requires promptBuilders LAZILY.
@@ -887,7 +887,20 @@ function buildEraGuard(era) {
 // prod job_1790107559778_fcmlfa8kn: a mis-described photo put "lattice metal
 // structure" in the brief; the judge failed the photo-faithful plate and its
 // "must be lattice" feedback repainted the landmark as something else.
-const LANDMARK_PHOTO_AUTHORITY = 'The photo is the authority on what the landmark looks like: where any words in this prompt describe its shape, structure, material or colour differently from the photo, the photo is right.';
+//
+// SCOPED 2026-09-26: the photo is right about the structures it SHOWS, and
+// nothing else. A plate may frame a part of the place the photo does not show
+// (the owner-approved photo-citation design, docs/decisions.md 2026-09-26),
+// and "the photo is right" with no scope told the image model to paint the
+// photo's view instead of the plate's.
+//
+// SCOPED AGAIN 2026-09-26: how the structures LOOK, never which of them fills
+// the frame. The plate QC read "a landmark that matches the photograph and not
+// the words is a PASS" as licence for a plate that painted the photo's view (a
+// guild hall across the river) where its FRAMING stood at the foot of a wall
+// (staging job_1790446348343_z3fw660ie LOC004.2 retry). One sentence for the
+// author's fidelity block and the judge's LANDMARK_CHECK.
+const LANDMARK_PHOTO_AUTHORITY = 'The photo is the authority on how the structures it shows look: where any words in this prompt describe their shape, structure, material or colour differently from the photo, the photo is right. It never decides which structure or view fills the frame: the camera, the framing and everything the photo does not show come from the words.';
 
 function buildLandmarkFidelityBlock(landmark, opts = {}) {
   const name = typeof landmark === 'string'
@@ -2009,6 +2022,28 @@ function extractCharacterVisualProfile(char, options = {}) {
 }
 
 /**
+ * A character's RECORDED FEATURES — the distinctive marks read off the photo
+ * (`physical.other`: freckles, a mole, a scar, a piercing, jewellery), as
+ * text, or '' when none is recorded.
+ *
+ * ONE source for both sides of the grid check (sibling set
+ * entity-grid-generator-vs-critic, 2026-09-26): the page render states them in
+ * its DISTINCTIVE FEATURES block, and the entity grid judge is told them as
+ * its Recorded Features line and reports no skin mark they do not name. The
+ * judge had been reading watercolour highlight washes on a styled sheet as a
+ * skin condition the character does not have, while the page prompt carried
+ * the recorded marks only when the Art Director happened to weave them in.
+ */
+function recordedFeatures(char) {
+  return formatRecordedFeatures(extractCharacterVisualProfile(char).other);
+}
+
+/** The recorded-features text of a visual profile's `other` field ('' for none). */
+function formatRecordedFeatures(other) {
+  return isNone(other) ? '' : stripAgeWords(other);
+}
+
+/**
  * Build the shared labeled-parts array used by numbered-list and
  * [Name]: markdown formatters. Returns an array of "Label: value" strings
  * with "none"-synonyms filtered out and age-word cleanup applied.
@@ -2040,7 +2075,8 @@ function buildLabeledPhysicalParts(profile, options = {}) {
   const face = includeFace ? buildFaceDescription(profile.face) : '';
   if (face) parts.push(`Face: ${face}`);
   if (!isNone(profile.glasses)) parts.push(`Glasses: ${profile.glasses}`);
-  if (!isNone(profile.other)) parts.push(`Distinctive marks: ${stripAgeWords(profile.other)}`);
+  const marks = formatRecordedFeatures(profile.other);
+  if (marks) parts.push(`Distinctive marks: ${marks}`);
 
   if (profile.clothing) parts.push(`${clothingLabel}: ${profile.clothing}`);
   else if (profile.clothingStyle) parts.push(`Clothing style: ${profile.clothingStyle}`);
@@ -2087,7 +2123,8 @@ function buildCharacterPhysicalDescription(char, clothingOverride = null) {
   const face = buildFaceDescription(p.face);
   if (face) s += `, ${face}`;
   if (!isNone(p.glasses)) s += `. Glasses: ${p.glasses}`;
-  if (!isNone(p.other)) s += `, ${stripAgeWords(p.other)}`;
+  const marks = formatRecordedFeatures(p.other);
+  if (marks) s += `, ${marks}`;
   if (p.clothing) s += `. Wearing: ${p.clothing}`;
   return s;
 }
@@ -3109,8 +3146,9 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // The Art Director AUTHORS the Visual Bible now (2026-09-11), so the three
     // inputs the bible rules need travel here instead of to the bible stage.
     CHARACTER_NAMES: characters.map(c => c.name).filter(Boolean).join(', ') || 'None',
-    // Each landmark's PHOTOS line: the bible may only name a viewpoint one of
-    // them shows, and the per-page `landmarkView` is picked from the same list.
+    // Each landmark's numbered PHOTOS list: the bible names a viewpoint one of
+    // them shows, and each real-landmark vantage cites its photo from the same
+    // list in `landmarkPhoto` (LANDMARK_PHOTO_CITE_RULE, inside this section).
     // The Art Director variant: it marks which of the plan's places are listed
     // landmarks and writes no story (2026-09-23).
     AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote, { forArtDirector: true }),
@@ -3198,6 +3236,9 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // The over-the-shoulder near figure is a crop, and never on a contact page
     // (owner, 2026-09-23) — the same constant at all four brief-authoring sites.
     OTS_NEAR_FIGURE: OTS_NEAR_FIGURE_RULE,
+    // Rule 4, the group rule scene-review check 6d and the brief check
+    // checkGroupStaging hold briefs to (shotVocabulary, 2026-09-27).
+    GROUP_STAGING: GROUP_STAGING_RULE,
     // C4 names the two axes separately — the eight-word SHOT_ENUM is not a
     // list of distances, and where the camera stands is no longer the vantage's
     // business but the shot word's own.
@@ -3522,6 +3563,9 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // The over-the-shoulder near figure is a crop, and never on a contact page
     // (owner, 2026-09-23) — the same constant at all four brief-authoring sites.
     OTS_NEAR_FIGURE: OTS_NEAR_FIGURE_RULE,
+    // Rule 4, the group rule scene-review check 6d and the brief check
+    // checkGroupStaging hold briefs to (shotVocabulary, 2026-09-27).
+    GROUP_STAGING: GROUP_STAGING_RULE,
     // C4 names the two axes separately — the eight-word SHOT_ENUM is not a
     // list of distances, and where the camera stands is no longer the vantage's
     // business but the shot word's own.
@@ -3921,6 +3965,9 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       // dump and come back described by species instead of by name.
       STAGED_FIGURES: stagedFigures || '',
       RECURRING_ELEMENTS: recurringElements,
+      // The `landmarkPhoto` field of a rewrite that writes a fresh plate: the
+      // one citation rule every plate author gets (LANDMARK_PHOTO_CITE_RULE).
+      LANDMARK_PHOTO_CITE: LANDMARK_PHOTO_CITE_RULE,
       AVAILABLE_AVATARS: availableAvatars || buildAvailableAvatarsForPrompt(characters),
       EXPECTED_CLOTHING: expectedClothingText,
       LOCKED_PERSPECTIVES: lockedPerspectivesText,
@@ -3987,6 +4034,8 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       // The over-the-shoulder near figure is a crop, and never on a contact page
       // (owner, 2026-09-23) — the same constant at all four brief-authoring sites.
       OTS_NEAR_FIGURE: OTS_NEAR_FIGURE_RULE,
+      // The group rule the scene review and the brief check hold briefs to.
+      GROUP_STAGING: GROUP_STAGING_RULE,
       // C4 names the two axes separately — the eight-word SHOT_ENUM is not a
       // list of distances, and where the camera stands is no longer the vantage's
       // business but the shot word's own.
@@ -4588,6 +4637,20 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     if (ageCueLines.length > 0) {
       characterReferenceList += `\nAGE & PROPORTIONS (render each character at their real age, regardless of the action described):\n${ageCueLines.join('\n')}\n`;
       log.debug(`[IMAGE PROMPT] Added age proportions for ${ageCueLines.length} character(s)`);
+    }
+
+    // The recorded marks, stated for the render (2026-09-26). The entity grid
+    // judge is told these same marks (recordedFeatures, one source) and judges
+    // a recorded mark missing from a page; the prose carried them only when
+    // the Art Director wove them in — on staging job_1790446348343_z3fw660ie a
+    // character's recorded freckles reached 0 of her 4 page prompts.
+    const featureLines = (sceneCharacters || [])
+      .filter(c => !isOtsFigure(c?.name))
+      .map(c => [c.name, recordedFeatures(c)])
+      .filter(([, marks]) => marks)
+      .map(([name, marks]) => `- ${name}: ${marks}`);
+    if (featureLines.length > 0) {
+      characterReferenceList += `\nDISTINCTIVE FEATURES (each character carries these on every page, wherever the angle shows them):\n${featureLines.join('\n')}\n`;
     }
 
     // Colour-frame mapping. Each reference card is framed in a colour (not
@@ -5635,10 +5698,9 @@ function buildExactPosesBlock(interactions, sceneCharacters = [], visualBible = 
   // An element that was scale-noted on this block already — the rider is stated
   // ONCE per element, on the first pose line that names it.
   const scaledElements = new Set();
-  // Even with zero declared interactions, we may still emit fill lines for
-  // uncovered fg/mg characters — so don't early-return on an empty list.
+  // Even with zero declared interactions every fg/mg character still gets an
+  // EXPRESSIONS AND EYES line — so don't early-return on an empty list.
   const lines = [];
-  const coveredNames = new Set();
   // Sort essentials before normal/low so the most important poses lead the
   // block. Image models weight prompt-tail content heavily — but within the
   // EXACT POSES section, the first lines also carry stronger signal because
@@ -5724,27 +5786,7 @@ function buildExactPosesBlock(interactions, sceneCharacters = [], visualBible = 
         lineWhere += scaleRider;
       }
       lines.push(`- ${label}: ${lineWhere}`);
-      coveredNames.add(label.toLowerCase());
-      coveredNames.add(target.toLowerCase());   // so the fill below skips it either way
     }
-  }
-
-  // Fill: every foreground/midground scene character without a declared
-  // interaction gets a low-priority default line. Goal isn't a specific gaze
-  // direction — it's to break the model's default "look at the camera"
-  // portrait pose. Background characters skipped (tiny anyway).
-  for (const c of (sceneCharacters || [])) {
-    if (!c || typeof c !== 'object') continue;
-    const name = (c.name || '').trim();
-    if (!name) continue;
-    if (coveredNames.has(name.toLowerCase())) continue;
-    const depth = String(c.depth || '').toLowerCase();
-    if (depth === 'background') continue;
-    // A figure the brief sends to the viewer (a cover portrait, 2026-09-24)
-    // keeps that gaze: its EYES line below says so, and a fill line saying
-    // "not at the viewer" would contradict it.
-    if (looksAtPhrase(c.looksAt, visualBible) === 'eyes on the viewer') continue;
-    lines.push(`- ${name}: looking off into the scene, not at the viewer`);
   }
 
   // Re-anchor per-character expressions at the tail, same reason as the poses:
@@ -5752,18 +5794,34 @@ function buildExactPosesBlock(interactions, sceneCharacters = [], visualBible = 
   // pulled tight") is buried mid-prose and Grok defaults every face to a mild
   // pleasant smile — a stubborn/scared/angry story beat renders as smiling.
   // Background faces skipped (unreadable at frame size).
+  //
+  // THE VIEWER RULE RIDES EVERY FIGURE'S EYES LINE (2026-09-26). A story page
+  // never sends a gaze to the viewer (LOOKS_AT_FIELD_RULE; covers excepted),
+  // and this used to be said only by a pose FILL line written for a figure with
+  // no interaction row — so a figure that had one got no viewer line at all,
+  // and an expression like "wide open laughing mouth" was shown by turning the
+  // face to the camera. Staging job_1790446348343_z3fw660ie p16: five figures
+  // briefed to look at a ship in the background, one of them with an
+  // interaction row and no viewer line, rendered as a row facing the viewer.
+  // Every foreground/midground figure's line now carries its gaze and the face
+  // turned with it, from the brief's `looksAt` alone; a figure the brief sends
+  // to the viewer (a cover) keeps exactly that. The fill line is deleted — this
+  // line replaces it.
   const exprLines = [];
   for (const c of (sceneCharacters || [])) {
     if (!c || typeof c !== 'object') continue;
     const name = (c.name || '').trim();
+    if (!name) continue;
+    if (String(c.depth || '').toLowerCase() === 'background') continue;
     const expr = typeof c.expression === 'string' ? c.expression.trim() : '';
     const gaze = looksAtPhrase(c.looksAt, visualBible);
-    if (!name || (!expr && !gaze)) continue;
-    if (String(c.depth || '').toLowerCase() === 'background') continue;
-    exprLines.push(`- ${name}: ${[expr, gaze].filter(Boolean).join('; ')}`);
+    const eyes = gaze === 'eyes on the viewer'
+      ? gaze
+      : `${gaze || 'eyes off into the scene'}, face turned the same way, never to the viewer`;
+    exprLines.push(`- ${name}: ${[expr, eyes].filter(Boolean).join('; ')}`);
   }
   const exprBlock = exprLines.length > 0
-    ? `EXPRESSIONS AND EYES (each face shows exactly this — no default smiles; each pair of eyes on exactly what is named):\n${exprLines.join('\n')}`
+    ? `EXPRESSIONS AND EYES (each face shows exactly this — no default smiles; each pair of eyes on exactly what is named, and a face turned away shows its expression in profile or three-quarter view, never by turning to the viewer):\n${exprLines.join('\n')}`
     : '';
 
   if (lines.length === 0 && !exprBlock) return '';
@@ -6138,6 +6196,7 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     STYLE_RULEBOOK,
     MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
     PAYOFF_KEEP: PAYOFF_KEEP_RULE,
+    MECHANISM_FIX: MECHANISM_FIX_RULE,
   });
 }
 
@@ -7238,13 +7297,15 @@ function buildTopicPromiseSection(guideText) {
   return promise ? `${TOPIC_PROMISE_HEADING}\n${promise}` : '';
 }
 
-function buildStoryContextFields(inputData) {
-  const language = inputData.language || 'en';
-  const brief = buildStoryBriefBody(inputData);
-  const characterSourceRuleText = characterSourceRule();
-
+/**
+ * The CHARACTER DETAILS block every story stage reads — the planner, the text
+ * writer, the arc stages, and the critics that judge their output (plan check,
+ * arc-informed text audit). One function, so a critic reads exactly what its
+ * generator was given.
+ */
+function storyCharacterDetails(inputData) {
   const mainIds = inputData.mainCharacters || [];
-  const characterDetails = (inputData.characters || []).map(char => {
+  return (inputData.characters || []).map(char => {
     const t = getTraits(char);
     const line = (label, v) => {
       const s = Array.isArray(v) ? v.filter(Boolean).join(', ') : v;
@@ -7261,6 +7322,13 @@ function buildStoryContextFields(inputData) {
       line('Special details', t.specialDetails),
     ].filter(Boolean).join('\n');
   }).join('\n\n') || '(no character details available)';
+}
+
+function buildStoryContextFields(inputData) {
+  const language = inputData.language || 'en';
+  const brief = buildStoryBriefBody(inputData);
+  const characterSourceRuleText = characterSourceRule();
+  const characterDetails = storyCharacterDetails(inputData);
 
   // The topic guide (historical event, educational subject, adventure setting).
   // The unified writer path has always had this (see the storyCategory branches
@@ -7549,7 +7617,15 @@ function buildChallengeIdeasSection(inputData, count = 25) {
 // Q15 (the exciting start) and Q16 (the ending's cast safe and together)
 // joined as must-fix (owner, 2026-09-25): each names a picture the book owes,
 // page 1 and the last page, the same kind of finding as Q4 and Q8.
-const REPLAN_MUST_FIX_CHECKS = new Set([4, 8, 12, 14, 15, 16]);
+//
+// Q17 (the whole-cast page names one shared action) joined as must-fix
+// (owner, 2026-09-26). It is NOT the rejected Q5: Q5 covers every
+// presence-only or after-state instant on any page (12-16 findings a book);
+// Q17 names only a page whose roster holds every commissioned character, and
+// asks for one shared action on that same page — a relabel of the instant,
+// never a page spent or moved. On staging job_1790446348343_z3fw660ie p16 the
+// advisory reading let a posed row facing the viewer ship.
+const REPLAN_MUST_FIX_CHECKS = new Set([4, 8, 12, 14, 15, 16, 17]);
 
 /**
  * THE SHOT-DISTRIBUTION BLOCK, declared ONCE (2026-09-20).
@@ -7628,6 +7704,13 @@ const REPLAN_MUST_FIX_CODES = new Set([
   // A plan line that breaks the CAST block the planner wrote before dividing
   // (2026-09-25): a deed page, a promised appearance or the ending's cast.
   'CAST_PROMISE_BROKEN',
+  // More pages hold more than three characters than the book's budget
+  // (castCoverage.groupPageBudget, one page in six). Owner ruling 2026-09-27:
+  // going over the budget forces a re-plan. It is a cast finding — a page is
+  // answered by casting out, never by relabelling a shot — so it COUNTS toward
+  // convergence (not in REPLAN_CONVERGENCE_EXEMPT_CODES): a round that leaves
+  // the book further over its budget is discarded by replanRoundRegressed.
+  'GROUP_PAGES_OVER_BUDGET',
   // THE SHOT DISTRIBUTION JOINED 2026-09-20 (owner), the whole block of it:
   // SHOT_MEDIUM_WIDE_EXCESS, SHOT_CLOSEUP_COUNT, SHOT_ULTRAWIDE_COUNT,
   // SHOT_OTS_COUNT and SHOT_NO_CAMERA_POSITION (SHOT_AERIAL_COUNT retired 2026-09-23 with the aerial floor).
@@ -7944,6 +8027,12 @@ function buildReplanSection(pagePlan, findingLines, { pageCount = null, keep = [
     '# RE-DIVIDE',
     '',
     'You divided this story once. Your plan and the findings against it follow. Return a line for every page you change, in the same format, and for no other page — a page you leave out stands exactly as it is. Where a must-fix finding and a noted one pull opposite ways, the must-fix wins.',
+    // THE WHOLE-CAST PAGE (2026-09-26, Lab #1537). The block restated no
+    // definition for a CHECK[17] line, and the round answered it with one
+    // figure's deed while the rest watched; answering another finding on a
+    // whole-cast page (p6) it traded the shared action for a two-figure one.
+    // The same constant plan-check question 17 reads.
+    `A page holding every commissioned character — the one a whole-cast finding names, and any such page you rewrite for another finding — gets one action all of them do together. ${WHOLE_CAST_DEF}`,
     `The book keeps ${span}. No number is added and none is retired. A moment that earns a picture of its own takes an existing number: that page's material joins a neighbouring page, and the freed number stages the moment. Return both pages.`,
     'A finding is answered by adding or by removing, whichever that finding asks for. A page holding none of the commissioned characters gains one. A page past the cast ceiling loses one, or a page holding more than one action keeps the first alone and what follows from it goes to "what is true after" or to a page of its own. A name, an action or a page goes only where a finding asks for less in frame, never where one asks for more.',
     `Two figures stay wherever they are: the character whose action a page's instant works against, and a character the division would leave with fewer than two pages in the book${floor > 2 ? ` — for a commissioned character, fewer than ${floor}` : ''}.`,
@@ -8355,11 +8444,44 @@ ${HINT_ANCHOR_RULE}
 ${hints}`;
 }
 
+// WHAT BREAKING A STATED FACT MEANS, for the planner and its checker
+// (owner, 2026-09-26). One constant: the planner is told to keep every page to
+// the facts, plan-check question 18 names a page that does not, and both read
+// this sentence inside the same section (buildStoryLogicSection).
+const STORY_LOGIC_FACT_RULE = 'A page breaks a fact when its who, its instant or its change uses a thing, a material, an ability or a limit against what the story logic states of it. A hint that names a fact it changes replaces that fact; every other fact holds on every page.';
+
+/**
+ * THE STORY LOGIC as the page planner and the plan check read it (owner,
+ * 2026-09-26). Until then only the hint pass (arc-hints.txt) saw the block the
+ * arc was told from; the planner got the FINAL ARC plus the hints, and the
+ * check neither. The facts the sentences only imply were lost at the division:
+ * on staging job_1790446348343_z3fw660ie the logic said the costumes are thin
+ * cotton that tears and only the doubled sash would bind a rope, a hint dropped
+ * the second half, and nothing downstream still knew the first.
+ *
+ * ONE builder, filled into story-beats.txt (first division and re-plan) and
+ * plan-check.txt as {STORY_LOGIC_SECTION}; question 18 is the checker's half.
+ *
+ * @param {string} storyLogic the final STORY LOGIC block body (parseStoryLogic().text,
+ *   stored as arcReviewReport.logic)
+ * @returns {string} '' when there is none — no arc, or a story told before the
+ *   logic-first arc; the planner and the checker then work from the arc alone
+ */
+function buildStoryLogicSection(storyLogic = '') {
+  const body = String(storyLogic || '').trim();
+  if (!body) return '';
+  return `# THE STORY LOGIC — the facts the story above was told from
+
+Every page keeps to these facts. ${STORY_LOGIC_FACT_RULE}
+
+${body}`;
+}
+
 // `centralFigure`: the names the arc's STORY LOGIC gives the commission's
 // central figure (arcReviewReport.centralFigure), null when it named none.
 // `castTable`: the CAST block the first division wrote (parsePlanCastBlock);
 // a re-plan is told it stands. The first division is asked to write one.
-function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', replan = '', centralFigure = null, mayAddDeeds = false, castTable = null } = {}) {
+function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', storyLogic = '', replan = '', centralFigure = null, mayAddDeeds = false, castTable = null } = {}) {
   const template = PROMPT_TEMPLATES.storyBeats;
   if (!template) {
     log.error('[PROMPT] storyBeats template not loaded — beats planning unavailable');
@@ -8424,6 +8546,16 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // the last page's cast. A re-plan keeps the table (castCoverage.castTableSpec).
     CAST_TABLE: castTableSpec(castCoverage({ pageCount, castCount: (inputData?.characters || []).filter(c => c && c.name).length }), pageCount, { replan: !!String(replan || '').trim(), table: castTable }),
     CAST_FORMAT: castTableFormat(castCoverage({ pageCount, castCount: (inputData?.characters || []).filter(c => c && c.name).length }), pageCount, { replan: !!String(replan || '').trim() }),
+    // HOW MANY PAGES MAY HOLD A GROUP (owner, 2026-09-27): one page in six,
+    // from the same castCoverage.groupPageBudget the counter
+    // GROUP_PAGES_OVER_BUDGET measures, on the same ceiling the pipeline
+    // passes the counters (IMAGE_MODELS maxCharactersPerScene).
+    GROUP_PAGE_BUDGET: groupPageRule(groupPageBudget({ pageCount, castCount: (inputData?.characters || []).filter(c => c && c.name).length, maxCharactersPerScene: ctx.MAX_CHARACTERS_PER_SCENE })),
+    // STAGING A GROUP (owner, 2026-09-27): the Art Director's rule 4 and the
+    // scene review's [group_staging] read this constant; the planner picks the
+    // shot, so it reads it too — a page of more than three planned `medium`
+    // left the review to override the plan (z3fw660ie p1, p6).
+    GROUP_STAGING: GROUP_STAGING_RULE,
     // The output scope follows the mode. A first plan (no replan section)
     // owes every page; a re-plan owes only the pages it changes under RE-DIVIDE
     // — the merge in beatsPipeline restores every other page from the division
@@ -8437,6 +8569,7 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     READER_LINE: readerLine,
     DEED_AND_EFFECT_DEF,
     TWO_HEIGHTS_DEF,
+    WHOLE_CAST_DEF,
     NAMING_DEF,
     ENDING_EVENT_DEF,
     EXCITING_START_DEF,
@@ -8474,6 +8607,9 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
         String(arcHints).trim(),
       ].join('\n')
       : '',
+    // The facts the arc was told from (owner, 2026-09-26) — the same section
+    // plan-check.txt reads for its question 18.
+    STORY_LOGIC_SECTION: buildStoryLogicSection(storyLogic),
     REPLAN_SECTION: String(replan || '').trim(),
     // NAMES AND WORLD ONLY — the header is now true (2026-09-19).
     //
@@ -8886,6 +9022,38 @@ const PAGE_CHANGE_DEF = 'What is true after is a change in the story’s state, 
 // planCounters (ARC_INVENTED_*): no name, and on a single page.
 const UNNAMED_FIGURE_EXEMPT = 'a figure given no name, referred to only by what it is, on a single page';
 
+/**
+ * THE WHOLE-CAST PAGE, one definition for the planner (story-beats.txt, the
+ * one-moment list) and the plan check (plan-check.txt question 17), 2026-09-26.
+ *
+ * The planner had this rule twice in its own words and the checker had it not
+ * at all: question 5 lists "stands, together" as a presence-only instant, but
+ * on staging job_1790446348343_z3fw660ie p16 ("the six stand together on the
+ * landing as the ship fades into the fog behind them, one of them laughing")
+ * the check filed Q1 and Q3 and no Q5, and the page rendered as a row facing
+ * the viewer. A feeling on one face read as the page's action. Question 17
+ * makes the checker enumerate every whole-cast page and name the one action it
+ * gives all of them, so the fault is a counted answer, not a keyword it may
+ * miss. Must-fix since 2026-09-26 (owner): REPLAN_MUST_FIX_CHECKS carries it.
+ *
+ * THE LAST SENTENCE (2026-09-26, Lab #1537). The planner's general one-action
+ * rule says "everyone else watches it or does that same thing", and the re-plan
+ * answered Q17 on z3fw660ie p16 with one figure pressing a prop into another's
+ * hands while the rest looked on — the watching half of that rule. The recheck
+ * filed Q17 again. On a whole-cast page the watching half does not apply; the
+ * sentence says so on both sides, so the planner is told what the check counts.
+ *
+ * WATCHING TOGETHER (owner ruling 2026-09-27, Lab #1550). The example "all
+ * turned toward one thing ahead of them" split the pair: the re-plan staged p16
+ * as all six standing facing the river as the ship fades and read it as that
+ * example; the recheck read a standing pose. Watching one thing together is a
+ * shared action only seen from behind or over the shoulder, toward what they
+ * watch — never facing the viewer. Same direction as the Art Director's group
+ * rule (shotVocabulary.GROUP_STAGING_RULE: a group looking at something deeper
+ * in the frame is seen from behind).
+ */
+const WHOLE_CAST_DEF = 'A page that gathers the whole cast is wide or distant, all of them sharing one simple action — boarding, hauling one line together — or seen from behind moving off. All of them watching one thing is a shared action only when they are seen from behind or over the shoulder, toward what they watch; facing the viewer it never is. Standing or gathering together while a feeling shows, or while the event happens behind them, is everyone present doing nothing — never a row of figures facing the viewer. One of them acting while the rest look on — a hand-over between two, one speaking, one laughing — is not a shared action: every one of them does the same thing.';
+
 const TWO_HEIGHTS_DEF = 'two named characters at different heights — deck and water, ledge and ground, roof and street. A whole cast carried together on one back or one boat is one level.';
 // No leading article: the planner says "stages THEIR arrival", the checker "stages AN arrival", and both wordings are pinned by tests.
 const NAMING_DEF = 'arrival or a naming by someone present; a badge, a garment, a title or an epithet is not a naming.';
@@ -9289,7 +9457,7 @@ const GAZE_TARGET_RULE = "Name at most one gaze target, and compose the frame so
  * and the scene review's gaze check read this ONE sentence, so neither the
  * author nor the critic "fixes" a cover portrait back into a page gaze.
  */
-const COVER_GAZE_EXCEPTION = "A book cover page (page -1, -2 or -3) is the one exception: its plan line poses the cast for the reader, every figure's `looksAt` is `viewer`, and that plan line overrides every rule against facing or looking at the viewer.";
+const COVER_GAZE_EXCEPTION = "A book cover page is the one exception — page -1 is the front cover, page -2 the opening (dedication) page, page -3 the back cover, each a picture posed for the reader rather than a moment of the story: its plan line poses the cast for the reader, every figure's `looksAt` is `viewer`, and that plan line overrides every rule against facing or looking at the viewer.";
 
 const LOOKS_AT_FIELD_RULE = "Every foreground or midground character carries `looksAt`: another character's name, a Visual Bible id, or `away`. There is no value for the viewer: a figure never meets the reader's eye. " + COVER_GAZE_EXCEPTION + " It is the eyes only; hands live in `interactions[]`, and a character holding a thing does not look at it unless the plan line says so. When the plan line stages two named characters facing each other, in a standoff, an exchange or a conversation, each one's `looksAt` is the other — unless the plan line gives one of them a different gaze (\"looks up at it\", \"stares at the chest\"), in which case that one looks where the plan says and the other looks at them. On different levels the lower one looks up, the upper one looks down. The prose clause says the same thing the field says. A secondary character (a CHR id in `objects[]`) has no `characters[]` row: its gaze is a `watching` interaction whose `object` is what it looks at, and its prose clause says the same.";
 
@@ -9563,6 +9731,25 @@ const MOTIVE_AT_THE_ACT_RULE = 'Where a character refuses, demands, flees, hides
  */
 const PAYOFF_KEEP_RULE = 'A sentence that shows something an earlier page set up doing its work, or a payoff the story names, is never deleted by a fix. Where a finding touches it, the fix rewrites around it and keeps what it shows.';
 
+// How the text writer is told to use CHARACTER DETAILS — its heading, and the
+// arc-informed audit's statement of what the writer was told (one string).
+const CHARACTER_DETAILS_USE = 'optional colour — use a trait where it fits a moment, never contradict one, never work through the list';
+
+/**
+ * A mechanism is fixed with what the pages hold (owner, 2026-09-26). ONE
+ * string for every whole-page text pass (text-refine.txt: the repair, its
+ * repetition_fix / length_fix rounds and the book-audit round). Staging
+ * job_1790446348343_z3fw660ie: the arc-informed audit filed that the climax's
+ * physical means could not work as told; the repair "fixed" it by adding a
+ * part of an object no page had and no geometry allowed, and nothing reads a
+ * repair for logic. The repair already may not invent an event that eases an
+ * obstacle; this closes the same door for a physical means. A mechanism the
+ * pages cannot make work is the arc's fault: the pass says so on a fixed
+ * "ARC FAULT:" ledger line (parseArcFaultLines, textRefine.js), which is
+ * stored on the round and logged, instead of inventing hardware.
+ */
+const MECHANISM_FIX_RULE = 'A fault about how something physically works (how a thing is lifted, tied, opened, crossed or carried) is fixed only with the objects, parts, positions and abilities the pages already establish. Where none of them makes it work, add nothing to make it work: the page stays as it is, and the ledger closes the fault on a line of its own, "ARC FAULT: p<N>: <what cannot happen as told, and what the story lacks>".';
+
 /**
  * The Art Director composition rules for a writer that authors its own scene
  * hints without an Art Director stage: trial and both unified variants. The
@@ -9712,6 +9899,29 @@ const ARC_EXCITING_DEF_SIMPLE = 'a problem that moves and pushes back — a thin
 const ARC_MAIN_TURN_RULE = 'Each main character the STORY SHAPE names carries an important part of the journey, with a turn of their own that changes the outcome — with two, one\'s idea and the other\'s deed; never one hero and a passenger';
 const ARC_PART_CHECK = 'a main character with no turn of their own that changes the outcome; an opposition or danger that only waits and never acts.';
 
+/**
+ * STAKES AND OPEN QUESTIONS (owner, 2026-09-26). Two rules the creator and the
+ * re-teller were given in RULES OF THE LOGIC ("it does not yield on request",
+ * "every question raised is answered") had no critic: the critique's only
+ * opposition fault was one that waits, and no panel lens read either. Staging
+ * job_1790446348343_z3fw660ie: the creator gave its opponent a limit ("he will
+ * not take a thing from a visitor by force") that licensed an early scene and
+ * then emptied the turn: he demands, is refused, and yields; the ending left
+ * open who keeps the prize. ONE string each, filled into {TELLING_RULES}
+ * (generator), the critique's fault list (arcCritiqueSpec) and the panel's
+ * STAKES lens (critics), through arcStakesRules. The opposition rule is off
+ * for the simple bands, whose telling rules forbid anyone standing in the way.
+ */
+const ARC_OPPOSITION_HOLDS_RULE = 'The opposition never gives way just because it is asked, and no limit the story logic gives it takes away its power at the turning point.';
+const ARC_QUESTIONS_ANSWERED_RULE = 'Every question the story raises is answered by its end, including who keeps what was sought, won or fought over.';
+
+/** The stakes rules this band's arc is written to and checked against — one list, both sides. */
+function arcStakesRules(inputData = {}) {
+  return SIMPLE_BANDS.has(resolveAgeBand(inputData))
+    ? [ARC_QUESTIONS_ANSWERED_RULE]
+    : [ARC_OPPOSITION_HOLDS_RULE, ARC_QUESTIONS_ANSWERED_RULE];
+}
+
 function arcExcitingDef(inputData = {}) {
   return SIMPLE_BANDS.has(resolveAgeBand(inputData)) ? ARC_EXCITING_DEF_SIMPLE : ARC_EXCITING_DEF;
 }
@@ -9783,14 +9993,14 @@ function buildTellingRulesSection(inputData = {}) {
     '- Challenges belong to the story, never dealt out one per character in turn; what the youngest does stays within a very young child\'s reach — noticing, holding, fetching, naming, offering, refusing.',
     simple
       ? '- Nothing stands in the way on purpose. What holds the main character up is a thing or a circumstance — out of reach, missing, not working yet — never anyone unwilling, and whoever they meet is friendly.'
-      : '- The opposition presses on the story to the end and stands in the scene at the turning point; it does not yield on request. A rival\'s thread ends with the rival present — arriving too late, seeing what they lost, paying.',
+      : `- The opposition presses on the story to the end and stands in the scene at the turning point. ${ARC_OPPOSITION_HOLDS_RULE} A rival's thread ends with the rival present — arriving too late, seeing what they lost, paying.`,
     '- Reasons come from who someone is, what a place is for, or what someone needs; a sign, an inscription or a rule stated once to license a turn is not a reason.',
     '- An obstacle comes from the story\'s own world — weather, distance, a rival, a broken or missing or guarded thing, a character\'s own flaw — and exists for its own reasons: never shaped around a thing a character carries, never a puzzle door, riddle or test set by no one unless the commission sets it.',
     '- Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level; a refusal, a loss, a delay or a broken promise carries the peril instead. Nobody looks monstrous, no familiar character turns frightening, and anyone separated or lost is reunited.',
     RISK_FRAMING_RULE,
     `- ${ANIMAL_FATE_RULE}`,
     '- The story ends with the children safe and together, one of them feeling something a child can name. A container or reveal the story promises opens before the end, and a story that enters through a doorway, portal or frame returns through it.',
-    '- Every question raised is answered, and what resolves the conflict has an origin — an earlier setup or a rule the story logic states. A figure singled out — the only one who can help, waited for, chosen — has a stated reason.',
+    `- ${ARC_QUESTIONS_ANSWERED_RULE} What resolves the conflict has an origin — an earlier setup or a rule the story logic states. A figure singled out — the only one who can help, waited for, chosen — has a stated reason.`,
     noSplit
       ? '- The cast stays together on one path — never two groups going separate ways; where the commission itself splits them, keep them together and justify it in one line.'
       : '- The group stays together unless it has a reason to separate and a reason to meet again.',
@@ -9910,7 +10120,13 @@ function arcLogicSpec(inputData = {}, pageCount = 10) {
  * repaired. A panel finding without a tag is dropped as a parse error
  * (filterPanelFindings), never read as one severity or another.
  */
-const ARC_SEVERITY_DEF = '[CRITICAL] — the story is broken; [MAJOR] — a real fault repairable inside the existing structure, which an act from no motive line and a main character with no turn always are; or [MINOR] — a blemish.';
+// IMPOSSIBLE ACTION = MAJOR (owner, 2026-09-26). Staging
+// job_1790446348343_z3fw660ie: a panelist caught that one rope could not do
+// the jobs the climax gave it and tagged it [MINOR]; the re-tell gate
+// (MAJOR/CRITICAL only) filtered it out, it rode into the pages, and the text
+// repair invented hardware to close it. The generator half is ARC_SENSE_RULE
+// ("that could not happen").
+const ARC_SEVERITY_DEF = '[CRITICAL] — the story is broken; [MAJOR] — a real fault repairable inside the existing structure, which an act from no motive line, a main character with no turn, and an action at the turn or the climax that could not happen as the arc states it always are; or [MINOR] — a blemish.';
 
 /**
  * THE ARC CRITIQUE SPEC — ONE source, both arc templates (owner, 2026-09-19).
@@ -9932,10 +10148,10 @@ const ARC_SEVERITY_DEF = '[CRITICAL] — the story is broken; [MAJOR] — a real
  *   retell  the arc-retell variant — the same spec against a final arc, whose
  *           faults are the ones that REMAIN after the re-telling.
  */
-function arcCritiqueSpec({ retell = false } = {}) {
+function arcCritiqueSpec({ retell = false, inputData = {} } = {}) {
   const remain = retell ? ' that remain' : '';
   return [
-    `"Faults:" then the arc's three worst faults${remain}, one per numbered line, or the single word "none". ${ARC_ISSUE_RULE} A fault is one of these: ${ARC_LOGIC_CHECK} Or one of these: ${ARC_PART_CHECK} Each line: ${arcIssueLine()} ${ARC_FINDING_RULE} Tag each ${ARC_SEVERITY_DEF} A fault is never a count, a page number or a sourced measurement.`,
+    `"Faults:" then the arc's three worst faults${remain}, one per numbered line, or the single word "none". ${ARC_ISSUE_RULE} A fault is one of these: ${ARC_LOGIC_CHECK} Or one of these: ${ARC_PART_CHECK} Or a break of one of these rules: ${arcStakesRules(inputData).join(' ')} Each line: ${arcIssueLine()} ${ARC_FINDING_RULE} Tag each ${ARC_SEVERITY_DEF} A fault is never a count, a page number or a sourced measurement.`,
     '',
     '"Commission honored:" one line — "yes", or the commission\'s own words the arc drops or inverts, quoted; a TOPIC PROMISE, where one is given, counts among the commission\'s words.',
   ].join('\n');
@@ -9961,7 +10177,7 @@ function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null } = 
     TELLING_RULES: buildTellingRulesSection(inputData),
     CHALLENGE_IDEAS: challengeIdeas ?? buildChallengeIdeasSection(inputData),
     ARC_LOGIC_SPEC: arcLogicSpec(inputData, pageCount),
-    ARC_CRITIQUE_SPEC: arcCritiqueSpec(),
+    ARC_CRITIQUE_SPEC: arcCritiqueSpec({ inputData }),
     ARC_LENGTH: arcLengthRange(pageCount),
   });
 }
@@ -9997,6 +10213,9 @@ function buildArcPanelPrompt(inputData, committedBlock) {
     ARC_GIVEN_RULE,
     ARC_SENSE_RULE,
     ARC_PLACE_RULE,
+    // The STAKES lens reads the rules the creator's TELLING_RULES carry, for
+    // this band (2026-09-26).
+    ARC_STAKES_RULES: arcStakesRules(inputData).join(' '),
     // A14: the REAL LANDMARKS block is one constant with three consumers
     // (create, panel, retell). The panel is the only independent reader of the
     // arc; without the list it cannot see a real place the arc invented, and
@@ -10038,7 +10257,7 @@ function buildArcRetellPrompt(inputData, pageCount, arcBlock, repairFindings, { 
     ARC_TO_REPAIR: String(arcBlock || '').trim(),
     REPAIR_FINDINGS: String(repairFindings).trim(),
     ARC_LOGIC_SPEC: arcLogicSpec(inputData, pageCount),
-    ARC_CRITIQUE_SPEC: arcCritiqueSpec({ retell: true }),
+    ARC_CRITIQUE_SPEC: arcCritiqueSpec({ retell: true, inputData }),
     ARC_LENGTH: arcLengthRange(pageCount),
     // A14: same block the creator got (see buildArcPanelPrompt).
     AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote),
@@ -10635,7 +10854,7 @@ function critiqueMaxSeverity(critique) {
  * here so the signature states the contract: this prompt's inputs are the arc
  * and the page plan, and the counting happens downstream of its answer.
  */
-function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHints = '', centralFigure = null, mayAddDeeds = false, castTable = null } = {}) {
+function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHints = '', storyLogic = '', centralFigure = null, mayAddDeeds = false, castTable = null } = {}) {
   const template = PROMPT_TEMPLATES.planCheck;
   if (!template) {
     log.error('[PROMPT] planCheck template not loaded — plan check unavailable');
@@ -10646,6 +10865,7 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHi
     // The fourth field's contract, shared with the planner that writes it.
     PAGE_CHANGE: PAGE_CHANGE_DEF,
     TWO_HEIGHTS_DEF,
+    WHOLE_CAST_DEF,
     NAMING_DEF,
     ENDING_EVENT_DEF,
     EXCITING_START_DEF,
@@ -10668,6 +10888,10 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHi
     // rule the text critics read (buildCriticArcHintsSection); question 13
     // checks where each landed.
     ARC_HINTS: buildCriticArcHintsSection(arcHints),
+    // Question 18: the STORY LOGIC the planner divided against, from the same
+    // builder (owner, 2026-09-26). A page that breaks a stated fact could not
+    // be judged by a checker never shown the facts.
+    STORY_LOGIC_SECTION: buildStoryLogicSection(storyLogic),
     // Question 14: the planner's over-the-shoulder contact rule (story-beats.txt
     // {OTS_NO_CONTACT}), the same constant. The planner ignored it on
     // job_1790277448294_5herh01j7 p12 (an ear pressed to what the near figure
@@ -10685,6 +10909,11 @@ ${castTableBlock(castTable)}`
       : '',
 
     ...buildStoryContextFields(inputData),
+    // CHARACTER DETAILS as the planner reads them (2026-09-26, the standing
+    // rule "every critic judges the source the generator was given"): the
+    // same block and the same arc-master source rule buildBeatsPrompt fills.
+    // CHARACTER_DETAILS rides in from buildStoryContextFields above.
+    CHARACTER_SOURCE_RULE: characterSourceRule({ master: 'arc' }),
     PAGE_COUNT: beats.length,
     // The plan line per page IS the division (2026-09-02); the block the
     // planner emitted is preferred, and the parsed pages stand in when a
@@ -11029,6 +11258,12 @@ function buildTextAuditPrompt(inputData, pages = [], arc = '', { arcHints = '' }
   return fillTemplate(template, {
     STORY_ARC: String(arc || '').trim() || '(no story was recorded — audit the pages alone)',
     ARC_HINTS: buildCriticArcHintsSection(arcHints),
+    // The CHARACTER DETAILS the writer wrote from (2026-09-26, standing rule
+    // "every critic judges the source the generator was given"): the same
+    // block and the same statement of how the writer was told to use it.
+    // The blind audit stays blind by design and does not get it.
+    CHARACTER_DETAILS: storyCharacterDetails(inputData),
+    CHARACTER_DETAILS_USE,
     PLAN_LINES: planLines || '(no page plan was recorded)',
     PULL_QUESTION: simpleBand
       ? 'skip this question — this book is built from self-contained moments, so a page that leaves nothing open is correct.'
@@ -11342,13 +11577,21 @@ function buildSceneReviewBibleBlock(visualBible) {
     const vantages = Array.isArray(loc.vantages) && loc.vantages.length > 0
       ? loc.vantages
       : [{ id: `${id}.1`, name: loc.name || '', shot: '', pages: loc.pages, emptyScenePrompt: loc.emptyScenePrompt }];
+    // A real landmark's plates each cite a photo (landmarkPhoto), judged by
+    // check [landmark_photo_mismatch] against the numbered PHOTOS list.
+    const photoList = loc.isRealLandmark ? landmarkPhotoListLines(loc, '    ') : '';
+    const ownVantages = Array.isArray(loc.vantages) && loc.vantages.length > 0;
     for (const v of vantages) {
       if (!v) continue;
       const plate = String(v.emptyScenePrompt || '').trim();
       if (!plate) continue;
       const pages = Array.isArray(v.pages) ? v.pages.map(Number) : (Array.isArray(loc.pages) ? loc.pages.map(Number) : []);
-      plateLines.push(`- ${String(v.id || `${id}.1`).trim().toUpperCase()} (${label}${v.shot ? `, ${v.shot}` : ''}) — pages ${JSON.stringify(pages)}: ${plate}`);
+      const citation = ownVantages ? v.landmarkPhoto : loc.landmarkPhoto;
+      const cited = !photoList ? ''
+        : ` — landmarkPhoto: ${citation === undefined || citation === null || citation === '' ? '(none cited)' : JSON.stringify(citation)}`;
+      plateLines.push(`- ${String(v.id || `${id}.1`).trim().toUpperCase()} (${label}${v.shot ? `, ${v.shot}` : ''}) — pages ${JSON.stringify(pages)}${cited}: ${plate}`);
     }
+    if (photoList) plateLines.push(`  ${id} (${label}) PHOTOS:\n${photoList}`);
   }
 
   // DECLARED TEXT. Check 9g faults an element that must carry readable
@@ -11432,7 +11675,9 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
   // Check 0 is about the MECHANICAL CLOTHING FAULTS section and is sent only
   // with it (2026-09-23): with no section it told the reviewer about a block
   // that is not there.
-  const rawTemplate = PROMPT_TEMPLATES.sceneReview;
+  // options.template: a Test Lab A/B replacement for the loaded template, for
+  // this call only (PROMPT_TEMPLATES is never mutated). The run passes none.
+  const rawTemplate = options.template || PROMPT_TEMPLATES.sceneReview;
   const template = rawTemplate && (options.clothingFindings
     ? rawTemplate.replace(/<!-- CLOTHING_MECHANICAL_(BEGIN|END) -->\n?/g, '')
     : rawTemplate.replace(/<!-- CLOTHING_MECHANICAL_BEGIN -->[\s\S]*?<!-- CLOTHING_MECHANICAL_END -->\n?/g, ''));
@@ -11487,6 +11732,8 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
     // No TEXT_NOT_A_CHECKLIST: this reviewer is shown neither the page text
     // (written after the images are planned) nor the arc — its job is
     // drawability (owner, 2026-09-23).
+    // Check [landmark_photo_mismatch]: the rule every plate author is given.
+    LANDMARK_PHOTO_CITE: LANDMARK_PHOTO_CITE_RULE,
     // Check 6, from the constants both Art Director templates state as 6d / 8l.
     EYES_OPEN: EYES_OPEN_RULE,
     SHARED_GRIP: SHARED_GRIP_RULE,
@@ -11503,6 +11750,9 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
     // as 11c and `shot_widened` states (shotVocabulary.CLOSEUP_KEPT_RULE).
     CLOSEUP_KEPT: CLOSEUP_KEPT_RULE,
     COVER_GAZE_EXCEPTION,
+    // Check 6d [group_staging], from the rule both Art Director templates state
+    // as rule 4 and the brief check measures (shotVocabulary.GROUP_STAGING_RULE).
+    GROUP_STAGING: GROUP_STAGING_RULE,
     // Check 3a, from the one rule every brief author is given (sceneLight.js).
     SCENE_LIGHT_FIELD: SCENE_LIGHT_FIELD_RULE,
   });
@@ -11600,6 +11850,7 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     // Text stage: the full reading-level block, PACING rhythm included.
     READING_LEVEL: getReadingLevel(inputData.languageLevel),
     PARAGRAPH_SHAPE: paragraphShapeRule(),
+    CHARACTER_DETAILS_USE,
     PAGE_COUNT: beats.length,
     PLAN_LINES: blocks,
     TITLE_RULE: buildTitleRule(inputData),
@@ -11803,13 +12054,11 @@ The main character has two avatar styles available:
     }
 
     // Build landmarks instruction for the visual bible.
-    // Each landmark lists what its indexed photos show, so the writer knows
-    // which views exist (an interior shot, a view from the top). The scene
-    // hint's `landmarkView` then picks the photo by kind
-    // (landmarkPhotos.pickVariantForView). The writer no longer cites a photo
-    // number as `[LOC###.N]`: a dotted id is a Visual Bible vantage, and
-    // reading it as a photo slot served the wrong photo (docs/decisions.md
-    // 2026-09-24).
+    // Each landmark lists its numbered photos (landmarkPhotoListLines), and
+    // the writer cites the one its location's plate shows in the location's
+    // `landmarkPhoto` (LANDMARK_PHOTO_CITE_RULE; a trial bible has one plate
+    // per location). Never a dotted `[LOC###.N]`: that reading served the
+    // wrong photo (docs/decisions.md 2026-09-24, 2026-09-26).
     let landmarksInstruction = '';
     if (inputData.ideaKind === 'fantasy') {
       // The make-believe idea: the real town frames the story, the pages
@@ -11827,11 +12076,8 @@ A make-believe world.${worldSentence ? ` ${worldSentence}` : ''} The first scene
       const cityName = inputData.userLocation?.city || '';
       const landmarkBlock = top3.map(l => {
         let entry = `- ${l.name}`;
-        const variants = l.photoVariants || [];
-        if (variants.length >= 2) {
-          const views = variants.map(v => `    - ${v.description}`).join('\n');
-          entry += `\n  PHOTOS (the views a scene's landmarkView can select):\n${views}`;
-        }
+        const list = landmarkPhotoListLines(l);
+        if (list) entry += `\n  PHOTOS:\n${list}`;
         return entry;
       }).join('\n');
       landmarksInstruction = `# Location${cityName ? `: ${cityName}` : ''}
@@ -11839,7 +12085,8 @@ The story takes place in ${cityName || 'the child\'s hometown'}. Use real place 
 At least one scene MUST take place at one of these real local landmarks:
 ${landmarkBlock}
 Include the chosen landmark(s) in the visual bible locations section with their real name and accurate visual description.
-Reference the landmark by its LOC ID in the relevant scene hints.`;
+Reference the landmark by its LOC ID in the relevant scene hints.
+${LANDMARK_PHOTO_CITE_RULE} The plate of a location is its \`backgrounds[]\` description, and the citation goes on the location's own entry.`;
     } else if (inputData.userLocation?.city) {
       landmarksInstruction = `# Location: ${inputData.userLocation.city}
 The story takes place in ${inputData.userLocation.city}. Use real place names — do NOT invent fictional city names.`;
@@ -11924,27 +12171,29 @@ Output: Title, then each page with story text and a scene hint for illustration.
  * @returns {string} - Prompt section with available landmarks, or empty string if none
  */
 /**
- * One VB location as prompt lines — SINGLE source for both Art Director
- * builders (all-pages + per-page). Real landmarks with any photo list their
- * dotted variant ids (vantage-labelled) so the AD can cite them in objects[];
- * without a listed id the photo never attaches.
+ * One VB location as prompt lines — SINGLE source for the per-page Art
+ * Director (buildRecurringElementsText) and the iterate rewrite
+ * (buildSceneDescriptionPrompt). A real landmark lists its numbered PHOTOS
+ * (landmarkPhotoListLines) and the photo each of its plates cites
+ * (`landmarkPhoto`, docs/decisions.md 2026-09-26). The old dotted
+ * `[LOC###.N]` photo handles are gone: a dotted id is a vantage.
  */
 function buildVbLocationLines(loc) {
   const description = loc.extractedDescription || loc.description;
-  const vantageTag = (v) => v.vantage ? `(${v.vantage}) ` : (v.variantNumber >= 4 ? '(interior) ' : '(exterior) ');
-  if (loc.isRealLandmark && loc.photoVariants && loc.photoVariants.length > 1) {
-    const variantStrs = loc.photoVariants.map(v =>
-      `[${loc.id}.${v.variantNumber}] ${vantageTag(v)}${v.description || `Photo ${v.variantNumber}`}`);
-    return `* **${loc.name}** [${loc.id}] (real landmark): ${description}\n`
-      + `  Photo variants: ${variantStrs.join(', ')}\n`;
-  }
-  if (loc.isRealLandmark && (loc.photoVariants?.length === 1 || loc.referencePhotoUrl || loc.referencePhotoData)) {
-    const v1 = loc.photoVariants?.[0];
-    return `* **${loc.name}** [${loc.id}] (real landmark): ${description}\n`
-      + `  Photo variants: [${loc.id}.1] ${v1 ? vantageTag(v1) : '(exterior) '}${v1?.description || 'reference photo'}\n`;
-  }
   const locType = loc.isRealLandmark ? 'real landmark' : 'location';
-  return `* **${loc.name}** [${loc.id}] (${locType}): ${description}\n`;
+  let out = `* **${loc.name}** [${loc.id}] (${locType}): ${description}\n`;
+  if (!loc.isRealLandmark) return out;
+  const list = landmarkPhotoListLines(loc);
+  if (!list) return out;
+  out += `  PHOTOS:\n${list}\n`;
+  const cite = (v) => (v === undefined || v === null || v === '' ? '(none cited)' : (String(v).toLowerCase() === 'none' ? 'none' : `Photo ${v}`));
+  const vantages = Array.isArray(loc.vantages) ? loc.vantages.filter(Boolean) : [];
+  if (vantages.length > 0) {
+    out += `  Plate photos: ${vantages.map(v => `${v.id} "${v.name || ''}" → ${cite(v.landmarkPhoto)}`).join('; ')}\n`;
+  } else {
+    out += `  Plate photo: ${cite(loc.landmarkPhoto)}\n`;
+  }
+  return out;
 }
 
 // `retryNote` (optional): one generic sentence injected when a previous writer
@@ -11980,6 +12229,63 @@ function shortLandmarkDescription(extract) {
 // landmark as far as the pictures are concerned, and the bible may only
 // name a viewpoint one of them shows.
 const LANDMARK_VANTAGE_RULE = "A landmark is drawn from one of its PHOTOS. Name a location or a vantage of it only from a viewpoint one of its photos shows — an exterior is seen from the street or the square, an interior from inside, a distant or view-from photo from afar. If no photo shows the view a page needs (a skyline from a hilltop, a bird's-eye, the far side), that landmark is not available for that page: use one whose photos fit, or none. A view the commission's own words describe is the exception: it stands, and the landmark in it is drawn from what its photos show";
+
+/**
+ * THE NUMBERED PHOTO LIST a plate author cites from (docs/decisions.md
+ * 2026-09-26). Every servable photo (landmarkPhotos.servablePhotos — the same
+ * set the server answers a citation from), numbered by slot, with its kind,
+ * its judged framing and its COMPLETE description: never cut, never merged by
+ * framing. The number is the value a `landmarkPhoto` field cites.
+ *
+ * @param {Object} l - an available landmark or a Visual Bible location
+ *   carrying photoVariants (variantsFromIndexRow shape); a legacy single-photo
+ *   location is photo 1
+ * @param {string} [indent]
+ * @returns {string} lines, '' when the landmark has no photo
+ */
+function landmarkPhotoListLines(l, indent = '    ') {
+  const { servablePhotos } = require('./landmarkPhotos');
+  const photos = servablePhotos(l?.photoVariants);
+  if (photos.length > 0) {
+    return photos.map((v) => {
+      const kind = v.kind || v.vantage || 'exterior';
+      const framing = v.framing ? `, framed ${v.framing}` : '';
+      return `${indent}Photo ${v.variantNumber} (${kind}${framing}): ${landmarkPhotoText(v)}`;
+    }).join('\n');
+  }
+  if (l?.referencePhotoUrl || l?.referencePhotoData) {
+    const desc = String(l.extractedDescription || l.photoDescription || '').trim() || '(no description stored)';
+    return `${indent}Photo 1: ${desc}`;
+  }
+  return '';
+}
+
+/**
+ * WHAT ONE LANDMARK PHOTO SHOWS, as every reader of it is told (2026-09-26):
+ * the stored description, then what the photo judge saw when it scored the
+ * photo (landmark_photo_scores.reason, carried as the variant's `judgedView`).
+ * The description is written from the photo once and can be wrong — Lindenhof
+ * slot 3 was described as a "waterfront promenade … Fraumünster" while it shows
+ * a guild hall across the river, and the Art Director cited it for a wall seen
+ * from its foot. The judge's line is a second look at the same pixels. ONE
+ * text for the Art Director's numbered PHOTOS list, the scene review (both via
+ * landmarkPhotoListLines) and the plate QC's landmark check (evalPipeline).
+ *
+ * @param {{description?: string, judgedView?: string}} v - a photo variant, or
+ *   a served landmark photo entry carrying the same two fields
+ * @returns {string}
+ */
+function landmarkPhotoText(v) {
+  const desc = String(v?.description || '').trim() || '(no description stored)';
+  const judged = String(v?.judgedView || '').trim();
+  return judged ? `${desc} Photo judge: ${judged}.` : desc;
+}
+
+// THE CITATION RULE — one constant for every author of a landmark plate (the
+// all-pages Art Director's vantages, the trial writer's locations, the iterate
+// rewrite's fresh plate) and for the scene review's critic check
+// [landmark_photo_mismatch] (sibling set landmark-photo-generator-vs-critic).
+const LANDMARK_PHOTO_CITE_RULE = 'Each plate of a real landmark cites, in `landmarkPhoto`, the number of the one photo in that landmark\'s PHOTOS list whose content the plate shows, seen from roughly that photo\'s viewpoint. A photo of another side, of a neighbouring place or of the wider town is not the plate\'s photo. It cites "none" when the plate\'s frame is dominated by a structure, a feature or a view that no listed photo shows: that plate, and every page on it, then carries the place in words alone. Nothing the cited photo shows is contradicted in the plate or its pages; what lies outside the photo comes from the words.';
 
 function landmarkPhotoLine(l) {
   const variants = Array.isArray(l.photoVariants) ? l.photoVariants : [];
@@ -12049,7 +12355,11 @@ function buildAvailableLandmarksSection(landmarks, retryNote = '', { forArtDirec
   if (!landmarks || landmarks.length === 0) {
     return '';
   }
-  const photoLine = landmarkPhotoLine;
+  // The Art Director cites a photo by number, so it gets the full numbered
+  // list (landmarkPhotoListLines); the writers get one short PHOTOS line.
+  const photoLine = forArtDirector
+    ? (l) => { const list = landmarkPhotoListLines(l); return list ? `\n  PHOTOS:\n${list}` : ''; }
+    : landmarkPhotoLine;
   const landmarkList = landmarks
     .map(l => {
       let entry = `- ${l.name}`;
@@ -12077,7 +12387,7 @@ ${landmarkList}
 
 For each landmark you use:
 - \`isRealLandmark\`: true, and \`landmarkQuery\`: its EXACT name from the list above, without the [type]. Its \`name\` may be the one the story uses.
-${hasDescriptions ? `- The DESCRIPTION says what the landmark is; it is not wording for a brief.\n` : ''}${photoRule}
+${hasDescriptions ? `- The DESCRIPTION says what the landmark is; it is not wording for a brief.\n` : ''}${photoRule}${hasPhotos ? `\n- ${LANDMARK_PHOTO_CITE_RULE}` : ''}
 `;
   }
   return `**REAL LANDMARKS — use only where they belong to the world the commission names. When the story's own places offer landmarks from this list, build at least two of them in, woven into the story's action (two to four is the target); never relocate the story or bend the plot to collect them. A story set anywhere else uses none, and no listed landmark renamed or reworked into a feature of the story's own setting. A landmark carried as background scenery counts as used:**
@@ -12341,6 +12651,9 @@ module.exports = {
   buildEraGuard,
   buildLandmarkFidelityBlock,
   LANDMARK_PHOTO_AUTHORITY,
+  LANDMARK_PHOTO_CITE_RULE,
+  landmarkPhotoListLines,
+  landmarkPhotoText,
   getAgeCategory,
   getAgeCategoryLabel,
   AGE_CATEGORY_ORDER,
@@ -12380,6 +12693,7 @@ module.exports = {
   isNone,
   extractCharacterVisualProfile,
   buildLabeledPhysicalParts,
+  recordedFeatures,
   buildCharacterPhysicalDescription,
   buildFaceDescription,
   buildGroundingPrompt,
@@ -12431,6 +12745,8 @@ module.exports = {
   parseTitleBlock,
   BRIEF_TRAILING_MARKERS,
   buildStoryContextFields,
+  storyCharacterDetails,
+  CHARACTER_DETAILS_USE,
   buildRelationshipLines,
   buildBeatsPrompt,
   buildChallengeIdeasSection,
@@ -12465,6 +12781,9 @@ module.exports = {
   arcRepairFindings,
   splitCommittedBlock,
   ARC_SEVERITY_DEF,
+  ARC_OPPOSITION_HOLDS_RULE,
+  ARC_QUESTIONS_ANSWERED_RULE,
+  arcStakesRules,
   COMMISSIONED_CAST_DEF,
   ARC_ENTRANCE_RULE,
   ARC_GIVEN_RULE,
@@ -12496,7 +12815,10 @@ module.exports = {
   // `beats-planner-vs-plan-check`).
   DEED_AND_EFFECT_DEF,
   TWO_HEIGHTS_DEF,
+  WHOLE_CAST_DEF,
   HINT_VS_ARC_RULE,
+  STORY_LOGIC_FACT_RULE,
+  buildStoryLogicSection,
   HINT_ANCHOR_RULE,
   NAMING_DEF,
   ENDING_EVENT_DEF,
@@ -12550,6 +12872,7 @@ module.exports = {
   STYLE_RULEBOOK,
   MOTIVE_AT_THE_ACT_RULE,
   PAYOFF_KEEP_RULE,
+  MECHANISM_FIX_RULE,
   AD_COMPOSITION_RULE,
   parseArcHints,
   parseArcCreate,

@@ -37,6 +37,7 @@ const path = require('path');
 const crypto = require('crypto');
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
+const { geminiUsage, sumUsage } = require('./providerUsage');
 const { PROMPT_TEMPLATES, fillTemplate, applyRepairStyleGuard } = require('../services/prompts');
 const { assertPromptFilled, guardPromptString } = require('../services/prompts');
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
@@ -574,8 +575,9 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
 
     // Route based on provider
     let data;
-    let inputTokens = 0;
-    let outputTokens = 0;
+    // Every provider's reply is Gemini-shaped by the time it lands in `data`
+    // (callGrokVisionAPI and the Claude wrapper below), so one reader serves all.
+    let usage = geminiUsage(null);
     if (modelConfig?.provider === 'anthropic') {
       // Claude vision path — uses callTextModel with images option
       log.info(`🔲 [BBOX-DETECT] ${pageLabel}Using Claude vision: ${modelId}`);
@@ -591,8 +593,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
         candidates: [{ content: { parts: [{ text: claudeResult.text }] } }],
         usageMetadata: { promptTokenCount: claudeResult.usage?.input_tokens || 0, candidatesTokenCount: claudeResult.usage?.output_tokens || 0 }
       };
-      inputTokens = claudeResult.usage?.input_tokens || 0;
-      outputTokens = claudeResult.usage?.output_tokens || 0;
+      usage = geminiUsage(data.usageMetadata);
     } else if (modelConfig?.provider === 'xai') {
       log.info(`🔲 [BBOX-DETECT] ${pageLabel}Using Grok vision: ${modelId}`);
       const { callGrokVisionAPI } = require('./images'); // lazy back-edge into images.js (see module header)
@@ -602,8 +603,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
         log.warn('⚠️  [BBOX-DETECT] Grok returned no text response');
         return dinoUndercountResult || null;
       }
-      inputTokens = data.usageMetadata?.promptTokenCount || data.usage?.prompt_tokens || 0;
-      outputTokens = data.usageMetadata?.candidatesTokenCount || data.usage?.completion_tokens || 0;
+      usage = geminiUsage(data.usageMetadata);
     } else {
       // Gemini path — retry once on empty response (0 output tokens)
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
@@ -654,8 +654,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
               const grokResp = await callGrokVisionAPI(grokFallbackId, grokModel.modelId || grokFallbackId, parts, prompt);
               data = await grokResp.json();
               if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-                inputTokens = data.usage?.prompt_tokens || 0;
-                outputTokens = data.usage?.completion_tokens || 0;
+                usage = geminiUsage(data.usageMetadata);
                 log.info(`✅ [BBOX-DETECT] Grok fallback succeeded after API error`);
                 break;
               }
@@ -668,9 +667,8 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
 
         data = await response.json();
 
-        inputTokens = data.usageMetadata?.promptTokenCount || 0;
-        outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
-        log.debug(`📊 [BBOX-DETECT] Token usage - input: ${inputTokens}, output: ${outputTokens}${bboxAttempt > 1 ? ` (retry ${bboxAttempt})` : ''}`);
+        usage = geminiUsage(data.usageMetadata);
+        log.debug(`📊 [BBOX-DETECT] Token usage - input: ${usage.input_tokens}, output: ${usage.output_tokens}, thinking: ${usage.thinking_tokens}${bboxAttempt > 1 ? ` (retry ${bboxAttempt})` : ''}`);
 
         const finishReason = data.candidates?.[0]?.finishReason;
         if (finishReason && finishReason !== 'STOP') {
@@ -723,9 +721,8 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
               const grokResponse = await callGrokVisionAPI(grokFallbackId2, grokFallbackModel.modelId || grokFallbackId2, parts, prompt);
               data = await grokResponse.json();
               if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-                inputTokens = data.usageMetadata?.promptTokenCount || data.usage?.prompt_tokens || 0;
-                outputTokens = data.usageMetadata?.candidatesTokenCount || data.usage?.completion_tokens || 0;
-                log.info(`✅ [BBOX-DETECT] Grok fallback succeeded (${outputTokens} output tokens)`);
+                usage = geminiUsage(data.usageMetadata);
+                log.info(`✅ [BBOX-DETECT] Grok fallback succeeded (${usage.output_tokens} output tokens)`);
                 break; // Got content from Grok
               }
               log.warn('⚠️  [BBOX-DETECT] Grok fallback also returned no text');
@@ -886,8 +883,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
     let finalFigures = figures;
     let finalObjects = objects;
     let refinementResponse = null;
-    let totalInputTokens = inputTokens;
-    let totalOutputTokens = outputTokens;
+    let totalUsage = usage;
 
     // Only refine if we have identified main characters (skip UNKNOWN-only results)
     const mainCharacters = figures.filter(f => f.name && f.name !== 'UNKNOWN');
@@ -952,8 +948,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
             refineData = await refineResp.json();
           }
 
-          totalInputTokens += refineData?.usageMetadata?.promptTokenCount || 0;
-          totalOutputTokens += refineData?.usageMetadata?.candidatesTokenCount || 0;
+          totalUsage = sumUsage([totalUsage, geminiUsage(refineData?.usageMetadata)]);
 
           const refineText = refineData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
           if (refineText) {
@@ -1026,7 +1021,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
       foundObjects,
       missingObjects,
       unknownFigures: finalFigures.filter(f => f.name === 'UNKNOWN').length,
-      usage: { input_tokens: totalInputTokens, output_tokens: totalOutputTokens },
+      usage: totalUsage,
       // Include raw prompt and response for dev mode debugging
       rawPrompt: prompt,
       rawResponse: responseText,
@@ -1209,9 +1204,8 @@ async function detectSubRegion(characterCrop, targetElement) {
     const data = await response.json();
 
     // Log token usage
-    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
-    log.debug(`📊 [SUB-REGION] Token usage - input: ${inputTokens}, output: ${outputTokens}`);
+    const usage = geminiUsage(data.usageMetadata);
+    log.debug(`📊 [SUB-REGION] Token usage - input: ${usage.input_tokens}, output: ${usage.output_tokens}, thinking: ${usage.thinking_tokens}`);
 
     if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
       log.warn('⚠️  [SUB-REGION] No response from Gemini');
@@ -1254,7 +1248,7 @@ async function detectSubRegion(characterCrop, targetElement) {
       box: normalizedBox,
       confidence: parsedResult.confidence || 'low',
       description: parsedResult.description || '',
-      usage: { input_tokens: inputTokens, output_tokens: outputTokens }
+      usage
     };
 
     if (result.found) {

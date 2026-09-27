@@ -177,7 +177,7 @@ describe('rebuilding job_1789584708605_rts4wqupm p16 through the real builder', 
   });
 
   it('the rewriter is now asked for the fields it dropped on all 11 rounds', () => {
-    for (const field of ['`shot`', '`landmarkView`', '`wornItems[]`', '`depth`', '`looksAt`']) {
+    for (const field of ['`shot`', '`landmarkPhoto`', '`wornItems[]`', '`depth`', '`looksAt`']) {
       expect(prompt.includes(field), `the rewrite prompt never mentions ${field}`).toBe(true);
     }
     expect(prompt).toMatch(/`action` is required on every row/);

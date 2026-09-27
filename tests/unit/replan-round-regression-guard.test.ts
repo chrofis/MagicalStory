@@ -71,7 +71,9 @@ describe('one guard, two callers', () => {
     const pipeline = read('server/lib/beatsPipeline.js');
     expect(pipeline).toMatch(/replanRoundRegressed\(pendingCheck, check2, changedThisRound, \{ round \}\)/);
     expect(pipeline).not.toMatch(/&& round > 1\)/);
-    expect(read('server/lib/testlab.js')).toMatch(/replanRoundRegressed\(\{ findings \}, \{ findings: recheck\.findings \}/);
+    // The Lab runs the run's own rounds since 2026-09-27 (beatsPipeline.runReplanRounds).
+    expect(read('server/lib/testlab.js')).toMatch(/await runReplanRounds\(\{/);
+    expect(read('server/lib/testlab.js')).not.toMatch(/replanRoundRegressed\(/);
   });
 });
 

@@ -75,11 +75,16 @@ describe('face-integrity gate', () => {
     expect(r.available).toBe(false);
   });
 
-  it('reports usage under the repair_face_check label', async () => {
+  it('books its usage ONCE, through the text-model chokepoint, under the repair_face_check label', async () => {
+    // callTextModel records every call into the job's sink with the provider key
+    // of the model's real vendor. The gate used to book the same usage a second
+    // time as 'openrouter' (it runs on Gemini); it must not book anything itself.
     reply = { text: '{"intact": true}', usage: { input_tokens: 5 }, modelId: 'x' };
     const seen: any[] = [];
-    await checkFaceIntegrity('a', 'b', 'CharacterA', { log, usageTracker: (...args: any[]) => seen.push(args) });
-    expect(seen[0][2]).toBe('repair_face_check');
+    const { runWithUsageSink } = require_('../../server/lib/usageContext');
+    await runWithUsageSink((...args: any[]) => seen.push(args), () => checkFaceIntegrity('a', 'b', 'CharacterA', { log }));
+    expect(calls[0].opts.usageLabel).toBe('repair_face_check');
+    expect(seen).toEqual([]);
   });
 });
 

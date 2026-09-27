@@ -287,8 +287,7 @@ function flattenEntityIssues(entityReport, pageNumber = null) {
  * though the quality / semantic / entity evaluators raised neither issue).
  *
  * @param {object} args
- * @param {string} args.sceneDescription - intended scene description
- * @param {object} args.evaluation - quality evaluation { fixableIssues, semanticResult, bboxDetection }
+ * @param {object} args.evaluation - quality evaluation { fixableIssues, semanticResult, bboxDetection, judgedPrompt }
  * @param {object} [args.entityReport] - entity consistency report (whole story) — only entries for this page are used
  * @param {number} [args.pageNumber] - page number (for filtering entity report)
  * @param {Array} [args.characters] - story characters [{ name, physicalDescription }]
@@ -481,8 +480,62 @@ function dropCropArtifactFixes(plan, pageNumber = null) {
   return removed;
 }
 
+/**
+ * AN IDENTITY SWAP IS NOT THE CONSOLIDATOR'S TO DROP (owner, 2026-09-27).
+ *
+ * `identity_swap` is the entity judge's finding that a figure's hair AND face
+ * both differ from the reference: it reads as another person. The judge saw the
+ * reference picture beside the cell; the consolidator sees neither, only the
+ * character's written profile. On staging job_1790446348343_z3fw660ie's initial
+ * page it dropped such a finding (then filed as a MAJOR hair_change) with
+ * `profile_says_trait_is_correct` because the profile's hair words matched the
+ * judge's description of the REFERENCE, and the page scored 96 unrepaired.
+ *
+ * So the swap never enters the model's input. It is appended to
+ * `deduped_issues` — the scoring source — exactly as the judge filed it, and its
+ * repair is routed from the entity report (repairLogic gate 2, char-fix). Scoped
+ * to this one type by its declared `type`; every other entity finding goes
+ * through the model as before (the owner did not approve a general change to the
+ * consolidator's drop rules).
+ */
+const IDENTITY_SWAP_TYPE = 'identity_swap';
+
+function isIdentitySwap(e) {
+  return String(e?.type || '').trim().toLowerCase() === IDENTITY_SWAP_TYPE;
+}
+
+/** The deduped_issues rows the page's identity swaps are charged as. */
+function identitySwapEntries(swaps) {
+  return (Array.isArray(swaps) ? swaps : []).filter(isIdentitySwap).map(e => {
+    const severity = String(e.severity || 'CRITICAL').toUpperCase();
+    return {
+      description: e.description || '',
+      severity,
+      severityChosen: severity,
+      type: IDENTITY_SWAP_TYPE,
+      character: e.characterName || e.name || null,
+      sources: mergeSources(sourcesOf(e), [FINDING_SOURCES.ENTITY]),
+      severities: { [FINDING_SOURCES.ENTITY]: severity },
+    };
+  });
+}
+
+/** Append the swaps the model never saw; one row per character. Returns the count added. */
+function appendIdentitySwaps(plan, swaps, pageNumber = null) {
+  if (!plan) return 0;
+  if (!Array.isArray(plan.deduped_issues)) plan.deduped_issues = [];
+  const key = (v) => (typeof v === 'string' ? v.trim().toLowerCase() : '');
+  let added = 0;
+  for (const row of identitySwapEntries(swaps)) {
+    if (plan.deduped_issues.some(i => key(i?.type) === IDENTITY_SWAP_TYPE && key(i?.character) === key(row.character))) continue;
+    plan.deduped_issues.push(row);
+    added++;
+  }
+  if (added) log.info(`🧑‍🤝‍🧑 [FEEDBACK-CONSOLIDATOR] page ${pageNumber}: ${added} identity_swap finding(s) charged as filed — never the consolidator's to drop`);
+  return added;
+}
+
 async function consolidateFeedback({
-  sceneDescription,
   evaluation = {},
   entityReport = null,
   // Pre-flattened per-page entity issues ({ characterName|name, severity,
@@ -527,6 +580,20 @@ async function consolidateFeedback({
     if (!template) {
       return { plan: null, usage: null, error: 'feedbackConsolidator prompt template not loaded' };
     }
+    // THE SCENE THE JUDGES SCORED (owner, 2026-09-26: "The eval should judge
+    // the same thing as image generation"). The consolidator reads the exact
+    // string the quality and semantic judges were given, which
+    // evaluateImageQuality stamps on its result as `judgedPrompt` — the prompt
+    // the image model received (or, on the batch eval, its scene block). It used
+    // to read the page's whole brief, a second contract beside the judges'.
+    // No judged prompt on the evaluation = nothing to consolidate against:
+    // fail, never fall back to another string.
+    const judgedPrompt = typeof evaluation.judgedPrompt === 'string' && evaluation.judgedPrompt.trim()
+      ? evaluation.judgedPrompt : null;
+    if (!judgedPrompt) {
+      log.error(`❌ [FEEDBACK-CONSOLIDATOR] page ${pageNumber}: the evaluation carries no judgedPrompt — the scene the judges scored is unknown, not consolidating`);
+      return { plan: null, usage: null, error: 'evaluation carries no judgedPrompt' };
+    }
 
     // evaluateImageQuality merges the compliance (three-stage) findings into
     // fixableIssues tagged `source: 'three-stage'` — split them back out so
@@ -556,6 +623,9 @@ async function consolidateFeedback({
       entityIssues = entityIssuesInput.map(e => ({
         characterName: e.characterName || e.name || '(unknown)',
         description: e.description || e.issue || '',
+        // The declared type, as flattenEntityIssues carries it — read only to
+        // hold identity swaps out of the model's input (below).
+        type: e.subType || e.type || null,
         severity: e.severity || 'MODERATE',
         // Same drop site as flattenEntityIssues, same rule (2026-09-14).
         sources: mergeSources(sourcesOf(e), [FINDING_SOURCES.ENTITY]),
@@ -563,6 +633,8 @@ async function consolidateFeedback({
     } else {
       entityIssues = flattenEntityIssues(entityReport, pageNumber);
     }
+    const identitySwaps = entityIssues.filter(isIdentitySwap);
+    entityIssues = entityIssues.filter(e => !isIdentitySwap(e));
 
     // Build character descriptions from the character profile (source of truth).
     // Fall back to a pre-built description if provided. The character profile
@@ -606,7 +678,7 @@ async function consolidateFeedback({
     });
 
     const userInput = buildFeedbackInput({
-      sceneDescription,
+      sceneDescription: judgedPrompt,
       fixableIssues,
       semanticIssues,
       complianceIssues,
@@ -756,6 +828,7 @@ async function consolidateFeedback({
     enforceNotADefectDrops(plan, pageNumber);
     applyRule7SceneFixGuard(plan, pageNumber);
     dropCropArtifactFixes(plan, pageNumber);
+    appendIdentitySwaps(plan, identitySwaps, pageNumber);
 
     // Enforce the 3-fix cap even if the consolidator slipped past the prompt.
     // When Grok is handed more than 3 fixes, it usually executes none of them —
@@ -953,6 +1026,9 @@ async function consolidateEvaluation({
   entityIssues = [],
   // Page-scoped IMG faults from the previous round's book audit.
   readerFindings = [],
+  // The page's DECLARED brief, read only for its `interactions` list by the
+  // deterministic spec-conflict check below. The scene the consolidator is
+  // shown is the one the judges scored (`evalResult.judgedPrompt`).
   sceneDescription = '',
   characters = [],
   sceneClothing = null,
@@ -987,7 +1063,13 @@ async function consolidateEvaluation({
     || evalResult.threeStageResult?.issues
     || rawFixable.filter(i => i?.source === 'three-stage'));
   const semanticCount = surviving(require('./repairLogic').semanticFindings(evalResult.semanticResult));
-  const entityCount = Array.isArray(entityIssues) ? entityIssues.length : 0;
+  // An identity swap never reaches the model (appendIdentitySwaps), so it does
+  // not by itself justify the call; a page whose only finding is one is charged
+  // it on the skip path below.
+  const entityList = Array.isArray(entityIssues) ? entityIssues : [];
+  const swapInputs = entityList.filter(e => isIdentitySwap({ type: e?.subType || e?.type }))
+    .map(e => ({ ...e, type: IDENTITY_SWAP_TYPE, characterName: e.characterName || e.name }));
+  const entityCount = entityList.length - swapInputs.length;
   // A page the evaluators like but the READER flagged must still reach the
   // model — skipping on the evaluator counts alone would discard the audit.
   const readerCount = Array.isArray(readerFindings) ? readerFindings.length : 0;
@@ -997,14 +1079,13 @@ async function consolidateEvaluation({
       per_character_fixes: [],
       scene_fix: { severity: 'NONE', instruction: '', preserve: [] },
       dropped_issues: [],
-      deduped_issues: [],
+      deduped_issues: identitySwapEntries(swapInputs),
       skipped: true,
     };
-    return { plan, dedupedIssues: [], usage: null, error: null, skipped: true };
+    return { plan, dedupedIssues: plan.deduped_issues, usage: null, error: null, skipped: true };
   }
 
   const { plan, usage, error } = await consolidateFeedback({
-    sceneDescription,
     evaluation: evalResult,
     entityIssues: Array.isArray(entityIssues) ? entityIssues : [],
     readerFindings: Array.isArray(readerFindings) ? readerFindings : [],
@@ -1047,6 +1128,8 @@ async function consolidateEvaluation({
 module.exports = {
   applyRule7SceneFixGuard,
   enforceNotADefectDrops, // exported for testing
+  appendIdentitySwaps, // exported for testing
+  identitySwapEntries, // exported for testing
   dropCropArtifactFixes, // exported for testing
   consolidateFeedback,
   medianSeverity, // exported for testing

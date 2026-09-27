@@ -244,3 +244,45 @@ describe('a garment clause is never geometry', () => {
     expect(out).toContain('upper-right');
   });
 });
+
+describe('a character description is never geometry', () => {
+  // BEHAVIOUR PINNED 2026-09-26: the Art Director hangs each character's look on
+  // the figure as an appositive. Cut into clauses, each item of the look named
+  // no one, and any item holding a place or light word reached the plate:
+  // staging job_1790446348343_z3fw660ie shipped "a broad orange sailcloth sash
+  // knotted at the left hip." and "light stubble." as SCENE GEOMETRY.
+  const facts = (prose: string, castNames: string[] = []) =>
+    geom().selectGeometryFacts({ mainScenePrompt: prose, castNames, maxFacts: 99 }).facts.join(' | ');
+
+  it('drops a dash appositive hung on an unnamed figure, keeps the place', () => {
+    const out = facts('An adult woman—average build, light brown hair, a white blouse, a broad orange sailcloth sash knotted at the left hip, and black ankle boots—stands on the wet riverside landing. The stone wall rises steeply to the upper left under a misty dusk.');
+    expect(out).not.toMatch(/sash|hip|light brown/i);
+    expect(out).toContain('rises steeply to the upper left');
+  });
+
+  it('drops a dash appositive hung on a cast name, including a bare trait like stubble', () => {
+    const out = facts('Facundo — a young man, dark wavy hair, light stubble, a blue shirt — leans over the rail in the left midground, the fog rolling across the dark river behind the hull.', ['Facundo']);
+    expect(out).not.toMatch(/stubble|Facundo/i);
+  });
+
+  it('drops a bracketed appositive and an unterminated one', () => {
+    const bracket = facts('Julian (a toddler, 4 heads tall with light blonde curly hair) falls forward beside a shadowed hollow beneath a thick root in the left foreground.', ['Julian']);
+    expect(bracket).not.toMatch(/blonde|heads tall|toddler/i);
+    const open = facts('Beside her walks a young woman—average build, light brown hair parted on the right, a broad sash at the left hip.');
+    expect(open).toBe('');
+  });
+
+  it('a dash aside that follows no figure is kept', () => {
+    const out = facts('The path—narrowing as it climbs—winds to the upper right toward the gate.');
+    expect(out).toContain('winds to the upper right');
+  });
+
+  it('a place or light word hidden inside another word is not geometry', () => {
+    // "b-road", "s-light-ly", "de-light-ed": none of them is a place or a light.
+    expect(facts('A slightly rounded belly, brow slightly furrowed.')).toBe('');
+    expect(facts('A broad grin, delighted.')).toBe('');
+    // A named compound light word and "afternoon" still count.
+    expect(facts('Candlelight falls from the left across the table.')).toContain('Candlelight');
+    expect(facts('On a cold autumn afternoon.')).toContain('afternoon');
+  });
+});

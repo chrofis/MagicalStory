@@ -2,18 +2,27 @@
 /**
  * Judge one stored story run against the verification registry (tasks/verify.json).
  *
- * WHY (owner, 2026-09-24): "we do 20 changes that need a new story. When we rerun
- * it we should ensure if all 20 are tested or not." Before this, "which shipped
- * changes did that run actually prove?" was answered by re-reading commits. Now
- * each change that needs a run is a registry entry with a claim, the run shape
- * that can exercise it and a check, and this script answers per entry:
+ * WHY (owner, 2026-09-24): "we do 20 changes that need a new story. When we
+ * rerun it we should ensure if all 20 are tested or not." Before this, "which
+ * shipped changes did that run actually prove?" was answered by re-reading
+ * commits. Now each change that needs a run is a registry entry with a claim,
+ * the run shape that can exercise it and a check, and this script answers per
+ * entry:
  *
  *   CONFIRMED    the stored run shows the claim holding
- *   FAILED       the stored run shows it NOT holding (loud; the entry stays pending)
+ *   FAILED       the stored run shows it NOT holding (loud)
  *   HUMAN        the data cannot decide alone — what to look at, with page URLs
  *   NOT COVERED  the run could not exercise it: its build lacks the commit, or
  *                the run shape is absent (no OTS page, no iterate repair, ...).
  *                Never counted as a pass.
+ *
+ * THE RULE (owner, 2026-09-27): after EVERY verification story run, run this
+ * with --write and commit tasks/verify.json. The pre-push hook warns (never
+ * blocks) while a staging run since 2026-09-24 has not been recorded
+ * (--unrecorded). What --write records is defined once in verify-core.js
+ * applyVerdicts: CONFIRMED / FAILED append evidence and set the status;
+ * HUMAN / NOT COVERED only move the entry's lastChecked pointer (it stays
+ * pending); the run is logged in registry.runs[].
  *
  * BUILD, NOT DATE. A run is only evidence for a commit its build CONTAINS:
  * stories.data.analytics.build.commitFull (recorded since 2026-09-14) must have
@@ -24,14 +33,20 @@
  *
  * Usage:
  *   node scripts/admin/verify-run.js <storyId> [--env=staging|prod] [--write] [--all]
- *   node scripts/admin/verify-run.js <storyId> --mark=<entryId>:confirmed|failed --note="what you saw" [--env=...]
+ *   node scripts/admin/verify-run.js <storyId> --mark=<entryId>:confirmed|failed --note="what you saw" [--by=claude|owner] [--env=...]
+ *   node scripts/admin/verify-run.js <storyId> --apply=<verdicts.json> [--env=...]  # verdicts from the review page (verify-review.js)
+ *   node scripts/admin/verify-run.js --pull [--all]     # write the reports the staging server stored
+ *   node scripts/admin/verify-run.js --unrecorded       # staging runs not yet judged into the registry (warns)
  *   node scripts/admin/verify-run.js --list
  *
- *   --write  append evidence (CONFIRMED / FAILED / HUMAN results) to each entry and
- *            flip status to "confirmed" on an auto pass with no human part.
- *            A FAILED result never flips status; it is recorded and printed loudly.
- *   --all    also judge entries that are already confirmed (regression read).
- *   --mark   record a human verdict for one entry on this run (writes).
+ * AUTO-CHECK (2026-09-27): the staging server judges every story it completes
+ * (server/lib/verifyAutoCheck.js, same engine) into story_verify_reports. It
+ * has no git, so --pull re-checks each entry's commits against the run's build
+ * before writing — a report verdict for a commit the build lacks is NOT COVERED.
+ *
+ *   --write  record the verdicts (rules above).
+ *   --all    also judge entries that are already confirmed or failed (regression read).
+ *   --mark   record a person's verdict for one entry on this run (writes).
  *
  * Reads: stories (data, image_version_meta, idea columns), story_images
  * (urls only, never image_data), story_jobs (status/timestamps). No model call.
@@ -43,11 +58,12 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..', '..');
-require('dotenv').config({ path: path.join(ROOT, '.env') });
 const { ch, fromPgNaive } = require('../lib/chTime');
-const { checks, evalRunShape } = require('./verify-checks');
+const core = require('./verify-core');
 
 const REGISTRY = path.join(ROOT, 'tasks', 'verify.json');
+// The registry started judging runs on this day; older runs predate every entry.
+const REGISTRY_SINCE = '2026-09-24';
 
 function arg(name) {
   const hit = process.argv.find(a => a === `--${name}` || a.startsWith(`--${name}=`));
@@ -77,88 +93,83 @@ function buildContains(commit, build) {
   }
 }
 
-async function loadRun(storyId, env) {
+function openPool(env) {
+  require('dotenv').config({ path: path.join(ROOT, '.env') });
   const url = env === 'prod'
     ? (process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL)
     : process.env.STAGING_DATABASE_URL;
   if (!url) throw new Error(env === 'prod' ? 'DATABASE_URL not set' : 'STAGING_DATABASE_URL not set');
   const { Pool } = require('pg');
-  const pool = new Pool({ connectionString: url, ssl: { rejectUnauthorized: false }, max: 2 });
-  try {
-    const s = await pool.query(
-      'SELECT id, data, image_version_meta, idea_source, idea_original, idea_used, created_at FROM stories WHERE id = $1',
-      [storyId]);
-    if (!s.rows[0]) throw new Error(`story ${storyId} not found on ${env}`);
-    const images = await pool.query(
-      'SELECT image_type, page_number, version_index, image_url FROM story_images WHERE story_id = $1',
-      [storyId]);
-    let job = null;
-    try {
-      const j = await pool.query('SELECT status, created_at, completed_at FROM story_jobs WHERE id = $1', [storyId]);
-      job = j.rows[0] || null;
-    } catch { /* story_jobs rows are reaped over time — the story row is the evidence */ }
-    const row = s.rows[0];
-    return {
-      storyId, env,
-      data: row.data || {},
-      versionMeta: row.image_version_meta || {},
-      row: { idea_source: row.idea_source, idea_original: row.idea_original, idea_used: row.idea_used },
-      createdAt: fromPgNaive(row.created_at),
-      job: job ? { status: job.status, createdAt: fromPgNaive(job.created_at), completedAt: job.completed_at ? fromPgNaive(job.completed_at) : null } : null,
-      images: images.rows,
-      build: row.data?.analytics?.build?.commitFull || null,
-    };
-  } finally {
-    await pool.end();
+  return new Pool({ connectionString: url, ssl: { rejectUnauthorized: false }, max: 2, connectionTimeoutMillis: 8000 });
+}
+
+function printRow(e, v) {
+  console.log(`${v.result.padEnd(11)} ${e.id}  — ${e.title}`);
+  if (v.why) console.log(`            ${v.why}`);
+  if (v.result === 'NOT COVERED') {
+    if (v.oldCode && v.detail) console.log(`            old code: ${v.detail}`);
+    return;
   }
+  if (v.detail) console.log(`            ${v.detail}`);
+  if (v.human) console.log(`            LOOK: ${v.human}`);
+}
+
+/** "old code:" reading for a build that lacks the commit — PASS / FAIL / undecided. */
+function oldCodeDetail(j) {
+  if (!j.oldCode || !j.r) return null;
+  const verdict = j.r.covered === false ? 'not exercised' : j.r.pass === true ? 'PASS' : j.r.pass === false ? 'FAIL' : 'undecided';
+  return `${verdict} — ${j.r.detail}`;
+}
+
+/** Staging stories since REGISTRY_SINCE that carry a build and are not yet judged into the registry. */
+async function unrecorded(pool, reg) {
+  const r = await pool.query(
+    `SELECT id, created_at, data->'analytics'->'build'->>'commitFull' AS build, (data->>'trialMode') AS trial
+       FROM stories
+      WHERE created_at >= $1
+        AND data->'analytics'->'build'->>'commitFull' IS NOT NULL
+        AND COALESCE(data->>'isPartial', 'false') <> 'true'
+      ORDER BY created_at`, [REGISTRY_SINCE]);
+  const seen = core.recordedStoryIds(reg);
+  return r.rows.filter(x => !seen.has(`staging:${x.id}`));
 }
 
 /**
- * Judge one entry against one run. Pure given `contains` (commit -> bool|null),
- * so the classification rules are unit-testable without git or a database.
+ * --pull: write the reports the staging server stored (story_verify_reports,
+ * server/lib/verifyAutoCheck.js) for every run the registry has not recorded.
+ * Containment is re-checked here with git — the server cannot.
  */
-function judge(entry, ctx, contains) {
-  const run = () => {
-    if (entry.check?.kind === 'auto') {
-      const fn = checks[entry.check.fn];
-      if (!fn) return { covered: true, pass: null, detail: `no check function "${entry.check.fn}" in verify-checks.js` };
-      try { return fn(ctx); } catch (e) { return { covered: true, pass: null, detail: `check threw: ${e.message}` }; }
-    }
-    return { covered: true, pass: null, detail: 'human check', human: entry.check?.what || '(no instruction)' };
-  };
-
-  if (!ctx.build) return { result: 'NOT COVERED', why: 'run has no recorded build commit', r: null };
-  const missing = [];
-  for (const c of entry.commits || []) {
-    const has = contains(c, ctx.build);
-    if (has === null) return { result: 'NOT COVERED', why: `cannot resolve ${c} or build ${ctx.build.slice(0, 9)} locally (git fetch?)`, r: null };
-    if (!has) missing.push(c);
+async function pull(env) {
+  const reg = loadRegistry();
+  const pool = openPool(env);
+  let rows;
+  try {
+    rows = (await pool.query('SELECT story_id, build, report, created_at FROM story_verify_reports ORDER BY created_at')).rows;
+  } finally { await pool.end(); }
+  const seen = core.recordedStoryIds(reg);
+  const fresh = rows.filter(r => !seen.has(`${env}:${r.story_id}`));
+  if (!fresh.length) { console.log(`verify-run --pull: all ${rows.length} stored ${env} report(s) are already recorded in tasks/verify.json`); return; }
+  const checkedAt = ch(new Date());
+  const allFailed = [];
+  for (const r of fresh) {
+    const report = typeof r.report === 'string' ? JSON.parse(r.report) : r.report;
+    const targets = reg.entries.filter(e => e.status === 'pending' || (arg('all') && ['confirmed', 'failed'].includes(e.status)));
+    const verdicts = core.verdictsFromReport(report, targets, buildContains);
+    const run = { storyId: r.story_id, env, build: report.build || null, runDate: report.runAt ? ch(new Date(report.runAt)) : null };
+    console.log(`\n${r.story_id} (${env}) — run ${run.runDate || '?'}, build ${run.build ? run.build.slice(0, 9) : 'UNRECORDED'}`);
+    for (const { e, v } of verdicts) if (v.result !== 'NOT COVERED') printRow(e, v);
+    const { counts, flipped } = core.applyVerdicts(reg, run, verdicts, { checkedAt, via: 'pull' });
+    console.log(`  ${counts.CONFIRMED} CONFIRMED, ${counts.FAILED} FAILED, ${counts.HUMAN} HUMAN, ${counts['NOT COVERED']} NOT COVERED`
+      + `${flipped.length ? ` — status changed: ${flipped.map(f => `${f.id} ${f.from}->${f.to}`).join(', ')}` : ''}`);
+    for (const { e, v } of verdicts) if (v.result === 'FAILED') allFailed.push(`${e.id} on ${r.story_id}`);
   }
-  if (missing.length) {
-    return { result: 'NOT COVERED', why: `build ${ctx.build.slice(0, 9)} lacks ${missing.join(', ')}`, r: run(), oldCode: true };
+  saveRegistry(reg);
+  if (allFailed.length) {
+    console.log(`\n!!! ${allFailed.length} FAILED: ${allFailed.join(', ')}`);
+    console.log('!!! Investigate each, and add a tasks/BACKLOG.md line for it.');
   }
-  const shape = evalRunShape(entry.runShape, ctx);
-  if (!shape.ok) return { result: 'NOT COVERED', why: shape.why, r: null };
-  const r = run();
-  if (!r.covered) return { result: 'NOT COVERED', why: r.detail, r };
-  if (r.pass === false) return { result: 'FAILED', r };
-  if (r.pass === true && !r.human) return { result: 'CONFIRMED', r };
-  return { result: 'HUMAN', r };
-}
-
-function printRow(entry, j) {
-  const tag = j.result.padEnd(11);
-  console.log(`${tag} ${entry.id}  — ${entry.title}`);
-  if (j.result === 'NOT COVERED') {
-    console.log(`            ${j.why}`);
-    if (j.oldCode && j.r) {
-      const verdict = j.r.covered === false ? 'not exercised' : j.r.pass === true ? 'PASS' : j.r.pass === false ? 'FAIL' : 'undecided';
-      console.log(`            old code: ${verdict} — ${j.r.detail}`);
-    }
-    return;
-  }
-  console.log(`            ${j.r.detail}`);
-  if (j.r.human) console.log(`            LOOK: ${j.r.human}`);
+  console.log(`\n${fresh.length} run(s) written to tasks/verify.json. Next: review the HUMAN entries (verify-review.js <storyId>), then`);
+  console.log('commit it: git commit -m "chore(verify): verdicts from <storyIds>" -- tasks/verify.json');
 }
 
 async function main() {
@@ -170,9 +181,39 @@ async function main() {
     return;
   }
 
+  if (process.argv.includes('--unrecorded')) {
+    // Pre-push warning: never blocks, never throws past this point. The registry
+    // is read from the COMMITTED HEAD of the tree being pushed (the hook runs the
+    // main clone's copy of this script, possibly for another worktree), so an
+    // uncommitted --write does not silence the warning.
+    let pool;
+    try {
+      const reg = JSON.parse(execFileSync('git', ['show', 'HEAD:tasks/verify.json'], { cwd: process.cwd(), encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }));
+      pool = openPool('staging');
+      const rows = await unrecorded(pool, reg);
+      if (!rows.length) { console.log('verify-registry: every staging run since 2026-09-24 is recorded in tasks/verify.json'); return; }
+      console.log('');
+      console.log(`verify-registry: WARNING — ${rows.length} staging run(s) not yet judged into tasks/verify.json:`);
+      for (const x of rows) console.log(`  ${x.id}  ${ch(fromPgNaive(x.created_at))}  build ${String(x.build).slice(0, 9)}${x.trial === 'true' ? '  (trial)' : ''}`);
+      console.log('  Record them: node scripts/admin/verify-run.js --pull (the reports the staging server stored)');
+      console.log('           or: node scripts/admin/verify-run.js <storyId> --write — then commit tasks/verify.json');
+      console.log('  (a warning only — this does not block the push)');
+    } catch (e) {
+      console.log(`verify-registry: unrecorded-run check skipped (${e.message})`);
+    } finally {
+      if (pool) await pool.end().catch(() => {});
+    }
+    return;
+  }
+
+  if (process.argv.includes('--pull')) {
+    await pull(arg('env') || 'staging');
+    return;
+  }
+
   const storyId = process.argv.slice(2).find(a => !a.startsWith('--'));
   if (!storyId) {
-    console.error('Usage: node scripts/admin/verify-run.js <storyId> [--env=staging|prod] [--write] [--all] | --mark=<id>:confirmed|failed --note="..."');
+    console.error('Usage: node scripts/admin/verify-run.js <storyId> [--env=staging|prod] [--write] [--all] | --mark=<id>:confirmed|failed --note="..." | --unrecorded | --list');
     process.exit(2);
   }
   const env = arg('env') || 'staging';
@@ -181,61 +222,67 @@ async function main() {
   const mark = arg('mark');
 
   const reg = loadRegistry();
-  const ctx = await loadRun(storyId, env);
-  const now = ch(new Date());
-  const runDate = ch(ctx.job?.createdAt || ctx.createdAt);
+  const pool = openPool(env);
+  let ctx;
+  try { ctx = await core.loadRun(pool, storyId, env); } finally { await pool.end(); }
+  const checkedAt = ch(new Date());
+  const run = { storyId, env, build: ctx.build, runDate: ch(ctx.job?.createdAt || ctx.createdAt) };
 
-  console.log(`\nverify-run: ${storyId} (${env}) — run ${runDate}, build ${ctx.build ? ctx.build.slice(0, 9) : 'UNRECORDED'}, `
+  console.log(`\nverify-run: ${storyId} (${env}) — run ${run.runDate}, build ${ctx.build ? ctx.build.slice(0, 9) : 'UNRECORDED'}, `
     + `${ctx.data.trialMode ? 'trial' : 'full story'}, ${(ctx.data.sceneImages || []).length} pages, job ${ctx.job?.status || 'row gone'}\n`);
 
   if (mark) {
     const [id, verdict] = String(mark).split(':');
-    const e = reg.entries.find(x => x.id === id);
-    if (!e) throw new Error(`no entry "${id}"`);
-    if (!['confirmed', 'failed'].includes(verdict)) throw new Error('--mark takes <id>:confirmed or <id>:failed');
     const note = arg('note');
-    if (!note || note === true) throw new Error('--mark needs --note="what you looked at and saw"');
-    e.evidence = e.evidence || [];
-    e.evidence.push({ storyId, env, build: ctx.build, runDate, checkedAt: now, result: `HUMAN-${verdict.toUpperCase()}`, note });
-    e.status = verdict;
+    const by = arg('by');
+    core.markVerdict(reg, run, { id, verdict, note: note === true ? '' : note, by: by === true ? null : by }, { checkedAt });
     saveRegistry(reg);
     console.log(`marked ${id} ${verdict} on ${storyId}`);
     return;
   }
 
-  const counts = { CONFIRMED: 0, FAILED: 0, HUMAN: 0, 'NOT COVERED': 0 };
-  const failed = [];
-  const targets = reg.entries.filter(e => e.status === 'pending' || (arg('all') && e.status === 'confirmed'));
-  const judged = targets.map(e => ({ e, j: judge(e, ctx, buildContains) }));
-  const order = ['FAILED', 'CONFIRMED', 'HUMAN', 'NOT COVERED'];
-  judged.sort((a, b) => order.indexOf(a.j.result) - order.indexOf(b.j.result));
-  for (const { e, j } of judged) {
-    counts[j.result] += 1;
-    if (j.result === 'FAILED') failed.push(e.id);
-    printRow(e, j);
-    if (write && j.result !== 'NOT COVERED') {
-      e.evidence = e.evidence || [];
-      e.evidence.push({
-        storyId, env, build: ctx.build, runDate, checkedAt: now,
-        result: j.result, note: [j.r.detail, j.r.human ? `LOOK: ${j.r.human}` : null].filter(Boolean).join(' | ').slice(0, 1500),
-      });
-      if (j.result === 'CONFIRMED') e.status = 'confirmed';
-    }
+  const apply = arg('apply');
+  if (apply) {
+    if (apply === true) throw new Error('--apply needs a file: --apply=<verify-verdicts-<storyId>.json>');
+    const file = JSON.parse(fs.readFileSync(apply, 'utf8'));
+    const { marked, skipped } = core.applyVerdictsFile(reg, run, file, { checkedAt });
+    saveRegistry(reg);
+    console.log(`applied ${marked.length} verdict(s): ${marked.join(', ') || 'none'}${skipped.length ? `; not decided: ${skipped.join(', ')}` : ''}`);
+    console.log('Commit it: git commit -m "chore(verify): review verdicts on <storyId>" -- tasks/verify.json');
+    return;
   }
 
+  const targets = reg.entries.filter(e => e.status === 'pending' || (arg('all') && ['confirmed', 'failed'].includes(e.status)));
+  const judged = core.judgeAll(targets, ctx, buildContains).map(({ e, j }) => {
+    const v = core.verdictOf(e, j);
+    const old = oldCodeDetail(j);
+    if (old) v.detail = old;
+    return { e, v };
+  });
+  for (const { e, v } of judged) printRow(e, v);
+
+  const counts = { CONFIRMED: 0, FAILED: 0, HUMAN: 0, 'NOT COVERED': 0 };
+  for (const { v } of judged) counts[v.result] += 1;
+  const failed = judged.filter(x => x.v.result === 'FAILED').map(x => x.e.id);
   const skipped = reg.entries.length - targets.length;
-  console.log(`\n${targets.length} entr${targets.length === 1 ? 'y' : 'ies'} judged (${skipped} confirmed/superseded/failed not judged${arg('all') ? '' : '; --all re-judges confirmed'}): `
+  console.log(`\n${targets.length} entr${targets.length === 1 ? 'y' : 'ies'} judged (${skipped} not judged${arg('all') ? '' : '; --all re-judges confirmed/failed'}): `
     + `${counts.CONFIRMED} CONFIRMED, ${counts.FAILED} FAILED, ${counts.HUMAN} HUMAN, ${counts['NOT COVERED']} NOT COVERED`);
   if (failed.length) {
     console.log(`\n!!! ${failed.length} FAILED on a run whose build contains the change: ${failed.join(', ')}`);
-    console.log('!!! The change did not do what it claims on this run. Investigate before building on it.');
+    console.log('!!! The change did not do what it claims on this run. Investigate, and add a tasks/BACKLOG.md line for each.');
   }
-  if (write) { saveRegistry(reg); console.log('\nevidence written to tasks/verify.json'); } else if (targets.length) {
-    console.log('\n(dry run — add --write to record evidence; --mark=<id>:confirmed --note="..." records a human verdict)');
+  if (write) {
+    const { flipped } = core.applyVerdicts(reg, run, judged, { checkedAt, via: 'write' });
+    saveRegistry(reg);
+    console.log(`\nverdicts written to tasks/verify.json${flipped.length ? ` — status changed: ${flipped.map(f => `${f.id} ${f.from}->${f.to}`).join(', ')}` : ''}`);
+    console.log('Commit it: git commit -m "chore(verify): ..." -- tasks/verify.json');
+  } else if (targets.length) {
+    console.log('\n(dry run — add --write to record the verdicts; --mark=<id>:confirmed --note="..." records a human verdict)');
   }
 }
 
-module.exports = { judge };
+// judge lives in verify-core.js; re-exported for callers that imported it from here.
+module.exports = { judge: core.judge };
 
 if (require.main === module) {
   main().catch(e => { console.error(`verify-run: ${e.message}`); process.exit(1); });

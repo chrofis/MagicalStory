@@ -298,6 +298,44 @@ function resolvePageClothingCategory(storyData, pageNumber, charName) {
   return null;
 }
 
+/**
+ * THE OUTFIT A CHARACTER WAS RENDERED IN on one page or cover — the category a
+ * repair must paint back, and the one its reference sheet and its clothing text
+ * must both come from. One resolver for every repair entry point (the Lab
+ * char_repair stage, the manual repair route, the in-run char-fix).
+ *
+ * 1. The record's own per-character map: `sceneCharacterClothing` (a stored
+ *    page), `perCharClothing` (a pipeline image, or a cover briefed as a page),
+ *    `characterClothing` (legacy), then its brief's `sceneMetadata.characterClothing`.
+ * 2. resolvePageClothingCategory — the cover brief / cover hint, else the page's
+ *    pageClothing, else the story's primaryClothing.
+ *
+ * A cover has no `sceneCharacterClothing`, so readers that only looked there
+ * fell to 'standard' and repainted a costumed cast into a wardrobe the story
+ * never used (staging job_1790446348343_z3fw660ie initialPage, Lab 1554: the
+ * prompt said "white and light blue tunic, dark blue jeans" while the avatar
+ * sent was the pirate costume). null means unknown — callers refuse, never
+ * default.
+ *
+ * @returns {string|null} canonical category
+ */
+function resolveRenderedClothingCategory(storyData, pageNumber, charName, record = null) {
+  if (!charName) return null;
+  const castIdx = buildCastIndex(storyData || null, storyData?.visualBible || null);
+  const maps = [
+    record?.sceneCharacterClothing,
+    record?.perCharClothing,
+    record?.characterClothing,
+    record?.sceneMetadata?.characterClothing,
+  ];
+  for (const map of maps) {
+    if (!map || typeof map !== 'object') continue;
+    const hit = lookupByName(map, charName, castIdx);   // RESOLVE
+    if (hit && typeof hit.value === 'string' && hit.value.trim()) return normalizeClothingCategory(hit.value);
+  }
+  return resolvePageClothingCategory(storyData, pageNumber, charName);
+}
+
 module.exports = {
   CANONICAL,
   AVATAR_SLOTS,
@@ -307,4 +345,5 @@ module.exports = {
   reconcilePageClothingWithRequirements,
   resolveCharacterReqs,
   resolvePageClothingCategory,
+  resolveRenderedClothingCategory,
 };

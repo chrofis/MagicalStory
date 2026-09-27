@@ -653,8 +653,21 @@ const PLATE_EDGE_RULE = `The painting fills the frame edge to edge, the scene it
  * PLATE_NO_PEOPLE_RULE; the plate QC (empty-scene-qc.txt) fails any PLATE_PEOPLE
  * item in its "Figures" check.
  */
-const PLATE_PEOPLE = 'person, passer-by, crowd, rider, or silhouette of a person';
+// "part or faint trace of one" named 2026-09-26: Lab 1505 carried a
+// half-erased ghost of a person and passed the Figures check.
+const PLATE_PEOPLE = 'person, passer-by, crowd, rider, silhouette of a person, or part or faint trace of one';
 const PLATE_NO_PEOPLE_RULE = `The place is painted with no people in it: no ${PLATE_PEOPLE} anywhere in the frame, however small or distant, even where such a place is normally busy or the description mentions people.`;
+
+/**
+ * What a landmark plate is told about its reference photo, and what its judge
+ * is told the plate was told (2026-09-26). The plate renders the part of the
+ * place its camera sees — the landmark, a part of it, or the view from it — so
+ * the judge holds only that part to the photograph. Lab 1506 failed its
+ * landmark check on a plate that looked from the landmark toward other towers
+ * the brief named. One sentence for both sides: empty-scene's REFERENCE line
+ * (prompts.js buildEmptyScenePrompt) and the plate QC's LANDMARK_CHECK.
+ */
+const PLATE_LANDMARK_REFERENCE = 'The place in this scene is the one shown in the attached reference image — render the part of it the camera sees, consistent in colour and construction.';
 
 /**
  * The plate's band note: which depth bands must give FOOTING, and which of them
@@ -716,7 +729,7 @@ function buildPlateSurfaceNote(characters, shot = '') {
  * image edit that word means position in the frame, and it pinned the camera
  * the instruction was asking to move (run 6 p2, 2026-09-23).
  */
-function buildPlateDeriveInstruction(baseShot, targetShot, { relight = '' } = {}) {
+function buildPlateDeriveInstruction(baseShot, targetShot, { relight = '', keepLight = '' } = {}) {
   const target = SHOTS.find(s => s.id === targetShot);
   if (!target) return null;
   const from = String(baseShot || '').trim();
@@ -726,14 +739,51 @@ function buildPlateDeriveInstruction(baseShot, targetShot, { relight = '' } = {}
   // `relight`: sceneLight.relightClause — the page this plate serves declares
   // a different time of day or weather than the base plate was painted in, so
   // the one edit moves the camera AND re-lights (2026-09-24).
+  // `keepLight`: sceneLight.keepLightClause — the page keeps the base plate's
+  // declared light, named with its weather, so a derive never drops the sky
+  // (2026-09-26: the generic "same direction and time of day" left a fog plate's
+  // weather out, and a sunny-rendered base stayed sunny).
   const light = relight
     ? `the palette and the season stay identical. ${relight}`
-    : 'the palette and the season stay identical, and the light keeps the same direction and time of day.';
+    : keepLight
+      ? `the palette and the season stay identical. ${keepLight}`
+      : 'the palette and the season stay identical, and the light keeps the same direction and time of day.';
   return `This backdrop is ${fromPhrase} of a place. ${move} `
     + `The buildings, walls, roofs, trees, paths and surfaces keep their shape, material and colour and their arrangement relative to each other; ${light} The camera moves; the place stays as it is, and no one is added to it.`;
 }
 
+/**
+ * STAGING A GROUP (owner, 2026-09-27).
+ *
+ * The Art Director's rule 4 said it in prose and no critic checked it. Staging
+ * job_1790446348343_z3fw660ie: p1 and p6 put five figures on a `medium` shot
+ * (p6 scored 9, the book's worst page), and p16 put five on a `wide` shot all
+ * looking at a ship deep in the frame with nobody turned away — a posed row of
+ * faces (score 15).
+ *
+ * ONE sentence, read by both Art Director templates (rule 4), both iterate
+ * templates and scene-review check [group_staging]; the brief check
+ * (sceneBriefCheck.checkGroupStaging) measures the same two halves from the
+ * structured fields: the shot class against GROUP_WIDER_SHOTS, and the gaze /
+ * perspective of each figure.
+ *
+ * Which shots are "wider": the two far distances, and the two camera positions
+ * that look down on the group from above so every figure sits at one depth.
+ * `medium` keeps each figure whole but large, `close-up` is faces, a
+ * `low-angle` makes its subject tower, and an `over-the-shoulder` puts one
+ * figure large in front of the others by definition.
+ */
+const GROUP_STAGING_MAX = 3; // the "three" GROUP_STAGING_RULE states
+const GROUP_WIDER_SHOTS = ['wide', 'ultra-wide', 'high-angle', 'aerial'];
+if (GROUP_WIDER_SHOTS.some(id => !SHOT_TYPES.includes(id))) {
+  throw new Error('shotVocabulary: GROUP_WIDER_SHOTS names a shot that does not exist');
+}
+const GROUP_STAGING_RULE = `When more than three characters share the frame, keep the whole group together at one depth in a wider shot — ${GROUP_WIDER_SHOTS.map(id => '`' + id + '`').join(', ').replace(/, ([^,]*)$/, ' or $1')} — or show them from behind (\`perspective: back view\`) as they move away; never five detailed close foreground faces. The group turns to each other or to what they look at, never lined up facing the viewer: a group looking at something deeper in the frame is seen from behind.`;
+
 module.exports = {
+  GROUP_STAGING_MAX,
+  GROUP_WIDER_SHOTS,
+  GROUP_STAGING_RULE,
   OTS_NEAR_FIGURE_CROP,
   OTS_NO_CONTACT_RULE,
   OTS_NEAR_FIGURE_RULE,
@@ -752,6 +802,7 @@ module.exports = {
   PLATE_EDGE_RULE,
   PLATE_PEOPLE,
   PLATE_NO_PEOPLE_RULE,
+  PLATE_LANDMARK_REFERENCE,
   buildPlateSurfaceNote,
   DISTANCE_SHOTS,
   POSITION_SHOTS,

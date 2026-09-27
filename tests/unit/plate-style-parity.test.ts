@@ -25,9 +25,10 @@ describe('plate art style', () => {
     }
   });
 
-  it('the Lab plate stage resolves the style the way production does', () => {
-    expect(SRC('server/lib/testlab.js')).toContain("const plateStyle = resolveArtStyle(params.artStyleOverride || ctx.artStyle || 'pixar') || '';");
-    expect(SRC('storyJobPipeline.js')).toContain("const artStyleDesc = resolveArtStyle(inputData.artStyle || 'pixar', repPageData.pageImageBackend) || '';");
+  it('the Lab plate stage resolves the style the way production does: it runs production\'s plate code', () => {
+    expect(SRC('server/lib/testlab.js')).toContain('plates.renderPagePlate(target, env)');
+    expect(SRC('server/lib/platePipeline.js')).toContain("const artStyleDesc = resolveArtStyle(inputData.artStyle || 'pixar', repPageData.pageImageBackend) || '';");
+    expect(SRC('server/lib/platePipeline.js')).toContain("const artStyleDesc = resolveArtStyle(inputData.artStyle || 'pixar', pageData.pageImageBackend) || '';");
   });
 
   it('the Lab plate text is plate text: resolvePagePlate, never the stored built prompt or the scene description', () => {

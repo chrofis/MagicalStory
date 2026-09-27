@@ -139,7 +139,8 @@ describe('logging and the deterministic-failure guard', () => {
   });
 
   it('the pipeline decides every plate retry with it — no issue-count comparison is left', () => {
-    const src = fs.readFileSync(path.join(__dirname, '..', '..', 'storyJobPipeline.js'), 'utf8');
+    // The plates live in platePipeline.js since 2026-09-27 (shared with the Lab).
+    const src = ['storyJobPipeline.js', 'server/lib/platePipeline.js'].map(f => fs.readFileSync(path.join(__dirname, '..', '..', f), 'utf8')).join('\n');
     expect(src).not.toMatch(/issues\.length < (qc|dqc)\.issues\.length/);
     expect(src.match(/decidePlateAfterRetry\(\{/g)).toHaveLength(3);
     expect(src.match(/\.catch\(nullOnPromptFit\)/g)).toHaveLength(2);

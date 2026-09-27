@@ -70,10 +70,27 @@ describe('assessTextReply — one verdict for every provider reply', () => {
 
 describe('describeTruncation', () => {
   it('names the reason, tokens and cap', () => {
-    expect(describeTruncation(assessTextReply({ text: '', usage: { output_tokens: 16000 } }, { capInForce: 16000 }))).toBe('returned an EMPTY response (16000 output tokens)');
+    expect(describeTruncation(assessTextReply({ text: '', usage: { output_tokens: 16000 } }, { capInForce: 16000 }))).toBe('returned an EMPTY response (16000 output tokens) [finish_reason=none, native_finish_reason=none, provider=unknown]');
     expect(describeTruncation(assessTextReply(fine({ stop_reason: 'max_tokens', usage: { output_tokens: 8192 } }), { capInForce: 8192 }))).toMatch(/TRUNCATED: stop_reason=max_tokens at 8192 output tokens \(cap 8192\)/);
-    expect(describeTruncation(assessTextReply(fine({ stop_reason: null, usage: { output_tokens: 16000 } }), { capInForce: 16000 }))).toBe('TRUNCATED: 16000 output tokens hit the 16000-token ceiling');
+    expect(describeTruncation(assessTextReply(fine({ stop_reason: null, usage: { output_tokens: 16000 } }), { capInForce: 16000 }))).toBe('TRUNCATED: 16000 output tokens hit the 16000-token ceiling [finish_reason=none, native_finish_reason=none, provider=unknown]');
     expect(describeTruncation({ suspected: false })).toBe('not truncated');
+  });
+
+  it('an EMPTY reply names why the model stopped and which upstream served it', () => {
+    // The empty check runs before the stop-reason classes; the message must
+    // still carry the provider's own reasons (OpenRouter: normalised + native).
+    const t = assessTextReply({ text: '', stop_reason: 'stop', native_finish_reason: 'end_turn', provider: 'DeepInfra', usage: { output_tokens: 0 } }, { capInForce: 64000 });
+    expect(t).toMatchObject({ reason: 'empty', finishReason: 'stop', nativeFinishReason: 'end_turn', provider: 'DeepInfra' });
+    expect(describeTruncation(t)).toBe('returned an EMPTY response (0 output tokens) [finish_reason=stop, native_finish_reason=end_turn, provider=DeepInfra]');
+  });
+
+  it('every verdict message carries the stop detail, whichever field the provider used', () => {
+    const cut = assessTextReply(fine({ stop_reason: 'length', native_finish_reason: 'MAX_TOKENS', provider: 'Novita' }), { capInForce: 64000 });
+    expect(describeTruncation(cut)).toMatch(/\[finish_reason=length, native_finish_reason=MAX_TOKENS, provider=Novita\]$/);
+    const raw = assessTextReply({ text: '', choices: [{ finish_reason: 'length', native_finish_reason: 'max_output_tokens' }] });
+    expect(raw).toMatchObject({ finishReason: 'length', nativeFinishReason: 'max_output_tokens' });
+    const gem = assessTextReply({ text: '', candidates: [{ finishReason: 'SAFETY' }] });
+    expect(describeTruncation(gem)).toMatch(/\[finish_reason=SAFETY, native_finish_reason=none, provider=unknown\]$/);
   });
 });
 

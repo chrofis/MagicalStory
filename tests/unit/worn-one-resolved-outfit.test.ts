@@ -116,8 +116,9 @@ describe('every page-path consumer routes through the one resolver', () => {
   });
 
   it('all three character-repair entry points', () => {
-    expect(src('server/lib/repairPipeline.js')).toMatch(/resolveOutfitForStoryPage\(clothingDesc, charName, storyData, pageNumber, sceneDesc\)/);
-    expect(src('server/lib/repairPipeline.js')).toMatch(/clothingDescription: pageClothingDesc/);
+    // The repair round's call is built by charFixCall.js (shared with the Lab char_repair stage).
+    expect(src('server/lib/charFixCall.js')).toMatch(/resolveOutfitForStoryPage\(clothingDesc, charName, storyData, pageNumber, sceneDesc\)/);
+    expect(src('server/lib/charFixCall.js')).toMatch(/clothingDescription: pageClothingDesc/);
     expect(src('server/routes/regeneration.js')).toMatch(/resolveOutfitForStoryPage\(storyClothingDesc, characterName, storyData, pageNumber, sceneDesc\)/);
     expect(src('server/lib/entityConsistency.js')).toMatch(/resolveGeneratedOutfit\(\s*\n\s*buildClothingDescription\(character, clothingCategory, artStyle, storyData\.clothingRequirements\)/);
   });

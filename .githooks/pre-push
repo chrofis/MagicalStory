@@ -47,6 +47,14 @@ node "$HOOK_DIR/../scripts/admin/check-doc-coupling.js" || exit 1
 # gate are never judged. After a run: node scripts/admin/verify-run.js <storyId> --write
 node "$HOOK_DIR/../scripts/admin/check-verify-coupling.js" || exit 1
 
+# Verify write-back (WARNS, never blocks — owner, 2026-09-27): after every
+# verification run the checker's verdicts go back into tasks/verify.json
+# (verify-run.js <storyId> --write, then commit). This lists staging runs since
+# 2026-09-24 that the committed registry has not recorded. Skips quietly when
+# the staging DB is unreachable. A warning, not a gate: a run can be in flight
+# or be someone else's, and a push must never wait on a DB round-trip.
+node "$HOOK_DIR/../scripts/admin/verify-run.js" --unrecorded || true
+
 # Gate 5: no OPEN reported bugs (tasks/bugs.json). CLAUDE.md has said "just fix
 # it" since the beginning and it kept not happening — clear bugs were backlogged
 # while unrelated work shipped over them. While any registry entry is open,

@@ -8,7 +8,9 @@ import path from 'path';
 // and COMPOSITION right before it, at the very end of the trimmable head. The
 // last-resort prose trim ate them first: staging job_1789853503332_riqncqg1i's
 // back cover shipped with all three gone. They are now in the protected tail on
-// every prompt; if the tail alone cannot fit, the shrink throws instead.
+// every prompt. Since 2026-09-26 the prose before the tail is never trimmed
+// either (owner: "The eval should judge the same thing as image generation"):
+// a prompt the ranked drops cannot fit fails loudly.
 // (Every cover now carries REQUIRED OBJECTS like a page; the cover's separate
 // KEY STORY ELEMENTS block was deleted the same day.)
 
@@ -32,7 +34,8 @@ const coverPrompt = (proseRepeat: number, styleRepeat = 20) => [
   '- The main character is a school-age child. Wearing: SENTINEL_OUTFIT.',
   '',
   'A wide group portrait set before the harbour. The main character stands in the center, eyes on the viewer. '
-    + 'Gulls wheel above the stone wall and the tide runs out slowly. '.repeat(proseRepeat),
+    + 'Gulls wheel above the stone wall and the tide runs out slowly. '.repeat(proseRepeat)
+    + 'SENTINEL_PROSE_END the last sentence of the brief.',
   '',
   buildCompositionBlock(),
   '',
@@ -56,15 +59,25 @@ const coverPrompt = (proseRepeat: number, styleRepeat = 20) => [
 const MUST_KEEP = ['SENTINEL_ELEMENT_LINE', 'SENTINEL_SEASON', 'SENTINEL_COMPOSITION', '**ART STYLE:**'];
 
 describe('cover shrink — the must-keep sections survive', () => {
-  it('when the drops are not enough, the prose is trimmed and the three must-keep sections stay whole', async () => {
-    const prompt = coverPrompt(100);
-    const cap = 7000;
-    expect(prompt.length).toBeGreaterThan(cap + 2500); // drops alone cannot fit it
+  // A cap the ranked drops can reach: the prompt is over it by less than the
+  // droppable blocks (COUNTS + DEPTH AND SIZE + the Composition bullets).
+  const fitCap = (prompt: string) => prompt.length - 400;
+
+  it('the drops fit it: every must-keep section, the cast and the WHOLE prose stay', async () => {
+    const prompt = coverPrompt(20);
+    const cap = fitCap(prompt);
     const out: string = await shrinkPromptForModel(prompt, cap, 'TEST cover', null);
     expect(out.length).toBeLessThanOrEqual(cap);
     for (const m of MUST_KEEP) expect(out).toContain(m);
-    // the page's cast survives too
     expect(out).toContain('SENTINEL_OUTFIT');
+    expect(out).toContain('SENTINEL_PROSE_END the last sentence of the brief.');
+  });
+
+  it('when the drops are not enough, it fails loudly and never trims the prose', async () => {
+    const prompt = coverPrompt(100);
+    const cap = 7000;
+    expect(prompt.length).toBeGreaterThan(cap + 2500); // drops alone cannot fit it
+    await expect(shrinkPromptForModel(prompt, cap, 'TEST cover', null)).rejects.toThrow(/refusing to cut/);
   });
 
   it('when the must-keep tail alone cannot fit, it fails loudly instead of cutting it', async () => {
@@ -75,7 +88,8 @@ describe('cover shrink — the must-keep sections survive', () => {
   // REQUIRED CAST is never cut (owner, 2026-09-25; staging
   // job_1790277448294_5herh01j7 lost it on p3, p10, p14 and the back cover).
   it('REQUIRED CAST survives every shrink, the drops go to other blocks', async () => {
-    const out: string = await shrinkPromptForModel(coverPrompt(100), 7000, 'TEST cover', null);
+    const prompt = coverPrompt(20);
+    const out: string = await shrinkPromptForModel(prompt, fitCap(prompt), 'TEST cover', null);
     expect(out).toContain(buildRequiredCastRule('ambient'));
   });
   it('REQUIRED CAST is on the never-cut list and no longer a cut step', async () => {
@@ -85,9 +99,10 @@ describe('cover shrink — the must-keep sections survive', () => {
   });
 
   it('with no REQUIRED OBJECTS block, SEASON still opens the protected tail', async () => {
-    const prompt = coverPrompt(100).replace(/\*\*REQUIRED OBJECTS[^\n]*\n\* \*\*SENTINEL_ELEMENT_LINE[^\n]*\n/, '');
+    const prompt = coverPrompt(20).replace(/\*\*REQUIRED OBJECTS[^\n]*\n\* \*\*SENTINEL_ELEMENT_LINE[^\n]*\n/, '');
     expect(prompt).not.toContain('REQUIRED OBJECTS');
-    const out: string = await shrinkPromptForModel(prompt, 7000, 'TEST no objects', null);
+    const out: string = await shrinkPromptForModel(prompt, fitCap(prompt), 'TEST no objects', null);
+    expect(out).toContain('SENTINEL_PROSE_END the last sentence of the brief.');
     for (const m of ['SENTINEL_SEASON', 'SENTINEL_COMPOSITION', '**ART STYLE:**']) expect(out).toContain(m);
   });
 });

@@ -15,7 +15,7 @@ Reading level: {READING_LEVEL}
 Pages: {PAGE_COUNT}
 Characters: {CHARACTER_NAMES}
 
-# CHARACTER DETAILS (optional colour — use a trait where it fits a moment, never contradict one, never work through the list)
+# CHARACTER DETAILS ({CHARACTER_DETAILS_USE})
 
 {CHARACTER_DETAILS}
 

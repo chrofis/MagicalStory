@@ -177,11 +177,14 @@ describe('production and the Lab mirror pass the same re-plan floor', () => {
   const fs = require('fs');
   const path = require('path');
   const src = (f: string) => fs.readFileSync(path.join(__dirname, '../../server/lib', f), 'utf8');
-  for (const f of ['beatsPipeline.js', 'testlab.js']) {
-    it(`${f} hands castFloor to buildReplanSection and to the review`, () => {
-      const s = src(f);
-      expect(s).toMatch(/buildReplanSection\([^)]*castFloor: coverageRule \? coverageRule\.appearances\.min : null/);
-      expect(s).toMatch(/castFloor(?:: coverageRule \? \{ names: commission\.listed, min: coverageRule\.appearances\.min \} : null|,)/);
-    });
-  }
+  it('beatsPipeline.js hands castFloor to buildReplanSection and to the review', () => {
+    const s = src('beatsPipeline.js');
+    expect(s).toMatch(/buildReplanSection\([^)]*castFloor: coverageRule \? coverageRule\.appearances\.min : null/);
+    expect(s).toMatch(/castFloor(?:: coverageRule \? \{ names: commission\.listed, min: coverageRule\.appearances\.min \} : null|,)/);
+  });
+  it('testlab.js runs the run\'s own rounds (one floor, one place) since 2026-09-27', () => {
+    const s = src('testlab.js');
+    expect(s).toMatch(/await runReplanRounds\(\{/);
+    expect(s).not.toMatch(/buildReplanSection\(/);
+  });
 });
