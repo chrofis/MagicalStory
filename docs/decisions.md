@@ -54,12 +54,19 @@ $0.34, which leaves no room under the CHF 0.35 cap for the second story):
 - Every applied page (2, 6, 10, 12, 15, 16) carries a declared change and is named by a finding. The merge
   restored pages 13 and 14, which lost cast without declaring it. No unflagged page changed.
 - The guard KEPT the round: cast/focal must-fix went 5 → 1, and the one survivor is the p16 Q17.
-- Open for the owner: the planner and the checker read "all turned toward one thing" differently. For the planner,
-  watching together is a shared action. For the checker, standing and watching is a pose. That ambiguity is inside
-  `WHOLE_CAST_DEF` itself. Tightening or dropping that example changes what Q17 flags, so it is a classification
-  call and is not made here.
+- The planner and the checker read "all turned toward one thing" differently. For the planner, watching together
+  is a shared action. For the checker, standing and watching is a pose. That ambiguity was inside `WHOLE_CAST_DEF`
+  itself. **Closed by owner ruling 2026-09-27:** on a whole-cast page, everyone watching the same thing together
+  counts as the shared action ONLY when the group is seen from behind or over the shoulder, toward what they
+  watch. Facing the viewer it never counts. `WHOLE_CAST_DEF` drops the "all turned toward one thing ahead of them"
+  example and states that condition, so the planner, the re-plan and plan-check Q17 read the same sentence. This
+  matches the Art Director's group rule (`shotVocabulary.GROUP_STAGING_RULE`, 2026-09-27: "a group looking at
+  something deeper in the frame is seen from behind"). The brief check's `group_facing_viewer` is the image-side
+  twin. Free check: I took the plan-check prompt the real builder stored for #1550 (z3fw660ie) and swapped in the
+  constant, which is the only builder input that changed. It carries the new definition once, with 0 unfilled
+  placeholders.
 
-**Touched:** server/lib/promptBuilders.js (`WHOLE_CAST_DEF`, `buildReplanSection`),
+**Touched:** server/lib/promptBuilders.js (`WHOLE_CAST_DEF` incl. the 2026-09-27 watching clause, `buildReplanSection`),
 tests/unit/plan-shared-definitions.test.ts (510c0fca2)
 **Status:** ✅ active (staging)
 

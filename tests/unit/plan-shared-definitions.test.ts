@@ -184,6 +184,18 @@ describe('the re-plan block carries the whole-cast definition the check grades b
     expect(section).toContain(pb.WHOLE_CAST_DEF);
   });
 
+  // Owner ruling 2026-09-27 (Lab #1550): the group watching one thing counts only
+  // seen from behind or over the shoulder. The same condition must reach every
+  // reader — planner, re-plan, checker — through the one constant.
+  it('watching together counts only from behind or over the shoulder, on every side', () => {
+    const clause = 'watching one thing is a shared action only when they are seen from behind or over the shoulder';
+    expect(pb.WHOLE_CAST_DEF).toContain(clause);
+    expect(pb.WHOLE_CAST_DEF).toContain('facing the viewer it never is');
+    expect(pb.WHOLE_CAST_DEF).not.toContain('all turned toward one thing ahead of them');
+    const section = pb.buildReplanSection(plan, [{ check: 17, line: 'CHECK[17]: page 1 x' }], { pageCount: 1 });
+    for (const text of [planner(), checker(), section]) expect(text).toContain(clause);
+  });
+
   it('it is stated once in the block', () => {
     const section = pb.buildReplanSection(plan, [{ check: 17, line: 'CHECK[17]: page 1 x' }], { pageCount: 1 });
     expect(section.split(pb.WHOLE_CAST_DEF).length - 1).toBe(1);
