@@ -67,6 +67,23 @@ describe('decideGroupCuts: Jev ranks and scores, code cuts and restores', () => 
     expect(p3.keep).toContain('Dee');
   });
 
+  it('never cuts a character the CAST block promises on that page (deed, also on, ending)', async () => {
+    const { pages, present } = groupBook();
+    const castTable = { characters: [{ name: 'Cy', deedPage: 9, alsoOn: [3] }, { name: 'Dee', deedPage: 1, alsoOn: [] }], ending: { page: 6, names: KIDS } };
+    const d = await JD.decideGroupCuts({ arc: 'A', pages, present, groupPages: [1, 3, 6], budget: 1, castTable },
+      { callImpl: cutJev(SCORES.together, SCORES.needed).impl });
+    const p1 = d.decisions.find((x: any) => x.pageNumber === 1);
+    const p3 = d.decisions.find((x: any) => x.pageNumber === 3);
+    expect(p1.keep).toContain('Dee');
+    expect(p3.keep).toContain('Cy');
+    expect(p3.required.Cy).toMatch(/promises/);
+  });
+
+  it('the CAST CUT line says the cast-out stay in the story, only outside the picture', () => {
+    const f = JD.castCutFindings({ decisions: [{ pageNumber: 3, keep: ['Ana'], remove: ['Cy'] }] });
+    expect(f[0].line).toContain(JD.CUT_STILL_IN_STORY);
+  });
+
   it('never empties a page — the highest-scored name stays', async () => {
     const { pages, present } = groupBook();
     const d = await JD.decideGroupCuts({ arc: 'A', pages, present, groupPages: [1, 3, 6], budget: 1 },

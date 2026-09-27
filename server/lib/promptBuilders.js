@@ -8028,7 +8028,7 @@ function buildReplanSection(pagePlan, findingLines, { pageCount = null, keep = [
     // (jevDecisions.decideGroupCuts), and code writes the who column. The
     // re-plan only re-words the instant for the cast that stays; a line that
     // still names a character cast out is rejected (beatsPipeline).
-    ...(items.some(f => f.castCut) ? ['A CAST CUT line is already decided: code writes that page\'s who column exactly as the line says. Return the page with its instant and what is true after rewritten for the characters it keeps — they alone act — and naming no one it casts out, whether by name, as part of a group or by a count. Declare nothing for a CAST CUT page.'] : []),
+    ...(items.some(f => f.castCut) ? ['A CAST CUT line is already decided: code writes that page\'s who column exactly as the line says. Return the page with its instant and what is true after rewritten for the characters it keeps — they alone act — and naming no one it casts out, whether by name, as part of a group or by a count. ' + require('./jevDecisions').CUT_STILL_IN_STORY + ' Declare nothing for a CAST CUT page.'] : []),
     'Declare every change you make under ---CHANGES---, with the finding it answers and why. A change you do not declare is undone.',
     '',
     // THE CAST TABLE STANDS (2026-09-25). The round repairs the plan lines

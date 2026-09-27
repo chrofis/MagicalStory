@@ -1284,6 +1284,7 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
           mainName: st.mainCharacter || null,
           centralFigure: arcCentralFigure,
           centralPages: st.centralFigure ? st.centralFigure.pages : null,
+          castTable,
           sameName,
         });
         if (jevReport) jevReport.castCuts.push({ round, ...castCut });

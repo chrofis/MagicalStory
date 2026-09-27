@@ -91,8 +91,25 @@ async function cuts() {
     const present = new Map(pages.map(p => [p.pageNumber, rosterOf(parsePlanLine(its[0].planText.split('\n').find(l => l.startsWith(`Page ${p.pageNumber}:`)).replace(/^Page \d+: /, '')).who, names)]));
     for (const i of its) present.set(i.page, i.roster);
     const cov = castCoverage({ pageCount: pages.length, castCount: names.length });
+    // The planner's CAST block, read from the stored reply (staging DB) — the
+    // promises the cut may never break.
+    let castTable = null;
+    if (process.env.STAGING_DATABASE_URL && !argv.noCastTable) {
+      const { Pool } = require('pg');
+      const pool = new Pool({ connectionString: process.env.STAGING_DATABASE_URL, ssl: { rejectUnauthorized: false } });
+      const { rows } = await pool.query(`SELECT data->'beatsReviewReport'->>'plannerReply' r, data->'characters' c FROM stories WHERE id LIKE $1`, [`%${sid}`]);
+      await pool.end();
+      const { parsePlanCastBlock } = require('../../server/lib/castCoverage');
+      try { if (rows[0] && rows[0].r) castTable = parsePlanCastBlock(rows[0].r, { listed: (rows[0].c || []).map(x => x && x.name).filter(Boolean) }); } catch (e) { console.log(`${sid}: no readable CAST block (${e.message})`); }
+    }
     const d = await JD.decideGroupCuts({ arc: its[0].arc, pages, present, groupPages: its[0].groupPages, budget: its[0].budget,
-      listed: names, floor: cov ? cov.appearances.min : 0 });
+      listed: names, floor: cov ? cov.appearances.min : 0, castTable });
+    const promiseBreaks = [];
+    if (castTable) for (const x of d.decisions) for (const n of (x.remove || [])) {
+      const c = castTable.characters.find(k => k.name === n);
+      if ((c && (Number(c.deedPage) === x.pageNumber || (c.alsoOn || []).includes(x.pageNumber))) || (castTable.ending.page === x.pageNumber && castTable.ending.names.includes(n))) promiseBreaks.push(`p${x.pageNumber}:${n}`);
+    }
+    if (castTable) console.log(`   cast table read; promise breaks by the cut: ${promiseBreaks.join(', ') || 'none'}`);
     addStats(d.stats);
     const rows = d.decisions.map(x => {
       const readKeep = L[hash(`gp:${sid}:${x.pageNumber}`)];

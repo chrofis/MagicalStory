@@ -379,6 +379,16 @@ function applyShots(pages, shots) {
 // ───────────────────────── GROUP-PAGE CAST CUTS ─────────────────────────
 // Wording verbatim from scripts/analysis/eval-jev-decision-layer.js.
 
+/**
+ * THE CAST-OUT ARE STILL IN THE STORY (2026-09-27, Lab 1577 p6). A cut takes a
+ * character out of the PICTURE, never out of the story: the story may still
+ * have them at the moment, just outside the frame. The dragon run's rewrite
+ * said the kept boy stepped onto the path ALONE while the story has all four
+ * step onto it, and the recheck filed CHECK[18]. One sentence, in the CAST CUT
+ * line and the RE-DIVIDE rule.
+ */
+const CUT_STILL_IN_STORY = 'The characters it casts out are still part of the story at this moment, only outside the picture: the instant never says they are absent, gone or left behind, and never calls a kept character alone or the only one.';
+
 const TOGETHER_Q = 'The page to judge is one where the story brings the whole group together: the opening gathering, the climax, or the ending.';
 const NEEDED_DEF = n => `${n} is needed in the picture of the page to judge: its instant gives ${n} something of their own to do, or acts on, speaks to or works against ${n}. A character who only stands by, follows, watches or is listed with the others is not needed.`;
 
@@ -413,6 +423,9 @@ const NEEDED_DEF = n => `${n} is needed in the picture of the page to judge: its
  * @param {string|null} [input.mainName]
  * @param {string[]|null} [input.centralFigure]
  * @param {number[]|null} [input.centralPages]
+ * @param {Object|null} [input.castTable] the planner's CAST block (castCoverage.parsePlanCastBlock):
+ *   a character it promises on a page — deed page, `also on`, the ending's cast —
+ *   is never cut from that page (the promise is the plan's structured fact).
  * @param {Function} [input.sameName]    (a, b) → true when two strings name one character
  */
 async function decideGroupCuts(input, opts = {}) {
@@ -449,6 +462,17 @@ async function decideGroupCuts(input, opts = {}) {
   const thirds = (() => { const a = Math.round(pageCount / 3), b = Math.round(2 * pageCount / 3); return [[1, a], [a + 1, b], [b + 1, pageCount]]; })();
   const thirdOf = n => thirds.find(([lo, hi]) => n >= lo && n <= hi);
 
+  // THE CAST TABLE'S PROMISES ARE KEPT (2026-09-27, Lab 1577): a cut that
+  // took a promised character off a page broke CAST_PROMISE_BROKEN on the
+  // recheck. Structured, from the table the planner wrote before its lines.
+  const promisedOn = (n) => {
+    const t = input.castTable;
+    if (!t) return [];
+    const out = [];
+    for (const c of t.characters || []) if (Number(c.deedPage) === n || (c.alsoOn || []).map(Number).includes(n)) out.push(c.name);
+    if (t.ending && Number(t.ending.page) === n) out.push(...(t.ending.names || []));
+    return out;
+  };
   const decisions = [];
   for (const r of ranked) {
     if (keepGroup.has(r.pageNumber)) decisions.push({ pageNumber: r.pageNumber, together: +r.together.toFixed(3), keepsGroup: true, cast: present.get(r.pageNumber) || [] });
@@ -460,6 +484,7 @@ async function decideGroupCuts(input, opts = {}) {
     for (const name of names) {
       const why = [];
       if ((input.obstacles?.get(n) || []).some(o => sameName(o, name))) why.push('the instant works against them');
+      if (promisedOn(n).some(p => sameName(p, name))) why.push('the CAST block promises them on this page');
       const pagesIn = inFrame.get(name) || new Set();
       if (isListed(name) && floor > 0 && pagesIn.size - 1 < floor) why.push(`would fall below ${floor} page(s) in frame`);
       if (isMain(name) && (pagesIn.size - 1) * 2 < pageCount) why.push('the main character would be in frame on fewer than half the pages');
@@ -511,7 +536,7 @@ function castCutFindings(cutDecision) {
     code: 'GROUP_PAGES_OVER_BUDGET',
     pages: [d.pageNumber],
     castCut: { keep: d.keep, remove: d.remove },
-    line: `PLAN[GROUP_PAGES_OVER_BUDGET] page ${d.pageNumber}: CAST CUT — this page keeps ${whoText(d.keep) || 'nobody'} in frame and casts out ${whoText(d.remove)}; code writes its who column as "${whoText(d.keep)}". Rewrite only this page's instant and what is true after, for ${whoText(d.keep) || 'the page with no one in frame'} alone: name no one it casts out, alone, as part of a group or by a count.`,
+    line: `PLAN[GROUP_PAGES_OVER_BUDGET] page ${d.pageNumber}: CAST CUT — this page keeps ${whoText(d.keep) || 'nobody'} in frame and casts out ${whoText(d.remove)}; code writes its who column as "${whoText(d.keep)}". Rewrite only this page's instant and what is true after, for ${whoText(d.keep) || 'the page with no one in frame'}: name no one it casts out, alone, as part of a group or by a count. ${CUT_STILL_IN_STORY}`,
   }));
 }
 
@@ -957,6 +982,7 @@ module.exports = {
   PLAN_SHOT_PLACEHOLDER,
   PLAN_HEAD,
   TOGETHER_Q,
+  CUT_STILL_IN_STORY,
   NEEDED_DEF,
   POP_PUBLIC_Q,
   POP_CROWD_Q,
