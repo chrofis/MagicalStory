@@ -21,6 +21,39 @@ superseded and link forward.
 
 ---
 
+## 2026-09-27 — Every verification run writes its verdicts back into tasks/verify.json; an auto FAILED now sets status failed
+
+**Context:** Owner, 2026-09-27: triage the 69 pending registry entries and make it a rule, enforced by
+tooling, that the checker's verdicts go back into the registry after every run. `--write` existed, but it
+appended a HUMAN evidence row per run per entry (the same ~40 human checks re-appended on every run, some
+twice for one story), never flipped an auto FAILED (so `status` could not show a change that did not work),
+and nothing noticed a run that was never judged — z3fw660ie sat unrecorded with two FAILED checks.
+
+**Decision:**
+- One engine, `scripts/admin/verify-core.js` (loadRun, judge, applyVerdicts, markVerdict); verify-run.js is
+  the CLI over it. `applyVerdicts` is the write-back contract: CONFIRMED appends evidence + status
+  `confirmed`; **FAILED appends evidence + status `failed`** (supersedes the 2026-09-24 "an auto FAILED stays
+  pending" line below: the owner asked for FAILED verdicts to be written, and a pending status on a change
+  the run showed broken is the wrong answer to "which changes are proven?"); HUMAN / NOT COVERED leave the
+  status and overwrite `lastChecked` (a pointer, not history); the run is logged once in `runs[]`; evidence
+  never takes the same story+result twice.
+- `--mark` takes `--by=claude|owner`: a person's verdict after looking is recorded as HUMAN-CONFIRMED /
+  HUMAN-FAILED evidence with who looked.
+- `verify-run.js --unrecorded` lists staging runs since 2026-09-24 that the committed registry has not
+  recorded; the pre-push hook runs it after gate 4b as a **warning only** (a run can be in flight or someone
+  else's, and a push must not wait on a DB round-trip). Reads `HEAD:tasks/verify.json` of the tree being
+  pushed. New run shape `lab-stage` (always NOT COVERED by a story run; recorded with --mark from the Lab).
+- The rule is in CLAUDE.md (task management + validation bullets) and the running-validation-stories skill.
+
+**Rationale:** the registry is only worth keeping if its statuses answer "proven or not" without re-reading
+runs; the write has to be one command with fixed semantics, and the omission has to be visible at push time.
+A blocking gate was rejected: the warning's data source (the staging DB) is outside the pushed tree.
+
+**Touched:** scripts/admin/verify-core.js (new), scripts/admin/verify-run.js, scripts/admin/verify-checks.js
+(lab-stage), .githooks/pre-push, tasks/verify.json (_readme), tests/unit/verify-writeback.test.ts, CLAUDE.md,
+.claude/skills/running-validation-stories/SKILL.md.
+**Status:** ✅ active.
+
 ## 2026-09-27 — The planner carries small casts: at most one page in six holds more than three characters, and the planner reads the Art Director's group rule
 
 **Context:** the owner asked whether the planner already prefers one to three characters a page. It does:
