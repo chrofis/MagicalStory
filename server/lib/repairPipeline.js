@@ -1412,24 +1412,17 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const character = characters.find(c => c && c.name === charName)
       || characters.find(c => c && c.name && canonicalName(c.name) === canonicalName(charName));
 
-    // Case-insensitive lookup — scene metadata can key perCharClothing with
-    // different casing than the canonical character name, and an exact-key
-    // miss silently degraded the repair to 'standard' clothing.
-    const perCharClothingKey = Object.keys(img.perCharClothing || {})
-      .find(k => k.toLowerCase() === charName.toLowerCase());
-    const { normalizeClothingCategory: normCat, resolvePageClothingCategory: pageCat } = require('./clothingCategories');
-    const rawCharClothing = perCharClothingKey && img.perCharClothing[perCharClothingKey];
+    // The outfit the character was RENDERED in: the page's own per-character
+    // clothing, else the cover brief / cover hint / pageClothing. One resolver
+    // with the manual repair route and the Lab stage, so the reference sheet
+    // and the clothing text below come from the same category.
     // NO DEFAULT (owner, 2026-08-07): the resolved category picks the styled
     // avatar this repair paints the character to match, so a guessed 'standard'
     // repaints the story outfit into a wardrobe from an unrelated story.
-    const clothingCategory = rawCharClothing
-      ? normCat(rawCharClothing)
-      : pageCat(storyData, pageNumber, charName);
+    const clothingCategory = require('./clothingCategories')
+      .resolveRenderedClothingCategory(storyData, pageNumber, charName, img);
     if (!clothingCategory) {
-      return { pageNumber, imageData: null, error: `no clothing category for ${charName} (perCharClothing and pageClothing both empty) — refusing to repair into a guessed outfit` };
-    }
-    if (!rawCharClothing) {
-      log.warn(`⚠️ [UNIFIED PIPELINE] Char-fix ${charName} p${pageNumber}: no perCharClothing entry — resolved "${clothingCategory}" from pageClothing`);
+      return { pageNumber, imageData: null, error: `no clothing category for ${charName} (page record, cover brief and pageClothing all empty) — refusing to repair into a guessed outfit` };
     }
     // WARDROBE STATE — the third repair entry point gets the same sheet the
     // page was generated against. Without it a character repair repaints the

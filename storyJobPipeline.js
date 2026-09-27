@@ -6682,6 +6682,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           createdAt: inputData.createdAt,
           clothingRequirements: clothingRequirements,
           pageClothing: pageClothingData,
+          // A trial (hint-made) cover's cast outfits live on its cover hint; a
+          // cover char-fix resolves them from here (resolveRenderedClothingCategory).
+          coverHints,
           // Preserve per-scene layout fields (imageAspect, textInImage) so any
           // iterate/redo inside the repair pipeline regenerates at the right
           // aspect. Stripping these would silently revert advanced-layout pages

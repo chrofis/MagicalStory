@@ -77,6 +77,8 @@ async function loadSceneContext(storyId, pageNumber) {
               data->'layout' AS layout,
               (data->'visualBible')::text AS visual_bible,
               (data->'clothingRequirements')::text AS clothing_reqs,
+              (data->'pageClothing')::text AS page_clothing,
+              (data->'coverHints')::text AS cover_hints,
               (data->'characters')::text AS characters_json,
               (data->'characterAvatars')::text AS character_avatars
        FROM stories WHERE stories.id = $1`,
@@ -94,6 +96,8 @@ async function loadSceneContext(storyId, pageNumber) {
               data->'layout' AS layout,
               (data->'visualBible')::text AS visual_bible,
               (data->'clothingRequirements')::text AS clothing_reqs,
+              (data->'pageClothing')::text AS page_clothing,
+              (data->'coverHints')::text AS cover_hints,
               (data->'characters')::text AS characters_json,
               (data->'characterAvatars')::text AS character_avatars
        FROM stories, jsonb_array_elements(data->'sceneImages') scene
@@ -118,6 +122,15 @@ async function loadSceneContext(storyId, pageNumber) {
   try {
     clothingRequirements = rows[0].clothing_reqs ? JSON.parse(rows[0].clothing_reqs) : null;
   } catch { /* run without — repairs fall back to avatar clothing */ }
+  // The story's clothing plan: what a page or cover resolves to when its own
+  // record names no per-character outfit (clothingCategories
+  // .resolveRenderedClothingCategory), the same fallback production uses.
+  let pageClothing = null;
+  let coverHints = null;
+  try {
+    pageClothing = rows[0].page_clothing ? JSON.parse(rows[0].page_clothing) : null;
+    coverHints = rows[0].cover_hints ? JSON.parse(rows[0].cover_hints) : null;
+  } catch { /* malformed — a stage that needs it refuses */ }
   let characters = [];
   try {
     characters = rows[0].characters_json ? JSON.parse(rows[0].characters_json) : [];
@@ -152,6 +165,8 @@ async function loadSceneContext(storyId, pageNumber) {
     storyTopic: rows[0].story_topic || null,
     title: rows[0].title || null,
     clothingRequirements,
+    pageClothing,
+    coverHints,
     characters,
     characterAvatars,
     referencePhotos,
@@ -2116,18 +2131,29 @@ async function runCharRepairStage(ctx, opts) {
   // clothing-scoped styled avatar, the story's resolved clothing description
   // (clothingRequirements is canonical, avatars.clothing can be stale), and
   // protection boxes for every OTHER named character on the page.
-  const { normalizeClothingCategory, resolveCharacterReqs } = require('./clothingCategories');
-  const { getStyledAvatarForClothing } = require('./entityConsistency');
+  const { resolveRenderedClothingCategory } = require('./clothingCategories');
+  const { getStyledAvatarForClothing, buildClothingDescription } = require('./entityConsistency');
   // The styled avatar must follow the REFERENCE, not the target region — looking
   // it up by charName silently replaced a swapped reference with the original
   // character's avatar, so the identity-swap test ran with the wrong image and
   // its result was meaningless (owner caught this on exp #320).
   const character = (ctx.characters || []).find(c => (c.name || '').toLowerCase() === refName.toLowerCase()) || null;
-  const clothingKey = Object.keys(ctx.scene.sceneCharacterClothing || {})
-    .find(k => k.toLowerCase() === charName.toLowerCase());
-  const clothingCategory = clothingKey
-    ? normalizeClothingCategory(ctx.scene.sceneCharacterClothing[clothingKey])
-    : 'standard';
+  // The outfit the TARGET was rendered in, through the one resolver production
+  // uses. A cover has no sceneCharacterClothing; reading only that fell to
+  // 'standard', so the text described the everyday outfit while the avatar
+  // lookup sent the costume (Lab 1554).
+  const { COVER_PAGE_NUMBERS } = require('./coverKeys');
+  const coverKey = Object.keys(COVER_PAGE_NUMBERS).find(k => COVER_PAGE_NUMBERS[k] === Number(ctx.pageNumber)) || null;
+  const clothingCategory = resolveRenderedClothingCategory({
+    pageClothing: ctx.pageClothing,
+    coverHints: ctx.coverHints,
+    coverImages: coverKey ? { [coverKey]: ctx.scene } : null,
+    characters: ctx.characters,
+    visualBible: ctx.visualBible,
+  }, ctx.pageNumber, charName, ctx.scene);
+  if (!clothingCategory) {
+    throw new Error(`No clothing category for "${charName}" on page ${ctx.pageNumber} (page record, cover brief and pageClothing all empty) — refusing to repair into a guessed outfit`);
+  }
   let avatarPhoto = ref.photoUrl;
   let avatarPhotoType = 'reference';
   if (character) {
@@ -2185,19 +2211,14 @@ async function runCharRepairStage(ctx, opts) {
     }
   }
 
-  const clothingDescription = (() => {
-    // Follows the REFERENCE character: during an identity swap the prompt must
-    // not keep demanding the TARGET's outfit, or the model is told to paint the
-    // original clothing onto the swapped person and nothing changes (owner:
-    // "neither changed the clothing", exp #326).
-    const reqs = resolveCharacterReqs(ctx.clothingRequirements, refName);
-    if (reqs?.[clothingCategory]) {
-      const cat = reqs[clothingCategory];
-      if (cat.signature && cat.signature !== 'none') return cat.signature;
-      if (cat.description) return cat.description;
-    }
-    return character?.avatars?.clothing?.[clothingCategory] || '';
-  })();
+  // Follows the REFERENCE character: during an identity swap the prompt must
+  // not keep demanding the TARGET's outfit, or the model is told to paint the
+  // original clothing onto the swapped person and nothing changes (owner:
+  // "neither changed the clothing", exp #326). Canonical clothing text:
+  // buildClothingDescription, story clothingRequirements first.
+  const clothingDescription = character
+    ? (buildClothingDescription(character, clothingCategory, ctx.artStyle, ctx.clothingRequirements) || '')
+    : '';
   const detFigures = params.detection?.figures
     || ctx.scene.bboxDetection?.figures || ctx.scene.bboxDetection?.characters || [];
   const protectedFaces = [];

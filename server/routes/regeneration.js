@@ -5830,45 +5830,15 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             return { task, error: true, failReason: 'No scene image data for this page' };
           }
 
-          // Determine clothing for this character on this page.
-          // Priority: sceneCharacterClothing (persisted from generation — source of truth)
-          //         > scene metadata > clothingRequirements > 'standard'
-          // sceneCharacterClothing was set by the unified pipeline at generation time and
-          // holds the actual perCharClothing used to render the page, so the styled avatar
-          // we pick to repair will match the avatar that drew the page.
-          let pageClothing = 'standard';
-          const persistedClothing = sceneImage.sceneCharacterClothing || sceneImage.characterClothing || null;
-          if (persistedClothing && persistedClothing[characterName]) {
-            pageClothing = persistedClothing[characterName];
-            log.info(`👕 [CHAR REPAIR] ${characterName} on page ${pageNumber}: using persisted clothing "${pageClothing}" (from generation)`);
-          } else {
-            const sceneMetadata = sceneImage.sceneMetadata || (sceneImage.description ? extractSceneMetadata(sceneImage.description) : null);
-            if (sceneMetadata?.characterClothing?.[characterName]) {
-              pageClothing = sceneMetadata.characterClothing[characterName];
-            } else if (storyData.clothingRequirements?.[characterName]) {
-              const charReqs = storyData.clothingRequirements[characterName];
-              if (charReqs?.costumed?.used && charReqs.costumed.costume) {
-                pageClothing = `costumed:${charReqs.costumed.costume}`;
-              } else {
-                // Covers have no persisted per-page clothing, so this chain
-                // used to fall through to 'standard' — the repair then sent
-                // the standard avatar and Grok redressed the character out
-                // of the story outfit (staging back-cover, 2026-07-11).
-                // Resolve like cover generation does: parse the description,
-                // else take the single category the story actually uses.
-                const parsed = parseClothingCategory(sceneImage.description || '', false);
-                const usedCats = ['winter', 'summer', 'standard'].filter(k => charReqs?.[k]?.used);
-                if (parsed) {
-                  pageClothing = parsed;
-                } else if (usedCats.length === 1) {
-                  pageClothing = usedCats[0];
-                }
-                if (pageClothing !== 'standard') {
-                  log.info(`👕 [CHAR REPAIR] ${characterName} on page ${pageNumber}: no persisted clothing — resolved "${pageClothing}" (${parsed ? 'parsed from description' : 'single used category'})`);
-                }
-              }
-            }
-          }
+          // The outfit this character was RENDERED in on this page or cover —
+          // the page's persisted per-character clothing, else the cover brief /
+          // cover hint / pageClothing. One resolver with the Lab and the in-run
+          // char-fix. This chain used to default to 'standard' and read only
+          // sceneCharacterClothing, which a cover never has; the repair then
+          // described one outfit while its reference showed another (Lab 1554).
+          // null → the NO DEFAULT refusal below.
+          const pageClothing = require('../lib/clothingCategories')
+            .resolveRenderedClothingCategory(storyData, pageNumber, characterName, sceneImage);
 
           // Stored boxes are only usable with the bytes they were computed on
           // (sourceImageFp stamp) — a stale box repaints the wrong region of a
@@ -5984,17 +5954,15 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             clothing: resolved.clothing || pageClothing,
           };
 
-          const { normalizeClothingCategory, resolvePageClothingCategory } = require('../lib/clothingCategories');
+          const { normalizeClothingCategory } = require('../lib/clothingCategories');
           // NO DEFAULT (owner, 2026-08-07): this category picks the styled
-          // avatar the repair paints the character to match.
+          // avatar the repair paints the character to match. pageClothing above
+          // already ran the full rendered-outfit chain, so null here is final.
           const clothingCategory = storedAppearance.clothing
             ? normalizeClothingCategory(storedAppearance.clothing)
-            : resolvePageClothingCategory(storyData, pageNumber, characterName);
+            : null;
           if (!clothingCategory) {
-            return res.status(422).json({ error: `${characterName} p${pageNumber}: no clothing category (stored appearance and pageClothing both empty) — refusing to repair into a guessed outfit` });
-          }
-          if (!storedAppearance.clothing) {
-            log.warn(`⚠️ [CHAR REPAIR] ${characterName} p${pageNumber}: no stored appearance clothing — resolved "${clothingCategory}" from pageClothing`);
+            return res.status(422).json({ error: `${characterName} p${pageNumber}: no clothing category (stored appearance, page record, cover brief and pageClothing all empty) — refusing to repair into a guessed outfit` });
           }
           const styledAvatar = await getStyledAvatarForClothing(character, artStyle, clothingCategory);
           const avatarData = styledAvatar || character.avatars?.standard || character.avatarUrl;

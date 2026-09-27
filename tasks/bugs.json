@@ -14,6 +14,18 @@
       "fix": "faceRepair.repairImageOrder returns the order constant each send site builds its image array from (CALL_MODEL_IMAGE_ORDER in callModel, imageCompositing.SCENE_EXACT_IMAGE_ORDER in grokEditSceneExact); buildPrompt fills {EDIT_IMAGE}/{REFERENCE_IMAGE} (and the whiteout/fallback ordinals) from it, and a template with a hard-coded 'IMAGE n' or without both placeholders throws. Send order unchanged. Test: tests/unit/char-repair-image-order.test.ts captures the images actually sent and checks the slot the prompt calls REFERENCE carries the avatar, for every axis combination."
     },
     {
+      "id": "char-repair-cover-outfit-standard",
+      "title": "Character repair on a cover described the 'standard' outfit while sending the costumed reference",
+      "reportedAt": "2026-09-27",
+      "source": "Owner-approved fix 2026-09-27. Lab 1554 (staging job_1790446348343_z3fw660ie initialPage, Fiona): clothingCategory 'standard', prompt 'Clothing: white and light blue tunic, dark blue jeans', avatar lookup log 'wanted standard but only costumed exists — sending costumed'. The cover record carries briefedAsPage + perCharClothing {Fiona: 'costumed:pirate'}; the story has no standard outfit in use.",
+      "rootCause": "The Lab char_repair stage read only scene.sceneCharacterClothing (a cover has none) and defaulted to 'standard'. The manual repair route (repair-workflow/character-repair) read sceneCharacterClothing / sceneMetadata / a costumed-used guess and otherwise defaulted to 'standard', ignoring the cover brief. The in-run char-fix read img.perCharClothing then pageClothing, but the pipeline context carried no coverHints, so a trial (hint-made) cover resolved to the story primary instead of its hint.",
+      "impact": "A cover repair's text ordered one outfit while its reference showed another; on the Fiona cover the pasted torso region came back in a vest/apron instead of the pirate coat.",
+      "status": "fixed",
+      "fixedAt": "2026-09-27",
+      "fixedIn": "",
+      "fix": "clothingCategories.resolveRenderedClothingCategory is the one resolver for the outfit a character was rendered in: the record's own sceneCharacterClothing / perCharClothing / characterClothing / sceneMetadata.characterClothing, then resolvePageClothingCategory (cover brief, cover hint, pageClothing, primary). Used by the Lab stage (which now also loads pageClothing + coverHints and builds the text with buildClothingDescription), the manual route and the in-run char-fix (context now carries coverHints). null refuses; no 'standard' default. Test: tests/unit/rendered-clothing-category.test.ts."
+    },
+    {
       "id": "calm-zone-rerender-drops-to-edit-tier",
       "title": "The calm-zone re-render (text-space gate, POST-REPAIR-TEXT, Lab text_zone) rendered on the Standard edit tier instead of the page render tier",
       "reportedAt": "2026-09-26",
