@@ -18,6 +18,7 @@ const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./
 const { generateWithGrok, editWithGrok, isGrokConfigured, packReferences } = require('./grok');
 const { PromptFitError } = require('./promptFitError');
 const { MODEL_PRICING } = require('../config/models');
+const { geminiUsage, xaiUsage, openRouterUsage } = require('./providerUsage');
 const { getCurrentLogger } = require('./generationLogger');
 const r2Lib = require('./r2');
 // Analyzer URL + in-flight cap now live in photoAnalyzerClient.js — shared
@@ -260,9 +261,10 @@ async function callGrokVisionAPI(modelKey, modelId, geminiParts, promptText) {
 
   const result = await response.json();
   const elapsed = Date.now() - startTime;
-  const inputTokens = result.usage?.prompt_tokens || 0;
-  const outputTokens = result.usage?.completion_tokens || 0;
-  log.debug(`📊 [GROK VISION] ${modelKey} (${elapsed}ms): ${inputTokens} in, ${outputTokens} out`);
+  // xAI bills reasoning tokens OUTSIDE completion_tokens — carried as
+  // thoughtsTokenCount so every Gemini-shape reader prices them.
+  const usage = xaiUsage(result.usage);
+  log.debug(`📊 [GROK VISION] ${modelKey} (${elapsed}ms): ${usage.input_tokens} in, ${usage.output_tokens} out, ${usage.thinking_tokens} reasoning`);
 
   // Convert Grok response to Gemini-compatible format so existing parsing works
   const text = result.choices?.[0]?.message?.content || '';
@@ -271,9 +273,9 @@ async function callGrokVisionAPI(modelKey, modelId, geminiParts, promptText) {
     json: async () => ({
       candidates: [{ content: { parts: [{ text }] }, finishReason: 'STOP' }],
       usageMetadata: {
-        promptTokenCount: inputTokens,
-        candidatesTokenCount: outputTokens,
-        thoughtsTokenCount: 0
+        promptTokenCount: usage.input_tokens,
+        candidatesTokenCount: usage.output_tokens,
+        thoughtsTokenCount: usage.thinking_tokens
       }
     })
   };
@@ -326,15 +328,15 @@ async function callOpenRouterVisionAPI(modelKey, modelId, geminiParts, promptTex
     return response;
   }
   const result = await response.json();
-  const inputTokens = result.usage?.prompt_tokens || 0;
-  const outputTokens = result.usage?.completion_tokens || 0;
-  log.debug(`📊 [OPENROUTER VISION] ${modelKey} (${Date.now() - startTime}ms): ${inputTokens} in, ${outputTokens} out`);
+  // OpenRouter's completion_tokens already include reasoning → thoughts stay 0.
+  const usage = openRouterUsage(result.usage);
+  log.debug(`📊 [OPENROUTER VISION] ${modelKey} (${Date.now() - startTime}ms): ${usage.input_tokens} in, ${usage.output_tokens} out (${usage.reasoning_tokens} reasoning, included)`);
   const text = result.choices?.[0]?.message?.content || '';
   return {
     ok: true,
     json: async () => ({
       candidates: [{ content: { parts: [{ text }] }, finishReason: 'STOP' }],
-      usageMetadata: { promptTokenCount: inputTokens, candidatesTokenCount: outputTokens, thoughtsTokenCount: 0 }
+      usageMetadata: { promptTokenCount: usage.input_tokens, candidatesTokenCount: usage.output_tokens, thoughtsTokenCount: usage.thinking_tokens }
     })
   };
 }
@@ -2066,11 +2068,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     }, { maxRetries: 2, baseDelay: 2000 });
   
     // Extract token usage from response (including thinking tokens for Gemini 2.5)
-    const imageUsage = {
-      input_tokens: data.usageMetadata?.promptTokenCount || 0,
-      output_tokens: data.usageMetadata?.candidatesTokenCount || 0,
-      thinking_tokens: data.usageMetadata?.thoughtsTokenCount || 0
-    };
+    const imageUsage = geminiUsage(data.usageMetadata);
     if (imageUsage.input_tokens > 0 || imageUsage.output_tokens > 0) {
       const thinkingInfo = imageUsage.thinking_tokens > 0 ? `, thinking: ${imageUsage.thinking_tokens.toLocaleString()}` : '';
       log.debug(`📊 [IMAGE GEN] Token usage - input: ${imageUsage.input_tokens.toLocaleString()}, output: ${imageUsage.output_tokens.toLocaleString()}${thinkingInfo}`);
@@ -2519,11 +2517,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
         }, { maxRetries: 2, baseDelay: 2000 });
   
         // Extract token usage
-        const usage = {
-          input_tokens: data.usageMetadata?.promptTokenCount || 0,
-          output_tokens: data.usageMetadata?.candidatesTokenCount || 0,
-          thinking_tokens: data.usageMetadata?.thoughtsTokenCount || 0
-        };
+        const usage = geminiUsage(data.usageMetadata);
   
         if (!data.candidates || data.candidates.length === 0) {
           // No candidates = likely safety block
@@ -6025,9 +6019,7 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
     const data = await response.json();
 
     // Extract token usage
-    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
-    const thinkingTokens = data.usageMetadata?.thoughtsTokenCount || 0;
+    const { input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: thinkingTokens } = geminiUsage(data.usageMetadata);
     log.debug(`📊 [IMAGE EDIT] Token usage - input: ${inputTokens}, output: ${outputTokens}${thinkingTokens ? `, thinking: ${thinkingTokens}` : ''}, model: ${geminiModelId}`);
 
     // Extract thinking text

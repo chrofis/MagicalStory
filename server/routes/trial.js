@@ -1093,9 +1093,8 @@ OUTPUT: A single character illustration. No text, no borders, no additional elem
     const compressed = await compressImageToJPEG(avatarImage, 85, 768);
     const finalImage = compressed || avatarImage;
 
-    const inputTokens = data?.usageMetadata?.promptTokenCount || 0;
-    const outputTokens = data?.usageMetadata?.candidatesTokenCount || 0;
-    log.info(`[TRIAL AVATAR] ✅ Generated preview avatar for "${safeName}" (${inputTokens} in / ${outputTokens} out)`);
+    const { input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: thinkingTokens } = require('../lib/providerUsage').geminiUsage(data?.usageMetadata);
+    log.info(`[TRIAL AVATAR] ✅ Generated preview avatar for "${safeName}" (${inputTokens} in / ${outputTokens} out / ${thinkingTokens} thinking)`);
 
     // If session token provided, save avatar to character in DB
     const authHeader = req.headers['authorization'];

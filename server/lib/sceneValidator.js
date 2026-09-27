@@ -29,9 +29,22 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 // forever (stuck-at-51% incident, 2026-07-07). The SDK aborts after this, the
 // error propagates, and callers skip the eval instead of hanging.
 const EVAL_REQUEST_OPTIONS = { timeout: 120000 };
-const { MODEL_DEFAULTS, resolveSceneValidationModel, GROK_VISION_FALLBACK } = require('../config/models');
+const { MODEL_DEFAULTS, resolveSceneValidationModel, GROK_VISION_FALLBACK, calculateTextCost } = require('../config/models');
+const { geminiUsage } = require('./providerUsage');
 const VISION_MODEL = MODEL_DEFAULTS.qualityEval || 'gemini-2.0-flash';
 const COMPARISON_MODEL = MODEL_DEFAULTS.qualityEval || 'gemini-2.0-flash';
+
+// A vision call's usage in the pipeline's shape, priced from MODEL_PRICING.
+// Replaces a hardcoded $0.15/$0.60 per 1M estimate that also ignored the
+// model's thinking tokens (billed as output, several times the answer).
+function pricedUsage(usageMetadata, modelId) {
+  const usage = geminiUsage(usageMetadata);
+  return {
+    ...usage,
+    tokens: usage.input_tokens + usage.output_tokens + usage.thinking_tokens,
+    estimatedCost: calculateTextCost(modelId, usage),
+  };
+}
 
 // Step 1: Vision model describes what it sees (no scene description provided)
 const IMAGE_DESCRIPTION_PROMPT = `Describe ONLY the geometric composition of this image. For each person visible:
@@ -277,16 +290,13 @@ async function describeImage(imageData) {
   const elapsed = Date.now() - startTime;
   const text = result.response.text();
 
-  const usage = result.response.usageMetadata;
-  const tokens = (usage?.promptTokenCount || 0) + (usage?.candidatesTokenCount || 0);
-  // Gemini 2.5 Flash pricing
-  const estimatedCost = ((usage?.promptTokenCount || 0) * 0.15 + (usage?.candidatesTokenCount || 0) * 0.60) / 1000000;
+  const usage = { ...pricedUsage(result.response.usageMetadata, VISION_MODEL), elapsed };
 
-  log.debug(`[SCENE-VALIDATOR] Description complete in ${elapsed}ms, tokens: ${tokens}`);
+  log.debug(`[SCENE-VALIDATOR] Description complete in ${elapsed}ms, tokens: ${usage.tokens}`);
 
   return {
     description: text,
-    usage: { tokens, estimatedCost, elapsed }
+    usage
   };
 }
 
@@ -422,16 +432,13 @@ async function analyzeGeneratedImage(imageData, characters = null, visualBible =
   const elapsed = Date.now() - startTime;
   const text = result.response.text();
 
-  const usage = result.response.usageMetadata;
-  const tokens = (usage?.promptTokenCount || 0) + (usage?.candidatesTokenCount || 0);
-  // Gemini 2.5 Flash pricing
-  const estimatedCost = ((usage?.promptTokenCount || 0) * 0.15 + (usage?.candidatesTokenCount || 0) * 0.60) / 1000000;
+  const usage = { ...pricedUsage(result.response.usageMetadata, VISION_MODEL), elapsed };
 
-  log.debug(`[SCENE-VALIDATOR] Generated image analysis complete in ${elapsed}ms, tokens: ${tokens}`);
+  log.debug(`[SCENE-VALIDATOR] Generated image analysis complete in ${elapsed}ms, tokens: ${usage.tokens}`);
 
   return {
     description: text,
-    usage: { tokens, estimatedCost, elapsed }
+    usage
   };
 }
 
@@ -555,18 +562,16 @@ async function validateComposition(sceneJson, imageDescription) {
     };
   }
 
-  const usage = result.response.usageMetadata;
-  const tokens = (usage?.promptTokenCount || 0) + (usage?.candidatesTokenCount || 0);
-  const estimatedCost = ((usage?.promptTokenCount || 0) * 0.15 + (usage?.candidatesTokenCount || 0) * 0.60) / 1000000;
+  const usage = { ...pricedUsage(result.response.usageMetadata, COMPARISON_MODEL), elapsed };
 
-  log.debug(`[SCENE-VALIDATOR] Comparison complete in ${elapsed}ms, tokens: ${tokens}`);
+  log.debug(`[SCENE-VALIDATOR] Comparison complete in ${elapsed}ms, tokens: ${usage.tokens}`);
 
   return {
     checks: analysis.checks || [],
     compositionIssues: analysis.compositionIssues || [],
     passesCompositionCheck: analysis.passesCompositionCheck !== false,
     summary: analysis.summary || '',
-    usage: { tokens, estimatedCost, elapsed }
+    usage
   };
 }
 
@@ -592,9 +597,12 @@ async function validateScene(sceneJson, options = {}) {
   // Combine usage stats
   const totalUsage = {
     previewCost: preview.usage.cost,
-    visionTokens: imageDesc.usage.tokens,
+    // Normalised { input_tokens, output_tokens, thinking_tokens } per call —
+    // what the pipeline's addUsage books (it read a Gemini-shaped object and
+    // recorded 0 tokens before).
+    visionUsage: imageDesc.usage,
     visionCost: imageDesc.usage.estimatedCost,
-    comparisonTokens: comparison.usage.tokens,
+    comparisonUsage: comparison.usage,
     comparisonCost: comparison.usage.estimatedCost,
     totalCost: preview.usage.cost + imageDesc.usage.estimatedCost + comparison.usage.estimatedCost
   };
@@ -926,14 +934,13 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
   }, level);
 
   // Parse the Gemini/Grok response text into a result object
-  const parseResponse = (text, usageMeta, elapsed) => {
-    const tokens = (usageMeta?.promptTokenCount || 0) + (usageMeta?.candidatesTokenCount || 0);
-    const estimatedCost = ((usageMeta?.promptTokenCount || 0) * 0.15 + (usageMeta?.candidatesTokenCount || 0) * 0.60) / 1000000;
+  const parseResponse = (text, usageMeta, elapsed, servedBy) => {
+    const usage = { ...pricedUsage(usageMeta, servedBy), elapsed };
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       log.warn(`[SEMANTIC] Failed to parse response: ${text.substring(0, 200)}`);
-      return { score: null, verdict: 'UNKNOWN', semanticIssues: [], usage: { tokens, estimatedCost, elapsed }, error: 'Failed to parse response' };
+      return { score: null, verdict: 'UNKNOWN', semanticIssues: [], usage, error: 'Failed to parse response' };
     }
 
     let analysis;
@@ -941,7 +948,7 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
       analysis = JSON.parse(jsonMatch[0]);
     } catch (err) {
       log.warn(`[SEMANTIC] JSON parse error: ${err.message}`);
-      return { score: null, verdict: 'UNKNOWN', semanticIssues: [], usage: { tokens, estimatedCost, elapsed }, error: err.message };
+      return { score: null, verdict: 'UNKNOWN', semanticIssues: [], usage, error: err.message };
     }
 
     // analysis.score is deliberately NOT read — image-semantic.txt no longer
@@ -955,7 +962,7 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
       require('./findingSources').FINDING_SOURCES.SEMANTIC
     );
 
-    log.info(`🔍 [SEMANTIC] Token usage - input: ${usageMeta?.promptTokenCount?.toLocaleString() || 0}, output: ${usageMeta?.candidatesTokenCount?.toLocaleString() || 0}, cost: $${estimatedCost.toFixed(4)}`);
+    log.info(`🔍 [SEMANTIC] Token usage - input: ${usage.input_tokens.toLocaleString()}, output: ${usage.output_tokens.toLocaleString()}, thinking: ${usage.thinking_tokens.toLocaleString()}, cost: $${usage.estimatedCost.toFixed(4)}`);
     if (semanticIssues.length > 0) {
       log.info(`🔍 [SEMANTIC] Found ${semanticIssues.length} semantic issues: ${semanticIssues.map(i => require('./scoring').findingText(i)).join('; ')}`);
     } else {
@@ -981,7 +988,7 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
       issues: analysis.issues || [],
       storyActions: analysis.story_actions || [],
       semanticChecks: analysis.semantic_checks || [],
-      usage: { tokens, input_tokens: usageMeta?.promptTokenCount || 0, output_tokens: usageMeta?.candidatesTokenCount || 0, estimatedCost, elapsed }
+      usage
     };
   };
 
@@ -998,7 +1005,7 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
       require('./evalCallLog').recordEvalCall({
         kind: 'semantic', pageNumber: evalContext.pageNumber ?? null, model: VISION_MODEL, prompt, rawResponse: text,
       });
-      return parseResponse(text, result.response.usageMetadata, Date.now() - startTime);
+      return parseResponse(text, result.response.usageMetadata, Date.now() - startTime, VISION_MODEL);
     } catch (err) {
       const isBlock = err.message?.includes('PROHIBITED_CONTENT') || err.message?.includes('blocked') || err.message?.includes('SAFETY');
       if (isBlock && i < levels.length - 1) {
@@ -1038,7 +1045,7 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
         require('./evalCallLog').recordEvalCall({
           kind: 'semantic', pageNumber: evalContext.pageNumber ?? null, model: grokModelId, prompt: fullPrompt, rawResponse: text,
         });
-        return parseResponse(text, grokData.usageMetadata, Date.now() - startTime);
+        return parseResponse(text, grokData.usageMetadata, Date.now() - startTime, grokModelId);
       }
     }
     log.error('[SEMANTIC] Grok fallback returned no text');

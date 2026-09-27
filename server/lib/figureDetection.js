@@ -16,6 +16,7 @@
 
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
+const { openRouterUsage } = require('./providerUsage');
 const { MODEL_DEFAULTS, TEXT_MODELS } = require('../config/models');
 const r2Lib = require('./r2');
 const { canonicalName } = require('./castResolver');
@@ -1584,9 +1585,7 @@ async function arbitrateIdentity(imageDataUri, figures, contestedIdx, ctx = {}) 
   const nameByFigure = parseArbiterAnswer(text, idx, candidates.map(c => c.name));
   if (!nameByFigure) { log.warn(`⚠️ [IDENTITY-ARBITER] ${pageLabel}unparseable answer: ${text.slice(0, 200)}`); return null; }
 
-  const usage = j?.usage
-    ? { input_tokens: j.usage.prompt_tokens || 0, output_tokens: j.usage.completion_tokens || 0 }
-    : null;
+  const usage = j?.usage ? openRouterUsage(j.usage) : null;
   log.info(`⚖️ [IDENTITY-ARBITER] ${pageLabel}${modelKey}: ${[...nameByFigure.entries()].map(([i, n]) => `fig${i}=${n}`).join(' ')}`);
   return { nameByFigure, model: modelKey, modelId, usage };
 }

@@ -32,6 +32,7 @@ const { PROMPT_TEMPLATES, fillTemplate, promptSections } = require('../services/
 const { assertPromptFilled, guardPromptString } = require('../services/prompts');
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
 const { TEXT_MODELS, GROK_VISION_FALLBACK } = require('../config/models');
+const { geminiUsage } = require('./providerUsage');
 const r2Lib = require('./r2');
 
 // storyHelpers functions (lazy-loaded to avoid circular dependencies)
@@ -93,7 +94,7 @@ const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) 
  * @param {string} modelId - Gemini model to use
  * @param {string} apiKey - Gemini API key
  * @param {string} pageContext - Page context for logging
- * @returns {Promise<{figures: Array, objectMatches: Array, rendering: Object, inputTokens: number, outputTokens: number}|null>}
+ * @returns {Promise<{figures: Array, objectMatches: Array, rendering: Object, inputTokens: number, outputTokens: number, thinkingTokens: number}|null>}
  */
 async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}) {
   try {
@@ -201,9 +202,7 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
     }
 
     let p1Data = await p1Response.json();
-    let inputTokens = p1Data.usageMetadata?.promptTokenCount || 0;
-    let outputTokens = p1Data.usageMetadata?.candidatesTokenCount || 0;
-    const thinkingTokens = p1Data.usageMetadata?.thoughtsTokenCount || 0;
+    let { input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: thinkingTokens } = geminiUsage(p1Data.usageMetadata);
 
     // ALLOW-LIST since 2026-09-18 (imageReplyGuard): a finish reason must MEAN
     // the model finished, or the inventory is treated as blocked and routed to
@@ -232,8 +231,7 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
               // that answered, not the one that was asked.
               modelId = grokFallbackId;
               modelConfig = grokFallbackModel;
-              inputTokens = p1Data.usageMetadata?.promptTokenCount || 0;
-              outputTokens = p1Data.usageMetadata?.candidatesTokenCount || 0;
+              ({ input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: thinkingTokens } = geminiUsage(p1Data.usageMetadata));
               if (p1Data?.candidates?.[0]?.content?.parts?.[0]?.text) {
                 log.info(`✅ [QUALITY P1] ${pageLabel}Grok fallback succeeded`);
               } else {
@@ -278,7 +276,7 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
     // the documented 2.5-flash fallback served all 10 pages, and the experiment
     // row still said 3.7: an A/B comparing a model with itself, caught only
     // because the token counts came back byte-identical to the 2.5 arm.
-    if (opts.raw) return { rawText: p1Text, inputTokens, outputTokens, servedByModel: modelId };
+    if (opts.raw) return { rawText: p1Text, inputTokens, outputTokens, thinkingTokens, servedByModel: modelId };
 
     let inventoryJson;
     try {
@@ -325,7 +323,8 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
       sceneSummary: inventoryJson.scene_summary || null,
       mainAction: inventoryJson.main_action || null,
       inputTokens,
-      outputTokens
+      outputTokens,
+      thinkingTokens
     };
   } catch (err) {
     log.warn(`⚠️ [QUALITY P1] Figure check failed: ${err.message}`);
@@ -1030,14 +1029,14 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
   // seven weeks later beside it (568aacce7). Both now come from ONE call whose
   // result is passed in, so the judge and the code read the same observation.
   let visionText = null;
-  let stage1Usage = { input_tokens: 0, output_tokens: 0 };
+  let stage1Usage = { input_tokens: 0, output_tokens: 0, thinking_tokens: 0 };
   try {
     const inventory = inventoryPromise ? await inventoryPromise : null;
     if (!inventory) {
       log.warn(`[THREE-STAGE] ${pageLabel}No shared inventory available, skipping`);
       return null;
     }
-    stage1Usage = { input_tokens: inventory.inputTokens || 0, output_tokens: inventory.outputTokens || 0 };
+    stage1Usage = { input_tokens: inventory.inputTokens || 0, output_tokens: inventory.outputTokens || 0, thinking_tokens: inventory.thinkingTokens || 0 };
     // The judge reads JSON now rather than prose. Its figures carry the same
     // 9-zone vocabulary it always paired on, plus the label it resolves to a
     // real name in STEP 1.
@@ -1057,7 +1056,7 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
 
   // --- Stage 2: Prompt compliance with Sonnet (text only, NO image) ---
   let complianceResult = null;
-  let stage2Usage = { input_tokens: 0, output_tokens: 0 };
+  let stage2Usage = { input_tokens: 0, output_tokens: 0, thinking_tokens: 0 };
   try {
     // If quality eval is producing its own figures[] + matches[], wait for those
     // so Stage 2 can pair named figures (quality) with independent descriptions (vision)
@@ -1141,7 +1140,8 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
 
     stage2Usage = {
       input_tokens: sonnetResult.usage?.input_tokens || 0,
-      output_tokens: sonnetResult.usage?.output_tokens || 0
+      output_tokens: sonnetResult.usage?.output_tokens || 0,
+      thinking_tokens: sonnetResult.usage?.thinking_tokens || 0
     };
 
     // A reply cut at the ceiling is a truncated finding list, not a verdict:
@@ -1150,7 +1150,7 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     if (sonnetResult.truncation?.suspected) {
       const reason = require('./textModels').describeTruncation(sonnetResult.truncation);
       log.warn(`[THREE-STAGE] ${pageLabel}Stage 2 evalFailed: compliance reply ${reason}`);
-      return { evalFailed: true, evalError: `compliance reply ${reason}`, notEvaluated: notEvaluated.list(), usage: { threeStage_input_tokens: stage2Usage.input_tokens, threeStage_output_tokens: stage2Usage.output_tokens } };
+      return { evalFailed: true, evalError: `compliance reply ${reason}`, notEvaluated: notEvaluated.list(), usage: { threeStage_input_tokens: stage2Usage.input_tokens, threeStage_output_tokens: stage2Usage.output_tokens, threeStage_thinking_tokens: stage2Usage.thinking_tokens } };
     }
     // Parse JSON from compliance response
     const parsed = getStoryHelpers().extractJsonFromText(sonnetResult.text);
@@ -1268,6 +1268,7 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     usage: {
       threeStage_input_tokens: stage1Usage.input_tokens + stage2Usage.input_tokens,
       threeStage_output_tokens: stage1Usage.output_tokens + stage2Usage.output_tokens,
+      threeStage_thinking_tokens: stage1Usage.thinking_tokens + stage2Usage.thinking_tokens,
       stage1_input_tokens: stage1Usage.input_tokens,
       stage1_output_tokens: stage1Usage.output_tokens,
       stage2_input_tokens: stage2Usage.input_tokens,
@@ -1723,8 +1724,7 @@ async function callAbsenceJudge(parts, modelId, apiKey) {
   const j = await resp.json();
   const text = j?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '';
   if (!text) throw new Error(`second look returned no text (finishReason ${j?.candidates?.[0]?.finishReason || 'none'})`);
-  const um = j?.usageMetadata || {};
-  return { text, usage: { input_tokens: um.promptTokenCount || 0, output_tokens: um.candidatesTokenCount || 0 } };
+  return { text, usage: geminiUsage(j?.usageMetadata) };
 }
 
 /** The presence types the derivation owns outright once it has spoken. */
@@ -2952,9 +2952,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     let data = await response.json();
 
     // Extract and log token usage for quality evaluation
-    const qualityInputTokens = data.usageMetadata?.promptTokenCount || 0;
-    const qualityOutputTokens = data.usageMetadata?.candidatesTokenCount || 0;
-    const qualityThinkingTokens = data.usageMetadata?.thoughtsTokenCount || 0;
+    const { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens, thinking_tokens: qualityThinkingTokens } = geminiUsage(data.usageMetadata);
     if (qualityInputTokens > 0 || qualityOutputTokens > 0) {
       const thinkingInfo = qualityThinkingTokens > 0 ? `, thinking: ${qualityThinkingTokens.toLocaleString()}` : '';
       log.verbose(`📊 [EVAL] Token usage - input: ${qualityInputTokens.toLocaleString()}, output: ${qualityOutputTokens.toLocaleString()}${thinkingInfo}`);
@@ -3532,7 +3530,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             // is used only where the evaluator named nobody — there is no pair
             // to break, and an honest figure list still beats none.
             if (p1Result.figures?.length && matches.length === 0) figures = p1Result.figures;
-            p1Usage = { inputTokens: p1Result.inputTokens, outputTokens: p1Result.outputTokens };
+            p1Usage = { inputTokens: p1Result.inputTokens, outputTokens: p1Result.outputTokens, thinkingTokens: p1Result.thinkingTokens || 0 };
 
             // DECLARED GAZE vs OBSERVED GAZE. The one thing P1 can settle
             // that the evaluator structurally cannot: it saw the picture
@@ -3802,7 +3800,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       const totalUsage = {
         input_tokens: qualityInputTokens + (p1Usage?.inputTokens || 0) + (semanticUsage.input_tokens || 0) + (threeStageUsage.threeStage_input_tokens || 0) + (secondLook?.usage?.input_tokens || 0),
         output_tokens: qualityOutputTokens + (p1Usage?.outputTokens || 0) + (semanticUsage.output_tokens || 0) + (threeStageUsage.threeStage_output_tokens || 0) + (secondLook?.usage?.output_tokens || 0),
-        thinking_tokens: qualityThinkingTokens,
+        // Every component's thinking, summed exactly like its output tokens —
+        // this used to carry the quality call's alone.
+        thinking_tokens: qualityThinkingTokens + (p1Usage?.thinkingTokens || 0) + (semanticUsage.thinking_tokens || 0) + (threeStageUsage.threeStage_thinking_tokens || 0) + (secondLook?.usage?.thinking_tokens || 0),
         p1_input_tokens: p1Usage?.inputTokens || 0,
         p1_output_tokens: p1Usage?.outputTokens || 0,
         semantic_input_tokens: semanticUsage.input_tokens || 0,
@@ -3889,7 +3889,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         try {
           const p1Result = await p1Promise;
           if (p1Result) {
-            p1Usage = { inputTokens: p1Result.inputTokens, outputTokens: p1Result.outputTokens };
+            p1Usage = { inputTokens: p1Result.inputTokens, outputTokens: p1Result.outputTokens, thinkingTokens: p1Result.thinkingTokens || 0 };
           }
         } catch (e) { /* already logged */ }
       }
@@ -3942,7 +3942,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       const totalUsage = {
         input_tokens: qualityInputTokens + (p1Usage?.inputTokens || 0) + (semanticUsage.input_tokens || 0) + (threeStageUsage.threeStage_input_tokens || 0),
         output_tokens: qualityOutputTokens + (p1Usage?.outputTokens || 0) + (semanticUsage.output_tokens || 0) + (threeStageUsage.threeStage_output_tokens || 0),
-        thinking_tokens: qualityThinkingTokens,
+        thinking_tokens: qualityThinkingTokens + (p1Usage?.thinkingTokens || 0) + (semanticUsage.thinking_tokens || 0) + (threeStageUsage.threeStage_thinking_tokens || 0),
         p1_input_tokens: p1Usage?.inputTokens || 0,
         p1_output_tokens: p1Usage?.outputTokens || 0,
         semantic_input_tokens: semanticUsage.input_tokens || 0,

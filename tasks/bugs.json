@@ -2367,6 +2367,18 @@
       "fixedAt": "2026-09-27",
       "fixedIn": "4bc136e3f",
       "fix": "textModels.js resolveImageInputs: one resolver for data URIs, bare base64, http(s) URLs (fetched) and Buffers, MIME sniffed from the bytes; anything else throws. Gemini sends inline_data parts, xAI and OpenRouter image_url parts, Anthropic base64 blocks; the Gemini-to-Grok fallback carries the images. Streaming Anthropic/Gemini/xAI refuse image inputs (refuseImageInputs). The warn-and-drop path is deleted. Sibling set textmodel-image-inputs. Test: tests/unit/text-model-image-inputs.test.ts."
+    },
+    {
+      "id": "cost-thinking-tokens-dropped",
+      "title": "Cost tracking dropped the reasoning tokens of Gemini judges and xAI calls (billed as output, never recorded)",
+      "reportedAt": "2026-09-27",
+      "source": "Owner-approved finding 2026-09-27 (docs/decisions.md entity-judge entry, BACKLOG). Stored: staging job_1790446348343_z3fw660ie entity history = 20 Gemini calls, 69.9k in / 4.7k out, thinking 0 recorded; page_quality thinking 0 although its semantic judge thinks. Measured 2026-09-27: gemini-2.5-flash semantic replays of that story's stored prompts spent 1,163 and 1,551 thoughtsTokenCount against 337/344 answer tokens; grok-4.3 reported completion 1 + reasoning 213 (total 417 = 203 + 1 + 213).",
+      "rootCause": "Every call site parsed usage by hand and most read only promptTokenCount/candidatesTokenCount. Gemini's candidatesTokenCount and xAI's completion_tokens both EXCLUDE the reasoning tokens, which are billed at the output rate on top. Dropped at: entity check, semantic judge (sceneValidator), P1 inventory/three-stage/second-look aggregates, VB cell gates, composite plate judge, scale-repair verify, 2x4 sheet judges, style analysis/repair, bbox sub-region, inpaint inspect/verify, avatar evals, xAI text + Grok vision. Opposite errors on the way: the Lab book-audit OpenRouter path priced reasoning twice (it is inside completion_tokens), scene validation booked a Gemini-shaped object addUsage read as 0 tokens, regeneration.js priced with a private table + 0.10/0.40 fallback, and the face gate booked its Gemini call a second time as 'openrouter'.",
+      "impact": "Per-function cost of thinking judges under-reported 3-8x (entity check ~$0.03 recorded vs ~$0.09-0.27 billed on the Fiona story); story totals low by ~2-5% (Fiona: ~$0.13-0.33 of $6.55). Judge-fixture entity estimate low ~5-7x.",
+      "status": "fixed",
+      "fixedAt": "2026-09-27",
+      "fixedIn": "",
+      "fix": "server/lib/providerUsage.js: geminiUsage / xaiUsage / openRouterUsage normalise every provider usage object to { input_tokens, output_tokens, thinking_tokens }; every call site reads through it and the per-site parsers are deleted. Entity report carries thinkingTokens; eval aggregates sum every component's thinking; sceneValidator prices from MODEL_PRICING; regeneration uses calculateTextCost; face gate relies on the textModels chokepoint. Test: tests/unit/provider-usage.test.ts (incl. a guard that no server file reads a raw usage field), judge-fixtures.test.ts, face-integrity-gate.test.ts."
     }
   ]
 }

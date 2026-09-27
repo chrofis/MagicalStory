@@ -248,15 +248,17 @@ const priceFlash = (inTok, outTok) => ((inTok || 0) * FLASH.input + (outTok || 0
  * What one replay cost, from the usage the judge returns — and, where a judge
  * returns none, a stated flat estimate. `basis` says which, so a report never
  * passes an estimate off as a measurement.
- *   semantic  — the judge returns only its total token count; the output share
- *               is taken as the length of its own JSON answer (~4 chars/token).
- *   quality   — the aggregate the pipeline records (quality + P1 + three-stage).
- *               It does NOT carry the semantic call's tokens (evaluateImageQuality
- *               reads semanticUsage.input_tokens, which the semantic judge never
- *               sets), so that call is added as the semantic estimate below.
+ * Thinking tokens are billed at the output rate and are NOT inside a Gemini
+ * reply's output count (server/lib/providerUsage.js), so every measured branch
+ * adds them to output — the entity estimate was ~5-7x low without them.
+ *   semantic  — the judge's own usage: input + output + thinking.
+ *   quality   — the aggregate the pipeline records (quality + P1 + semantic +
+ *               three-stage). The semantic call is inside it whenever it ran
+ *               (semantic_input_tokens > 0); only when it did not is the flat
+ *               semantic estimate added.
  *   plate_qc  — validateEmptyScene returns no usage: ~4k input tokens (the prompt,
  *               the plate and the landmark photo) + ~300 output.
- *   entity    — no usage returned: one grid call per character, ~12k in + 1.5k out.
+ *   entity    — the check's report.tokenUsage (input + output + thinking).
  *   book_audit, arc_panel — the stage's own measured cost.
  */
 function estimateCostUsd(judge, result) {
@@ -264,10 +266,9 @@ function estimateCostUsd(judge, result) {
   const SEMANTIC_FLAT = priceFlash(14000, 1500);
   switch (judge) {
     case 'semantic': {
-      const total = Number(r.usage?.tokens) || 0;
-      if (!total) return { usd: SEMANTIC_FLAT, basis: 'flat estimate (no usage returned)' };
-      const out = Math.round(JSON.stringify({ v: r.visible, e: r.expected, i: r.semanticIssues }).length / 4);
-      return { usd: priceFlash(Math.max(0, total - out), out), basis: 'measured total tokens, output share estimated' };
+      const u = r.usage || {};
+      if (!Number(u.input_tokens)) return { usd: SEMANTIC_FLAT, basis: 'flat estimate (no usage returned)' };
+      return { usd: priceFlash(u.input_tokens, (Number(u.output_tokens) || 0) + (Number(u.thinking_tokens) || 0)), basis: 'measured (input + output + thinking)' };
     }
     case 'quality':
     case 'lettering': {
@@ -275,12 +276,16 @@ function estimateCostUsd(judge, result) {
       const inTok = Number(u.input_tokens) || 0;
       const outTok = (Number(u.output_tokens) || 0) + (Number(u.thinking_tokens) || 0);
       if (!inTok) return { usd: priceFlash(30000, 3000) + SEMANTIC_FLAT, basis: 'flat estimate (no usage returned)' };
+      if (Number(u.semantic_input_tokens) > 0) return { usd: priceFlash(inTok, outTok), basis: 'measured (quality + P1 + semantic + three-stage, incl. thinking)' };
       return { usd: priceFlash(inTok, outTok) + SEMANTIC_FLAT, basis: 'measured quality+P1 tokens + semantic estimate' };
     }
     case 'plate_qc':
       return { usd: priceFlash(4000, 300), basis: 'flat estimate (validateEmptyScene returns no usage)' };
-    case 'entity':
-      return { usd: priceFlash(12000, 1500), basis: 'flat estimate per character grid call' };
+    case 'entity': {
+      const t = r.report?.tokenUsage || {};
+      if (!Number(t.inputTokens)) return { usd: priceFlash(12000, 1500), basis: 'flat estimate per character grid call (no usage returned)' };
+      return { usd: priceFlash(t.inputTokens, (Number(t.outputTokens) || 0) + (Number(t.thinkingTokens) || 0)), basis: 'measured (input + output + thinking)' };
+    }
     case 'book_audit':
       return { usd: Number(r.cost) || 0, basis: 'measured (stage cost)' };
     case 'arc_panel':

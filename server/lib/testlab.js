@@ -18,6 +18,7 @@
 'use strict';
 
 const { log } = require('../utils/logger');
+const { geminiUsage } = require('./providerUsage');
 const { samUnionBlend, maskBlurThreshold, fetchMaskWithRetry, BLEND_RULE_VERSION } = require('./samBlend');
 const { assessSceneReview, assertReviewedArtifactUsable, pickReviewedBrief } = require('./sceneReviewGuard');
 // Production's arguments for the beats writer/Art-Director calls, resolved from
@@ -7335,7 +7336,7 @@ async function runEmptySceneAdherenceStage(ctx, { experimentId }) {
     landmarkName: landmark?.name || null,
     pixelCorrelation,
     ...judged,
-    usage: j.usageMetadata ? { input_tokens: j.usageMetadata.promptTokenCount, output_tokens: j.usageMetadata.candidatesTokenCount } : null,
+    usage: j.usageMetadata ? geminiUsage(j.usageMetadata) : null,
   };
 }
 

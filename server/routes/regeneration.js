@@ -17,7 +17,8 @@ const { imageRegenerationLimiter } = require('../middleware/rateLimit');
 
 // Config
 const { CREDIT_CONFIG, CREDIT_COSTS } = require('../config/credits');
-const { calculateImageCost, formatCostSummary, MODEL_DEFAULTS, MODEL_PRICING, REPAIR_DEFAULTS, IMAGE_MODELS, TEXT_MODELS } = require('../config/models');
+const { calculateImageCost, calculateTextCost, formatCostSummary, MODEL_DEFAULTS, MODEL_PRICING, REPAIR_DEFAULTS, IMAGE_MODELS, TEXT_MODELS } = require('../config/models');
+const { sumUsage } = require('../lib/providerUsage');
 
 // Services
 const { log } = require('../utils/logger');
@@ -273,12 +274,6 @@ async function rehydrateActivePageImage(storyId, storyData, pageNumber) {
   return storyData;
 }
 
-// Calculate token-based API cost for Gemini models
-function calculateTokenCost(modelId, inputTokens, outputTokens) {
-  const pricing = MODEL_PRICING[modelId] || { input: 0.10, output: 0.40 };
-  if (pricing.perImage) return 0; // Image models use per-image pricing
-  return ((inputTokens / 1_000_000) * pricing.input) + ((outputTokens / 1_000_000) * pricing.output);
-}
 
 // Atomically add repair cost to story analytics
 async function addRepairCost(storyId, cost, stepName) {
@@ -4415,15 +4410,8 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
     })));
 
     // Calculate cost before responding
-    let totalInput = 0, totalOutput = 0;
-    for (const pageData of Object.values(pages)) {
-      if (pageData.usage) {
-        totalInput += pageData.usage.input_tokens || 0;
-        totalOutput += pageData.usage.output_tokens || 0;
-      }
-    }
     const evalModel = qualityModelOverride || 'gemini-2.5-flash';
-    const apiCost = calculateTokenCost(evalModel, totalInput, totalOutput);
+    const apiCost = calculateTextCost(evalModel, sumUsage(Object.values(pages).map(p => p.usage)));
 
     log.info(`✅ [REPAIR-WORKFLOW] Re-evaluation complete for ${Object.keys(pages).length} pages`);
     const badPages = findBadPages(pages, scoreThreshold ? { scoreThreshold } : {});
@@ -5343,8 +5331,8 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (
       report.overallConsistent !== false && (report.totalIssues || 0) + legacyIssues === 0;
 
     // Calculate cost before responding
-    const { inputTokens = 0, outputTokens = 0, model: checkModel } = report.tokenUsage || {};
-    const apiCost = calculateTokenCost(checkModel || 'gemini-2.5-flash', inputTokens, outputTokens);
+    const { inputTokens = 0, outputTokens = 0, thinkingTokens = 0, model: checkModel } = report.tokenUsage || {};
+    const apiCost = calculateTextCost(checkModel || 'gemini-2.5-flash', { input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: thinkingTokens });
 
     log.info(`✅ [REPAIR-WORKFLOW] Consistency check complete: ${report.totalIssues} issues found`);
     res.json({ report, apiCost });
@@ -5567,7 +5555,6 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
 
     const results = [];
     let totalGeminiRepairs = 0, totalMagicApiRepairs = 0, totalGrokRepairs = 0;
-    let totalVerifyTokensIn = 0, totalVerifyTokensOut = 0;
     const artStyle = storyData.artStyle || 'pixar';
 
     // Flatten all (character, page) pairs into parallel repair tasks
@@ -6335,11 +6322,6 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
       } else {
         totalGeminiRepairs++;
       }
-      // Track verify tokens (only for non-Grok methods — Grok returns direct_cost, not token counts)
-      if (repairResult.usage && !repairResult.method?.startsWith('grok_')) {
-        totalVerifyTokensIn += repairResult.usage.promptTokenCount || 0;
-        totalVerifyTokensOut += repairResult.usage.candidatesTokenCount || 0;
-      }
 
       if (!repairResult.success) {
         const reason = repairResult.reason || repairResult.error || 'Unknown error';
@@ -6561,8 +6543,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
     const perImageCost = MODEL_PRICING['gemini-2.5-flash-image']?.perImage ?? 0.04;
     const grokPerImageCost = MODEL_PRICING['grok-imagine-image']?.perImage ?? 0.02;
     const imageGenCost = totalGeminiRepairs * perImageCost + totalGrokRepairs * grokPerImageCost;
-    const verifyTokenCost = calculateTokenCost('gemini-2.5-flash', totalVerifyTokensIn, totalVerifyTokensOut);
-    const apiCost = imageGenCost + verifyTokenCost;
+    // No verify-token term: repairSinglePage returns usage only from its Grok
+    // path (priced per image above); the Gemini-shaped reader here never fired.
+    const apiCost = imageGenCost;
     const totalAttempts = totalGeminiRepairs + totalMagicApiRepairs + totalGrokRepairs;
     // Deduct credits: 5 per page actually repaired
     const totalPagesRepaired = results.reduce((sum, r) => sum + (r.pagesRepaired?.length || 0), 0);

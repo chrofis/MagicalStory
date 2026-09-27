@@ -684,7 +684,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   if (entityReport?.tokenUsage && usageTracker) {
     usageTracker('gemini_quality', {
       input_tokens: entityReport.tokenUsage.inputTokens || 0,
-      output_tokens: entityReport.tokenUsage.outputTokens || 0
+      output_tokens: entityReport.tokenUsage.outputTokens || 0,
+      thinking_tokens: entityReport.tokenUsage.thinkingTokens || 0
     }, 'entity_consistency_check', entityReport.tokenUsage.model || 'gemini-2.5-flash');
   }
 
@@ -1324,6 +1325,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       usageTracker(provider, {
         input_tokens: result.usage?.inputTokens || 0,
         output_tokens: result.usage?.outputTokens || 0,
+        thinking_tokens: result.usage?.thinkingTokens || 0,
         cost: result.usage?.cost,
         direct_cost: result.usage?.cost,  // Grok/Runware track via direct_cost
       }, 'inpaint', inpaintModel || 'grok-text-edit');
@@ -1395,7 +1397,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       currentImageData,
       repairResult.imageData,
       charName,
-      { log, usageTracker, jobKey: storyData?.id || jobId, context: `CHAR-FIX Page ${pageNumber} ${charName}` }
+      { log, jobKey: storyData?.id || jobId, context: `CHAR-FIX Page ${pageNumber} ${charName}` }
     );
     if (!faceGate.ok) {
       log.warn(`🚫 [CHAR-FIX] Page ${pageNumber} ${charName}: REFUSED — the repair left the face unreadable (${faceGate.reason}). Keeping the original.`);
@@ -2663,7 +2665,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         if (freshEntity?.tokenUsage && usageTracker) {
           usageTracker('gemini_quality', {
             input_tokens: freshEntity.tokenUsage.inputTokens || 0,
-            output_tokens: freshEntity.tokenUsage.outputTokens || 0
+            output_tokens: freshEntity.tokenUsage.outputTokens || 0,
+            thinking_tokens: freshEntity.tokenUsage.thinkingTokens || 0
           }, `entity_consistency_r${round}`, freshEntity.tokenUsage.model || 'gemini-2.5-flash');
         }
         // Merge: repaired pages' issues are REPLACED by the fresh (per-image)

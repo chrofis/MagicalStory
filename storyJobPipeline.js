@@ -1109,11 +1109,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 if (validationResult.usage.previewCost) {
                   addUsage('runware', { cost: validationResult.usage.previewCost }, 'scene_validation_preview');
                 }
-                if (validationResult.usage.visionCost || validationResult.usage.comparisonCost) {
-                  addUsage('gemini_text', {
-                    promptTokenCount: (validationResult.usage.visionTokens || 0) + (validationResult.usage.comparisonTokens || 0),
-                    candidatesTokenCount: 0
-                  }, 'scene_validation_analysis');
+                if (validationResult.usage.visionUsage || validationResult.usage.comparisonUsage) {
+                  // Was a Gemini-shaped { promptTokenCount } object, which
+                  // addUsage (reads input_tokens) booked as 0 tokens.
+                  const { sumUsage } = require('./server/lib/providerUsage');
+                  addUsage('gemini_text', sumUsage([validationResult.usage.visionUsage, validationResult.usage.comparisonUsage]), 'scene_validation_analysis', MODEL_DEFAULTS.qualityEval);
                 }
                 if (validationResult.repair?.usage) {
                   addUsage('anthropic', validationResult.repair.usage, 'scene_validation_repair');

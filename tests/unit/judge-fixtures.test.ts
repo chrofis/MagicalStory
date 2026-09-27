@@ -165,7 +165,8 @@ describe('estimateCostUsd', () => {
   it('prices measured usage and labels flat estimates as estimates', () => {
     expect(JF.estimateCostUsd('book_audit', { cost: 0.031 })).toEqual({ usd: 0.031, basis: 'measured (stage cost)' });
     expect(JF.estimateCostUsd('plate_qc', {}).basis).toMatch(/estimate/);
-    const sem = JF.estimateCostUsd('semantic', { usage: { tokens: 15000 }, semanticIssues: [] });
+    const sem = JF.estimateCostUsd('semantic', { usage: { input_tokens: 14000, output_tokens: 1000, thinking_tokens: 2000, tokens: 17000 }, semanticIssues: [] });
+    expect(sem.basis).toMatch(/measured/);
     expect(sem.usd).toBeGreaterThan(0.004);
     expect(sem.usd).toBeLessThan(0.02);
   });

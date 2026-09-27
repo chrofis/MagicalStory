@@ -24,6 +24,7 @@ const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
+const { geminiUsage } = require('./providerUsage');
 const { editWithGrok, GROK_MODELS } = require('./grok');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { assertPromptFilled, guardPromptString } = require('../services/prompts');
@@ -58,7 +59,7 @@ async function editWithGeminiImage(prompt, refImages, { aspectRatio = '16:9', mo
     // a bare "no image", leaving the operator nothing to act on.
     throw new Error(`Gemini returned no image (style transfer): ${describeImageOutcome(assessImageResponse(j))}`);
   }
-  const usage = j?.usageMetadata ? { input_tokens: j.usageMetadata.promptTokenCount || 0, output_tokens: j.usageMetadata.candidatesTokenCount || 0 } : null;
+  const usage = j?.usageMetadata ? geminiUsage(j.usageMetadata) : null;
   return { imageData: 'data:image/jpeg;base64,' + inline.data, usage, modelId: model, sentToGrok: refImages };
 }
 
@@ -1125,10 +1126,7 @@ async function askSheetJudge({ model, parts, prompt, label, usageTracker, usageF
     const { text, usageMetadata } = await callSheetJudge(model, parts, null, apiKey);
     if (!text) throw new Error(`${label} (${model}) returned no text`);
     if (usageTracker && usageMetadata) {
-      usageTracker('gemini_quality', {
-        input_tokens: usageMetadata.promptTokenCount || 0,
-        output_tokens: usageMetadata.candidatesTokenCount || 0,
-      }, usageFn, model);
+      usageTracker('gemini_quality', geminiUsage(usageMetadata), usageFn, model);
     }
     const verdict = parseJudgeJson(text);
     if (!isEchoedJudgeVerdict(verdict, prompt)) return verdict;

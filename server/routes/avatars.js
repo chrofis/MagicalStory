@@ -12,6 +12,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
+const { geminiUsage } = require('../lib/providerUsage');
 const { logActivity, dbQuery, withTransaction, saveAvatarToR2, saveAvatarThumbToR2, uploadCharacterPhotosToR2, offloadCharacterImages } = require('../services/database');
 const { PROMPT_TEMPLATES, fillTemplate, assertPromptFilled } = require('../services/prompts');
 const { compressImageToJPEG } = require('../lib/images');
@@ -376,10 +377,9 @@ async function _extractTraitsWithGeminiOnce(imageData, languageInstruction = '')
 
     // Log token usage
     const modelId = 'gemini-2.5-flash';
-    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+    const { input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: thinkingTokens } = geminiUsage(data.usageMetadata);
     if (inputTokens > 0 || outputTokens > 0) {
-      console.log(`📊 [CHARACTER ANALYSIS] Token usage - model: ${modelId}, input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+      console.log(`📊 [CHARACTER ANALYSIS] Token usage - model: ${modelId}, input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}, thinking: ${thinkingTokens.toLocaleString()}`);
     }
 
     if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
@@ -604,10 +604,9 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
     const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
 
     // Log token usage
-    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+    const { input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: thinkingTokens } = geminiUsage(data.usageMetadata);
     if (inputTokens > 0) {
-      console.log(`📊 [AVATAR EVAL] model: gemini-2.5-flash, input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+      console.log(`📊 [AVATAR EVAL] model: gemini-2.5-flash, input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}, thinking: ${thinkingTokens.toLocaleString()}`);
     }
 
     log.verbose(`🔍 [AVATAR EVAL] Raw response: ${responseText.replace(/\n\s*/g, ' ').substring(0, 200)}...`);
@@ -672,9 +671,9 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
  * that existed in two places.
  *
  * Returns a result shape that lets the caller decide how to surface errors:
- *   { ok: true,  imageData, inputTokens, outputTokens }
- *   { ok: false, error,                 inputTokens, outputTokens }
- *   { ok: false, blocked: true, blockReason, inputTokens, outputTokens }   // safety filter
+ *   { ok: true,  imageData, inputTokens, outputTokens, thinkingTokens }
+ *   { ok: false, error,                 inputTokens, outputTokens, thinkingTokens }
+ *   { ok: false, blocked: true, blockReason, inputTokens, outputTokens, thinkingTokens }   // safety filter
  *
  * @param {Object} opts
  * @param {string}  opts.geminiApiKey
@@ -732,13 +731,12 @@ async function callGeminiAvatarApi(opts) {
   if (!response.ok) {
     const errorText = await response.text();
     log.error(`❌ ${logTag} HTTP ${response.status}:`, errorText);
-    return { ok: false, error: `API error: ${response.status}`, inputTokens: 0, outputTokens: 0 };
+    return { ok: false, error: `API error: ${response.status}`, inputTokens: 0, outputTokens: 0, thinkingTokens: 0 };
   }
   const data = await response.json();
-  const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-  const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+  const { input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: thinkingTokens } = geminiUsage(data.usageMetadata);
   if (data.promptFeedback?.blockReason) {
-    return { ok: false, blocked: true, blockReason: data.promptFeedback.blockReason, inputTokens, outputTokens };
+    return { ok: false, blocked: true, blockReason: data.promptFeedback.blockReason, inputTokens, outputTokens, thinkingTokens };
   }
   let imageData = null;
   if (data.candidates?.[0]?.content?.parts) {
@@ -749,8 +747,8 @@ async function callGeminiAvatarApi(opts) {
       }
     }
   }
-  if (!imageData) return { ok: false, error: 'No image in response', inputTokens, outputTokens };
-  return { ok: true, imageData, inputTokens, outputTokens };
+  if (!imageData) return { ok: false, error: 'No image in response', inputTokens, outputTokens, thinkingTokens };
+  return { ok: true, imageData, inputTokens, outputTokens, thinkingTokens };
 }
 
 /**
@@ -851,10 +849,9 @@ Set pass=true if:
     const finishReason = data.candidates?.[0]?.finishReason;
 
     // Log token usage
-    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+    const { input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: thinkingTokens } = geminiUsage(data.usageMetadata);
     const duration = Date.now() - startTime;
-    console.log(`📊 [COSTUME EVAL] input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}, ${duration}ms`);
+    console.log(`📊 [COSTUME EVAL] input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}, thinking: ${thinkingTokens.toLocaleString()}, ${duration}ms`);
 
     // Check for truncated response
     if (finishReason && finishReason !== 'STOP') {
@@ -1752,6 +1749,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
       const MAX_RETRIES = 2; // Total attempts = MAX_RETRIES + 1 = 3
       let totalInputTokens = 0;
       let totalOutputTokens = 0;
+      let totalThinkingTokens = 0;
 
       try {
         const promptPart = splitPromptFromCatalogue(PROMPT_TEMPLATES.avatarMainPrompt).task.trim();
@@ -1798,17 +1796,17 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
                 if (attempt > 0) {
                   log.info(`[AVATAR JOB ${jobId}] ✅ ${category} succeeded on Grok retry ${attempt}`);
                 }
-                return { category, imageData: compressedImage, prompt: avatarPrompt, refsSent: grokRefs, attempts: attempt + 1, inputTokens: 0, outputTokens: 0 };
+                return { category, imageData: compressedImage, prompt: avatarPrompt, refsSent: grokRefs, attempts: attempt + 1, inputTokens: 0, outputTokens: 0, thinkingTokens: 0 };
               }
             } catch (grokErr) {
               lastErrorMsg = grokErr.message;
               log.warn(`[AVATAR JOB ${jobId}] Grok ${category} attempt ${attempt + 1} failed: ${grokErr.message}`);
               if (attempt >= MAX_RETRIES) {
-                return { category, imageData: null, prompt: avatarPrompt, refsSent: grokRefs, attempts: attempt + 1, lastError: lastErrorMsg, inputTokens: 0, outputTokens: 0 };
+                return { category, imageData: null, prompt: avatarPrompt, refsSent: grokRefs, attempts: attempt + 1, lastError: lastErrorMsg, inputTokens: 0, outputTokens: 0, thinkingTokens: 0 };
               }
             }
           }
-          return { category, imageData: null, prompt: avatarPrompt, refsSent: grokRefs, attempts: MAX_RETRIES + 1, lastError: lastErrorMsg, inputTokens: 0, outputTokens: 0 };
+          return { category, imageData: null, prompt: avatarPrompt, refsSent: grokRefs, attempts: MAX_RETRIES + 1, lastError: lastErrorMsg, inputTokens: 0, outputTokens: 0, thinkingTokens: 0 };
         }
 
         // Build request body matching the sync CLOTHING AVATARS path
@@ -1871,10 +1869,10 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
           let imageData = null;
 
           // Extract token usage from response
-          const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-          const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+          const { input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: thinkingTokens } = geminiUsage(data.usageMetadata);
           totalInputTokens += inputTokens;
           totalOutputTokens += outputTokens;
+          totalThinkingTokens += thinkingTokens;
 
           // Log API response status for debugging
           if (!response.ok) {
@@ -1888,7 +1886,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               continue; // Go to next attempt in the retry loop
             }
 
-            return { category, imageData: null, prompt: avatarPrompt, inputTokens: totalInputTokens, outputTokens: totalOutputTokens };
+            return { category, imageData: null, prompt: avatarPrompt, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, thinkingTokens: totalThinkingTokens };
           }
 
           if (data.candidates && data.candidates[0]?.content?.parts) {
@@ -1909,7 +1907,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               log.info(`[AVATAR JOB ${jobId}] ✅ ${category} succeeded on retry ${attempt}`);
             }
             const compressedImage = await compressImageToJPEG(imageData);
-            return { category, imageData: compressedImage, prompt: avatarPrompt, inputTokens: totalInputTokens, outputTokens: totalOutputTokens };
+            return { category, imageData: compressedImage, prompt: avatarPrompt, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, thinkingTokens: totalThinkingTokens };
           }
 
           // No image - check if it's IMAGE_OTHER (retryable) or something else
@@ -1930,7 +1928,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             }
             // Log full response for debugging IMAGE_OTHER
             log.warn(`[AVATAR JOB ${jobId}] Full Gemini response: ${JSON.stringify(data).substring(0, 1000)}`);
-            return { category, imageData: null, prompt: avatarPrompt, inputTokens: totalInputTokens, outputTokens: totalOutputTokens };
+            return { category, imageData: null, prompt: avatarPrompt, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, thinkingTokens: totalThinkingTokens };
           }
 
           // IMAGE_OTHER with retries remaining - continue to next iteration
@@ -1938,10 +1936,10 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
         }
 
         // Should not reach here, but just in case
-        return { category, imageData: null, prompt: avatarPrompt, inputTokens: totalInputTokens, outputTokens: totalOutputTokens };
+        return { category, imageData: null, prompt: avatarPrompt, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, thinkingTokens: totalThinkingTokens };
       } catch (err) {
         log.error(`[AVATAR JOB ${jobId}] Generation failed for ${category}:`, err.message);
-        return { category, imageData: null, prompt: null, inputTokens: totalInputTokens, outputTokens: totalOutputTokens };
+        return { category, imageData: null, prompt: null, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, thinkingTokens: totalThinkingTokens };
       }
     };
 
@@ -1989,7 +1987,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
 
     // Aggregate token usage + O2 generation metadata (retry trail, refs sent)
     results.generationMeta = {};
-    for (const { category, prompt, refsSent, attempts, lastError, inputTokens, outputTokens } of generatedAvatars) {
+    for (const { category, prompt, refsSent, attempts, lastError, inputTokens, outputTokens, thinkingTokens } of generatedAvatars) {
       if (prompt) results.prompts[category] = prompt;
       if (attempts) results.generationMeta[category] = { attempts, ...(lastError && { lastError }) };
       // Refs are the same body-cutout + face-crop pair for every category —
@@ -1997,10 +1995,11 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
       if (refsSent && !results.avatarRefsSent) results.avatarRefsSent = refsSent;
       if (inputTokens > 0 || outputTokens > 0) {
         if (!results.tokenUsage.byModel[geminiModelId]) {
-          results.tokenUsage.byModel[geminiModelId] = { input_tokens: 0, output_tokens: 0 };
+          results.tokenUsage.byModel[geminiModelId] = { input_tokens: 0, output_tokens: 0, thinking_tokens: 0 };
         }
         results.tokenUsage.byModel[geminiModelId].input_tokens += inputTokens;
         results.tokenUsage.byModel[geminiModelId].output_tokens += outputTokens;
+        results.tokenUsage.byModel[geminiModelId].thinking_tokens += thinkingTokens || 0;
       }
     }
 
@@ -2248,10 +2247,11 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             // Aggregate retry token usage
             if (retryGen.inputTokens > 0 || retryGen.outputTokens > 0) {
               if (!results.tokenUsage.byModel[geminiModelId]) {
-                results.tokenUsage.byModel[geminiModelId] = { input_tokens: 0, output_tokens: 0 };
+                results.tokenUsage.byModel[geminiModelId] = { input_tokens: 0, output_tokens: 0, thinking_tokens: 0 };
               }
               results.tokenUsage.byModel[geminiModelId].input_tokens += retryGen.inputTokens;
               results.tokenUsage.byModel[geminiModelId].output_tokens += retryGen.outputTokens;
+              results.tokenUsage.byModel[geminiModelId].thinking_tokens += retryGen.thinkingTokens || 0;
             }
 
             // Extract thumbnails from retry result
@@ -3121,19 +3121,20 @@ These corrections OVERRIDE what is visible in the reference photo.
           modelId: geminiModelId,
           logTag: `[CLOTHING AVATARS] ${category}`,
         };
-        const trackTokens = (modelId, input, output) => {
+        const trackTokens = (modelId, input, output, thinking = 0) => {
           if (input <= 0 && output <= 0) return;
-          console.log(`📊 [AVATAR GENERATION] ${category} - model: ${modelId}, input: ${input.toLocaleString()}, output: ${output.toLocaleString()}`);
+          console.log(`📊 [AVATAR GENERATION] ${category} - model: ${modelId}, input: ${input.toLocaleString()}, output: ${output.toLocaleString()}, thinking: ${thinking.toLocaleString()}`);
           if (!results.tokenUsage.byModel[modelId]) {
-            results.tokenUsage.byModel[modelId] = { input_tokens: 0, output_tokens: 0, calls: 0 };
+            results.tokenUsage.byModel[modelId] = { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 };
           }
           results.tokenUsage.byModel[modelId].input_tokens += input;
           results.tokenUsage.byModel[modelId].output_tokens += output;
+          results.tokenUsage.byModel[modelId].thinking_tokens += thinking;
           results.tokenUsage.byModel[modelId].calls += 1;
         };
 
         let geminiResult = await callGeminiAvatarApi(callOpts);
-        trackTokens(selectedModel, geminiResult.inputTokens, geminiResult.outputTokens);
+        trackTokens(selectedModel, geminiResult.inputTokens, geminiResult.outputTokens, geminiResult.thinkingTokens);
 
         if (geminiResult.blocked) {
           log.warn(`[CLOTHING AVATARS] ${category} blocked by safety filters: ${geminiResult.blockReason} — retrying with simplified prompt`);
@@ -3146,7 +3147,7 @@ These corrections OVERRIDE what is visible in the reference photo.
             OUTFIT_DESCRIPTION: outfitDescription
           });
           geminiResult = await callGeminiAvatarApi({ ...callOpts, prompt: retryPrompt, logTag: `[CLOTHING AVATARS] ${category} retry` });
-          trackTokens(selectedModel, geminiResult.inputTokens, geminiResult.outputTokens);
+          trackTokens(selectedModel, geminiResult.inputTokens, geminiResult.outputTokens, geminiResult.thinkingTokens);
           if (geminiResult.blocked) {
             log.warn(`[CLOTHING AVATARS] ${category} retry also blocked: ${geminiResult.blockReason}`);
             return { category, prompt: avatarPrompt, imageData: null };

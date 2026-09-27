@@ -9,6 +9,7 @@ const { TEXT_MODELS, MODEL_DEFAULTS, GROK_VISION_FALLBACK } = require('../config
 const { withAnthropic, withGemini, withGrok } = require('./aiConcurrency');
 const apiHealth = require('./apiHealth');
 const { recordTextUsage } = require('./usageContext');
+const { geminiUsage, xaiUsage, openRouterUsage } = require('./providerUsage');
 const { guardPromptString } = require('../services/prompts');
 
 // Map a text-model provider to its tokenUsage accounting key. Text Gemini
@@ -583,9 +584,7 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk, o
     const decoder = new TextDecoder();
     let fullText = '';
     let buffer = '';
-    let inputTokens = 0;
-    let outputTokens = 0;
-    let thinkingTokens = 0;
+    let usage = geminiUsage(null);
     let finishReason = null;
     let firstChunkTime = null;
     resetInactivity(); // Start inactivity timer after connection established
@@ -636,11 +635,8 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk, o
             if (event.candidates?.[0]?.finishReason) finishReason = event.candidates[0].finishReason;
 
             // Extract usage metadata (usually in the last chunk)
-            if (event.usageMetadata) {
-              inputTokens = event.usageMetadata.promptTokenCount || inputTokens;
-              outputTokens = event.usageMetadata.candidatesTokenCount || outputTokens;
-              thinkingTokens = event.usageMetadata.thoughtsTokenCount || thinkingTokens;
-            }
+            // Each event carries the cumulative totals; the last one wins.
+            if (event.usageMetadata) usage = geminiUsage(event.usageMetadata);
           } catch {
             // Skip malformed JSON
           }
@@ -651,20 +647,16 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk, o
     }
 
     // Always log token usage for debugging, even if 0
-    const thinkingInfo = thinkingTokens > 0 ? `, thinking: ${thinkingTokens.toLocaleString()}` : '';
-    log.debug(`📊 [GEMINI STREAM] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}${thinkingInfo}`);
-    if (inputTokens === 0 && outputTokens === 0) {
+    const thinkingInfo = usage.thinking_tokens > 0 ? `, thinking: ${usage.thinking_tokens.toLocaleString()}` : '';
+    log.debug(`📊 [GEMINI STREAM] Token usage - input: ${usage.input_tokens.toLocaleString()}, output: ${usage.output_tokens.toLocaleString()}${thinkingInfo}`);
+    if (usage.input_tokens === 0 && usage.output_tokens === 0) {
       log.warn(`⚠️ [GEMINI STREAM] No token usage captured! Buffer remaining: ${buffer.length} chars`);
     }
 
     return {
       text: fullText,
       stop_reason: finishReason,
-      usage: {
-        input_tokens: inputTokens,
-        output_tokens: outputTokens,
-        thinking_tokens: thinkingTokens
-      },
+      usage,
       modelId,
       ttft: firstChunkTime ? firstChunkTime - startTime : null
     };
@@ -735,13 +727,11 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId, options = {}) {
   let data = await response.json();
 
   // Extract token usage (including thinking tokens for Gemini 2.5)
-  const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-  const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
-  const thinkingTokens = data.usageMetadata?.thoughtsTokenCount || 0;
+  const usage = geminiUsage(data.usageMetadata);
 
-  if (inputTokens > 0 || outputTokens > 0) {
-    const thinkingInfo = thinkingTokens > 0 ? `, thinking: ${thinkingTokens.toLocaleString()}` : '';
-    log.debug(`📊 [GEMINI] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}${thinkingInfo}`);
+  if (usage.input_tokens > 0 || usage.output_tokens > 0) {
+    const thinkingInfo = usage.thinking_tokens > 0 ? `, thinking: ${usage.thinking_tokens.toLocaleString()}` : '';
+    log.debug(`📊 [GEMINI] Token usage - input: ${usage.input_tokens.toLocaleString()}, output: ${usage.output_tokens.toLocaleString()}${thinkingInfo}`);
   }
 
   // Check for empty/blocked response and retry with fallback model
@@ -793,11 +783,7 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId, options = {}) {
   return {
     text: prefill ? prefill + geminiText : geminiText,
     stop_reason: data.candidates[0].finishReason || null,
-    usage: {
-      input_tokens: inputTokens,
-      output_tokens: outputTokens,
-      thinking_tokens: thinkingTokens
-    }
+    usage
   };
 }
 
@@ -875,11 +861,10 @@ async function callXaiAPI(prompt, maxTokens, modelId, options = {}) {
     return res.json();
   }, { maxRetries: 2, baseDelay: 2000 }));
 
-  const inputTokens = data.usage?.prompt_tokens || 0;
-  const outputTokens = data.usage?.completion_tokens || 0;
+  const usage = xaiUsage(data.usage);
 
-  if (inputTokens > 0 || outputTokens > 0) {
-    log.debug(`📊 [XAI] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+  if (usage.input_tokens > 0 || usage.output_tokens > 0) {
+    log.debug(`📊 [XAI] Token usage - input: ${usage.input_tokens.toLocaleString()}, output: ${usage.output_tokens.toLocaleString()}, reasoning: ${usage.thinking_tokens.toLocaleString()}`);
   }
 
   const responseText = data.choices?.[0]?.message?.content || '';
@@ -890,10 +875,7 @@ async function callXaiAPI(prompt, maxTokens, modelId, options = {}) {
     text: fullText,
     // OpenAI-compatible finish_reason: 'length' = cut at max_tokens.
     stop_reason: data.choices?.[0]?.finish_reason || null,
-    usage: {
-      input_tokens: inputTokens,
-      output_tokens: outputTokens
-    }
+    usage
   };
 }
 
@@ -959,10 +941,10 @@ async function callXaiAPIStreaming(prompt, maxTokens, modelId, onChunk, options 
       const decoder = new TextDecoder();
       let fullText = '';
       let buffer = '';
-      let inputTokens = 0;
-      let outputTokens = 0;
+      let usage = xaiUsage(null);
       let firstChunkTime = null;
       let finishReason = null;
+
       resetInactivity();
 
       try {
@@ -1007,10 +989,7 @@ async function callXaiAPIStreaming(prompt, maxTokens, modelId, onChunk, options 
               if (event.choices?.[0]?.finish_reason) finishReason = event.choices[0].finish_reason;
 
               // Usage info (may come in the final chunk)
-              if (event.usage) {
-                inputTokens = event.usage.prompt_tokens || inputTokens;
-                outputTokens = event.usage.completion_tokens || outputTokens;
-              }
+              if (event.usage) usage = xaiUsage(event.usage);
             } catch {
               // Skip malformed JSON
             }
@@ -1020,17 +999,14 @@ async function callXaiAPIStreaming(prompt, maxTokens, modelId, onChunk, options 
         reader.releaseLock();
       }
 
-      log.debug(`📊 [XAI STREAM] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+      log.debug(`📊 [XAI STREAM] Token usage - input: ${usage.input_tokens.toLocaleString()}, output: ${usage.output_tokens.toLocaleString()}, reasoning: ${usage.thinking_tokens.toLocaleString()}`);
 
       const responseText = options.prefill ? options.prefill + fullText : fullText;
 
       return {
         text: responseText,
         stop_reason: finishReason,
-        usage: {
-          input_tokens: inputTokens,
-          output_tokens: outputTokens
-        },
+        usage,
         modelId,
         ttft: firstChunkTime ? firstChunkTime - startTime : null
       };
@@ -1231,10 +1207,11 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
               if (event.usage) {
                 usageEvents++;
                 rawUsage = event.usage;
-                inputTokens = event.usage.prompt_tokens || inputTokens;
-                outputTokens = event.usage.completion_tokens || outputTokens;
-                reasoningTokens = event.usage.completion_tokens_details?.reasoning_tokens || reasoningTokens;
-                cachedInputTokens = event.usage.prompt_tokens_details?.cached_tokens || cachedInputTokens;
+                const u = openRouterUsage(event.usage);
+                inputTokens = u.input_tokens || inputTokens;
+                outputTokens = u.output_tokens || outputTokens;
+                reasoningTokens = u.reasoning_tokens || reasoningTokens;
+                cachedInputTokens = u.cached_input_tokens || cachedInputTokens;
                 totalTokens = event.usage.total_tokens || totalTokens;
                 if (typeof event.usage.cost === 'number') actualCost = event.usage.cost;
               }

@@ -29,6 +29,7 @@
  */
 
 const { log } = require('../utils/logger');
+const { geminiUsage } = require('./providerUsage');
 const { stripDataUriPrefix } = require('./r2');
 
 /**
@@ -262,10 +263,7 @@ async function verifyScaleRepair(imageData, bgChars, { pageNumber = null, usageT
     ]);
     const text = result.response.text();
     if (usageTracker && result.response.usageMetadata) {
-      usageTracker('gemini_quality', {
-        input_tokens: result.response.usageMetadata.promptTokenCount || 0,
-        output_tokens: result.response.usageMetadata.candidatesTokenCount || 0,
-      }, 'scale_repair_verify', 'gemini-2.5-flash');
+      usageTracker('gemini_quality', geminiUsage(result.response.usageMetadata), 'scale_repair_verify', 'gemini-2.5-flash');
     }
     const parsed = JSON.parse((text.match(/\{[\s\S]*\}/) || ['{}'])[0]);
     if (!Array.isArray(parsed.checks)) throw new Error('unparseable verification response');

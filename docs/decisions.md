@@ -63000,3 +63000,52 @@ verdicts look normal. A failed call is visible (the face gate fails open and cou
 scripts/admin/sibling-registry.json (set `textmodel-image-inputs`), tasks/bugs.json.
 
 **Status:** ✅ staging.
+
+## 2026-09-27 — Every provider usage object is read through one normaliser; reasoning tokens are billed
+
+**Context.** Cost tracking prices `thinking_tokens` at the output rate on top of `output_tokens`
+(`storyJobPipeline` addUsage, `config/models.calculateTextCost`), but ~25 call sites parsed usage by
+hand and most read only `promptTokenCount` / `candidatesTokenCount`. Measured 2026-09-27:
+Gemini's `candidatesTokenCount` EXCLUDES `thoughtsTokenCount` (gemini-2.5-flash: 13 + 1 + 790 =
+804 total); xAI's `completion_tokens` EXCLUDES `completion_tokens_details.reasoning_tokens`
+(grok-4.3: 203 + 1 + 213 = 417); OpenRouter's `completion_tokens` INCLUDES reasoning (measured
+2026-09-11, textReplyGuard.js). Replaying two stored semantic-judge prompts of staging
+job_1790446348343_z3fw660ie on gemini-2.5-flash: 1,163 and 1,551 thinking tokens against 337 and
+344 answer tokens. The entity check spends ~1.1k–4.7k per call (entity-judge entry above).
+
+**Decision.** `server/lib/providerUsage.js` — `geminiUsage`, `xaiUsage`, `openRouterUsage`,
+`sumUsage` — turns every provider usage object into `{ input_tokens, output_tokens,
+thinking_tokens }` (`thinking_tokens` = reasoning billed OUTSIDE the output count; 0 for
+OpenRouter, whose `reasoning_tokens` stays informational). Every call site reads through it and its
+private parser is deleted; a unit test fails if any server file reads a raw usage field outside
+that module. Downstream: the entity report carries `thinkingTokens`; the page-eval aggregate sums
+every component's thinking (quality, P1, semantic, three-stage, second look); the Grok-vision shim
+carries xAI reasoning as `thoughtsTokenCount`; `sceneValidator` prices from `MODEL_PRICING`
+instead of a hardcoded $0.15/$0.60; `regeneration.js` prices through `calculateTextCost` (its
+private table with a $0.10/$0.40 fallback is deleted, and so is the verify-token term that read a
+shape `repairSinglePage` never returns); the Lab book-audit OpenRouter path no longer prices
+reasoning twice; the face gate no longer books its Gemini call a second time as `openrouter` —
+the `callTextModel` chokepoint records it. Anthropic needs no normaliser (`output_tokens` includes
+extended thinking).
+
+**Measured impact (Fiona story, reported $6.55).** Missing: 20 entity calls × 1.1k–4.7k thinking
+= $0.055–0.235 (entity cost recorded $0.033, billed ~$0.09–0.27) and 25 semantic calls × ~1.36k
+= ~$0.085. Story total under-reported by ~$0.13–0.33 (2–5%); the per-function figures of thinking
+judges were 3–8× low. Quality eval, P1 (Qwen via OpenRouter) and the 2×4 sheet judges run with
+`thinkingBudget: 0` or are OpenRouter, so they were right.
+
+**Not covered here (BACKLOG).** Gemini calls that record NO usage at all (plate QC
+`validateEmptyScene` — 16 thinking calls on the Fiona story — faceRepair, repairVerification,
+visualBible, magicApi, coverTitlePaint, garmentColourFix, landmarkPhotos, figureDetection SoM,
+entity face-crop validation, avatar evals; OpenRouter evalJudges/traitPanel); the three-stage
+compliance tokens counted twice (chokepoint `semantic_compliance` + `page_quality`) and the P1
+stage-1 tokens counted twice inside `page_quality`, whenever three-stage runs (code reading); quality-eval retries not counted.
+
+**Touched:** server/lib/providerUsage.js (new), textModels, images, evalPipeline, sceneValidator,
+entityConsistency, repairPipeline, bboxDetection, bookAudit, character2x4Sheet, imageInpainting,
+referenceSheets, scaleRepair, sceneComposite, styleAnalysis, styleConsistency, styleRepair,
+testlab, figureDetection, faceIntegrityGate, judgeFixtures, routes/regeneration, routes/avatars,
+routes/trial, routes/ai-proxy, storyJobPipeline.js; tests/unit/provider-usage.test.ts (new),
+judge-fixtures.test.ts, face-integrity-gate.test.ts.
+
+**Status:** ✅ staging.

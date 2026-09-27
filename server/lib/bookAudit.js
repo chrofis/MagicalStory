@@ -35,6 +35,7 @@
  */
 
 const { log } = require('../utils/logger');
+const { geminiUsage, openRouterUsage } = require('./providerUsage');
 const { MODEL_DEFAULTS } = require('../config/models');
 const r2Lib = require('./r2');
 const { assertPromptFilled } = require('../services/prompts');
@@ -307,12 +308,9 @@ async function judgeChunkOpenRouter(parts, modelId, thinkingLevel) {
   }
   return {
     text: String(choice?.message?.content || '').trim(),
-    usage: {
-      input_tokens: data.usage?.prompt_tokens || 0,
-      output_tokens: data.usage?.completion_tokens || 0,
-      thinking_tokens: data.usage?.completion_tokens_details?.reasoning_tokens || 0,
-      cost_usd: data.usage?.cost ?? null,
-    },
+    // completion_tokens already include reasoning on OpenRouter — the old
+    // thinking_tokens: reasoning_tokens here priced every reasoning token twice.
+    usage: { ...openRouterUsage(data.usage), cost_usd: data.usage?.cost ?? null },
   };
 }
 
@@ -419,11 +417,7 @@ async function judgeGeminiParts(parts, modelId, thinkingLevel = null) {
     .trim();
   return {
     text,
-    usage: {
-      input_tokens: data.usageMetadata?.promptTokenCount || 0,
-      output_tokens: data.usageMetadata?.candidatesTokenCount || 0,
-      thinking_tokens: data.usageMetadata?.thoughtsTokenCount || 0,
-    },
+    usage: geminiUsage(data.usageMetadata),
   };
 }
 

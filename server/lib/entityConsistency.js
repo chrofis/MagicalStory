@@ -16,6 +16,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { createLabeledGrid, escapeXml } = require('./repairGrid');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { log } = require('../utils/logger');
+const { geminiUsage } = require('./providerUsage');
 const { buildCharRepairRequest } = require('./charRepairRequest');
 const { extractSceneMetadata, buildCharacterPhysicalDescription, getCharactersInScene, buildHairDescription, extractJsonFromText } = require('./storyHelpers');
 const { getFacePhoto, loadAvatarBytes } = require('./characterPhotos');
@@ -864,6 +865,9 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
     tokenUsage: {
       inputTokens: 0,
       outputTokens: 0,
+      // Billed as output, NOT inside outputTokens — 1.1k-4.7k per grid call,
+      // several times the answer. Omitting it under-reported this check ~5-7x.
+      thinkingTokens: 0,
       calls: 0,
       model: ENTITY_CHECK_MODEL
     }
@@ -1572,12 +1576,13 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
 
         if (evalResult.usage) {
           // The two-pass head-grid split (2026-08-27) merges identity+wardrobe
-          // into ONE evalResult whose usage is an ARRAY of usageMetadata objects.
-          // Reading .promptTokenCount off the array recorded 0 tokens for every
+          // into ONE evalResult whose usage is an ARRAY of per-call usages.
+          // Reading a field off the array recorded 0 tokens for every
           // character since then.
           for (const u of (Array.isArray(evalResult.usage) ? evalResult.usage : [evalResult.usage])) {
-            report.tokenUsage.inputTokens += u.promptTokenCount || 0;
-            report.tokenUsage.outputTokens += u.candidatesTokenCount || 0;
+            report.tokenUsage.inputTokens += u.input_tokens || 0;
+            report.tokenUsage.outputTokens += u.output_tokens || 0;
+            report.tokenUsage.thinkingTokens += u.thinking_tokens || 0;
             report.tokenUsage.calls++;
           }
         }
@@ -1695,8 +1700,9 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
           // Track token usage
           for (const r of evals) {
             if (r.usage) {
-              report.tokenUsage.inputTokens += r.usage.promptTokenCount || 0;
-              report.tokenUsage.outputTokens += r.usage.candidatesTokenCount || 0;
+              report.tokenUsage.inputTokens += r.usage.input_tokens || 0;
+              report.tokenUsage.outputTokens += r.usage.output_tokens || 0;
+              report.tokenUsage.thinkingTokens += r.usage.thinking_tokens || 0;
               report.tokenUsage.calls++;
             }
           }
@@ -3217,7 +3223,7 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headG
         // O7: verbatim model output — was kept only on parse failure, so a
         // successful eval's raw judgment was unreconstructable afterwards.
         rawResponse: text,
-        usage: response.usageMetadata
+        usage: geminiUsage(response.usageMetadata)
       };
     } catch (err) {
       lastErr = err;

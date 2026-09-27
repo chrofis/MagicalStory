@@ -68,6 +68,7 @@
  */
 
 const { log } = require('../utils/logger');
+const { geminiUsage } = require('./providerUsage');
 const { assertPromptFilled } = require('../services/prompts');
 
 /**
@@ -158,7 +159,7 @@ async function geminiStyleRepaint(prompt, pageImage, { retries = 3, refImages = 
       const um = j?.usageMetadata;
       // direct_cost mirrors cost: addUsage (storyJobPipeline) only sums
       // usage.direct_cost, so per-image spend recorded in `cost` alone lands as $0.
-      const usage = { input_tokens: um?.promptTokenCount || 0, output_tokens: um?.candidatesTokenCount || 0, cost: 0.039, direct_cost: 0.039 };
+      const usage = { ...geminiUsage(um), cost: 0.039, direct_cost: 0.039 };
       return { imageData: 'data:image/jpeg;base64,' + inline.data, usage };
     }
     lastReason = cand?.finishReason || 'no-image';

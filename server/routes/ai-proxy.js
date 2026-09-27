@@ -186,11 +186,10 @@ router.post('/gemini', aiProxyLimiter, authenticateToken, async (req, res) => {
     const data = await response.json();
 
     // Log token usage for tracking
-    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+    const { input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: thinkingTokens } = require('../lib/providerUsage').geminiUsage(data.usageMetadata);
     const modelUsed = model || 'gemini-2.5-flash-image';
     if (inputTokens > 0 || outputTokens > 0) {
-      log.debug(`📊 [GEMINI PROXY] Token usage - input: ${inputTokens}, output: ${outputTokens}, model: ${modelUsed}, user: ${req.user?.username}`);
+      log.debug(`📊 [GEMINI PROXY] Token usage - input: ${inputTokens}, output: ${outputTokens}, thinking: ${thinkingTokens}, model: ${modelUsed}, user: ${req.user?.username}`);
     }
 
     if (!response.ok) {
