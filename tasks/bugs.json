@@ -2,6 +2,18 @@
   "_readme": "CLEAR-BUG REGISTRY. A bug the owner reported, or one confirmed from stored evidence, goes here the moment it is confirmed - and the pre-push gate (scripts/admin/check-open-bugs.js) BLOCKS every push while any entry is open. That is the point: a reported bug is fixed immediately, not backlogged. Only CLEAR bugs belong here (reproduced, or owner-reported with evidence); design questions and improvements go to the task list instead. Close an entry by setting status to 'fixed' with the commit hash IN THE SAME COMMIT as the fix. Emergency escape: PUSH_WITH_OPEN_BUGS=1 git push (documented, visible, deliberate).",
   "bugs": [
     {
+      "id": "review-bible-correction-rejects-cover-pages",
+      "title": "A scene-review Visual Bible correction whose states carry a cover page (-1/-2/-3) was rejected whole as 'pages outside the book'",
+      "reportedAt": "2026-09-27",
+      "source": "Owner-approved fix task 2026-09-27. Staging job_1790508305061_dka3jpog9 (48c00fdff): generationLog beats_scene_review_bible_rejected ANI001 'state \"unaltered\" has pages outside the book'. The bible the review saw carried ANI001.1 = [5,9,12,13,14,-1] and ANI001.2 (missing scale) = []; the review's analysis ([vb_state_range]) moved page 15 to ANI001.2 and copied the -1 back.",
+      "rootCause": "server/lib/beatsPipeline.js applyReviewBibleCorrections (line 446 at 48c00fdff) accepted a state page only when 1 <= n <= pageCount. Since covers became pages (2026-09-24) the bible's own state tables carry the cover numbers (coverKeys.COVER_PAGE_NUMBERS), so any correction that kept them was refused. The other page-range readers (syncVisualBibleSection pageList, visualBible state parsing, vbElementBudget.applyBriefUsage, sceneReviewGuard, extractBibleSections) already accept negative numbers; checkObjectStateBase / checkBiblePageTable skip covers by design (a cover takes the final state, resolveObjectState rule 0).",
+      "impact": "The whole entry's correction was dropped: on dka3jpog9 the 'missing scale' state kept no pages at the review, so p15 (the page the gap is pointed at) had no state of its own until the later usage rebuild. In the 30 days to 2026-09-27, 2 of 57 staging stories with a scene review logged this rejection reason (dka3jpog9 confirmed a cover page; 3kxqshifx predates covers-as-pages, raw correction not stored).",
+      "status": "fixed",
+      "fixedAt": "2026-09-27",
+      "fixedIn": "see the next entry-update commit",
+      "fix": "A state page is valid when it is a cover page (coverBeats.isCoverPage) or 1..pageCount. Test: tests/unit/review-bible-writeback.test.ts (dka3jpog9 shape: applied, written back, re-parsed, p15 resolves to ANI001.2; 0 / pageCount+1 / -4 still rejected). Replay of the stored dka3jpog9 transcript + review-time ANI001 through applyReviewBibleCorrections + syncVisualBibleSection + re-parse: applied, 0 missing from the transcript, p14/p15/p16 -> ANI001.1/.2/.3."
+    },
+    {
       "id": "char-repair-image-labels-reversed",
       "title": "Character-repair prompts named the images in the wrong order on every cutout / face repair: 'IMAGE 1 = REFERENCE' while the scene crop was sent first",
       "reportedAt": "2026-09-27",

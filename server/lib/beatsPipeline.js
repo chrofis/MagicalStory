@@ -438,12 +438,19 @@ function applyReviewBibleCorrections(raw, visualBible, pageCount, citedHandles) 
     }
     const states = [];
     let bad = null;
+    // A page of the book, or a cover. The bible's own state tables carry the
+    // cover pages (-1/-2/-3, coverKeys.COVER_PAGE_NUMBERS) since covers became
+    // pages, and a reviewer correcting a range copies them back: staging
+    // job_1790508305061_dka3jpog9 lost the whole ANI001 correction to
+    // `unaltered = [-1, 5, 9, …]` when this accepted only 1..pageCount.
+    const { isCoverPage } = require('./coverBeats');
+    const onBook = (n) => Number.isFinite(n) && (isCoverPage(n) || (n >= 1 && (!maxPage || n <= maxPage)));
     for (const st of row.states) {
       const name = st && String(st.name || '').trim();
       const delta = st && String(st.delta || '').trim();
       if (!name || !delta) { bad = 'a state is missing name or delta'; break; }
       const pages = (Array.isArray(st.pages) ? st.pages : []).map(Number);
-      if (pages.length === 0 || pages.some(n => !Number.isFinite(n) || n < 1 || (maxPage && n > maxPage))) {
+      if (pages.length === 0 || !pages.every(onBook)) {
         bad = `state "${name}" has pages outside the book`;
         break;
       }

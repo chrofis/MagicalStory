@@ -111,3 +111,53 @@ describe('scene review bible corrections are written back into the transcript', 
     expect(corr.rejected).toEqual([]);
   });
 });
+
+// Staging job_1790508305061_dka3jpog9: the bible's own state tables carry the
+// cover pages (ANI001.1 = [-1, 5, 9, …]) and the review's correction for ANI001
+// copied that -1 back — rejected whole as "pages outside the book", so page 15
+// kept a "missing scale" state with no pages. A cover page is a page of the book.
+describe('a bible correction that carries a cover page', () => {
+  const dragon = {
+    secondaryCharacters: [],
+    animals: [{
+      id: 'ANI001', name: 'Sura', pages: [5, 9, 12, 13, 14, 16, 17, -1], description: 'a grown grey dragon',
+      states: [
+        { name: 'unaltered', delta: 'a plain grey scaled chest', pages: [5, 9, 12, 13, 14, -1] },
+        { name: 'missing scale', delta: 'a dark round gap in the chest', pages: [] },
+        { name: 'scale restored', delta: 'the chest glows warmly', pages: [16, 17] },
+      ],
+    }],
+  };
+  const text = `---VISUAL BIBLE---\n\`\`\`json\n${JSON.stringify(dragon, null, 2)}\n\`\`\`\n\n`;
+  const correction = { animals: [{ id: 'ANI001', states: [
+    { name: 'unaltered', delta: 'a plain grey scaled chest', pages: [-1, 5, 9, 12, 13, 14] },
+    { name: 'missing scale', delta: 'a dark round gap in the chest', pages: [15] },
+    { name: 'scale restored', delta: 'the chest glows warmly', pages: [16, 17] },
+  ] }] };
+
+  it('is applied, reaches the transcript, and the page resolves to the corrected state', () => {
+    const vb = reparse(text);
+    const corr = applyReviewBibleCorrections(review(correction), vb, 18, new Set(['ANI001.1', 'ANI001.3']));
+    expect(corr.rejected).toEqual([]);
+    expect(corr.applied.map((a: any) => a.id)).toEqual(['ANI001']);
+    const synced = syncVisualBibleSection(text, vb);
+    expect(bibleCorrectionsMissingFromTranscript(synced, vb, corr.applied)).toEqual([]);
+    const back = reparse(synced).animals[0];
+    expect(back.states.map((s: any) => [s.id, s.pages])).toEqual([
+      ['ANI001.1', [-1, 5, 9, 12, 13, 14]], ['ANI001.2', [15]], ['ANI001.3', [16, 17]],
+    ]);
+    const { objectStateForPage } = nodeRequire('../../server/lib/visualBible.js');
+    expect(objectStateForPage(back, 15).id).toBe('ANI001.2');
+  });
+
+  it('still rejects a page that is neither in the book nor a cover', () => {
+    for (const bad of [0, 19, -4]) {
+      const vb = reparse(text);
+      const wrong = JSON.parse(JSON.stringify(correction));
+      wrong.animals[0].states[1].pages = [15, bad];
+      const corr = applyReviewBibleCorrections(review(wrong), vb, 18);
+      expect(corr.applied).toEqual([]);
+      expect(corr.rejected).toEqual([{ id: 'ANI001', reason: 'state "missing scale" has pages outside the book' }]);
+    }
+  });
+});
