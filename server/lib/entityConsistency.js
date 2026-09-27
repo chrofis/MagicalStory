@@ -927,6 +927,15 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
       }
     }
     const allImages = [...sceneImages, ...coverEntries];
+    // The stored scene of a page or cover, for the pose its figures were
+    // rendered in (referencePoseFor reads the scene's character entries).
+    const sceneForPage = (pageNumber) => {
+      if (pageNumber < 0) {
+        const coverType = Object.keys(COVER_PAGE_NUMBERS).find(k => COVER_PAGE_NUMBERS[k] === pageNumber);
+        return (coverType && storyData.coverImages?.[coverType]) || null;
+      }
+      return sceneImages.find(s => s.pageNumber === pageNumber) || null;
+    };
 
     if (allImages.length < 2) {
       report.summary = 'Not enough images for entity consistency check';
@@ -1191,8 +1200,32 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
                 : require('./promptBuilders').recordedFeatures(character),
               expectedClothing, referencePhoto: refAvatar, cellCount: batchCrops.length,
             };
-            const runPass = (buffer, focus) => evaluateEntityConsistency(
-              buffer, gridResult.manifest, { ...baseInfo, focus }, null);
+            // The reference FACES at full size, each its own image (owner,
+            // 2026-09-27). Cell R shows the front face at ~70 px inside a grid
+            // Gemini sees as one fixed 258-token tile, and the judge filed a
+            // swapped woman (short dark curls, another face) as hair_change
+            // only (z3fw660ie initial page, Lab 1565). Built only when a model
+            // reads them — gridsOnly makes no call.
+            const identityRead = !gridsOnly && mode !== 'wardrobe';
+            let referenceFaces = null;
+            let referenceError = null;
+            if (identityRead && refAvatar) {
+              try {
+                const { buildJudgeReferenceFaces, referencePoseFor } = require('./charRepairReference');
+                const poses = character.__vbSecondary ? [] : batchCrops.map(c => referencePoseFor(sceneForPage(c.pageNumber), charName));
+                referenceFaces = await buildJudgeReferenceFaces(await r2.bytesFromAnyImage(refAvatar), {
+                  isSheet: !character.__vbSecondary, poses,
+                });
+              } catch (err) {
+                referenceError = err;
+                log.error(`❌ [ENTITY-CHECK] ${batchLabel}: reference faces could not be built (${err.message}) — the identity half fails closed`);
+              }
+            }
+            const runPass = (buffer, focus) => (focus !== 'clothing' && referenceError)
+              ? Promise.resolve(referenceFailedResult(referenceError))
+              : evaluateEntityConsistency(
+                buffer, gridResult.manifest,
+                { ...baseInfo, focus, ...(focus !== 'clothing' && referenceFaces && { referenceFaces }) }, null);
 
             let evalResult;
             if (gridsOnly) {
@@ -1227,10 +1260,7 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
               // No head grid built — the body grid alone answers both halves,
               // which is the configuration clothing already worked in. A
               // single-half task keeps its focus so it still asks one question.
-              evalResult = await evaluateEntityConsistency(
-                gridResult.buffer, gridResult.manifest,
-                mode === 'both' ? baseInfo : { ...baseInfo, focus: mode === 'identity' ? 'identity' : 'clothing' },
-                null);
+              evalResult = await runPass(gridResult.buffer, mode === 'both' ? null : (mode === 'identity' ? 'identity' : 'clothing'));
             }
 
             gridResults.push({ gridResult, headGrid, evalResult, batchCrops });
@@ -2861,6 +2891,44 @@ async function createEntityHeadGrid(crops, entityName, referencePhoto = null) {
  * @param {Object} entityInfo - Entity information
  * @returns {Promise<Object>} Evaluation result
  */
+/** An identity half that could not be judged: fails closed, never a clean pass. */
+function referenceFailedResult(err) {
+  return {
+    consistent: false,
+    evalFailed: true,
+    score: 0,
+    issues: [],
+    summary: `Identity not judged: reference faces unavailable (${err.message})`,
+    error: err.message,
+  };
+}
+
+const POSE_WORDS = { front: 'front view', threeQuarter: 'three-quarter view', profile: 'profile', back: 'back of the head' };
+
+/**
+ * The text part that introduces one reference face image. Cell R is the front
+ * face shrunk into the grid; these are the sheet's faces at full size.
+ */
+function referenceFaceLabel(face) {
+  return face.pose
+    ? `Reference face, ${POSE_WORDS[face.pose] || face.pose}, at full size (the character's reference sheet; cell R is the front one, shrunk). Compare each cell's face, hair and apparent age against the reference faces.`
+    : 'Reference image at full size (the same image as cell R). Compare each cell\'s face, hair and apparent age against it.';
+}
+
+/**
+ * The request parts of one entity check: the prompt, the grid, the optional
+ * second grid, then each reference face as its own labelled image.
+ */
+function entityCheckParts(prompt, gridBuffer, headGridBuffer = null, referenceFaces = null) {
+  const img = (buf) => ({ inlineData: { mimeType: 'image/jpeg', data: buf.toString('base64') } });
+  return [
+    prompt,
+    img(gridBuffer),
+    ...(headGridBuffer ? [img(headGridBuffer)] : []),
+    ...(referenceFaces || []).flatMap(face => [referenceFaceLabel(face), img(face.buf)]),
+  ];
+}
+
 /** The closed entity type list as the prompt shows it — from the one constant. */
 function entityIssueTypesForPrompt() {
   return ENTITY_CHECK_TYPES.map(t => '`' + t + '`').join(', ');
@@ -2869,7 +2937,7 @@ function entityIssueTypesForPrompt() {
 async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headGridBuffer = null) {
   const { entityType, entityName, referencePhoto, cellCount, clothingCategory, expectedClothing,
           removedGarments = [], primaryIsHeadGrid = false, focus = null,
-          vbDescription = '', cellStates = {}, recordedFeatures = null } = entityInfo;
+          vbDescription = '', cellStates = {}, recordedFeatures = null, referenceFaces = null } = entityInfo;
   const isObject = entityType === 'object';
 
   // Build prompt from template
@@ -3000,7 +3068,8 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headG
       // ONLY image. Five prompt wordings failed to move it. So identity gets
       // the head grid alone and wardrobe gets the body grid alone, each told
       // to judge only its half and to leave the other silent.
-      ? 'This image shows each cell cropped to the head, at full size. Judge identity only: face shape, facial features, hair colour, hair style, skin tone and apparent age. A head crop cannot show an outfit — report no clothing or garment-colour findings and leave `clothing_check` an empty array; the wardrobe is judged separately.'
+      ? (referenceFaces?.length ? 'The first image shows each cell cropped to the head; the reference faces follow it as separate images. ' : 'This image shows each cell cropped to the head, at full size. ')
+        + 'Judge identity only: face shape, facial features, hair colour, hair style, skin tone and apparent age. A head crop cannot show an outfit — report no clothing or garment-colour findings and leave `clothing_check` an empty array; the wardrobe is judged separately.'
       : focus === 'clothing'
       ? 'This image shows each cell as a full-body crop, with the reference sheet as cell R. Judge the wardrobe only: clothing, garment colour and body build. The faces here are too small to compare — report no identity, hair, skin or age findings; those are judged separately.'
       : !headGridBuffer
@@ -3044,11 +3113,7 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headG
   let lastErr = null;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      const result = await model.generateContent([
-        prompt,
-        { inlineData: { mimeType: 'image/jpeg', data: gridBuffer.toString('base64') } },
-        ...(headGridBuffer ? [{ inlineData: { mimeType: 'image/jpeg', data: headGridBuffer.toString('base64') } }] : []),
-      ]);
+      const result = await model.generateContent(entityCheckParts(prompt, gridBuffer, headGridBuffer, referenceFaces));
       const response = result.response;
       const text = response.text();
 
@@ -3840,6 +3905,7 @@ module.exports = {
   createEntityHeadGrid,
   evaluateEntityConsistency,
   entityIssueTypesForPrompt,
+  entityCheckParts,
   getStyledAvatarForClothing,
   saveEntityGrid,
   saveEntityGrids,

@@ -32,6 +32,10 @@
  * (automatic char-fix, the manual route, the entity single-page repair, the Test
  * Lab stage): callers hand over the sheet and the pose; the target is decided
  * inside the spine, after the geometry guards have fixed face vs body.
+ *
+ * The entity identity judge reads the same face cells through
+ * buildJudgeReferenceFaces, so the face a repair paints toward and the face a
+ * judge compares against are one image.
  */
 
 const sharp = require('sharp');
@@ -86,6 +90,40 @@ async function buildRepairReference(buf, { target, isSheet, pose } = {}) {
   return { buf: out, kind, width: meta.width, height: meta.height };
 }
 
+const JUDGE_POSE_ORDER = ['front', 'threeQuarter', 'profile', 'back'];
+
+/**
+ * The reference faces the entity identity judge reads, built by the same
+ * builder a face repair sends (owner, 2026-09-27: the judge gets the reference
+ * face large and legible). Each face is its OWN image: gemini-2.5-flash bills
+ * and sees every image as one fixed 258-token tile whatever its pixel size
+ * (countTokens, 2026-09-27: 256² … 3000×1000 all 258), so a face inside the
+ * head grid is shrunk with the grid, while a separate image gets the whole
+ * tile. The front face always; then the face of each other pose the grid's
+ * cells were rendered from (the cell a page's generator was given).
+ *
+ * A non-sheet reference (a Visual Bible secondary's image) is sent whole, once.
+ *
+ * @param {Buffer} buf - the reference bytes (styled 2×4 sheet or single image)
+ * @param {Object} o
+ * @param {boolean} o.isSheet
+ * @param {string[]} [o.poses] - resolveCellPose poses of the grid's cells
+ * @returns {Promise<Array<{ pose: string|null, buf: Buffer }>>}
+ */
+async function buildJudgeReferenceFaces(buf, { isSheet, poses = [] } = {}) {
+  if (!isSheet) {
+    const out = await upscaleToLongSide(buf, REPAIR_REFERENCE_LONG_SIDE);
+    return [{ pose: null, buf: out }];
+  }
+  const wanted = new Set(['front', ...poses.filter(p => JUDGE_POSE_ORDER.includes(p))]);
+  const faces = [];
+  for (const pose of JUDGE_POSE_ORDER.filter(p => wanted.has(p))) {
+    const r = await buildRepairReference(buf, { target: 'face', isSheet: true, pose });
+    faces.push({ pose, buf: r.buf });
+  }
+  return faces;
+}
+
 /**
  * Pad (never crop) a reference to a Grok aspect preset string ('1:1', '3:4', …),
  * so editWithGrok's own aspect normalisation finds it already matching and
@@ -127,5 +165,6 @@ module.exports = {
   referencePoseFor,
   isSheetPhotoType,
   buildRepairReference,
+  buildJudgeReferenceFaces,
   fitReferenceToAspect,
 };

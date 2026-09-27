@@ -62826,3 +62826,40 @@ tests/unit/char-repair-reference-by-target.test.ts, tests/unit/char-repair-image
 tests/manual/test-blended-repair.js, docs/lab-divergences.md, docs/image-generation-methods.html.
 
 **Status:** ✅ staging.
+
+## 2026-09-27 — The entity identity judge reads the reference faces as their own images, at full size
+
+**Context.** Cell R of the entity head grid is the sheet's FRONT face cell fitted into a 256 px
+grid cell (`FACE_CROP_SIZE`), so the reference face is ~70 px wide. The judge filed Fiona's
+identity swap on the initial page of staging job_1790446348343_z3fw660ie (short dark curls and
+another face against long, straight, light-brown hair) as `hair_change` MAJOR only (Lab 1565, and
+both identity_swap replays 1559/1562). Owner (2026-09-27): give the judge the reference face large
+and legible.
+
+**Measured tile behaviour (countTokens, gemini-2.5-flash, 2026-09-27, $0).** Every image is one
+fixed 258-token tile whatever its pixel size: 256², 384², 768², 800×900, 1024², 1536×768, 2048²
+and 3000×1000 all counted 258; two 1024² images counted 516. The live calls agree
+(`promptTokensDetails` IMAGE = 258 per attached image). So a bigger R cell inside the grid buys
+nothing — the grid is resampled to the same tile — and a separate image gives the face the whole
+tile.
+
+**Decision.** The identity half of the character entity check (the head-grid pass, and the body
+grid when it answers both halves) sends, after the grid, each reference face as its OWN image with
+a one-line text label: the front face always, then the face cell of every other pose the grid's
+cells were rendered from (`referencePoseFor` → the shared `resolveCellPose`, the same resolver that
+picked the page generator's cell). Built by `charRepairReference.buildJudgeReferenceFaces`, which
+calls the repair's `buildRepairReference` — one builder for the face a repair paints toward and the
+face the judge compares against (1024 on the long side). A Visual Bible secondary's reference is
+one image, sent whole. The grids, their cells and cell R are unchanged. A reference that cannot be
+built fails the identity half closed (`evalFailed`), never a silent grid-only judgement. The
+wardrobe pass is unchanged. Production and the Lab run the same code (the Lab's entity stage and
+judge fixtures call `runEntityConsistencyChecks`).
+
+**Cost.** +258 input tokens per reference image (typically 2 per identity call: front +
+threeQuarter, since an unposed page resolves to threeQuarter). The entity token accounting counts
+`candidatesTokenCount` only; the calls also spend ~1.1k–4.7k `thoughtsTokenCount` each (measured
+on the Fiona smoke), billed as output and not in `report.tokenUsage` — the judge-fixture cost
+estimate ($0.0074 per character) is low by roughly 5–7×.
+
+**Touched:** server/lib/charRepairReference.js, server/lib/entityConsistency.js,
+tests/unit/entity-judge-reference-faces.test.ts.
