@@ -3829,7 +3829,9 @@
     {
       "id": "challenge-taken-memory",
       "title": "The next book excludes the challenges earlier books TOOK; the created arc reports its taken challenges",
-      "commits": [],
+      "commits": [
+        "78ee855c6"
+      ],
       "addedAt": "2026-09-27",
       "claim": "On the next staging beats story: stories.data.challengeTakenIds is non-empty and a subset of challengeDrawIds, whether or not the re-telling ran (arcReviewReport.retellSkipped); the arc_create reply carries a \"Challenges taken:\" block with [C###]/[own] tags and no tag reaches finalArc; no arc_challenges_taken_missing. On a second book of the same type on that account: the arc_variety log line reports the earlier book as contributing, excludedIds = its challengeTakenIds, and none of them is in the new challengeDrawIds.",
       "runShape": [
