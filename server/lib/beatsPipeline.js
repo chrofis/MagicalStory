@@ -2,6 +2,7 @@
 
 const { runPlanCounters, collectPlaceNames, castLostByReplan, reviewPlanChanges, refreshPlanShot } = require('./planCounters');
 const { commissionedCast, castCoverage, parsePlanCastBlock } = require('./castCoverage');
+const { arcRepairFindingsWithCastCheck } = require('./jevAudit');
 const { lookupByName } = require('./castResolver');
 const { textZoneRulesActive } = require('../config/runtime');
 const { commissionedChildBand, applySecondaryAgeBand } = require('./inventedAgeBand');
@@ -99,7 +100,6 @@ const {
   parseArcCreate,
   parseArcRetell,
   filterPanelFindings,
-  arcRepairFindings,
   splitCommittedBlock,
   arcInventedAllowance,
   arcShapeCounts,
@@ -1144,13 +1144,23 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // and it is handed those findings alone. Same gate as the Lab mirrors
       // (testlab.js arc_effort / arc_panel_replay, sibling set arc-retell-gate).
       const { arcBlock, critique: roundCritique } = splitCommittedBlock(currentBlock);
-      const gate = arcRepairFindings({ critique: roundCritique, reviewedArc: arcBlock, panel });
+      // + the Jev cast check (2026-09-27): a character on the list with no act
+      // of their own in this arc is one more MAJOR finding for the gate.
+      const { gate, jevCast } = await arcRepairFindingsWithCastCheck({
+        critique: roundCritique, reviewedArc: arcBlock, panel, castNames: commissionedCast(inputData).listed,
+      });
+      if (jevCast?.findings.length) {
+        gl.info('arc_jev_cast', `Round ${round}: Jev cast check — ${jevCast.findings.length} character(s) with no act of their own go to the gate`, null, { round, ...jevCast });
+      } else if (jevCast && !jevCast.ok) {
+        gl.error('arc_jev_cast_failed', `Round ${round}: Jev cast check FAILED — no automatic cast finding this round: ${jevCast.error}`, null, { round, error: jevCast.error });
+      }
       if (gate.critique.malformed.length || gate.critique.dropped.length) {
         gl.warn('arc_critique_dropped', `Round ${round}: critique faults dropped — ${gate.critique.malformed.length} not in the issue shape, ${gate.critique.dropped.length} quoting nothing in the arc`, null, { round, malformed: gate.critique.malformed, dropped: gate.critique.dropped });
       }
       const gateReport = {
         repair: gate.count, duplicates: gate.duplicates, critiqueRepair: gate.critiqueRepair, panelRepair: gate.panelRepair,
         critiqueDropped: gate.critique.dropped, critiqueMalformed: gate.critique.malformed,
+        jevCast,
       };
       if (!gate.retell) {
         retellSkipped = gate.skipReason;

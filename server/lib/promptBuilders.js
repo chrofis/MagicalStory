@@ -20,6 +20,7 @@ const { REQUIRED_TEXT_AUTHORING_RULE, declaredText } = require('./requiredText')
 const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote, withScaleNote } = require('./visualBible');
 const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
+const { SLOP_RULES } = require('./proseSlop');
 const { castCoverage, castCoverageRule, castActionRule, castTableSpec, castTableFormat, castTableBlock } = require('./castCoverage');
 // REQUIRED IN-IMAGE TEXT: one source for the generator block, the repair
 // clause and the judges' TEXT RULES block. Safe as a top-level require --
@@ -9519,6 +9520,10 @@ const SIZE_LOOK_RULE = 'A size or a look is stated only where the plot turns on 
  *
  * The voice line joined 2026-09-24 (D6): it left the arc, whose factual
  * register cannot carry a voice, and no prose pass had it.
+ *
+ * The AI-slop lines joined 2026-09-27 (SLOP_RULES, proseSlop.js): the Jev text
+ * audit judges every page for those slop types, so the writer is told each one
+ * from the same module (generator-vs-critic).
  */
 const STYLE_RULEBOOK = [
   'Every sentence is complete and finishes: no sentence broken off for effect, no bare fragment standing as a sentence, no caption-style line describing the scene like a stage direction. The story is told aloud.',
@@ -9528,6 +9533,7 @@ const STYLE_RULEBOOK = [
   SIZE_LOOK_RULE,
   'Each named character who speaks has a voice of their own: word choice and rhythm a listener could tell apart without the name.',
   'The last page ends on the concrete act or spoken line the story ends with and lands one feeling, plainly and warmly. A string of short solemn sentences is not an ending, and neither is a closing sentence that sums up the story.',
+  ...SLOP_RULES,
 ].map(r => `- ${r}`).join('\n');
 
 /**

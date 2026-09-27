@@ -170,7 +170,9 @@
       ],
       "severity": "block",
       "parity": {
-        "anchors": ["clampApparentAge("]
+        "anchors": [
+          "clampApparentAge("
+        ]
       }
     },
     {
@@ -265,6 +267,21 @@
         "prompts/story-text-audit-blind.txt",
         "prompts/story-text-proofread.txt",
         "prompts/book-audit.txt"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "prose-slop-generator-vs-critic",
+      "axis": "generator-vs-critic",
+      "reason": "The Jev text audit (jevAudit.js, wired into textRefine.refineStoryText 2026-09-27) flags a page for each AI-slop type in proseSlop.SLOP_TYPES, and the page goes to the one repair pass. Each type carries its writer rule and its Jev question side by side; SLOP_RULES fills STYLE_RULEBOOK, which reaches the beats writer, the trial writer and the text repair through {STYLE_RULEBOOK}. A slop type Jev judges that the writer was never told is a finding no first draft can avoid; a rule the writer gets that Jev does not judge is unmeasured. Change a type in proseSlop.js, never in one template or in the Jev question file.",
+      "generators": [
+        "server/lib/proseSlop.js",
+        "prompts/story-text-from-beats.txt",
+        "prompts/story-trial.txt",
+        "prompts/text-refine.txt"
+      ],
+      "critics": [
+        "server/lib/jevAudit.js"
       ],
       "severity": "block"
     },
@@ -499,7 +516,7 @@
     {
       "id": "arc-retell-gate",
       "axis": "Test Lab stage vs production call site",
-      "reason": "The arc re-telling runs only when a quoted MAJOR or CRITICAL issue survives (the create critique's three worst or a panelist's three worst), and is handed only those issues, duplicates across panelists merged (owner, 2026-09-25; Lab #1459-1467: every re-telling that answered MINOR findings was judged worse). Production (beatsPipeline.js, the arc machine's round loop) and the Lab mirrors (testlab.js arc_effort stage 'pipeline' and arc_panel_replay params.retell) all call the ONE gate, arcRepairFindings with splitCommittedBlock in promptBuilders.js; a mirror that re-tells ungated measures a call production no longer makes.",
+      "reason": "The arc re-telling runs only when a quoted MAJOR or CRITICAL issue survives (the create critique's three worst or a panelist's three worst), and is handed only those issues, duplicates across panelists merged (owner, 2026-09-25; Lab #1459-1467: every re-telling that answered MINOR findings was judged worse). Production (beatsPipeline.js, the arc machine's round loop) and the Lab mirrors (testlab.js arc_effort stage 'pipeline' and arc_panel_replay params.retell) all call the ONE gate, arcRepairFindings with splitCommittedBlock in promptBuilders.js, through jevAudit.arcRepairFindingsWithCastCheck since 2026-09-27 (the Jev cast check is one more MAJOR voice); a mirror that re-tells ungated measures a call production no longer makes.",
       "members": [
         "server/lib/beatsPipeline.js",
         "server/lib/testlab.js"
@@ -507,7 +524,7 @@
       "severity": "block",
       "parity": {
         "anchors": [
-          "arcRepairFindings("
+          "arcRepairFindingsWithCastCheck("
         ]
       }
     },

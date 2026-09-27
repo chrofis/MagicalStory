@@ -5,23 +5,27 @@
  * reads a text "state" plus questions and returns a probability per question
  * (`noul` = P(yes)) or a choice. It generates nothing. ~$0.00003 per call.
  *
- * NOT WIRED INTO THE PIPELINE (2026-09-27). This module is the detector plus
- * its evaluation; see docs/decisions.md 2026-09-27 "Jev text audit" for which
- * checks separated and at which threshold. The intended consumer is the
- * existing text chain in textRefine.js: `toFaultLines()` renders flags in the
- * `FAULT[<CATEGORY>]: p<N> — <text>` shape that `mergeAuditFindings` already
- * parses, so Jev would become a third audit source next to the arc-informed
- * and blind audits, and the ONE repair pass (runRepairPass) rewrites only the
- * flagged pages. No second repair mechanism.
+ * WIRED 2026-09-27 (owner: "slop + logic/arc rewrites"), two consumers:
+ *   - textRefine.refineStoryText runs `runJevTextSource` in parallel with the
+ *     arc-informed and blind audits; its FAULT lines join mergeAuditFindings
+ *     and the ONE repair pass rewrites only the pages they name;
+ *   - the arc machine's re-tell gate (beatsPipeline + the Lab mirrors) adds
+ *     `jevCastBeatVoice`: a commissioned character with no act of their own.
+ * Which checks run and at which threshold is JEV_CHECKS, set from the
+ * evaluation (docs/decisions.md 2026-09-27 "Jev text audit" and "… wired").
  *
- * Question text lives in prompts/jev-text-audit.txt (versioned); code only
- * fills placeholders and aggregates.
+ * Question text lives in prompts/jev-text-audit.txt (versioned), except the
+ * slop questions, which live beside the writer rules they judge in
+ * proseSlop.js (one source for generator and critic); code only fills
+ * placeholders and aggregates.
  *
  * Fails loudly: a non-200, a missing answer, or an oversize state throws.
  */
 
 const fs = require('fs');
 const path = require('path');
+const { log } = require('../utils/logger');
+const { SLOP_TYPES } = require('./proseSlop');
 
 const JEV_URL = 'https://openrouter.ai/api/alpha/decisions';
 const JEV_MODEL = 'typesafe/jev-1.13';
@@ -56,8 +60,9 @@ const JEV_CHECKS = {
   SLOP_MORAL_SUMMARY: slop(), // real recall 3/6, no false flag
   SLOP_RULE_OF_THREE: slop(0.5, '🟡'), // real 0/2, injected 8/9
   SLOP_INTENSIFIER: slop(0.5, '🟡'),
-  SLOP_SUDDENLY: off('❌'), // fires 0.6-0.87 on every page; counted in code instead (MECH_SUDDENLY)
-  SLOP_EMOTION_LABEL: slop(0.5, '🟡'),
+  // SLOP_SUDDENLY ❌ (fires 0.6-0.87 on every page) and SLOP_EMOTION_LABEL
+  // (contradicts MOTIVE_AT_THE_ACT_RULE's "a feeling named") are not asked:
+  // neither is in proseSlop.SLOP_TYPES. "Suddenly" is counted (MECH_SUDDENLY).
   SLOP_REPETITIVE_OPENINGS: slop(0.7, '🟡'),
   SLOP_LESSON_EXPLAIN: slop(),
   SLOP_PURPLE_SIMILE: slop(),
@@ -72,7 +77,10 @@ const JEV_CHECKS = {
   LOGIC_MOTIVE: { enabled: true, threshold: 0.55, flagWhen: 'above', verdict: '🟡' }, // 3/4, clean max 0.56
   // ARC — page text vs its plan line.
   ARC_PAGE_MATCH: off('❌'), // flags picture-only plan detail on the older plan format (10/18 pages of one story)
-  ARC_PAGE_CONTRADICT: { enabled: true, threshold: 0.85, flagWhen: 'above', verdict: '🟡' }, // subtle 5/7, originals 1/147 (a real contradiction)
+  // v2 wording (2026-09-27, picture-only plan detail excluded): subtle 4/7, originals 0/147
+  // at 0.8. v1 (0.85: 5/7, 1/147) flagged a plan's 'no figures in the frame' on
+  // a page whose prose names the cast — a rewrite toward a picture instruction.
+  ARC_PAGE_CONTRADICT: { enabled: true, threshold: 0.8, flagWhen: 'above', verdict: '🟡' },
   ARC_CAST_BEAT: { enabled: true, threshold: 0.35, flagWhen: 'below', verdict: '🟡' }, // cut member 52/57 below; passive members score low too
   // SHOT ❌ — 61% / 58% (two phrasings) vs 60% always-"medium"; the brief's own
   // camera/shot field is counted instead, $0.
@@ -140,8 +148,14 @@ function buildGrammarQuestions(language, { ids, questions } = {}) {
   return asNoul(pick('GRAMMAR', ids, questions), { LANGUAGE: languageName(language) });
 }
 
-function buildSlopQuestions({ ids, questions } = {}) {
-  return asNoul(pick('SLOP', ids, questions), {});
+/** The slop questions come from proseSlop.SLOP_TYPES, the same entries that write the writer's rules. */
+function buildSlopQuestions({ ids } = {}) {
+  const list = ids ? ids.map(id => {
+    const t = SLOP_TYPES.find(x => x.id === id);
+    if (!t) throw new Error(`jevAudit: no slop type ${id} in proseSlop.SLOP_TYPES`);
+    return t;
+  }) : SLOP_TYPES;
+  return asNoul(list.map(t => ({ id: t.id, text: t.question })), {});
 }
 
 function buildLogicQuestions(pageNumber, { ids, questions } = {}) {
@@ -298,7 +312,12 @@ function aggregateFlags(rows, checks = JEV_CHECKS) {
       });
     }
   }
-  flags.sort((a, b) => ((a.pageNumber ?? 0) - (b.pageNumber ?? 0)) || ((a.paragraphIndex ?? -1) - (b.paragraphIndex ?? -1)));
+  // Deterministic order: the audit's calls finish in any order.
+  flags.sort((a, b) => ((a.pageNumber ?? 0) - (b.pageNumber ?? 0))
+    || ((a.paragraphIndex ?? -1) - (b.paragraphIndex ?? -1))
+    || String(a.check).localeCompare(String(b.check))
+    || String(a.questionId).localeCompare(String(b.questionId))
+    || String(a.subject || '').localeCompare(String(b.subject || '')));
   return flags;
 }
 
@@ -335,6 +354,17 @@ function shotDistribution(labels) {
   return dist;
 }
 
+/**
+ * A beats plan line is "<shot> — <cast> — <what happens> — <outcome>" (the
+ * outlineExtract PLAN: line). Jev was measured on the part after the shot, so
+ * a leading shot token is dropped. Empty in, empty out.
+ */
+function planLineForJev(line) {
+  const parts = String(line || '').trim().split(/\s+—\s+/);
+  if (parts.length > 1 && normalizeShot(parts[0]) && parts[0].split(/\s+/).length <= 3) parts.shift();
+  return parts.join(' — ').trim();
+}
+
 // ───────────────────────── the audit ─────────────────────────
 
 /**
@@ -352,7 +382,8 @@ async function auditStoryText(input, { checks = JEV_CHECKS, callImpl = callJev, 
   const { pages = [], language, arc, planLines = [], cast = [], briefs = [] } = input;
   if (!pages.length) throw new Error('jevAudit: no pages');
   const Q = questions || loadQuestions();
-  const enabledIn = section => (Q[section] || []).map(q => q.id).filter(id => checks[id]?.enabled);
+  const enabledIn = section => (section === 'SLOP' ? SLOP_TYPES : (Q[section] || [])).map(q => q.id).filter(id => checks[id]?.enabled);
+  const concurrency = Math.max(1, Number(input.concurrency) || 6);
   const rows = [];
   let cost = 0;
   let calls = 0;
@@ -372,6 +403,14 @@ async function auditStoryText(input, { checks = JEV_CHECKS, callImpl = callJev, 
   const gramIds = enabledIn('GRAMMAR');
   const slopIds = enabledIn('SLOP');
   const logicIds = enabledIn('LOGIC');
+  // Every call is independent: queue them all, run a small pool. Sequential,
+  // an 18-page story took ~15 s (55 calls). Any call that throws fails the
+  // whole audit; there is no partial result.
+  const tasks = [];
+  const task = (state, qs, row) => tasks.push(async () => {
+    const { scores, texts } = await ask(state, qs);
+    rows.push({ ...row, scores, texts });
+  });
   for (const page of pages) {
     const paras = splitParagraphs(page.text);
     for (const m of mechanicalChecks(page.text, language)) mechanical.push({ pageNumber: page.pageNumber, ...m });
@@ -379,30 +418,29 @@ async function auditStoryText(input, { checks = JEV_CHECKS, callImpl = callJev, 
       const unit = checks[gramIds[0]].unit || 'page';
       const units = unit === 'paragraph' ? paras.map((t, i) => [t, i]) : [[page.text, null]];
       for (const [t, i] of units) {
-        const { scores, texts } = await ask(t, buildGrammarQuestions(language, { ids: gramIds, questions: Q }));
-        rows.push({ pageNumber: page.pageNumber, paragraphIndex: i, check: 'grammar', scores, texts });
+        task(t, buildGrammarQuestions(language, { ids: gramIds, questions: Q }), { pageNumber: page.pageNumber, paragraphIndex: i, check: 'grammar' });
       }
     }
     if (slopIds.length) {
-      const { scores, texts } = await ask(page.text, buildSlopQuestions({ ids: slopIds, questions: Q }));
-      rows.push({ pageNumber: page.pageNumber, paragraphIndex: null, check: 'slop', scores, texts });
+      task(page.text, buildSlopQuestions({ ids: slopIds }), { pageNumber: page.pageNumber, paragraphIndex: null, check: 'slop' });
     }
     if (logicIds.length) {
-      const state = buildMarkedStoryState(pages, page.pageNumber);
-      const { scores, texts } = await ask(state, buildLogicQuestions(page.pageNumber, { ids: logicIds, questions: Q }));
-      rows.push({ pageNumber: page.pageNumber, paragraphIndex: null, check: 'logic', scores, texts });
+      task(buildMarkedStoryState(pages, page.pageNumber), buildLogicQuestions(page.pageNumber, { ids: logicIds, questions: Q }), { pageNumber: page.pageNumber, paragraphIndex: null, check: 'logic' });
     }
   }
-
   if (checks.ARC_PAGE_MATCH?.enabled || checks.ARC_PAGE_CONTRADICT?.enabled) {
     const ids = ['ARC_PAGE_MATCH', 'ARC_PAGE_CONTRADICT'].filter(id => checks[id]?.enabled);
     for (const pl of planLines) {
       const page = pages.find(p => p.pageNumber === pl.pageNumber);
-      if (!page) continue;
-      const { scores, texts } = await ask(page.text, buildArcPageQuestions(pl.line, { ids, questions: Q }));
-      rows.push({ pageNumber: pl.pageNumber, paragraphIndex: null, check: 'arc', scores, texts });
+      const line = planLineForJev(pl.line);
+      if (!page || !line) continue;
+      task(page.text, buildArcPageQuestions(line, { ids, questions: Q }), { pageNumber: pl.pageNumber, paragraphIndex: null, check: 'arc' });
     }
   }
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(concurrency, tasks.length) }, async () => {
+    while (next < tasks.length) await tasks[next++]();
+  }));
   if (checks.ARC_CAST_BEAT?.enabled && arc && cast.length) {
     const names = cast.map(c => c.name).filter(Boolean);
     const qs = buildCastBeatQuestions(names, { questions: Q });
@@ -437,7 +475,146 @@ async function auditStoryText(input, { checks = JEV_CHECKS, callImpl = callJev, 
   };
 }
 
+// ───────────────────────── consumer 1: the text chain ─────────────────────────
+
+/** Languages the 2026-09-27 evaluation covered. Any other language: the source does not run, and says so. */
+const JEV_TEXT_LANGUAGES = new Set(['de', 'fr', 'en']);
+
+const MECH_TEXT = {
+  MECH_ESZETT: e => `Swiss German never writes ß: «${e}» takes ss.`,
+  MECH_QUOTES: e => `Swiss dialogue uses «» guillemets, not ${e.trim()}.`,
+  MECH_SUDDENLY: e => `"Suddenly" (or its equivalent) appears ${e} on this page; at most once.`,
+};
+
+/** The $0 string checks as FAULT lines, one per page and check. */
+function mechanicalFaultLines(mechanical = []) {
+  return mechanical.map(m => `FAULT[MECH]: p${m.pageNumber} — [${m.questionId}] ${MECH_TEXT[m.questionId] ? MECH_TEXT[m.questionId](m.evidence || '') : m.questionId}`);
+}
+
+/**
+ * The Jev source for textRefine.refineStoryText: slop, logic (vanish, animal,
+ * motive) and arc contradiction per page, plus the $0 string checks, as FAULT
+ * lines for mergeAuditFindings. The cast-beat check is not asked here — it
+ * judges the ARC and runs in the arc machine (jevCastBeatVoice).
+ *
+ * NEVER THROWS, and NEVER DEGRADES QUIETLY: on any Jev error the whole source
+ * is reported failed (`ok: false`, logged as an error) and contributes no
+ * finding, exactly like a failed arc-informed or blind audit. The $0 string
+ * checks are part of this source and are dropped with it, so a Jev outage
+ * cannot ship a half-audited story that looks fully audited.
+ *
+ * @param {{ language: string }} storyData
+ * @param {Array<{pageNumber:number, text:string, planLine?:string}>} pages
+ * @returns {Promise<{source:'jev', ok:boolean, raw?:string, error?:string, skipped?:string,
+ *   flags?:Array, mechanical?:Array, cost?:number, calls?:number, elapsedMs:number}>}
+ */
+async function runJevTextSource(storyData, pages, { checks = JEV_CHECKS, callImpl = callJev, concurrency } = {}) {
+  const t0 = Date.now();
+  const language = String(storyData?.language || '').toLowerCase();
+  if (!JEV_TEXT_LANGUAGES.has(language.split(/[-_]/)[0])) {
+    const skipped = `language "${language || '(none)'}" was not in the 2026-09-27 evaluation (de, fr, en)`;
+    log.info(`ℹ️ [TEXT-AUDIT/jev] not run: ${skipped}`);
+    return { source: 'jev', ok: false, skipped, elapsedMs: 0 };
+  }
+  const textChecks = { ...checks, ARC_CAST_BEAT: { ...(checks.ARC_CAST_BEAT || {}), enabled: false } };
+  try {
+    const r = await auditStoryText({
+      pages: pages.map(p => ({ pageNumber: p.pageNumber, text: p.text })),
+      language,
+      planLines: pages.filter(p => String(p.planLine || '').trim()).map(p => ({ pageNumber: p.pageNumber, line: p.planLine })),
+      concurrency,
+    }, { checks: textChecks, callImpl });
+    const lines = [...r.faultLines, ...mechanicalFaultLines(r.mechanical)];
+    const elapsedMs = Date.now() - t0;
+    log.info(`🔎 [TEXT-AUDIT/jev] ${lines.length} fault(s) on ${new Set([...r.flags, ...r.mechanical].map(f => f.pageNumber)).size} page(s), ${r.calls} calls, $${r.cost.toFixed(5)}, ${(elapsedMs / 1000).toFixed(1)}s`);
+    return { source: 'jev', ok: true, raw: lines.join('\n'), flags: r.flags, mechanical: r.mechanical, cost: r.cost, calls: r.calls, elapsedMs };
+  } catch (e) {
+    log.error(`❌ [TEXT-AUDIT/jev] FAILED — the Jev source contributes NO findings to this story (slop, logic, arc contradiction and the ß/«»/suddenly checks are all missing): ${e.message}`);
+    return { source: 'jev', ok: false, error: e.message, elapsedMs: Date.now() - t0 };
+  }
+}
+
+// ───────────────────────── consumer 2: the arc re-tell gate ─────────────────────────
+
+/** The numbered sentences of an arc block ("STORY LOGIC: … ARC: 1. … 2. …"), from the ARC heading on. */
+function arcSentencesText(arcBlock) {
+  const lines = String(arcBlock || '').split('\n');
+  const at = lines.findIndex(l => /^\s*(?:\*\*|#+\s*)?(?:FINAL\s+)?ARC(?:\s*\*\*)?\s*:?\s*(?:\*\*)?\s*$/i.test(l));
+  return (at >= 0 ? lines.slice(at + 1) : lines).join('\n').trim();
+}
+
+/**
+ * The cast-beat check as one more voice for promptBuilders.arcRepairFindings:
+ * every child on the character list whose Jev "does something that changes
+ * what happens" answer falls below the threshold becomes one MAJOR issue in
+ * the CAST lens. The generator side is EVERY_CHILD_ACTS_RULE, which the arc
+ * create and re-tell already carry; the arc critics had no lens for it.
+ *
+ * The issue cites every arc sentence (the fault is an absence, there is no one
+ * sentence to quote) and carries no quote — it is built here, never parsed
+ * from model text, so the quote guard of parseArcIssues does not apply.
+ *
+ * Never throws: on a Jev error it logs an error and returns no voice.
+ *
+ * @param {string} arcBlock  the committed block's story logic + arc (splitCommittedBlock().arcBlock)
+ * @param {string[]} childNames  the commissioned children (the character list, adults excluded)
+ * @returns {Promise<{letter:'J', findings:Array, ok:boolean, error?:string, scores?:Object, cost?:number}|null>}
+ */
+async function jevCastBeatVoice(arcBlock, childNames, { checks = JEV_CHECKS, callImpl = callJev } = {}) {
+  const cfg = checks.ARC_CAST_BEAT;
+  const names = [...new Set((childNames || []).map(n => String(n || '').trim()).filter(Boolean))];
+  if (!cfg?.enabled || !names.length) return null;
+  const arcText = arcSentencesText(arcBlock);
+  if (!arcText) return null;
+  const sentenceCount = (arcText.match(/^\s*\d+[.)]/gm) || []).length;
+  try {
+    const qs = buildCastBeatQuestions(names);
+    const r = await callImpl({ state: arcText, questions: qs });
+    const scores = Object.fromEntries(names.map((n, i) => [n, yesProb(r.answers[`ARC_CAST_BEAT__${i}`])]));
+    const weak = names.filter(n => scores[n] < cfg.threshold);
+    const cite = sentenceCount > 1 ? `s1-s${sentenceCount}` : 's1';
+    const findings = weak.map((n, i) => ({
+      text: `${i + 1}. [MAJOR] (${cite}) CAST: ${n} is on the character list and does nothing of their own in the arc that changes what happens (automatic cast check). Smallest change: give ${n} one act of their own that matters to the plot, inside an event the arc already has.`,
+      severity: 'MAJOR', rank: i + 1, lens: 'CAST',
+      // No sentence list: arcRepairFindings dedupes on lens + cited sentences, and
+      // two cast findings citing the whole arc would fold into one.
+      sentences: [],
+      quotes: [], verified: [], unverified: [],
+    }));
+    if (weak.length) log.info(`🧮 [ARC/jev] cast-beat: ${weak.map(n => `${n} ${scores[n]}`).join(', ')} below ${cfg.threshold}`);
+    return { letter: 'J', ok: true, findings, scores, cost: r.cost };
+  } catch (e) {
+    log.error(`❌ [ARC/jev] cast-beat check FAILED — no automatic cast finding for this round: ${e.message}`);
+    return { letter: 'J', ok: false, findings: [], error: e.message };
+  }
+}
+
+/**
+ * THE re-tell gate with the Jev cast check as one more voice — the ONE entry
+ * point production (beatsPipeline round loop) and the Lab mirrors (testlab.js
+ * arc_effort, arc_panel_replay) all call (sibling set arc-retell-gate). The
+ * voice joins only the gate; the panel list the callers report is unchanged.
+ *
+ * @param {{critique:string, reviewedArc:string, panel:Array, castNames:string[]}} args
+ * @returns {Promise<{gate:Object, jevCast:Object|null}>} gate = arcRepairFindings(); jevCast = what the check said, for the report
+ */
+async function arcRepairFindingsWithCastCheck({ critique, reviewedArc, panel = [], castNames = [] }, opts = {}) {
+  const { arcRepairFindings } = require('./promptBuilders');
+  const voice = await jevCastBeatVoice(reviewedArc, castNames, opts);
+  const voices = voice && voice.findings.length ? [...panel, voice] : panel;
+  const gate = arcRepairFindings({ critique, reviewedArc, panel: voices });
+  const jevCast = voice && { ok: voice.ok, scores: voice.scores || null, findings: voice.findings.map(f => f.text), error: voice.error || null, cost: voice.cost ?? null };
+  return { gate, jevCast };
+}
+
 module.exports = {
+  arcRepairFindingsWithCastCheck,
+  JEV_TEXT_LANGUAGES,
+  planLineForJev,
+  mechanicalFaultLines,
+  runJevTextSource,
+  arcSentencesText,
+  jevCastBeatVoice,
   JEV_URL,
   JEV_MODEL,
   JEV_CHECKS,

@@ -40,10 +40,12 @@ describe('question file', () => {
 
   it('the shipped file parses and every section the audit asks for exists', () => {
     const real = J.loadQuestions();
-    for (const s of ['GRAMMAR', 'SLOP', 'LOGIC', 'ARC', 'SHOT']) expect(real[s]?.length).toBeGreaterThan(0);
-    // one question per slop type, so a flag names the problem
-    const ids = real.SLOP.map((q: any) => q.id);
+    for (const s of ['GRAMMAR', 'LOGIC', 'ARC', 'SHOT']) expect(real[s]?.length).toBeGreaterThan(0);
+    // the slop questions live in proseSlop.js, one per type, so a flag names the problem
+    expect(real.SLOP).toBeUndefined();
+    const ids = Object.keys(J.buildSlopQuestions());
     expect(new Set(ids).size).toBe(ids.length);
+    expect(ids.length).toBeGreaterThan(5);
   });
 
   it('fills the language name and refuses an unknown language', () => {
@@ -121,16 +123,23 @@ describe('mechanical Swiss checks', () => {
 
 describe('adopted check table', () => {
   it('asks no question the evaluation rejected', () => {
-    for (const id of ['GRAM_ANY', 'SLOP_SUDDENLY', 'LOGIC_APPEAR', 'LOGIC_OBJECT', 'ARC_PAGE_MATCH', 'SHOT_TYPE']) {
+    for (const id of ['GRAM_ANY', 'LOGIC_APPEAR', 'LOGIC_OBJECT', 'ARC_PAGE_MATCH', 'SHOT_TYPE']) {
       expect(J.JEV_CHECKS[id].enabled).toBe(false);
     }
+    // not even asked: gone from the slop set
+    const slopIds = Object.keys(J.buildSlopQuestions());
+    expect(slopIds).not.toContain('SLOP_SUDDENLY');
+    expect(slopIds).not.toContain('SLOP_EMOTION_LABEL');
   });
-  it('every enabled check names a question in the shipped file and has a threshold', () => {
-    const ids = new Set(Object.values(J.loadQuestions()).flat().map((q: any) => q.id));
+  it('every check names a question that exists and every enabled one has a threshold', () => {
+    const ids = new Set([...Object.values(J.loadQuestions()).flat().map((q: any) => q.id), ...Object.keys(J.buildSlopQuestions())]);
     for (const [id, c] of Object.entries(J.JEV_CHECKS) as any) {
       expect(ids.has(id)).toBe(true);
       if (c.enabled) { expect(typeof c.threshold).toBe('number'); expect(['above', 'below']).toContain(c.flagWhen); }
     }
+  });
+  it('every slop type is enabled', () => {
+    for (const id of Object.keys(J.buildSlopQuestions())) expect(J.JEV_CHECKS[id]?.enabled).toBe(true);
   });
 });
 

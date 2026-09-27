@@ -129,7 +129,9 @@ function score() {
 
   // grammar / slop / logic: per question + check-level aggregates, per unit, excluding borderline
   for (const [check, section] of [['grammar', 'GRAMMAR'], ['slop', 'SLOP'], ['logic', 'LOGIC']]) {
-    const ids = Q[section].map(x => x.id);
+    // SLOP questions live in proseSlop.js since 2026-09-27 (SLOP_EMOTION_LABEL and
+    // SLOP_SUDDENLY left the set); earlier runs' answers carry them and are ignored.
+    const ids = section === 'SLOP' ? require('../../server/lib/proseSlop').SLOP_TYPES.map(t => t.id) : Q[section].map(x => x.id);
     const cr = rows.filter(r => r.it.check === check);
     const units = [...new Set(cr.map(r => r.it.unit))];
     const agg = {

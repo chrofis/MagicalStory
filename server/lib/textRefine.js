@@ -18,7 +18,11 @@
  *           brief; no back cover, no commission — corrected 2026-09-23)
  *        b. blind         — grok-4.6, story-text-audit-blind.txt (page text and
  *           nothing else)
- *   2. MERGE + DEDUPE the two fault lists in code (mergeAuditFindings)
+ *        c. jev           — the Jev decision model (jevAudit.runJevTextSource,
+ *           2026-09-27): per-page AI-slop, blatant logic and plan-line
+ *           contradiction flags plus the $0 ß / «» / "suddenly" checks, as
+ *           FAULT lines; a Jev failure = no Jev findings, logged as an error
+ *   2. MERGE + DEDUPE the fault lists in code (mergeAuditFindings)
  *   3. ONE REPAIR PASS over the merged findings (textRefineModel)
  *   4. ONE GRAMMAR CHECK over the pages the repair rewrote — BEFORE/AFTER as
  *      numbered sentences; it may only FIX a sentence or RESTORE a writer
@@ -1068,6 +1072,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
   } = require('./storyHelpers');
   const { callTextModelStreaming, describeTruncation } = require('./textModels');
   const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
+  const { runJevTextSource, JEV_MODEL } = require('./jevAudit');
 
   if (!Array.isArray(pages) || pages.length === 0) {
     throw new Error('refineStoryText: no page text to refine');
@@ -1267,9 +1272,31 @@ async function refineStoryText(storyData, pages, opts = {}) {
     // clearTimeout below is what stops it leaking, and it runs on both branches.
     return Promise.race([p, deadline]).finally(() => clearTimeout(timer));
   };
+  // THE JEV SOURCE (owner, 2026-09-27: "slop + logic/arc rewrites") — the
+  // third auditor, in the same Promise.all and under the same deadline. Cheap
+  // per-page yes/no checks (jevAudit.runJevTextSource): the AI-slop types the
+  // writer's STYLE_RULEBOOK names, three blatant logic faults, a page that
+  // contradicts its plan line, and the $0 ß / «» / "suddenly" string checks.
+  // Its FAULT lines join the merge like any auditor's, so the ONE repair pass
+  // below rewrites only the pages they name. A Jev failure logs an ERROR and
+  // the source contributes nothing — the same contract as a failed audit,
+  // recorded in the report as `{source:'jev', ok:false, error}`.
+  // see docs/decisions.md 2026-09-27 "Jev text audit wired"
+  const runJev = async () => {
+    const r = await runJevTextSource(storyData, current, opts.jevOptions || {});
+    const raw = r.raw || '';
+    return {
+      ...r,
+      modelKey: JEV_MODEL,
+      error: r.error || (r.skipped ? `not run: ${r.skipped}` : null),
+      faults: r.ok ? countFaults(raw) : 0,
+      byCategory: r.ok ? faultsByCategory(raw) : {},
+    };
+  };
   audits = await Promise.all([
     withDeadline(runAudit('arc-informed', auditModel, buildTextAuditPrompt(storyData, current, arc, { arcHints }), 'text_audit'), 'arc-informed'),
     withDeadline(runAudit('blind', blindAuditModel, buildTextAuditBlindPrompt(storyData, current), 'text_audit_blind'), 'blind'),
+    withDeadline(runJev(), 'jev'),
   ]);
   for (const a of audits) {
     if (!a.ok && a.error) log.warn(`⚠️ [TEXT-AUDIT/${a.source}] ${a.error}`);

@@ -318,7 +318,10 @@ describe('refineStoryText — chain order', () => {
   afterAll(() => { textModels.callTextModelStreaming = original; });
 
   it('runs the two audits in parallel, then one repair, then one lector', async () => {
-    const res = await refineStoryText(STORY, PAGES, { arc: 'the arc, read-only' });
+    // Jev (third auditor since 2026-09-27) answers every question 'no'.
+    const jevCalls: any[] = [];
+    const jevClean = async ({ questions }: any) => { jevCalls.push(questions); return { answers: Object.fromEntries(Object.keys(questions).map(k => [k, { type: 'noul', noul: 0.01 }])), cost: 0 }; };
+    const res = await refineStoryText(STORY, PAGES, { arc: 'the arc, read-only', jevOptions: { callImpl: jevClean } });
 
     const labels = calls.map(c => c.label);
     expect(labels.filter(l => l === 'text_audit' || l === 'text_audit_blind')).toHaveLength(2);
@@ -347,7 +350,10 @@ describe('refineStoryText — chain order', () => {
     const counterFindings = res.mergedFindings.filter((f: any) => f.category === 'LENGTH');
     expect(counterFindings.map((f: any) => f.pageNumber)).toEqual([1, 2]);
     for (const f of counterFindings) expect(f.sources).toEqual(['counter']);
-    expect(res.audits.map((a: any) => a.source)).toEqual(['arc-informed', 'blind']);
+    expect(res.audits.map((a: any) => a.source)).toEqual(['arc-informed', 'blind', 'jev']);
+    // A clean Jev answer is an ok source with no finding.
+    expect(res.audits[2]).toMatchObject({ ok: true, faults: 0 });
+    expect(jevCalls.length).toBeGreaterThan(0);
 
     // The lector's finding was applied IN CODE — there is no apply call in the
     // ledger — and the one quoting nothing on its page was dropped.

@@ -3,6 +3,8 @@
 #! ("noul") or a choice. One line per question: `ID: proposition`. A flag names
 #! the ID that fired, so the repair knows WHICH problem the passage has.
 #! Placeholders: {LANGUAGE} {PAGE} {PLAN} {NAME}. Section headers are `[NAME]`.
+#! The [SLOP] questions moved to server/lib/proseSlop.js (2026-09-27): each sits
+#! beside the writer rule it judges, one source for generator and critic.
 #! Keep every proposition generic: no names, places or plots from a real story.
 #! Changing a line changes a measured score: re-run
 #! scripts/analysis/eval-jev-text-audit.js and append to evals/results/results.jsonl.
@@ -16,21 +18,6 @@ GRAM_NONWORD: This {LANGUAGE} text contains a misspelled word or a word that doe
 GRAM_TENSE: The narration of this {LANGUAGE} text switches between past tense and present tense.
 GRAM_CLEAN: Every sentence of this {LANGUAGE} text is grammatically correct and every word is spelled correctly.
 
-[SLOP]
-SLOP_STOCK_WONDER: The text uses a stock phrase of awe or magic, such as "a sense of wonder", "magic filled the air" or "eyes sparkling with wonder".
-SLOP_BODY_CLICHE: The text describes a feeling with a cliché of the body, such as a heart swelling, a heart pounding with excitement or warmth spreading through a chest.
-SLOP_FORESHADOW: The text uses a narrator's teaser such as "little did they know", "they did not know yet that" or "this was only the beginning".
-SLOP_MORAL_SUMMARY: A sentence states the moral or lesson of the story outright, such as "and so they learned that friendship is the greatest treasure".
-SLOP_RULE_OF_THREE: The text strings three abstract adjectives or nouns together for rhythm, such as "brave, kind and true" or "laughter, light and love".
-SLOP_INTENSIFIER: The text leans on empty intensifiers such as "very", "really", "truly", "incredibly" or "absolutely" where they add nothing.
-SLOP_SUDDENLY: The word "suddenly" (or its equivalent in the text's language) is used more than once or where nothing sudden happens.
-SLOP_EMOTION_LABEL: The text names a character's feeling flatly ("she felt sad", "he was very happy") instead of showing it through what the character does or says.
-SLOP_REPETITIVE_OPENINGS: Three or more sentences in a row begin with the same word or the same name.
-SLOP_LESSON_EXPLAIN: The narrator explains why an action was good, kind or important, telling the reader what to think about it.
-SLOP_PURPLE_SIMILE: The text stacks decorative similes or metaphors, such as "like a thousand tiny stars" or "as if the whole world held its breath".
-SLOP_GENERIC_ENDING: The text closes on a generic warm formula, such as hearts full of love, the stars smiling down or a day they would never forget.
-SLOP_PARALLEL_NEGATION: The text uses a "not X, but Y" or "It wasn't just X. It was Y." construction for effect.
-
 [LOGIC]
 LOGIC_APPEAR: On page {PAGE}, a person or animal takes part who is not mentioned on any earlier page, and page {PAGE} does not say where they came from.
 LOGIC_VANISH: On page {PAGE}, a person or animal who was there before is suddenly gone or absent, and no page says why or how they left.
@@ -40,7 +27,7 @@ LOGIC_MOTIVE: On page {PAGE}, a character acts against what they want or what th
 
 [ARC]
 ARC_PAGE_MATCH: The page text tells the events of this plan line: «{PLAN}»
-ARC_PAGE_CONTRADICT: The page text contradicts this plan line: «{PLAN}»
+ARC_PAGE_CONTRADICT: The events told in the page text contradict the events of this plan line; what a picture shows, frames or leaves out does not count: «{PLAN}»
 ARC_CAST_BEAT: In this story arc, {NAME} does something that changes what happens in the story.
 
 [SHOT]

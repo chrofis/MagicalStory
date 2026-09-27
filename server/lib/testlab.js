@@ -8467,7 +8467,7 @@ async function runWriterCompareStage(target, { params = {} }) {
 async function runArcEffortStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
-  const { buildArcCreatePrompt, buildArcPanelPrompt, buildArcRetellPrompt, parseArcCreate, parseArcRetell, filterPanelFindings, arcRepairFindings, splitCommittedBlock, arcShapeCounts, drawChallengeIdeas } = require('./storyHelpers');
+  const { buildArcCreatePrompt, buildArcPanelPrompt, buildArcRetellPrompt, parseArcCreate, parseArcRetell, filterPanelFindings, splitCommittedBlock, arcShapeCounts, drawChallengeIdeas } = require('./storyHelpers');
   const { callTextModelStreaming } = require('./textModels');
   const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
   const sc = require('./storyScorecard');
@@ -8620,6 +8620,7 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
   // The re-tell gate's verdict (pipeline stage only): what it passed, or why
   // no re-telling ran.
   let gate = null;
+  let gateJevCast = null;
   let retellSkipped = null;
   if (flag(params.baselineFromStory)) {
     const report = storyData.arcReviewReport || {};
@@ -8672,7 +8673,10 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
     voices.forEach((p, i) => { p.letter = String.fromCharCode(65 + i); });
     // Production's re-tell gate (beatsPipeline, sibling set arc-retell-gate).
     const { arcBlock, critique } = splitCommittedBlock(created.commit.committed);
-    gate = arcRepairFindings({ critique, reviewedArc: arcBlock, panel: voices });
+    // + the Jev cast check, as production (jevAudit.arcRepairFindingsWithCastCheck).
+    let jevCast = null;
+    ({ gate, jevCast } = await require('./jevAudit').arcRepairFindingsWithCastCheck({ critique, reviewedArc: arcBlock, panel: voices, castNames: require('./castCoverage').commissionedCast(storyData).listed }));
+    gateJevCast = jevCast;
     if (!gate.retell) {
       retellSkipped = gate.skipReason;
     } else {
@@ -8689,7 +8693,7 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
     arms,
     panel,
     retellSkipped,
-    gate: gate && { repair: gate.count, duplicates: gate.duplicates, critiqueRepair: gate.critiqueRepair, panelRepair: gate.panelRepair, critiqueDropped: gate.critique.dropped, critiqueMalformed: gate.critique.malformed },
+    gate: gate && { repair: gate.count, duplicates: gate.duplicates, critiqueRepair: gate.critiqueRepair, panelRepair: gate.panelRepair, critiqueDropped: gate.critique.dropped, critiqueMalformed: gate.critique.malformed, jevCast: gateJevCast },
     totalCost: Number((arms.reduce((s, a) => s + (a.cost || 0) + (a.judgeCost || 0), 0) + panelCost).toFixed(4)),
     summary: [
       ...arms.map(a => (a.ok && a.phase.startsWith('baseline')
@@ -9180,8 +9184,9 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
       // Production's re-tell gate (beatsPipeline, sibling set arc-retell-gate):
       // no quoted MAJOR or CRITICAL finding, no re-telling.
       const { arcBlock, critique } = H.splitCommittedBlock(committed);
-      const gate = H.arcRepairFindings({ critique, reviewedArc: arcBlock, panel });
-      const gateReport = { repair: gate.count, duplicates: gate.duplicates, critiqueRepair: gate.critiqueRepair, panelRepair: gate.panelRepair, critiqueDropped: gate.critique.dropped, critiqueMalformed: gate.critique.malformed };
+      // + the Jev cast check, as production (jevAudit.arcRepairFindingsWithCastCheck).
+      const { gate, jevCast } = await require('./jevAudit').arcRepairFindingsWithCastCheck({ critique, reviewedArc: arcBlock, panel, castNames: require('./castCoverage').commissionedCast(storyData).listed });
+      const gateReport = { repair: gate.count, duplicates: gate.duplicates, critiqueRepair: gate.critiqueRepair, panelRepair: gate.panelRepair, critiqueDropped: gate.critique.dropped, critiqueMalformed: gate.critique.malformed, jevCast };
       if (!gate.retell) {
         retell = { ok: true, skipped: gate.skipReason, gate: gateReport };
       } else {

@@ -48,7 +48,8 @@ describe('textRefine.refineStoryText — every round falls back to its input on 
     // Nothing was adopted.
     expect(out.pages.map((p: any) => p.text)).toEqual(pages.map(p => p.text));
     expect(out.changed).toEqual([]);
-    for (const a of out.audits) {
+    // The model audits (Jev is not a text model and has its own failure test).
+    for (const a of out.audits.filter((x: any) => x.source !== 'jev')) {
       expect(a.ok).toBe(false);
       expect(a.error).toMatch(/audit reply TRUNCATED/);
     }
