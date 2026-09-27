@@ -2371,6 +2371,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "planner-group-page-budget",
+      "title": "At most one page in six holds more than three characters, and the planner stages a group wide or from behind",
+      "commits": [
+        "1601ca902"
+      ],
+      "addedAt": "2026-09-27",
+      "claim": "On the next staging full story: beatsReviewReport.counterStats.groupPages.pages has no more pages than its budget (round(P/6), at least one) on the first division, or GROUP_PAGES_OVER_BUDGET is raised and the shipped division is within budget; every plan line with more than three named characters has a wide / ultra-wide / high-angle / aerial shot or stages the group from behind; UNDER_COVERED_CHARACTER and NO_FOCAL_PAGE do not rise against the pre-change baseline.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "beatsReviewReport.counterStats.groupPages and recheck.counterStats.groupPages; counterFindings for GROUP_PAGES_OVER_BUDGET, UNDER_COVERED_CHARACTER, NO_FOCAL_PAGE; the shot of each plan line whose castPerPage holds more than three. Baseline: 4 of 15 staging full books shipped 4 group pages against a budget of 3 (riqncqg1i, 1nitlympp, 5herh01j7, vnx5l8iy7)."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }
