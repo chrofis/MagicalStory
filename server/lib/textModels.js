@@ -326,7 +326,7 @@ async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
 
   if (inputTokens > 0 || outputTokens > 0 || cacheReadTokens > 0) {
     const cacheStr = cacheReadTokens > 0 || cacheCreationTokens > 0 ? ` (cache: ${cacheReadTokens.toLocaleString()} read / ${cacheCreationTokens.toLocaleString()} write)` : '';
-    log.debug(`📊 [ANTHROPIC] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}${cacheStr}`);
+    log.debug(`📊 [ANTHROPIC] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}${cacheStr}, stop_reason=${data.stop_reason || 'none'}`);
   }
 
   // Prepend prefill to response only for models that support assistant prefill.
@@ -495,7 +495,7 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk, op
     }
 
     // Always log token usage for debugging, even if 0
-    log.debug(`📊 [ANTHROPIC STREAM] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+    log.debug(`📊 [ANTHROPIC STREAM] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}, stop_reason=${stopReason || 'none'}`);
     if (inputTokens === 0 && outputTokens === 0) {
       log.warn(`⚠️ [ANTHROPIC STREAM] No token usage captured! Buffer remaining: ${buffer.length} chars`);
     }
@@ -648,7 +648,7 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk, o
 
     // Always log token usage for debugging, even if 0
     const thinkingInfo = usage.thinking_tokens > 0 ? `, thinking: ${usage.thinking_tokens.toLocaleString()}` : '';
-    log.debug(`📊 [GEMINI STREAM] Token usage - input: ${usage.input_tokens.toLocaleString()}, output: ${usage.output_tokens.toLocaleString()}${thinkingInfo}`);
+    log.debug(`📊 [GEMINI STREAM] Token usage - input: ${usage.input_tokens.toLocaleString()}, output: ${usage.output_tokens.toLocaleString()}${thinkingInfo}, finishReason=${finishReason || 'none'}`);
     if (usage.input_tokens === 0 && usage.output_tokens === 0) {
       log.warn(`⚠️ [GEMINI STREAM] No token usage captured! Buffer remaining: ${buffer.length} chars`);
     }
@@ -731,7 +731,7 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId, options = {}) {
 
   if (usage.input_tokens > 0 || usage.output_tokens > 0) {
     const thinkingInfo = usage.thinking_tokens > 0 ? `, thinking: ${usage.thinking_tokens.toLocaleString()}` : '';
-    log.debug(`📊 [GEMINI] Token usage - input: ${usage.input_tokens.toLocaleString()}, output: ${usage.output_tokens.toLocaleString()}${thinkingInfo}`);
+    log.debug(`📊 [GEMINI] Token usage - input: ${usage.input_tokens.toLocaleString()}, output: ${usage.output_tokens.toLocaleString()}${thinkingInfo}, finishReason=${data.candidates?.[0]?.finishReason || 'none'}`);
   }
 
   // Check for empty/blocked response and retry with fallback model
@@ -864,7 +864,7 @@ async function callXaiAPI(prompt, maxTokens, modelId, options = {}) {
   const usage = xaiUsage(data.usage);
 
   if (usage.input_tokens > 0 || usage.output_tokens > 0) {
-    log.debug(`📊 [XAI] Token usage - input: ${usage.input_tokens.toLocaleString()}, output: ${usage.output_tokens.toLocaleString()}, reasoning: ${usage.thinking_tokens.toLocaleString()}`);
+    log.debug(`📊 [XAI] Token usage - input: ${usage.input_tokens.toLocaleString()}, output: ${usage.output_tokens.toLocaleString()}, reasoning: ${usage.thinking_tokens.toLocaleString()}, finish_reason=${data.choices?.[0]?.finish_reason || 'none'}`);
   }
 
   const responseText = data.choices?.[0]?.message?.content || '';
@@ -999,7 +999,7 @@ async function callXaiAPIStreaming(prompt, maxTokens, modelId, onChunk, options 
         reader.releaseLock();
       }
 
-      log.debug(`📊 [XAI STREAM] Token usage - input: ${usage.input_tokens.toLocaleString()}, output: ${usage.output_tokens.toLocaleString()}, reasoning: ${usage.thinking_tokens.toLocaleString()}`);
+      log.debug(`📊 [XAI STREAM] Token usage - input: ${usage.input_tokens.toLocaleString()}, output: ${usage.output_tokens.toLocaleString()}, reasoning: ${usage.thinking_tokens.toLocaleString()}, finish_reason=${finishReason || 'none'}`);
 
       const responseText = options.prefill ? options.prefill + fullText : fullText;
 
@@ -1235,7 +1235,10 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
         `, out ${outputTokens.toLocaleString()}` +
         (reasoningTokens > 0 ? ` (${reasoningTokens.toLocaleString()} reasoning)` : '') +
         `, ${elapsedSec.toFixed(1)}s (${tps} tok/s)` +
-        (actualCost !== null ? `, $${actualCost.toFixed(4)} actual` : '')
+        (actualCost !== null ? `, $${actualCost.toFixed(4)} actual` : '') +
+        // WHY IT STOPPED, on every call: an empty or cut reply is otherwise
+        // undiagnosable after the fact (which upstream, which reason).
+        `, finish_reason=${finishReason || 'none'}, native_finish_reason=${nativeFinishReason || 'none'}`
       );
       // The billed prompt is larger than the prompt we sent by more than any
       // tokenizer accounts for (~1 token per 2 chars is already pessimistic for

@@ -2208,8 +2208,9 @@ async function runSceneReview({ inputData, expansions, clothingRequirements, vis
       // the first is success — separate them or the log reports failure as a pass.
       const srOutTok = srRes.usage?.output_tokens ?? null;
       if (!String(srRes.text || '').trim() || srOutTok === 0) {
-        log.error(`❌ [BEATS] Scene review returned an EMPTY response (${srOutTok} output tokens) — briefs ship unreviewed`);
-        gl.warn('beats_scene_review_empty', `Scene review returned nothing (${srOutTok} output tokens) — provider failure, briefs shipped unreviewed`);
+        const why = require('./textReplyGuard').describeStop(srRes.truncation || {});
+        log.error(`❌ [BEATS] Scene review returned an EMPTY response (${srOutTok} output tokens; ${why}) — briefs ship unreviewed`);
+        gl.warn('beats_scene_review_empty', `Scene review returned nothing (${srOutTok} output tokens; ${why}) — provider failure, briefs shipped unreviewed`);
       }
       // TRUNCATION (textReplyGuard.js): a review cut at the ceiling rewrote the
       // EARLIEST pages and never reached the ones it named — adopting the pages
