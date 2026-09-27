@@ -6850,12 +6850,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       generationLog: genLog.getEntries(), // Generation log for dev mode
       textRefineReport, // per-page before/after from the parallel refine pass
       arcReviewReport,   // drafted arc + arc-review analysis (beats mode)
-      // The catalogue ids this book was OFFERED. The next book on this
-      // account excludes them at draw time (loadUsedChallengeIds) — which is
-      // the whole of the cross-story variety rule: no prompt names a previous
-      // story, so nothing can leak one book's cast into another's.
+      // The catalogue ids this book was OFFERED — kept for audit: a repeat can
+      // be read back against the whole menu the arc saw.
       challengeDrawIds,
-      challengeTakenIds, // which of them the arc built on, by catalogue id
+      // The ids of those the shipped arc actually TOOK (a subset). THIS is what
+      // the next book on this account excludes at draw time
+      // (loadUsedChallengeIds; owner, 2026-09-21 / 2026-09-27) — the whole of
+      // the cross-story variety rule: no prompt names a previous story. An empty
+      // list with a non-empty draw raises `arc_challenges_taken_missing`.
+      challengeTakenIds,
       challengeDraw, // the catalogue menu the arc plan was offered (beats mode)
       // How that menu was chosen (2026-09-27): Jev's score per eligible id, its
       // top 20 and the 12 drawn — or the random draw on the Jev backup.

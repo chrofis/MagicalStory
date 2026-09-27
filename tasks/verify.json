@@ -3791,7 +3791,9 @@
     {
       "id": "jev-selection-built",
       "title": "Jev picks the challenges (12 of its top 20) and orders the story's landmarks; the trial story's 3 are the pin + a draw from the top 5",
-      "commits": ["2f2a0d881"],
+      "commits": [
+        "2f2a0d881"
+      ],
       "addedAt": "2026-09-27",
       "claim": "On the next full staging beats story: stories.data.challengeSelection.method = 'jev', 12 picked ids all inside its `top` (20), `scores` holds every eligible id, challengeDrawIds = picked; landmarkSelection.method = 'jev', availableLandmarks (replayInputs) in descending LB2 order after any premisePinned place; jevFallback null. On the next /try trial with an own-town idea: landmarkSelection.mode = 'trial', its 3 picked names are the first 3 landmarks of the trial prompt, the premise-named place first when there is one, and every name the idea card used is in the story's list.",
       "runShape": [
@@ -3823,6 +3825,22 @@
       "status": "pending",
       "evidence": [],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — FAILED verify jev-decision-layer-wired smoke p1/p4 line"
+    },
+    {
+      "id": "challenge-taken-memory",
+      "title": "The next book excludes the challenges earlier books TOOK; the created arc reports its taken challenges",
+      "commits": [],
+      "addedAt": "2026-09-27",
+      "claim": "On the next staging beats story: stories.data.challengeTakenIds is non-empty and a subset of challengeDrawIds, whether or not the re-telling ran (arcReviewReport.retellSkipped); the arc_create reply carries a \"Challenges taken:\" block with [C###]/[own] tags and no tag reaches finalArc; no arc_challenges_taken_missing. On a second book of the same type on that account: the arc_variety log line reports the earlier book as contributing, excludedIds = its challengeTakenIds, and none of them is in the new challengeDrawIds.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "stories.data.challengeTakenIds / challengeDrawIds / arcReviewReport.create + retellSkipped; generationLog arc_variety, arc_challenges_taken_missing, arc_challenges_taken_undrawn. Free replay 2026-09-27: 4/4 current-format stored re-tell replies re-derive their stored takenIds; the create block is unproven until a real run."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

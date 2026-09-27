@@ -7422,8 +7422,9 @@ function buildStoryContextFields(inputData) {
 // category caps).
 //
 // VARIETY IS A SELECTION RULE, NOT A PROMPT INSTRUCTION (owner, 2026-09-19).
-// The draw excludes the catalogue ids this reader's earlier books were offered,
-// so the new story simply never sees them. Nothing about a previous story is
+// The draw excludes the catalogue ids this reader's earlier books TOOK (owner,
+// 2026-09-21, shipped 2026-09-27 — an offered-but-unused challenge never reached
+// a reader), so the new story simply never sees them. Nothing about a previous story is
 // ever written into a prompt — see loadUsedChallengeIds in beatsPipeline.js and
 // the block this replaced, which told the arc creator "this reader's earlier
 // books used these challenges" and listed prose lifted from those books' arcs.
@@ -7442,12 +7443,16 @@ let challengeCatalogueCache = null;
  * still has somewhere to go. Below it the spread degenerates and the "random
  * sample" becomes the remainder of the catalogue, which is not a sample.
  *
- * The Jev draw (2026-09-27) keeps 45. What the floor protects there is the
- * pool Jev RANKS, not the count offered: the top-20 window is under half of a
- * 45-entry pool, so the ranking still rejects more than it keeps. A book now
- * adds 12 offered ids to the memory instead of 25, so the same floor carries
- * about twice as many books before the oldest is shed; the "newest book alone"
- * valve compares against the 20-entry window (`need`), not the 12 drawn.
+ * 2026-09-27, the Jev draw and the TAKEN memory. The floor now protects the
+ * pool Jev RANKS: the top-20 window is under half of a 45-entry pool, so the
+ * ranking still rejects more than it keeps. The memory is the ~3-5 ids each
+ * book took, at most 12 books (PRIOR_STORY_LIMIT) — ~60 ids — against a
+ * smallest eligible pool of 139 (age 4; 5 = 327, 6-8 = 336, 9-12 = 256): 79
+ * left, well above 45, so in normal use nothing is ever shed. Shedding and the
+ * "newest book alone cannot fill the draw" valve (`need`: the 20-entry window,
+ * or the backup draw's 25) stay as the guard for an input the numbers above do
+ * not describe — a book reporting dozens of taken ids, a narrower band — and
+ * both are logged when they act. Pinned by challenge-variety-selection.test.ts.
  */
 const MIN_POOL = 45;
 
@@ -7484,7 +7489,7 @@ const CHALLENGE_IDEAS_HEADING = [
  *   need        the fewest entries a draw from this pool needs (the random
  *               draw's `count`; the Jev draw's top window). Below it even the
  *               newest book's exclusion is abandoned.
- *   excludeIds  catalogue ids this reader has already been offered, GROUPED BY
+ *   excludeIds  catalogue ids this reader's earlier books TOOK, GROUPED BY
  *               BOOK, NEWEST FIRST (a flat array is read as one book). Honoured
  *               as far as the pool allows: when the full list would starve the
  *               pool, the OLDEST book's ids are shed one book at a time until
@@ -10261,6 +10266,7 @@ function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null } = 
     log.error('[PROMPT] arcCreate template not loaded — arc machine unavailable');
     return null;
   }
+  const ideas = challengeIdeas ?? buildChallengeIdeasSection(inputData);
   return fillTemplate(template, {
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: pageCount,
@@ -10272,7 +10278,11 @@ function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null } = 
     AGE_MODE: buildAgeModeSection(inputData, { bandView: 'premise' }),
     AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote),
     TELLING_RULES: buildTellingRulesSection(inputData),
-    CHALLENGE_IDEAS: challengeIdeas ?? buildChallengeIdeasSection(inputData),
+    CHALLENGE_IDEAS: ideas,
+    // The created arc reports what it took, so a book whose re-telling gate
+    // stays shut still records its cross-story memory (2026-09-27). Only when
+    // there was a draw to take from.
+    CHALLENGES_TAKEN: ideas ? `Then ${CHALLENGES_TAKEN_RULE}` : '',
     ARC_LOGIC_SPEC: arcLogicSpec(inputData, pageCount),
     ARC_CRITIQUE_SPEC: arcCritiqueSpec({ inputData }),
     ARC_LENGTH: arcLengthRange(pageCount),
@@ -10345,6 +10355,7 @@ function buildArcRetellPrompt(inputData, pageCount, arcBlock, repairFindings, { 
   }
   return fillTemplate(template, {
     CHALLENGE_IDEAS: challengeIdeas ?? buildChallengeIdeasSection(inputData),
+    CHALLENGES_TAKEN_RULE,
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: pageCount,
     ARC_PRINCIPLES: arcPrinciples(inputData, pageCount),
@@ -10769,6 +10780,34 @@ function parseStoryLogic(raw) {
   };
 }
 
+/**
+ * WHICH DRAWN CHALLENGES DID THIS ARC USE — one output line for the creator and
+ * the re-teller alike ({CHALLENGES_TAKEN} in arc-create.txt, arc-retell.txt).
+ * The ids are the next book's cross-story memory (loadUsedChallengeIds reads
+ * `challengeTakenIds`), so the arc that ships must report them whether or not
+ * the re-telling runs (2026-09-27).
+ */
+const CHALLENGES_TAKEN_RULE = '"Challenges taken:" then a numbered list, one line per challenge the arc builds on, a few words each. Each line opens with the [C###] tag of the drawn challenge it builds on, or with [own] where the challenge is the arc\'s own invention. The tag names the source only; it is never written into a story sentence.';
+
+/**
+ * Read a "Challenges taken:" block: the catalogue ids it tags, how many lines
+ * carry a tag at all ([C###] or [own] — an arc built only on its own
+ * challenges is a valid answer, a block with no tagged line is not), and the
+ * block's text with the tags removed (bookkeeping, not story: a stray [C###]
+ * in text that travels on reads as a VB cell reference).
+ * @returns {{ids: number[], tagged: number, text: string}}
+ */
+function parseChallengesTaken(block) {
+  const lines = String(block || '').replace(/\*\*/g, '').split('\n');
+  const ids = [...new Set(lines
+    .map(l => (l.match(/\[C(\d+)\]/i) || [, ''])[1])
+    .filter(Boolean)
+    .map(Number)
+    .filter(Number.isFinite))];
+  const tagged = lines.filter(l => /\[(?:C\d+|own)\]/i.test(l)).length;
+  return { ids, tagged, text: lines.join('\n').trim().replace(/\[(?:C\d+|own)\]\s*/gi, '') };
+}
+
 /** The highest numbered sentence of an arc (the same reading arcActSpans uses). */
 function arcSentenceCount(arcText) {
   let n = 0;
@@ -10790,7 +10829,20 @@ function parseArcCreate(raw) {
   const logic = parseStoryLogic(full);
   const arcIdx = full.search(arcHeadingRe('ARC'));
   if (arcIdx < 0) throw new Error('no "ARC:" block');
-  const after = full.slice(arcIdx).replace(/^\s*[^\n]*\n?/, '');
+  // "Challenges taken:" (CHALLENGES_TAKEN_RULE) comes between the logic and the
+  // arc; wherever the model put it, it is cut out of the block it landed in.
+  const takenIdx = full.search(arcHeadingRe('Challenges taken'));
+  let taken = { ids: [], tagged: 0, text: '' };
+  let body = full;
+  if (takenIdx >= 0) {
+    const tail = full.slice(takenIdx).replace(/^\s*[^\n]*\n?/, '');
+    const stop = tail.search(/^\s*(?:\*\*|#+\s*)?(?:STORY LOGIC|ARC|CRITIQUE)(?:\s*\*\*)?\s*(?::|$)/mi);
+    const block = stop >= 0 ? tail.slice(0, stop) : tail;
+    taken = parseChallengesTaken(block);
+    body = full.slice(0, takenIdx) + (stop >= 0 ? tail.slice(stop) : '');
+  }
+  const arcAt = body.search(arcHeadingRe('ARC'));
+  const after = body.slice(arcAt).replace(/^\s*[^\n]*\n?/, '');
   const critIdx = after.search(arcHeadingRe('CRITIQUE'));
   const arc = (critIdx >= 0 ? after.slice(0, critIdx) : after).trim();
   if (!arc) throw new Error('ARC block is empty');
@@ -10799,6 +10851,8 @@ function parseArcCreate(raw) {
     logic,
     arc,
     critique,
+    takenIds: taken.ids,
+    takenTagged: taken.tagged,
     sentences: arcSentenceCount(arc),
     committed: `STORY LOGIC:\n${logic.text}\n\nARC:\n${arc}\n\nCRITIQUE:\n${critique}`,
   };
@@ -10829,25 +10883,19 @@ function parseArcRetell(raw) {
   // A "Challenges taken:" block ahead of FINAL ARC (current contract order).
   let headChallenges = '';
   let takenIds = [];
+  let takenTagged = 0;
   const chIdx = head.search(/^\s*(?:\*\*)?Challenges taken\s*:/mi);
   if (chIdx >= 0) {
     const tail = head.slice(chIdx);
     const stop = tail.search(/^\s*(?:\*\*)?(?:Used|Fixing|Keeping)\s*:/mi);
-    headChallenges = (stop > 0 ? tail.slice(0, stop) : tail).replace(/\*\*/g, '').trim();
-    // WHICH DRAWN CHALLENGES DID THIS BOOK USE (2026-09-20). Each taken line
-    // opens with the [C###] tag of the entry it builds on, or [own] when the
-    // arc invented it, so "taken" joins to "drawn" by id instead of by prose.
-    takenIds = [...new Set(
-      headChallenges.split('\n')
-        .map(l => (l.match(/\[C(\d+)\]/i) || [, ''])[1])
-        .filter(Boolean)
-        .map(Number)
-        .filter(Number.isFinite)
-    )];
-    // The tag is bookkeeping, not story. The arc text travels on to the beats
-    // planner, the text writer and the image prompts, and a stray [C###] there
-    // reads as a VB cell reference.
-    headChallenges = headChallenges.replace(/\[(?:C\d+|own)\]\s*/gi, '');
+    // WHICH DRAWN CHALLENGES DID THIS BOOK USE (2026-09-20): each taken line
+    // opens with the [C###] tag of the entry it builds on, or [own], so "taken"
+    // joins to "drawn" by id instead of by prose. The tags are stripped from
+    // the text that travels on (parseChallengesTaken).
+    const taken = parseChallengesTaken(stop > 0 ? tail.slice(0, stop) : tail);
+    headChallenges = taken.text;
+    takenIds = taken.ids;
+    takenTagged = taken.tagged;
   }
   const after = full.slice(fa).replace(/^\s*(?:\*\*|#+\s*)?FINAL ARC\s*:?\**\s*/i, '');
   const usedIdx = after.search(/^\s*(?:\*\*)?Used\s*:/mi);
@@ -10864,7 +10912,7 @@ function parseArcRetell(raw) {
   const critique = critIdx >= 0
     ? after.slice(critIdx).replace(/^\s*(?:\*\*|#+\s*)?CRITIQUE\s*:?\**\s*/i, '').trim()
     : '';
-  return { finalArc, used, critique, fixing, keeping, takenIds, logic, sentences };
+  return { finalArc, used, critique, fixing, keeping, takenIds, takenTagged, logic, sentences };
 }
 
 /**
@@ -13003,6 +13051,8 @@ module.exports = {
   parseArcHints,
   parseArcCreate,
   parseArcRetell,
+  parseChallengesTaken,
+  CHALLENGES_TAKEN_RULE,
   parseStoryLogic,
   isNegativeFigureAnswer,
   arcInventedAllowance,

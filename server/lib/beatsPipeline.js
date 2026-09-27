@@ -819,35 +819,47 @@ async function runVisualBibleLabelRound(visualBible, { model, language, gl, log:
 //      figures, and into whose CHARACTER DETAILS those names do not appear.
 //
 // So the exclusion moved off the prompt and onto the DRAW. We record which
-// catalogue ids each book was offered, and the next book's draw filters them
-// out — it simply never sees them. No prompt anywhere mentions a previous
-// story, and there is no instruction for the creator to misread.
+// catalogue ids each book TOOK, and the next book's draw filters them out — it
+// simply never sees them. No prompt anywhere mentions a previous story, and
+// there is no instruction for the creator to misread.
 // How many earlier books the draw may remember. Raised 3 -> 12 (2026-09-20)
-// once the exclusion stopped being all-or-nothing: the draw now sheds the
-// OLDEST book's ids one book at a time until its pool clears the floor, so
-// offering more books costs nothing — an unaffordable one is simply dropped
-// instead of collapsing the whole memory.
+// once the exclusion stopped being all-or-nothing: the draw sheds the OLDEST
+// book's ids one book at a time until its pool clears the floor, so offering
+// more books costs nothing — an unaffordable one is simply dropped instead of
+// collapsing the whole memory.
 //
-// The EFFECTIVE memory is band-limited, not limited by this number. The 3-5
-// band has only 139 eligible entries, so at a draw of 25 it tops out around 3
-// books before the floor bites; 6-8 (336) and 9-12 (256) carry far more. Every
-// story's generationLog records effective-vs-offered, so the ceiling is
-// measured rather than assumed. Raising this further buys the young band
-// nothing — the real lever there is growing the 3-5 band of the catalogue.
+// TAKEN, NOT OFFERED (owner, 2026-09-21; shipped 2026-09-27). Excluding the 25
+// ids a book was OFFERED capped the memory by band (3-5: ~3 books); a book
+// takes ~3-5 challenges, so 12 books exclude at most ~60 ids and every band
+// keeps the full 12 (3-5: 139 eligible). THIS number is the binding limit.
+// Every story's generationLog records effective-vs-contributing, so the
+// ceiling stays measured rather than assumed.
 const PRIOR_STORY_LIMIT = 12;
 
 /**
- * The challenge-catalogue ids this account's previous books were offered.
+ * The challenge-catalogue ids this account's previous books actually TOOK.
+ *
+ * TAKEN, NOT OFFERED (owner, 2026-09-21, confirmed 2026-09-27 with the Jev
+ * draw). A challenge that was drawn and never used never reached a reader, so
+ * there is nothing to avoid repeating; excluding it burns catalogue — and,
+ * since the Jev draw offers 12 of the 20 best fits, it would have removed the
+ * best-fitting entries from the next book's window, decaying the draw book by
+ * book (docs/decisions.md 2026-09-27 "Jev picks the challenges…", account-
+ * memory table).
  *
  * Reads the DB directly (same lazy `require('../services/database')` every other
  * lib module uses) rather than threading a pool through the caller: the query
  * needs nothing storyJobPipeline has that jobId does not already resolve, and a
  * new parameter would have to be plumbed through server.js and the Test Lab too.
  *
- * `data->'challengeDrawIds'` doubles as the completeness filter — a job that
- * never got as far as drawing has nothing to contribute, and story_jobs rows are
- * pruned, so joining on job status would silently drop the older books that
- * matter most here.
+ * `data->'challengeTakenIds'` doubles as the completeness filter — a book that
+ * never got as far as an arc reporting its choices has nothing to contribute,
+ * and story_jobs rows are pruned, so joining on job status would silently drop
+ * the older books that matter most here.
+ *
+ * No fallback to the drawn ids: a second path reading the weaker column would
+ * hide a broken tag contract forever. Books before 2026-09-20 recorded no taken
+ * ids and contribute nothing.
  *
  * Never throws: a failed lookup means the draw runs unfiltered, which is exactly
  * what happened before any of this existed.
@@ -857,18 +869,23 @@ const PRIOR_STORY_LIMIT = 12;
  * draw sheds from the old end when the pool cannot carry the whole list, which
  * it can only do if it knows where one book's ids end and the next begin.
  *
- * @returns {Promise<{idsByStory: number[][], stories: number}>}
+ * `examined` is every prior book the query matched; `stories` is how many of
+ * them contributed any id. They differ when a book completed with an empty taken
+ * list — the silent-failure mode this depends on not happening — so the gap is
+ * reported, never swallowed.
+ *
+ * @returns {Promise<{idsByStory: number[][], stories: number, examined: number}>}
  */
 async function loadUsedChallengeIds(jobId, gl = NOOP_LOG) {
-  if (!jobId) return { idsByStory: [], stories: 0 };
+  if (!jobId) return { idsByStory: [], stories: 0, examined: 0 };
   try {
     const { dbQuery } = require('../services/database');
     const rows = await dbQuery(
-      `SELECT s.id, s.data->'challengeDrawIds' AS ids
+      `SELECT s.id, s.data->'challengeTakenIds' AS ids
          FROM stories s
         WHERE s.user_id = (SELECT user_id FROM story_jobs WHERE id = $1)
           AND s.id <> $1
-          AND jsonb_typeof(s.data->'challengeDrawIds') = 'array'
+          AND jsonb_typeof(s.data->'challengeTakenIds') = 'array'
           -- Same story TYPE only (2026-08-27): the smoke account mixes toddler
           -- and standard books, and the age bands a draw is filtered by differ
           -- between them, so a toddler book's ids would exclude entries a
@@ -879,16 +896,53 @@ async function loadUsedChallengeIds(jobId, gl = NOOP_LOG) {
       [String(jobId)]
     );
     const idsByStory = [];
+    const examined = (rows || []).length;
+    const emptyStoryIds = [];
     for (const row of rows || []) {
       const own = [...new Set((Array.isArray(row.ids) ? row.ids : []).map(Number).filter(Number.isFinite))];
       if (own.length) idsByStory.push(own);
+      else emptyStoryIds.push(row.id);
     }
-    return { idsByStory, stories: idsByStory.length };
+    // A book that stored an EMPTY taken list contributes nothing, and a run
+    // whose memory is silently empty must be visible in the story's own log
+    // rather than looking identical to "this account has no earlier books".
+    if (emptyStoryIds.length) {
+      log.warn(`⚠️ [BEATS] ${emptyStoryIds.length}/${examined} earlier book(s) stored an empty challengeTakenIds — they contribute no cross-story memory`);
+      gl.warn('arc_variety_empty_prior', `${emptyStoryIds.length} of ${examined} earlier book(s) recorded no challenges taken — no memory from them`, null, { emptyStoryIds });
+    }
+    return { idsByStory, stories: idsByStory.length, examined };
   } catch (err) {
     log.warn(`⚠️ [BEATS] Prior-challenge lookup failed (${err.message}) — challenges drawn without cross-story memory`);
     gl.warn('arc_variety_failed', `Prior-challenge lookup failed: ${err.message}`);
-    return { idsByStory: [], stories: 0 };
+    return { idsByStory: [], stories: 0, examined: 0 };
   }
+}
+
+/**
+ * A drawn-but-nothing-taken arc is a BROKEN CONTRACT, not a quiet edge case.
+ *
+ * The taken ids are the whole of the next book's cross-story memory. The arc
+ * that ships reports them — the created arc when the re-telling gate stays
+ * shut, else the last re-telling — each in its "Challenges taken:" block
+ * (CHALLENGES_TAKEN_RULE). If that block is missing, or its [C###] tags do not
+ * survive, this book contributes nothing and the next book's exclusion silently
+ * becomes "exclude nothing". A draw WAS made and an arc WAS written from it, so
+ * a block with no tagged line cannot be correct. A block whose every line is
+ * [own] (`tagged` > 0, no id) is a valid answer: the arc used none of the draw.
+ *
+ * @param {{tagged?: number}} opts - how many block lines carry [C###] or [own]
+ *   (parseChallengesTaken); defaults to the id count
+ * @returns {boolean} true when the contract was broken (and reported)
+ */
+function reportChallengeMemoryBreach(jobId, challengeDrawIds, challengeTakenIds, gl = NOOP_LOG, { tagged = null } = {}) {
+  const drawn = Array.isArray(challengeDrawIds) ? challengeDrawIds.length : 0;
+  const taken = Array.isArray(challengeTakenIds) ? challengeTakenIds.length : 0;
+  if (!drawn || taken || (tagged ?? 0) > 0) return false;
+  log.error(`❌ [ARC] The shipped arc named no challenges taken though ${drawn} were drawn — this book contributes NOTHING to cross-story challenge variety`);
+  gl.error('arc_challenges_taken_missing', `The shipped arc reported no [C###] challenge taken though ${drawn} were drawn — this story adds no cross-story variety memory`, null, {
+    jobId: jobId || null, challengeDrawIds: challengeDrawIds || [],
+  });
+  return true;
 }
 
 /**
@@ -3198,9 +3252,10 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // was this book offered / which did it take" is answerable from the story
   // record (owner, 2026-08-29).
   //
-  // The draw EXCLUDES what this account's earlier books were offered
-  // (loadUsedChallengeIds) — variety is a selection rule, so no prompt ever
-  // mentions a previous story. The ids are persisted next to the lines so the
+  // The draw EXCLUDES what this account's earlier books actually TOOK
+  // (loadUsedChallengeIds; owner, 2026-09-21 / 2026-09-27) — variety is a
+  // selection rule, so no prompt ever mentions a previous story. The taken ids
+  // (a subset of the offered ones) are persisted next to the drawn ones so the
   // next book can exclude this one.
   //
   // JEV SELECTS (owner, 2026-09-27): the landmark list is ordered by its fit
@@ -3218,15 +3273,27 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // generationLog has to show — is how much memory actually survived.
     const kept = priorIds.idsByStory.slice(0, draw.effectiveStories);
     const excludedIds = [...new Set(kept.flat())];
-    gl.info('arc_variety', `Excluding ${excludedIds.length} catalogue challenge(s) from ${draw.effectiveStories} of ${priorIds.stories} earlier book(s) on this account`
+    gl.info('arc_variety', `Excluding ${excludedIds.length} catalogue challenge(s) taken by ${draw.effectiveStories} of ${priorIds.stories} earlier book(s) on this account (${priorIds.examined} examined)`
       + (draw.effectiveStories < priorIds.stories ? ` — the oldest ${priorIds.stories - draw.effectiveStories} shed, this age band's pool cannot carry them` : ''), null, {
-      storiesOffered: priorIds.stories, storiesEffective: draw.effectiveStories, excludedIds,
+      storiesContributing: priorIds.stories, storiesExamined: priorIds.examined, storiesEffective: draw.effectiveStories, excludedIds,
+    });
+  } else if (priorIds.examined > 0) {
+    // Books exist on this account and NONE of them contributed a taken id: the
+    // exclusion is a no-op, which looks exactly like success unless it is said.
+    gl.warn('arc_variety', `No cross-story exclusion: ${priorIds.examined} earlier book(s) examined, none recorded any challenge taken`, null, {
+      storiesContributing: 0, storiesExamined: priorIds.examined, storiesEffective: 0, excludedIds: [],
     });
   }
   const challengeIdeas = draw.section;
   const challengeDrawIds = draw.ids;
-  // Filled by the re-telling below (the only call that reports its choices).
+  // Which drawn challenges the SHIPPED arc builds on: the created arc reports
+  // them (arc-create "Challenges taken:"), and a re-telling, when the gate
+  // opens, reports them again for the arc it writes. Checked once the arc
+  // machine is done (reportChallengeMemoryBreach).
   let challengeTakenIds = [];
+  // How many lines of that block carry a tag ([C###] or [own]): an arc built
+  // only on its own challenges is valid; a block with no tagged line is not.
+  let challengeTakenTagged = 0;
   const challengeDraw = challengeIdeas.split('\n').filter(l => l.startsWith('- ')).map(l => l.slice(2));
   if (challengeDraw.length) gl.info('challenge_draw', `Drew ${challengeDraw.length} challenge idea(s) for the arc plan`, null, { challengeDraw, challengeDrawIds });
   let approvedArc = '';
@@ -3293,6 +3360,10 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         gl.warn('arc_chain_out_of_range', `${label}: ${counts.chainLinks} chain links against a range of ${counts.chainRange.lo}-${counts.chainRange.hi}`, null, { round, chainLinks: counts.chainLinks, range: counts.chainRange });
       }
     };
+    // The created arc's own "Challenges taken:" — the shipped value whenever
+    // the re-telling gate stays shut; a re-telling replaces it.
+    challengeTakenIds = commit.takenIds;
+    challengeTakenTagged = commit.takenTagged;
     const createCounts = arcShapeCounts({ sentences: commit.sentences, logic: commit.logic, inputData, pageCount });
     logArcCounts('arc create', 0, createCounts);
     gl.info('arc_create', `Arc creator ${createRes.modelId || arcCreateModel} wrote one arc (${commit.sentences} sentences, ${createCounts.chainLinks} chain links, ${commit.logic.invented.length} new figure(s))`, null, {
@@ -3458,6 +3529,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // id — the join between what was offered and what shipped. The last
       // re-telling wins: it is the one whose arc becomes the story.
       challengeTakenIds = retold.takenIds || [];
+      challengeTakenTagged = retold.takenTagged || 0;
       // The critique travels to the beats prompt together with the re-telling's
       // contract lines: what was already fixed, and which scenes and turns must
       // survive the page division untouched (owner refinement, 2026-08-30 —
@@ -3619,6 +3691,16 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     gl.info('beats_arc', `Arc machine done: ${roundReports.length}/${arcRounds} round(s)${retellSkipped ? ` (re-telling skipped: ${retellSkipped})` : ''}, final arc by ${lastRetold ? arcRetellModel : arcCreateModel} (${(meta.timings.arcMs / 1000).toFixed(1)}s)`, null, {
       rounds: roundReports.length, createModel: arcCreateModel, retellModel: lastRetold ? arcRetellModel : null,
     });
+    // Taken is a subset of offered: a tag the arc was never shown is a misread,
+    // not a memory, and is dropped loudly.
+    const offTheMenu = challengeTakenIds.filter(id => !challengeDrawIds.includes(id));
+    if (offTheMenu.length) {
+      gl.warn('arc_challenges_taken_undrawn', `The arc tagged ${offTheMenu.length} challenge(s) it was never offered (${offTheMenu.map(id => `C${id}`).join(', ')}) — dropped from the taken list`, null, { offTheMenu, challengeDrawIds });
+      challengeTakenIds = challengeTakenIds.filter(id => challengeDrawIds.includes(id));
+    }
+    // The taken ids are the next book's whole memory: the shipped arc drew on
+    // the draw, so an empty list is a broken tag contract, said loudly.
+    reportChallengeMemoryBreach(jobId, challengeDrawIds, challengeTakenIds, gl, { tagged: challengeTakenTagged });
   } catch (err) {
     // Never block a story on the arc step: without it the planner writes the
     // arc inline exactly as it did before this stage existed.
@@ -4451,4 +4533,4 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   return { title, titleJudge, beats, pages, scenes, coverScenes, rawOutline, visualBible, meta, challengeDrawIds, challengeTakenIds, challengeDraw, challengeSelection, arcReviewReport, beatsReviewReport, jevDecisions: jevReport, jevFallback: jevReport.fallback, storyBibleReport, clothingReviewReport, wardrobeBibleReport, sceneExpansionReport, sceneReviewReport };
 }
 
-module.exports = { generateStoryViaBeats, finalizePlanShots, applyJevBriefDecisions, pinJevFixedFields, runArtDirector, arcTempFor, makeArcCreatorCall, runSceneReview, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, bibleCorrectionsMissingFromTranscript, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };
+module.exports = { generateStoryViaBeats, reportChallengeMemoryBreach, finalizePlanShots, applyJevBriefDecisions, pinJevFixedFields, runArtDirector, arcTempFor, makeArcCreatorCall, runSceneReview, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, bibleCorrectionsMissingFromTranscript, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };

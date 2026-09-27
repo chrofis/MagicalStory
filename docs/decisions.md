@@ -21,6 +21,95 @@ superseded and link forward.
 
 ---
 
+## 2026-09-27 — Cross-story challenge variety excludes what earlier books TOOK, not what they were OFFERED; the created arc reports its taken challenges too
+
+**Context.** Since 2026-09-19 challenge variety has been a SELECTION rule: `loadUsedChallengeIds`
+(`server/lib/beatsPipeline.js`) reads this account's earlier books' catalogue ids, and the next
+book's draw never sees them. The set it read was `data->'challengeDrawIds'`, the ids each book was
+OFFERED. That was never a judgement; it was the only thing on disk. Nothing recorded which
+challenges a book USED until 2026-09-20, when `arc-retell.txt` began tagging each
+"Challenges taken:" line `[C###]` and `parseArcRetell` began returning `takenIds`.
+- The switch to taken ids was built on 2026-09-21 (`9ff93be24`, owner-approved) but never pushed.
+- The Jev draw (entry below, "Jev selection built") made the question sharper. Each book is now
+  offered 12 of Jev's 20 best fits. Excluding those 12 would strip the best-fitting entries from
+  the next book's window and decay the draw book by book: good share 54% → 34% → 27% → 20% → 10%
+  by book 6, on the eval's re-run premise.
+- Owner, 2026-09-27 (AskUserQuestion): exclude only the challenges the story actually TOOK.
+
+**Decision.**
+1. **The memory is `data->'challengeTakenIds'`**, the ~3–5 ids the shipped arc built on. The
+   `jsonb_typeof(...) = 'array'` completeness filter moved to the same column.
+   - `challengeDrawIds` stays on the story for audit only.
+   - There is no fallback to the drawn ids. A second path reading the weaker column would hide a
+     broken tag contract forever.
+   - Books from before 2026-09-20 contribute nothing (cold start, accepted).
+2. **The created arc reports its taken challenges too** (new, 2026-09-27). Since 2026-09-25 the
+   re-telling runs only while a MAJOR/CRITICAL finding survives. Whenever that gate stays shut, the
+   CREATED arc is the one that ships, and it had no "Challenges taken:" block, so such a book would
+   have added nothing to the next book's exclusion.
+   - `arc-create.txt` now asks for the same block (`{CHALLENGES_TAKEN}`, filled only when there is
+     a draw). `arc-retell.txt` reads the same constant (`CHALLENGES_TAKEN_RULE` in
+     `promptBuilders.js`, one copy).
+   - `parseArcCreate` returns `takenIds`, and cuts the block out of the arc and out of the
+     `committed` text the panel reads, wherever the model put it.
+   - The create's value is the shipped value unless a re-telling replaces it.
+3. **Taken ⊆ offered.** A tag the arc was never shown is dropped, with the warning
+   `arc_challenges_taken_undrawn`.
+4. **The guards from `9ff93be24`, checked once the arc machine is done:**
+   - `reportChallengeMemoryBreach` raises `log.error` plus `arc_challenges_taken_missing` when a
+     non-empty draw yields a block with NO tagged line. An arc whose every line is `[own]` is a
+     valid answer (it used none of the draw) and stays silent.
+   - `loadUsedChallengeIds` reports contributing vs examined books: `arc_variety_empty_prior` for a
+     prior book with an empty list, and `arc_variety` at warn level when books exist and none
+     contributed.
+5. **MIN_POOL and the shedding, made coherent.** The memory is at most 12 books × ~3–5 ids, about
+   60 ids.
+   - The smallest eligible pool is 139 (age-4 focus; 5 → 327, 6–8 → 336, 9–12 → 256). That leaves
+     79, above `MIN_POOL = 45`, so nothing is shed in normal use. `PRIOR_STORY_LIMIT = 12` is the
+     binding limit again in every band. Before, the offered memory held about 3 books in the young
+     band.
+   - `MIN_POOL` now protects the pool Jev ranks: a top-20 window is under half of 45.
+   - Oldest-first shedding and the "newest book alone" valve (`need` = the 20-entry window, or the
+     backup draw's 25) stay as the logged guard for inputs these numbers do not describe. The
+     comment beside `MIN_POOL` says exactly this; the old "12 offered ids per book" reasoning is
+     gone.
+
+**Validation (free replay, staging, read-only).**
+- 7 stories carry `challengeTakenIds`. All 7 taken lists are a subset of their draw.
+- The refactored `parseArcRetell` re-derives the stored taken ids exactly from the stored re-tell
+  reply on all 4 current-format stories. The 3 older ones are pre-STORY-LOGIC replies, which the
+  parser has rejected since 2026-09-24.
+- `parseArcCreate` parses all 4 current-format stored create replies, with taken `[]`: today's
+  prompt did not ask for the block.
+- The new loader's SQL for a next book on each account/type:
+
+  | Account / type | Excluded, taken memory | Pool | Excluded, offered memory | Pool |
+  |---|---|---|---|---|
+  | Smoke account, dragon (4 books) | 17 ids | 310 of 327 | 115 ids | 212 |
+  | Smoke account, adventure | 4 | 135 of 139 | 25 | 114 |
+  | Smoke account, pirate | 5 | 251 of 256 | 25 | 231 |
+  | Wizard account | 2 | 334 of 336 | 25 | 311 |
+
+- **Unproven:** whether Opus follows the new create line. The re-telling followed the identical
+  line on every current-format stored story. The next beats story shows it (`verify.json`
+  `challenge-taken-memory`).
+
+**Supersedes.** The account-memory half of 2026-09-19 "variety is a SELECTION rule" (the rule
+stands; its column changed). Closes the open question in the "Jev selection built" entry below.
+Tests: `tests/unit/challenge-variety-selection.test.ts` (column, grouping, guards, shedding on a
+realistic taken-sized memory, the create prompt and parser, `[own]`-only).
+
+**Touched:** server/lib/beatsPipeline.js (`loadUsedChallengeIds`, `reportChallengeMemoryBreach`,
+the draw-site logging, taken from the create, subset filter), server/lib/promptBuilders.js
+(`CHALLENGES_TAKEN_RULE`, `parseChallengesTaken`, `parseArcCreate`, `parseArcRetell`,
+`buildArcCreatePrompt`, `buildArcRetellPrompt`, the `MIN_POOL` / selection comments),
+prompts/arc-create.txt, prompts/arc-retell.txt, storyJobPipeline.js (persistence comments),
+tests/unit/challenge-variety-selection.test.ts, tasks/BACKLOG.md, tasks/verify.json,
+docs/prompt-inventory.md.
+**Status:** ✅ active on staging.
+
+---
+
 ## 2026-09-27 — Famous story shapes per age band: Jev picks the shape well, but swapping only the band's beats does not change the arc (measured, NOT built)
 
 **Context.** Owner, 2026-09-27: *"Are there famous story arcs? Start happy, drop to sad, end at

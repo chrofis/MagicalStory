@@ -762,7 +762,8 @@ Run verifications now live in **`tasks/verify.json`** (judge a stored run: `node
 - [ ] `tests/unit/no-output-caps.test.ts` FAILS on origin/staging (a real assertion, not the cold-cache timeout): `scripts/analysis/eval-jev-arc-direct.js:166` and `scripts/analysis/eval-jev-story-shapes.js:467` pass `max_tokens: 65536` (commits 8cf3f4abd, 041b84bdb). Found 2026-09-27 by the fixed-blocks session, not touched → use the model max or add them to `KEPT_DIRECT_CAPS` with a reason
 - [ ] beats_replan_failed "re-plan returned no parseable plan lines" on job_1790529840433_ar4u7qry3 (9 check findings, 4 pages): the unparseable reply is not stored, so the cause cannot be read — record the reply on that path → server/lib/beatsPipeline.js runReplanRounds (readPlan throw)
 - [ ] FAILED verify idea-pick-recorded on job_1790508305061_dka3jpog9 (pulled 2026-09-27 by verify-run --pull; not investigated in the Jev session) → tasks/verify.json idea-pick-recorded
-- [ ] OPEN QUESTION — challenge exclusion memory: the next book on an account excludes the ids a book was OFFERED (challengeDrawIds, now 12 of Jev's top 20), not the ids the arc TOOK. Excluding offered ids makes the Jev window decay book by book (eval, same premise re-run: good share 54% → 34% → 27% → 20% → 10% by book 6); excluding only taken ids would stop that, but challengeTakenIds is written only when the re-telling runs. Owner call → docs/decisions.md (2026-09-27 "Jev selection built", Touches)
+- [x] DECIDED + BUILT 2026-09-27 (owner: exclude only TAKEN) — challenge exclusion memory reads challengeTakenIds; the created arc now reports its taken challenges too, so a book whose re-telling gate stays shut still records its memory → docs/decisions.md (2026-09-27 "Cross-story challenge variety excludes what earlier books TOOK")
+- [ ] VERIFY on a real story — the created arc's "Challenges taken:" block (new in arc-create.txt) is followed and stored: challengeTakenIds non-empty, subset of challengeDrawIds, no arc_challenges_taken_missing → tasks/verify.json `challenge-taken-memory`
 - [ ] VERIFY on a real story — Jev selection: challengeSelection.method = jev with 12 picks inside its top 20, landmarkSelection on a beats story and on a /try trial, idea-card log lines "idea landmarks (jev)" after a prepare → docs/decisions.md (2026-09-27 "Jev selection built")
 - [x] BUILT 2026-09-27 on staging (owner approved 12-from-top-20, trial 3-from-top-5, idea cards off the request path) — Jev picks the challenges and landmarks that fit, measured 2026-09-27: challenges CB2 (noul per catalogue entry on the premise) → offered bad 58% → 14%, good 10% → 48% (AUC 0.89); the arc took 6 B-labelled challenges of 20 from today's random draws; landmarks LB2 first-2 18G/0B vs fame 8G/3B. Decide: arc draw 12-from-top-20 vs 25-from-top-40; trial story 3-from-top-5; idea-prompt landmarks only off the happy path (prewarm/cache, +290 ms if synchronous); exclude offered vs taken ids → docs/decisions.md (2026-09-27 "Jev picks the challenges and landmarks that fit")
 - [ ] BUILDING 2026-09-27 (owner approved) — Jev decision layer wired into beats: shots (A1 + assign, code writes field 0), group-page cast cuts (TOGETHER + NEEDED, code writes the who column), VB citations per page, timeOfDay/indoor/aboard/population per location → tasks/jev-decision-layer-2026-09-27.md:1
@@ -1984,14 +1985,13 @@ three below are prompt/classification questions and are the owner's call.
   spread rule is wanted before reading the next run's variety as evidence.
   → `server/lib/planCounters.js` (`SHOT_NO_CAMERA_POSITION`), `docs/decisions.md` "The shot field has two axes"
 
-- [ ] **The 3–5 challenge band is the binding constraint on challenge variety — grow the catalogue, not the knobs.**
-  `prompts/challenge-catalogue.txt` holds 395 entries, but a draw only sees the reader's age band:
-  **3–5 = 139**, 6–8 = 336, 9–12 = 256. With the draw raised to 25 (owner, 2026-09-20) the effective
-  cross-story memory is ~3 books in the 3–5 band versus 11 and 8 in the other two, because oldest-first
-  shedding hits the pool floor long before `PRIOR_STORY_LIMIT` (now 12) does. Most books run in this
-  band. Every code lever here trades one good property for another; adding 3–5 entries is the only
-  change that buys both a wide draw and deep memory.
-  → `prompts/challenge-catalogue.txt`, `server/lib/promptBuilders.js` (`drawChallengeIdeas`, MIN_POOL)
+- [ ] **Challenge catalogue: the 3–5 band is no longer a CONSTRAINT, but it is still thin — optional quality work.**
+  SUPERSEDED as a constraint (2026-09-27). `prompts/challenge-catalogue.txt` holds 395 entries and a
+  draw sees only the reader's band (3–5 = 139, 6–8 = 336, 9–12 = 256). Excluding the 25 ids each book
+  was OFFERED held the 3–5 memory to ~3 books; the exclusion now reads the ~3–5 ids each book TOOK and
+  every band keeps the full 12 (worst case ~60 excluded of 139, nothing shed). What remains is variety
+  quality: P, Q, AA and CC have 1 toddler-suitable entry each, BB has 2.
+  → `prompts/challenge-catalogue.txt`, `docs/decisions.md` (2026-09-27 "Cross-story challenge variety excludes what earlier books TOOK")
 
 - [ ] **Story `job_1789853503332_riqncqg1i` page 7 shipped at q=40 / sem=20, unrepaired.** The book's
   inciting theft. The plan asked for Silvan riding away down the lane with the egg, the square empty and
