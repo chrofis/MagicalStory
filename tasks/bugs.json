@@ -2379,6 +2379,18 @@
       "fixedAt": "2026-09-27",
       "fixedIn": "535baec85",
       "fix": "server/lib/providerUsage.js: geminiUsage / xaiUsage / openRouterUsage normalise every provider usage object to { input_tokens, output_tokens, thinking_tokens }; every call site reads through it and the per-site parsers are deleted. Entity report carries thinkingTokens; eval aggregates sum every component's thinking; sceneValidator prices from MODEL_PRICING; regeneration uses calculateTextCost; face gate relies on the textModels chokepoint. Test: tests/unit/provider-usage.test.ts (incl. a guard that no server file reads a raw usage field), judge-fixtures.test.ts, face-integrity-gate.test.ts."
+    },
+    {
+      "id": "scene-review-bible-correction-not-written-back",
+      "title": "Scene review Visual Bible corrections (landmark photo, text, new states) never reached the transcript that every re-parse reads",
+      "reportedAt": "2026-09-27",
+      "source": "Owner-approved fix task 2026-09-27. Lab #1574 (scene_review_replay on staging job_1790446348343_z3fw660ie, ca02aa270) applied LOC004.2 photo 3 -> none and LOC005.1 photo 1 -> none and warned \"could not be written back\". Production run z3fw660ie itself logged beats_vb_sync_failed: its ART003 coat-rope states are in data.visualBible but absent from data.outline's ---VISUAL BIBLE---. Stored staging stories 2026-09-15..27: 5 runs applied a correction; 1 of 5 (z3fw660ie) lost it from the transcript; the 4 others were page-range changes on entries that already had states[] and landed.",
+      "rootCause": "server/lib/beatsPipeline.js syncVisualBibleSection projected only pages, states (and only when the AUTHORED entry already carried states[]), label and the age clamp. It never projected `landmarkPhoto` (location or vantage) or `text`, and dropped looks the review gave a stateless entry. The review site then compared strings (synced === bibleSections) and only warned; when some other field reformatted the section the correction was lost with no message at all. Also applyLandmarkPhotoCorrection compared the authored \"1\" to the review's 1 by ===, booking a no-op as a correction (Lab 1574 LOC004.3).",
+      "impact": "The live run was unaffected (storyJobPipeline prefers the in-memory bible, which carried the correction). Every re-parse of the stored transcript - the resume path (storyJobPipeline parser.extractVisualBible fallback), the Lab replays and any later extractVisualBible() - read the UNCORRECTED bible: the wrong landmark photo for the plate (defeats b881cd2c1 / check 10ab), a withdrawn in-image text, or an object with no looks.",
+      "status": "fixed",
+      "fixedAt": "2026-09-27",
+      "fixedIn": "(pending)",
+      "fix": "syncVisualBibleSection projects landmarkPhoto (location + each vantage by id), text (set or withdrawn) and states whenever the parsed copy has them. The review site verifies the write-back by RE-PARSING the transcript (bibleCorrectionsMissingFromTranscript) and logs an ERROR (gl.error beats_vb_sync_failed) naming each correction the transcript lacks; report.bibleCorrections.unsynced records them. A throw in the correction step is an error, not a warn. The citation compare goes through parseLandmarkPhotoCitation. Test: tests/unit/review-bible-writeback.test.ts. Replay over stored z3fw660ie transcript + Lab 1574 corrections: 3 corrections missing before, 0 after."
     }
   ]
 }

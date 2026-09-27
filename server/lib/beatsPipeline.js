@@ -534,7 +534,9 @@ function applyLandmarkPhotoCorrection(row, entry, id, out) {
   const set = (target, raw, label) => {
     const c = valid(raw);
     if (c == null) { out.rejected.push({ id: label, reason: `landmarkPhoto ${JSON.stringify(raw)} is not one of its photos (${allowed.join(',') || 'none'}) or "none"` }); return; }
-    if (target.landmarkPhoto === c) return;
+    // Compare as citations: the Art Director may have authored "1" where the
+    // review writes 1 — the same photo, not a correction (Lab 1574 LOC004.3).
+    if (parseLandmarkPhotoCitation(target.landmarkPhoto) === c) return;
     out.applied.push({ id: label, name: '(landmarkPhoto)', oldPhoto: target.landmarkPhoto ?? null, newPhoto: c });
     target.landmarkPhoto = c;
   };
@@ -582,7 +584,12 @@ function syncVisualBibleSection(bibleSections, visualBible) {
       const mem = byId.get(String(entry.id).trim().toUpperCase());
       if (!mem) continue;
       entry.pages = pageList(mem.appearsInPages);
-      if (Array.isArray(entry.states) && Array.isArray(mem.states)) {
+      // States are projected whenever the parsed copy has them — including
+      // an entry the Art Director authored WITHOUT states[] that a later step
+      // (the scene review's bible correction) gave looks to. Gated on the
+      // authored entry already carrying states, the new looks never reached
+      // the transcript (staging job_1790446348343_z3fw660ie, ART003).
+      if (Array.isArray(mem.states) && (Array.isArray(entry.states) || mem.states.length > 0)) {
         entry.states = mem.states.map(st => ({
           name: st.name,
           delta: st.delta,
@@ -600,11 +607,77 @@ function syncVisualBibleSection(bibleSections, visualBible) {
         entry.age = mem.age;
         entry.secondaryAgeClamped = mem.secondaryAgeClamped;
       }
+      // The scene review's `text` correction (check 9g): a withdrawn
+      // declaration is null in the parsed copy and leaves the transcript too.
+      if (Object.prototype.hasOwnProperty.call(mem, 'text')) {
+        if (typeof mem.text === 'string' && mem.text) entry.text = mem.text;
+        else delete entry.text;
+      }
+      // The landmark photo citation — on the location and on each vantage. The
+      // plates are painted from the photo it cites (b881cd2c1); the review's
+      // [landmark_photo_mismatch] correction lands here.
+      if (key === 'locations') {
+        if (Object.prototype.hasOwnProperty.call(mem, 'landmarkPhoto')) entry.landmarkPhoto = mem.landmarkPhoto;
+        const memVantages = new Map((Array.isArray(mem.vantages) ? mem.vantages : [])
+          .filter(v => v && v.id).map(v => [String(v.id).trim().toUpperCase(), v]));
+        for (const v of (Array.isArray(entry.vantages) ? entry.vantages : [])) {
+          const mv = v && v.id ? memVantages.get(String(v.id).trim().toUpperCase()) : null;
+          if (mv && Object.prototype.hasOwnProperty.call(mv, 'landmarkPhoto')) v.landmarkPhoto = mv.landmarkPhoto;
+        }
+      }
     }
   }
 
   const body = '```json\n' + JSON.stringify(json, null, 2) + '\n```\n\n';
   return text.replace(sectionRe, (_m, marker) => `${marker}${body}`);
+}
+
+/**
+ * Which of the scene review's applied bible corrections a re-parse of the
+ * transcript does NOT carry. The transcript is what storyJobPipeline's resume
+ * path, the Lab and every later `extractVisualBible()` read, so a correction
+ * missing from it is a correction lost. Checked by re-parsing — never by
+ * comparing strings — so a write-back that rewrote the section but dropped
+ * the corrected field is caught too.
+ *
+ * @param {string} bibleSections the transcript after write-back
+ * @param {object} visualBible the parsed copy the corrections were applied to
+ * @param {Array<{id: string, name: string, newText?: *, newPhoto?: *}>} applied
+ * @returns {Array<{id: string, field: string, expected: *, found: *}>}
+ */
+function bibleCorrectionsMissingFromTranscript(bibleSections, visualBible, applied) {
+  const { parseLandmarkPhotoCitation } = require('./landmarkPhotos');
+  const reparsed = new UnifiedStoryParser(String(bibleSections || '')).extractVisualBible() || {};
+  const find = (vb, baseId) => {
+    for (const key of SYNCED_COLLECTIONS) {
+      const e = (Array.isArray(vb[key]) ? vb[key] : []).find(x => x && String(x.id || '').trim().toUpperCase() === baseId);
+      if (e) return e;
+    }
+    return null;
+  };
+  const statesOf = (e) => JSON.stringify((Array.isArray(e && e.states) ? e.states : [])
+    .filter(Boolean).map(st => [st.name, (st.pages || []).map(Number)]));
+  const missing = [];
+  for (const a of (Array.isArray(applied) ? applied : [])) {
+    const fullId = String(a.id || '').trim().toUpperCase();
+    const baseId = fullId.split('.')[0];
+    const got = find(reparsed, baseId);
+    if (a.name === '(landmarkPhoto)') {
+      const target = fullId.includes('.')
+        ? (got && Array.isArray(got.vantages) ? got.vantages.find(v => v && String(v.id || '').trim().toUpperCase() === fullId) : null)
+        : got;
+      const found = target ? parseLandmarkPhotoCitation(target.landmarkPhoto) : null;
+      if (found !== a.newPhoto) missing.push({ id: fullId, field: 'landmarkPhoto', expected: a.newPhoto, found });
+    } else if (a.name === '(text)') {
+      const found = got && typeof got.text === 'string' ? got.text : null;
+      if (found !== a.newText) missing.push({ id: fullId, field: 'text', expected: a.newText, found });
+    } else {
+      const want = statesOf(find(visualBible, baseId));
+      const found = statesOf(got);
+      if (found !== want) missing.push({ id: fullId, field: 'states', expected: want, found });
+    }
+  }
+  return missing;
 }
 
 /**
@@ -2316,16 +2389,21 @@ async function runSceneReview({ inputData, expansions, clothingRequirements, vis
               + corr.applied.map(e => `${e.id} ${e.oldPages} → ${e.newPages}`).join('; '), null, corr);
             // ONE SOURCE OF TRUTH: the transcript is what every later reader
             // re-parses, exactly as the label round and the age clamp do.
-            const synced = syncVisualBibleSection(bibleSections, visualBible);
-            if (synced === bibleSections) {
-              log.warn('⚠️ [BEATS] Scene review bible correction could not be written back into the transcript — downstream re-parses will read the UNCORRECTED bible');
-              gl.warn('beats_vb_sync_failed', 'Scene review bible correction could not be written back into the transcript — stored bible will not reflect it');
-            } else {
-              bibleSections = synced;
+            // Verified by re-parsing the written transcript: a correction the
+            // re-parse does not carry is LOST for the resume path, the Lab
+            // and every later extractVisualBible() — an error, never a hint.
+            bibleSections = syncVisualBibleSection(bibleSections, visualBible);
+            const lost = bibleCorrectionsMissingFromTranscript(bibleSections, visualBible, corr.applied);
+            corr.unsynced = lost;
+            if (lost.length > 0) {
+              const detail = lost.map(m => `${m.id} ${m.field} expected ${JSON.stringify(m.expected)}, transcript has ${JSON.stringify(m.found)}`).join('; ');
+              log.error(`❌ [BEATS] Scene review bible correction NOT in the transcript — re-parses read the UNCORRECTED bible: ${detail}`);
+              gl.error('beats_vb_sync_failed', `Scene review bible correction(s) missing from the transcript after write-back: ${detail}`, null, lost);
             }
           }
         } catch (bcErr) {
-          log.warn(`⚠️ [BEATS] Scene review bible correction failed (${bcErr.message}) — bible unchanged`);
+          log.error(`❌ [BEATS] Scene review bible correction failed (${bcErr.message}) — corrections may be partly applied and not written back`);
+          gl.error('beats_scene_review_bible_failed', `Scene review bible correction threw: ${bcErr.message}`);
         }
       }
 
@@ -3960,4 +4038,4 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   return { title, titleJudge, beats, pages, scenes, coverScenes, rawOutline, visualBible, meta, challengeDrawIds, challengeTakenIds, challengeDraw, arcReviewReport, beatsReviewReport, storyBibleReport, clothingReviewReport, wardrobeBibleReport, sceneExpansionReport, sceneReviewReport };
 }
 
-module.exports = { generateStoryViaBeats, runArtDirector, arcTempFor, makeArcCreatorCall, runSceneReview, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };
+module.exports = { generateStoryViaBeats, runArtDirector, arcTempFor, makeArcCreatorCall, runSceneReview, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, bibleCorrectionsMissingFromTranscript, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };
