@@ -10413,8 +10413,10 @@ function analyzeReplanCompliance({
 }
 
 /**
- * ONE plan check + ONE re-plan against a stored story's first division, then
- * the compliance verdict. Text only — no image spend, no story run.
+ * The run's Step 2 on a stored story's first division: the plan check and
+ * the re-plan rounds production runs (up to two, with its review and guards),
+ * then the Lab's compliance reading of round 1. Text only — no image spend,
+ * no story run.
  *
  * params.planModel  — the re-planner (default: production's outline model)
  * params.checkModel — the plan checker (default: production's planCheckModel)
@@ -10427,8 +10429,8 @@ function analyzeReplanCompliance({
  * answers a different arc. The central figure, the (commissioned) figures and
  * the invented list come from that arm's STORY LOGIC, as beatsPipeline takes
  * them from the committed arc; arcHints is null (arc_effort runs no hints
- * call). Then production's page-plan step: plan check + counters, and ONE
- * re-plan only when production would re-plan (any finding). The result adds
+ * call). Then production's page-plan step: plan check + counters, and the
+ * re-plan rounds when production would re-plan (any finding). The result adds
  * the first division and a per-character summary (`castSummary`).
  *
  * params.plannerMayAddDeeds (Lab only) — the planner, the re-planner and the
@@ -10438,64 +10440,59 @@ async function runBeatsReplanStage(target, { params = {} }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const {
-    buildBeatsPrompt, buildPlanCheckPrompt, parsePlanCheck, parsePlanCheckRoster, parsePlanCheckCentralPages,
-    parsePlanCheckObstacles, buildReplanSection, getHistoricalLocations, getHistoricalObjects,
-    parsePlanCheckWanted, parsePlanCheckActions, replanKeepPages, replanRoundRegressed,
-    parseStoryLogic, parsePlanResponse, arcInventedAllowance, pickMainCharacters,
+    buildBeatsPrompt, parsePlanCheckObstacles, parsePlanCheckActions, replanKeepPages,
+    parseStoryLogic, arcInventedAllowance, pickMainCharacters,
   } = require('./promptBuilders');
   const { parsePlanCastBlock, commissionedCast } = require('./castCoverage');
   const { parseBeats } = require('./storyHelpers');
-  const { runPlanCounters, collectPlaceNames } = require('./planCounters');
   const { callTextModelStreaming } = require('./textModels');
-  const { MODEL_DEFAULTS, IMAGE_MODELS, TEXT_MODELS, calculateTextCost } = require('../config/models');
+  const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
+  // THE RUN'S OWN STEP 2 (owner 2026-09-27: "The Lab must use 100% identical
+  // code to production"): the plan check and the re-plan rounds are the
+  // functions generateStoryViaBeats calls (beatsPipeline.planCheckInputs,
+  // createPlanCheckRunner, runReplanRounds), on the inputs the run gave them,
+  // rebuilt from the stored story: the planner's stored reply read by the run's
+  // plan reader, its CAST table parsed by the run's parser, and the arc's
+  // invented / commissioned figures and central figure read off its stored
+  // STORY LOGIC. The stage used to rebuild the check, one round and its guard
+  // itself — no CAST table on the re-plan, no invented / commissioned figures,
+  // no PEOPLELESS pick, no review of declared changes, one round only.
+  const { makePlanReader, planCheckInputs, createPlanCheckRunner, runReplanRounds, shippedReplanState } = require('./beatsPipeline');
 
   const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
 
-  const checkModel = params.checkModel || MODEL_DEFAULTS.planCheckModel;
-  const planModel = params.planModel || MODEL_DEFAULTS.outline;
-  for (const m of [checkModel, planModel]) if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
   // Lab A/B (2026-09-25): the planner may add a deed (castActionRule
   // `mayAddDeeds`) — the same sentence reaches the plan check.
   const mayAddDeeds = params.plannerMayAddDeeds === true || params.plannerMayAddDeeds === 'true';
+  const labPromptOptions = mayAddDeeds ? { mayAddDeeds } : {};
+  // modelOverrides are not stored: the run's defaults, as planCheckInputs and
+  // generateStoryViaBeats resolve them. params.planModel / params.checkModel
+  // are the A/B knobs.
+  const planModel = params.planModel || MODEL_DEFAULTS.outline;
 
-  let standing, pagePlan, pageCount, approvedArc, arcHints, centralFigure, storyLogic;
-  // Set only on the arcFromExperiment path: the arc's own logic, and the
-  // division this stage planned from it.
+  const calls = [];
+  const onCall = (res) => calls.push(res);
+  const events = [];
+  const record = (level) => (event, message) => { events.push({ level, event, message }); };
+  const gl = { info: record('info'), warn: record('warn'), error: record('error'), debug: record('debug') };
+
+  let approvedArc, arcHints, centralFigure, storyLogic, pageCount;
+  // What the arc machine hands Step 2: the (commissioned) and (new) figures of
+  // its STORY LOGIC and the invented allowance (generateStoryViaBeats sets all
+  // three when the arc commits).
+  let arcPremiseNames = [];
+  let arcInventedNames = null;
+  let arcInventedLimit = null;
   let expArc = null;
   let firstPlan = null;
-  let planRes = null;
-  let planMs = 0;
-  // THE CAST TABLE (2026-09-25), as beatsPipeline reads it off the first
-  // division. A division this stage plans must carry one — the parse throws
-  // and the run fails loudly otherwise. A STORED division predates the table
-  // and is replayed without one, which the report states.
+  let plannerReply = null;
+  let plan = null;
   let castTable = null;
   let castTableNote = null;
-  // PRODUCTION'S FIRST DIVISION (beatsPipeline Step 1): the same builder, the
-  // same arguments, the same parse. Shared by the two paths that plan their
-  // own division (arcFromExperiment, planAndCheck).
-  const planFirstDivision = async () => {
-    const planPrompt = buildBeatsPrompt(storyData, pageCount, { finalArc: approvedArc, arcHints, storyLogic, centralFigure, mayAddDeeds });
-    if (!planPrompt) throw new Error('story-beats template unavailable');
-    const t0 = Date.now();
-    planRes = await callTextModelStreaming(planPrompt, null, null, planModel, { usageLabel: 'testlab_beats_replan_plan' });
-    planMs = Date.now() - t0;
-    if (!String(planRes.text || '').trim()) throw new Error(`planner ${planModel} returned an empty response — provider failure, not a result`);
-    const parsed = parsePlanResponse(planRes.text || '', Array.from({ length: pageCount }, (_, i) => i + 1));
-    if (parsed.pages.length === 0) throw new Error('planner returned no parseable plan lines');
-    standing = parsed.pages.map(pg => ({ pageNumber: Number(pg.pageNumber), planLine: pg.planLine }));
-    pagePlan = parsed.pagePlan;
-    pageCount = standing.length;
-    castTable = parsePlanCastBlock(planRes.text || '', { listed: commissionedCast(storyData).listed });
-    firstPlan = { prompt: planPrompt, rawResponse: (planRes.text || '').slice(0, 40000), missingPages: parsed.missing };
-  };
-  // params.planAndCheck (Lab only, 2026-09-27): divide the story's STORED arc
-  // afresh with production's planner call, run the plan check and the counters
-  // on that division, and stop — no re-plan. The cheap measure of a planner
-  // prompt change (one planner call + one check), where a stored division
-  // would only replay the old planner's answer.
   const planAndCheck = params.planAndCheck === true || params.planAndCheck === 'true';
   if (params.arcFromExperiment != null && params.arcFromExperiment !== '') {
+    // params.arcFromExperiment (2026-09-25): the arc is that arc_effort
+    // experiment's arm, and the stage plans its own first division from it.
     const { dbQuery } = require('../services/database');
     const expId = parseInt(params.arcFromExperiment, 10);
     if (!Number.isFinite(expId)) throw new Error(`arcFromExperiment must be an experiment id, not "${params.arcFromExperiment}"`);
@@ -10507,243 +10504,199 @@ async function runBeatsReplanStage(target, { params = {} }) {
     arcHints = expArc.arcHints;
     centralFigure = expArc.centralFigure;
     storyLogic = expArc.logic.text;
-    // The page count the arc was written for.
-    pageCount = expArc.pageCount || (storyData.sceneImages || []).length || storyData.pages;
+    arcPremiseNames = expArc.logic.commissioned;
+    arcInventedNames = expArc.logic.invented;
+    arcInventedLimit = arcInventedAllowance(storyData);
+    pageCount = expArc.pageCount || parseInt(storyData.pages, 10) || (storyData.sceneImages || []).length;
     if (!pageCount) throw new Error(`arcFromExperiment ${expId}: no page count on the experiment or the story`);
-    await planFirstDivision();
-  } else if (planAndCheck) {
-    // The story's own committed arc, divided afresh by production's planner.
+  } else {
     approvedArc = resolveReplayArc(storyData, { parseBeats });
     arcHints = resolveReplayArcHints(storyData);
     centralFigure = resolveReplayCentralFigure(storyData);
     storyLogic = resolveReplayStoryLogic(storyData);
-    pageCount = (storyData?.beatsReviewReport?.briefsIn || []).length || (storyData.sceneImages || []).length || storyData.pages;
-    if (!approvedArc) throw new Error(`story ${target.storyId} carries no arc — nothing to divide`);
+    if (storyLogic) {
+      // The stored block is the logic's body; the run parsed it with its heading.
+      const logic = parseStoryLogic(`STORY LOGIC:\n${storyLogic}`);
+      arcPremiseNames = logic.commissioned;
+      arcInventedNames = logic.invented;
+      arcInventedLimit = arcInventedAllowance(storyData);
+    }
+    // The page count the run was ordered (generateStoryViaBeats `pageCount`).
+    pageCount = parseInt(storyData.pages, 10) || (storyData?.beatsReviewReport?.briefsIn || []).length || (storyData.sceneImages || []).length;
     if (!pageCount) throw new Error(`story ${target.storyId}: no page count`);
-    await planFirstDivision();
+  }
+  const expected = Array.from({ length: pageCount }, (_, i) => i + 1);
+  const readPlan = makePlanReader(expected, approvedArc);
+  const readCastTable = (reply) => {
+    if (!(storyData?.characters || []).some(c => c && c.name)) return null;
+    try {
+      return parsePlanCastBlock(reply, { listed: commissionedCast(storyData).listed });
+    } catch (err) {
+      castTableNote = `the planner's CAST block could not be read: ${err.message} — as in the run, no plan line is held to a cast table`;
+      return null;
+    }
+  };
+
+  if (expArc || planAndCheck) {
+    // THE FIRST DIVISION, planned afresh with the run's planner call (the
+    // stored one answers a different arc, or the point is a planner change).
+    const planPrompt = buildBeatsPrompt(storyData, pageCount, { finalArc: approvedArc, arcHints, storyLogic, centralFigure, ...labPromptOptions });
+    if (!planPrompt) throw new Error('story-beats template unavailable');
+    const t0 = Date.now();
+    const planRes = await callTextModelStreaming(planPrompt, null, null, planModel, { usageLabel: 'testlab_beats_replan_plan' });
+    onCall(planRes);
+    plannerReply = String(planRes.text || '');
+    if (!plannerReply.trim()) throw new Error(`planner ${planModel} returned an empty response — provider failure, not a result`);
+    plan = readPlan(plannerReply).parsed;
+    castTable = readCastTable(plannerReply);
+    firstPlan = { prompt: planPrompt, rawResponse: plannerReply.slice(0, 40000), missingPages: plan.missing, modelId: planRes.modelId || planModel, elapsedMs: Date.now() - t0 };
+  } else if (storyData?.beatsReviewReport?.plannerReply) {
+    // THE RUN'S FIRST DIVISION: its stored reply, read by the run's reader.
+    plannerReply = String(storyData.beatsReviewReport.plannerReply);
+    plan = readPlan(plannerReply).parsed;
+    castTable = readCastTable(plannerReply);
   } else {
-    // ROUND ONE'S DIVISION, FROZEN. `briefsIn` is written from `plan.pages` — the
-    // FIRST division, before any re-plan round touched it — so the findings this
-    // stage raises are findings against the same division the story's own check
-    // saw. `pagePlan` on the report is the SHIPPED division and is deliberately
-    // not used: re-checking the post-re-plan division would measure a different
-    // round from the one the stored findings describe.
+    // A story stored before the planner reply was kept (2026-09-23): the first
+    // division survives only as `briefsIn`, and no CAST table.
     const briefsIn = storyData?.beatsReviewReport?.briefsIn || [];
-    standing = briefsIn
+    const pages = briefsIn
       .filter(b => b && b.pageNumber != null)
       .map(b => ({ pageNumber: Number(b.pageNumber), planLine: String(b.brief || '').replace(/^\s*PLAN:\s*/i, '').trim() }))
       .filter(b => b.planLine)
       .sort((a, b) => a.pageNumber - b.pageNumber);
-    if (standing.length === 0) {
-      throw new Error(`story ${target.storyId} carries no beatsReviewReport.briefsIn plan lines — nothing to re-divide`);
-    }
-    pagePlan = standing.map(pg => `Page ${pg.pageNumber}: ${pg.planLine}`).join('\n');
-    pageCount = standing.length;
-    approvedArc = resolveReplayArc(storyData, { parseBeats });
-    arcHints = resolveReplayArcHints(storyData);
-    centralFigure = resolveReplayCentralFigure(storyData);
-    storyLogic = resolveReplayStoryLogic(storyData);
-    castTableNote = 'the stored division predates the CAST block; no plan line is held to one';
+    if (pages.length === 0) throw new Error(`story ${target.storyId} carries neither a planner reply nor beatsReviewReport.briefsIn — nothing to re-divide`);
+    plan = { pages, missing: [], pagePlan: pages.map(pg => `Page ${pg.pageNumber}: ${pg.planLine}`).join('\n'), arc: approvedArc };
+    castTableNote = 'the stored story predates the stored planner reply; the division is its briefsIn, with no CAST table';
   }
+  if (!plan || plan.pages.length === 0) throw new Error('the first division has no parseable plan lines');
+  const pagePlan = plan.pagePlan;
   // The focus character, as production passes it (MAIN_UNDER_HALF, 2026-09-25).
   const mainName = pickMainCharacters(storyData).focus?.name || null;
 
-  // Production's counter inputs. On the arcFromExperiment path the arc's STORY
-  // LOGIC supplies what beatsPipeline takes from the committed arc — the
-  // (commissioned) figures, the invented list and its allowance. A stored
-  // story does not carry them (the arc machine's premise figures and invented
-  // allowance do not survive into the row).
-  const commission = require('./castCoverage').commissionedCast(storyData, expArc ? expArc.logic.commissioned : []);
-  const commissionedNames = commission.all;
-  const inventedArgs = expArc ? { declaredInvented: expArc.logic.invented, inventedAllowance: arcInventedAllowance(storyData) } : {};
-  const placeNames = collectPlaceNames(storyData, [
-    ...(storyData?.storyCategory === 'historical'
-      ? [...getHistoricalLocations(storyData.storyTopic), ...getHistoricalObjects(storyData.storyTopic)].map(e => e && e.name)
-      : []),
-  ]);
-  const maxCast = IMAGE_MODELS[storyData?.modelOverrides?.imageModel || MODEL_DEFAULTS.pageImage]?.maxCharactersPerScene || 3;
-
+  const inputs = planCheckInputs(storyData, { arcPremiseNames, modelOverrides: {} });
+  const { commission, commissionedNames, maxCast } = inputs;
+  const checkModel = params.checkModel || inputs.planCheckModel;
+  for (const m of [checkModel, planModel]) if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
+  const runCheck = createPlanCheckRunner({
+    inputData: storyData, approvedArc, arcHints, arcStoryLogic: storyLogic, arcCentralFigure: centralFigure, castTable,
+    commission, commissionedNames, placeNames: inputs.placeNames, maxCast, arcInventedNames, arcInventedLimit, mainName,
+    planCheckModel: checkModel, onChunk: null, gl, labPromptOptions, onCall,
+  });
   const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
-
-  // ── the plan check ────────────────────────────────────────────────────────
-  // One helper for the check and the recheck, shaped as beatsPipeline's
-  // runCheck: the model call, its roster, the counters on that roster, and the
-  // findings structured the way the re-plan and the round guard read them.
-  const runCheckOn = async (pages, planText, usageLabel) => {
-    const prompt = buildPlanCheckPrompt(storyData, pages, approvedArc, planText, { arcHints, storyLogic, centralFigure, mayAddDeeds, castTable });
-    if (!prompt) throw new Error('plan-check template unavailable');
-    const res = await callTextModelStreaming(prompt, null, null, checkModel, {
-      usageLabel,
-      ...(TEXT_MODELS[checkModel]?.provider === 'anthropic' ? {} : { temperature: 0 }),
-    });
-    if (!String(res.text || '').trim()) throw new Error(`plan checker ${checkModel} returned an empty response — provider failure, not a result`);
-    const modelFindings = parsePlanCheck(res.text || '');
-    const roster = parsePlanCheckRoster(res.text || '');
-    const counters = runPlanCounters({
-      pages, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, roster, centralFigure,
-      centralPages: parsePlanCheckCentralPages(res.text || ''), ...inventedArgs,
-      mainName, castTable, actions: parsePlanCheckActions(res.text || ''),
-    });
-    return {
-      prompt, res, roster, counters,
-      findings: [
-        ...counters.findings.map((f, i) => ({ kind: 'counter', code: f.code, line: counters.lines[i] })),
-        ...modelFindings.map(f => ({ kind: 'check', check: f.check, line: `CHECK[${f.check}]: ${f.text}` })),
-      ],
-    };
-  };
-  let t = Date.now();
-  const firstCheck = await runCheckOn(standing, pagePlan, 'testlab_beats_replan_check');
-  const checkMs = Date.now() - t;
-  const { prompt: checkPrompt, res: checkRes, roster, counters, findings } = firstCheck;
-  const obstacles = parsePlanCheckObstacles(checkRes.text || '');
-  const checkActions = parsePlanCheckActions(checkRes.text || '');
-  // What the stage reads off the first check for every run: the findings that
-  // answer "does each commissioned character get a page", and the per-character
-  // pages on the checker's roster.
-  const castFindings = findings
-    .filter(f => (f.kind === 'counter' && CAST_FINDING_CODES.has(f.code)) || (f.kind === 'check' && f.check === 12))
-    .map(f => f.line);
-  const castSummary = castPageSummary({
-    listed: commission.listed, stats: counters.stats, actions: checkActions,
-    aliases: (counters.cast && counters.cast.aliases) || {},
-  });
-  // Echoed so the row says which prompt variant it measured.
-  const variant = { plannerMayAddDeeds: mayAddDeeds, planAndCheck, arcSource: expArc ? expArc.source : 'stored story arc', castTable, ...(castTableNote ? { castTableNote } : {}) };
-  const firstPlanOut = firstPlan && {
-    ...firstPlan,
-    modelId: planRes.modelId || planModel,
-    elapsedMs: planMs,
-    cost: costOf(planRes),
-    pages: standing,
-  };
-  if (findings.length === 0 || planAndCheck) {
-    // Production re-plans on any finding (beatsPipeline: `check1.lines.length > 0`).
-    // A stored division is replayed only to measure a re-plan, so there it is a
-    // bad pick; a division this stage planned simply shipped as it stands.
-    // planAndCheck stops here by definition, findings or not.
-    if (!expArc && !planAndCheck) throw new Error('the plan check raised no finding against this division — there is nothing for a re-plan to answer, so pick a story whose check fires');
-    const calls = [planRes, checkRes];
-    return {
-      storyId: target.storyId,
-      pages: pageCount,
-      models: { checkModel, checkModelId: checkRes.modelId || checkModel, planModel, planModelId: planRes.modelId || planModel },
-      elapsedMs: planMs + checkMs,
-      cost: calls.reduce((a, r) => a + costOf(r), 0),
-      usage: {
-        input_tokens: calls.reduce((a, r) => a + (r.usage?.input_tokens || 0), 0),
-        output_tokens: calls.reduce((a, r) => a + (r.usage?.output_tokens || 0), 0),
-      },
-      note: findings.length === 0
-        ? `plan check raised no finding — production would not re-plan; the first division ships (${castSummary.map(c => `${c.name}: ${c.actionPage == null ? 'no action page' : `action p${c.actionPage}`}`).join(', ')})`
-        : `planAndCheck: fresh division checked, ${findings.length} finding(s), no re-plan run (group pages ${(counters.stats.groupPages?.pages || []).join(', ') || 'none'} of budget ${counters.stats.groupPages?.budget ?? 'none'})`,
-      report: { ...variant, replan: findings.length === 0 ? 'not run: the plan check raised no finding' : 'not run: planAndCheck', castSummary, castFindings },
-      firstPlan: firstPlanOut,
-      standingPlan: standing,
-      findings: findings.map(f => f.line),
-      counterStats: counters.stats,
-      cast: counters.cast,
-      rosterPages: roster ? roster.size : 0,
-      checkPrompt,
-      checkRawResponse: (checkRes.text || '').slice(0, 40000),
-      checkActions,
-    };
-  }
-
-  // ── the re-plan ───────────────────────────────────────────────────────────
-  const keep = replanKeepPages({
-    pageCount,
-    wanted: parsePlanCheckWanted(checkRes.text || ''),
-    actions: checkActions,
-    focalPages: (counters.stats && counters.stats.focalPages) || {},
-  });
-  const coverageRule = require('./castCoverage').castCoverage({ pageCount, castCount: commission.listed.length });
-  const replanSection = buildReplanSection(pagePlan, findings, { pageCount, keep, castFloor: coverageRule ? coverageRule.appearances.min : null, castTable });
-  const replanPrompt = buildBeatsPrompt(storyData, pageCount, { finalArc: approvedArc, arcHints, storyLogic, centralFigure, replan: replanSection, mayAddDeeds, castTable });
-  if (!replanPrompt) throw new Error('story-beats template unavailable');
-  t = Date.now();
-  const rpRes = await callTextModelStreaming(replanPrompt, null, null, planModel, { usageLabel: 'testlab_beats_replan' });
-  if (!String(rpRes.text || '').trim()) throw new Error(`planner ${planModel} returned an empty response — provider failure, not a result`);
-  const replanMs = Date.now() - t;
-
-  const verdict = analyzeReplanCompliance({
-    replanText: rpRes.text || '',
-    checkText: checkRes.text || '',
-    standing,
-    findings,
-    castNames: (counters.cast && counters.cast.all) || commissionedNames,
-    aliases: (counters.cast && counters.cast.aliases) || {},
-    maxCast,
-    focalNames: coverageRule && coverageRule.focalEach ? commission.listed : [],
-    keep,
-    castFloor: coverageRule ? { names: commission.listed, min: coverageRule.appearances.min } : null,
-  });
-
-  // ── the recheck and the round guard, as beatsPipeline runs them ───────────
-  // Production rechecks every round the corruption guards let through and
-  // discards one that raises the cast/focal must-fix count
-  // (`replanRoundRegressed`, round 1 semantics — this stage is one round). A
-  // round the guards already discarded, or one that changed nothing, is never
-  // rechecked there, so it is not rechecked here.
-  let recheck = null;
-  let guard = null;
-  let recheckMs = 0;
-  if (!verdict.discardReason && verdict.changedPagesApplied.length > 0) {
-    const appliedText = verdict.appliedPlan.map(pg => `Page ${pg.pageNumber}: ${pg.planLine}`).join('\n');
-    t = Date.now();
-    recheck = await runCheckOn(verdict.appliedPlan, appliedText, 'testlab_beats_replan_recheck');
-    recheckMs = Date.now() - t;
-    const g = replanRoundRegressed({ findings }, { findings: recheck.findings }, verdict.changedPagesApplied, { round: 1 });
-    guard = {
-      before: g.before, after: g.after, noise: g.noise.map(f => f.line),
-      kept: !g.discard,
-      discardReason: g.discard ? `raised the cast/focal must-fix count (${g.before} → ${g.after})` : null,
-    };
-  }
-  // The division that ships, read on the checker that last saw it: the recheck
-  // when the round was kept, the first check otherwise.
-  const recheckCastSummary = recheck ? castPageSummary({
-    listed: commission.listed, stats: recheck.counters.stats, actions: parsePlanCheckActions(recheck.res.text || ''),
-    aliases: (recheck.counters.cast && recheck.counters.cast.aliases) || {},
-  }) : null;
-
-  const { appliedPlan, ...reportFields } = verdict;
-  const calls = [...(planRes ? [planRes] : []), checkRes, rpRes, ...(recheck ? [recheck.res] : [])];
-
-  return {
-    storyId: target.storyId,
-    pages: pageCount,
-    models: { checkModel, checkModelId: checkRes.modelId || checkModel, planModel, planModelId: rpRes.modelId || planModel },
-    elapsedMs: planMs + checkMs + replanMs + recheckMs,
+  const tally = () => ({
     cost: calls.reduce((a, r) => a + costOf(r), 0),
     usage: {
       input_tokens: calls.reduce((a, r) => a + (r.usage?.input_tokens || 0), 0),
       output_tokens: calls.reduce((a, r) => a + (r.usage?.output_tokens || 0), 0),
     },
-    note: `${verdict.passed}/${verdict.checks.length} plumbing checks pass — ${verdict.changesParsed} change(s) on ${verdict.changeLines} line(s), ${verdict.formatViolations.length} format violation(s), ${verdict.refusals.length} refusal(s) — ${verdict.noOp ? 'the round WOULD have been a no-op' : `${verdict.changedPagesApplied.length} page(s) survive to the book`}${verdict.discardReason ? ` (round discarded: ${verdict.discardReason})` : ''}${guard ? ` — guard: cast/focal must-fix ${guard.before} → ${guard.after}, round ${guard.kept ? 'KEPT' : 'DISCARDED'}` : ''}`,
+  });
+
+  const t0 = Date.now();
+  const check1 = await runCheck('plan_check', plan.pages, pagePlan);
+  const checkActions = check1.actions || [];
+  // The findings that answer "does each commissioned character get a page",
+  // and the per-character pages on the checker's roster.
+  const castFindings = check1.findings
+    .filter(f => (f.kind === 'counter' && CAST_FINDING_CODES.has(f.code)) || (f.kind === 'check' && f.check === 12))
+    .map(f => f.line);
+  const castSummary = castPageSummary({
+    listed: commission.listed, stats: check1.counters.stats, actions: checkActions,
+    aliases: (check1.counters.cast && check1.counters.cast.aliases) || {},
+  });
+  const variant = {
+    plannerMayAddDeeds: mayAddDeeds, planAndCheck, arcSource: expArc ? expArc.source : 'stored story arc',
+    firstDivision: firstPlan ? 'planned by this stage' : (plannerReply ? 'the run\'s stored planner reply' : 'the stored briefsIn'),
+    castTable, ...(castTableNote ? { castTableNote } : {}),
+  };
+  const base = {
+    storyId: target.storyId,
+    pages: pageCount,
+    models: { checkModel, checkModelId: check1.checkModelId || checkModel, planModel },
+    firstPlan,
+    standingPlan: plan.pages.map(pg => ({ pageNumber: Number(pg.pageNumber), planLine: pg.planLine })),
+    findings: check1.lines,
+    counterStats: check1.counters.stats,
+    cast: check1.counters.cast,
+    rosterPages: (check1.rosterLines || []).length,
+    obstaclePages: check1.obstacles ? [...check1.obstacles.keys()].sort((a, b) => a - b) : [],
+    checkPrompt: check1.prompt,
+    checkActions,
+    checkRawResponse: (check1.reply || '').slice(0, 40000),
+    events,
+  };
+  if (check1.lines.length === 0 || planAndCheck) {
+    // Production re-plans on any finding (`check1.lines.length > 0`).
+    // planAndCheck stops here by definition, findings or not.
+    if (!expArc && !planAndCheck && !firstPlan && check1.lines.length === 0) {
+      throw new Error('the plan check raised no finding against this division — there is nothing for a re-plan to answer, so pick a story whose check fires');
+    }
+    return {
+      ...base, ...tally(), elapsedMs: Date.now() - t0,
+      note: check1.lines.length === 0
+        ? `plan check raised no finding — production would not re-plan; the first division ships (${castSummary.map(c => `${c.name}: ${c.actionPage == null ? 'no action page' : `action p${c.actionPage}`}`).join(', ')})`
+        : `planAndCheck: fresh division checked, ${check1.lines.length} finding(s), no re-plan run (group pages ${(check1.counters.stats.groupPages?.pages || []).join(', ') || 'none'} of budget ${check1.counters.stats.groupPages?.budget ?? 'none'})`,
+      report: { ...variant, replan: check1.lines.length === 0 ? 'not run: the plan check raised no finding' : 'not run: planAndCheck', castSummary, castFindings },
+    };
+  }
+
+  // ── the re-plan rounds, as the run runs them ──────────────────────────────
+  const replanRounds = [];
+  const shippedDivision = await runReplanRounds({
+    inputData: storyData, pageCount, plan, check1, replanRounds, approvedArc, arcHints, arcStoryLogic: storyLogic,
+    arcCentralFigure: centralFigure, castTable, commission, commissionedNames, maxCast, planModel, readPlan, runCheck,
+    onChunk: null, gl, stage: async () => {}, checkCancellation: async () => {}, labPromptOptions, onCall,
+    beats: plan.pages, pagePlan,
+  });
+  const shipped = shippedReplanState(replanRounds);
+
+  // THE LAB'S COMPLIANCE READING of round 1 (research, no production
+  // counterpart): how the round's reply kept the re-plan contract, read off
+  // the run's own round record.
+  const round1 = replanRounds.find(r => r.round === 1) || null;
+  const coverageRule = require('./castCoverage').castCoverage({ pageCount, castCount: commission.listed.length });
+  const keep = replanKeepPages({
+    pageCount, wanted: check1.wanted, actions: checkActions,
+    focalPages: (check1.counters.stats && check1.counters.stats.focalPages) || {},
+  });
+  const verdict = round1 ? analyzeReplanCompliance({
+    replanText: round1.replanReply || '',
+    checkText: check1.reply || '',
+    standing: plan.pages,
+    findings: check1.findings,
+    castNames: (check1.counters.cast && check1.counters.cast.all) || commissionedNames,
+    aliases: (check1.counters.cast && check1.counters.cast.aliases) || {},
+    maxCast,
+    focalNames: coverageRule && coverageRule.focalEach ? commission.listed : [],
+    keep,
+    castFloor: coverageRule ? { names: commission.listed, min: coverageRule.appearances.min } : null,
+  }) : null;
+  const shippedCheck = shipped.recheck;
+  const recheckCastSummary = shippedCheck ? castPageSummary({
+    listed: commission.listed, stats: shippedCheck.counterStats || {}, actions: shippedCheck.actions || [],
+    aliases: (check1.counters.cast && check1.counters.cast.aliases) || {},
+  }) : null;
+  const { appliedPlan, ...complianceFields } = verdict || {};
+  const roundsOut = replanRounds.map(r => ({
+    round: r.round, kept: r.kept, discardReason: r.discardReason || null, changedPages: r.changedPages,
+    findingsIn: r.findingsIn ?? null, declaredChanges: r.declaredChanges ?? null, changeRefusals: r.changeRefusals || [],
+    recheckFindings: r.recheck ? r.recheck.lines : null,
+  }));
+  return {
+    ...base, ...tally(), elapsedMs: Date.now() - t0,
+    note: `${replanRounds.length} re-plan round(s): ${roundsOut.map(r => `round ${r.round} ${r.kept ? 'KEPT' : `DISCARDED (${r.discardReason})`}, ${r.changedPages.length} page(s) changed`).join('; ')} — ${shipped.changedPages.length} page(s) re-divided in the division that ships${verdict ? ` — round 1: ${verdict.passed}/${verdict.checks.length} plumbing checks pass, ${verdict.changesParsed} change(s), ${verdict.formatViolations.length} format violation(s), ${verdict.refusals.length} refusal(s)` : ''}`,
     // `report` is what the Lab renders for this stage (client TestLab.tsx).
-    // The applied division travels beside it rather than inside: the rendered
-    // block stays the verdict, not a second copy of the page plan.
     report: {
       ...variant,
-      ...reportFields, guard, recheckFindings: recheck ? recheck.findings.map(f => f.line) : null,
+      ...complianceFields,
+      rounds: roundsOut,
+      shippedChangedPages: shipped.changedPages,
+      recheckFindings: shippedCheck ? shippedCheck.lines : null,
       castSummary, castFindings, recheckCastSummary,
     },
-    firstPlan: firstPlanOut,
-    appliedPlan,
-    standingPlan: standing,
-    findings: findings.map(f => f.line),
-    counterStats: counters.stats,
-    cast: counters.cast,
-    rosterPages: roster ? roster.size : 0,
-    obstaclePages: [...obstacles.keys()].sort((a, b) => a - b),
-    replanSection,
-    checkPrompt,
-    replanPrompt,
-    checkActions,
-    checkRawResponse: (checkRes.text || '').slice(0, 40000),
-    recheckRawResponse: recheck ? (recheck.res.text || '').slice(0, 40000) : null,
-    replanRawResponse: (rpRes.text || '').slice(0, 40000),
+    appliedPlan: shippedDivision.beats.map(pg => ({ pageNumber: Number(pg.pageNumber), planLine: pg.planLine })),
+    replanPrompt: round1 ? round1.replanPrompt : null,
+    replanRawResponse: round1 ? (round1.replanReply || '').slice(0, 40000) : null,
+    recheckRawResponse: shippedCheck ? (shippedCheck.reply || '').slice(0, 40000) : null,
   };
 }
 
@@ -11125,6 +11078,7 @@ module.exports = {
   runEvalVarianceStage,
   runConsolidateStage,
   runInpaintStage,
+  runBeatsReplanStage,
   runEmptySceneStage,
   runEditImageStage,
   // The page render and the char-fix, exported so "with no params the Lab sends

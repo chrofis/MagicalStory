@@ -873,6 +873,613 @@ function shippedReplanState(rounds = []) {
   return { changedPages: [...changed].sort((a, b) => a - b), recheck, discardedRounds, declaredChanges, changeRefusals, replanPrompts, replanReplies };
 }
 
+// ── STEP 2 OF THE BEATS PIPELINE, SHARED WITH THE TEST LAB ─────────────────
+// The plan check (counters + the one model call) and the re-plan rounds, moved
+// verbatim out of generateStoryViaBeats on 2026-09-27 so the Lab's
+// beats_replan stage runs the rounds production runs (owner: "The Lab must use
+// 100% identical code to production"). The stage used to rebuild the check,
+// one round and its guard itself — without the CAST table on the re-plan, the
+// arc's invented / commissioned figures, the checker's PEOPLELESS pick, the
+// review of declared changes and the second round.
+// `labPromptOptions` carries a Test Lab A/B prompt knob (plannerMayAddDeeds)
+// and `onCall` hands the Lab each model reply (its cost report); the run
+// passes neither.
+
+/**
+ * One planner response -> its PAGE PLAN text and its parsed beats, for the
+ * first division and every re-plan alike (shared with the Test Lab).
+ */
+function makePlanReader(expected, approvedArc) {
+  return (raw) => {
+    const parsed = parsePlanResponse(String(raw || ''), expected);
+    // The approved arc is the story; the planner does not author one.
+    parsed.arc = approvedArc || '';
+    return { parsed, pagePlan: parsed.pagePlan };
+  };
+}
+
+/**
+ * The counter inputs of the plan check: the commissioned cast (the character
+ * list plus the figures the arc tagged commissioned), the place names that
+ * can never be cast, the page cast ceiling and the check model.
+ */
+function planCheckInputs(inputData, { arcPremiseNames = [], modelOverrides = {} } = {}) {
+  // The character list PLUS the figures the premise supplied (the arc reports
+  // them; see `arcPremiseNames`). A pet the commission named is commissioned.
+  //
+  // ONE definition, shared with the Test Lab replay (castCoverage.commissionedCast):
+  // `listed` is the character list — the characters that owe the book a focal
+  // page and the castCoverage() appearance floor — and `all` adds the figures
+  // the commission supplied elsewhere, which are never invented.
+  const commission = commissionedCast(inputData, arcPremiseNames);
+  const commissionedNames = commission.all;
+  if (arcPremiseNames.length) log.info(`👪 [BEATS] Figures the arc tagged (commissioned), counted as commissioned: ${arcPremiseNames.join(', ')}`);
+  // The counters must never read a PLACE as a person. The names come from the
+  // same authoritative data the planner itself was given — the resolved
+  // landmark list, the family's town, and (historical stories) the canonical
+  // locations and period objects — never from a word list or a prose pattern.
+  // Story job_1788614817116_vxnu60yjg entered "Uetliberg" and "Aussichtsturm
+  // Uetliberg" into the invented cast and manufactured six INVENTED_DOMINANT
+  // pages off it (docs/decisions.md, 2026-09-05).
+  const placeNames = collectPlaceNames(inputData, [
+    ...(inputData?.storyCategory === 'historical'
+      ? [...getHistoricalLocations(inputData.storyTopic), ...getHistoricalObjects(inputData.storyTopic)].map(e => e && e.name)
+      : []),
+  ]);
+  if (placeNames.length) log.debug(`[BEATS] plan counters know ${placeNames.length} place name(s) that can never be cast`);
+  const maxCast = IMAGE_MODELS[inputData?.modelOverrides?.imageModel || MODEL_DEFAULTS.pageImage]?.maxCharactersPerScene || 3;
+  const planCheckModel = modelOverrides.planCheckModel || MODEL_DEFAULTS.planCheckModel;
+  return { commission, commissionedNames, placeNames, maxCast, planCheckModel };
+}
+
+/**
+ * Counters (free, deterministic) + the one model call. Never throws: the
+ * model half is advisory, and a lost call leaves the counters standing alone
+ * rather than skipping the check entirely.
+ */
+// MODEL FIRST, COUNTERS SECOND (2026-09-11). The counters used to run first
+// and their lines were shown to the model for reference. They cannot run
+// first any more: who is on a page is a question about English, the model
+// call answers it as a ROSTER, and the counters do arithmetic on that answer
+// instead of re-deriving the cast from the prose with a grammar heuristic.
+function createPlanCheckRunner({ inputData, approvedArc, arcHints, arcStoryLogic, arcCentralFigure, castTable, commission, commissionedNames, placeNames, maxCast, arcInventedNames, arcInventedLimit, mainName, planCheckModel, onChunk, gl, labPromptOptions = {}, onCall = null }) {
+  return async (label, pages, planText) => {
+    let modelFindings = [];
+    let roster = null;
+    // The check's OBSTACLES block: per page, the character whose action that
+    // page's instant works against (plan-check Q11). It is the declared
+    // evidence a re-plan's removal is judged against — a figure the arc gives a
+    // moment of their own is not a figure a page may quietly drop — so it is
+    // read as DATA here, never re-derived from a finding's prose.
+    let obstacles = null;
+    // The check's PEOPLELESS line (Q6): the page the checker nominates to give
+    // up its cast, emitted only when no page is people-free. Read as DATA, the
+    // same way the OBSTACLES block is — picking the page in code was built and
+    // rejected on measurement (docs/decisions.md, 2026-09-20).
+    let peoplelessPick = null;
+    // The check's WANTED (Q4) and ACTION (Q12) lines: the pictures the next
+    // round must keep, read as DATA like OBSTACLES (2026-09-23).
+    let wanted = [];
+    let actions = [];
+    // The check's CENTRAL line: the pages whose picture shows the central
+    // figure, answered for the name Q12 gives it (2026-09-25). null = no line.
+    let centralPages = null;
+    let checkModelId = null;
+    let prompt = null;
+    // THE REPLY IS EVIDENCE, NOT A BYPRODUCT (2026-09-19).
+    //
+    // `modelFindings: []` has two readings — the checker found nothing, or it
+    // answered badly — and until this was kept the row could not tell them
+    // apart. On staging job_1789759147125_p08djwhbl the eleven-check call
+    // returned zero findings against a plan that breaks four of the planner's
+    // own rules on page 5 alone, and the only reason we know the call arrived
+    // at all is that `cast` happens to be derived from its roster.
+    //
+    // Text only, no images, and the arc stage already keeps the creator's full
+    // reply (`arcReviewReport.create`) for exactly this reason.
+    let reply = '';
+    let rosterLines = [];
+    try {
+      // No counter findings ride in: they do not exist yet. See the builder's
+      // header — the counters read this call's ROSTER, so they run below.
+      prompt = buildPlanCheckPrompt(inputData, pages, approvedArc, planText, { arcHints, storyLogic: arcStoryLogic, centralFigure: arcCentralFigure, castTable, ...labPromptOptions });
+      if (!prompt) throw new Error('plan-check template unavailable');
+      const res = await textModels.callTextModelStreaming(prompt, null, onChunk, planCheckModel, {
+        usageLabel: label,
+        // Judges run at temperature 0 (settled); the Anthropic path sends none.
+        ...(TEXT_MODELS[planCheckModel]?.provider === 'anthropic' ? {} : { temperature: 0 }),
+      });
+      if (onCall) onCall(res);
+      checkModelId = res.modelId || planCheckModel;
+      reply = String(res.text || '');
+      modelFindings = parsePlanCheck(res.text || '');
+      roster = parsePlanCheckRoster(res.text || '');
+      obstacles = parsePlanCheckObstacles(res.text || '');
+      peoplelessPick = parsePlanCheckPeoplelessPick(res.text || '');
+      wanted = parsePlanCheckWanted(res.text || '');
+      actions = parsePlanCheckActions(res.text || '');
+      centralPages = parsePlanCheckCentralPages(res.text || '');
+      // The roster AS PARSED, page by page. The raw reply above carries the
+      // same lines verbatim; this is the form every counter actually reasons
+      // on, so a reader can see what the arithmetic was given — including a
+      // `covers` that expanded nobody, which is how "all four boys" reached
+      // the cast count as two names on that same job.
+      rosterLines = [...roster.entries()]
+        .sort((a, b) => a[0] - b[0])
+        .map(([pageNumber, r]) => ({ pageNumber, people: r.people, things: r.things, covers: r.covers }));
+    } catch (err) {
+      // LOUD, NEVER FATAL. A lost plan check takes the ENTIRE counter layer
+      // with it (the counters do arithmetic on its roster), so this is an
+      // ERROR in the run log and in the generation log — not a WARN that two
+      // days of beats runs scrolled past (2026-09-13, the undefined
+      // `parsePlanCheckRoster` binding). It still never aborts a paid run:
+      // quality gates ship with a warning (feedback_gates_are_guidelines).
+      log.error(`❌ [BEATS] Plan check (${label}) failed (${err.message}) — NO ROSTER, so the entire plan-counter layer is skipped this round`);
+      gl.error(`${label}_failed`, `Plan check failed: ${err.message} — no roster, so every plan counter (cast, invented cast, shot variety, focal pages) is skipped this round`, null, { error: err.message, model: planCheckModel });
+    }
+    const counters = runPlanCounters({ pages, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit, roster, peoplelessPick, centralFigure: arcCentralFigure, centralPages, mainName, castTable, actions });
+    // The central-figure counter counts on the CENTRAL line alone; a check
+    // that named no pages for a named figure leaves it uncounted — loudly.
+    if (counters.stats?.centralFigure?.unanswered) {
+      log.error(`❌ [BEATS] Plan check (${label}) gave no CENTRAL line for the central figure (${arcCentralFigure.join(' / ')}) — CENTRAL_FIGURE_ABSENT_THIRD did not run`);
+      gl.error(`${label}_no_central_line`, 'The plan check named no pages for the central figure (CENTRAL line absent); the per-third presence counter did not run', null, { model: checkModelId || planCheckModel, centralFigure: arcCentralFigure });
+    }
+    // NO FALLBACK, NO SYNTHESIS. The finding degrades to its page-less
+    // sentence when Q6 nominated nothing; code never picks the page itself.
+    // The miss is loud so a checker that stops answering Q6 is visible.
+    if (!peoplelessPick && counters.findings.some(f => f.code === 'NO_PEOPLELESS_PAGE')) {
+      log.error(`❌ [BEATS] Plan check (${label}) fired NO_PEOPLELESS_PAGE but emitted no PEOPLELESS line — the finding names no page, and the planner picks blind`);
+      gl.error(`${label}_no_peopleless_nomination`, 'The plan check found no people-free page but nominated none either (Q6 PEOPLELESS line absent); the finding degrades to naming no page', null, { model: checkModelId || planCheckModel });
+    }
+    if (counters.skipped) {
+      const got = roster ? roster.size : 0;
+      log.error(`❌ [BEATS] Plan counters (${label}) SKIPPED (${counters.skipped}) — the roster covers ${got} of ${pages.length} page(s); no cast, invented-cast, shot-variety or focal-page counting ran`);
+      gl.error(`${label}_counters_skipped`, `Plan counters did not run (${counters.skipped}): the check's roster covers ${got} of ${pages.length} page(s)`, null, { reason: counters.skipped, rosterPages: got, pages: pages.length });
+    }
+    // Findings travel STRUCTURED to the re-plan: a counter keeps its code, a
+    // model finding the check number it answered, so buildReplanSection can rank
+    // them without reading their prose. `lines` stays the flat rendering the
+    // report and the logs have always carried.
+    const structured = [
+      ...counters.findings.map((f, i) => ({ kind: 'counter', code: f.code, line: counters.lines[i] })),
+      ...modelFindings.map(f => ({ kind: 'check', check: f.check, line: `CHECK[${f.check}]: ${f.text}` })),
+    ];
+    const all = structured.map(f => f.line);
+    gl.info(label, `Plan check by ${checkModelId || planCheckModel}: ${counters.lines.length} counter finding(s), ${modelFindings.length} model finding(s)`, null, {
+      counterFindings: counters.lines, modelFindings, model: checkModelId, stats: counters.stats, cast: counters.cast,
+    });
+    return { counters, modelFindings, findings: structured, lines: all, checkModelId, prompt, obstacles, reply, rosterLines, wanted, actions };
+  };
+}
+
+function recheckRecord(c) {
+  // ONE shape for a recheck wherever it is recorded — the canonical `recheck`
+  // and a discarded round's sit side by side in the stored report and a reader
+  // must be able to compare them without learning two layouts.
+  return (c ? {
+    counterFindings: c.counters.lines,
+    counterStats: c.counters.stats,
+    modelFindings: c.modelFindings,
+    // The flat rendering (counter lines + `CHECK[n]: …`) the summary prose and
+    // the log line both read, so the record is self-contained and no reader
+    // re-derives it.
+    lines: c.lines,
+    // Same evidence as the first check: an empty `modelFindings` on a RECHECK
+    // is the same two-way ambiguity, and a discarded round's record is where
+    // one would most want to see what the model actually said.
+    reply: c.reply || '',
+    rosterLines: c.rosterLines || [],
+    // THE RECHECK'S OWN PROMPT (2026-09-23). Only the first check's prompt was
+    // stored, so a recheck could be read only by rebuilding it at the run's
+    // commit — a reconstruction, not the bytes sent.
+    prompt: c.prompt || '',
+    wanted: c.wanted || [],
+    actions: c.actions || [],
+  } : null);
+}
+
+/**
+ * The re-plan rounds for a division whose first check raised findings. Pushes
+ * every round onto `replanRounds` (kept and discarded alike) and returns the
+ * division that ships.
+ *
+ * @returns {Promise<{beats: Array, pagePlan: string}>}
+ */
+async function runReplanRounds({ inputData, pageCount, plan, check1, replanRounds, approvedArc, arcHints, arcStoryLogic, arcCentralFigure, castTable, commission, commissionedNames, maxCast, planModel, readPlan, runCheck, onChunk, gl, stage, checkCancellation, labPromptOptions = {}, onCall = null, beats, pagePlan }) {
+  try {
+    // RE-PLAN ROUNDS (2026-09-09). The loop used to be check → re-plan →
+    // recheck → ship: a fault the RE-PLAN ITSELF introduced was named by the
+    // recheck and never fixed. Measured on the dragon story: the first
+    // division buried the spring's release inside a four-action page; the
+    // re-plan correctly split it out and left the new page holding the deed
+    // AND its effect ("rams the branch into the crack, water shoots out").
+    // The recheck said so in those words and the story shipped that way.
+    // A second round runs only when a MUST-FIX finding survives — the
+    // ranking `replanRank` already computes, so an "also noted" line can
+    // never spend a round. Bounded at two re-plans; the plan model is the
+    // cheapest call in the stage and a third round has never been needed.
+    const MAX_REPLAN_ROUNDS = 2;
+    let pendingCheck = check1;
+    // A round must EARN its keep. Measured 2026-09-09 on
+    // job_1788903616404_iqvhj4l8m: round 2 re-wrote 17 of 18 pages to clear
+    // three must-fix findings and minted five new ones (findings 26 -> 13 ->
+    // 23). The planner re-emits the whole division each round, so a round
+    // that does not reduce the must-fix count is not converging — it is
+    // rolling the dice on every page at once. Such a round is DISCARDED and
+    // the previous division stands, which makes the loop monotonic.
+    //
+    // THE COUNT IS THE CAST/FOCAL MUST-FIX COUNT, NOT THE RAW TOTAL
+    // (2026-09-20). Shot-distribution findings are must-fix — the re-plan is
+    // obliged to answer them — but they are exempt from THIS measure
+    // (promptBuilders.REPLAN_CONVERGENCE_EXEMPT_CODES). A shot finding is
+    // cleared by relabelling one page's shot word; a cast or focal finding
+    // costs the book a picture, so a raw total lets cheap shot clears pay for
+    // a lost wanted picture. Measured on job_1789853503332_riqncqg1i, whose
+    // round 2 rewrote 17 of 18 pages, took Q4 wanted-picture findings 2 -> 3
+    // and dropped its Q8 ending, yet read 6 -> 5 on the total because one
+    // ultra-wide finding fell.
+    let bestBeats = beats;
+    let bestPagePlan = pagePlan;
+    // The review's refusals from the round before, told to the next round.
+    let lastRefusals = [];
+    const coverageRule = castCoverage({ pageCount: beats.length, castCount: commission.listed.length });
+    for (let round = 1; round <= MAX_REPLAN_ROUNDS; round++) {
+      await checkCancellation();
+      await stage(5, 'Re-dividing the named pages...', { next: 18, ms: 45000 });
+      // WHAT THIS ROUND MUST KEEP (2026-09-23): the last page, the check's
+      // WANTED and ACTION pages, and a character's only focal page — one list
+      // for the prompt and for the review's `protected` rule below.
+      const keep = replanKeepPages({
+        pageCount: beats.length,
+        wanted: pendingCheck.wanted,
+        actions: pendingCheck.actions,
+        focalPages: (pendingCheck.counters.stats && pendingCheck.counters.stats.focalPages) || {},
+      });
+      const replanPrompt = buildBeatsPrompt(inputData, pageCount, {
+        finalArc: approvedArc,
+        arcHints,
+        storyLogic: arcStoryLogic,
+        centralFigure: arcCentralFigure,
+        castTable,
+        ...labPromptOptions,
+        replan: buildReplanSection(pagePlan, pendingCheck.findings, { pageCount: beats.length, keep, refused: lastRefusals, castFloor: coverageRule ? coverageRule.appearances.min : null, castTable }),
+      });
+      if (!replanPrompt) throw new Error('story-beats template unavailable');
+      const rpRes = await textModels.callTextModelStreaming(replanPrompt, null, onChunk, planModel, { usageLabel: 'beats_replan' });
+      if (onCall) onCall(rpRes);
+      const second = readPlan(rpRes.text);
+      if (second.parsed.pages.length === 0) throw new Error('re-plan returned no parseable plan lines');
+      // DECLARE. The round states each structural change it made — a name in
+      // or out of frame, an action moved or dropped, one page's material
+      // joining another's — with the finding it answers and why. `present:
+      // false` is a round that emitted no block at all: every change it made
+      // is then undeclared, which is the behaviour the merge had before
+      // declarations existed (2026-09-18).
+      const declared = parsePlanChanges(rpRes.text);
+      // A TOTAL IS ALWAYS SELF-CERTIFIABLE: the block re-counts its own lines,
+      // and a count that disagrees with the enumeration is the enumeration's
+      // word against an assertion. The lines win; the discrepancy is reported.
+      if (declared.present && declared.declaredCount != null && declared.declaredCount !== declared.counted) {
+        gl.warn('beats_replan_change_count', `Round ${round}: the change block declares ${declared.declaredCount} change(s) and enumerates ${declared.counted} across ${declared.lines} line(s); the enumeration stands`, null, { round, declared: declared.declaredCount, counted: declared.counted, lines: declared.lines });
+      }
+      // ONE LINE, ONE CHANGE — recorded, not re-asked (2026-09-18). The
+      // parser splits a packed line into its clauses rather than mis-reading
+      // it, so a violation costs the round nothing; it is recorded because a
+      // format nobody polices is not a format. A re-ask is deliberately NOT
+      // wired: both planner models broke the contract on the first live
+      // attempt (Lab 1326: 7 of 10 lines; 1327: 1 of 5), so an automatic
+      // re-ask would buy a paid call on most rounds for a fault the parser
+      // already absorbs.
+      if (declared.violations.length) {
+        const detail = declared.violations.map(v => `p${v.pageNumber} (${v.rule})`).join(', ');
+        log.warn(`⚠️ [BEATS] Round ${round}: ${declared.violations.length} declared change(s) break the change-block format (${detail}) - read clause by clause, not refused`);
+        gl.warn('beats_replan_change_format', `Round ${round}: ${declared.violations.length} declared change(s) break the one-line-one-change format — ${detail}; each was read clause by clause rather than refused`, null, { round, violations: declared.violations });
+      }
+      const unreadable = declared.changes.filter(c => c.kind === 'other');
+      if (unreadable.length) {
+        gl.warn('beats_replan_change_unreadable', `Round ${round}: ${unreadable.length} declared change(s) do not use the declared vocabulary, so nothing reviewed them`, null, { round, lines: unreadable.map(c => c.line.slice(0, 160)) });
+      }
+      // MERGE, don't replace. The re-plan is asked for ONLY the pages a
+      // finding names; every other page stands. Until 2026-09-09 it returned
+      // the whole division, and the planner rewrote 15-18 of 18 pages every
+      // round — which is how a story lost the page where its quest object was
+      // put back (job_1788903616404_iqvhj4l8m: check 9 named the page, the
+      // re-plan answered by deleting the moment, and no check noticed it had
+      // gone). Pages no finding named are restored from the division that
+      // stands, so a round can only change what it was asked to change.
+      const namedPages = new Set();
+      for (const nf of (pendingCheck.findings || [])) for (const n of findingPages(nf)) namedPages.add(Number(n));
+      // A DECLARED PAGE IS IN SCOPE. Splitting a page's second action onto a
+      // picture of its own needs two pages rewritten — the one a finding
+      // named and the neighbour whose number now stages the new moment — and
+      // until 2026-09-18 the merge below restored the neighbour, which made
+      // the split the prompt described structurally impossible. A page the
+      // round DECLARES it changed, with the finding it answers and why, is
+      // asked-for work; a page in neither list is still restored.
+      const declaredPages = new Set();
+      for (const c of declared.changes) {
+        if (Number.isFinite(c.pageNumber)) declaredPages.add(Number(c.pageNumber));
+        if (Number.isFinite(c.toPage)) declaredPages.add(Number(c.toPage));
+        if (Number.isFinite(c.fromPage)) declaredPages.add(Number(c.fromPage));
+      }
+      // When NO finding names a page — a whole-book finding, or a finding whose
+      // page reference could not be read — the re-plan is answering for the
+      // whole division, so every returned page is accepted. The merge still
+      // runs: a page the return omits is filled from the division that stands,
+      // which is what keeps a partial answer from failing the page-count guard
+      // below and having the round discarded without a word.
+      const scopeAll = namedPages.size === 0;
+      {
+        const standing = new Map(beats.map(b => [b.pageNumber, b]));
+        const kept = [];
+        const inScope = n => namedPages.has(Number(n)) || declaredPages.has(Number(n));
+        for (const pg of second.parsed.pages) {
+          if (scopeAll || inScope(pg.pageNumber) || !standing.has(pg.pageNumber)) kept.push(pg);
+          else kept.push(standing.get(pg.pageNumber));
+        }
+        for (const [num, pg] of standing) if (!kept.some(k => k.pageNumber === num)) kept.push(pg);
+        kept.sort((a, b) => a.pageNumber - b.pageNumber);
+        const overridden = scopeAll ? 0 : second.parsed.pages.filter(pg => !inScope(pg.pageNumber) && standing.has(pg.pageNumber)).length;
+        if (overridden > 0) {
+          log.warn(`[BEATS] Round ${round}: the re-plan returned ${overridden} page(s) no finding named and no change declared - restored from the standing division`);
+          gl.warn('beats_replan_unnamed_pages', `Round ${round}: the re-plan rewrote ${overridden} page(s) that no finding named and no change declared; those pages were restored from the division that stands`, null, { round, overridden, named: [...namedPages].sort((a, b) => a - b), declared: [...declaredPages].sort((a, b) => a - b) });
+        }
+        second.parsed.pages = kept;
+        second.parsed.missing = [];
+      }
+      // REVIEW, then APPLY (2026-09-18). A removal is judged, never banned
+      // and never waved through.
+      //
+      // What this replaced: the round was told a removal is never a fix and
+      // `castLostByReplan` mechanically restored every name a re-plan took
+      // out. That rule is one-directional — `NO_COMMISSIONED_ON_PAGE` is
+      // answered by adding, `CAST_OVER_CEILING` by writing a justification
+      // into the line, plan-check Q3 likewise — so an over-crowded page could
+      // only ever get more crowded, and the standing division was treated as
+      // always right when it is itself a model output. Owner's verdict: "we
+      // can not say delete only or add only; we must give a fair review and
+      // allow both fix types."
+      //
+      // Two passes, in this order:
+      //   1. DECLARED changes go to `reviewPlanChanges`, which refuses one
+      //      against declared evidence — the check's own OBSTACLES line for
+      //      that page, the figure's span across the book, the cast ceiling,
+      //      and the page-count balance of a merge and a split. A refusal
+      //      restores that page from the division that stands and the finding
+      //      that named it survives to the recheck; it never discards a round.
+      //   2. UNDECLARED removals — a name gone from a who column with no
+      //      change line saying so — are restored exactly as before. A silent
+      //      deletion is unreviewable: the plan line is the brief's authority,
+      //      so the Art Director loses the figure and the scene review strips
+      //      them by the book (`[cast_not_in_plan]`). On staging
+      //      job_1789681157795_wkt20ckod that cost three CRITICAL and one
+      //      MAJOR IMG fault for an antagonist the page text describes and no
+      //      picture shows, and the only way anyone found it was diffing two
+      //      who-columns after the book was finished.
+      let reviewRefusals = [];
+      {
+        const guardCast = (pendingCheck.counters.cast && pendingCheck.counters.cast.all) || commissionedNames;
+        const guardAliases = (pendingCheck.counters.cast && pendingCheck.counters.cast.aliases) || {};
+        const standing = new Map(beats.map(b => [b.pageNumber, b]));
+        const restore = (pageNumbers) => {
+          const want = new Set(pageNumbers.map(Number));
+          second.parsed.pages = second.parsed.pages.map(pg => (
+            want.has(Number(pg.pageNumber)) && standing.has(pg.pageNumber) ? standing.get(pg.pageNumber) : pg
+          ));
+        };
+
+        const review = reviewPlanChanges({
+          changes: declared.changes,
+          standing: beats,
+          returned: second.parsed.pages,
+          castNames: guardCast,
+          aliases: guardAliases,
+          maxCast,
+          obstacles: pendingCheck.obstacles,
+          focalNames: coverageRule && coverageRule.focalEach ? commission.listed : [],
+          protectedPages: new Map(keep.map(k => [Number(k.page), k.why])),
+          actions: pendingCheck.actions,
+          rankOf: replanRank,
+          // The commissioned span floor the re-plan was told (2026-09-25).
+          castFloor: coverageRule ? { names: commission.listed, min: coverageRule.appearances.min } : null,
+        });
+        reviewRefusals = review.refusals;
+        lastRefusals = review.refusals;
+        if (review.notes.length) {
+          gl.info('beats_replan_change_notes', `Round ${round}: ${review.notes.length} declared change(s) could not be tied to a finding or a cast name`, null, { round, notes: review.notes });
+        }
+        if (review.refusals.length) {
+          restore(review.refusals.map(r => r.pageNumber));
+          const detail = review.refusals.map(r => `p${r.pageNumber} (${r.rule}): ${r.detail}`).join('; ');
+          log.warn(`⚠️ [BEATS] Round ${round}: ${review.refusals.length} declared change(s) refused on review - ${detail}`);
+          gl.warn('beats_replan_change_refused', `Round ${round}: the review refused ${review.refusals.length} declared change(s) — ${detail}; ${review.refusals.length === 1 ? 'that page was' : 'those pages were'} restored from the division that stands`, null, { round, refusals: review.refusals });
+        }
+
+        const lost = castLostByReplan(beats, second.parsed.pages, guardCast, guardAliases, review.declaredOut);
+        if (lost.length) {
+          restore(lost.map(l => l.pageNumber));
+          const detail = lost.map(l => `p${l.pageNumber}: ${l.lost.join(', ')}`).join('; ');
+          log.warn(`⚠️ [BEATS] Round ${round}: the re-plan dropped cast from ${lost.length} page(s) without declaring it (${detail}) - restored from the standing division`);
+          gl.warn('beats_replan_cast_lost', `Round ${round}: the re-plan removed ${detail} from the page plan and declared no change for it; an undeclared removal is unreviewable, so ${lost.length === 1 ? 'that page was' : 'those pages were'} restored from the division that stands`, null, { round, pages: lost, declaredBlock: declared.present });
+        }
+      }
+      // A re-plan that answers "this page holds two actions" by copying a
+      // neighbouring page has destroyed the page, not fixed it. Measured
+      // 2026-09-09 on job_1788903616404_iqvhj4l8m: the page staging the
+      // quest object's return came back as a verbatim duplicate of the page
+      // before it, and the story lost its climax with no check firing.
+      // Two pages with the same instant is corruption, so the round is
+      // discarded and the division that stands is kept.
+      {
+        const instants = second.parsed.pages.map(pg => String(pg.planLine || '').toLowerCase().replace(/\s+/g, ' ').trim());
+        const dupe = instants.find((t, k) => t && instants.indexOf(t) !== k);
+        if (dupe) {
+          log.warn(`[BEATS] Round ${round} returned two pages with the same line - discarding it, the previous division stands`);
+          gl.warn('beats_replan_duplicate', `Round ${round} produced two pages with an identical plan line; the round was discarded and the previous division stands`, null, { round, line: dupe.slice(0, 160) });
+          replanRounds.push({ round, changedPages: [], recheck: null, kept: false, replanPrompt, replanReply: String(rpRes.text || ''), discardReason: 'two pages returned with an identical plan line' });
+          beats = bestBeats;
+          pagePlan = bestPagePlan;
+          break;
+        }
+      }
+      // THE PAGE COUNT IS THE ORDER (2026-09-14). The re-plan may move, split
+      // or merge instants, but a round that returns more or fewer pages than
+      // the division that stands is not a re-division of THIS book: on
+      // job_1789337998754_apslnsq1z an 18-page order came back as 19 plan
+      // lines, passed both guards above (no duplicate, nothing omitted), and
+      // shipped as a 19-page book. Same remedy as the duplicate guard: the
+      // round is discarded and the previous division stands.
+      if (second.parsed.pages.length !== beats.length) {
+        log.warn(`[BEATS] Round ${round} returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book - discarding it, the previous division stands`);
+        gl.warn('beats_replan_page_count', `Round ${round} returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book; the round was discarded and the previous division stands`, null, { round, returned: second.parsed.pages.length, expected: beats.length });
+        replanRounds.push({ round, changedPages: [], recheck: null, kept: false, replanPrompt, replanReply: String(rpRes.text || ''), discardReason: `returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book` });
+        beats = bestBeats;
+        pagePlan = bestPagePlan;
+        break;
+      }
+      if (second.parsed.missing.length > 0) {
+        log.warn(`⚠️ [BEATS] Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — previous division kept`);
+        gl.warn('beats_replan_incomplete', `Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — previous division kept`);
+        replanRounds.push({ round, changedPages: [], recheck: null, kept: false, replanPrompt, replanReply: String(rpRes.text || ''), discardReason: `omitted page(s) ${second.parsed.missing.join(', ')}` });
+        break;
+      }
+      const before = new Map(beats.map(p => [p.pageNumber, p.planLine || '']));
+      const changedThisRound = second.parsed.pages
+        .filter(p => (before.get(p.pageNumber) || '') !== (p.planLine || ''))
+        .map(p => p.pageNumber);
+      beats = second.parsed.pages;
+      // Rebuild the plan TEXT from the merged pages. `second.pagePlan` is the
+      // raw re-plan response, so on any page the merge restored, the string
+      // and the array disagreed — and the string is what every report, every
+      // later reader and the recheck see. Measured 2026-09-09: one page of
+      // eighteen, and it was one of the pages a reviewer then judged against
+      // a line that had never been used. Deriving it from the pages makes the
+      // two representations incapable of diverging.
+      pagePlan = beats.map(pg => `Page ${pg.pageNumber}: ${pg.planLine || ''}`).join(String.fromCharCode(10));
+      gl.info('beats_replan', `Round ${round}: planner re-divided ${changedThisRound.length} page(s) for ${pendingCheck.lines.length} finding(s)`, null, {
+        round, replannedPages: changedThisRound, findings: pendingCheck.lines.length,
+      });
+      const check2 = await runCheck(round === 1 ? 'plan_recheck' : `plan_recheck_r${round}`, beats, pagePlan);
+      // Entered KEPT and demoted below if the round is thrown away, so the
+      // ledger records the round whichever way the verdict goes.
+      const roundRecord = {
+        round,
+        changedPages: changedThisRound,
+        findingsIn: pendingCheck.lines.length,
+        // The re-plan request this round was given, verbatim — the only
+        // prompt in the stage that carries the findings (## MUST FIX / ##
+        // ALSO NOTED). Text, additive, read by nothing.
+        replanPrompt,
+        // The re-plan's reply verbatim (2026-09-23): the stored round kept
+        // only the merged pages and the parsed changes.
+        replanReply: String(rpRes.text || ''),
+        recheck: recheckRecord(check2),
+        kept: true,
+        // WHAT THE ROUND SAID IT DID, AND WHAT THE REVIEW MADE OF IT. Before
+        // 2026-09-18 a removal was recorded nowhere at all — the only way to
+        // find one was diffing two who-columns after the book was finished.
+        // `declaredChanges: null` marks a round that emitted no block.
+        declaredChanges: declared.present ? declared.changes.map(c => c.line) : null,
+        changeRefusals: reviewRefusals,
+      };
+      replanRounds.push(roundRecord);
+      // Every surviving must-fix finding — what the NEXT round is mandated to
+      // answer, and what the ships-as-it-stands warning names.
+      const stillMustFix = (check2.findings || []).filter(f => replanRank(f) === 'must');
+      // The subset the round-keeping decision is made on: cast/focal only.
+      const stillConverging = stillMustFix.filter(countsTowardConvergence);
+      const shotOnly = stillMustFix.length - stillConverging.length;
+      // THE GUARD — every round, round 1 included (owner, 2026-09-24). Until
+      // then `&& round > 1` exempted round 1, and 8 of 32 stored books shipped
+      // a round-1 division with MORE cast/focal must-fix findings than the
+      // division it replaced (job_1790100385959_1nitlympp: 5 → 7). A round
+      // that regresses is discarded on any round; a round 2+ must also reduce
+      // (it is bought only to mop up). See `replanRoundRegressed` for the
+      // measure, which sets aside a model verdict that flips on a page the
+      // round never touched.
+      const verdict = replanRoundRegressed(pendingCheck, check2, changedThisRound, { round });
+      if (verdict.discard) {
+        const noiseNote = verdict.noise.length ? `, ${verdict.noise.length} checker verdict(s) on untouched pages set aside` : '';
+        const detail = `cast/focal must-fix ${verdict.before} → ${verdict.after}${noiseNote}`
+          + ` (${stillMustFix.length} must-fix in total, ${shotOnly} of them shot-distribution, which do not count toward convergence)`;
+        const what = verdict.regressed ? 'raised' : 'did not reduce';
+        log.warn(`⚠️ [BEATS] Round ${round} ${what} the cast/focal must-fix count (${detail}) — discarding it, the previous division stands`);
+        gl.warn('beats_replan_discarded', `Round ${round} ${what} the cast/focal must-fix count (${detail}) — the round was discarded and the previous division stands`, null, {
+          round, before: verdict.before, after: verdict.after, noise: verdict.noise.map(f => f.line),
+          totalMustFixAfter: stillMustFix.length, shotMustFixAfter: shotOnly,
+        });
+        roundRecord.kept = false;
+        roundRecord.discardReason = `${what} the cast/focal must-fix count (${detail})`;
+        beats = bestBeats;
+        pagePlan = bestPagePlan;
+        break;
+      }
+      bestBeats = beats;
+      bestPagePlan = pagePlan;
+      if (stillMustFix.length === 0) break;
+      // A FURTHER ROUND MUST BE MOPPING UP, NOT RE-ROLLING (2026-09-21).
+      //
+      // The planner re-emits the whole division each round, so a round is only
+      // worth buying when the one before it was CONVERGING: strictly fewer
+      // cast/focal must-fix findings than it was given, and not one of them
+      // new. A recheck that names a fault the previous check did not is a
+      // round that moved sideways, and the next round is then re-rolling the
+      // same dice at ~$0.09 and ~160s a throw — which is exactly what the
+      // monotonic discard below then throws away.
+      //
+      // Measured by replaying this test over stored staging
+      // `beatsReviewReport` rows (28 books with a recheck in 45 days, zero
+      // paid calls): 6 rechecks are a strict subset and still buy a round; 22
+      // are not, 10 of them because the recheck minted a new cast/focal
+      // must-fix. Exactly 2 books ever ran a round 2 in that window, this test
+      // would have skipped both, and BOTH were discarded by the convergence
+      // rule below after they ran — i.e. no kept round 2 exists in the window.
+      //
+      // The identity of a finding is its code (a counter) or the check number
+      // that produced it (a model finding) plus the pages it names — never its
+      // prose, which this codebase forbids reading for meaning.
+      {
+        const conv = replanRoundConverged(pendingCheck, check2);
+        if (!conv.converged) {
+          const why = conv.minted.length
+            ? `the recheck names ${conv.minted.length} cast/focal must-fix finding(s) the check before it did not`
+            : `cast/focal must-fix ${conv.given} → ${conv.surviving} is not a reduction`;
+          log.warn(`⚠️ [BEATS] Round ${round} did not converge (${why}) — no further round; the division it produced ships`);
+          gl.info('beats_replan_no_further_round', `Round ${round} did not converge (${why}); no further re-plan round was bought and the division that round produced ships`, null, {
+            round, given: conv.given, surviving: conv.surviving,
+            minted: conv.minted.map(f => f.line),
+          });
+          break;
+        }
+      }
+      if (round === MAX_REPLAN_ROUNDS) {
+        // Ships with the fault named. A division is never withheld from a
+        // paid run over a plan finding (gates are guidelines).
+        log.warn(`⚠️ [BEATS] ${stillMustFix.length} must-fix finding(s) survive ${MAX_REPLAN_ROUNDS} re-plan round(s) — the division ships as it stands`);
+        gl.warn('beats_replan_unfixed', `${stillMustFix.length} must-fix finding(s) survive ${MAX_REPLAN_ROUNDS} round(s): ${stillMustFix.map(f => f.line).join(' | ')}`, null, {
+          rounds: MAX_REPLAN_ROUNDS, unfixed: stillMustFix.map(f => f.line),
+        });
+        break;
+      }
+      pendingCheck = check2;
+    }
+  } catch (err) {
+    // Never block a story on the check: the first division is a complete plan.
+    log.warn(`🚨 [BEATS] Re-plan failed (${err.message}) — the first division ships`);
+    gl.warn('beats_replan_failed', `Re-plan failed: ${err.message} — the first division ships`);
+    beats = plan.pages;
+    // The FIRST division ships, so no round describes what shipped any more —
+    // including a round that had been kept before the failure. They stay on
+    // the ledger as discarded rather than being deleted (diagnostics).
+    for (const r of replanRounds) {
+      if (!r.kept) continue;
+      r.kept = false;
+      r.discardReason = `re-plan failed after this round (${err.message}) — the first division ships`;
+    }
+  }
+  return { beats, pagePlan };
+}
+
 /**
  * Run the beats-first pipeline.
  *
@@ -1436,12 +2043,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
    * re-division — the second response is read exactly like the first, with no
    * merge path that could leave half a plan behind.
    */
-  const readPlan = (raw) => {
-    const parsed = parsePlanResponse(String(raw || ''), expected);
-    // The approved arc is the story; the planner does not author one.
-    parsed.arc = approvedArc || '';
-    return { parsed, pagePlan: parsed.pagePlan };
-  };
+  const readPlan = makePlanReader(expected, approvedArc);
 
   t = Date.now();
   await stage(3, 'Planning the story beats...', { next: 5, ms: 25000 });
@@ -1509,172 +2111,13 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   await checkCancellation();
   let beats = plan.pages;
   let beatsReviewReport = null;
-  // The character list PLUS the figures the premise supplied (the arc reports
-  // them; see `arcPremiseNames`). A pet the commission named is commissioned.
-  //
-  // ONE definition, shared with the Test Lab replay (castCoverage.commissionedCast):
-  // `listed` is the character list — the characters that owe the book a focal
-  // page and the castCoverage() appearance floor — and `all` adds the figures
-  // the commission supplied elsewhere, which are never invented.
-  const commission = commissionedCast(inputData, arcPremiseNames);
-  const commissionedNames = commission.all;
-  if (arcPremiseNames.length) log.info(`👪 [BEATS] Figures the arc tagged (commissioned), counted as commissioned: ${arcPremiseNames.join(', ')}`);
-  // The counters must never read a PLACE as a person. The names come from the
-  // same authoritative data the planner itself was given — the resolved
-  // landmark list, the family's town, and (historical stories) the canonical
-  // locations and period objects — never from a word list or a prose pattern.
-  // Story job_1788614817116_vxnu60yjg entered "Uetliberg" and "Aussichtsturm
-  // Uetliberg" into the invented cast and manufactured six INVENTED_DOMINANT
-  // pages off it (docs/decisions.md, 2026-09-05).
-  const placeNames = collectPlaceNames(inputData, [
-    ...(inputData?.storyCategory === 'historical'
-      ? [...getHistoricalLocations(inputData.storyTopic), ...getHistoricalObjects(inputData.storyTopic)].map(e => e && e.name)
-      : []),
-  ]);
-  if (placeNames.length) log.debug(`[BEATS] plan counters know ${placeNames.length} place name(s) that can never be cast`);
-  const maxCast = IMAGE_MODELS[inputData?.modelOverrides?.imageModel || MODEL_DEFAULTS.pageImage]?.maxCharactersPerScene || 3;
-  const planCheckModel = modelOverrides.planCheckModel || MODEL_DEFAULTS.planCheckModel;
+  const { commission, commissionedNames, placeNames, maxCast, planCheckModel } = planCheckInputs(inputData, { arcPremiseNames, modelOverrides });
 
-  /**
-   * Counters (free, deterministic) + the one model call. Never throws: the
-   * model half is advisory, and a lost call leaves the counters standing alone
-   * rather than skipping the check entirely.
-   */
-  // MODEL FIRST, COUNTERS SECOND (2026-09-11). The counters used to run first
-  // and their lines were shown to the model for reference. They cannot run
-  // first any more: who is on a page is a question about English, the model
-  // call answers it as a ROSTER, and the counters do arithmetic on that answer
-  // instead of re-deriving the cast from the prose with a grammar heuristic.
-  const runCheck = async (label, pages, planText) => {
-    let modelFindings = [];
-    let roster = null;
-    // The check's OBSTACLES block: per page, the character whose action that
-    // page's instant works against (plan-check Q11). It is the declared
-    // evidence a re-plan's removal is judged against — a figure the arc gives a
-    // moment of their own is not a figure a page may quietly drop — so it is
-    // read as DATA here, never re-derived from a finding's prose.
-    let obstacles = null;
-    // The check's PEOPLELESS line (Q6): the page the checker nominates to give
-    // up its cast, emitted only when no page is people-free. Read as DATA, the
-    // same way the OBSTACLES block is — picking the page in code was built and
-    // rejected on measurement (docs/decisions.md, 2026-09-20).
-    let peoplelessPick = null;
-    // The check's WANTED (Q4) and ACTION (Q12) lines: the pictures the next
-    // round must keep, read as DATA like OBSTACLES (2026-09-23).
-    let wanted = [];
-    let actions = [];
-    // The check's CENTRAL line: the pages whose picture shows the central
-    // figure, answered for the name Q12 gives it (2026-09-25). null = no line.
-    let centralPages = null;
-    let checkModelId = null;
-    let prompt = null;
-    // THE REPLY IS EVIDENCE, NOT A BYPRODUCT (2026-09-19).
-    //
-    // `modelFindings: []` has two readings — the checker found nothing, or it
-    // answered badly — and until this was kept the row could not tell them
-    // apart. On staging job_1789759147125_p08djwhbl the eleven-check call
-    // returned zero findings against a plan that breaks four of the planner's
-    // own rules on page 5 alone, and the only reason we know the call arrived
-    // at all is that `cast` happens to be derived from its roster.
-    //
-    // Text only, no images, and the arc stage already keeps the creator's full
-    // reply (`arcReviewReport.create`) for exactly this reason.
-    let reply = '';
-    let rosterLines = [];
-    try {
-      // No counter findings ride in: they do not exist yet. See the builder's
-      // header — the counters read this call's ROSTER, so they run below.
-      prompt = buildPlanCheckPrompt(inputData, pages, approvedArc, planText, { arcHints, storyLogic: arcStoryLogic, centralFigure: arcCentralFigure, castTable });
-      if (!prompt) throw new Error('plan-check template unavailable');
-      const res = await textModels.callTextModelStreaming(prompt, null, onChunk, planCheckModel, {
-        usageLabel: label,
-        // Judges run at temperature 0 (settled); the Anthropic path sends none.
-        ...(TEXT_MODELS[planCheckModel]?.provider === 'anthropic' ? {} : { temperature: 0 }),
-      });
-      checkModelId = res.modelId || planCheckModel;
-      reply = String(res.text || '');
-      modelFindings = parsePlanCheck(res.text || '');
-      roster = parsePlanCheckRoster(res.text || '');
-      obstacles = parsePlanCheckObstacles(res.text || '');
-      peoplelessPick = parsePlanCheckPeoplelessPick(res.text || '');
-      wanted = parsePlanCheckWanted(res.text || '');
-      actions = parsePlanCheckActions(res.text || '');
-      centralPages = parsePlanCheckCentralPages(res.text || '');
-      // The roster AS PARSED, page by page. The raw reply above carries the
-      // same lines verbatim; this is the form every counter actually reasons
-      // on, so a reader can see what the arithmetic was given — including a
-      // `covers` that expanded nobody, which is how "all four boys" reached
-      // the cast count as two names on that same job.
-      rosterLines = [...roster.entries()]
-        .sort((a, b) => a[0] - b[0])
-        .map(([pageNumber, r]) => ({ pageNumber, people: r.people, things: r.things, covers: r.covers }));
-    } catch (err) {
-      // LOUD, NEVER FATAL. A lost plan check takes the ENTIRE counter layer
-      // with it (the counters do arithmetic on its roster), so this is an
-      // ERROR in the run log and in the generation log — not a WARN that two
-      // days of beats runs scrolled past (2026-09-13, the undefined
-      // `parsePlanCheckRoster` binding). It still never aborts a paid run:
-      // quality gates ship with a warning (feedback_gates_are_guidelines).
-      log.error(`❌ [BEATS] Plan check (${label}) failed (${err.message}) — NO ROSTER, so the entire plan-counter layer is skipped this round`);
-      gl.error(`${label}_failed`, `Plan check failed: ${err.message} — no roster, so every plan counter (cast, invented cast, shot variety, focal pages) is skipped this round`, null, { error: err.message, model: planCheckModel });
-    }
-    const counters = runPlanCounters({ pages, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit, roster, peoplelessPick, centralFigure: arcCentralFigure, centralPages, mainName, castTable, actions });
-    // The central-figure counter counts on the CENTRAL line alone; a check
-    // that named no pages for a named figure leaves it uncounted — loudly.
-    if (counters.stats?.centralFigure?.unanswered) {
-      log.error(`❌ [BEATS] Plan check (${label}) gave no CENTRAL line for the central figure (${arcCentralFigure.join(' / ')}) — CENTRAL_FIGURE_ABSENT_THIRD did not run`);
-      gl.error(`${label}_no_central_line`, 'The plan check named no pages for the central figure (CENTRAL line absent); the per-third presence counter did not run', null, { model: checkModelId || planCheckModel, centralFigure: arcCentralFigure });
-    }
-    // NO FALLBACK, NO SYNTHESIS. The finding degrades to its page-less
-    // sentence when Q6 nominated nothing; code never picks the page itself.
-    // The miss is loud so a checker that stops answering Q6 is visible.
-    if (!peoplelessPick && counters.findings.some(f => f.code === 'NO_PEOPLELESS_PAGE')) {
-      log.error(`❌ [BEATS] Plan check (${label}) fired NO_PEOPLELESS_PAGE but emitted no PEOPLELESS line — the finding names no page, and the planner picks blind`);
-      gl.error(`${label}_no_peopleless_nomination`, 'The plan check found no people-free page but nominated none either (Q6 PEOPLELESS line absent); the finding degrades to naming no page', null, { model: checkModelId || planCheckModel });
-    }
-    if (counters.skipped) {
-      const got = roster ? roster.size : 0;
-      log.error(`❌ [BEATS] Plan counters (${label}) SKIPPED (${counters.skipped}) — the roster covers ${got} of ${pages.length} page(s); no cast, invented-cast, shot-variety or focal-page counting ran`);
-      gl.error(`${label}_counters_skipped`, `Plan counters did not run (${counters.skipped}): the check's roster covers ${got} of ${pages.length} page(s)`, null, { reason: counters.skipped, rosterPages: got, pages: pages.length });
-    }
-    // Findings travel STRUCTURED to the re-plan: a counter keeps its code, a
-    // model finding the check number it answered, so buildReplanSection can rank
-    // them without reading their prose. `lines` stays the flat rendering the
-    // report and the logs have always carried.
-    const structured = [
-      ...counters.findings.map((f, i) => ({ kind: 'counter', code: f.code, line: counters.lines[i] })),
-      ...modelFindings.map(f => ({ kind: 'check', check: f.check, line: `CHECK[${f.check}]: ${f.text}` })),
-    ];
-    const all = structured.map(f => f.line);
-    gl.info(label, `Plan check by ${checkModelId || planCheckModel}: ${counters.lines.length} counter finding(s), ${modelFindings.length} model finding(s)`, null, {
-      counterFindings: counters.lines, modelFindings, model: checkModelId, stats: counters.stats, cast: counters.cast,
-    });
-    return { counters, modelFindings, findings: structured, lines: all, checkModelId, prompt, obstacles, reply, rosterLines, wanted, actions };
-  };
+  const runCheck = createPlanCheckRunner({
+    inputData, approvedArc, arcHints, arcStoryLogic, arcCentralFigure, castTable, commission, commissionedNames, placeNames,
+    maxCast, arcInventedNames, arcInventedLimit, mainName, planCheckModel, onChunk, gl,
+  });
 
-  // ONE shape for a recheck wherever it is recorded — the canonical `recheck`
-  // and a discarded round's sit side by side in the stored report and a reader
-  // must be able to compare them without learning two layouts.
-  const recheckRecord = c => (c ? {
-    counterFindings: c.counters.lines,
-    counterStats: c.counters.stats,
-    modelFindings: c.modelFindings,
-    // The flat rendering (counter lines + `CHECK[n]: …`) the summary prose and
-    // the log line both read, so the record is self-contained and no reader
-    // re-derives it.
-    lines: c.lines,
-    // Same evidence as the first check: an empty `modelFindings` on a RECHECK
-    // is the same two-way ambiguity, and a discarded round's record is where
-    // one would most want to see what the model actually said.
-    reply: c.reply || '',
-    rosterLines: c.rosterLines || [],
-    // THE RECHECK'S OWN PROMPT (2026-09-23). Only the first check's prompt was
-    // stored, so a recheck could be read only by rebuilding it at the run's
-    // commit — a reconstruction, not the bytes sent.
-    prompt: c.prompt || '',
-    wanted: c.wanted || [],
-    actions: c.actions || [],
-  } : null);
 
   t = Date.now();
   await stage(4, 'Checking the page division...', { next: 5, ms: 45000 });
@@ -1684,395 +2127,10 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // only ever describe the division that shipped.
   const replanRounds = [];
   if (check1.lines.length > 0) {
-    try {
-      // RE-PLAN ROUNDS (2026-09-09). The loop used to be check → re-plan →
-      // recheck → ship: a fault the RE-PLAN ITSELF introduced was named by the
-      // recheck and never fixed. Measured on the dragon story: the first
-      // division buried the spring's release inside a four-action page; the
-      // re-plan correctly split it out and left the new page holding the deed
-      // AND its effect ("rams the branch into the crack, water shoots out").
-      // The recheck said so in those words and the story shipped that way.
-      // A second round runs only when a MUST-FIX finding survives — the
-      // ranking `replanRank` already computes, so an "also noted" line can
-      // never spend a round. Bounded at two re-plans; the plan model is the
-      // cheapest call in the stage and a third round has never been needed.
-      const MAX_REPLAN_ROUNDS = 2;
-      let pendingCheck = check1;
-      // A round must EARN its keep. Measured 2026-09-09 on
-      // job_1788903616404_iqvhj4l8m: round 2 re-wrote 17 of 18 pages to clear
-      // three must-fix findings and minted five new ones (findings 26 -> 13 ->
-      // 23). The planner re-emits the whole division each round, so a round
-      // that does not reduce the must-fix count is not converging — it is
-      // rolling the dice on every page at once. Such a round is DISCARDED and
-      // the previous division stands, which makes the loop monotonic.
-      //
-      // THE COUNT IS THE CAST/FOCAL MUST-FIX COUNT, NOT THE RAW TOTAL
-      // (2026-09-20). Shot-distribution findings are must-fix — the re-plan is
-      // obliged to answer them — but they are exempt from THIS measure
-      // (promptBuilders.REPLAN_CONVERGENCE_EXEMPT_CODES). A shot finding is
-      // cleared by relabelling one page's shot word; a cast or focal finding
-      // costs the book a picture, so a raw total lets cheap shot clears pay for
-      // a lost wanted picture. Measured on job_1789853503332_riqncqg1i, whose
-      // round 2 rewrote 17 of 18 pages, took Q4 wanted-picture findings 2 -> 3
-      // and dropped its Q8 ending, yet read 6 -> 5 on the total because one
-      // ultra-wide finding fell.
-      let bestBeats = beats;
-      let bestPagePlan = pagePlan;
-      // The review's refusals from the round before, told to the next round.
-      let lastRefusals = [];
-      const coverageRule = castCoverage({ pageCount: beats.length, castCount: commission.listed.length });
-      for (let round = 1; round <= MAX_REPLAN_ROUNDS; round++) {
-        await checkCancellation();
-        await stage(5, 'Re-dividing the named pages...', { next: 18, ms: 45000 });
-        // WHAT THIS ROUND MUST KEEP (2026-09-23): the last page, the check's
-        // WANTED and ACTION pages, and a character's only focal page — one list
-        // for the prompt and for the review's `protected` rule below.
-        const keep = replanKeepPages({
-          pageCount: beats.length,
-          wanted: pendingCheck.wanted,
-          actions: pendingCheck.actions,
-          focalPages: (pendingCheck.counters.stats && pendingCheck.counters.stats.focalPages) || {},
-        });
-        const replanPrompt = buildBeatsPrompt(inputData, pageCount, {
-          finalArc: approvedArc,
-          arcHints,
-          storyLogic: arcStoryLogic,
-          centralFigure: arcCentralFigure,
-          castTable,
-          replan: buildReplanSection(pagePlan, pendingCheck.findings, { pageCount: beats.length, keep, refused: lastRefusals, castFloor: coverageRule ? coverageRule.appearances.min : null, castTable }),
-        });
-        if (!replanPrompt) throw new Error('story-beats template unavailable');
-        const rpRes = await textModels.callTextModelStreaming(replanPrompt, null, onChunk, planModel, { usageLabel: 'beats_replan' });
-        const second = readPlan(rpRes.text);
-        if (second.parsed.pages.length === 0) throw new Error('re-plan returned no parseable plan lines');
-        // DECLARE. The round states each structural change it made — a name in
-        // or out of frame, an action moved or dropped, one page's material
-        // joining another's — with the finding it answers and why. `present:
-        // false` is a round that emitted no block at all: every change it made
-        // is then undeclared, which is the behaviour the merge had before
-        // declarations existed (2026-09-18).
-        const declared = parsePlanChanges(rpRes.text);
-        // A TOTAL IS ALWAYS SELF-CERTIFIABLE: the block re-counts its own lines,
-        // and a count that disagrees with the enumeration is the enumeration's
-        // word against an assertion. The lines win; the discrepancy is reported.
-        if (declared.present && declared.declaredCount != null && declared.declaredCount !== declared.counted) {
-          gl.warn('beats_replan_change_count', `Round ${round}: the change block declares ${declared.declaredCount} change(s) and enumerates ${declared.counted} across ${declared.lines} line(s); the enumeration stands`, null, { round, declared: declared.declaredCount, counted: declared.counted, lines: declared.lines });
-        }
-        // ONE LINE, ONE CHANGE — recorded, not re-asked (2026-09-18). The
-        // parser splits a packed line into its clauses rather than mis-reading
-        // it, so a violation costs the round nothing; it is recorded because a
-        // format nobody polices is not a format. A re-ask is deliberately NOT
-        // wired: both planner models broke the contract on the first live
-        // attempt (Lab 1326: 7 of 10 lines; 1327: 1 of 5), so an automatic
-        // re-ask would buy a paid call on most rounds for a fault the parser
-        // already absorbs.
-        if (declared.violations.length) {
-          const detail = declared.violations.map(v => `p${v.pageNumber} (${v.rule})`).join(', ');
-          log.warn(`⚠️ [BEATS] Round ${round}: ${declared.violations.length} declared change(s) break the change-block format (${detail}) - read clause by clause, not refused`);
-          gl.warn('beats_replan_change_format', `Round ${round}: ${declared.violations.length} declared change(s) break the one-line-one-change format — ${detail}; each was read clause by clause rather than refused`, null, { round, violations: declared.violations });
-        }
-        const unreadable = declared.changes.filter(c => c.kind === 'other');
-        if (unreadable.length) {
-          gl.warn('beats_replan_change_unreadable', `Round ${round}: ${unreadable.length} declared change(s) do not use the declared vocabulary, so nothing reviewed them`, null, { round, lines: unreadable.map(c => c.line.slice(0, 160)) });
-        }
-        // MERGE, don't replace. The re-plan is asked for ONLY the pages a
-        // finding names; every other page stands. Until 2026-09-09 it returned
-        // the whole division, and the planner rewrote 15-18 of 18 pages every
-        // round — which is how a story lost the page where its quest object was
-        // put back (job_1788903616404_iqvhj4l8m: check 9 named the page, the
-        // re-plan answered by deleting the moment, and no check noticed it had
-        // gone). Pages no finding named are restored from the division that
-        // stands, so a round can only change what it was asked to change.
-        const namedPages = new Set();
-        for (const nf of (pendingCheck.findings || [])) for (const n of findingPages(nf)) namedPages.add(Number(n));
-        // A DECLARED PAGE IS IN SCOPE. Splitting a page's second action onto a
-        // picture of its own needs two pages rewritten — the one a finding
-        // named and the neighbour whose number now stages the new moment — and
-        // until 2026-09-18 the merge below restored the neighbour, which made
-        // the split the prompt described structurally impossible. A page the
-        // round DECLARES it changed, with the finding it answers and why, is
-        // asked-for work; a page in neither list is still restored.
-        const declaredPages = new Set();
-        for (const c of declared.changes) {
-          if (Number.isFinite(c.pageNumber)) declaredPages.add(Number(c.pageNumber));
-          if (Number.isFinite(c.toPage)) declaredPages.add(Number(c.toPage));
-          if (Number.isFinite(c.fromPage)) declaredPages.add(Number(c.fromPage));
-        }
-        // When NO finding names a page — a whole-book finding, or a finding whose
-        // page reference could not be read — the re-plan is answering for the
-        // whole division, so every returned page is accepted. The merge still
-        // runs: a page the return omits is filled from the division that stands,
-        // which is what keeps a partial answer from failing the page-count guard
-        // below and having the round discarded without a word.
-        const scopeAll = namedPages.size === 0;
-        {
-          const standing = new Map(beats.map(b => [b.pageNumber, b]));
-          const kept = [];
-          const inScope = n => namedPages.has(Number(n)) || declaredPages.has(Number(n));
-          for (const pg of second.parsed.pages) {
-            if (scopeAll || inScope(pg.pageNumber) || !standing.has(pg.pageNumber)) kept.push(pg);
-            else kept.push(standing.get(pg.pageNumber));
-          }
-          for (const [num, pg] of standing) if (!kept.some(k => k.pageNumber === num)) kept.push(pg);
-          kept.sort((a, b) => a.pageNumber - b.pageNumber);
-          const overridden = scopeAll ? 0 : second.parsed.pages.filter(pg => !inScope(pg.pageNumber) && standing.has(pg.pageNumber)).length;
-          if (overridden > 0) {
-            log.warn(`[BEATS] Round ${round}: the re-plan returned ${overridden} page(s) no finding named and no change declared - restored from the standing division`);
-            gl.warn('beats_replan_unnamed_pages', `Round ${round}: the re-plan rewrote ${overridden} page(s) that no finding named and no change declared; those pages were restored from the division that stands`, null, { round, overridden, named: [...namedPages].sort((a, b) => a - b), declared: [...declaredPages].sort((a, b) => a - b) });
-          }
-          second.parsed.pages = kept;
-          second.parsed.missing = [];
-        }
-        // REVIEW, then APPLY (2026-09-18). A removal is judged, never banned
-        // and never waved through.
-        //
-        // What this replaced: the round was told a removal is never a fix and
-        // `castLostByReplan` mechanically restored every name a re-plan took
-        // out. That rule is one-directional — `NO_COMMISSIONED_ON_PAGE` is
-        // answered by adding, `CAST_OVER_CEILING` by writing a justification
-        // into the line, plan-check Q3 likewise — so an over-crowded page could
-        // only ever get more crowded, and the standing division was treated as
-        // always right when it is itself a model output. Owner's verdict: "we
-        // can not say delete only or add only; we must give a fair review and
-        // allow both fix types."
-        //
-        // Two passes, in this order:
-        //   1. DECLARED changes go to `reviewPlanChanges`, which refuses one
-        //      against declared evidence — the check's own OBSTACLES line for
-        //      that page, the figure's span across the book, the cast ceiling,
-        //      and the page-count balance of a merge and a split. A refusal
-        //      restores that page from the division that stands and the finding
-        //      that named it survives to the recheck; it never discards a round.
-        //   2. UNDECLARED removals — a name gone from a who column with no
-        //      change line saying so — are restored exactly as before. A silent
-        //      deletion is unreviewable: the plan line is the brief's authority,
-        //      so the Art Director loses the figure and the scene review strips
-        //      them by the book (`[cast_not_in_plan]`). On staging
-        //      job_1789681157795_wkt20ckod that cost three CRITICAL and one
-        //      MAJOR IMG fault for an antagonist the page text describes and no
-        //      picture shows, and the only way anyone found it was diffing two
-        //      who-columns after the book was finished.
-        let reviewRefusals = [];
-        {
-          const guardCast = (pendingCheck.counters.cast && pendingCheck.counters.cast.all) || commissionedNames;
-          const guardAliases = (pendingCheck.counters.cast && pendingCheck.counters.cast.aliases) || {};
-          const standing = new Map(beats.map(b => [b.pageNumber, b]));
-          const restore = (pageNumbers) => {
-            const want = new Set(pageNumbers.map(Number));
-            second.parsed.pages = second.parsed.pages.map(pg => (
-              want.has(Number(pg.pageNumber)) && standing.has(pg.pageNumber) ? standing.get(pg.pageNumber) : pg
-            ));
-          };
-
-          const review = reviewPlanChanges({
-            changes: declared.changes,
-            standing: beats,
-            returned: second.parsed.pages,
-            castNames: guardCast,
-            aliases: guardAliases,
-            maxCast,
-            obstacles: pendingCheck.obstacles,
-            focalNames: coverageRule && coverageRule.focalEach ? commission.listed : [],
-            protectedPages: new Map(keep.map(k => [Number(k.page), k.why])),
-            actions: pendingCheck.actions,
-            rankOf: replanRank,
-            // The commissioned span floor the re-plan was told (2026-09-25).
-            castFloor: coverageRule ? { names: commission.listed, min: coverageRule.appearances.min } : null,
-          });
-          reviewRefusals = review.refusals;
-          lastRefusals = review.refusals;
-          if (review.notes.length) {
-            gl.info('beats_replan_change_notes', `Round ${round}: ${review.notes.length} declared change(s) could not be tied to a finding or a cast name`, null, { round, notes: review.notes });
-          }
-          if (review.refusals.length) {
-            restore(review.refusals.map(r => r.pageNumber));
-            const detail = review.refusals.map(r => `p${r.pageNumber} (${r.rule}): ${r.detail}`).join('; ');
-            log.warn(`⚠️ [BEATS] Round ${round}: ${review.refusals.length} declared change(s) refused on review - ${detail}`);
-            gl.warn('beats_replan_change_refused', `Round ${round}: the review refused ${review.refusals.length} declared change(s) — ${detail}; ${review.refusals.length === 1 ? 'that page was' : 'those pages were'} restored from the division that stands`, null, { round, refusals: review.refusals });
-          }
-
-          const lost = castLostByReplan(beats, second.parsed.pages, guardCast, guardAliases, review.declaredOut);
-          if (lost.length) {
-            restore(lost.map(l => l.pageNumber));
-            const detail = lost.map(l => `p${l.pageNumber}: ${l.lost.join(', ')}`).join('; ');
-            log.warn(`⚠️ [BEATS] Round ${round}: the re-plan dropped cast from ${lost.length} page(s) without declaring it (${detail}) - restored from the standing division`);
-            gl.warn('beats_replan_cast_lost', `Round ${round}: the re-plan removed ${detail} from the page plan and declared no change for it; an undeclared removal is unreviewable, so ${lost.length === 1 ? 'that page was' : 'those pages were'} restored from the division that stands`, null, { round, pages: lost, declaredBlock: declared.present });
-          }
-        }
-        // A re-plan that answers "this page holds two actions" by copying a
-        // neighbouring page has destroyed the page, not fixed it. Measured
-        // 2026-09-09 on job_1788903616404_iqvhj4l8m: the page staging the
-        // quest object's return came back as a verbatim duplicate of the page
-        // before it, and the story lost its climax with no check firing.
-        // Two pages with the same instant is corruption, so the round is
-        // discarded and the division that stands is kept.
-        {
-          const instants = second.parsed.pages.map(pg => String(pg.planLine || '').toLowerCase().replace(/\s+/g, ' ').trim());
-          const dupe = instants.find((t, k) => t && instants.indexOf(t) !== k);
-          if (dupe) {
-            log.warn(`[BEATS] Round ${round} returned two pages with the same line - discarding it, the previous division stands`);
-            gl.warn('beats_replan_duplicate', `Round ${round} produced two pages with an identical plan line; the round was discarded and the previous division stands`, null, { round, line: dupe.slice(0, 160) });
-            replanRounds.push({ round, changedPages: [], recheck: null, kept: false, replanPrompt, replanReply: String(rpRes.text || ''), discardReason: 'two pages returned with an identical plan line' });
-            beats = bestBeats;
-            pagePlan = bestPagePlan;
-            break;
-          }
-        }
-        // THE PAGE COUNT IS THE ORDER (2026-09-14). The re-plan may move, split
-        // or merge instants, but a round that returns more or fewer pages than
-        // the division that stands is not a re-division of THIS book: on
-        // job_1789337998754_apslnsq1z an 18-page order came back as 19 plan
-        // lines, passed both guards above (no duplicate, nothing omitted), and
-        // shipped as a 19-page book. Same remedy as the duplicate guard: the
-        // round is discarded and the previous division stands.
-        if (second.parsed.pages.length !== beats.length) {
-          log.warn(`[BEATS] Round ${round} returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book - discarding it, the previous division stands`);
-          gl.warn('beats_replan_page_count', `Round ${round} returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book; the round was discarded and the previous division stands`, null, { round, returned: second.parsed.pages.length, expected: beats.length });
-          replanRounds.push({ round, changedPages: [], recheck: null, kept: false, replanPrompt, replanReply: String(rpRes.text || ''), discardReason: `returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book` });
-          beats = bestBeats;
-          pagePlan = bestPagePlan;
-          break;
-        }
-        if (second.parsed.missing.length > 0) {
-          log.warn(`⚠️ [BEATS] Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — previous division kept`);
-          gl.warn('beats_replan_incomplete', `Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — previous division kept`);
-          replanRounds.push({ round, changedPages: [], recheck: null, kept: false, replanPrompt, replanReply: String(rpRes.text || ''), discardReason: `omitted page(s) ${second.parsed.missing.join(', ')}` });
-          break;
-        }
-        const before = new Map(beats.map(p => [p.pageNumber, p.planLine || '']));
-        const changedThisRound = second.parsed.pages
-          .filter(p => (before.get(p.pageNumber) || '') !== (p.planLine || ''))
-          .map(p => p.pageNumber);
-        beats = second.parsed.pages;
-        // Rebuild the plan TEXT from the merged pages. `second.pagePlan` is the
-        // raw re-plan response, so on any page the merge restored, the string
-        // and the array disagreed — and the string is what every report, every
-        // later reader and the recheck see. Measured 2026-09-09: one page of
-        // eighteen, and it was one of the pages a reviewer then judged against
-        // a line that had never been used. Deriving it from the pages makes the
-        // two representations incapable of diverging.
-        pagePlan = beats.map(pg => `Page ${pg.pageNumber}: ${pg.planLine || ''}`).join(String.fromCharCode(10));
-        gl.info('beats_replan', `Round ${round}: planner re-divided ${changedThisRound.length} page(s) for ${pendingCheck.lines.length} finding(s)`, null, {
-          round, replannedPages: changedThisRound, findings: pendingCheck.lines.length,
-        });
-        const check2 = await runCheck(round === 1 ? 'plan_recheck' : `plan_recheck_r${round}`, beats, pagePlan);
-        // Entered KEPT and demoted below if the round is thrown away, so the
-        // ledger records the round whichever way the verdict goes.
-        const roundRecord = {
-          round,
-          changedPages: changedThisRound,
-          findingsIn: pendingCheck.lines.length,
-          // The re-plan request this round was given, verbatim — the only
-          // prompt in the stage that carries the findings (## MUST FIX / ##
-          // ALSO NOTED). Text, additive, read by nothing.
-          replanPrompt,
-          // The re-plan's reply verbatim (2026-09-23): the stored round kept
-          // only the merged pages and the parsed changes.
-          replanReply: String(rpRes.text || ''),
-          recheck: recheckRecord(check2),
-          kept: true,
-          // WHAT THE ROUND SAID IT DID, AND WHAT THE REVIEW MADE OF IT. Before
-          // 2026-09-18 a removal was recorded nowhere at all — the only way to
-          // find one was diffing two who-columns after the book was finished.
-          // `declaredChanges: null` marks a round that emitted no block.
-          declaredChanges: declared.present ? declared.changes.map(c => c.line) : null,
-          changeRefusals: reviewRefusals,
-        };
-        replanRounds.push(roundRecord);
-        // Every surviving must-fix finding — what the NEXT round is mandated to
-        // answer, and what the ships-as-it-stands warning names.
-        const stillMustFix = (check2.findings || []).filter(f => replanRank(f) === 'must');
-        // The subset the round-keeping decision is made on: cast/focal only.
-        const stillConverging = stillMustFix.filter(countsTowardConvergence);
-        const shotOnly = stillMustFix.length - stillConverging.length;
-        // THE GUARD — every round, round 1 included (owner, 2026-09-24). Until
-        // then `&& round > 1` exempted round 1, and 8 of 32 stored books shipped
-        // a round-1 division with MORE cast/focal must-fix findings than the
-        // division it replaced (job_1790100385959_1nitlympp: 5 → 7). A round
-        // that regresses is discarded on any round; a round 2+ must also reduce
-        // (it is bought only to mop up). See `replanRoundRegressed` for the
-        // measure, which sets aside a model verdict that flips on a page the
-        // round never touched.
-        const verdict = replanRoundRegressed(pendingCheck, check2, changedThisRound, { round });
-        if (verdict.discard) {
-          const noiseNote = verdict.noise.length ? `, ${verdict.noise.length} checker verdict(s) on untouched pages set aside` : '';
-          const detail = `cast/focal must-fix ${verdict.before} → ${verdict.after}${noiseNote}`
-            + ` (${stillMustFix.length} must-fix in total, ${shotOnly} of them shot-distribution, which do not count toward convergence)`;
-          const what = verdict.regressed ? 'raised' : 'did not reduce';
-          log.warn(`⚠️ [BEATS] Round ${round} ${what} the cast/focal must-fix count (${detail}) — discarding it, the previous division stands`);
-          gl.warn('beats_replan_discarded', `Round ${round} ${what} the cast/focal must-fix count (${detail}) — the round was discarded and the previous division stands`, null, {
-            round, before: verdict.before, after: verdict.after, noise: verdict.noise.map(f => f.line),
-            totalMustFixAfter: stillMustFix.length, shotMustFixAfter: shotOnly,
-          });
-          roundRecord.kept = false;
-          roundRecord.discardReason = `${what} the cast/focal must-fix count (${detail})`;
-          beats = bestBeats;
-          pagePlan = bestPagePlan;
-          break;
-        }
-        bestBeats = beats;
-        bestPagePlan = pagePlan;
-        if (stillMustFix.length === 0) break;
-        // A FURTHER ROUND MUST BE MOPPING UP, NOT RE-ROLLING (2026-09-21).
-        //
-        // The planner re-emits the whole division each round, so a round is only
-        // worth buying when the one before it was CONVERGING: strictly fewer
-        // cast/focal must-fix findings than it was given, and not one of them
-        // new. A recheck that names a fault the previous check did not is a
-        // round that moved sideways, and the next round is then re-rolling the
-        // same dice at ~$0.09 and ~160s a throw — which is exactly what the
-        // monotonic discard below then throws away.
-        //
-        // Measured by replaying this test over stored staging
-        // `beatsReviewReport` rows (28 books with a recheck in 45 days, zero
-        // paid calls): 6 rechecks are a strict subset and still buy a round; 22
-        // are not, 10 of them because the recheck minted a new cast/focal
-        // must-fix. Exactly 2 books ever ran a round 2 in that window, this test
-        // would have skipped both, and BOTH were discarded by the convergence
-        // rule below after they ran — i.e. no kept round 2 exists in the window.
-        //
-        // The identity of a finding is its code (a counter) or the check number
-        // that produced it (a model finding) plus the pages it names — never its
-        // prose, which this codebase forbids reading for meaning.
-        {
-          const conv = replanRoundConverged(pendingCheck, check2);
-          if (!conv.converged) {
-            const why = conv.minted.length
-              ? `the recheck names ${conv.minted.length} cast/focal must-fix finding(s) the check before it did not`
-              : `cast/focal must-fix ${conv.given} → ${conv.surviving} is not a reduction`;
-            log.warn(`⚠️ [BEATS] Round ${round} did not converge (${why}) — no further round; the division it produced ships`);
-            gl.info('beats_replan_no_further_round', `Round ${round} did not converge (${why}); no further re-plan round was bought and the division that round produced ships`, null, {
-              round, given: conv.given, surviving: conv.surviving,
-              minted: conv.minted.map(f => f.line),
-            });
-            break;
-          }
-        }
-        if (round === MAX_REPLAN_ROUNDS) {
-          // Ships with the fault named. A division is never withheld from a
-          // paid run over a plan finding (gates are guidelines).
-          log.warn(`⚠️ [BEATS] ${stillMustFix.length} must-fix finding(s) survive ${MAX_REPLAN_ROUNDS} re-plan round(s) — the division ships as it stands`);
-          gl.warn('beats_replan_unfixed', `${stillMustFix.length} must-fix finding(s) survive ${MAX_REPLAN_ROUNDS} round(s): ${stillMustFix.map(f => f.line).join(' | ')}`, null, {
-            rounds: MAX_REPLAN_ROUNDS, unfixed: stillMustFix.map(f => f.line),
-          });
-          break;
-        }
-        pendingCheck = check2;
-      }
-    } catch (err) {
-      // Never block a story on the check: the first division is a complete plan.
-      log.warn(`🚨 [BEATS] Re-plan failed (${err.message}) — the first division ships`);
-      gl.warn('beats_replan_failed', `Re-plan failed: ${err.message} — the first division ships`);
-      beats = plan.pages;
-      // The FIRST division ships, so no round describes what shipped any more —
-      // including a round that had been kept before the failure. They stay on
-      // the ledger as discarded rather than being deleted (diagnostics).
-      for (const r of replanRounds) {
-        if (!r.kept) continue;
-        r.kept = false;
-        r.discardReason = `re-plan failed after this round (${err.message}) — the first division ships`;
-      }
-    }
+    ({ beats, pagePlan } = await runReplanRounds({
+      inputData, pageCount, plan, check1, replanRounds, approvedArc, arcHints, arcStoryLogic, arcCentralFigure, castTable,
+      commission, commissionedNames, maxCast, planModel, readPlan, runCheck, onChunk, gl, stage, checkCancellation, beats, pagePlan,
+    }));
   }
   meta.timings.planCheckMs = Date.now() - t;
 
@@ -3818,4 +3876,4 @@ ${bibleBody}` : bibleBody;
   return { title, titleJudge, beats, pages, scenes, coverScenes, rawOutline, visualBible, meta, challengeDrawIds, challengeTakenIds, challengeDraw, arcReviewReport, beatsReviewReport, storyBibleReport, clothingReviewReport, wardrobeBibleReport, sceneExpansionReport, sceneReviewReport };
 }
 
-module.exports = { generateStoryViaBeats, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };
+module.exports = { generateStoryViaBeats, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };

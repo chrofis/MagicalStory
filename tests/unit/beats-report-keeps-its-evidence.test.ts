@@ -67,13 +67,14 @@ describe('the beats report keeps the evidence it is judged on', () => {
   });
 
   it('a recheck — including a discarded round — keeps the same evidence', () => {
-    const rec = src.slice(src.indexOf('const recheckRecord'), src.indexOf('t = Date.now();', src.indexOf('const recheckRecord')));
+    // recheckRecord and the check runner are module-level since 2026-09-27 (shared with the Test Lab).
+    const rec = src.slice(src.indexOf('function recheckRecord(c) {'), src.indexOf('} : null);', src.indexOf('function recheckRecord(c) {')));
     expect(rec).toContain("reply: c.reply || ''");
     expect(rec).toContain('rosterLines: c.rosterLines || []');
   });
 
   it('runCheck returns them, so the report is not reading undefined', () => {
-    const fn = src.slice(src.indexOf('const runCheck = async'), src.indexOf('// ONE shape for a recheck'));
+    const fn = src.slice(src.indexOf('function createPlanCheckRunner('), src.indexOf('function recheckRecord(c) {'));
     expect(fn).toContain("reply = String(res.text || '')");
     expect(fn).toMatch(/return \{[^}]*\breply\b[^}]*\brosterLines\b[^}]*\}/);
   });

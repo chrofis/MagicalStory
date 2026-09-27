@@ -437,12 +437,20 @@
     {
       "id": "replan-prod-vs-lab",
       "axis": "Test Lab stage vs production call site",
-      "reason": "The page plan's re-plan round runs in production in beatsPipeline.js (buildReplanSection, replanKeepPages, reviewPlanChanges, the recheck and replanRoundRegressed) and is mirrored by the Lab's beats_replan stage in testlab.js (runBeatsReplanStage, analyzeReplanCompliance). A re-plan argument passed on one side only makes the Lab measure a round production never runs. Found 2026-09-25 while adding the commissioned span floor (castFloor) to both, on Lab #1494.",
+      "reason": "The page plan's re-plan round runs in production in beatsPipeline.js (buildReplanSection, replanKeepPages, reviewPlanChanges, the recheck and replanRoundRegressed) and is mirrored by the Lab's beats_replan stage in testlab.js (runBeatsReplanStage, analyzeReplanCompliance). A re-plan argument passed on one side only makes the Lab measure a round production never runs. Found 2026-09-25 while adding the commissioned span floor (castFloor) to both, on Lab #1494. Since 2026-09-27 the Lab no longer mirrors the round: it calls the run's own Step 2 (makePlanReader, planCheckInputs, createPlanCheckRunner, runReplanRounds), and tests/unit/lab-prod-call-parity.test.ts compares the two call sequences.",
       "members": [
         "server/lib/beatsPipeline.js",
         "server/lib/testlab.js"
       ],
-      "severity": "block"
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "makePlanReader",
+          "planCheckInputs",
+          "createPlanCheckRunner",
+          "runReplanRounds"
+        ]
+      }
     },
     {
       "id": "plan-cast-table-prod-vs-lab",

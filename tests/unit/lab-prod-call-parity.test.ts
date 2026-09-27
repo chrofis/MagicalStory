@@ -667,6 +667,105 @@ describe('consolidate / inpaint: no params = the repair round\'s calls for the s
   });
 });
 
+// ── beats_replan: the run's Step 2 on the run's stored inputs ────────────────
+const BP = req('../../server/lib/beatsPipeline');
+const CCov = req('../../server/lib/castCoverage');
+const textModelsMod = req('../../server/lib/textModels');
+
+describe('beats_replan: no params = the run\'s plan check and re-plan rounds', () => {
+  const ARC = 'Mira and Tobias cross the harbour at night to bring the lantern home.';
+  const LOGIC = [
+    'Want and stakes: Mira wants the lantern home before the tide.',
+    'Facts:',
+    '- Mira (commissioned)',
+    '- Tobias (commissioned)',
+    '- the ferryman (new)',
+    'Central figure: Mira',
+    'Chain:',
+    '- Mira finds the lantern',
+    '- the ferryman takes them across',
+  ].join('\n');
+  const REPLY = [
+    '---CAST---',
+    'Mira — deed page 2: lifts the lantern out of the net, alone — also on pages 1, 4',
+    'Tobias — deed page 3: rows the little boat, with Mira — also on pages 1, 4',
+    'Ending page 4: Mira and Tobias',
+    '---PAGE PLAN---',
+    'Page 1: wide — Mira, Tobias — the two reach the harbour wall — the night is set',
+    'Page 2: medium — Mira — Mira lifts the lantern out of the net — she has it',
+    'Page 3: medium — Tobias, Mira — Tobias rows the little boat — they leave the wall',
+    'Page 4: wide — Mira, Tobias — the lantern is hung at home — the house is lit',
+  ].join('\n');
+  const STORED = () => ({
+    ...storyFor(storedScene(), { textInImage: false }), pages: 4, languageLevel: 'standard',
+    arcReviewReport: { finalArc: ARC, arcHints: '', logic: LOGIC, centralFigure: ['Mira'] },
+    beatsReviewReport: { plannerReply: REPLY, briefsIn: [1, 2, 3, 4].map(n => ({ pageNumber: n, brief: 'PLAN: x' })) },
+  });
+  // The check names a fault on page 2, so the run re-plans; the re-plan hands
+  // back the same division.
+  const CHECK_REPLY = [
+    '4. Page 2 gives Tobias no arrival',
+    'ROSTER 1: people=Mira, Tobias',
+    'ROSTER 2: people=Mira',
+    'ROSTER 3: people=Tobias, Mira',
+    'ROSTER 4: people=Mira, Tobias',
+  ].join('\n');
+  let modelCalls: any[] = [];
+  let savedStream: any;
+  beforeEach(() => {
+    modelCalls = [];
+    savedStream = textModelsMod.callTextModelStreaming;
+    textModelsMod.callTextModelStreaming = async (prompt: string, _s: any, _c: any, model: string, opts: any) => {
+      modelCalls.push({ prompt, model, label: opts?.usageLabel });
+      const text = /replan/.test(opts?.usageLabel || '') && !/recheck/.test(opts?.usageLabel || '') ? REPLY : CHECK_REPLY;
+      return { text, modelId: model, usage: { input_tokens: 1, output_tokens: 1 } };
+    };
+  });
+  afterEach(() => { textModelsMod.callTextModelStreaming = savedStream; });
+
+  it('sends the calls generateStoryViaBeats sends, with the CAST table and the arc\'s figures', async () => {
+    STORY = STORED();
+    // PRODUCTION: Step 2 as generateStoryViaBeats runs it, on the inputs it holds.
+    const readPlan = BP.makePlanReader([1, 2, 3, 4], ARC);
+    const plan = readPlan(REPLY).parsed;
+    const castTable = CCov.parsePlanCastBlock(REPLY, { listed: CCov.commissionedCast(STORY).listed });
+    const logic = PB.parseStoryLogic(`STORY LOGIC:\n${LOGIC}`);
+    const inputs = BP.planCheckInputs(STORY, { arcPremiseNames: logic.commissioned, modelOverrides: {} });
+    const gl = { info() {}, warn() {}, error() {}, debug() {} };
+    const runCheck = BP.createPlanCheckRunner({
+      inputData: STORY, approvedArc: ARC, arcHints: '', arcStoryLogic: LOGIC, arcCentralFigure: ['Mira'], castTable,
+      commission: inputs.commission, commissionedNames: inputs.commissionedNames, placeNames: inputs.placeNames, maxCast: inputs.maxCast,
+      arcInventedNames: logic.invented, arcInventedLimit: PB.arcInventedAllowance(STORY),
+      mainName: PB.pickMainCharacters(STORY).focus?.name || null, planCheckModel: inputs.planCheckModel, onChunk: null, gl,
+    });
+    const check1 = await runCheck('plan_check', plan.pages, plan.pagePlan);
+    expect(check1.lines.length).toBeGreaterThan(0);
+    const rounds: any[] = [];
+    await BP.runReplanRounds({
+      inputData: STORY, pageCount: 4, plan, check1, replanRounds: rounds, approvedArc: ARC, arcHints: '', arcStoryLogic: LOGIC,
+      arcCentralFigure: ['Mira'], castTable, commission: inputs.commission, commissionedNames: inputs.commissionedNames, maxCast: inputs.maxCast,
+      planModel: MODEL_DEFAULTS.outline, readPlan, runCheck, onChunk: null, gl, stage: async () => {}, checkCancellation: async () => {},
+      beats: plan.pages, pagePlan: plan.pagePlan,
+    });
+    const prodCalls = modelCalls.splice(0);
+    expect(prodCalls.length).toBeGreaterThanOrEqual(3);                        // check, re-plan, recheck
+    // THE LAB, no params.
+    const r = await testlab.runBeatsReplanStage({ storyId: 'job_parity' }, { params: {} });
+    expect(modelCalls.map(c => [c.label, c.model, c.prompt])).toEqual(prodCalls.map(c => [c.label, c.model, c.prompt]));
+    expect(r.report.castTable).toEqual(castTable);                             // pre-fix: dropped
+    expect(r.report.rounds.length).toBe(rounds.length);
+    expect(modelCalls[0].prompt).toContain('lifts the lantern out of the net'); // the table reaches the check
+  });
+
+  it('the run builds Step 2 with the shared functions (source scan)', () => {
+    const src = read('server/lib/beatsPipeline.js');
+    expect(src).toContain('const readPlan = makePlanReader(expected, approvedArc);');
+    expect(src).toMatch(/planCheckInputs\(inputData, \{ arcPremiseNames, modelOverrides \}\)/);
+    expect(src).toMatch(/const runCheck = createPlanCheckRunner\(\{/);
+    expect(src).toMatch(/\(\{ beats, pagePlan \} = await runReplanRounds\(\{/);
+  });
+});
+
 describe('the run still calls the shared builders (source scan)', () => {
   const pipeline = read('storyJobPipeline.js');
   const repair = read('server/lib/repairPipeline.js');

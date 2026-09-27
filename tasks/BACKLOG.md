@@ -615,7 +615,7 @@ are listed stage by stage in the audit table.
 - [ ] pick_best: tie-break `'earliest'`, the pipeline's rule → docs/testlab-prod-parity.md:47
 - [ ] scene_expansion / _ab / scene_variant: the all-pages builder, the production model, the plan line, `story` and the clothing contract → docs/testlab-prod-parity.md:48
 - [ ] beats_scenes: `sceneReviewModel`, clothing findings, `checkBriefs` with `planLine`/`textZoneRules`, the planner landmarks; export the production recovery / bible-adoption / review-merge blocks and delete the Lab copies → docs/testlab-prod-parity.md:57
-- [ ] beats_replan: `castTable`, the parsed `plannerReply` page plan, invented / commissioned figures, `peoplelessPick`; export `runPlanCheck` / `runReplanRound` from beatsPipeline → docs/testlab-prod-parity.md:58
+- [x] beats_replan: `castTable`, the parsed `plannerReply` page plan, invented / commissioned figures, `peoplelessPick`; export `runPlanCheck` / `runReplanRound` from beatsPipeline — fixed 2026-09-27 (`createPlanCheckRunner`, `runReplanRounds`) → docs/testlab-prod-parity.md:58
 - [ ] arc_panel_replay: landmarks, the job's stored challenge draw for the re-tell, `creatorCall` → docs/testlab-prod-parity.md:59
 - [ ] scene_review_replay: default input `sceneReviewReport.briefsIn` with covers; `keepDeclaredLight`; truncation guard → docs/testlab-prod-parity.md:60
 - [ ] judge_fixture plate_qc: derived-plate QC options from the base plate and the representative page (shared with `derivedQcOpts`) → docs/testlab-prod-parity.md:61
