@@ -62800,6 +62800,24 @@ B), so a face repair's reference carries no headwear; the clothing text in the p
 **Lab pose follows the target figure** (`charName`), as production always did; the Lab looked
 the pose up under the reference character's name.
 
+**Validation (rung 2, Test Lab set #78, Fiona on staging job_1790446348343_z3fw660ie initialPage,
+same treated input as the baseline — byte-identical 864² crop).** Baseline Lab 1561 (stacked):
+Grok slot 2 = 14 KB. Lab 1563 and 1564 (this change): `reference face-cell-threeQuarter 551x1024
+padded to 1:1, 102KB`, slot 2 = 102 KB, prompt "IMAGE 2 = REFERENCE FACE of Fiona (head and
+shoulders)". Pixels (charfix-sent/heads_input_1561_1563_1564_ref.jpg): both new runs give a
+narrower, longer, older face, closer to the reference than 1561's round young face; the HAIR still
+does not match — shoulder-length and wavy in all three runs, never long, straight and centre-parted.
+The blur region is the original figure's head silhouette (short curly hair ending at the jaw), and
+a face repair only repaints inside it, so hair length cannot move past it whatever the reference
+shows. A short-hair→long-hair identity swap therefore needs a body-target repair (or a head
+region grown to the reference's hair length) — open, see BACKLOG. 1564 retried once inside the
+spine (first draw rejected). Cost ≈ $0.08 incl. the entity replay.
+
+**Entity judge reference (Lab 1565, entity stage, character Fiona, stored story — not changed
+here).** Cell R is the FRONT face cell fitted into a 256 px grid cell (`FACE_CROP_SIZE`,
+entityConsistency.js ~2801), so the reference face is ~70 px wide, the same size as the page
+crops. The judge again filed the initialPage as hair_change MAJOR, not identity_swap.
+
 **Touched:** server/lib/charRepairReference.js (new), server/lib/faceRepair.js,
 server/lib/charRepairRequest.js, server/lib/repairPipeline.js, server/lib/testlab.js,
 server/routes/regeneration.js, server/lib/entityConsistency.js, server/lib/grok.js,

@@ -90,6 +90,8 @@ Last full sweep: **2026-09-06**.
 
 ## Image quality — unresolved render defects
 
+- [ ] A face repair cannot change hair LENGTH: the blur region is the original head silhouette, so Fiona's short curly hair stays shoulder-length with the new big face reference (Lab 1563/1564). Owner call: route hair-length identity swaps to a body-target repair, or grow the head region to the reference's hair → docs/decisions.md (2026-09-27 "A character repair sends ONE reference cell by target", Validation)
+- [ ] Entity judge reference cell R is the front face cell in a 256 px cell (~70 px face), always front pose — small next to the page crops' role as the identity anchor; not changed → docs/decisions.md (2026-09-27 "A character repair sends ONE reference cell by target", Entity judge reference)
 - [ ] identity_swap misses the motivating page: the entity grid judge still reads Fiona on staging job_1790446348343_z3fw660ie's initial page (-2) as the same woman (Lab #1559, #1562; fixture entity-fiona-z3f-initialpage-identity-swap is FN) while catching the three other swaps. Two prompt attempts spent; next options are the owner's (judge model, a face-only comparison cell) → docs/decisions.md (2026-09-27 "An identity swap …", Validation)
 
 - [ ] The beats planner (story-beats.txt) is not given GROUP_STAGING_RULE: it chose `medium` for five characters on both pages that motivated the group check (Fiona p1, p6), and the scene review now overrides a planned medium. Owner call whether the planner gets the rule too → docs/decisions.md (2026-09-27 "A group of more than three is checked", Open)
