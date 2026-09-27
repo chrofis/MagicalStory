@@ -63910,6 +63910,118 @@ outside the dragon family; the floors change.
 evals/datasets/jev-shot-budget-v1/reading_labels.json (new),
 evals/runs/2026-09-27_jev-shot-budget/metrics.json (new), docs/decisions.md, tasks/BACKLOG.md.
 
+## 2026-09-27 — Gaze, depth, story relevance asked as fit (follow-up to the extra-fields table): gaze ✅ as a choice over code-listed targets; depth ❌ and row relevance ❌ stay with the AD; per-element relevance 🟡 — measured, NOT built
+
+**Context:** owner, 2026-09-27: "redo the gaze, depth and story relevant; think of a better way to ask
+the question to Jev." The extra-fields table above asked Jev to CLASSIFY each field (❌ for all three).
+The lesson from shots: ask what SERVES the moment, one yes/no per option with graded scores, and let
+code pick. Three or more question designs per field, on the SAME 70 pages / 139 characters / 81
+interaction rows of the same four books (`5herh01j7`, `vnx5l8iy7`, `z3fw660ie`, `dka3jpog9`). The state
+is the earlier one: the whole story text with the page marked + the page's plan line without its shot
+token. `scripts/analysis/eval-jev-extra-fields.js`, run `2026-09-27_jev-extra-fields`,
+`evals/runs/2026-09-27_jev-extra-fields/metrics.json`; 1,170 Jev calls (3 reps of each), **$0.157**,
+p50 279 ms per call.
+
+**Truth.** A new reading, written from the story text + plan line BEFORE any Jev call and with the AD's
+values hidden (`evals/datasets/jev-extra-fields-v1/reading_labels.json`, hashed keys, 450 labels, all
+NEW): per character the SET of acceptable gaze targets at the element level (a roster name, a VB
+element id, `away`), per character the acceptable depth set, and per cited VB element whether it is
+story-relevant on the page (164 elements, a new question — the AD marks only interaction rows). Row
+relevance keeps the 73 labels of `jev-shot-budget-v1` and adds the 8 rows that had none. The earlier
+gaze reading was coarse (a name / "thing" / away) and cannot score a pick that names a target; the new
+reading overlaps it on 130 / 136 characters.
+
+**Gaze (looksAt) — candidates listed in code**: every other character in the AD roster, every VB
+element the page cites (clothing excluded), creatures/figures the plan line names but the page does not
+cite, and `away`; `viewer` is never offered on a story page.
+
+| Design | Question | Right / 139 | Flips (3 reps) |
+|---|---|---|---|
+| **G2 choice** | `In the instant of the page to judge, what are <X>'s eyes and hands on?` over the candidate list | **128 (0.921)**; 1 call 126 (0.906) | **2** |
+| G4 "serves" nouls → argmax | `The picture of the page to judge is best told with <X> looking at <target>, better than with <X> looking anywhere else.` | 118 (0.849), AUC 0.80 | 7 |
+| G1 attention nouls → argmax | `In the instant of the page to judge, <X>'s attention is on <target>: what <X> is dealing with, reacting to, or reaching for.` | 114 (0.820), AUC 0.81 | 5 |
+| G3 two-stage | noul `…attention is on another person or creature, not on a thing or a place` → a choice among the beings or among the things | 109 (0.784) | 8 |
+| G0 the first test's wording | coarse choice (names / "the thing the instant is about" / viewer / away) — cannot name a target | (125 scored coarsely) | 10 |
+| **Art Director** `looksAt` | — | 111 (0.799) | — |
+
+A symmetric second look at the misses (after scoring, both sides): 11 AD misses are defensible (a book
+the reader holds, the coat being cut — clothing is not a candidate, an egg the page does not cite, each
+child looking at the one ahead in a line, a vantage id "over the heap" standing for the heap) → ~122
+(0.88); 5 G2 misses are defensible (frozen children looking nowhere, a held egg) → ~133 (0.96). The AD's
+real errors are systematic: `away` for children facing the moment's creature (6 on the dragon book's
+summit and gap pages), the ship on a closing group page (5). On the old coarse labels the AD scores
+127 / 136 and G2 113 / 136 — the coarse scheme counts a creature outside the roster as "thing" and one
+inside it as a name, so a correct fine pick scores as a miss.
+
+Why the CHOICE wins here while nouls won the shot: a character looks at exactly one thing, and there is
+no budget across pages, so no second choice is ever needed. Independent nouls over-score the page's
+place ("attention on the place itself" is true of everyone in it): 11 of G1's 25 misses pick the place,
+3 more the ship they stand on. What changed from the first test is the option list: targets listed in
+code at the element level, instead of four coarse categories.
+
+**Depth.**
+
+| Design | How | Right / 139 | Flips |
+|---|---|---|---|
+| D0 code | wide / ultra-wide / aerial → all midground; close-up with ≤ 2 → foreground; else the first name in the who column → foreground, the rest midground | 136 (0.978) | 0 |
+| D1 Jev + code | nouls `<X> is the one the instant of the page to judge is about.` + `In the instant of the page to judge, <X> is set apart from the others: far off, behind them, left waiting, or watching from a distance.` → APART ≥ 0.5 → background; then the D0 shot rules; else FOCUS top or ≥ 0.5 → foreground | 134 (0.964) | 4 |
+| D3 plane nouls | `The picture of the page to judge is best told with <X> in the foreground: nearest the camera, large in the frame.` (×3 planes) → argmax | 129 (0.928) | 4 |
+| D2 the first test's choice | | 127 (0.914) | 8 |
+| **Art Director** `depth` | | 120 (0.863) | — |
+
+This does NOT show code or Jev beating the AD: the reading applies the same convention D0 encodes (a
+wide shot keeps its figures in the midground), and 13 of the AD's 19 misses are a figure in the
+foreground of a wide or ultra-wide shot — a composition choice, not a story error. On the 17 depth
+labels of the earlier, independent reading the AD scores 17 / 17, D0 and D1 15 / 17. Jev's FOCUS
+separates the foreground figure well (AUC 0.93) and APART found the one truly set-apart figure (a parent
+on a distant bench, 0.96), but APART also fires at 0.57-0.72 on three near figures.
+
+**Story relevance.**
+
+| Set | Design | Result | AD |
+|---|---|---|---|
+| interaction rows (81, 71 relevant) | R0 the first test's wording | AUC 0.75, 66 / 81 at 0.5 | **73 / 81** (8 of 10 negatives) |
+| | R1 counterfactual `The instant of the page to judge would still make sense if the picture did not show this: <row>.` (inverted) | AUC **0.89**, but calibrated low: 44 / 81 at 0.5, 0.85 with a leave-one-book-out threshold (0.05-0.20) | |
+| | R2 role `In the instant of the page to judge, <object> is used, held, sought, or is the cause of what happens.` | AUC 0.66, 68 / 81 | |
+| | R3 continuity `<object> matters later in the story because of what happens to it or with it on the page to judge.` | AUC 0.60, flips 7 | |
+| | min(¬R1, R2) | AUC 0.90, leave-one-book-out 0.84 | |
+| cited elements, not places (92, 84 relevant) | **R2 role** at 0.5 | **86 / 92** (6 of 8 negatives), AUC 0.89, flips 2; leave-one-book-out 0.913 | the AD marks rows only (proxy 47 / 92); "all relevant" = 84 / 92 |
+| cited places (72, 17 relevant) | best: R3 at 0.75 (leave-one-book-out 0.82, AUC 0.75) | ≈ majority 0.76 | proxy 55 / 72 |
+
+The counterfactual is the best ranker the relevance tests have seen (0.89 vs the first test's 0.71),
+but no threshold chosen on the other books beats the AD's own booleans, which already get 8 of the 10
+irrelevant rows (worn items, a figure standing by). Per element, the role question separates the few
+background elements, but "everything cited is relevant" is already 91%.
+
+**Verdicts.**
+- **looksAt ✅ Jev + code beats the AD** (0.92 vs 0.80 as labelled; ~0.96 vs ~0.88 after a symmetric
+  second look). Winner G2: one call per page carrying one choice per character; the options are the
+  candidate list built in code; average the choice probabilities of 3 calls (flips 2 / 139; one call
+  0.906). Code writes the chosen id or name into `looksAt`. Build notes (not measured): add the clothing
+  an interaction row acts on and the objects the page text names to the candidates; offer `viewer` only
+  on covers.
+- **depth ❌ stays with the AD.** No independent evidence that Jev adds anything; if the field ever
+  leaves the AD, D0 ($0 code) is the candidate, not Jev.
+- **storyRelevant (rows) ❌ stays with the AD.** Per-element relevance (a field the AD does not have)
+  🟡: R2 role ≥ 0.5, 94% vs 91% for "all relevant" — not worth a call on its own.
+
+**Cost:** G2 alone is one call per page (~$0.00013), ~$0.007 for an 18-page book averaged over 3 calls.
+This whole run: 1,170 calls, $0.157.
+
+**Risks.** (a) One reader, four books (three dragon plots, one pirate plot, German); a gaze target is
+often defensibly two things — the acceptable-set rate is the defensible number. (b) The roster is the
+AD's own character list; in the decision layer it would be the plan's who column. (c) The depth reading
+shares D0's convention, so the depth numbers are circular except for the 17 old labels.
+
+**Owner decision:** take looksAt (G2 + code-listed candidates) into the decision layer, or leave it with
+the AD; depth and row relevance stay with the AD either way.
+
+**Revisit if:** a new Jev version; the AD's gaze rule changes; a book set outside the dragon family.
+
+**Touched:** scripts/analysis/eval-jev-extra-fields.js (new),
+evals/datasets/jev-extra-fields-v1/reading_labels.json (new),
+evals/runs/2026-09-27_jev-extra-fields/metrics.json (new), docs/decisions.md, tasks/BACKLOG.md.
+
 ## 2026-09-27 — A grammar-check RESTORE names what it replaces; it can never leave both
 
 **Context:** staging `job_1790508305061_dka3jpog9` p2. The repair rewrote writer sentence B4

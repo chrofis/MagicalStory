@@ -1,0 +1,320 @@
+{
+  "run": "2026-09-27_jev-extra-fields",
+  "calls": 1170,
+  "costUsd": 0.15712,
+  "costPerCallUsd": 0.000134,
+  "msP50": 279,
+  "costByVariant": {
+    "B": 0.02568,
+    "G1": 0.02604,
+    "G23": 0.02796,
+    "G4": 0.02571,
+    "D": 0.02493,
+    "R": 0.02757
+  },
+  "gaze": {
+    "n": 139,
+    "designs": {
+      "G1": {
+        "right": 114,
+        "n": 139,
+        "acc": 0.82,
+        "flips": 5,
+        "coarse": "117/136"
+      },
+      "G2": {
+        "right": 128,
+        "n": 139,
+        "acc": 0.921,
+        "flips": 2,
+        "coarse": "113/136"
+      },
+      "G3": {
+        "right": 109,
+        "n": 139,
+        "acc": 0.784,
+        "flips": 8,
+        "coarse": "111/136"
+      },
+      "G4": {
+        "right": 118,
+        "n": 139,
+        "acc": 0.849,
+        "flips": 7,
+        "coarse": "113/136"
+      },
+      "G1:1call": {
+        "right": 115,
+        "n": 139,
+        "acc": 0.827,
+        "flips": 0,
+        "coarse": null
+      },
+      "G2:1call": {
+        "right": 126,
+        "n": 139,
+        "acc": 0.906,
+        "flips": 0,
+        "coarse": null
+      },
+      "G4:1call": {
+        "right": 116,
+        "n": 139,
+        "acc": 0.835,
+        "flips": 0,
+        "coarse": null
+      },
+      "AD": {
+        "right": 111,
+        "n": 139,
+        "acc": 0.799,
+        "flips": 0,
+        "coarse": "127/136"
+      },
+      "G0": {
+        "right": 125,
+        "n": 139,
+        "acc": 0.899,
+        "flips": 10,
+        "coarse": "118/136"
+      }
+    },
+    "aucCandidate": {
+      "G1": 0.807,
+      "G4": 0.804
+    },
+    "adWrongJevRight": 26,
+    "jevWrongAdRight": 23
+  },
+  "depth": {
+    "designs": {
+      "D0 code": {
+        "right": 136,
+        "n": 139,
+        "acc": 0.978,
+        "flips": 0
+      },
+      "D1 focus/apart+code": {
+        "right": 134,
+        "n": 139,
+        "acc": 0.964,
+        "flips": 4
+      },
+      "D2 choice (old)": {
+        "right": 127,
+        "n": 139,
+        "acc": 0.914,
+        "flips": 8
+      },
+      "D3 plane nouls": {
+        "right": 129,
+        "n": 139,
+        "acc": 0.928,
+        "flips": 4
+      },
+      "AD": {
+        "right": 120,
+        "n": 139,
+        "acc": 0.863,
+        "flips": 0
+      }
+    },
+    "focusAucForeground": 0.925
+  },
+  "relevance": {
+    "rows": {
+      "n": 81,
+      "positives": 71,
+      "majority": 0.877,
+      "AD": {
+        "acc": 0.901,
+        "right": 73
+      },
+      "R0": {
+        "acc": 0.815,
+        "right": 66,
+        "auc": 0.746,
+        "flips": 6
+      },
+      "R1": {
+        "acc": 0.543,
+        "right": 44,
+        "auc": 0.892,
+        "flips": 1
+      },
+      "R2": {
+        "acc": 0.84,
+        "right": 68,
+        "auc": 0.655,
+        "flips": 1
+      },
+      "R3": {
+        "acc": 0.704,
+        "right": 57,
+        "auc": 0.604,
+        "flips": 7
+      },
+      "mean(¬R1,R2)": {
+        "acc": 0.802,
+        "right": 65,
+        "auc": 0.844
+      },
+      "mean(¬R1,R2,R3)": {
+        "acc": 0.802,
+        "right": 65,
+        "auc": 0.781
+      },
+      "max(¬R1,R2)": {
+        "acc": 0.877,
+        "right": 71,
+        "auc": 0.678
+      },
+      "min(¬R1,R2)": {
+        "acc": 0.506,
+        "right": 41,
+        "auc": 0.902
+      }
+    },
+    "elements": {
+      "n": 164,
+      "positives": 101,
+      "majority": 0.616,
+      "AD": {
+        "acc": 0.622,
+        "right": 102
+      },
+      "R1": {
+        "acc": 0.75,
+        "right": 123,
+        "auc": 0.898,
+        "flips": 7
+      },
+      "R2": {
+        "acc": 0.683,
+        "right": 112,
+        "auc": 0.718,
+        "flips": 5
+      },
+      "R3": {
+        "acc": 0.671,
+        "right": 110,
+        "auc": 0.774,
+        "flips": 13
+      },
+      "mean(¬R1,R2)": {
+        "acc": 0.762,
+        "right": 125,
+        "auc": 0.847
+      },
+      "mean(¬R1,R2,R3)": {
+        "acc": 0.744,
+        "right": 122,
+        "auc": 0.846
+      },
+      "max(¬R1,R2)": {
+        "acc": 0.683,
+        "right": 112,
+        "auc": 0.727
+      },
+      "min(¬R1,R2)": {
+        "acc": 0.75,
+        "right": 123,
+        "auc": 0.897
+      }
+    },
+    "elementsNoPlace": {
+      "n": 92,
+      "positives": 84,
+      "majority": 0.913,
+      "AD": {
+        "acc": 0.511,
+        "right": 47
+      },
+      "R1": {
+        "acc": 0.75,
+        "right": 69,
+        "auc": 0.917,
+        "flips": 5
+      },
+      "R2": {
+        "acc": 0.935,
+        "right": 86,
+        "auc": 0.89,
+        "flips": 2
+      },
+      "R3": {
+        "acc": 0.783,
+        "right": 72,
+        "auc": 0.755,
+        "flips": 8
+      },
+      "mean(¬R1,R2)": {
+        "acc": 0.88,
+        "right": 81,
+        "auc": 0.926
+      },
+      "mean(¬R1,R2,R3)": {
+        "acc": 0.88,
+        "right": 81,
+        "auc": 0.902
+      },
+      "max(¬R1,R2)": {
+        "acc": 0.935,
+        "right": 86,
+        "auc": 0.891
+      },
+      "min(¬R1,R2)": {
+        "acc": 0.75,
+        "right": 69,
+        "auc": 0.915
+      }
+    },
+    "places": {
+      "n": 72,
+      "positives": 17,
+      "majority": 0.764,
+      "AD": {
+        "acc": 0.764,
+        "right": 55
+      },
+      "R1": {
+        "acc": 0.75,
+        "right": 54,
+        "auc": 0.781,
+        "flips": 2
+      },
+      "R2": {
+        "acc": 0.361,
+        "right": 26,
+        "auc": 0.557,
+        "flips": 3
+      },
+      "R3": {
+        "acc": 0.528,
+        "right": 38,
+        "auc": 0.748,
+        "flips": 5
+      },
+      "mean(¬R1,R2)": {
+        "acc": 0.611,
+        "right": 44,
+        "auc": 0.645
+      },
+      "mean(¬R1,R2,R3)": {
+        "acc": 0.569,
+        "right": 41,
+        "auc": 0.711
+      },
+      "max(¬R1,R2)": {
+        "acc": 0.361,
+        "right": 26,
+        "auc": 0.557
+      },
+      "min(¬R1,R2)": {
+        "acc": 0.75,
+        "right": 54,
+        "auc": 0.781
+      }
+    }
+  }
+}
