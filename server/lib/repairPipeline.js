@@ -296,6 +296,97 @@ function mergeEntityIssues(base, fresh, repairedPages) {
 }
 
 /**
+ * ONE evaluateImageBatch input for a page version: `entry` is the version being
+ * judged, `orig` the page's first-render record (the run's rawImages entry), and
+ * `allCharacterPhotos` the whole-cast reference list. The repair round's
+ * builder, exported on 2026-09-27 so the Test Lab eval stages hand the batch the
+ * same input for a stored page (owner: "The Lab must use 100% identical code to
+ * production").
+ */
+function buildEvalInput(entry, orig, allCharacterPhotos) {
+  const { resolveSceneEra } = require('./landmarkProtection');
+  // sharedBboxDetection is the bbox detection that ran on the ORIGINAL
+  // image bytes pre-pipeline (server.js:5570). Reusing it skips a redundant
+  // Gemini call when re-evaluating the same image. But it MUST NOT be
+  // reused when the entry's imageData differs from the original — that
+  // happens on every round-result image (iterate / inpaint / char-fix
+  // produce new bytes). Page 5 of job_1778525478433_fkl0f12x4 showed v3
+  // and v4 carrying v0's bbox figures even though their pixel content was
+  // completely different — because every round eval got the same
+  // sharedBboxDetection forwarded.
+  const isOriginalImage = entry.imageData === orig.imageData;
+  // A repaired version is evaluated against ITS OWN contract when it has
+  // one (iterate rewrites the scene — prompt, description, characters,
+  // metadata can all legitimately differ from the original plan). Falling
+  // back to orig.* for entries without a rewrite (inpaint, char-fix keep
+  // the original scene contract).
+  return {
+    imageData: entry.imageData,
+    pageNumber: entry.pageNumber,
+    prompt: entry.prompt || orig.prompt,
+    characterPhotos: orig.characterPhotos,
+    allCharacterPhotos,
+    sceneDescription: entry.description || orig.sceneDescription,
+    // The post-shrink prose THIS version's render actually received, by
+    // lineage — its own when it was compressed, the page's when it is
+    // original-lineage, null when it authored a brief that fit. One rule,
+    // shared with the promotion at final assembly (resolveVersionCompressedScene).
+    compressedScene: resolveVersionCompressedScene(entry, orig),
+    // An ARRAY on the entry is that version's own declaration (an iterate
+    // rewrite can legitimately empty the cast); anything else inherits the
+    // page's. `||` cannot say that — `[]` is truthy. See resolveDeclaredCast.
+    sceneCharacters: resolveDeclaredCast(entry.sceneCharacters, orig.sceneCharacters),
+    sceneMetadata: entry.sceneMetadata || orig.sceneMetadata,
+    pageText: orig.text,
+    // Era-aware landmark protection (2026-09-05): the real-landmark refs this
+    // page was rendered from + the story era. The compliance judge uses them
+    // to keep a present-day landmark's own structures out of `object_presence`.
+    landmarkPhotos: orig.landmarkPhotos || null,
+    era: resolveSceneEra(entry.sceneMetadata || orig.sceneMetadata),
+    // SCENE_HINT = what the image was MADE from. One resolver for every eval
+    // call site (sceneMetadata.resolveEvalSceneHint) — the inline `||` chain
+    // this replaced assumed pages never set `outlineExtract`, an assumption
+    // 824fb02d9 broke two days later by storing "PLAN: <planLine>" on every
+    // beats page. See the helper's own comment for the full history.
+    sceneHint: resolveEvalSceneHint({
+      evaluationType: orig.evaluationType,
+      entryDescription: entry.description,
+      sceneDescription: orig.sceneDescription,
+      outlineExtract: orig.scene?.outlineExtract,
+      sceneHint: orig.scene?.sceneHint,
+    }),
+    evaluationType: orig.evaluationType,
+    // Structured cover text contract (replaces the old prompt-string surgery):
+    // 'appOverlay' → evaluator must never flag the (textless) title missing;
+    // 'painted' + expectedText → evaluator letter-checks the painted text.
+    expectedText: orig.expectedText ?? null,
+    textMode: orig.textMode ?? null,
+    coverIsPage: orig.coverIsPage === true,
+    // Detection reuse, in pairing order: the entry's OWN detection first —
+    // a round-result entry carries the detection made on its accepted new
+    // bytes (iterate's internal re-detect, or the round pre-detect step) —
+    // else the pre-pipeline shared detection when the bytes are still the
+    // original's. Never the original's detection for repaired bytes.
+    // bboxPairsWith re-verifies the fingerprint before any reuse.
+    sharedBboxDetection: entry.bboxDetection
+      || (isOriginalImage ? (orig.sharedBboxDetection || null) : null),
+  };
+
+}
+
+/**
+ * The story identity evaluateImageBatch records its counters under — shared
+ * with the Test Lab eval stages.
+ */
+function evalStoryMetaOf(storyData, jobId = null) {
+  return {
+    storyId: storyData?.id || jobId || null,
+    language: storyData?.language || null,
+    genre: storyData?.genre || null,
+  };
+}
+
+/**
  * Style reference sheets for one style-repair target: the styled avatars of the
  * characters that appear on that page, i.e. this exact cast already painted in
  * the commissioned style.
@@ -386,11 +477,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // (presence_*, eval_matches_missing) off it — so with no caller passing it,
   // those counters went to the NOOP recorder and no story ever stored one.
   // Same id the repair pipeline already uses for its own counters below.
-  const evalStoryMeta = {
-    storyId: storyData?.id || jobId || null,
-    language: storyData?.language || null,
-    genre: storyData?.genre || null,
-  };
+  const evalStoryMeta = evalStoryMetaOf(storyData, jobId);
 
   const imagesWithData = rawImages.filter(r => r.imageData);
   const effectiveUseIteratePage = useIteratePage && !!storyData;
@@ -449,75 +536,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   );
 
   // Reusable helper: build eval inputs for an array of image entries
-  const buildEvalInputs = (imageEntries) => imageEntries.map(entry => {
-    const orig = rawImages.find(img => img.pageNumber === entry.pageNumber) || entry;
-    // sharedBboxDetection is the bbox detection that ran on the ORIGINAL
-    // image bytes pre-pipeline (server.js:5570). Reusing it skips a redundant
-    // Gemini call when re-evaluating the same image. But it MUST NOT be
-    // reused when the entry's imageData differs from the original — that
-    // happens on every round-result image (iterate / inpaint / char-fix
-    // produce new bytes). Page 5 of job_1778525478433_fkl0f12x4 showed v3
-    // and v4 carrying v0's bbox figures even though their pixel content was
-    // completely different — because every round eval got the same
-    // sharedBboxDetection forwarded.
-    const isOriginalImage = entry.imageData === orig.imageData;
-    // A repaired version is evaluated against ITS OWN contract when it has
-    // one (iterate rewrites the scene — prompt, description, characters,
-    // metadata can all legitimately differ from the original plan). Falling
-    // back to orig.* for entries without a rewrite (inpaint, char-fix keep
-    // the original scene contract).
-    return {
-      imageData: entry.imageData,
-      pageNumber: entry.pageNumber,
-      prompt: entry.prompt || orig.prompt,
-      characterPhotos: orig.characterPhotos,
-      allCharacterPhotos,
-      sceneDescription: entry.description || orig.sceneDescription,
-      // The post-shrink prose THIS version's render actually received, by
-      // lineage — its own when it was compressed, the page's when it is
-      // original-lineage, null when it authored a brief that fit. One rule,
-      // shared with the promotion at final assembly (resolveVersionCompressedScene).
-      compressedScene: resolveVersionCompressedScene(entry, orig),
-      // An ARRAY on the entry is that version's own declaration (an iterate
-      // rewrite can legitimately empty the cast); anything else inherits the
-      // page's. `||` cannot say that — `[]` is truthy. See resolveDeclaredCast.
-      sceneCharacters: resolveDeclaredCast(entry.sceneCharacters, orig.sceneCharacters),
-      sceneMetadata: entry.sceneMetadata || orig.sceneMetadata,
-      pageText: orig.text,
-      // Era-aware landmark protection (2026-09-05): the real-landmark refs this
-      // page was rendered from + the story era. The compliance judge uses them
-      // to keep a present-day landmark's own structures out of `object_presence`.
-      landmarkPhotos: orig.landmarkPhotos || null,
-      era: resolveSceneEra(entry.sceneMetadata || orig.sceneMetadata),
-      // SCENE_HINT = what the image was MADE from. One resolver for every eval
-      // call site (sceneMetadata.resolveEvalSceneHint) — the inline `||` chain
-      // this replaced assumed pages never set `outlineExtract`, an assumption
-      // 824fb02d9 broke two days later by storing "PLAN: <planLine>" on every
-      // beats page. See the helper's own comment for the full history.
-      sceneHint: resolveEvalSceneHint({
-        evaluationType: orig.evaluationType,
-        entryDescription: entry.description,
-        sceneDescription: orig.sceneDescription,
-        outlineExtract: orig.scene?.outlineExtract,
-        sceneHint: orig.scene?.sceneHint,
-      }),
-      evaluationType: orig.evaluationType,
-      // Structured cover text contract (replaces the old prompt-string surgery):
-      // 'appOverlay' → evaluator must never flag the (textless) title missing;
-      // 'painted' + expectedText → evaluator letter-checks the painted text.
-      expectedText: orig.expectedText ?? null,
-      textMode: orig.textMode ?? null,
-      coverIsPage: orig.coverIsPage === true,
-      // Detection reuse, in pairing order: the entry's OWN detection first —
-      // a round-result entry carries the detection made on its accepted new
-      // bytes (iterate's internal re-detect, or the round pre-detect step) —
-      // else the pre-pipeline shared detection when the bytes are still the
-      // original's. Never the original's detection for repaired bytes.
-      // bboxPairsWith re-verifies the fingerprint before any reuse.
-      sharedBboxDetection: entry.bboxDetection
-        || (isOriginalImage ? (orig.sharedBboxDetection || null) : null),
-    };
-  });
+  // (the per-entry builder is shared with the Test Lab eval stages).
+  const buildEvalInputs = (imageEntries) => imageEntries.map(entry => buildEvalInput(
+    entry, rawImages.find(img => img.pageNumber === entry.pageNumber) || entry, allCharacterPhotos));
 
   // Reusable helper: build entity check data for an array of image entries
   const buildEntityCheckData = (imageEntries) => ({
@@ -4012,6 +4033,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 }
 
 module.exports = {
+  buildEvalInput,
+  evalStoryMetaOf,
   runUnifiedRepairPipeline,
   // Exported for the Test Lab `style_repair` stage: the A/B that decides
   // whether `styleRepairCharacterRefs` ships needs the SAME sheet-collection

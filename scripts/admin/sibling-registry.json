@@ -184,7 +184,13 @@
         "server/lib/testlab.js",
         "server/lib/evalPipeline.js"
       ],
-      "severity": "block"
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "prepareEvalJudgeInputs",
+          "semanticFidelityOptions"
+        ]
+      }
     },
     {
       "id": "page-image-generator-vs-critics",
@@ -921,6 +927,22 @@
           "pageRenderModel",
           "makePageImagePrompt",
           "pageRenderOptions"
+        ]
+      }
+    },
+    {
+      "id": "lab-vs-prod-page-eval",
+      "axis": "Lab vs prod",
+      "reason": "The Test Lab eval stages (quality_eval, semantic_eval, eval_variance, the image stage's auto-eval) and the repair round's page eval build the batch input with the SAME function, repairPipeline.buildEvalInput, and the batch's per-page call with images.batchEvalQualityCall (owner 2026-09-27: the Lab must use 100% identical code to production). A change to what a page eval is handed lands there, where both read it; tests/unit/lab-prod-call-parity.test.ts compares the two.",
+      "members": [
+        "server/lib/repairPipeline.js",
+        "server/lib/testlab.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "buildEvalInput",
+          "evalStoryMetaOf"
         ]
       }
     },

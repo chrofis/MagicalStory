@@ -528,6 +528,95 @@ function evalSceneHint(ctx, params = null) {
   return briefOverrideOf(params) || ctx.outlineHint || null;
 }
 
+/**
+ * THE RUN'S PAGE EVAL CALL for a Lab image (owner 2026-09-27: "The Lab must
+ * use 100% identical code to production"): the run's first-render record for
+ * the page (its `rawImages` entry, rebuilt from the stored page), the version
+ * being judged as the repair round's entry, `repairPipeline.buildEvalInput` on
+ * the two with the whole-cast references, and evaluateImageBatch's options.
+ * The eval stages hand these to `images.evaluateImageBatch` or, for a single
+ * judge, to the batch's own `batchEvalQualityCall`.
+ *
+ * Which bytes: a fresh Lab render (`render`: its sent prompt and
+ * compressedScene, judged as the run judges a first render), a fixture's own
+ * image (`ctx.imageDataOverride`, fresh bytes, no stored detection), or a stored
+ * version — pinned or active — judged against that version's own record
+ * (description, prompt, cast, metadata, detection), as a repair round judges
+ * it.
+ *
+ * Not stored, so the run's defaults stand in: `modelOverrides` (coverTitleMode).
+ * The run's `storyData` is a working object; the eval reads only its
+ * `characters`. `recordStats: false` keeps a Lab re-eval out of the
+ * eval_finding_stats aggregate (a statistics sink; no score reads it).
+ */
+function labEvalCall(ctx, { imageData, render = null, params = null, evalOptionOverrides = null, qualityModelOverride = null, loadedVersion = null } = {}) {
+  const { buildEvalInput, evalStoryMetaOf } = require('./repairPipeline');
+  const { buildWholeCastReferencePhotos } = require('./storyHelpers');
+  const scene = ctx.scene || {};
+  const brief = briefOverrideOf(params);
+  const coverOpts = require('./coverRender').coverRenderOptions(ctx.pageNumber, { title: ctx.title || '', dedication: ctx.dedication || null });
+  // A cover the run briefed as a page carries the page path's cover fields
+  // (storyJobPipeline.js rawImages); an older cover was judged by the cover
+  // path, whose text contract and roster buildEvalReplayOptions resolves.
+  let coverFields = {};
+  if (coverOpts && scene.briefedAsPage === true) {
+    coverFields = { evaluationType: 'cover', expectedText: coverOpts.expectedText, textMode: coverOpts.textMode, coverIsPage: true, excludedCastNames: [] };
+  } else if (coverOpts) {
+    const legacy = buildEvalReplayOptions(ctx, { detectedFigures: null }).options;
+    coverFields = { evaluationType: 'cover', expectedText: legacy.expectedText, textMode: legacy.textMode, coverIsPage: false, excludedCastNames: legacy.excludedCastNames };
+  }
+  const orig = {
+    pageNumber: ctx.pageNumber,
+    imageData: null,
+    prompt: scene.prompt || null,
+    compressedScene: scene.compressedScene || null,
+    characterPhotos: ctx.referencePhotos || [],
+    landmarkPhotos: ctx.landmarkPhotos || null,
+    sceneDescription: brief || scene.sceneDescription || '',
+    text: scene.text,
+    sceneCharacters: scene.sceneCharacters || null,
+    sceneMetadata: scene.sceneMetadata || null,
+    scene: { outlineExtract: scene.outlineExtract || null, sceneHint: scene.sceneHint || null },
+    sharedBboxDetection: null,
+    ...coverFields,
+  };
+  let entry;
+  if (render) {
+    // A first render: the run's rawImages record IS this render.
+    Object.assign(orig, { imageData, prompt: render.prompt || orig.prompt, compressedScene: render.compressedScene || null });
+    entry = { imageData, pageNumber: ctx.pageNumber };
+  } else if (ctx.imageDataOverride) {
+    entry = { imageData, pageNumber: ctx.pageNumber };
+  } else {
+    const versions = scene.imageVersions || [];
+    const { arrayIndexForDb } = require('./versionManager');
+    const v = loadedVersion != null ? versions[arrayIndexForDb(versions, loadedVersion, 'scene')] : null;
+    entry = v
+      ? { imageData, pageNumber: ctx.pageNumber, description: v.description || null, prompt: v.prompt || null, compressedScene: v.compressedScene, sceneCharacters: v.sceneCharacters, sceneMetadata: v.sceneMetadata || null, bboxDetection: v.bboxDetection || null }
+      // A story stored before per-version records: the page record and its detection.
+      : { imageData, pageNumber: ctx.pageNumber, bboxDetection: scene.bboxDetection || null };
+    if (brief) entry.description = brief;
+  }
+  const storyData = {
+    id: ctx.storyId, characters: ctx.characters || [], visualBible: ctx.visualBible || null,
+    clothingRequirements: ctx.clothingRequirements || null, artStyle: ctx.artStyle, language: ctx.language,
+  };
+  const allCharacterPhotos = buildWholeCastReferencePhotos(ctx.characters || [], ctx.artStyle, ctx.clothingRequirements || null);
+  const input = buildEvalInput(entry, orig, allCharacterPhotos);
+  const options = {
+    concurrency: 1,
+    qualityModelOverride,
+    visualBible: ctx.visualBible || null,
+    clothingRequirements: ctx.clothingRequirements || null,
+    storyData,
+    artStyle: ctx.artStyle,
+    ...evalStoryMetaOf(storyData),
+    evalOptionOverrides,
+    recordStats: false,
+  };
+  return { input, options };
+}
+
 /** Reference photos for eval, guaranteed to carry clothingDescription. */
 function evalReferencePhotos(ctx) {
   const photos = (ctx.referencePhotos || []).filter(p => p?.name && p?.clothingDescription);
@@ -796,27 +885,18 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
   let scores = null;
   if (autoEval) {
     try {
-      const { evaluateImageQuality } = require('./images');
-      // PRODUCTION'S OPTION SET, one resolver (buildEvalReplayOptions). This
-      // site used to pass five keys; without visualBible the judge's CLOTHING
-      // CONTRACT still named a garment the page declared `off`, and without
-      // artStyle every style-dependent rule skipped. See evalReplayInputs.js.
-      // No figure count: these are FRESH bytes and no detector runs in this
-      // stage, so the stored detection belongs to a different image. Null makes
-      // the roster decline to judge the count rather than judge it against the
-      // wrong picture.
-      const replay = buildEvalReplayOptions(ctx, {
-        detectedFigures: null,
-        // The A/B renders in params.artStyleOverride when set — the judge must
-        // be told the style it is actually looking at, not the story's.
-        artStyleKey: params.artStyleOverride || undefined,
-      });
-      const evalRes = await evaluateImageQuality(
-        result.imageData, evalSceneDescription(ctx, params, result), evalReferencePhotos(ctx), replay.evaluationType,
-        null, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
-        ctx.scene.text || null, evalSceneHint(ctx, params), ctx.scene.sceneCharacters || null,
-        replay.options
-      );
+      // THE RUN'S FIRST-ROUND EVAL of a fresh render: evaluateImageBatch on the
+      // input buildEvalInput builds when this render is the page's rawImages
+      // record (its sent prompt and compressedScene). No stored detection
+      // belongs to these bytes, so the batch detects them, as the run's
+      // Phase 5b-pre does before its eval. The A/B renders in
+      // params.artStyleOverride when set — the judge is told that style.
+      const { input, options } = labEvalCall(
+        params.artStyleOverride ? { ...ctx, artStyle: params.artStyleOverride } : ctx,
+        { imageData: result.imageData, render: result, params });
+      const [batchRes] = await require('./images').evaluateImageBatch([input], options);
+      const evalRes = batchRes?.evaluated ? batchRes : null;
+      if (batchRes && !batchRes.evaluated) throw new Error(batchRes.error || batchRes.evalError || 'evaluation failed');
       if (evalRes) {
         scores = {
           quality: evalRes.qualityScore ?? evalRes.score ?? null,
@@ -1107,7 +1187,7 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
 async function runQualityEvalStage(ctx, { promptOverride, experimentId, params = {} }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
-  const { evaluateImageQuality } = require('./images');
+  const images = require('./images');
 
   // A pinned target evaluates THAT version (2026-09-12). Without this the stage
   // always judged the active one, so two versions of a page — an original and
@@ -1115,49 +1195,38 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId, params =
   // ctx.imageDataOverride: the judge_fixture stage hands the fixture's own
   // stored image (by R2 URL), so a fixture judges exactly the picture it pins.
   const imageData = ctx.imageDataOverride || await loadActivePageImage(ctx.storyId, ctx.pageNumber, ctx.versionIndex ?? null);
+  const loaded = ctx.imageDataOverride ? null : getLastPageLoad();
   const t0 = Date.now();
-  // PRODUCTION'S OPTION SET (buildEvalReplayOptions) + this stage's explicit
-  // A/B knobs. The baseline must equal production; the overrides are the point
-  // of the experiment. visualBible / clothingRequirements / storyData were all
-  // missing here, which is why every clothing finding this stage has ever
-  // produced was judged against the unstripped story-level outfit.
-  const replay = buildEvalReplayOptions(ctx, {
-    // The stored detection was made on the ACTIVE version's bytes. When a
-    // different version is pinned it describes a different picture, so the
-    // count is withheld rather than guessed.
-    detectedFigures: (ctx.versionIndex ?? null) === null
-      ? (ctx.scene.bboxDetection?.figures || null) : null,
-    overrides: {
-      evalTemplateOverride: promptOverride || null,
-      // Stage-2 compliance A/B: swap the model (default qwen-plus) and/or its
-      // template to test the over-strict-CRITICAL problem.
-      complianceModelOverride: params.complianceModel || null,
-      compliancePromptOverride: params.compliancePrompt || null,
-      // THE COMPLIANCE JUDGE IS OFF IN PRODUCTION (2026-09-19,
-      // MODEL_DEFAULTS.promptComplianceJudge). This stage's baseline must equal
-      // production, so it follows the flag by default rather than forcing the
-      // judge on — otherwise every image_eval run would score against a judge
-      // prod never consults. Two ways to measure it anyway:
-      //   - `complianceJudge: true` asks for it outright (how experiment 1333
-      //     would be re-run);
-      //   - setting `complianceModel` or `compliancePrompt` IS asking for it —
-      //     an A/B on the judge's model or template is meaningless with the
-      //     judge off, so either one implies it.
-      complianceJudgeOverride: params.complianceJudge != null
-        ? !!params.complianceJudge
-        : ((params.complianceModel || params.compliancePrompt) ? true : null),
-    },
-  });
-  const result = await evaluateImageQuality(
-    imageData, evalSceneDescription(ctx), evalReferencePhotos(ctx), replay.evaluationType,
+  // THE RUN'S PAGE EVAL (owner 2026-09-27: "The Lab must use 100% identical
+  // code to production"): the repair round's evaluateImageBatch on the input
+  // its own buildEvalInput builds for this page — the page prompt (REQUIRED
+  // OBJECTS), the whole-cast references, the scene hint by resolveEvalSceneHint,
+  // the story language — and the batch's post-eval steps (the empty-inventory
+  // cap, detection enrichment, the identity reconcile). The stage used to call
+  // evaluateImageQuality itself with a thinner input. Every params.* below is an
+  // explicit A/B override on top.
+  const evalOptionOverrides = {};
+  if (promptOverride) evalOptionOverrides.evalTemplateOverride = promptOverride;
+  // Stage-2 compliance A/B: swap the model and/or its template.
+  if (params.complianceModel) evalOptionOverrides.complianceModelOverride = params.complianceModel;
+  if (params.compliancePrompt) evalOptionOverrides.compliancePromptOverride = params.compliancePrompt;
+  // THE COMPLIANCE JUDGE IS OFF IN PRODUCTION (2026-09-19,
+  // MODEL_DEFAULTS.promptComplianceJudge); unset follows the flag. Two ways to
+  // measure it anyway: `complianceJudge: true`, or a complianceModel /
+  // compliancePrompt A/B (meaningless with the judge off, so either implies it).
+  if (params.complianceJudge != null) evalOptionOverrides.complianceJudgeOverride = !!params.complianceJudge;
+  else if (params.complianceModel || params.compliancePrompt) evalOptionOverrides.complianceJudgeOverride = true;
+  const { input, options } = labEvalCall(ctx, {
+    imageData,
+    loadedVersion: loaded?.loadedVersion ?? null,
+    evalOptionOverrides: Object.keys(evalOptionOverrides).length ? evalOptionOverrides : null,
     // Quality-judge A/B (2026-09-08): params.model swaps the P2 judge (and,
     // because an override wins there too, the P1 inventory) for one experiment.
-    params.model || null, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
-    ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
-    replay.options
-  );
+    qualityModelOverride: params.model || null,
+  });
+  const [result] = await images.evaluateImageBatch([input], options);
   const elapsedMs = Date.now() - t0;
-  if (!result) throw new Error('Quality evaluation returned null');
+  if (!result || !result.evaluated) throw new Error(`Quality evaluation failed: ${result?.error || result?.evalError || 'no result'}`);
 
   return {
     elapsedMs,
@@ -1184,6 +1253,8 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId, params =
     // the inventory said `complete: false`, the prompt carried the rule, and
     // nothing arrived — no way to tell which side lost it).
     complianceRaw: result.threeStageResult?.complianceResult || null,
+    // Who-is-who between the judge and the detector, as the batch settled it.
+    identityAgreement: result.identityAgreement || null,
     // What RAN, not what was asked: the judge key and the per-stage token
     // counts (a model's input-token signature is how a swap is verified).
     modelId: params.model || require('../config/models').MODEL_DEFAULTS.qualityEval,
@@ -1269,20 +1340,16 @@ async function runEvalVarianceStage(ctx, { experimentId, params = {} }) {
 
   // Frozen inputs, resolved ONCE and reused by every repeat — re-deriving them
   // per run would let an input drift and be mistaken for judge variance.
-  const sceneDescription = evalSceneDescription(ctx);
-  const referencePhotos = evalReferencePhotos(ctx);
-  // Production's option set, frozen with everything else. Measuring the judge's
-  // variance against a THINNER input set than production's measures a different
-  // judge: a missing visualBible turns the clothing contract into the
-  // unstripped story-level outfit, and worn-item findings then flip on every
-  // repeat for a reason that has nothing to do with judge stability.
-  const replay = buildEvalReplayOptions(ctx, {
-    // Frozen with the other inputs: a count that changed between repeats would
-    // be read as judge variance. Withheld when a version is pinned (the stored
-    // detection is the active version's).
-    detectedFigures: versionIndex === null
-      ? (ctx.scene.bboxDetection?.figures || null) : null,
-  });
+  // THE RUN'S EVAL CALL for this page (labEvalCall → the batch's own
+  // batchEvalQualityCall): the arguments evaluateImageBatch hands
+  // evaluateImageQuality, the judged version's own detection count included.
+  // Measuring the judge's variance against a different input set than
+  // production's measures a different judge. The batch's post-eval steps
+  // (detection enrichment, identity reconcile) are not repeated: this stage
+  // scores the evaluators' findings itself (composeDeductions).
+  const { input: evalInput, options: evalBatchOptions } = labEvalCall(ctx, { imageData, loadedVersion: getLastPageLoad()?.loadedVersion ?? null });
+  const evalCall = require('./images').batchEvalQualityCall(evalInput, evalBatchOptions);
+  const sceneDescription = evalCall.sceneDescription;
 
   const runs = [];
   for (let i = 1; i <= repeats; i++) {
@@ -1291,10 +1358,10 @@ async function runEvalVarianceStage(ctx, { experimentId, params = {} }) {
     let error = null;
     try {
       evalResult = await evaluateImageQuality(
-        imageData, sceneDescription, referencePhotos, replay.evaluationType,
+        imageData, evalCall.sceneDescription, evalCall.referenceImages, evalCall.evaluationType,
         null, `testlab-var${experimentId}-P${ctx.pageNumber}-r${i}`,
-        ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
-        replay.options
+        evalInput.pageText || null, evalInput.sceneHint || null, evalInput.sceneCharacters || null,
+        evalCall.evalOptions
       );
     } catch (err) { error = err.message; }
     const elapsedMs = Date.now() - t0;
@@ -1511,66 +1578,32 @@ async function runSemanticEvalStage(ctx, { promptOverride, experimentId }) {
   // already do — judging the active version instead makes an original-vs-repair
   // comparison compare the repair with itself.
   const imageData = ctx.imageDataOverride || await loadActivePageImage(ctx.storyId, ctx.pageNumber, ctx.versionIndex ?? null);
-  const storyText = ctx.scene.text || null;
-  if (!storyText) throw new Error('Scene has no story text — semantic eval needs it');
-
-  // THE SIXTH ARGUMENT. Production never calls evaluateSemanticFidelity bare —
-  // evalPipeline.js hands it the art style, the CLOTHING CONTRACT and the
-  // EXPECTED CAST roster it built for all three judges. This stage passed none
-  // of them, so its judge saw no outfit contract at all (clothing findings
-  // suppressed outright) and no kind labels to keep an `(animal)` entry out of
-  // the named-character count. Same three inputs, same builders.
-  const replay = buildEvalReplayOptions(ctx, {
-    detectedFigures: ctx.scene.bboxDetection?.figures || null,
+  // THE RUN'S SEMANTIC CALL (owner 2026-09-27: "The Lab must use 100% identical
+  // code to production"). evaluateImageQuality builds every judge's inputs in
+  // evalPipeline.prepareEvalJudgeInputs and hands the semantic judge
+  // semanticFidelityOptions of them; this stage runs the same two functions on
+  // the arguments the run's batch eval passes for this page (labEvalCall →
+  // batchEvalQualityCall). It used to rebuild three of the inputs itself and
+  // missed the REQUIRED TEXT rules, the cover fidelity reference (a cover's
+  // reference is its brief), the Visual Bible reference cells and the story
+  // language; its scene hint was not resolveEvalSceneHint's.
+  const { input, options } = labEvalCall(ctx, { imageData, loadedVersion: ctx.imageDataOverride ? null : (getLastPageLoad()?.loadedVersion ?? null) });
+  const evalCall = require('./images').batchEvalQualityCall(input, options);
+  const { judgedSceneText, prepareEvalJudgeInputs, semanticFidelityOptions } = require('./evalPipeline');
+  const pageContext = `testlab-exp${experimentId}-P${ctx.pageNumber}`;
+  const originalPrompt = judgedSceneText(evalCall.sceneDescription);
+  const judgeInputs = prepareEvalJudgeInputs({
+    originalPrompt, referenceImages: evalCall.referenceImages, evaluationType: evalCall.evaluationType, pageContext,
+    storyText: input.pageText || null, sceneHint: input.sceneHint || null, sceneCharacters: input.sceneCharacters || null,
+    evalOptions: evalCall.evalOptions,
+    notEvaluated: require('./notEvaluated').createNotEvaluatedRecorder({ pageContext }),
   });
-  const { buildExpectedCastBlock, buildEvalClothingContract, judgedSceneText } = require('./evalPipeline');
-  // The scene text production's semantic judge reads: the prompt the render was
-  // SENT (evalSceneDescription: its recorded scene block when the shrink fired,
-  // else the brief), metadata-stripped as evaluateImageQuality strips it
-  // (owner, 2026-09-26: the eval judges what image generation was given).
-  const judgedScene = judgedSceneText(evalSceneDescription(ctx));
-  const semanticOpts = {
-    artStyle: replay.options.artStyle,
-    clothingContract: buildEvalClothingContract({
-      sceneCharacters: ctx.scene.sceneCharacters || null,
-      referenceImages: evalReferencePhotos(ctx),
-      artStyle: replay.options.artStyle,
-      visualBible: replay.options.visualBible,
-      clothingRequirements: replay.options.clothingRequirements,
-      sceneMetadata: replay.options.sceneMetadata,
-      sceneHint: ctx.outlineHint,
-      originalPrompt: judgedScene,
-    }).block,
-    expectedCast: buildExpectedCastBlock({
-      sceneCharacters: ctx.scene.sceneCharacters || null,
-      sceneHint: ctx.outlineHint,
-      originalPrompt: judgedScene,
-      visualBible: replay.options.visualBible,
-      evaluationType: replay.evaluationType,
-      detectedFigureCount: Array.isArray(replay.options.detectedFigures)
-        ? require('./bboxDetection').countRealFigures(replay.options.detectedFigures) : null,
-      pageLabel: `testlab-exp${experimentId}-P${ctx.pageNumber} `,
-      sceneMetadata: replay.options.sceneMetadata,
-      storyData: replay.options.storyData,
-      pageNumber: replay.options.pageNumber,
-    }).block,
-    // THE LANDMARK BLOCK — the fourth input production hands this judge since
-    // 2026-09-18. Built from the replay's own landmarkPhotos + era, by the same
-    // builder evalPipeline uses, so a Lab arm judges the page production judges.
-    landmarkContext: require('./landmarkProtection').buildLandmarkContextBlock(
-      require('./landmarkProtection').computeLandmarkProtection({
-        landmarkPhotos: replay.options.landmarkPhotos,
-        era: replay.options.era,
-      })),
-    // The bible PAGE ELEMENTS / DECLARED INTERACTIONS resolve ids against, as
-    // production passes it (evalPipeline, 2026-09-26).
-    visualBible: replay.options.visualBible || null,
-  };
+  if (!judgeInputs.runFidelity) throw new Error('The run gives this page no semantic judge: it has neither page prose nor a cover brief');
 
   const t0 = Date.now();
   const result = await evaluateSemanticFidelity(
-    imageData, storyText, judgedScene,
-    ctx.outlineHint, promptOverride || null, semanticOpts
+    imageData, judgeInputs.fidelityRef, originalPrompt,
+    input.sceneHint || null, promptOverride || null, semanticFidelityOptions(judgeInputs, evalCall.evalOptions)
   );
   const elapsedMs = Date.now() - t0;
   if (!result) throw new Error('Semantic evaluation returned null');
@@ -11025,6 +11058,8 @@ module.exports = {
   labPagePlateText,
   labDerivedPlateQcOptions,
   runQualityEvalStage,
+  runSemanticEvalStage,
+  runEvalVarianceStage,
   runEmptySceneStage,
   runEditImageStage,
   // The page render and the char-fix, exported so "with no params the Lab sends

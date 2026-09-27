@@ -2839,6 +2839,128 @@ function composeEvalReferencePhotos(pagePhotos, wholeCastPhotos) {
   return [...page, ...cast.filter(p => !onPage.has(key(p)))];
 }
 
+/**
+ * What evaluateImageBatch hands evaluateImageQuality for ONE page: the scene
+ * text the judge scores against, the reference list, the evaluation type and
+ * the evalOptions. Moved verbatim out of evaluateImageBatch on 2026-09-27 so
+ * the Test Lab eval stages build the call production makes (owner: "The Lab
+ * must use 100% identical code to production").
+ *
+ * `options.evalOptionOverrides` is the Test Lab's A/B channel (template, judge
+ * or compliance swaps), merged last, and `options.recordStats: false` keeps a Lab
+ * re-eval out of eval_finding_stats; the run passes neither.
+ *
+ * @param {object} img - one evaluateImageBatch input (repairPipeline.buildEvalInput)
+ * @param {object} options - evaluateImageBatch's options
+ * @returns {{sceneDescription: string, referenceImages: Array, evaluationType: string, evalOptions: object}}
+ */
+function batchEvalQualityCall(img, options = {}) {
+  const {
+    visualBible = null,
+    clothingRequirements = null,
+    artStyle = null,
+    storyData = null,
+    storyId = null,
+    genre = null,
+    language = null,
+    evalOptionOverrides = null,
+    recordStats = true,
+  } = options;
+  // The clothing facts now travel as the CLOTHING CONTRACT input, built
+  // inside evaluateImageQuality from these same photos — prepending them to
+  // the prompt as well would state the outfit twice.
+  //
+  // NOT the sent prompt, deliberately: this site feeds the judge the scene
+  // DESCRIPTION, and the resolveEvalArtStyle call below depends on that —
+  // ORIGINAL_PROMPT here must carry no ART STYLE block.
+  //
+  // But when the page's built prompt went over the model cap,
+  // shrinkPromptForModel COMPRESSED the scene prose before sending it, and
+  // the description stored on the page still names clauses the model never
+  // received. The shrink path now hands its compressed scene block back
+  // (`compressedScene`), so that is what the judge scores against when it
+  // exists. No shrink → the exact chain this site always used. The resolver
+  // also re-checks the ART STYLE invariant on the compressed string, since
+  // that head is LLM-rewritten. See
+  // sceneMetadata.resolveEvalSceneDescription (sibling of
+  // resolveEvalImagePrompt, which closed the six prompt-side sites).
+  const sceneDescWithClothing = resolveEvalSceneDescription({
+    compressedScene: img.compressedScene,
+    sceneDescription: img.sceneDescription,
+    prompt: img.prompt,
+  });
+
+  // Run quality evaluation (with parallel semantic fidelity check if pageText provided)
+  // Use img.evaluationType if set (covers use 'cover' for text-focused eval)
+  // Lab/staging parity: resolveEvalArtStyle is the ONE resolver both this
+  // path and the Test Lab quality_eval stage use. ORIGINAL_PROMPT here is the
+  // scene DESCRIPTION (no ART STYLE block), so without this every
+  // style-dependent evaluator rule skipped silently in production too.
+  //
+  // The judge's reference list, and with it the CLOTHING CONTRACT the
+  // eval builds from these refs' clothingDescription. The page's own
+  // photos come first: they carry the outfit the page was actually
+  // generated against (costumes, worn-item strips). A cover's description
+  // has no clothing text, so a contract built from the story-level outfit
+  // ruled the requested costume "unrequested" and the repair stripped it.
+  // The whole-cast list then adds the characters the page did not list,
+  // so identity checks still see the full cast.
+  const refsForEval = composeEvalReferencePhotos(img.characterPhotos, img.allCharacterPhotos);
+  const evalOptions = {
+    // The bible the batch caller already holds. Reaches the evaluators'
+    // INTERACTIONS_BLOCK and the cover fidelity reference, both of which
+    // used to render raw VB ids into a judge's prompt.
+    visualBible,
+    artStyle: require('../services/prompts').resolveEvalArtStyle(artStyle, img.prompt || null),
+    // Same reason the style is read off the built prompt here: the
+    // REQUIRED OBJECTS checklist lives in the prompt TAIL, which the
+    // judge's ORIGINAL_PROMPT (the scene description) deliberately does
+    // not carry. Passed as its own input so D-16b can fire; falls back to
+    // sceneMetadata.objects when no prompt was stored.
+    pagePrompt: img.prompt || null,
+    storyData,
+    clothingRequirements,
+    // Structured cover text contract from the pseudo-page record
+    // (expectedText / textMode) — see evaluateImageQuality's cover branch.
+    expectedText: img.expectedText ?? null,
+    textMode: img.textMode ?? null,
+    // Whether this cover was briefed as a page (runs the lettering check).
+    coverIsPage: img.coverIsPage === true,
+    // Era-aware landmark protection: set by buildEvalInputs in the repair
+    // pipeline (landmark refs + scene era). Absent → no protection.
+    landmarkPhotos: img.landmarkPhotos || null,
+    era: img.era || null,
+    // The page's PARSED metadata, so the EXPECTED CAST roster reads the
+    // brief's `objects[]` even when sceneHint is a plan line.
+    sceneMetadata: img.sceneMetadata || null,
+    // Covers only: the characters the generator was ORDERED to leave off
+    // (cap + exclusion list, server/lib/coverCastRoster.js). The cover
+    // branch of buildExpectedCastBlock reads the cover prose, which still
+    // names them — without this the judge holds a roster the generator
+    // was told to violate.
+    excludedCastNames: img.excludedCastNames || null,
+    // Detector figure count for the EXPECTED CAST block — present on
+    // repair-round re-evaluations that carry the previous detection;
+    // null on a first-round eval, which runs before detection.
+    // Phase 5b-pre already detected on these exact bytes; the repair
+    // rounds carry their own. Shared first, page second — never a new call.
+    detectedFigures: img.sharedBboxDetection?.figures || img.bboxDetection?.figures || null,
+    storyMeta: {
+      storyId, pageNumber: img.pageNumber, artStyle, genre, language,
+      charCount: Array.isArray(img.sceneCharacters) ? img.sceneCharacters.length : null,
+      // The Test Lab re-judges a stored page: it keeps the eval_finding_stats
+      // aggregate to the run's own evaluations. The run passes nothing.
+      ...(recordStats === false ? { recordStats: false } : {}),
+    },
+  };
+  return {
+    sceneDescription: sceneDescWithClothing,
+    referenceImages: refsForEval,
+    evaluationType: img.evaluationType || 'scene',
+    evalOptions: evalOptionOverrides ? { ...evalOptions, ...evalOptionOverrides } : evalOptions,
+  };
+}
+
 async function evaluateImageBatch(images, options = {}) {
   const {
     concurrency = 100,
@@ -2878,101 +3000,19 @@ async function evaluateImageBatch(images, options = {}) {
         };
       }
 
-      // The clothing facts now travel as the CLOTHING CONTRACT input, built
-      // inside evaluateImageQuality from these same photos — prepending them to
-      // the prompt as well would state the outfit twice.
-      //
-      // NOT the sent prompt, deliberately: this site feeds the judge the scene
-      // DESCRIPTION, and the resolveEvalArtStyle call below depends on that —
-      // ORIGINAL_PROMPT here must carry no ART STYLE block.
-      //
-      // But when the page's built prompt went over the model cap,
-      // shrinkPromptForModel COMPRESSED the scene prose before sending it, and
-      // the description stored on the page still names clauses the model never
-      // received. The shrink path now hands its compressed scene block back
-      // (`compressedScene`), so that is what the judge scores against when it
-      // exists. No shrink → the exact chain this site always used. The resolver
-      // also re-checks the ART STYLE invariant on the compressed string, since
-      // that head is LLM-rewritten. See
-      // sceneMetadata.resolveEvalSceneDescription (sibling of
-      // resolveEvalImagePrompt, which closed the six prompt-side sites).
-      const sceneDescWithClothing = resolveEvalSceneDescription({
-        compressedScene: img.compressedScene,
-        sceneDescription: img.sceneDescription,
-        prompt: img.prompt,
-      });
-
-      // Run quality evaluation (with parallel semantic fidelity check if pageText provided)
-      // Use img.evaluationType if set (covers use 'cover' for text-focused eval)
-      // Lab/staging parity: resolveEvalArtStyle is the ONE resolver both this
-      // path and the Test Lab quality_eval stage use. ORIGINAL_PROMPT here is the
-      // scene DESCRIPTION (no ART STYLE block), so without this every
-      // style-dependent evaluator rule skipped silently in production too.
-      //
-      // The judge's reference list, and with it the CLOTHING CONTRACT the
-      // eval builds from these refs' clothingDescription. The page's own
-      // photos come first: they carry the outfit the page was actually
-      // generated against (costumes, worn-item strips). A cover's description
-      // has no clothing text, so a contract built from the story-level outfit
-      // ruled the requested costume "unrequested" and the repair stripped it.
-      // The whole-cast list then adds the characters the page did not list,
-      // so identity checks still see the full cast.
-      const refsForEval = composeEvalReferencePhotos(img.characterPhotos, img.allCharacterPhotos);
+      const evalCall = batchEvalQualityCall(img, options);
+      const refsForEval = evalCall.referenceImages;
       const qualityResult = await evaluateImageQuality(
         img.imageData,
-        sceneDescWithClothing,
+        evalCall.sceneDescription,
         refsForEval,
-        img.evaluationType || 'scene',
+        evalCall.evaluationType,
         qualityModelOverride,
         pageLabel,
         img.pageText || null,  // Story text for semantic fidelity check
         img.sceneHint || null, // Scene hint for semantic evaluation
         img.sceneCharacters || null,  // Enables STEP 2C head-to-body proportion check
-        // evalOptions: story-level context so the eval records per-style/genre
-        // stats to eval_findings (best-effort; no behaviour change).
-        {
-          // The bible the batch caller already holds. Reaches the evaluators'
-          // INTERACTIONS_BLOCK and the cover fidelity reference, both of which
-          // used to render raw VB ids into a judge's prompt.
-          visualBible,
-          artStyle: require('../services/prompts').resolveEvalArtStyle(artStyle, img.prompt || null),
-          // Same reason the style is read off the built prompt here: the
-          // REQUIRED OBJECTS checklist lives in the prompt TAIL, which the
-          // judge's ORIGINAL_PROMPT (the scene description) deliberately does
-          // not carry. Passed as its own input so D-16b can fire; falls back to
-          // sceneMetadata.objects when no prompt was stored.
-          pagePrompt: img.prompt || null,
-          storyData,
-          clothingRequirements,
-          // Structured cover text contract from the pseudo-page record
-          // (expectedText / textMode) — see evaluateImageQuality's cover branch.
-          expectedText: img.expectedText ?? null,
-          textMode: img.textMode ?? null,
-          // Whether this cover was briefed as a page (runs the lettering check).
-          coverIsPage: img.coverIsPage === true,
-          // Era-aware landmark protection: set by buildEvalInputs in the repair
-          // pipeline (landmark refs + scene era). Absent → no protection.
-          landmarkPhotos: img.landmarkPhotos || null,
-          era: img.era || null,
-          // The page's PARSED metadata, so the EXPECTED CAST roster reads the
-          // brief's `objects[]` even when sceneHint is a plan line.
-          sceneMetadata: img.sceneMetadata || null,
-          // Covers only: the characters the generator was ORDERED to leave off
-          // (cap + exclusion list, server/lib/coverCastRoster.js). The cover
-          // branch of buildExpectedCastBlock reads the cover prose, which still
-          // names them — without this the judge holds a roster the generator
-          // was told to violate.
-          excludedCastNames: img.excludedCastNames || null,
-          // Detector figure count for the EXPECTED CAST block — present on
-          // repair-round re-evaluations that carry the previous detection;
-          // null on a first-round eval, which runs before detection.
-          // Phase 5b-pre already detected on these exact bytes; the repair
-          // rounds carry their own. Shared first, page second — never a new call.
-          detectedFigures: img.sharedBboxDetection?.figures || img.bboxDetection?.figures || null,
-          storyMeta: {
-          storyId, pageNumber: img.pageNumber, artStyle, genre, language,
-          charCount: Array.isArray(img.sceneCharacters) ? img.sceneCharacters.length : null,
-        } }
+        evalCall.evalOptions
       );
 
       // FLOOR (owner, 2026-08-26): an EMPTY figure inventory on a page whose
@@ -6332,6 +6372,7 @@ module.exports = {
   generateWithIterativePlacement,
   applyStyleTransfer,
   evaluateImageBatch,
+  batchEvalQualityCall,
   composeEvalReferencePhotos,
 
   // Unified repair pipeline (the only active repair pipeline)

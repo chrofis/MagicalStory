@@ -470,6 +470,125 @@ describe('empty_scene stage: no params = the run\'s plate for the stored page', 
   });
 });
 
+// ── quality_eval / semantic_eval / eval_variance: the run's batch eval call ───
+const { buildEvalInput } = req('../../server/lib/repairPipeline');
+const evalPipeline = req('../../server/lib/evalPipeline');
+const sceneValidator = req('../../server/lib/sceneValidator');
+const { buildWholeCastReferencePhotos } = req('../../server/lib/storyHelpers');
+
+describe('eval stages: no params = the run\'s first-round page eval', () => {
+  const layout = { mode: 'square-below', imageAspect: '1:1', textInImage: false };
+  // A third character who is NOT on the page: the run's judge still gets her
+  // reference (the whole cast); the pre-fix Lab never did.
+  const CAST = [...CHARACTERS, { id: 'c3', name: 'Oma', age: 70, gender: 'woman', description: 'a grandmother', avatars: { standard: 'https://r2/oma.png' } }];
+  const evalScene = () => storedScene({
+    prompt: 'the prompt the model was sent, with its **REQUIRED OBJECTS** tail',
+    // A beats page stores its PLAN line here; the render was made from the brief.
+    outlineExtract: 'PLAN: Mira lights the way',
+    description: 'PLAN: Mira lights the way',
+  });
+  const evalCtx = (scene: any) => ({ ...ctxFor(scene, layout), characters: CAST, language: 'de' });
+
+  /** The run's rawImages record for the page (storyJobPipeline.js Phase 5a) and its first-round eval input. */
+  function productionEvalInput(scene: any, ctx: any, imageData: string) {
+    const rawRecord = {
+      pageNumber: scene.pageNumber, imageData, prompt: scene.prompt, compressedScene: null,
+      characterPhotos: ctx.referencePhotos, landmarkPhotos: ctx.landmarkPhotos, sceneDescription: scene.sceneDescription,
+      text: scene.text, sceneCharacters: scene.sceneCharacters, sceneMetadata: scene.sceneMetadata,
+      scene: { sceneDescription: scene.sceneDescription, outlineExtract: scene.outlineExtract },
+      // Phase 5b-pre's detection on these bytes.
+      sharedBboxDetection: scene.bboxDetection,
+    };
+    const wholeCast = buildWholeCastReferencePhotos(CAST, 'watercolor', STORY.clothingRequirements);
+    return buildEvalInput({ imageData, pageNumber: scene.pageNumber }, rawRecord, wholeCast);
+  }
+
+  let batchCalls: any[] = [];
+  let savedBatch: any; let savedSem: any;
+  beforeEach(() => {
+    batchCalls = [];
+    savedBatch = images.evaluateImageBatch; savedSem = sceneValidator.evaluateSemanticFidelity;
+    images.evaluateImageBatch = async (inputs: any[], options: any) => {
+      batchCalls.push({ inputs, options });
+      return inputs.map((i: any) => ({ pageNumber: i.pageNumber, evaluated: true, score: 80, qualityScore: 80, semanticScore: 70, figures: [], fixableIssues: [] }));
+    };
+  });
+  afterEach(() => { images.evaluateImageBatch = savedBatch; sceneValidator.evaluateSemanticFidelity = savedSem; });
+
+  it('quality_eval hands evaluateImageBatch the run\'s own input and story options', async () => {
+    const scene = evalScene();
+    STORY = { ...storyFor(scene, layout), characters: CAST };
+    const ctx = evalCtx(scene);
+    await testlab.runQualityEvalStage(ctx, { experimentId: 1, params: {} });
+    expect(batchCalls).toHaveLength(1);
+    const labInput = batchCalls[0].inputs[0];
+    expect(labInput).toEqual(productionEvalInput(scene, ctx, PX));
+    const opts = batchCalls[0].options;
+    expect(opts.storyData.characters).toEqual(CAST);
+    expect(opts.visualBible).toBe(VISUAL_BIBLE);
+    expect(opts.language).toBe('de');
+    expect(opts.evalOptionOverrides).toBeNull();
+    // What the judge then receives, through the batch's own builder:
+    const call = images.batchEvalQualityCall(labInput, opts);
+    expect(call.evalOptions.pagePrompt).toBe(scene.prompt);                    // REQUIRED OBJECTS source
+    expect(call.referenceImages.map((r: any) => r.name)).toContain('Oma');       // whole cast
+    expect(labInput.sceneHint).toBe(scene.sceneDescription);                   // the brief, never the PLAN line
+    expect(call.evalOptions.storyMeta.language).toBe('de');                    // the label language
+    expect(call.evalOptions.storyMeta.recordStats).toBe(false);                // no stats rows from the Lab
+  });
+
+  it('quality_eval params ride as explicit overrides on top', async () => {
+    const scene = evalScene();
+    STORY = { ...storyFor(scene, layout), characters: CAST };
+    await testlab.runQualityEvalStage(evalCtx(scene), { experimentId: 1, promptOverride: 'ALT', params: { model: 'judge-x', complianceModel: 'cm' } });
+    const opts = batchCalls[0].options;
+    expect(opts.qualityModelOverride).toBe('judge-x');
+    expect(opts.evalOptionOverrides).toEqual({ evalTemplateOverride: 'ALT', complianceModelOverride: 'cm', complianceJudgeOverride: true });
+    expect(images.batchEvalQualityCall(batchCalls[0].inputs[0], opts).evalOptions.complianceModelOverride).toBe('cm');
+  });
+
+  it('semantic_eval sends the semantic judge exactly what evaluateImageQuality sends it', async () => {
+    const scene = evalScene();
+    STORY = { ...storyFor(scene, layout), characters: CAST };
+    const ctx = evalCtx(scene);
+    const semCalls: any[] = [];
+    sceneValidator.evaluateSemanticFidelity = async (...a: any[]) => { semCalls.push(a); return { score: 70, semanticIssues: [] }; };
+    await testlab.runSemanticEvalStage(ctx, { experimentId: 1 });
+    expect(semCalls).toHaveLength(1);
+    // Production: evaluateImageQuality on the batch call → prepareEvalJudgeInputs → semanticFidelityOptions.
+    const input = productionEvalInput(scene, ctx, PX);
+    const call = images.batchEvalQualityCall(input, { visualBible: VISUAL_BIBLE, clothingRequirements: STORY.clothingRequirements, storyData: { characters: CAST }, artStyle: 'watercolor', storyId: 'job_parity', language: 'de', recordStats: false });
+    const originalPrompt = evalPipeline.judgedSceneText(call.sceneDescription);
+    const prep = evalPipeline.prepareEvalJudgeInputs({
+      originalPrompt, referenceImages: call.referenceImages, evaluationType: call.evaluationType, pageContext: 'x',
+      storyText: input.pageText, sceneHint: input.sceneHint, sceneCharacters: input.sceneCharacters, evalOptions: call.evalOptions,
+      notEvaluated: req('../../server/lib/notEvaluated').createNotEvaluatedRecorder({ pageContext: 'x' }),
+    });
+    const [img, fidelityRef, prompt, hint, template, opts] = semCalls[0];
+    expect(img).toBe(PX);
+    expect(fidelityRef).toBe(prep.fidelityRef);
+    expect(prompt).toBe(originalPrompt);
+    expect(hint).toBe(scene.sceneDescription);
+    expect(template).toBeNull();
+    expect(opts).toEqual(evalPipeline.semanticFidelityOptions(prep, call.evalOptions));
+    // The input the pre-fix stage never passed.
+    expect(opts).toHaveProperty('textRules');
+    // evaluateImageBatch passes no evalOptions.pageNumber (only storyMeta's), so
+    // the run's semantic judge gets null here; the pre-fix Lab sent the page
+    // number. Reported for a decision (BACKLOG), not changed here.
+    expect(opts.pageNumber).toBeNull();
+  });
+
+  it('evaluateImageQuality hands the semantic judge the shared builders\' output (source scan)', () => {
+    const src = read('server/lib/evalPipeline.js');
+    expect(src).toContain('const judgeInputs = prepareEvalJudgeInputs({ originalPrompt, referenceImages, evaluationType, pageContext, storyText, sceneHint, sceneCharacters, evalOptions, notEvaluated });');
+    expect(src).toContain('semanticFidelityOptions(judgeInputs, evalOptions)');
+    const imgs = read('server/lib/images.js');
+    expect(imgs).toContain('const evalCall = batchEvalQualityCall(img, options);');
+    expect(read('server/lib/repairPipeline.js')).toContain('const buildEvalInputs = (imageEntries) => imageEntries.map(entry => buildEvalInput(');
+  });
+});
+
 describe('the run still calls the shared builders (source scan)', () => {
   const pipeline = read('storyJobPipeline.js');
   const repair = read('server/lib/repairPipeline.js');

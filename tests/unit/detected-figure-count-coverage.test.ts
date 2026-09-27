@@ -88,12 +88,14 @@ describe('the eval is given a figure count wherever a detection exists', () => {
     expect(feeds).toBe(replays);
   });
 
-  it('a pinned Test Lab version never borrows the active version\'s count', () => {
-    // The stored detection describes the ACTIVE image; a pinned target is a
-    // different picture, and a count from the wrong picture is worse than none.
+  it('a Test Lab version is judged with its OWN detection, never the active version\'s', () => {
+    // The stored page detection describes the ACTIVE image; a pinned target is
+    // a different picture. Since 2026-09-27 the Lab judges a stored version
+    // as a repair round does: the version's own record, its own detection
+    // (buildEvalInput reuses entry.bboxDetection; bboxPairsWith re-verifies).
     const src = read('server/lib/testlab.js');
-    expect(src).toMatch(/\(ctx\.versionIndex \?\? null\) === null\s*\n\s*\? \(ctx\.scene\.bboxDetection\?\.figures \|\| null\) : null/);
-    expect(src).toMatch(/versionIndex === null\s*\n\s*\? \(ctx\.scene\.bboxDetection\?\.figures \|\| null\) : null/);
+    expect(src).toContain('bboxDetection: v.bboxDetection || null');
+    expect(read('server/lib/repairPipeline.js')).toMatch(/sharedBboxDetection: entry\.bboxDetection\s*\n\s*\|\| \(isOriginalImage \? \(orig\.sharedBboxDetection \|\| null\) : null\)/);
   });
 });
 

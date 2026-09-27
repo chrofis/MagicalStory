@@ -2194,53 +2194,25 @@ function judgedSceneText(originalPrompt) {
   return originalPrompt;
 }
 
-async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene', qualityModelOverride = null, pageContext = '', storyText = null, sceneHint = null, sceneCharacters = null, evalOptions = {}) {
-  // evalOptions.evalTemplateOverride / .semanticTemplateOverride: Test Lab A/B
-  // variants — full replacement template strings used instead of the loaded
-  // files for THIS call only (PROMPT_TEMPLATES is never mutated).
-  // Hoisted outside try so the catch/finally below can reference them.
-  // `let` is block-scoped to the try body — without these declarations here,
-  // the finally's `if (qualityFiguresResolve)` throws ReferenceError on every
-  // call, taking down all 10 page evaluations + cover gen with it.
-  let semanticPromise = null;
-  let threeStagePromise = null;
-  let qualityFiguresPromise = null;
-  let qualityFiguresResolve = null;
-  let p1Promise = null;
-  // NOT-EVALUATED RECORD (2026-09-14). Silence from a check that ran clean and
-  // silence from a check that could not run used to be the same signal; this
-  // makes the second one a field on the result. Recording only — no entry here
-  // is ever a deduction, a severity, or a repair trigger. See notEvaluated.js.
-  const notEvaluated = require('./notEvaluated').createNotEvaluatedRecorder({ pageContext });
-  try {
-    // Guard against undefined/invalid imageData
-    if (!imageData || typeof imageData !== 'string') {
-      log.warn(`⚠️ [QUALITY] Invalid imageData passed to evaluateImageQuality: ${typeof imageData}`);
-      return null;
-    }
-
-    // Strip scene description to relevant parts (remove Art Director checks, corrections, preview mismatches)
-    // This reduces prompt size significantly and focuses the model on actual scene content
-    // GATE ON THE DELIMITER, not on two field names that happen to appear in
-    // one metadata dialect. A brief whose METADATA block carried neither
-    // "previewMismatches" nor "checks" skipped the strip entirely and shipped
-    // the whole JSON — `objects: ["LOC006","ART001",...]` included — into the
-    // evaluator prompt.
-    {
-      const stripped = judgedSceneText(originalPrompt);
-      if (stripped !== originalPrompt) {
-        log.debug(`✂️ [QUALITY] ${pageContext} Stripped scene description: ${originalPrompt.length} → ${stripped.length} chars`);
-        originalPrompt = stripped;
-      }
-    }
-
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    if (!apiKey) {
-      log.verbose('⚠️  [QUALITY] Gemini API key not configured, skipping quality evaluation');
-      return null;
-    }
-
+/**
+ * THE INPUTS EVERY PAGE JUDGE IS GIVEN, built once per evaluation: the cover
+ * text contract, the fidelity reference, the art style, the CLOTHING CONTRACT,
+ * the LANDMARK CONTEXT, REQUIRED OBJECTS / REQUIRED TEXT, the EXPECTED CAST
+ * roster and count, and the reference list with the Visual Bible cells for the
+ * secondaries on it.
+ *
+ * Moved verbatim out of evaluateImageQuality on 2026-09-27 so the Test Lab
+ * `semantic_eval` stage hands the semantic judge the inputs production hands it
+ * (owner: "The Lab must use 100% identical code to production"). The stage had
+ * rebuilt three of them itself and missed the REQUIRED TEXT rules, the cover
+ * fidelity reference and the Visual Bible reference cells.
+ *
+ * @param {object} args - evaluateImageQuality's own arguments (originalPrompt
+ *   already metadata-stripped) plus its not-evaluated recorder.
+ * @returns {object} every value evaluateImageQuality reads further down, and
+ *   `referenceImages` with the Visual Bible cells appended.
+ */
+function prepareEvalJudgeInputs({ originalPrompt, referenceImages, evaluationType, pageContext, storyText, sceneHint, sceneCharacters, evalOptions, notEvaluated }) {
     // Covers get the SAME fidelity checks as pages (semantic, three-stage,
     // visual inventory) — they are not exempt. A page's reference is its story
     // prose; a cover has none, so its reference is the cover brief, which
@@ -2334,22 +2306,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     const landmarkProtection = require('./landmarkProtection')
       .computeLandmarkProtection({ landmarkPhotos: evalOptions.landmarkPhotos || null, era: evalOptions.era || null });
     const landmarkContextBlock = require('./landmarkProtection').buildLandmarkContextBlock(landmarkProtection);
-    // THE LANDMARK GUARD RUNS WHERE THE FINDINGS ARE MADE (2026-09-26). It used
-    // to run at eval time only inside the compliance judge — which is switched
-    // off — and otherwise only inside the consolidator. The consolidator's copy
-    // protected the SCORE (its deduped list came back empty, the page scored
-    // 100), but the raw semantic list still carried the finding, and every
-    // reader that fell back to the raw lists saw a CRITICAL the score had never
-    // charged: staging job_1790446348343_z3fw660ie p9 was admitted to repair as
-    // critical on a guarded "replace the cityscape" finding, routed to inpaint,
-    // and failed with "no instruction to send". Guarding the record itself means
-    // no reader, present or future, can see the finding as live.
-    //
-    // Same contract as the compliance judge: the kept list replaces the record,
-    // the dropped findings survive as `suppressedIssues` (stamped
-    // `suppressed: 'landmark_protected'`) — the record, never the deduction.
-    const guardLandmarkRecord = (holder, key, label) => require('./landmarkProtection')
-      .guardLandmarkRecord(holder, key, landmarkProtection, { pageNumber: pageContext || null, label });
     if (contract.error) {
       log.debug(`[EVAL] clothing contract block skipped: ${contract.error}`);
       notEvaluated.record('clothing', 'clothing_contract_build_failed', contract.error);
@@ -2452,11 +2408,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         nh.has(canonicalName(name || '')) || isNonHuman(resolveEntity(name, castIdx));
       return countRealFigures(evalOptions.detectedFigures.filter(f => !nonHumanFigure(f?.name)));
     })();
-    // WHO THE EVALUATOR CAN ACTUALLY MATCH AGAINST. Filled by the reference
-    // attach loop below with the names that reached the critique as a labelled
-    // `Reference: <name>` image — not what was requested, what was attached.
-    // The presence derivation gates its identity branch on this.
-    const attachedReferenceNames = [];
     const expectedCast = buildExpectedCastBlock({
       sceneCharacters,
       sceneHint,
@@ -2497,6 +2448,113 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       }
     }
 
+
+  return {
+    isCover, coverEvalNote, coverTextMode, coverExpectedText, coverNotes, coverHasPaintedText, coverTextNote, fidelityRef, runFidelity, artStyleForEval, contract, clothingContractBlock, landmarkProtection, landmarkContextBlock, requiredObjects, requiredObjectsBlock, requiredTextBlock, declaredTexts, requiredTextItems, realFigureCount, castIdx, detectedPeopleCount, expectedCast,
+    referenceImages,
+  };
+}
+
+/**
+ * The options evaluateImageQuality hands the semantic judge — shared with the
+ * Test Lab semantic_eval stage.
+ */
+function semanticFidelityOptions(judgeInputs, evalOptions) {
+  const { artStyleForEval, clothingContractBlock, expectedCast, landmarkContextBlock, requiredTextBlock } = judgeInputs;
+  return {
+    artStyle: artStyleForEval,
+    clothingContract: clothingContractBlock,
+    // ONE ROSTER for the blind judges too (2026-09-14): the kind labels are
+    // what keep an `(animal)` entry out of the named-character count.
+    expectedCast: expectedCast.block,
+    // THE LANDMARK BLOCK (2026-09-18). This judge had none, and it is the
+    // judge that produced the one landmark removal that reached production.
+    landmarkContext: landmarkContextBlock,
+    // Same REQUIRED TEXT allow-list the other two judges get.
+    textRules: requiredTextBlock,
+    // The bible the PAGE ELEMENTS and DECLARED INTERACTIONS blocks resolve
+    // their ids against — the quality judge's builder gets the same one
+    // (sceneValidator.semanticDeclaredBlocks, 2026-09-26).
+    visualBible: evalOptions.visualBible || null,
+    // Where the call's prompt is recorded (eval_calls).
+    pageNumber: evalOptions.pageNumber ?? null,
+  };
+}
+
+async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene', qualityModelOverride = null, pageContext = '', storyText = null, sceneHint = null, sceneCharacters = null, evalOptions = {}) {
+  // evalOptions.evalTemplateOverride / .semanticTemplateOverride: Test Lab A/B
+  // variants — full replacement template strings used instead of the loaded
+  // files for THIS call only (PROMPT_TEMPLATES is never mutated).
+  // Hoisted outside try so the catch/finally below can reference them.
+  // `let` is block-scoped to the try body — without these declarations here,
+  // the finally's `if (qualityFiguresResolve)` throws ReferenceError on every
+  // call, taking down all 10 page evaluations + cover gen with it.
+  let semanticPromise = null;
+  let threeStagePromise = null;
+  let qualityFiguresPromise = null;
+  let qualityFiguresResolve = null;
+  let p1Promise = null;
+  // NOT-EVALUATED RECORD (2026-09-14). Silence from a check that ran clean and
+  // silence from a check that could not run used to be the same signal; this
+  // makes the second one a field on the result. Recording only — no entry here
+  // is ever a deduction, a severity, or a repair trigger. See notEvaluated.js.
+  const notEvaluated = require('./notEvaluated').createNotEvaluatedRecorder({ pageContext });
+  try {
+    // Guard against undefined/invalid imageData
+    if (!imageData || typeof imageData !== 'string') {
+      log.warn(`⚠️ [QUALITY] Invalid imageData passed to evaluateImageQuality: ${typeof imageData}`);
+      return null;
+    }
+
+    // Strip scene description to relevant parts (remove Art Director checks, corrections, preview mismatches)
+    // This reduces prompt size significantly and focuses the model on actual scene content
+    // GATE ON THE DELIMITER, not on two field names that happen to appear in
+    // one metadata dialect. A brief whose METADATA block carried neither
+    // "previewMismatches" nor "checks" skipped the strip entirely and shipped
+    // the whole JSON — `objects: ["LOC006","ART001",...]` included — into the
+    // evaluator prompt.
+    {
+      const stripped = judgedSceneText(originalPrompt);
+      if (stripped !== originalPrompt) {
+        log.debug(`✂️ [QUALITY] ${pageContext} Stripped scene description: ${originalPrompt.length} → ${stripped.length} chars`);
+        originalPrompt = stripped;
+      }
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      log.verbose('⚠️  [QUALITY] Gemini API key not configured, skipping quality evaluation');
+      return null;
+    }
+
+    const judgeInputs = prepareEvalJudgeInputs({ originalPrompt, referenceImages, evaluationType, pageContext, storyText, sceneHint, sceneCharacters, evalOptions, notEvaluated });
+    const {
+      isCover, coverEvalNote, coverTextMode, coverExpectedText, coverNotes, coverHasPaintedText, coverTextNote, fidelityRef, runFidelity, artStyleForEval, contract, clothingContractBlock, landmarkProtection, landmarkContextBlock, requiredObjects, requiredObjectsBlock, requiredTextBlock, declaredTexts, requiredTextItems, realFigureCount, castIdx, detectedPeopleCount, expectedCast,
+    } = judgeInputs;
+    referenceImages = judgeInputs.referenceImages;
+    // THE LANDMARK GUARD RUNS WHERE THE FINDINGS ARE MADE (2026-09-26). It used
+    // to run at eval time only inside the compliance judge — which is switched
+    // off — and otherwise only inside the consolidator. The consolidator's copy
+    // protected the SCORE (its deduped list came back empty, the page scored
+    // 100), but the raw semantic list still carried the finding, and every
+    // reader that fell back to the raw lists saw a CRITICAL the score had never
+    // charged: staging job_1790446348343_z3fw660ie p9 was admitted to repair as
+    // critical on a guarded "replace the cityscape" finding, routed to inpaint,
+    // and failed with "no instruction to send". Guarding the record itself means
+    // no reader, present or future, can see the finding as live.
+    //
+    // Same contract as the compliance judge: the kept list replaces the record,
+    // the dropped findings survive as `suppressedIssues` (stamped
+    // `suppressed: 'landmark_protected'`) — the record, never the deduction.
+    const guardLandmarkRecord = (holder, key, label) => require('./landmarkProtection')
+      .guardLandmarkRecord(holder, key, landmarkProtection, { pageNumber: pageContext || null, label });
+    // WHO THE EVALUATOR CAN ACTUALLY MATCH AGAINST. Filled by the reference
+    // attach loop below with the names that reached the critique as a labelled
+    // `Reference: <name>` image — not what was requested, what was attached.
+    // The presence derivation gates its identity branch on this.
+    const attachedReferenceNames = [];
+
     // Start semantic evaluation in parallel when we have a reference (page prose
     // or cover brief).
     if (!runFidelity && (evaluationType === 'scene' || isCover)) {
@@ -2505,24 +2563,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     }
     if (runFidelity) {
       const { evaluateSemanticFidelity } = require('./sceneValidator');
-      semanticPromise = evaluateSemanticFidelity(imageData, fidelityRef, originalPrompt, sceneHint, evalOptions.semanticTemplateOverride || null, {
-        artStyle: artStyleForEval,
-        clothingContract: clothingContractBlock,
-        // ONE ROSTER for the blind judges too (2026-09-14): the kind labels are
-        // what keep an `(animal)` entry out of the named-character count.
-        expectedCast: expectedCast.block,
-        // THE LANDMARK BLOCK (2026-09-18). This judge had none, and it is the
-        // judge that produced the one landmark removal that reached production.
-        landmarkContext: landmarkContextBlock,
-        // Same REQUIRED TEXT allow-list the other two judges get.
-        textRules: requiredTextBlock,
-        // The bible the PAGE ELEMENTS and DECLARED INTERACTIONS blocks resolve
-        // their ids against — the quality judge's builder gets the same one
-        // (sceneValidator.semanticDeclaredBlocks, 2026-09-26).
-        visualBible: evalOptions.visualBible || null,
-        // Where the call's prompt is recorded (eval_calls).
-        pageNumber: evalOptions.pageNumber ?? null,
-      });
+      semanticPromise = evaluateSemanticFidelity(imageData, fidelityRef, originalPrompt, sceneHint, evalOptions.semanticTemplateOverride || null,
+        semanticFidelityOptions(judgeInputs, evalOptions));
       log.debug('🔍 [QUALITY] Starting parallel semantic fidelity evaluation');
     }
 
@@ -3333,7 +3375,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // multi-judge mode so stats populate even before the jury is enabled.
       try {
         const sm = evalOptions && evalOptions.storyMeta;
-        if (sm && sm.storyId) {
+        if (sm && sm.storyId && sm.recordStats !== false) {
           const { mapIssuesToBuckets } = require('./evalBuckets');
           const db = require('../services/database');
           const vec = mapIssuesToBuckets(fixableIssues);
@@ -4040,6 +4082,8 @@ module.exports = {
   sanitizeForGemini,
   evaluateImageQuality,
   judgedSceneText,
+  prepareEvalJudgeInputs,
+  semanticFidelityOptions,
   buildEvalClothingContract,
   buildEvalRequiredObjects,
   buildExpectedCastBlock,
