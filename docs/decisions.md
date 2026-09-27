@@ -63580,3 +63580,199 @@ re-run `score` for (a)); the Q17 wording (`WHOLE_CAST_DEF`) changes — re-run `
 **Touched:** scripts/analysis/eval-jev-replan-guard.js (new),
 evals/datasets/jev-replan-guard-v1/reading_labels.json (new),
 evals/runs/2026-09-27_jev-replan-guard/metrics.json (new), docs/decisions.md, tasks/BACKLOG.md.
+
+## 2026-09-27 — Jev as the plan's DECISION layer: VB membership ✅, who to cut ✅, which group page (as a ranking) ✅, light 🟡/✅, emotion 🟡, population ❌ per page, shot ❌ (code rule instead) — measured, NOT built
+
+**Context:** owner, 2026-09-27: "All of it should be in Jev. Ask Jev which page to drop characters.
+Ask which ones to drop. It should also do the entire metadata the AD now does … Then give to
+replanner the Jev output: on page x you must drop character y. Page y you must change from wide to
+ultra wide." Then: "We could completely redo. Jev plans all based on beats so we have metadata first,
+then AI just puts that to prose for the image model." Motivating failure: staging
+`job_1790508305061_dka3jpog9` — 5 group pages over a budget of 3, unchanged after the re-plan; the
+dragon (ANI001) described on p11 but never cited, so no reference and no dragon drawn. Phase 1 is
+measurement only: can Jev (`typesafe/jev-1.13`, `jevAudit.callJev`, no second client) make each
+decision reliably enough to hand the re-planner / brief writer a BINDING instruction?
+
+**What the stored dragon run shows first** (read from `beatsReviewReport.replanReplies`, round 1,
+kept): the re-planner DECLARED "Page 6: cast out Max", "Page 6: cast out Julian" and did not write
+it — its p6 plan line still carries all four. It DID write "Page 11: cast out Sura" — the creature
+the page's instant is about — which left p11 a group page anyway (four children > 3) and took the
+dragon out of the who column; from there the Art Director described the wing and cited nothing.
+The re-planner is both deciding badly (which name) and executing unreliably (declared ≠ written).
+
+**Measured** (`scripts/analysis/eval-jev-decision-layer.js`, run `2026-09-27_jev-decision-layer`,
+`evals/runs/2026-09-27_jev-decision-layer/metrics.json`; 1,563 Jev calls, **$0.182**; every item 3×,
+Jev has no temperature). Data: every staging beats story of the last 24 days with a commissioned
+cast — 38 group pages (> `GROUP_STAGING_MAX` named characters in the who column of the FIRST plan,
+`briefsIn`) over 17 stories, 5 of them over budget (`riqncqg1i`, `1nitlympp`, `5herh01j7`,
+`vnx5l8iy7`, `dka3jpog9`); 170 (group page × character) items + 31 from the Lab re-plans that
+removed a name (#1326, #1332, #1491, #1494, #1498, #1558); the 70 final pages of the four stories
+whose briefs carry the light fields (`5herh01j7`, `vnx5l8iy7`, `z3fw660ie`, `dka3jpog9`): 70 page
+metadata items (139 character emotions) and 522 (page × Visual Bible element) items.
+
+**Truth is the evaluator's reading, stated as such** (`evals/datasets/jev-decision-layer-v1/reading_labels.json`,
+hashed keys, no story text). Group-page, character and VB-membership labels were written from the
+plan line, arc and page text BEFORE any Jev call of that kind. The metadata fields were adjudicated
+AFTER, on every Jev-vs-AD disagreement only (an agreement is counted as agreement, not verified).
+Group page: KEEP = the opening gathering, the climax, the ending (the owner's own rule in
+`GROUP_PAGES_OVER_BUDGET`) or every character acts; 4 ambiguous pages left out. Character: NEEDED =
+the instant gives them something of their own to do, or acts on, speaks to or works against them;
+standing by, following, watching or being listed is not needed. Owner-accepted drops (Lab #1558
+p6 "Levin and Julian run", p7 "Kiaan whispers to Levin") are among the positives.
+
+| Decision | Question (state) | Verdict | Accuracy / AUC vs reading | Binding threshold | Flips (3 reps) |
+|---|---|---|---|---|---|
+| **Which group page keeps its group** | noul TOGETHER "the page is one where the story brings the whole group together: the opening gathering, the climax, or the ending" (arc + whole plan, page marked) | ✅ as a RANKING | AUC **0.90** (34 pages). Ranked inside each over-budget story, cutting the `groupPages − budget` lowest: **7 of 7** cuts are reading-cut pages (5 stories; dka3jpog9 → p6, p11). As an absolute cut P<0.5: precision 0.85, recall 0.79. $0 baseline "keep only first and last page": precision 0.64 | rank; never a fixed P | 1 / 38 |
+| — same, other phrasings | noul NEED_ALL "the instant needs every one of these characters"; choice "which page needs its group least" | ❌ | NEED_ALL AUC **0.41** (worse than chance); the choice picked the ENDING page on 7 of 8 stories | — | 6 / 38; 1 / 8 |
+| **Which characters to cut** | noul per character, the NEEDED definition above (arc + whole plan, page marked) | ✅ | AUC **0.98** (89 labelled). P(needed) < 0.5 → **51 cuts, 0 wrong**, recall 0.81; < 0.3 → 23 cuts, 0 wrong. The per-page choice "which character does the instant need least" picked a not-needed character 23 of 23 times. dka3jpog9 p11: Sura 0.81 needed, the four children 0.2–0.3 | P(needed) < 0.5 | 10 / 201 |
+| **VB membership: creatures** | noul per element "X is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene" (arc + story text, page marked + plan line) | ✅ | AUC **1.00** (119). ≥ 0.7: **31/31, 0 false**. The AD's cites: 29/31, 1 false — it missed **dka3jpog9 p11 Sura (Jev 0.93)** and **z3fw660ie p12 Pfeffer (Jev 0.92)** | ≥ 0.7 | 0 / 124 |
+| VB: vehicles | same | ✅ | AUC 1.00 (14). ≥ 0.5: 10/10, 0 false. AD 7/10 | ≥ 0.5 | 0 / 16 |
+| VB: secondary characters | same | ✅ | AUC 0.94 (59). ≥ 0.5: 7/9, 0 false (misses: a generic "crew member" entry the AD never cites either). AD 6/9 — missed Mama on `vnx5l8iy7` p1 | ≥ 0.5 | 2 / 66 |
+| VB: objects | same | ✅ at 0.7, 🟡 below | AUC 0.99 (196). ≥ 0.7: precision 0.97, recall 0.72; ≥ 0.5: precision 0.85, recall 0.98. AD: precision 0.98, recall 0.87 | ≥ 0.7 binding; 0.5–0.7 is the band to leave to the brief writer | 6 / 210 |
+| VB: clothing | same | ❌ not Jev — code | AUC 0.93, but the bible's own wearer-derived `pages` are exact (21/21, 0 false): a garment is in frame when its wearer is | — (code) | 5 / 106 |
+| **timeOfDay** | choice over `TIMES_OF_DAY` (story text, page marked, + arc + plan line) | ✅ | 83% agree with the AD; all 12 disagreements are neighbours on the clock (dusk/evening, evening/night); reading accepts Jev on 12, the AD on 11 | modal of 3 | 1 / 70 |
+| **weather** | choice over `WEATHERS`, `none` = interior | 🟡 | 70% agree. On the 21 disagreements Jev right 15, AD right 15. Jev's errors: `overcast` beside a visible low sun (6, one book), `none` at a museum entrance. The AD's: **`storm` on five fog pages of the dragon book** (the owner's fog-page report) and `none` on an outdoor page | advisory | 4 / 70 |
+| **indoor / outdoor** | noul | ✅ | 69/70 agree; the one disagreement is the AD's error (`weather: none` on `vnx5l8iy7` p16, a linden tree outdoors) | ≥ 0.5 | 0 / 70 |
+| **population** | choice cast_only / ambient / crowd | ❌ per page | 59% agree; of 29 disagreements Jev right 16, AD right 13 — Jev calls the same public square `ambient` in one book and `cast_only` in another, and the AD does the same. It is a property of the PLACE (the AD rule: "ambient whenever the location is one the public can walk into") | — | 6 / 70 |
+| **emotion per character** | choice over `EMOTIONS`, "the feeling X's face shows" | ❌ | 60% agree; it defaults to `neutral` (40 of 55 disagreements). Reading: Jev 40 / AD 51 of 72 adjudicated | — | 4 / 139 |
+| — story phrasing | "the feeling X has at this moment, as the story tells it", each value glossed | 🟡 | 60% agree; reading Jev **56** / AD 51 of 72. Better than the AD on the disputed items, not by enough to make it the author. The AD also wrote OFF-ENUM values 3 times (`scared`, `strained` ×2) | advisory | 7 / 139 |
+| **shot** | choice closeup/medium/wide from the plan line with its shot token stripped | ❌ | 60% agree with the planner's own shot (majority baseline 36% — better than the brief-text test's 61% vs 60%, still not an author). Main error: the planner's close-up → Jev medium (17). The AD copies the planner's shot on 70/70 pages | — | 2 / 70 |
+| **shot: group rule** | CODE: > 3 named characters → shot ∈ `GROUP_WIDER_SHOTS` (`GROUP_STAGING_RULE`) | ✅ ($0, exact) | **4 of the 15** stored pages holding > 3 characters break it: `vnx5l8iy7` p6 medium, p7 over-the-shoulder; `z3fw660ie` p1 medium, p6 medium | exact | — |
+
+**Cost and latency.** A whole story's decision layer at one call per item (the four full stories):
+68–82 calls, **$0.008–$0.009 per story**. The production shape (one metadata call + one VB call per
+page, one TOGETHER call per group page, one NEEDED call per character on the pages to cut) is ~60
+calls, < $0.01. Latency per call p50 **285 ms**, p90 347 ms, max 681 ms (states up to ~20k chars);
+the calls are independent, so at 8 in flight a story's layer is ~2–3 s wall, fully parallel < 1 s.
+One call per item is enough where the flip rate is ≤ 1% (creatures, vehicles, time, indoor); the
+cutting decisions (flips 3–5%) should average 3 calls, still < $0.03 a story.
+
+**Proposed architecture — the decision layer (Jev decides, code verifies, the LLM executes).**
+Nothing here is built.
+1. *Group pages* (after the first plan): code finds the group pages and the budget
+   (`castCoverage.groupPageBudget`, exact). If over budget, Jev TOGETHER per group page; code keeps
+   the `budget` highest and marks the rest for cutting. Never a fixed threshold, never NEED_ALL,
+   never the "which page" choice.
+2. *Who to cut* on each marked page: Jev NEEDED per character; code cuts every name below 0.5, then
+   re-checks the constraints and puts names back highest-P first until they hold: the page stays ≤
+   `GROUP_STAGING_MAX`; the main character and the central figure stay on their focal pages; no
+   character falls below the coverage floor; a character the instant works against is never cut
+   (in the measured items NEEDED already scores them ≥ 0.8). If the constraints cannot hold, the
+   page keeps its group and the finding ships reported — no loop.
+3. *Shot*: code rules only — roster > 3 → the page's shot moves to `wide` (or `ultra-wide` when
+   it is already `wide` and the budget floors ask for one); the existing shot floors
+   (`SHOT_*_COUNT`) and `CONSECUTIVE_SAME_SHOT_CAST` pick WHICH page changes by structure.
+4. *Instruction to the re-planner*, one line per change, structured, applied by code where it is
+   mechanical and handed to the LLM only for the instant's wording:
+   `Page 6: remove Max, Julian — keep Levin, Kiaan. Rewrite the instant for Levin, Kiaan only.`
+   `Page 11: keep Sura, Levin — remove Julian, Max, Kiaan.` `Page 6: shot wide → ultra-wide.`
+   Code writes the who column and the shot token itself (the dragon run shows the model declaring a
+   cut and not writing it); the model rewrites only field 3 (the instant) under a fixed roster, and
+   code rejects a rewrite whose instant names a removed character.
+5. *VB citation* per final page: Jev membership per creature / secondary / vehicle (≥ 0.5–0.7) and
+   per object (≥ 0.7) sets the page's `objects[]` ids; code validates the ids, the dotted state,
+   and the element budget (`VB_ELEMENT_BUDGET`, top-P first); garments come from the wearer (code).
+   This complements the concurrent structured check `sceneBriefCheck.checkPlanCastCited`
+   (`plan_cast_uncited`, 3a65d887e): that one needs the who column to name the figure — on the
+   dragon p11 the re-planner had removed Sura from the who column, so it cannot fire there (Lab
+   #1575 still left p11 uncited); Jev reads the instant and the text and fires at 0.93. On the other
+   two AD misses (Pfeffer p12, Mama p1) the who column names the figure, so both would catch them.
+6. *Light*: Jev sets `timeOfDay` (modal of 3) and indoor; `weather` stays with the brief author
+   with Jev's answer as a check (disagreement → the scene review's `light_fields` finding).
+   Code enforces the closed enums (the AD wrote off-enum emotions) and C2 monotonic time.
+
+**Metadata-first pipeline (the owner's "redo") — every brief field classified.** J = Jev over a
+closed option set from beats + story logic + bible; C = code from structured data; L = needs an LLM
+author. "Measured" cites the table above.
+
+| Field (Art Director brief / scene review) | Class | Evidence / how to test |
+|---|---|---|
+| who is in frame (`characters[].name`, the plan's who column) | J + C | measured: NEEDED ✅, TOGETHER ✅ (ranking); code enforces budget, floors, focal, central figure |
+| `objects[]` VB ids: creatures, secondary, vehicles | J + C | measured ✅ (AUC 0.94–1.00); code validates ids, dotted states, budget |
+| `objects[]`: artifacts | J (≥ 0.7) + L below | measured: precision 0.97 at 0.7, recall 0.72 |
+| `objects[]`: the vantage `LOC###.N` | C | the bible's vantage `pages` lists already assign every page (exact) |
+| `wornItems`, `clothing` category | C | `pageClothing` / clothing requirements are canonical per story (clothing source of truth); the "off"/`redressNote` text is L |
+| `timeOfDay` | J | measured ✅ (83%, all disagreements neighbours) |
+| `weather` | J advisory / L | measured 🟡 (tie with the AD on disputes) |
+| indoor (weather `none`) | J | measured ✅ |
+| `population` | J per LOCATION + C | per page ❌; untested per location: one noul per location "a place the public can walk into?" + "written around a crowd?" → code maps location → value. Test: label the ~15 locations of the four books |
+| `shot` | C (+ planner) | Jev ❌ twice; code group rule ✅; floors/consecutive counters exist |
+| `era` | C | one story-level value (story settings) |
+| `aboard` | J | untested: noul per vehicle "the camera stands on / in X" — test on the pirate and ship books |
+| `landmarkPhoto` | L / C | an image-vs-description choice; not a text decision. Stays with the vantage author |
+| `characters[].emotion` | J advisory | measured 🟡 (story phrasing 56 vs AD 51 of 72); code enforces the enum |
+| `characters[].expression` (brows/eyes/mouth) | L | free text; must agree with `emotion` |
+| `characters[].depth` (fg/mid/bg) | J? | untested; closed enum but compositional — test vs AD on the same 70 pages, then check against rendered bboxes |
+| `characters[].position` | L | free phrase read by the bbox detector ("left foreground", "behind the desk"); an enum would lose the second kind |
+| `characters[].looksAt` | J | untested; a choice over (cast names ∪ cited ids ∪ `away`) per character is well-formed — test vs AD, adjudicate |
+| `characters[].perspective` | C + L | over-the-shoulder near figure is structural (C); "back view, head turned …" wording is L |
+| `interactions[]` rows (character, object, action, hands, storyRelevant, priority) | L (+ J for `storyRelevant`) | the row wording is L; `storyRelevant` is a closed flag, testable per row as a noul |
+| `sceneIntent` | L | free text |
+| `textPosition` | C | text-zone code (calmness map) decides after the render; the brief's value is a hint |
+| `textZoneDescription` | L | free text |
+| the prose (illustration brief) | L | the one thing the LLM writer keeps |
+| cover fields (cover hint, cover beats) | C + L | cover gaze is already code-owned (`coverBeats.js`); cast/objects per cover = the same J+C as a page; composition prose L |
+| scene-review checks that are counts or membership (`cast_over_cap`, `cast_not_in_plan`, `cast_crowded`, `element_uncited`, `vb_state_range`, `light_fields` enums, `group_staging`, `closeup_below_waist` shot/pose) | C / J | they become verifications of fixed fields, not judgements |
+| scene-review checks on prose (`drawability`, `force_at_rest`, `contact_not_pose`, `footing`, `negation_named`, `critique_in_brief`, `themed_setting_bare`, `page_repetition`, `visual_arc`) | L-critic | stay with an LLM reviewer, narrowed to "does the prose render the fixed fields and read as one drawable instant" |
+
+*Flow:* beats (arc, plan lines) → **Jev decisions** (roster cuts, VB membership, time, indoor,
+per-location population) → **code** (budgets, floors, shot rules, enum and id validation,
+vantage, clothing, era) → **one LLM prose writer** given the FIXED fields ("render exactly these:
+cast …, cite …, shot …, light …") → a **check that the prose matches the fields** (code for names
+and ids; Jev noul per fixed field for the rest, e.g. "the prose shows the page at dusk").
+*What the AD becomes:* a prose writer that no longer chooses cast, ids, shot or light — its prompt
+loses those decisions and keeps staging, expression, position, interactions and prose. *What the
+scene review becomes:* its count/membership checks move to code before it runs; it keeps the
+prose-drawability checks. *Generator↔critic:* every judge (semantic eval, visual-flow, plate QC)
+already compares against the brief's FIELDS (`timeOfDay`/`weather`, `population`, cited ids); with
+the fields fixed upstream, the generator (prose writer) and the critics read the same fixed values,
+so no rule exists on one side only — the one new sync point is the Jev question wordings, which
+must be the SAME constants the planner is given (as `WHOLE_CAST_DEF` is for Q17).
+*Cost/latency vs today:* the decision layer adds < $0.01 and ~2–3 s. It removes nothing by itself;
+the savings come only if the prose writer is cheaper than today's Art Director (~$0.40) and the
+narrowed scene review (~$0.09–0.19, 6–10 min on Novita) shrinks with it — both unmeasured.
+*Migration:* (1) a Lab stage that runs the decision layer on a stored story's `briefsIn` and the
+final briefs and prints the instruction list next to what the re-plan/AD did (free to replay on
+every stored beats story); (2) wire VB membership as a CHECK on the AD's `objects[]` (it finds the
+dragon p11 miss) and the roster cuts as the re-plan's MUST-FIX input, the re-planner still writing;
+(3) code writes the who column / shot token; (4) only then the fields-first brief, run side by side
+with the current AD in the Lab and compared page by page before any switch.
+
+**Risks.** (a) Truth is one evaluator's reading on 17 stories that are mostly two casts (the four
+boys, the five pirates) and German; a French/English book or a large invented cast is untested.
+(b) TOGETHER is only good as a ranking — as an absolute threshold it would cut two "everyone acts"
+pages; the architecture must never apply it without the budget count. (c) Jev has no temperature:
+3–5% flips on the cutting decisions; averaging 3 calls is required there, and SETTLED's
+"eval judges run at temperature 0" cannot hold for Jev at all. (d) NEEDED labels and the NEEDED
+question share one definition by design (generator↔critic) — the AUC measures Jev applying that
+rule, not whether the rule is the owner's taste. (e) Code applying cuts to the who column leaves the
+instant mentioning "the four" — the LLM rewrite of field 3 is still needed and can still fail;
+code must reject it, not repair it. (f) Population and emotion are not solved; moving the AD's
+authorship of them without the per-location test would trade one error mix for another.
+
+**Settled rules this would touch (reversals need the SETTLED protocol):**
+- SETTLED "VB element budget … is a PROMPT rule … no code trims a brief … do not re-add a code
+  enforcer" — step 5 (code picks the top-P ids within the budget) IS a code enforcer. Reversal.
+- SETTLED "A page's time of day and weather are its brief's `timeOfDay` / `weather` fields" and
+  "`population` is read only from the brief" — the field-not-prose principle stays; the AUTHOR
+  changes from the AD to Jev/code. Needs the owner's sign-off as a reversal of who authors.
+- SETTLED "Eval judges run at temperature 0, always" — impossible for Jev; replaced by a flip-rate
+  measurement and 3-call averaging on the binding decisions.
+- decisions.md 2026-09-27 "Jev for the re-plan guard" — its item (iii) left the over-budget cut to
+  the planner; this replaces the planner's choice with Jev + code.
+- memory "AD trims cast by design" and the planner's "which of them keep their group is the story's
+  call, so the re-plan chooses" (planCounters 8c) — the choice moves to Jev.
+
+**Owner decisions:** (i) wire order: VB membership as a check first (it answers the dragon p11 bug
+alone), or the whole roster-cut instruction first; (ii) does code write the who column and shot
+token (recommended, the stored run shows declared ≠ written), leaving the model only the instant;
+(iii) the SETTLED reversals above; (iv) thresholds: creatures 0.7 vs 0.5 (same result on this data),
+objects 0.7; (v) whether to spend on the untested J fields (population per location, looksAt, depth,
+`storyRelevant`, `aboard`) — each is one more `run --only=` on the same dataset, cents.
+
+**Revisit if:** a new Jev version; a book outside the two casts measured here; the NEEDED or
+TOGETHER wording changes (re-run `run --only=chardrop,grouppage`).
+
+**Touched:** scripts/analysis/eval-jev-decision-layer.js (new),
+evals/datasets/jev-decision-layer-v1/reading_labels.json (new),
+evals/runs/2026-09-27_jev-decision-layer/metrics.json (new), docs/decisions.md, tasks/BACKLOG.md.
