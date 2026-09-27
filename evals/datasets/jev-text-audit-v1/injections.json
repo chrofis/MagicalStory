@@ -1,0 +1,109 @@
+{
+  "_doc": "Hand-written injections for jev-text-audit-v1 (2026-09-27). slop: one or two sentences per type and language, {NAME} = the story's first main character; inserted after a sentence of a clean page by scripts/analysis/jev-text-audit-dataset.js. logic/arc: story-specific edits written after reading each story; 'insert' puts text at the end of the page ('at':'start' at the beginning), 'replace' swaps an exact substring. label = the question id the edit should trip; the edited page is the positive page.",
+  "slop": {
+    "SLOP_STOCK_WONDER": {
+      "de": ["{NAME} spürte ein Gefühl von Staunen und Zauber, das die ganze Luft erfüllte.", "Ein Hauch von Magie lag in der Luft, und {NAME}s Augen funkelten vor Staunen."],
+      "fr": ["Un sentiment d'émerveillement et de magie remplissait l'air autour de {NAME}."],
+      "en": ["A sense of wonder filled the air, and {NAME}'s eyes sparkled with magic."]
+    },
+    "SLOP_BODY_CLICHE": {
+      "de": ["{NAME}s Herz schwoll vor Stolz, und eine warme Welle breitete sich in der Brust aus.", "Das Herz von {NAME} klopfte vor Aufregung bis zum Hals."],
+      "fr": ["Le cœur de {NAME} se gonfla de fierté, et une douce chaleur se répandit dans sa poitrine."],
+      "en": ["{NAME}'s heart swelled with pride, and warmth spread through their chest."]
+    },
+    "SLOP_FORESHADOW": {
+      "de": ["Doch {NAME} ahnte noch nicht, dass dies erst der Anfang eines grossen Abenteuers war.", "Was {NAME} nicht wusste: Schon bald sollte sich alles verändern."],
+      "fr": ["Mais {NAME} ne savait pas encore que ce n'était que le début d'une grande aventure."],
+      "en": ["Little did {NAME} know that this was only the beginning."]
+    },
+    "SLOP_MORAL_SUMMARY": {
+      "de": ["Und so lernte {NAME}, dass Freundschaft der grösste Schatz von allen ist.", "An diesem Tag verstand {NAME}, dass man mit Mut und einem guten Herzen alles schaffen kann."],
+      "fr": ["Et c'est ainsi que {NAME} apprit que l'amitié est le plus grand des trésors."],
+      "en": ["And so {NAME} learned that friendship is the greatest treasure of all."]
+    },
+    "SLOP_RULE_OF_THREE": {
+      "de": ["{NAME} fühlte sich mutig, stark und frei.", "Es war ein Tag voller Lachen, Licht und Liebe."],
+      "fr": ["{NAME} se sentait courageux, fort et libre."],
+      "en": ["{NAME} felt brave, strong and free."]
+    },
+    "SLOP_INTENSIFIER": {
+      "de": ["Es war wirklich ein ganz unglaublich, absolut wunderschöner und sehr, sehr besonderer Moment.", "{NAME} war total, wirklich extrem glücklich."],
+      "fr": ["C'était vraiment un moment absolument, incroyablement et tellement très spécial."],
+      "en": ["It was truly an incredibly, absolutely, really very special moment."]
+    },
+    "SLOP_SUDDENLY": {
+      "de": ["Plötzlich blieb {NAME} stehen. Plötzlich wehte ein Wind. Und plötzlich war alles still.", "Plötzlich lächelte {NAME}, und plötzlich schaute {NAME} wieder auf."],
+      "fr": ["Soudain, {NAME} s'arrêta. Soudain, le vent se leva. Et soudain, tout devint calme."],
+      "en": ["Suddenly {NAME} stopped. Suddenly the wind rose. And suddenly everything was quiet."]
+    },
+    "SLOP_EMOTION_LABEL": {
+      "de": ["{NAME} war sehr traurig. Dann war {NAME} wieder sehr glücklich.", "{NAME} fühlte sich froh und zufrieden."],
+      "fr": ["{NAME} était très triste. Puis {NAME} était de nouveau très heureux."],
+      "en": ["{NAME} felt very sad. Then {NAME} felt very happy again."]
+    },
+    "SLOP_REPETITIVE_OPENINGS": {
+      "de": ["{NAME} ging zum Fenster. {NAME} schaute hinaus. {NAME} dachte nach. {NAME} lächelte.", "Dann nickte {NAME}. Dann stand {NAME} auf. Dann ging {NAME} los."],
+      "fr": ["{NAME} alla à la fenêtre. {NAME} regarda dehors. {NAME} réfléchit. {NAME} sourit."],
+      "en": ["{NAME} went to the window. {NAME} looked outside. {NAME} thought hard. {NAME} smiled."]
+    },
+    "SLOP_LESSON_EXPLAIN": {
+      "de": ["Das war sehr freundlich von {NAME}, denn wer anderen hilft, macht die Welt ein bisschen besser.", "Es war wichtig, dass {NAME} die Wahrheit sagte, denn Ehrlichkeit ist immer der richtige Weg."],
+      "fr": ["C'était très gentil de la part de {NAME}, car aider les autres rend le monde un peu meilleur."],
+      "en": ["That was very kind of {NAME}, because helping others makes the world a little better."]
+    },
+    "SLOP_PURPLE_SIMILE": {
+      "de": ["Die Lichter glitzerten wie tausend kleine Sterne, als hielte die ganze Welt den Atem an, wie ein Traum aus Silber und Gold.", "Die Stille lag wie eine weiche Decke aus Samt über allem, wie ein Flüstern der Ewigkeit."],
+      "fr": ["Les lumières scintillaient comme mille petites étoiles, comme si le monde entier retenait son souffle."],
+      "en": ["The lights glittered like a thousand tiny stars, as if the whole world were holding its breath, like a dream of silver and gold."]
+    },
+    "SLOP_GENERIC_ENDING": {
+      "de": ["Und die Sterne lächelten auf sie herab, und ihre Herzen waren voller Liebe — es war ein Tag, den sie nie vergessen würden.", "Es war der schönste Tag ihres Lebens, und ihre Herzen waren warm und voller Glück."],
+      "fr": ["Et les étoiles leur souriaient, leurs cœurs remplis d'amour: c'était une journée qu'ils n'oublieraient jamais."],
+      "en": ["And the stars smiled down on them, their hearts full of love: it was a day they would never forget."]
+    },
+    "SLOP_PARALLEL_NEGATION": {
+      "de": ["Es war nicht nur ein Spiel. Es war ein Versprechen.", "Es ging nicht um das Gewinnen, sondern um das Zusammensein."],
+      "fr": ["Ce n'était pas seulement un jeu. C'était une promesse."],
+      "en": ["It wasn't just a game. It was a promise."]
+    }
+  },
+  "logic": [
+    {"story": "job_1790282439176_ppgelxibt", "page": 4, "label": "LOGIC_APPEAR", "insert": "Onkel Timo hielt ihm eine Taschenlampe hin und nickte ihm zu."},
+    {"story": "job_1790282439176_ppgelxibt", "page": 5, "label": "LOGIC_OBJECT", "insert": "Der rote Quader hatte die ganze Zeit in seiner Jackentasche gesteckt, und dort steckte er noch immer.", "at": "start"},
+    {"story": "job_1790282439176_ppgelxibt", "page": 5, "label": "LOGIC_VANISH", "insert": "Als er sich umdrehte, um Lena zu danken, war sie nicht mehr da, und niemand im Raum hatte sie gehen sehen."},
+    {"story": "job_1790282439176_ppgelxibt", "page": 5, "label": "LOGIC_MOTIVE", "insert": "Dann nahm Burak den roten Quader wieder von der Turmspitze und warf ihn in den Abfallkorb."},
+    {"story": "job_1790496731630_m9pp92go3", "page": 4, "label": "LOGIC_ANIMAL", "insert": "Der Vogel nahm den Bleistift in die Krallen und schrieb das Wort «Schuh» sauber auf einen Zettel."},
+    {"story": "job_1790496731630_m9pp92go3", "page": 2, "label": "LOGIC_APPEAR", "insert": "Onkel Mehmet sass auf dem Sofa und las ihr die Wörter aus einer Liste vor."},
+    {"story": "job_1790496731630_m9pp92go3", "page": 6, "label": "LOGIC_OBJECT", "insert": "Der Ball lag noch immer in zwei Hälften zerbrochen unter dem Tisch."},
+    {"story": "job_1790256136168_pbxibjv0r", "page": 3, "label": "LOGIC_APPEAR", "insert": "Die Nachbarskatze Mimi sprang auf das Tablett und schnupperte am Brei."},
+    {"story": "job_1790256136168_pbxibjv0r", "page": 5, "label": "LOGIC_OBJECT", "insert": "Der Löffel lag noch immer unten auf dem Steinboden, und Lilli hatte keinen Löffel in der Hand.", "at": "start"},
+    {"story": "job_1790256136168_pbxibjv0r", "page": 2, "label": "LOGIC_MOTIVE", "insert": "Dann schob Lilli die Schüssel weit weg, verschränkte die Arme und wollte gar keinen Zauber mehr machen.", "at": "start"},
+    {"story": "job_1789292742265_mgxmrkfpd", "page": 6, "label": "LOGIC_VANISH", "insert": "Mama war seit dem Nachmittag verschwunden, ohne ein Wort zu sagen, und niemand wusste, wo sie war."},
+    {"story": "job_1789292742265_mgxmrkfpd", "page": 6, "label": "LOGIC_OBJECT", "insert": "Der Schild lag noch immer in zwei Hälften auf dem Teppich, genau wie nach dem Sturz.", "at": "start"},
+    {"story": "job_1789292742265_mgxmrkfpd", "page": 4, "label": "LOGIC_APPEAR", "insert": "Opa Kurt sass neben Mama am Tisch und reichte ihm schweigend ein Taschentuch."},
+    {"story": "job_1789292742265_mgxmrkfpd", "page": 4, "label": "LOGIC_MOTIVE", "replace": ["«Mama, der Schild ist kaputt. Ich bin gestolpert, und er ist auf den Boden gefallen und zerbrochen.»", "«Mama, ein fremder Hund ist ins Zimmer gekommen und hat den Schild zerbissen.»"]},
+    {"story": "job_1789975900382_dyc1g7wue", "page": 4, "label": "LOGIC_APPEAR", "insert": "Sa grande sœur Clara lui tend une pelote de ficelle sans un mot."},
+    {"story": "job_1789975900382_dyc1g7wue", "page": 2, "label": "LOGIC_ANIMAL", "insert": "Sur une branche, son chat Moustache lit à haute voix la carte du chemin et coche les étapes avec un crayon."},
+    {"story": "job_1789944735873_vmbd0or30", "page": 5, "label": "LOGIC_OBJECT", "insert": "Mais le grand coquillage rose est resté dans le jardin, sur le rebord du bac à sable.", "at": "start"},
+    {"story": "job_1789944735873_vmbd0or30", "page": 3, "label": "LOGIC_APPEAR", "insert": "Son cousin Hugo lui prend la main et l'accompagne."},
+    {"story": "job_1789944735873_vmbd0or30", "page": 6, "label": "LOGIC_VANISH", "insert": "Le petit crabe a disparu, et personne ne sait où il est passé.", "at": "start"},
+    {"story": "job_1790277448294_5herh01j7", "page": 7, "label": "LOGIC_ANIMAL", "insert": "Nia zog Levins Handy aus der Jackentasche, tippte die Nummer ein und rief die Feuerwehr an."},
+    {"story": "job_1790277448294_5herh01j7", "page": 12, "label": "LOGIC_APPEAR", "insert": "Frau Keller, die Bäckerin, stellte sich neben Kiaan und hielt ihm ihre Laterne hin.", "at": "start"},
+    {"story": "job_1790277448294_5herh01j7", "page": 16, "label": "LOGIC_VANISH", "insert": "Max war nicht mehr da; keiner hatte gesehen, wohin er gegangen war.", "at": "start"},
+    {"story": "job_1790277448294_5herh01j7", "page": 16, "label": "LOGIC_OBJECT", "replace": ["Julian hielt die warme Tüte noch immer in den Händen. Den ganzen Nachmittag hatte er sie bewacht.", "Julian hatte die Marroni schon auf der Treppe alle aufgegessen und die leere Tüte weggeworfen. Den ganzen Nachmittag hatte er sie bewacht."]},
+    {"story": "job_1790277448294_5herh01j7", "page": 7, "label": "LOGIC_MOTIVE", "replace": ["«Nein», sagte Julian, ohne nachzudenken. ¶ Max seufzte.", "«Nimm doch alle», sagte Julian und schüttete Max die ganze Tüte Marroni in die Hände. ¶ Max staunte."]},
+    {"story": "job_1786918670311_qgrdbmlr8", "page": 6, "label": "LOGIC_ANIMAL", "insert": "Beside her, the office dog Rex typed the next column of numbers into the computer with his paws."},
+    {"story": "job_1786918670311_qgrdbmlr8", "page": 11, "label": "LOGIC_OBJECT", "insert": "The pole was still lying back inside the lander; they had never taken it out.", "at": "start"},
+    {"story": "job_1785441560733_9xigyv8u6", "page": 5, "label": "LOGIC_OBJECT", "insert": "Das Fläschchen war leer, bis zum letzten Körnchen, und Amira hatte nichts mehr davon.", "at": "start"},
+    {"story": "job_1785441560733_9xigyv8u6", "page": 3, "label": "LOGIC_APPEAR", "insert": "Ihr Grossvater Selim kniete neben ihr und hielt ihr den Korken hin."}
+  ],
+  "arc_subtle": [
+    {"story": "job_1790277448294_5herh01j7", "page": 5, "replace": ["Das Ei bewegte sich, ein wenig, noch ein wenig. Dann löste es sich.", "Aber das Ei bewegte sich nicht. Es blieb fest zwischen den Wurzeln stecken."]},
+    {"story": "job_1790277448294_5herh01j7", "page": 7, "replace": ["Levin zog seine Jacke aus, wickelte sie um das Ei und drückte das ganze Bündel fest an Julians Brust. «Halt es warm», sagte er. «Genau so.»", "Levin behielt seine Jacke an und legte das Ei einfach ins kalte Laub. «Lass es liegen», sagte er. «Es geht schon.»"]},
+    {"story": "job_1790277448294_5herh01j7", "page": 9, "replace": ["Er wollte etwas sagen, aber Nebla streckte schon die Klauen aus und hob das Ei aus seinen Händen.", "Er wollte etwas sagen, aber Nebla schaute das Ei nur kurz an und liess es in seinen Händen."]},
+    {"story": "job_1790277448294_5herh01j7", "page": 12, "replace": ["«Es klopft nicht mehr», sagte er.", "«Es klopft ganz laut und kräftig», sagte er."]},
+    {"story": "job_1790277448294_5herh01j7", "page": 14, "replace": ["Das Ei blieb kalt und klopfte nicht. Julian weinte leise.", "Sofort wurde das Ei warm und klopfte laut. Julian lachte."]},
+    {"story": "job_1790277448294_5herh01j7", "page": 16, "replace": ["Jetzt streckte er sie Nebla hin. ¶ «Damit kannst du den Kleinen wärmen», sagte er.", "Jetzt steckte er sie zurück in den Anorak. ¶ «Die gehören mir», sagte er."]},
+    {"story": "job_1790277448294_5herh01j7", "page": 17, "replace": ["Nach einer Weile klopfte es wieder, einmal, zweimal. Dann brach die Schale auf. Ein kleiner Drache kletterte heraus und setzte sich auf Julians Knie.", "Nach einer Weile war es immer noch still. Die Schale blieb geschlossen, und nichts bewegte sich."]}
+  ]
+}
