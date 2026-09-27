@@ -1992,6 +1992,25 @@ export default function StoryWizard() {
     localStorage.setItem('story_art_style', artStyle);
   }, [artStyle]);
 
+  // Rank the town's landmarks for this story kind the moment it is picked, so
+  // the idea request below reads a ready ranking and never waits for one
+  // (server: POST /api/prepare-idea-landmarks). Same fields the idea request
+  // sends; re-fired only when one of them changes.
+  const preparedLandmarksKeyRef = useRef('');
+  useEffect(() => {
+    if (!storyCategory || !(storyTheme || storyTopic) || !userLocation?.city || storyCategory === 'historical') return;
+    const cast = characters.filter(c => !excludedCharacters.includes(c.id)).map(c => ({ age: c.age, gender: c.gender }));
+    if (!cast.length) return;
+    const data = {
+      storyCategory, storyTopic: storyTopic || undefined, storyTheme: storyTheme || undefined,
+      language: storyLanguage, characters: cast, userLocation,
+    };
+    const key = JSON.stringify(data);
+    if (key === preparedLandmarksKeyRef.current) return;
+    preparedLandmarksKeyRef.current = key;
+    storyService.prepareIdeaLandmarks(data);
+  }, [storyCategory, storyTopic, storyTheme, storyLanguage, userLocation, characters, excludedCharacters]);
+
   // Pre-generate story ideas when user reaches step 4 (art style) if we have enough info
   // This way ideas are ready by the time they reach step 5 (summary)
   const preGenerateIdeasRef = useRef(false);

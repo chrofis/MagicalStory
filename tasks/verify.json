@@ -3787,6 +3787,23 @@
         "result": "HUMAN",
         "note": "human check | LOOK: stories.data.jevDecisions; sceneImages[].sceneMetadata fields vs jevDecisions; sceneReviewReport.briefFindings (jev_fixed_field) and jevRepinned; per-page pixels. Replays: scripts/analysis/replay-jev-decision-layer.js (shots 0.935 / 0 violations; cuts 5/5 budget, 7/7; VB creatures 31/31; light indoor 69/70; population 13/13; aboard 9/10; gaze 124/139). Lab 1577 (beats_replan, d"
       }
+    },
+    {
+      "id": "jev-selection-built",
+      "title": "Jev picks the challenges (12 of its top 20) and orders the story's landmarks; the trial story's 3 are the pin + a draw from the top 5",
+      "commits": [],
+      "addedAt": "2026-09-27",
+      "claim": "On the next full staging beats story: stories.data.challengeSelection.method = 'jev', 12 picked ids all inside its `top` (20), `scores` holds every eligible id, challengeDrawIds = picked; landmarkSelection.method = 'jev', availableLandmarks (replayInputs) in descending LB2 order after any premisePinned place; jevFallback null. On the next /try trial with an own-town idea: landmarkSelection.mode = 'trial', its 3 picked names are the first 3 landmarks of the trial prompt, the premise-named place first when there is one, and every name the idea card used is in the story's list.",
+      "runShape": [
+        "full-story",
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "stories.data.challengeSelection / landmarkSelection / challengeDrawIds / replayInputs.availableLandmarks / jevFallback; the generation log's jev_challenge_selection and jev_landmark_selection lines. Free replay over the eval's 11 staging setups with stored Jev answers: picks 100% inside the top-k (docs/decisions.md 2026-09-27 \"Jev selection built\")."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

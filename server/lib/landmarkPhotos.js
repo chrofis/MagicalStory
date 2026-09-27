@@ -4262,6 +4262,9 @@ async function resolveAvailableLandmarks(location, opts = {}) {
     // premise that names the city (all of them do).
     const pinned = await premiseNamedLandmarks(premiseText, premiseWords(location.city), location);
     if (pinned.length) {
+      // Marked, so the Jev ordering (jevSelection.selectStoryLandmarks) keeps
+      // them first whatever it scores them.
+      for (const p of pinned) p.premisePinned = true;
       const ids = new Set(pinned.map(p => p.landmarkIndexId));
       landmarks = [...pinned, ...landmarks.filter(l => !ids.has(l.landmarkIndexId))];
       log.info(`[LANDMARK] premise names ${pinned.map(p => `"${p.name}"`).join(', ')} → pinned first`);

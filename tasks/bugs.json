@@ -2427,6 +2427,18 @@
       "fixedAt": "2026-09-27",
       "fixedIn": "99e91d68b",
       "fix": "A RESTORE names what it removes: `RESTORE B<j> REPLACING A<k>` / `A<k>-A<m>` replaces that run of AFTER sentences; `REPLACING NONE AFTER A<k>` is the insertion, only for a sentence dropped with nothing in its place. The old bare form is unparsed (loud). The applier also refuses any restore that would stand beside a kept AFTER sentence (>= 3 words) whose words stand unbroken inside it (`duplicates-A<k>`), whatever the reply named, and a restore whose run overlaps another edit (`overlap`). Tests: tests/unit/text-stage-counter-and-specs.test.ts (p2 replay), text-chain-hints-and-ledger.test.ts. Replay: the stored p2 edit as an insertion is now dropped `duplicates-A4`."
+    },
+    {
+      "id": "trial-idea-landmarks-outside-story-list",
+      "title": "The trial idea prompt named real places the trial story's own landmark list does not contain (a lake, a river), so the chosen idea promised a place the story could not stage",
+      "reportedAt": "2026-09-27",
+      "source": "Observation in aa903083f (docs/decisions.md 2026-09-27 \"Jev picks the challenges and landmarks that fit\"), owner-approved fix 2026-09-27. Eval run evals/runs/2026-09-27_jev-selection metrics: 9 of 11 staging setups had a trial-idea landmark outside the story's 20 (label '?'). Reproduced against the staging DB 2026-09-27: getIndexedLandmarks(loc, 3) gives Zürich [Zürichsee, Grossmünster, Zoo] (Zürichsee not in the story's 20), Baden [Reuss (Fluss), …], Luzern [… Vierwaldstättersee]. Two live staging /try idea requests (Zürich, pirate) both built the idea on 'am Zürichsee'.",
+      "rootCause": "server/routes/trial.js POST /generate-ideas-stream (was :2286) called getIndexedLandmarks(userLocation, 3): a limit of 3 is below landmarkPhotos MIN_OWN_LOCALITY_ROWS = 5, so rung 1a (own locality) never passes and the query widens to the whole municipality, where lakes and rivers rank first. The trial story resolves its list through resolveAvailableLandmarks(loc, {limit: 20}) — a different list. The Lab's idea stage (testlab.js route mirror) copied the same call.",
+      "impact": "Every /try own-town idea in a town whose municipality rung holds a feature the locality list lacks: the idea card promises e.g. the lake, the story's writer is offered three other places, and the book either drops the promised place or invents it without a reference photo.",
+      "status": "fixed",
+      "fixedAt": "2026-09-27",
+      "fixedIn": "see the commit 'feat(jev-selection): Jev picks the challenges and landmarks that fit' on staging",
+      "fix": "Both the route and the Lab mirror call jevSelection.trialIdeaLandmarks, which resolves the story's own list (resolveTrialIdeaLandmarks = resolveAvailableLandmarks with the story's STORY_LANDMARK_LIMIT) and names 3 of it (Jev's top 5 when ready). Replayed against the staging DB: the new list equals the story's list for Zürich, Baden, Lausanne, Luzern, Dübendorf, Turgi. Test: tests/unit/jev-selection.test.ts."
     }
   ]
 }

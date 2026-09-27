@@ -1655,6 +1655,21 @@ export const storyService = {
     return response;
   },
 
+  // Fired when the story kind is picked: the server ranks the town's landmarks
+  // for this setup in the background, so the idea request reads a ready ranking
+  // instead of waiting for one. Fire-and-forget; a failure only means the idea
+  // request uses the unranked order.
+  prepareIdeaLandmarks(data: {
+    storyCategory?: string;
+    storyTopic?: string;
+    storyTheme?: string;
+    language: StoryLanguageCode;
+    characters: Array<{ age: string; gender: string }>;
+    userLocation?: UserLocation;
+  }): void {
+    api.post('/api/prepare-idea-landmarks', data).catch(() => { /* ranking is optional for the idea request */ });
+  },
+
   // Streaming version of generateStoryIdeas - streams stories as they're generated
   generateStoryIdeasStream(
     data: {

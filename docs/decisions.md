@@ -156,6 +156,99 @@ gitignored (story text). No production change.
 
 ---
 
+## 2026-09-27 — Jev selection built: the arc is offered 12 of Jev's 20 best-fitting challenges, the story reads its places in Jev order, the idea cards name Jev's picks when the ranking is ready
+
+**Context.** Owner approved the design of the entry below ("Jev picks the challenges and landmarks
+that fit", measured) on 2026-09-27, with one addition: the idea-card landmarks may never add latency
+to the idea request.
+
+**Decision.** One module, `server/lib/jevSelection.js`, holds the measured question wording (CB2,
+LB1, LB2), the states and the draws; `scripts/analysis/eval-jev-selection.js` imports them (one
+copy). Every Jev call goes through `jevDecisions.runJevRequests` (the call pool, the 60 s timeout,
+the 5-minute outage wait).
+1. **Challenges (beats, `generateStoryViaBeats`).** The age-band, peril and account-exclusion
+   filters stay (`promptBuilders.challengePool`, split out of `drawChallengeIdeas`). ONE Jev call,
+   a CB2 noul per eligible entry on cast ages + story kind + home town + the commissioned idea;
+   code ranks and draws **12 at random from the top 20** (`JEV_CHALLENGE_COUNT` / `_TOP`).
+   `stories.data.challengeSelection` = `{method:'jev', scores (every eligible id), top, picked}`;
+   `challengeDrawIds` stays the offered 12, and the next book on the account excludes those.
+   **MIN_POOL stays 45**: it protects the pool Jev ranks, and the top-20 window is under half of
+   it. A book now adds 12 offered ids to the memory instead of 25, so the same floor carries about
+   twice as many books before the oldest is shed. The "newest book alone" valve compares against
+   the 20-entry window (`need`), not the 12 drawn. The CHALLENGE IDEAS heading still says "drawn at
+   random": that stays true, and the prompt did not change.
+2. **Story landmarks.** `resolveAvailableLandmarks` still shuffles and pins the premise-named place
+   (now marked `premisePinned`). With Jev live, `selectStoryLandmarks` re-orders the list by LB2 on
+   the commissioned idea before any writer reads it, and pinned places stay first.
+   - Full story: the arc, planner and Art Director read the whole list in Jev order. This runs in
+     `generateStoryViaBeats` after the probe, next to the challenge draw.
+   - Trial story: the first 3 (what `buildTrialStoryPrompt` reads, `TRIAL_STORY_LANDMARKS`) are
+     the pin, then a random draw from the top 5. This runs in `processUnifiedStoryJob` before the
+     writer call, as the trial's one Jev step. It is probed first (the story-level health check), so
+     a Jev outage costs the trial at most the 20 s probe and never the 5-minute wait. A make-believe
+     trial idea makes no call.
+   - Both runs are recorded once per job as `stories.data.landmarkSelection`. The landmark-minimum
+     retry does not re-rank. `replayInputs.availableLandmarks` stores the Jev order.
+3. **Idea-card landmarks (LB1, no premise yet).** The wizard names 2 places and the trial names 3,
+   drawn at random from Jev's top 5. The ranking is computed OFF the idea request:
+   `POST /api/prepare-idea-landmarks` (wizard, fired by `StoryWizard` when category + theme/topic
+   are set) and `POST /api/trial/prepare-idea-landmarks` (fired by `TrialWizard` when the story
+   kind is complete). Each answers 202 immediately, then resolves the town's list and ranks it in
+   the background. Results are cached per town + language + category/theme/topic + cast age bands
+   (≤5, 6-8, 9-15, adult; 24 h). They have their own rate limiter, `ideaLandmarksPrepareLimiter`,
+   so prepares never spend the idea quota.
+   **OWNER-APPROVED LATENCY RULE (not a hidden fallback):** an idea request whose ranking is not
+   ready (still running, never prepared, or the town's list changed since) uses today's order for
+   THAT request, logs `ranking <pending|absent> … keeps today's order (owner latency rule)` and
+   starts the ranking for the next request. It never waits. A failed ranking is logged at error
+   level and forgotten, so the next prepare retries.
+4. **Bug fixed (tasks/bugs.json `trial-idea-landmarks-outside-story-list`).** The trial idea took
+   `getIndexedLandmarks(loc, 3)`. A limit below `MIN_OWN_LOCALITY_ROWS = 5` always widened to the
+   municipality, so the idea could name the Zürichsee, the Reuss or the Vierwaldstättersee, none of
+   which are in the story's 20. The route and its Lab mirror now share `jevSelection.trialIdeaLandmarks`,
+   which uses the story's resolver and limit (`STORY_LANDMARK_LIMIT`).
+
+**Outage.** Every step follows the existing story-level switch, which moved as-is to
+`jevDecisions.jevActive / jevFallBack` so the trial can flip it too. The switch covers a failed
+probe (`start`), a challenge call still failing after the wait (`challenges`), and a landmark call
+still failing after the wait (`landmarks`). On the backup the challenge draw is today's random 25
+(`drawChallengeIdeas`) and the landmark list keeps the resolver's order. Both are logged at error
+level (`jev_fallback`) and stored as `jevFallback`; a trial's comes from its own switch. No new
+fallback path was added. The idea-card rule above is a latency rule, not an outage path.
+
+**Validation.**
+- Free replay of the shipped code over the eval's 11 staging setups, with Jev answered from the
+  stored rep-0 answers (scratch script, not committed):
+  - Challenges: 10/10 setups, one call each, the eligible pool identical to the eval's, every pick
+    inside Jev's stored top 20. The 120 picks were labelled 60 G / 47 N / 13 B, against today's
+    random draw at 10% G / 58% B.
+  - Full-story order: equal to the LB2 rank on 11/11 setups.
+  - Trial story: all 3 inside the top 5 on 11/11 setups (11 G / 17 N / 5 B).
+  - Idea cards: all picks inside the LB1 top 5, and a not-ready request returned exactly today's
+    first 2.
+- Staging DB, trial idea lookup: the new list equals the story's list for 6 towns. Old query
+  median ~103 ms (two rungs); new ~85 ms in the big towns and ~140 ms in the two small ones (local
+  machine → Railway DB). Measurements on staging are in the commit report.
+
+**Touches.** 2026-08-29 random draw: the randomness now lives inside Jev's top 20. 2026-09-19
+variety as selection: unchanged, and exclusions still filter before Jev ranks. **Open (BACKLOG):**
+exclude OFFERED ids (today) or only TAKEN ids. 2026-09-20 MIN_POOL: see point 1. 2026-08-21/25
+fame and judged score: still the filter and the list; Jev only orders it. 2026-09-02 premise pin:
+kept first. 2026-09-27 Jev outage: the switch moved and gained steps `challenges` and `landmarks`,
+and the trial gained a probe. "Trials never run Jev" no longer holds for this one step.
+
+**Touched:** server/lib/jevSelection.js (new), server/lib/jevDecisions.js (jevActive / jevFallBack
+moved here), server/lib/beatsPipeline.js, server/lib/promptBuilders.js (challengePool,
+challengeSection, trialIdeaLandmarksText), server/lib/landmarkPhotos.js (premisePinned),
+storyJobPipeline.js, server/routes/storyIdeas.js, server/routes/trial.js, server/lib/testlab.js,
+server/middleware/rateLimit.js, client/src/pages/StoryWizard.tsx, client/src/pages/TrialWizard.tsx,
+client/src/services/storyService.ts, scripts/analysis/eval-jev-selection.js,
+scripts/admin/sibling-registry.json (`idea-landmark-paths`), tests/unit/jev-selection.test.ts,
+tests/unit/jev-outage-backup.test.ts.
+**Status:** ✅ active on staging.
+
+---
+
 ## 2026-09-27 — Jev picks the challenges and landmarks that fit: yes/no per item on the premise, then a small random draw from the top (measured, NOT built)
 
 **Context.** Owner, 2026-09-27: *"We inject ideas from the 200+ list, as well as landmarks. Now we
@@ -260,7 +353,7 @@ prompt (only the arc, a multi-dollar stage), so a cheap-model premise A/B would 
 
 **Touched:** `scripts/analysis/eval-jev-selection.js`, `evals/datasets/jev-selection-v1/reading_labels.json`,
 `evals/runs/2026-09-27_jev-selection/metrics.json`.
-**Status:** 🟡 measured, owner call pending (tasks/BACKLOG.md).
+**Status:** ✅ built 2026-09-27 — see "Jev selection built" above (12-from-top-20, trial 3-from-top-5, idea cards off the request path).
 
 ---
 

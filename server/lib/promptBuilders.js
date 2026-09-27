@@ -7436,6 +7436,13 @@ let challengeCatalogueCache = null;
  * 45 is ~1.8x the draw size: enough oversupply that the per-category spread
  * still has somewhere to go. Below it the spread degenerates and the "random
  * sample" becomes the remainder of the catalogue, which is not a sample.
+ *
+ * The Jev draw (2026-09-27) keeps 45. What the floor protects there is the
+ * pool Jev RANKS, not the count offered: the top-20 window is under half of a
+ * 45-entry pool, so the ranking still rejects more than it keeps. A book now
+ * adds 12 offered ids to the memory instead of 25, so the same floor carries
+ * about twice as many books before the oldest is shed; the "newest book alone"
+ * valve compares against the 20-entry window (`need`), not the 12 drawn.
  */
 const MIN_POOL = 45;
 
@@ -7463,12 +7470,15 @@ const CHALLENGE_IDEAS_HEADING = [
 ];
 
 /**
- * Draw a random, age-filtered, category-spread sample of the challenge
- * catalogue.
+ * The eligible catalogue entries for this story, after the age-band and peril
+ * filters and the account's exclusion memory. ONE pool for both draws (the Jev
+ * draw and the random draw of a story on the Jev-outage backup).
  *
  * @param {Object} inputData
  * @param {Object} opts
- *   count       how many to draw (default 25)
+ *   need        the fewest entries a draw from this pool needs (the random
+ *               draw's `count`; the Jev draw's top window). Below it even the
+ *               newest book's exclusion is abandoned.
  *   excludeIds  catalogue ids this reader has already been offered, GROUPED BY
  *               BOOK, NEWEST FIRST (a flat array is read as one book). Honoured
  *               as far as the pool allows: when the full list would starve the
@@ -7479,85 +7489,102 @@ const CHALLENGE_IDEAS_HEADING = [
  *               repeat they actually notice.
  *
  *               One exception, functional rather than cosmetic: if even the
- *               newest book alone leaves fewer than `count` entries there is no
+ *               newest book alone leaves fewer than `need` entries there is no
  *               draw to make, so the exclusion is abandoned. A draw that cannot
  *               be filled is a broken input, not a thin sample.
+ * @returns {{entries: Array<{id:number, cat:string, text:string, tests:string, line:string}>, eligible: number, offeredStories: number, effectiveStories: number}}
+ *   `entries` is empty when the story's band takes no catalogue challenge.
+ */
+function challengePool(inputData, { need = 25, excludeIds = [] } = {}) {
+  const bands = challengeCatalogueBands(inputData);
+  const groups = exclusionGroups(excludeIds);
+  if (!bands.length) return { entries: [], eligible: 0, offeredStories: groups.length, effectiveStories: 0 };
+  if (challengeCatalogueCache === null) {
+    challengeCatalogueCache = require('fs').readFileSync(
+      require('path').join(__dirname, '../../prompts/challenge-catalogue.txt'), 'utf-8');
+  }
+  const ages = (inputData?.characters || []).map(c => parseInt(c.age, 10)).filter(Number.isFinite);
+  const youngest = ages.length ? Math.min(...ages) : 8;
+  const eligible = challengeCatalogueCache.split('\n')
+    .filter(l => l && !l.startsWith('#'))
+    .map(l => l.split('|'))
+    .filter(f => f.length >= 6)
+    .filter(f => bands.some(b => f[4].startsWith(b)))
+    .filter(f => youngest > 5 || f[5].trim() !== '1');
+  // OLDEST-FIRST SHEDDING (2026-09-20). The valve this replaced was
+  // all-or-nothing: one book too many and the ENTIRE memory was discarded, so
+  // the draw ran unfiltered. Now the memory is trimmed from the old end until
+  // it fits, and a reader keeps as much variety as their band can pay for.
+  const poolAfter = (n) => {
+    if (!n) return eligible;
+    const excluded = new Set(groups.slice(0, n).flat());
+    return eligible.filter(f => !excluded.has(parseInt(f[0], 10)));
+  };
+  let effectiveStories = groups.length;
+  while (effectiveStories > 1 && poolAfter(effectiveStories).length < MIN_POOL) effectiveStories -= 1;
+  // The newest book alone cannot even fill the draw: no exclusion is possible.
+  if (effectiveStories === 1 && poolAfter(1).length < need) effectiveStories = 0;
+  const kept = poolAfter(effectiveStories);
+  if (groups.length) {
+    const detail = `${effectiveStories}/${groups.length} book(s) of memory kept, pool ${kept.length} of ${eligible.length} eligible (floor ${MIN_POOL}, need ${need})`;
+    if (effectiveStories === groups.length) log.info(`[PROMPT] challenge variety: ${detail}`);
+    else log.info(`[PROMPT] challenge variety: shed the oldest — ${detail}`);
+  }
+  const entries = kept.map(f => {
+    const id = parseInt(f[0], 10);
+    return { id, cat: f[1], text: f[2], tests: f[3], line: `- [C${id}] ${f[2]} (tests: ${f[3]})` };
+  });
+  return { entries, eligible: eligible.length, offeredStories: groups.length, effectiveStories };
+}
+
+/** The drawn section, fixed heading + one line per entry; '' when nothing was drawn. */
+function challengeSection(picked) {
+  if (!picked.length) return '';
+  // No count here (2026-09-25): the arc's principles state the one event
+  // budget (arcEventRange); a second number in this heading disagreed with it.
+  return [...CHALLENGE_IDEAS_HEADING, '', ...picked.map(x => x.line)].join('\n');
+}
+
+/**
+ * Draw a random, age-filtered, category-spread sample of the challenge
+ * catalogue — the draw of a story whose Jev layer is on the outage backup
+ * (docs/decisions.md 2026-09-27 "Jev outage"), and of the Lab stages that
+ * sample the catalogue on their own.
+ *
+ * @param {Object} inputData
+ * @param {Object} opts  count (default 25), excludeIds (see challengePool)
  * @returns {{section: string, ids: number[], offeredStories: number, effectiveStories: number}}
  */
 function drawChallengeIdeas(inputData, { count = 25, excludeIds = [] } = {}) {
-  const bands = challengeCatalogueBands(inputData);
-  const groups = exclusionGroups(excludeIds);
-  if (!bands.length) return { section: '', ids: [], offeredStories: groups.length, effectiveStories: 0 };
+  let pool;
   try {
-    if (challengeCatalogueCache === null) {
-      challengeCatalogueCache = require('fs').readFileSync(
-        require('path').join(__dirname, '../../prompts/challenge-catalogue.txt'), 'utf-8');
-    }
-    const ages = (inputData?.characters || []).map(c => parseInt(c.age, 10)).filter(Number.isFinite);
-    const youngest = ages.length ? Math.min(...ages) : 8;
-    const eligible = challengeCatalogueCache.split('\n')
-      .filter(l => l && !l.startsWith('#'))
-      .map(l => l.split('|'))
-      .filter(f => f.length >= 6)
-      .filter(f => bands.some(b => f[4].startsWith(b)))
-      .filter(f => youngest > 5 || f[5].trim() !== '1');
-    // OLDEST-FIRST SHEDDING (2026-09-20). The valve this replaced was
-    // all-or-nothing: one book too many and the ENTIRE memory was discarded, so
-    // the draw ran unfiltered. Now the memory is trimmed from the old end until
-    // it fits, and a reader keeps as much variety as their band can pay for.
-    const poolAfter = (n) => {
-      if (!n) return eligible;
-      const excluded = new Set(groups.slice(0, n).flat());
-      return eligible.filter(f => !excluded.has(parseInt(f[0], 10)));
-    };
-    let effectiveStories = groups.length;
-    while (effectiveStories > 1 && poolAfter(effectiveStories).length < MIN_POOL) effectiveStories -= 1;
-    // The newest book alone cannot even fill the draw: no exclusion is possible.
-    if (effectiveStories === 1 && poolAfter(1).length < count) effectiveStories = 0;
-    const entries = poolAfter(effectiveStories);
-    if (groups.length) {
-      const detail = `${effectiveStories}/${groups.length} book(s) of memory kept, pool ${entries.length} of ${eligible.length} eligible (floor ${MIN_POOL}, draw ${count})`;
-      if (effectiveStories === groups.length) log.info(`[PROMPT] challenge variety: ${detail}`);
-      else log.info(`[PROMPT] challenge variety: shed the oldest — ${detail}`);
-    }
-    const byCat = new Map();
-    for (const f of entries) {
-      if (!byCat.has(f[1])) byCat.set(f[1], []);
-      byCat.get(f[1]).push({ id: parseInt(f[0], 10), line: `- [C${parseInt(f[0], 10)}] ${f[2]} (tests: ${f[3]})` });
-    }
-    const DEFAULT_ZONE = new Set(['A', 'C', 'D', 'F', 'G']);
-    const picked = [];
-    const cats = [...byCat.keys()].sort(() => Math.random() - 0.5);
-    let round = 0;
-    while (picked.length < count && round < 8) {
-      for (const c of cats) {
-        if (picked.length >= count) break;
-        const used = picked.filter(x => x.cat === c).length;
-        if (used >= (DEFAULT_ZONE.has(c) ? 1 : round + 1)) continue;
-        const pool = byCat.get(c);
-        if (!pool.length) continue;
-        const i = Math.floor(Math.random() * pool.length);
-        picked.push({ cat: c, ...pool.splice(i, 1)[0] });
-      }
-      round++;
-    }
-    if (!picked.length) return { section: '', ids: [], offeredStories: groups.length, effectiveStories };
-    // No count here (2026-09-25): the arc's principles state the one event
-    // budget (arcEventRange); a second number in this heading disagreed with it.
-    return {
-      section: [
-        ...CHALLENGE_IDEAS_HEADING,
-        '',
-        ...picked.map(x => x.line),
-      ].join('\n'),
-      ids: picked.map(x => x.id),
-      offeredStories: groups.length,
-      effectiveStories,
-    };
+    pool = challengePool(inputData, { need: count, excludeIds });
   } catch (err) {
     log.warn(`[PROMPT] challenge catalogue unavailable: ${err.message}`);
     return { section: '', ids: [], offeredStories: 0, effectiveStories: 0 };
   }
+  const byCat = new Map();
+  for (const e of pool.entries) {
+    if (!byCat.has(e.cat)) byCat.set(e.cat, []);
+    byCat.get(e.cat).push(e);
+  }
+  const DEFAULT_ZONE = new Set(['A', 'C', 'D', 'F', 'G']);
+  const picked = [];
+  const cats = [...byCat.keys()].sort(() => Math.random() - 0.5);
+  let round = 0;
+  while (picked.length < count && round < 8) {
+    for (const c of cats) {
+      if (picked.length >= count) break;
+      const used = picked.filter(x => x.cat === c).length;
+      if (used >= (DEFAULT_ZONE.has(c) ? 1 : round + 1)) continue;
+      const list = byCat.get(c);
+      if (!list.length) continue;
+      const i = Math.floor(Math.random() * list.length);
+      picked.push(list.splice(i, 1)[0]);
+    }
+    round++;
+  }
+  return { section: challengeSection(picked), ids: picked.map(x => x.id), offeredStories: pool.offeredStories, effectiveStories: pool.effectiveStories };
 }
 
 /** The section alone, for callers that do not record the draw. */
@@ -12145,7 +12172,10 @@ The main character has two avatar styles available:
       landmarksInstruction = `# World
 A make-believe world.${worldSentence ? ` ${worldSentence}` : ''} The first scene shows the child where they really are${city ? ` (${city})` : ''}, dressing up or starting to play, and the last scene brings them back there; every scene between is inside the make-believe world, with its own invented places and no real place names.`;
     } else if (inputData.availableLandmarks?.length > 0) {
-      const top3 = inputData.availableLandmarks.slice(0, 3);
+      // The first 3 are the story's pick: the premise-named place(s), then a
+      // random draw from Jev's top 5 on the chosen idea — ordered so by
+      // jevSelection.selectStoryLandmarks before this prompt is built.
+      const top3 = inputData.availableLandmarks.slice(0, require('./jevSelection').TRIAL_STORY_LANDMARKS);
       const cityName = inputData.userLocation?.city || '';
       const landmarkBlock = top3.map(l => {
         let entry = `- ${l.name}`;
@@ -12630,6 +12660,15 @@ function nextIdeaAxisPair() {
 }
 
 /**
+ * The own-town trial idea's landmark mandate, one copy for the /try route and
+ * the Lab's variety stage (sibling set trial-idea-prompt-mirror).
+ * @param {string[]} names - the places jevSelection.pickIdeaLandmarks chose
+ */
+function trialIdeaLandmarksText(names) {
+  return names.length ? `At least one scene must take place at one of these real local landmarks: ${names.join(', ')}.` : '';
+}
+
+/**
  * The two trial idea prompts, built once for every caller (the /try route and
  * the Lab's variety stage, which has to measure what production sends).
  *
@@ -12825,6 +12864,8 @@ module.exports = {
   buildBeatsPrompt,
   buildChallengeIdeasSection,
   drawChallengeIdeas,
+  challengePool,
+  challengeSection,
   CHALLENGE_IDEAS_HEADING,
   buildArcCreatePrompt,
   buildArcPanelPrompt,
@@ -13019,6 +13060,7 @@ module.exports = {
   buildAvailableLandmarksSection,
   buildTrialIdeaCostumeInstructions,
   buildTrialIdeaPrompts,
+  trialIdeaLandmarksText,
   AGE_OWNS_PROPS_RULE,
   nextIdeaVarietyAxis,
   nextIdeaAxisPair,

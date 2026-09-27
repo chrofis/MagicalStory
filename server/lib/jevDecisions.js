@@ -237,6 +237,28 @@ async function probeJev({ callImpl } = {}) {
   }
 }
 
+/**
+ * THE JEV-OUTAGE BACKUP (owner, 2026-09-27: "Can we keep today's setup as
+ * backup if Jev is down?" — an explicit exception to NO FALLBACKS).
+ *
+ * `jevReport.fallback` is the one switch. It is set once per story, at the
+ * pre-start probe (step 'start': the whole story runs today's setup before the
+ * layer — the planner authors shots, cuts and the Art Director its fields) or
+ * at the first step whose Jev calls still fail after the 5-minute wait
+ * (JEV_OUTAGE): that step and every later one run the backup. Logged at error
+ * level (`jev_fallback`) and stored on the story. The beats pipeline and the
+ * trial's landmark selection (jevSelection.js) flip the same switch.
+ */
+function jevActive(jevReport) { return !(jevReport && jevReport.fallback); }
+
+function jevFallBack(jevReport, step, err, gl) {
+  if (!jevReport) throw err;
+  if (jevReport.fallback) return;
+  jevReport.fallback = { step, reason: String((err && err.message) || err).slice(0, 500), at: new Date().toISOString() };
+  log.error(`🚨 [JEV] BACKUP PATH from step "${step}" — the Jev decision layer is unavailable (${jevReport.fallback.reason}); this step and every later decision run today's setup before the layer`);
+  if (gl) gl.error('jev_fallback', `Jev unavailable from step "${step}": this story runs the backup path (the planner / Art Director author the decisions) — ${jevReport.fallback.reason}`, null, jevReport.fallback);
+}
+
 function newStats() { return { calls: 0, cost: 0, ms: [], retries: 0, failed: 0, errors: [] }; }
 
 /** Repeat each request `reps` times under one key. */
@@ -1045,6 +1067,11 @@ module.exports = {
   JevDecisionError,
   JEV_OUTAGE,
   probeJev,
+  jevActive,
+  jevFallBack,
+  newStats,
+  summarise,
+  meanNoul,
   JEV_FIXED_FIELDS_RULE,
   JEV_BACKUP_SHOT_RULE,
   fixedFieldsRule,

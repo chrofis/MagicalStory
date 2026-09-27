@@ -9525,17 +9525,17 @@ async function runTrialIdeaVarietyStage(target, { params = {}, promptOverride = 
     categoryContext = `This is a ${storyTheme || 'adventure'} story${storyTopic ? ` about "${storyTopic}"` : ''}. Make it exciting and appropriate for children.`;
   }
 
-  // ── route mirror: landmarks ──
+  // ── route mirror: landmarks ── the route's own helper (jevSelection
+  // .trialIdeaLandmarks); the Lab waits for Jev's ranking, which the route
+  // reads only when a prepare call has made it ready.
   let landmarksText = '';
   const landmarkNames = [];
-  if (params.landmarks !== 'false' && params.landmarks !== false && userLocation?.city && storyCategory !== 'historical') {
+  if (params.landmarks !== 'false' && params.landmarks !== false) {
     try {
-      const { getIndexedLandmarks } = require('./landmarkPhotos');
-      const landmarks = await getIndexedLandmarks(userLocation, 3);
-      if (landmarks.length > 0) {
-        landmarkNames.push(...landmarks.map(l => l.name));
-        landmarksText = 'At least one scene must take place at one of these real local landmarks: ' + landmarkNames.join(', ') + '.';
-      }
+      const idea = await require('./jevSelection').trialIdeaLandmarks(
+        { characters: [mainChar], storyCategory, storyTheme, storyTopic, language, userLocation }, { wait: true });
+      landmarkNames.push(...idea.names);
+      landmarksText = idea.text;
     } catch (err) {
       log.debug(`[TESTLAB] idea-variety landmark lookup failed: ${err.message}`);
     }

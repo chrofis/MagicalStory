@@ -128,26 +128,8 @@ async function extract() {
 
 function loadItems() { return fs.readFileSync(ITEMS, 'utf8').trim().split('\n').map(JSON.parse); }
 
-function castLine(it) {
-  const ages = it.cast.map(c => Number(c.age)).filter(Number.isFinite);
-  const kids = ages.filter(a => a < 16), adults = ages.filter(a => a >= 16);
-  return [kids.length ? `children aged ${kids.join(', ')}` : '', adults.length ? `${adults.length} grown-up${adults.length > 1 ? 's' : ''} (aged ${adults.join(', ')})` : ''].filter(Boolean).join(' and ');
-}
-
-/** What the idea stage knows: who, what kind of story, where. No premise. */
-function setupState(it) {
-  return [
-    '# A CHILDREN\'S PICTURE BOOK, BEFORE ITS STORY IS WRITTEN',
-    `Cast: ${castLine(it)}.`,
-    `Kind of story: ${[it.category, it.theme && `theme "${it.theme}"`, it.topic && `topic "${it.topic}"`].filter(Boolean).join(', ')}.`,
-    it.city ? `Home town: ${it.city}.` : 'No home town given.',
-  ].join('\n');
-}
-
-/** What the arc stage knows: the setup plus the commissioned premise. */
-function premiseState(it) {
-  return `${setupState(it).replace('BEFORE ITS STORY IS WRITTEN', 'AND ITS COMMISSIONED IDEA')}\n\n# THE COMMISSIONED IDEA\n${it.premise || '(none — the family wrote no idea)'}`;
-}
+// The questions and states are production's (server/lib/jevSelection.js): one copy.
+const { castLine, setupState, premiseState, chLabel, lmLabel, Q } = require('../../server/lib/jevSelection');
 
 function dump() {
   const cat = catalogue();
@@ -162,12 +144,6 @@ function dump() {
 
 // ───────────────────────── run ─────────────────────────
 
-const chLabel = c => `${c.text} (tests: ${c.tests})`;
-const lmLabel = l => `${l.name}${l.type ? ` (${l.type})` : ''}${l.desc ? `: ${l.desc.slice(0, 160)}` : ''}`;
-const Q = {
-  CB: c => `A trial or obstacle like this fits this book: it can happen naturally in its world and to its cast, and it serves the kind of story it is. The trial: ${chLabel(c)}`,
-  LB: l => `This real place fits this book: a story of this kind, with this cast, would naturally happen at or around it. The place: ${lmLabel(l)}`,
-};
 
 function chunks(ids) {
   const n = Math.ceil(ids.length / CHOICE_MAX);

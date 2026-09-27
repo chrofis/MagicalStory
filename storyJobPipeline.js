@@ -399,6 +399,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
   // on. One declaration, both readers. See docs/decisions.md
   // "Unevaluated runs report not-measured, never a clean score".
   const skipQualityEval = inputData.skipQualityEval === true;
+  // The trial's Jev switch (jevDecisions.jevFallBack): its one Jev step is the
+  // landmark selection before the writer call. A beats story keeps its own
+  // report inside generateStoryViaBeats.
+  const trialJev = { probe: null, fallback: null };
 
   // The stories row exists from the FIRST moment (owner, 2026-08-15).
   // story_images.story_id references stories.id, so anything written during
@@ -670,6 +674,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // pre-beats unified writer (buildUnifiedStoryPrompt + story-unified*.txt)
     // was deleted 2026-09-15 — see docs/decisions.md. resolvePipelineMode
     // guarantees a non-trial job is always 'beats', so this stays null there.
+    // The trial writer reads the first 3 landmarks: Jev picks them on the
+    // chosen idea (LB2, 3 at random from the top 5, the premise-named place
+    // pinned first). Probed first, as a beats story is; on the backup the
+    // resolver's order stands (docs/decisions.md 2026-09-27 "Jev selection built").
+    if (inputData.trialMode) {
+      await require('./server/lib/jevSelection').selectStoryLandmarks(inputData, { jevReport: trialJev, gl: genLog, mode: 'trial', probe: true });
+    }
     const unifiedPrompt = inputData.trialMode
       ? buildTrialStoryPrompt(inputData, sceneCount)
       : null;
@@ -4133,7 +4144,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // run can be replayed. docs/decisions.md "Jev decision layer wired".
     const jevDecisions = beatsResult?.jevDecisions || null;
     // Set when the Jev-outage backup ran (owner exception, 2026-09-27): {step, reason, at}.
-    const jevFallback = beatsResult?.jevFallback || null;
+    // A trial's only Jev step is its landmark selection (trialJev below).
+    const jevFallback = beatsResult?.jevFallback || trialJev.fallback || null;
     // Drafted arc + the arc reviewer's analysis, so a shipped story can be read
     // back against the arc it promised.
     const arcReviewReport = beatsResult?.arcReviewReport || null;
@@ -6844,7 +6856,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // story, so nothing can leak one book's cast into another's.
       challengeDrawIds,
       challengeTakenIds, // which of them the arc built on, by catalogue id
-      challengeDraw, // the random catalogue menu the arc plan was offered (beats mode)
+      challengeDraw, // the catalogue menu the arc plan was offered (beats mode)
+      // How that menu was chosen (2026-09-27): Jev's score per eligible id, its
+      // top 20 and the 12 drawn — or the random draw on the Jev backup.
+      challengeSelection: beatsResult?.challengeSelection || null,
+      // How the landmark list was ordered: Jev's LB2 score per place and the
+      // order every writer read (the trial: the 3 it was given) — or today's.
+      landmarkSelection: inputData.landmarkSelection || null,
       // What a Test Lab replay needs and the run held only in memory
       // (2026-09-27): the shuffled landmark list every writer prompt read, and
       // the run's model overrides. Text only. Read by beatsReplayInputs
@@ -7878,8 +7896,11 @@ async function _processStoryJobImpl(jobId) {
 
     // Inject pre-discovered landmarks if available for this user's location.
     // Shared resolver: landmark_index (proximity fallback) -> shared in-memory
-    // cache. No live discovery at job start (would block 15s); shuffled so the
-    // writer doesn't keep reaching for the same top-scored entries.
+    // cache. No live discovery at job start (would block 15s). Shuffled: that
+    // is the order a story on the Jev backup keeps; with Jev live the list is
+    // re-ordered by its fit to the commissioned idea before any writer reads
+    // it (jevSelection.selectStoryLandmarks — beats: generateStoryViaBeats;
+    // trial: before the writer call in processUnifiedStoryJob).
     // Skip for historical stories - they use historically accurate locations, not local landmarks
     if (inputData.userLocation?.city && inputData.storyCategory !== 'historical') {
       const { resolveAvailableLandmarks } = require('./server/lib/landmarkPhotos');
@@ -7888,7 +7909,9 @@ async function _processStoryJobImpl(jobId) {
         // pipeline asked for 30 and the arc prompt then carried 15.5k chars of
         // landmark listing — 41% of everything the arc creator read, most of it
         // guild houses and archives no children's story reaches for.
-        limit: 20, discoverOnMiss: false, language: inputData.language, shuffle: true,
+        // The trial idea route resolves the same list (jevSelection
+        // .resolveTrialIdeaLandmarks), so an idea only names places the story has.
+        limit: require('./server/lib/jevSelection').STORY_LANDMARK_LIMIT, discoverOnMiss: false, language: inputData.language, shuffle: true,
         // A landmark the family names in their idea is pinned first (after the
         // shuffle), so the writer's top-3 opens on it.
         premiseText: [inputData.storyDetails, inputData.title].filter(Boolean).join('\n'),

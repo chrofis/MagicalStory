@@ -5,6 +5,7 @@ const { commissionedCast, castCoverage, parsePlanCastBlock } = require('./castCo
 const { arcRepairFindingsWithCastCheck } = require('./jevAudit');
 const jevDecisions = require('./jevDecisions');
 const { JevDecisionError } = jevDecisions;
+const jevSelection = require('./jevSelection');
 const { lookupByName } = require('./castResolver');
 const { textZoneRulesActive } = require('../config/runtime');
 const { commissionedChildBand, applySecondaryAgeBand } = require('./inventedAgeBand');
@@ -93,7 +94,6 @@ const textModels = require('./textModels');
 const { MODEL_DEFAULTS, IMAGE_MODELS, TEXT_MODELS } = require('../config/models');
 const {
   buildBeatsPrompt,
-  drawChallengeIdeas,
   buildArcCreatePrompt,
   buildArcPanelPrompt,
   buildArcRetellPrompt,
@@ -1701,26 +1701,9 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
   return { beats, pagePlan, check: bestCheck };
 }
 
-/**
- * THE JEV-OUTAGE BACKUP (owner, 2026-09-27: "Can we keep today's setup as
- * backup if Jev is down?" — an explicit exception to NO FALLBACKS).
- *
- * `jevReport.fallback` is the one switch. It is set once per story, at the
- * pre-start probe (step 'start': the whole story runs today's setup before the
- * layer — the planner authors shots, cuts and the Art Director its fields) or
- * at the first step whose Jev calls still fail after the 5-minute wait
- * (jevDecisions.JEV_OUTAGE): that step and every later one run the backup.
- * Logged at error level (`jev_fallback`) and stored on the story.
- */
-function jevActive(jevReport) { return !(jevReport && jevReport.fallback); }
-
-function jevFallBack(jevReport, step, err, gl) {
-  if (!jevReport) throw err;
-  if (jevReport.fallback) return;
-  jevReport.fallback = { step, reason: String((err && err.message) || err).slice(0, 500), at: new Date().toISOString() };
-  log.error(`🚨 [JEV] BACKUP PATH from step "${step}" — the Jev decision layer is unavailable (${jevReport.fallback.reason}); this step and every later decision run today's setup before the layer`);
-  if (gl) gl.error('jev_fallback', `Jev unavailable from step "${step}": this story runs the backup path (the planner / Art Director author the decisions) — ${jevReport.fallback.reason}`, null, jevReport.fallback);
-}
+// THE JEV-OUTAGE BACKUP switch (jevActive / jevFallBack) lives in jevDecisions.js
+// since 2026-09-27: the trial's landmark selection flips the same switch.
+const { jevActive, jevFallBack } = jevDecisions;
 
 /** Shots authored by the planner: only a story that started on the backup. */
 function legacyShotsOf(jevReport) { return !!(jevReport && jevReport.fallback && jevReport.fallback.step === 'start'); }
@@ -3219,8 +3202,16 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // (loadUsedChallengeIds) — variety is a selection rule, so no prompt ever
   // mentions a previous story. The ids are persisted next to the lines so the
   // next book can exclude this one.
+  //
+  // JEV SELECTS (owner, 2026-09-27): the landmark list is ordered by its fit
+  // to the commissioned idea (LB2), and the draw is 12 at random from Jev's 20
+  // best-fitting eligible entries (CB2) — both inside the layer's one switch:
+  // on the backup the list keeps the resolver's shuffle and the draw is
+  // today's random 25 (jevSelection.js).
+  await jevSelection.selectStoryLandmarks(inputData, { jevReport, gl, mode: 'full' });
   const priorIds = await loadUsedChallengeIds(jobId, gl);
-  const draw = drawChallengeIdeas(inputData, { excludeIds: priorIds.idsByStory });
+  const draw = await jevSelection.selectChallengeDraw({ inputData, excludeIds: priorIds.idsByStory, jevReport, gl });
+  const challengeSelection = draw.selection;
   if (priorIds.stories > 0) {
     // EFFECTIVE, not offered. The draw sheds the oldest books whose ids its
     // band cannot afford, so the number that matters — and the one a story's
@@ -4457,7 +4448,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // kept in step by syncVisualBibleSection; the re-parse is the fallback).
   // The backup marker rides on the report the dev panel already shows.
   if (beatsReviewReport) beatsReviewReport.jevFallback = jevReport.fallback;
-  return { title, titleJudge, beats, pages, scenes, coverScenes, rawOutline, visualBible, meta, challengeDrawIds, challengeTakenIds, challengeDraw, arcReviewReport, beatsReviewReport, jevDecisions: jevReport, jevFallback: jevReport.fallback, storyBibleReport, clothingReviewReport, wardrobeBibleReport, sceneExpansionReport, sceneReviewReport };
+  return { title, titleJudge, beats, pages, scenes, coverScenes, rawOutline, visualBible, meta, challengeDrawIds, challengeTakenIds, challengeDraw, challengeSelection, arcReviewReport, beatsReviewReport, jevDecisions: jevReport, jevFallback: jevReport.fallback, storyBibleReport, clothingReviewReport, wardrobeBibleReport, sceneExpansionReport, sceneReviewReport };
 }
 
 module.exports = { generateStoryViaBeats, finalizePlanShots, applyJevBriefDecisions, pinJevFixedFields, runArtDirector, arcTempFor, makeArcCreatorCall, runSceneReview, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, bibleCorrectionsMissingFromTranscript, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };

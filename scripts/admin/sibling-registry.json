@@ -162,6 +162,16 @@
       "severity": "block"
     },
     {
+      "id": "idea-landmark-paths",
+      "axis": "wizard idea route vs trial idea route",
+      "reason": "both idea routes name real places in their prompt from the town list the story will read, picked by Jev's LB1 ranking when a prepare call made it ready and in today's order otherwise (jevSelection.pickIdeaLandmarks, docs/decisions.md 2026-09-27 \"Jev selection built\"); each route has its own prepare endpoint the client fires when the story kind is picked (StoryWizard.tsx / TrialWizard.tsx). The trial route resolved a DIFFERENT list (getIndexedLandmarks(loc, 3) — the municipality rung) until 2026-09-27 and named places its story never had: a change to how one route picks, resolves or prepares its places belongs on the other.",
+      "members": [
+        "server/routes/storyIdeas.js",
+        "server/routes/trial.js"
+      ],
+      "severity": "block"
+    },
+    {
       "id": "photo-apparent-age-clamp",
       "axis": "regular avatar trait write vs trial trait write",
       "reason": "a photo's apparentAge reaches character.physical at two sites: the regular avatar paths (routes/avatars.js, clampApparentAge on the consensus traits) and the trial (trialAge.js applyTrialPhotoTraits / reclampTrialApparentAge, used by every trial.js writer). extractCharacterVisualProfile trusts apparentAge over the declared age because that clamp bounds it; the trial copied it unclamped from e894b0fe6 until 2026-09-26, and prod trial job_1790282439176_ppgelxibt drew a declared 5-year-old as a middle-aged man.",

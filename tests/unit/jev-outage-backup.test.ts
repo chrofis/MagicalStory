@@ -121,7 +121,8 @@ describe('Jev down before the story starts: the whole story runs the backup', ()
 describe('Jev lost half-way: what was decided stays, the rest goes to the backup', () => {
   it('the probe answers, the shot calls fail after the wait: the plan keeps the placeholder and the Art Director picks the shots', async () => {
     JD.JEV_OUTAGE.waitMs = 30;
-    const r = await run(async (req: any) => { if (req.questions.PROBE) return answerAll(req); throw new Error('jevAudit: HTTP 502: bad gateway'); });
+    // The probe and the challenge draw (jevSelection, one call of c<id> nouls) answer; the shot calls fail.
+    const r = await run(async (req: any) => { if (!Object.keys(req.questions).some(k => /^S\d$/.test(k))) return answerAll(req); throw new Error('jevAudit: HTTP 502: bad gateway'); });
     const fb = r.events.filter(e => e.key === 'jev_fallback');
     expect(fb).toHaveLength(1);
     expect(fb[0].data.step).toBe('shots');
@@ -129,7 +130,10 @@ describe('Jev lost half-way: what was decided stays, the rest goes to the backup
     expect(r.prompts.beats_scene_expansion).toContain(`PLAN: ${SV.PLAN_SHOT_PLACEHOLDER} —`);
     expect(r.prompts.beats_scene_expansion).toContain(JD.JEV_BACKUP_SHOT_RULE);
     expect(r.prompts.beats_scene_expansion).not.toContain('FIXED: timeOfDay');       // no later Jev step ran
-    expect(r.jevCalls.filter((c: any) => !c.questions.PROBE).every((c: any) => Object.keys(c.questions).some(k => /^S\d$/.test(k)))).toBe(true);
+    // Before the shots only the probe and the challenge ranking asked Jev anything.
+    const selection = (c: any) => c.questions.PROBE || Object.keys(c.questions).every(k => /^c\d+$/.test(k));
+    expect(r.jevCalls.filter((c: any) => Object.keys(c.questions).every(k => /^c\d+$/.test(k)))).toHaveLength(1);
+    expect(r.jevCalls.filter((c: any) => !selection(c)).every((c: any) => Object.keys(c.questions).some(k => /^S\d$/.test(k)))).toBe(true);
   });
 
   it('Jev live throughout: no switch, every decided step runs', async () => {
@@ -142,7 +146,9 @@ describe('Jev lost half-way: what was decided stays, the rest goes to the backup
       return { answers, cost: 0, model: 'stub', usage: {} };
     });
     expect(r.events.some(e => e.key === 'jev_fallback')).toBe(false);
-    for (const key of ['beats_jev_shots', 'beats_jev_light', 'beats_jev_brief_fields']) expect(r.events.some(e => e.key === key), key).toBe(true);
+    for (const key of ['beats_jev_shots', 'beats_jev_light', 'beats_jev_brief_fields', 'jev_challenge_selection']) expect(r.events.some(e => e.key === key), key).toBe(true);
+    // The arc is offered Jev's draw: 12 catalogue lines.
+    expect((r.prompts.arc_create.match(/^- \[C\d+\]/gm) || []).length).toBe(12);
     expect(r.prompts.beats_scene_expansion).toContain('FIXED: timeOfDay');
     expect(r.prompts.beats_scene_expansion).toContain(JD.JEV_FIXED_FIELDS_RULE);
   });
