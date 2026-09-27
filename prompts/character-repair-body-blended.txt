@@ -1,5 +1,5 @@
 TWO IMAGES ATTACHED.
-- {REFERENCE_IMAGE} = REFERENCE PORTRAIT of {charName}. Use it ONLY to copy face, hair, skin tone, eye color, body build, and clothing. NEVER return this image. NEVER reproduce its background, framing, or composition.
+- {REFERENCE_IMAGE} = REFERENCE BODY AND OUTFIT of {charName} (the full figure). Use it ONLY to copy face, hair, skin tone, eye color, body build, and clothing. NEVER return this image. NEVER reproduce its background, framing, or composition.
 - {EDIT_IMAGE} = THE SCENE TO EDIT. {sceneMediumLine} with {charName}'s entire figure blurred (face, hair, body, clothing). Other characters' faces or full bodies may also be blurred to prevent trait bleed. Your output MUST be an edited copy of {EDIT_IMAGE} — same dimensions, same background, same other characters, same composition, same art style. Only the blurred regions inside {EDIT_IMAGE} are repainted.
 
 If you are tempted to return anything that looks like {REFERENCE_IMAGE}, stop — return {EDIT_IMAGE} with the blurred areas repainted instead.

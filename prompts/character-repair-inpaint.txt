@@ -1,5 +1,5 @@
 TWO IMAGES ATTACHED.
-- {REFERENCE_IMAGE} = REFERENCE PORTRAIT of {charName}. Use it ONLY to copy face, hair, skin tone, build, and clothing. NEVER return this image. NEVER reproduce its background or composition.
+- {REFERENCE_IMAGE} = REFERENCE BODY AND OUTFIT of {charName} (the full figure). Use it ONLY to copy face, hair, skin tone, build, and clothing. NEVER return this image. NEVER reproduce its background or composition.
 - {EDIT_IMAGE} = THE SCENE TO EDIT. The figure to replace is marked by a magenta crosshatch. Your output MUST be an edited copy of {EDIT_IMAGE} — same dimensions, same background, same other characters. Only the crosshatched area is repainted.
 
 If you are tempted to return anything that looks like {REFERENCE_IMAGE}, stop — return {EDIT_IMAGE} with the crosshatch repainted instead.

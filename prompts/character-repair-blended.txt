@@ -1,5 +1,5 @@
 TWO IMAGES ATTACHED.
-- {REFERENCE_IMAGE} = REFERENCE PORTRAIT of {charName}. Use it only to copy face, hair, skin tone, eye color, and distinctive features. Don't return this image. Don't reproduce its background, framing, or composition.
+- {REFERENCE_IMAGE} = REFERENCE FACE of {charName} (head and shoulders). Use it only to copy face, hair, skin tone, eye color, and distinctive features. Don't return this image. Don't reproduce its background, framing, or composition.
 - {EDIT_IMAGE} = THE SCENE TO EDIT. {sceneMediumLine} with one or more character faces blurred. Your output is an edited copy of {EDIT_IMAGE} — same dimensions, same background, same other characters, same composition, same art style. Only the blurred face/head regions inside {EDIT_IMAGE} are repainted.
 
 If you are tempted to return anything that looks like {REFERENCE_IMAGE}, stop — return {EDIT_IMAGE} with the blurred areas repainted instead.

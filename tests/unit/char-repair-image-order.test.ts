@@ -42,7 +42,7 @@ const AXES = [
 ];
 
 const refSlot = (prompt: string) => {
-  const m = prompt.match(/- IMAGE (\d) = REFERENCE PORTRAIT/);
+  const m = prompt.match(/- IMAGE (\d) = REFERENCE (?:FACE|BODY AND OUTFIT) of/);
   if (!m) throw new Error(`no reference label in: ${prompt.slice(0, 300)}`);
   return Number(m[1]) - 1;
 };

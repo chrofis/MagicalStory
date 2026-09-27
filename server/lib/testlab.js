@@ -2169,47 +2169,12 @@ async function runCharRepairStage(ctx, opts) {
     }
   }
 
-  // Same cell selection as production's char-fix (repairPipeline): the shared
-  // resolveCellPose/cropAvatarCell chain picks the sheet cell matching the
-  // figure's declared facing — body cell for a body repair, face cell stacked
-  // above it for a face repair. params.referenceCells overrides for A/B:
-  // 'full' forces the raw 2x4 sheet (the old behaviour), 'body4' the body row,
-  // 'body1' the front body cell.
-  if (avatarPhoto && params.referenceCells !== 'full') {
-    try {
-      const sharpRC = require('sharp');
-      const r2RC = require('./r2');
-      if (params.referenceCells === 'body4' || params.referenceCells === 'body1') {
-        const rcBuf = Buffer.from(r2RC.stripDataUriPrefix(await toDataUri(avatarPhoto) || avatarPhoto), 'base64');
-        const rcMeta = await sharpRC(rcBuf).metadata();
-        const W = rcMeta.width, H = rcMeta.height;
-        const region = params.referenceCells === 'body1'
-          ? { left: 0, top: Math.round(H / 2), width: Math.round(W / 4), height: Math.round(H / 2) }
-          : { left: 0, top: Math.round(H / 2), width: W, height: Math.round(H / 2) };
-        const cropped = await sharpRC(rcBuf).extract(region).jpeg({ quality: 92 }).toBuffer();
-        avatarPhoto = `data:image/jpeg;base64,${cropped.toString('base64')}`;
-        avatarPhotoType = `${avatarPhotoType}+${params.referenceCells}`;
-      } else {
-        const { resolveCellPose } = require('./storyAvatars');
-        const { cropAvatarCell } = require('./sceneComposite');
-        const metaChars = ctx.scene.sceneMetadata?.fullData?.characters
-          || ctx.scene.sceneMetadata?.characters || ctx.scene.sceneCharacters || [];
-        const sc = (Array.isArray(metaChars) ? metaChars : []).find(c =>
-          ((typeof c === 'string' ? c : c?.name) || '').toLowerCase() === refName.toLowerCase());
-        const pf = resolveCellPose(sc || {});
-        const wantFace = whiteoutTarget === 'face';
-        const { body, stacked } = await cropAvatarCell(avatarPhoto,
-          { pose: pf.pose, includeFace: wantFace, stack: wantFace });
-        const cell = wantFace ? (stacked || body) : body;
-        if (cell) {
-          avatarPhoto = cell;
-          avatarPhotoType = `${avatarPhotoType}+cell-${pf.pose}${wantFace ? '-stacked' : ''}`;
-        }
-      }
-    } catch (err) {
-      log.warn(`[TESTLAB] cell selection failed (${err.message}) — sending the full sheet`);
-    }
-  }
+  // Same reference as production's char-fix: the figure's pose picks the sheet
+  // cell, and the spine sends the face cell alone for a face repair, the body
+  // cell alone for a body repair (charRepairReference.js). The pose follows the
+  // TARGET figure on the page — the reference character's sheet is drawn in the
+  // pose the target figure holds.
+  const referencePose = require('./charRepairReference').referencePoseFor(ctx.scene, charName);
 
   // Follows the REFERENCE character: during an identity swap the prompt must
   // not keep demanding the TARGET's outfit, or the model is told to paint the
@@ -2269,7 +2234,7 @@ async function runCharRepairStage(ctx, opts) {
     const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, dataUri, experimentId);
     steps.push({ label, imageType: 'tl_step', versionIndex: v });
   };
-  await addStep(`input: character reference (${avatarPhotoType})`, avatarPhoto);
+  await addStep(`input: character sheet (${avatarPhotoType})`, avatarPhoto);
 
   // Replay support for the crosshatch/blur spine: params.reuseModelOutput is a
   // tl_step version index (or a data URI) holding a previous 'model raw output'.
@@ -2303,6 +2268,7 @@ async function runCharRepairStage(ctx, opts) {
       return (typeof d === 'string' ? d : d?.richDescription) || '';
     })(),
     photoType: avatarPhotoType,
+    referencePose,
     sceneDescription: ctx.scene.sceneDescription || ctx.scene.text || '',
     artStyle: params.artStyleOverride || ctx.artStyle || null,
     faceBbox: faceBbox || null,
@@ -2357,6 +2323,9 @@ async function runCharRepairStage(ctx, opts) {
     ...(params.blurFace !== undefined ? { blurFace: params.blurFace } : {}),
   });
   const elapsedMs = Date.now() - t0;
+  // What the spine actually sent as the reference (face cell or body cell,
+  // upscaled and padded to the call's aspect).
+  if (result?.croppedAvatar) await addStep('reference sent to model', result.croppedAvatar);
   const finalImage = result?.imageData;
   if (!finalImage) {
     // A GATE rejection is a result, not a void: show WHY and what the model

@@ -1166,23 +1166,6 @@ async function extractBottomBody3Columns(buffer) {
 }
 
 /**
- * Public helper retained for backwards compat: extract front views from a
- * 2×2 avatar grid and rearrange them as a horizontal [body|face] strip.
- * Non-grid images are returned unchanged.
- */
-async function cropToFrontColumn(buffer) {
-  try {
-    const parts = await extractFaceAndBody(buffer);
-    if (!parts) return buffer;
-    const composed = await composeBodyFaceHorizontal(parts.face, parts.body);
-    return composed;
-  } catch (err) {
-    log.warn(`⚠️ [GROK] cropToFrontColumn failed: ${err.message}`);
-    return buffer;
-  }
-}
-
-/**
  * Pack reference images into max 3 slots for Grok's edit endpoint.
  *
  * Strategy:
@@ -2115,7 +2098,6 @@ module.exports = {
   // layout arithmetic, and reaching it through packReferences means composing
   // four character cards just to read back two numbers.
   composeCharWithVbRow,
-  cropToFrontColumn,
   extractBottomBody3Columns,
   detectMinVarianceSeparator,
   buildCharacterGroupSlot,

@@ -62763,3 +62763,48 @@ tests/unit/identity-swap-critical.test.ts, tests/judge-fixtures/fixtures.json (4
 docs/SETTLED.md.
 
 **Status:** ✅ active on staging. Supersedes the 2026-09-04 entry for identity swaps only.
+
+## 2026-09-27 — A character repair sends ONE reference cell by target: the face cell alone for a face, the body cell alone for a body
+
+**Context.** Owner: "Face should get the face ref in big. Body repair should get just the body."
+The face repair sent the face cell STACKED over the body cell, 256×1024 from the 1024² styled
+sheet. `editWithGrok` crops every input whose aspect differs from the call's (crop is its
+default; `padInput` is off for repairs), and a face repair runs at 1:1 — so the stack was
+centre-cropped to 256×256: the jacket at the bottom of the face cell over the ~50 px head of the
+body cell, ~15 KB next to a ~1.9 MB scene (replayed from Lab 1561's stored stack,
+`charfix-sent/ref_old_actually_sent_1x1.jpg`). A body repair's 256×~570 cell was cropped the same
+way to its cutout aspect. The manual route and the entity single-page repair never cropped a cell
+at all: they sent the raw 2×4 sheet (`cropToFrontColumn` only split a portrait-aspect grid, so a
+square sheet went through untouched — the bugs.json note from exp #53 already measured that).
+
+**Decision.** `server/lib/charRepairReference.js` is the one decision. Callers hand the repair
+spine the styled sheet plus `referencePose` (`referencePoseFor(scene, name)` → the shared
+`resolveCellPose`); `faceRepair._repairCharacterFaceOnce` builds the reference AFTER the geometry
+guards have fixed face vs body: face → the pose's face cell alone, body → the pose's body cell
+alone, upscaled (lanczos) to 1024 on the long side, JPEG q92, and PADDED white to the aspect of
+the call it goes out with (the 1:1 face crop, the cutout preset, or `closestGrokAspect` for the box
+path), so Grok's own normalisation leaves it alone. A sheet with no pose throws. The templates
+label the slot `REFERENCE FACE` (blended face) or `REFERENCE BODY AND OUTFIT` (body-blended,
+cutout, inpaint), through the existing `{REFERENCE_IMAGE}` slot labels. Deleted: the stacked
+reference in repairPipeline and the Lab, both "cell crop failed — sending the full sheet"
+fallbacks, the Lab's `referenceCells` override ('full'/'body4'/'body1' — its question was
+answered by Lab #785 vs #792/#793), and `grok.cropToFrontColumn`.
+
+**Source choice.** The styled sheet, not avatar-refs or face thumbnails: the reference must be in
+the story's art style and costume, and only the (artStyle, clothing category) sheet is. The
+avatar-refs are photo derivatives sent to the avatar generator. The face cell is sent whole
+(head and shoulders as the sheet draws it), not cut to the head — hair length is an identity trait
+and sits below the chin. **Known limit:** the sheet's face row is drawn hatless (2026-09-06 entry
+B), so a face repair's reference carries no headwear; the clothing text in the prompt does.
+
+**Lab pose follows the target figure** (`charName`), as production always did; the Lab looked
+the pose up under the reference character's name.
+
+**Touched:** server/lib/charRepairReference.js (new), server/lib/faceRepair.js,
+server/lib/charRepairRequest.js, server/lib/repairPipeline.js, server/lib/testlab.js,
+server/routes/regeneration.js, server/lib/entityConsistency.js, server/lib/grok.js,
+server/lib/images.js, prompts/character-repair-{blended,body-blended,cutout,inpaint}.txt,
+tests/unit/char-repair-reference-by-target.test.ts, tests/unit/char-repair-image-order.test.ts,
+tests/manual/test-blended-repair.js, docs/lab-divergences.md, docs/image-generation-methods.html.
+
+**Status:** ✅ staging.

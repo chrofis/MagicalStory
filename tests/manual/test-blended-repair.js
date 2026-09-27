@@ -14,7 +14,8 @@ const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
 
-const { editWithGrok, cropToFrontColumn } = require('../../server/lib/grok');
+const { editWithGrok } = require('../../server/lib/grok');
+const { buildRepairReference } = require('../../server/lib/charRepairReference');
 
 const FIXTURES = path.join(__dirname, '../fixtures/grok-char-test');
 const OUTPUT_DIR = path.join(__dirname, '../fixtures');
@@ -131,7 +132,7 @@ async function main() {
 
     // Load avatar
     const avatarBuffer = fs.readFileSync(path.join(FIXTURES, REPAIR_AVATARS[charName]));
-    const croppedAvatar = await cropToFrontColumn(avatarBuffer);
+    const croppedAvatar = (await buildRepairReference(avatarBuffer, { target: 'body', isSheet: true, pose: 'front' })).buf;
     const avatarDataUri = `data:image/jpeg;base64,${croppedAvatar.toString('base64')}`;
 
     // Blackout on current result

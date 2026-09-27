@@ -67,10 +67,13 @@ async function normalizeSceneBuffer(imageData) {
   return Buffer.from(r2Lib.stripDataUriPrefix(imageData), 'base64');
 }
 
-async function normalizeAvatar(characterPhoto, opts) {
-  const sharp = require('sharp');
+// The reference by repair target — charRepairReference.buildRepairReference is
+// the ONE decision (face repair: the pose's face cell alone; body repair: the
+// pose's body cell alone; both upscaled). `target` is the FINAL face/body axis,
+// after the geometry guards, so the reference always matches what is repainted.
+async function normalizeAvatar(characterPhoto, opts, target) {
   const r2Lib = require('./r2');
-  const { cropToFrontColumn } = require('./grok');
+  const { buildRepairReference, isSheetPhotoType } = require('./charRepairReference');
   let avatarBuffer;
   if (typeof characterPhoto === 'string' && /^https?:\/\//i.test(characterPhoto)) {
     avatarBuffer = await require('./r2').fetchImageBytes(characterPhoto);
@@ -81,10 +84,11 @@ async function normalizeAvatar(characterPhoto, opts) {
   if (!avatarBuffer || avatarBuffer.length < 1000) {
     throw new Error(`Character reference is empty/invalid (${avatarBuffer?.length || 0} bytes) — refusing to send to the model`);
   }
-  // FAITHFULNESS-CHECK: images.js:11431-11433 (styled-avatar grid → front column).
-  const isAvatarGrid = opts.photoType && (opts.photoType.startsWith('styled-') || opts.photoType.startsWith('costumed-') || opts.photoType.startsWith('clothing-'));
-  const cropped = isAvatarGrid ? await cropToFrontColumn(avatarBuffer) : avatarBuffer;
-  return `data:image/jpeg;base64,${cropped.toString('base64')}`;
+  return buildRepairReference(avatarBuffer, {
+    target,
+    isSheet: isSheetPhotoType(opts.photoType),
+    pose: opts.referencePose || null,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -1059,7 +1063,18 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
   if (!faceOnly && !bodyBbox) throw new Error(`${descriptor}: body repair needs a bodyBbox`);
 
   const sceneBuffer = await normalizeSceneBuffer(sceneInput);
-  const avatarUri = await normalizeAvatar(avatarInput, opts);
+  const reference = await normalizeAvatar(avatarInput, opts, faceOnly ? 'face' : 'body');
+  // Padded (never cropped) to the aspect of the call it goes out with: Grok
+  // crops any input whose aspect differs, which is what cut the old stacked
+  // reference down to its middle. `avatarUri` records exactly what was sent.
+  let avatarUri = null;
+  const referenceUriFor = async (aspectStr) => {
+    const { fitReferenceToAspect } = require('./charRepairReference');
+    const buf = aspectStr ? await fitReferenceToAspect(reference.buf, aspectStr) : reference.buf;
+    avatarUri = `data:image/jpeg;base64,${buf.toString('base64')}`;
+    log.info(`👤 [FACE REPAIR] ${opts.charName || opts.characterName || 'character'}: reference ${reference.kind} ${reference.width}x${reference.height}${aspectStr ? ` padded to ${aspectStr}` : ''}, ${Math.round(buf.length / 1024)}KB`);
+    return avatarUri;
+  };
   const meta = await sharp(sceneBuffer).metadata();
   const W = meta.width, H = meta.height;
 
@@ -1148,6 +1163,7 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
     candidateCrop = regionSource === 'box'
       ? await sharp(buf).resize(W, H, { fit: 'fill' }).extract({ left: crop.x, top: crop.y, width: crop.w, height: crop.h }).png().toBuffer()
       : await sharp(buf).resize(crop.w, crop.h, { fit: 'fill' }).png().toBuffer();
+    await referenceUriFor(aspect);
     log.info(`[FACE REPAIR] reusing a stored model output — no model call (${descriptor})`);
   } else if (regionSource === 'box') {
     // The model edits the WHOLE scene (treatment already painted on the crop
@@ -1161,13 +1177,16 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
     // full-page raw output made the pair impossible to compare (owner, #307).
     sentToModelUri = treatedSceneUri;
     if (model === 'grok') {
-      const exact = await grokEditSceneExact(prompt, [avatarUri], treatedScene, W, H, { encode: 'png' });
+      // grokEditSceneExact sends the scene at closestGrokAspect(W, H); the
+      // reference goes at that same aspect so it is not cropped.
+      const { closestGrokAspect } = require('./grokAspect');
+      const exact = await grokEditSceneExact(prompt, [await referenceUriFor(closestGrokAspect(W, H))], treatedScene, W, H, { encode: 'png' });
       if (!exact.buffer) throw new Error('Grok returned no image (box mode)');
       usage = exact.grokResult?.usage;
       grokRawResult = exact.grokResult?.imageData;
       candidateCrop = await sharp(exact.buffer).extract({ left: crop.x, top: crop.y, width: crop.w, height: crop.h }).png().toBuffer();
     } else {
-      const r = await callModel({ model, prompt, treatedUri: treatedSceneUri, avatarUri, aspect: null, cropW: W, cropH: H });
+      const r = await callModel({ model, prompt, treatedUri: treatedSceneUri, avatarUri: await referenceUriFor(null), aspect: null, cropW: W, cropH: H });
       usage = r.usage; grokRawResult = r.imageData;
       const outBuf = Buffer.from(r.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
       candidateCrop = await sharp(outBuf).resize(W, H, { fit: 'fill' }).extract({ left: crop.x, top: crop.y, width: crop.w, height: crop.h }).png().toBuffer();
@@ -1175,7 +1194,7 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
   } else {
     // cutout: the model edits ONLY the crop.
     const treatedUri = `data:image/png;base64,${treatedBuf.toString('base64')}`;
-    const r = await callModel({ model, prompt, treatedUri, avatarUri, aspect, cropW: crop.w, cropH: crop.h });
+    const r = await callModel({ model, prompt, treatedUri, avatarUri: await referenceUriFor(aspect || '1:1'), aspect, cropW: crop.w, cropH: crop.h });
     usage = r.usage; grokRawResult = r.imageData;
     const outBuf = Buffer.from(r.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
     candidateCrop = await sharp(outBuf).resize(crop.w, crop.h, { fit: 'fill' }).png().toBuffer();
@@ -1199,6 +1218,7 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
           rejectedReason: 'style_drift',
           gateMessage: `${sm.styleB} vs ${sm.styleA}`,
           grokRawResult,
+          croppedAvatar: avatarUri,
           blackoutImage: sentToModelUri || `data:image/png;base64,${treatedBuf.toString('base64')}`,
           promptSent: prompt,
           usage,
@@ -1330,6 +1350,7 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
     return {
       imageData: null, character: charName, method: legacyMethod, descriptor,
       rejectedReason: 'blend_gate', gateMessage: blendErr.message, usage,
+      croppedAvatar: avatarUri,
       blackoutImage: sentToModelUri || `data:image/png;base64,${treatedBuf.toString('base64')}`,
       grokRawResult,
       promptSent: prompt,
@@ -1364,7 +1385,7 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
       if (origSharpness >= REPAIR_SHARPNESS_MIN_ORIG && repairedSharpness < origSharpness * REPAIR_SHARPNESS_REJECT_RATIO) {
         log.warn(`🚫 [FACE REPAIR] ${descriptor} for ${charName} REJECTED: repaired figure blurred (${repairedSharpness.toFixed(0)} vs ${origSharpness.toFixed(0)})`);
         require('./runMetrics').forJob(require('./styledAvatars')._cacheContext?.getStore?.()).count('blur_gate_reject');
-        return { imageData: null, character: charName, method: legacyMethod, descriptor, rejectedReason: 'repaired_figure_blurred', sharpness: { original: origSharpness, repaired: repairedSharpness }, usage };
+        return { imageData: null, character: charName, method: legacyMethod, descriptor, rejectedReason: 'repaired_figure_blurred', sharpness: { original: origSharpness, repaired: repairedSharpness }, usage, croppedAvatar: avatarUri };
       }
     } catch (e) { log.warn(`[FACE REPAIR] sharpness gate failed (${e.message}) — accepting unchecked`); }
   }

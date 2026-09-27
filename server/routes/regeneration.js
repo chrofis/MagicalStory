@@ -6121,6 +6121,10 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
                 whiteoutTarget: whiteoutTarget || (useFaceOnly ? 'face' : 'body'),
                 includeDebug: req.user.role === 'admin',
                 photoType: avatarPhotoType,
+                // The figure's pose picks the sheet cell; the spine sends the
+                // face cell alone for a face repair, the body cell alone for a
+                // body repair — this route used to send the whole 2x4 sheet.
+                referencePose: require('../lib/charRepairReference').referencePoseFor(sceneImage, characterName),
                 artStyle,
                 // LAB/BUTTON PARITY (2026-09-06). The automatic pipeline
                 // (repairPipeline.js) and the Test Lab stage both send this;

@@ -3659,6 +3659,12 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
         sceneDescription: sceneDesc,
         faceBbox: targetAppearance.faceBox || null,
         bodyBbox: bbox,
+        // The styled avatar is a 2x4 sheet: say so, and give the figure's pose,
+        // so the spine sends the face cell or the body cell (charRepairReference.js)
+        // instead of the whole sheet — which is what this path used to send.
+        photoType: clothingCategory.startsWith('costumed') ? `costumed-${clothingCategory.split(':')[1] || 'default'}` : `styled-${clothingCategory}`,
+        referencePose: require('./charRepairReference').referencePoseFor(
+          (storyData.sceneImages || []).find(x => x.pageNumber === pageNumber) || null, charName),
         artStyle,
         textPosition: pageTextPosition,
         detectionBodyMask: await require('./charRepairTarget').resolveFigureMask(
