@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createRequire } from 'node:module';
 
 const require_ = createRequire(import.meta.url);
-const { resolveWornItemsForPage, buildWornStateLines } = require_('../../server/lib/wornItems.js');
+const { resolveWornItemsForPage, buildWornStateLines, buildWornStateBlock, WORN_ITEMS_HEADER } = require_('../../server/lib/wornItems.js');
 const { restoreUndeclaredRemovals } = require_('../../server/lib/sceneReviewGuard.js');
 
 /**
@@ -47,7 +47,7 @@ describe('a handover whose OWNER is off-page still resolves', () => {
     const out = resolveWornItemsForPage(VB, ['Wearer'], META(HANDOVER), { pageNumber: 17 });
     const text = buildWornStateLines(out).join('\n');
     expect(text).toContain('Wearer IS wearing this on this page');
-    expect(text).toContain('Draw it on Wearer.');
+    expect(text).toMatch(/^- Wearer IS wearing this on this page: .+\.$/m);
     // Commit 2193438b6: no off-page name reaches a prompt-facing string. An
     // owner named here invites the model to draw the character the page excludes.
     expect(text).not.toMatch(/Owner/);
@@ -58,7 +58,8 @@ describe('a handover whose OWNER is off-page still resolves', () => {
     expect(out[0].ownerInCast).toBe(true);
     const text = buildWornStateLines(out).join('\n');
     expect(text).toContain('Wearer IS wearing this on this page, and Owner is NOT');
-    expect(text).toContain('Draw it on Wearer only, and leave it off Owner even if the attached references show the opposite.');
+    // The override against the references is said once, by the block header (2026-09-27).
+    expect(buildWornStateBlock(out)).toContain(WORN_ITEMS_HEADER);
   });
 
   it('drops the row LOUDLY when neither owner nor wearer is on the page', () => {
@@ -80,7 +81,7 @@ describe('ordinary non-handover rows are untouched', () => {
     expect(out[0].handedOver).toBe(false);
     const line = buildWornStateLines(out).join('\n');
     expect(line.startsWith('- Owner IS wearing this on this page: moss-green corduroy jacket')).toBe(true);
-    expect(line).toContain('Draw it on Owner even if the attached reference shows Owner without it.');
+    expect(buildWornStateBlock(out)).toContain(WORN_ITEMS_HEADER);
   });
 
   it('owner absent and no wearer named: dropped, and SILENTLY — that is every page of every story', () => {

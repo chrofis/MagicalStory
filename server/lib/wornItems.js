@@ -865,6 +865,18 @@ function carryForwardWornItemsInBrief(newBrief, savedBrief) {
   };
 }
 
+/**
+ * The override is said ONCE, by the header (2026-09-27, owner: "shorten the
+ * fixed blocks"). Each line used to repeat it ("Draw it on X even if the
+ * attached reference shows X without it", "Leave it off X even if the attached
+ * reference shows it worn") — ~75 chars per row in the never-cut part of the
+ * page prompt, where staging job_1790529840433_ar4u7qry3 p1/p4 missed the Grok
+ * cap by 378/222 chars and rendered nothing. A line states the page's fact
+ * (worn / not worn / handed over, and where an off item lies); the header says
+ * that fact wins over every attached reference.
+ */
+const WORN_ITEMS_HEADER = '**WORN ITEMS ON THIS PAGE (each drawn on or off exactly as listed, whatever the attached references show):**';
+
 function buildWornStateLines(resolved) {
   const lines = [];
   for (const r of (resolved || [])) {
@@ -879,7 +891,7 @@ function buildWornStateLines(resolved) {
     // needs: this character is wearing it, draw it on them. `=== false` on
     // purpose — a row built without the field keeps the old rendering.
     if (r.ownerInCast === false && r.handedOver) {
-      lines.push(`- ${r.wearer} IS wearing this on this page: ${item}. Draw it on ${r.wearer}.`);
+      lines.push(`- ${r.wearer} IS wearing this on this page: ${item}.`);
       continue;
     }
     // The item NAME sits at the end of its own clause on purpose: every VB name
@@ -889,14 +901,13 @@ function buildWornStateLines(resolved) {
     // instruction this block exists to deliver.
     if (r.state === 'off') {
       const where = r.location ? ` — ${r.location}.` : ' — it is elsewhere in the scene.';
-      lines.push(`- ${r.owner} is NOT wearing this on this page: ${item}. Leave it off ${r.owner} even if the attached reference shows it worn${where}`);
+      lines.push(`- ${r.owner} is NOT wearing this on this page: ${item}${where}`);
     } else if (r.handedOver) {
       // The item is on the page, on the other character. Both halves are said
       // in one clause: nobody but the wearer carries it.
-      lines.push(`- ${r.wearer} IS wearing this on this page, and ${r.owner} is NOT: ${item}. `
-        + `Draw it on ${r.wearer} only, and leave it off ${r.owner} even if the attached references show the opposite.`);
+      lines.push(`- ${r.wearer} IS wearing this on this page, and ${r.owner} is NOT: ${item}.`);
     } else {
-      lines.push(`- ${r.owner} IS wearing this on this page: ${item}. Draw it on ${r.owner} even if the attached reference shows ${r.owner} without it.`);
+      lines.push(`- ${r.owner} IS wearing this on this page: ${item}.`);
     }
   }
   return lines;
@@ -906,7 +917,7 @@ function buildWornStateLines(resolved) {
 function buildWornStateBlock(resolved) {
   const lines = buildWornStateLines(resolved);
   if (lines.length === 0) return '';
-  return `\n**WORN ITEMS ON THIS PAGE (the attached references are not authoritative for these):**\n${lines.join('\n')}\n`;
+  return `\n${WORN_ITEMS_HEADER}\n${lines.join('\n')}\n`;
 }
 
 /** Every garment noun in the closed vocabulary, across all slots. */
@@ -1747,6 +1758,7 @@ module.exports = {
   DEPENDENT_OPENER_RE,
   buildWornStateLines,
   buildWornStateBlock,
+  WORN_ITEMS_HEADER,
   removeWornItemFromOutfit,
   stripOffItemsFromOutfit,
   applyWornItemsToOutfit,

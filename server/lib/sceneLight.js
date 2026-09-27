@@ -224,7 +224,7 @@ function buildLightLine(light, { plate = false } = {}) {
   if (!phrase) return '';
   return plate
     ? `**LIGHT:** ${phrase}. Paint the place in this time of day and weather; it wins over any other time or weather named above and over the light of a reference photo.`
-    : `**LIGHT:** ${phrase}. This is the page's time of day and weather, and it wins over the light and weather of any reference image.`;
+    : `**LIGHT:** ${phrase}. It wins over the light and weather of any reference image.`;
 }
 
 /**

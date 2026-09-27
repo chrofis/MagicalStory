@@ -105,7 +105,7 @@ describe('a VB entity citation resolves from objects[] ∪ characters[]', () => 
       [{ name: 'Mila', position: 'center', depth: 'midground' }, 'ANI001', 'ANI002'],
       ['ART003', 'ANI002'],
     );
-    expect(prompt).toContain('The attached reference images include rough images of:');
+    expect(prompt).toContain('Attached rough images of:');
     expect(prompt).toContain('Mother Dragon');
     expect(prompt).toContain('dragon egg');
   });

@@ -2388,7 +2388,7 @@ const SIZE_BAND_BODY_PART = Object.freeze({
 // The REQUIRED OBJECTS block's precedence line, emitted when a line there
 // carries a yardstick against a figure: the computed size beats a ratio the
 // Art Director wrote into the prose (rule 8f, TRUE_RELATIVE_SIZE_RULE).
-const ELEMENT_SIZE_PRECEDENCE_LINE = 'Each size stated above holds over any other size the scene description gives the same element.';
+const ELEMENT_SIZE_PRECEDENCE_LINE = 'These sizes win over any size the scene description gives the same element.';
 
 /**
  * AN ELEMENT'S SIZE AGAINST THE PEOPLE IN FRAME — one yardstick for every
@@ -2801,10 +2801,13 @@ function buildReferenceCardColours(chars, referencePhotos) {
     // Only characters with a reference card get a colour line (matches grok.js).
     if (cardNames.length && !cardSet.has(String(c.name).toLowerCase())) continue;
     const col = frameColorForName(c.name, canonNames);
-    if (col) frameLines.push(`- ${col.label} frame = ${c.name}`);
+    if (col) frameLines.push(`${col.label} = ${c.name}`);
   }
   if (frameLines.length === 0) return '';
-  return `\nREFERENCE CARD COLOURS (each character's reference card has a coloured frame — match each person to their card):\n${frameLines.join('\n')}\nThe frame colours are identifiers ONLY. Never paint a coloured frame or border into the scene, and never recolour a character, garment, prop or surface to match a frame — each keeps the colours described for it.\n`;
+  // One line, not one per card (2026-09-27, owner: "shorten the fixed blocks"):
+  // this legend sits in the never-cut part of the page prompt, where staging
+  // job_1790529840433_ar4u7qry3 p1/p4 missed the Grok cap and rendered nothing.
+  return `\nREFERENCE CARD FRAMES (match each person to their card): ${frameLines.join('; ')}. The colours only identify the cards: never paint a frame into the scene, and never recolour anything to match one.\n`;
 }
 
 function buildCharacterReferenceList(photos, characters = null, { includeClothing = false } = {}) {
@@ -4656,7 +4659,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       .filter(([, marks]) => marks)
       .map(([name, marks]) => `- ${name}: ${marks}`);
     if (featureLines.length > 0) {
-      characterReferenceList += `\nDISTINCTIVE FEATURES (each character carries these on every page, wherever the angle shows them):\n${featureLines.join('\n')}\n`;
+      characterReferenceList += `\nDISTINCTIVE FEATURES (on every page, wherever the angle shows them):\n${featureLines.join('\n')}\n`;
     }
 
     // Colour-frame mapping. Each reference card is framed in a colour (not
@@ -5140,8 +5143,8 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // Plain line (no "* **" prefix) so parseVisualBibleObjects' entry
         // regex never reads it as an object.
         requiredObjectsSection += gridRefNames.length === 1
-          ? `The attached reference images include a rough image of ${gridRefNames[0]} — match its look at the size and placement the scene description gives it.\n`
-          : `The attached reference images include rough images of: ${gridRefNames.join('; ')} — match each one's look at the size and placement the scene description gives it.\n`;
+          ? `Attached rough image of ${gridRefNames[0]} — match its look at the size and placement the scene description gives it.\n`
+          : `Attached rough images of: ${gridRefNames.join('; ')} — match each one's look at the size and placement the scene description gives it.\n`;
       }
       // MARKINGS DO NOT MULTIPLY WITH THE OBJECT. Plain line (no "* **"
       // prefix) so parseVisualBibleObjects never reads it as an object.
@@ -5827,7 +5830,9 @@ function buildExactPosesBlock(interactions, sceneCharacters = [], visualBible = 
     exprLines.push(`- ${name}: ${[expr, eyes].filter(Boolean).join('; ')}`);
   }
   const exprBlock = exprLines.length > 0
-    ? `EXPRESSIONS AND EYES (each face shows exactly this — no default smiles; each pair of eyes on exactly what is named, and a face turned away shows its expression in profile or three-quarter view, never by turning to the viewer):\n${exprLines.join('\n')}`
+    // Each line names its own gaze and the viewer rule, so the header does not
+    // repeat them (2026-09-27, owner: "shorten the fixed blocks").
+    ? `EXPRESSIONS AND EYES (each face shows exactly this, no default smiles; a face turned away shows its expression in profile or three-quarter view):\n${exprLines.join('\n')}`
     : '';
 
   if (lines.length === 0 && !exprBlock) return '';
@@ -8987,10 +8992,13 @@ const COMPOSITION_SIZE_BULLET = "- A vessel, building or vehicle keeps its true 
  * listed character's hair, build or outfit (D-03b duplicate_identity).
  */
 const REQUIRED_CAST_LEAD = '**REQUIRED CAST:** Every named character is in the frame, exactly one of each';
-const REQUIRED_CAST_UNACTED = 'A character the scene description gives no action to is still drawn, placed where the moment puts them and doing something consistent with it.';
+// Terse on purpose (2026-09-27, owner: "shorten the fixed blocks"): this line
+// is never cut, and the ambient tail pushed staging job_1790529840433_ar4u7qry3
+// p1/p4 over the Grok cap.
+const REQUIRED_CAST_UNACTED = 'A character given no action is still drawn, placed and occupied as the moment suggests.';
 const REQUIRED_CAST_BACKGROUND = {
   cast_only: ', and no one else is added.',
-  ambient: ". This place has a few people of its own: paint a few passers-by far behind the cast, where the scene description places them if it does, each much smaller than any listed character, unnamed, faces indistinct, none sharing a listed character's hair, build or outfit. No one else is added.",
+  ambient: ". Add a few unnamed passers-by far behind the cast (where the scene description places them, if it does), each much smaller than any listed character, faces indistinct, none sharing a listed character's hair, build or outfit. No one else is added.",
   crowd: ". Paint the unnamed people the scene description places, as it places them: faces indistinct, varied hair and garment colours and shapes, none sharing a listed character's hair, build or outfit. No one else is added.",
 };
 

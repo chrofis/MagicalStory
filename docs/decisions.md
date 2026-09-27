@@ -64945,3 +64945,60 @@ server/lib/promptBuilders.js (plannerShotFills, checkerShotFills, re-plan rankin
 server/lib/planCounters.js (legacyShots), server/lib/shotVocabulary.js (the pre-Jev distribution,
 restored), prompts/story-beats.txt, prompts/plan-check.txt, storyJobPipeline.js (jevFallback),
 client/src/types/story.ts, client/src/components/generation/StoryDisplay.tsx, tests.
+
+## 2026-09-27 — The page prompt's fixed blocks are compact, so a full scene fits Grok's cap (owner: "shorten fixed blocks")
+
+**Context:** staging smoke `job_1790529840433_ar4u7qry3` rendered NO image on pages 1 and 4
+(`prompt_fit_failed`): after every ranked cut the prompts were 8,278 / 8,122 chars against Grok's
+7,900 — scene ~3.6k plus the never-cut blocks ~4.6k. The Jev decision layer made both pages longer
+(ambient population lengthens REQUIRED CAST; a VB citation added a vehicle to REQUIRED OBJECTS).
+Owner's choice among the options: shorten the fixed blocks. NOT an element cap, NOT a budget raise,
+NOT a truncation fallback, and never cut scene content (the 2026-09-26 rule: judges score the prompt
+that was sent).
+
+**Decision:** every never-cut block keeps its meaning and says it once, tersely:
+- WORN ITEMS: the "whatever the attached reference shows" override is the header's, once; each row
+  states only its fact (`IS wearing` / `is NOT wearing … — <where>` / handover). The per-row
+  "Draw it on X even if…" / "Leave it off X even if…" / "Draw it on X only, and leave it off Y…"
+  sentences are gone (~75 chars a row). Identical rows now merge in the existing bullet dedupe.
+- REFERENCE CARD FRAMES: one line (`BLUE = A; GREEN = B`) and one do-not-paint sentence.
+- REQUIRED CAST: shorter ambient tail and unacted-character sentence (same rules: few, unnamed,
+  far behind, much smaller, no shared hair/build/outfit, no one else).
+- EXPRESSIONS AND EYES header: drops what every line already says (its gaze, "never to the viewer").
+- SEASON, LIGHT trailer, DISTINCTIVE FEATURES header, the element-size precedence line and the
+  "rough images" line: terser wording, same instruction.
+- NOT touched: ART STYLE (its intensity words are load-bearing — 2026-08-20), the NO MARKS / HANDS
+  parity anchors (one constant shared with the judges), element scale riders (Lab-proven wording),
+  the ranked cut order, the cap.
+
+**Evidence (free replay of the production builder `pageRenderCall.makePageImagePrompt` over the
+stored inputs of 226 pages from the 14 latest staging stories; the replay reproduced the smoke
+pages' stored prompts byte-for-byte before the change):**
+
+| | before | after |
+|---|---|---|
+| pages that cannot fit (prompt_fit_failed) | 3 (smoke p1, p4; 5herh01j7 p10) | 0 |
+| worst floor (size after every allowed cut) | 8,278 | 7,462 (cap 7,900) |
+| smoke p1 / p4 floor | 8,278 / 8,122 | 7,462 / 7,317 |
+| pages needing the ranked cut | 187 | 168 |
+| chars cut by the shrink, all pages | 279,941 | 205,926 |
+| built prompt, mean | 8,847 | 8,465 (no page longer; saved 0-764, median 397) |
+
+Mean block sizes before → after: WORN ITEMS 422 → 344, REFERENCE CARD 385 → 212, REQUIRED CAST
+286 → 225 (ambient 510 → 414), EXPRESSIONS AND EYES 483 → 402, SEASON 289 → 243, LIGHT 282 → 234,
+REQUIRED OBJECTS 624 → 583, DISTINCTIVE FEATURES 181 → 152.
+
+**Rationale:** the fixed blocks repeated themselves (per-row overrides, a legend line per card,
+headers restating their lines), which is where the scene's room went. Compacting them is the one
+fix that keeps every instruction and every scene word.
+
+**Pinned by:** `tests/unit/page-prompt-fixed-blocks-fit.test.ts` (the smoke p1/p4 inputs as a
+fixture: they fit with ≥300 chars to spare after every allowed cut, and every non-cut paragraph is
+sent; the worn override is said once; the card legend is one line), verify entry
+`page-prompt-fixed-blocks-fit` (check `pagePromptsFit`).
+
+**Touched:** server/lib/wornItems.js (WORN_ITEMS_HEADER, buildWornStateLines),
+server/lib/promptBuilders.js (buildReferenceCardColours, DISTINCTIVE FEATURES header,
+ELEMENT_SIZE_PRECEDENCE_LINE, the rough-images line, REQUIRED_CAST_*, EXPRESSIONS AND EYES header),
+server/lib/season.js (buildSeasonNote), server/lib/sceneLight.js (buildLightLine, page variant),
+scripts/admin/verify-checks.js (pagePromptsFit), tests.

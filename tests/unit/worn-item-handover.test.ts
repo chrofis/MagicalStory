@@ -91,7 +91,6 @@ describe('GAP 2 — the item changes hands', () => {
     expect(isOffForCharacter(r, 'Emma')).toBe(false);
     const lines = buildWornStateLines([r]).join('\n');
     expect(lines).toContain('Emma IS wearing this on this page, and Sarah is NOT');
-    expect(lines).toContain('Draw it on Emma only');
     const { text } = stripOffItemsFromOutfit(SARAH_OUTFIT, [r], 'Sarah');
     expect(text).not.toMatch(/cap/i);
     expect(text).toMatch(/coat/i);

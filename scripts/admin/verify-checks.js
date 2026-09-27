@@ -825,4 +825,20 @@ checks.outfitAppearanceOnly = (ctx) => {
   return { covered: true, pass: true, detail: `all ${n} outfit description(s) free of page numbers and other figures' names` };
 };
 
+/**
+ * The compact fixed blocks (2026-09-27): no page or cover of the run failed the
+ * image model's prompt cap (`prompt_fit_failed`, which ships the page with no
+ * image). Detail reports how many renders still needed the ranked cut.
+ */
+checks.pagePromptsFit = (ctx) => {
+  const log = Array.isArray(ctx.data?.generationLog) ? ctx.data.generationLog : [];
+  const renders = pages(ctx).filter(p => String(p.prompt || '').length > 0);
+  if (!renders.length) return notCovered('no page stored a prompt');
+  const failed = log.filter(e => e?.event === 'prompt_fit_failed');
+  const cut = log.filter(e => e?.event === 'prompt_shrink' && e?.details?.branch === 'cut');
+  const detail = `${failed.length} prompt_fit_failed event(s); ${cut.length} render(s) needed the ranked cut; longest built page prompt ${Math.max(...renders.map(p => String(p.prompt).length))} chars`;
+  if (failed.length) return { covered: true, pass: false, detail: `${detail}: ${failed.slice(0, 4).map(e => trunc(e.message || '', 100)).join(' | ')}` };
+  return { covered: true, pass: true, detail };
+};
+
 module.exports = { checks, SHAPES, evalRunShape, helpers: { pages, brief, versions, shotOf, activeImageUrl, plateUrl, pageFindings, splitSentences, sizeHits } };
