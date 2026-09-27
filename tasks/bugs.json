@@ -2355,6 +2355,18 @@
       "fixedAt": "2026-09-26",
       "fixedIn": "a1ac0bf2c",
       "fix": "coverEvalLayer.loadCoverArtForRepair puts the active version's art on the repaired cover (stamped cover without art: refused); the repaired art is judged, restamped (restampRepairedCover -> coverTypography.restampCover) and saved at the next DB index with its own art row. Cover edit refuses (409) without the active version's art; trial iterate references the art. Stored versions above are not recoverable. Test: tests/unit/cover-eval-layer.test.ts."
+    },
+    {
+      "id": "face-gate-judged-blind-gemini-text-drops-images",
+      "title": "The char-fix face-integrity gate judged blind: callGeminiTextAPI dropped its two images",
+      "reportedAt": "2026-09-27",
+      "source": "Lab #1569 (char_repair p7 Facundo, staging job_1790446348343_z3fw660ie): the run log says \"[GEMINI TEXT] image options are not supported … images were ignored\" and the gate refused with \"Facundo's face … is a blank area\". Owner approved the fix 2026-09-27.",
+      "rootCause": "faceIntegrityGate.js sends before/after through callTextModel; repairFaceCheck is gemini-2.5-flash (since 79f1e3c44, 2026-09-15), which routes to callGeminiTextAPI. That path logged a warning and sent only the text. callXaiAPI (also the Gemini empty-reply fallback) and the three non-OpenRouter streaming entry points dropped options.images without a word.",
+      "impact": "Every face-gate verdict since 2026-09-15 was given without seeing a face. Stored: 6 char-fixes refused in 4 staging stories and 1 on prod (job_1789945743706_8ayo2w19e p3), plus 4 blind passes; the two manual char-repair routes and the Lab ran the same gate.",
+      "status": "fixed",
+      "fixedAt": "2026-09-27",
+      "fixedIn": "",
+      "fix": "textModels.js resolveImageInputs: one resolver for data URIs, bare base64, http(s) URLs (fetched) and Buffers, MIME sniffed from the bytes; anything else throws. Gemini sends inline_data parts, xAI and OpenRouter image_url parts, Anthropic base64 blocks; the Gemini-to-Grok fallback carries the images. Streaming Anthropic/Gemini/xAI refuse image inputs (refuseImageInputs). The warn-and-drop path is deleted. Sibling set textmodel-image-inputs. Test: tests/unit/text-model-image-inputs.test.ts."
     }
   ]
 }

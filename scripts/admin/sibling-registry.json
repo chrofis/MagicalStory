@@ -956,6 +956,20 @@
       "severity": "block"
     },
     {
+      "id": "textmodel-image-inputs",
+      "axis": "provider entry points (Gemini / Anthropic / xAI / OpenRouter, streaming and not)",
+      "reason": "every provider entry point in textModels.js must either deliver options.images (resolveImageInputs) or refuse them (refuseImageInputs). callGeminiTextAPI dropped them with a warning and the char-fix face gate judged blind for twelve days; xAI and the streaming paths dropped them silently (2026-09-27).",
+      "file": "server/lib/textModels.js",
+      "blockPattern": "(?:async\\s+)?function\\s+(call\\w*API\\w*)\\s*\\(",
+      "mustContain": "ImageInputs(",
+      "exclude": [
+        "callClaudeAPI",
+        "callOpenRouterAPI"
+      ],
+      "excludeReason": "callClaudeAPI dispatches to callTextModel, and callOpenRouterAPI delegates to callOpenRouterAPIStreaming with the same options — the callee resolves the images.",
+      "severity": "block"
+    },
+    {
       "id": "iterate-page-staging-sites",
       "axis": "staged-figures list vs anchored-object allow-list",
       "reason": "collectStagedFigures (names a Visual Bible figure onto the rewriter's locked cast) and partitionAnchoredObjects (lets a rewrite ADD a Visual Bible id) are the two sites that put a bible entity on a page; fa2cb3696 gated one on the bible's structured page range and not the other, so the creature the allow-list refused on p13/p16 was still staged there by its plan-line name. Both must consult vbEntityCoversPage.",

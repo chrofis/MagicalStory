@@ -62963,3 +62963,40 @@ tests/unit/lab-prod-call-parity.test.ts (new), scripts/admin/sibling-registry.js
 docs/testlab-prod-parity.md (new), docs/lab-divergences.md, tasks/BACKLOG.md.
 
 **Status:** ✅ staging.
+
+## 2026-09-27 — A text-model call delivers its image inputs or fails; the Gemini text path sends them
+
+**Context:** the char-fix face-integrity gate (`faceIntegrityGate.js`) asks one vision question —
+is the repaired character's face intact, IMAGE A before vs IMAGE B after — through
+`callTextModel`. Since 79f1e3c44 (2026-09-15) its model is `repairFaceCheck: gemini-2.5-flash`,
+which routes to `callGeminiTextAPI`. That path logged "[GEMINI TEXT] image options are not
+supported … images were ignored" and sent the prompt alone, so Gemini answered a two-image
+question about a face it never saw (Lab #1569: "Facundo's face … is a blank area"). The
+same class, without even the warning: `callXaiAPI` (also the Gemini empty-reply fallback) and the
+Anthropic / Gemini / xAI streaming entry points dropped `options.images` silently.
+
+Stored damage (free replay of `stories.data`, all stories, both environments): staging — 6
+char-fixes refused by the blind gate (job_1789506283204_3kxqshifx p9 + p11,
+job_1789584708605_rts4wqupm p15 + p12, job_1789853503332_riqncqg1i p14,
+job_1790446348343_z3fw660ie back cover) and 4 blind passes (rts4wqupm ×2, job_1790100385959_1nitlympp,
+z3fw660ie ×1); prod — 1 refusal (job_1789945743706_8ayo2w19e p3). The manual char-repair
+routes return their refusal to the client and store nothing, so their count is not recoverable.
+Only the face gate was affected among production image callers: `bbox_detect`, `regen_refine`
+and `regen_iterate` pass images to `callTextModel` only on their Anthropic branch.
+
+**Decision (owner, 2026-09-27):** keep gemini-2.5-flash as the checker; the Gemini text path
+sends the images. One resolver, `resolveImageInputs` in `textModels.js`, turns every image input
+(data URI, bare base64, http(s) URL fetched to bytes, Buffer) into bytes with the MIME type
+sniffed from the bytes, and throws on anything else. Gemini sends `inline_data` parts ahead of the
+text, xAI and OpenRouter `image_url` parts, Anthropic base64 blocks; the Gemini→Grok fallback
+carries the images. The streaming Anthropic / Gemini / xAI entry points throw on image inputs
+(`refuseImageInputs`) — no caller streams with images. The warn-and-drop path is deleted.
+
+**Rationale:** an image that silently does not arrive turns a vision judge into a guesser whose
+verdicts look normal. A failed call is visible (the face gate fails open and counts it as
+`repair_face_integrity_unavailable`); a blind verdict was not.
+
+**Touched:** server/lib/textModels.js, tests/unit/text-model-image-inputs.test.ts (new),
+scripts/admin/sibling-registry.json (set `textmodel-image-inputs`), tasks/bugs.json.
+
+**Status:** ✅ staging.
