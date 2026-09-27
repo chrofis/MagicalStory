@@ -2437,7 +2437,7 @@
       "impact": "Every /try own-town idea in a town whose municipality rung holds a feature the locality list lacks: the idea card promises e.g. the lake, the story's writer is offered three other places, and the book either drops the promised place or invents it without a reference photo.",
       "status": "fixed",
       "fixedAt": "2026-09-27",
-      "fixedIn": "see the commit 'feat(jev-selection): Jev picks the challenges and landmarks that fit' on staging",
+      "fixedIn": "2f2a0d881",
       "fix": "Both the route and the Lab mirror call jevSelection.trialIdeaLandmarks, which resolves the story's own list (resolveTrialIdeaLandmarks = resolveAvailableLandmarks with the story's STORY_LANDMARK_LIMIT) and names 3 of it (Jev's top 5 when ready). Replayed against the staging DB: the new list equals the story's list for Zürich, Baden, Lausanne, Luzern, Dübendorf, Turgi. Test: tests/unit/jev-selection.test.ts."
     }
   ]

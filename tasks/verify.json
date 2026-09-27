@@ -3791,7 +3791,7 @@
     {
       "id": "jev-selection-built",
       "title": "Jev picks the challenges (12 of its top 20) and orders the story's landmarks; the trial story's 3 are the pin + a draw from the top 5",
-      "commits": [],
+      "commits": ["2f2a0d881"],
       "addedAt": "2026-09-27",
       "claim": "On the next full staging beats story: stories.data.challengeSelection.method = 'jev', 12 picked ids all inside its `top` (20), `scores` holds every eligible id, challengeDrawIds = picked; landmarkSelection.method = 'jev', availableLandmarks (replayInputs) in descending LB2 order after any premisePinned place; jevFallback null. On the next /try trial with an own-town idea: landmarkSelection.mode = 'trial', its 3 picked names are the first 3 landmarks of the trial prompt, the premise-named place first when there is one, and every name the idea card used is in the story's list.",
       "runShape": [
