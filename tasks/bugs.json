@@ -2389,7 +2389,7 @@
       "impact": "The live run was unaffected (storyJobPipeline prefers the in-memory bible, which carried the correction). Every re-parse of the stored transcript - the resume path (storyJobPipeline parser.extractVisualBible fallback), the Lab replays and any later extractVisualBible() - read the UNCORRECTED bible: the wrong landmark photo for the plate (defeats b881cd2c1 / check 10ab), a withdrawn in-image text, or an object with no looks.",
       "status": "fixed",
       "fixedAt": "2026-09-27",
-      "fixedIn": "(pending)",
+      "fixedIn": "b5bc1866c",
       "fix": "syncVisualBibleSection projects landmarkPhoto (location + each vantage by id), text (set or withdrawn) and states whenever the parsed copy has them. The review site verifies the write-back by RE-PARSING the transcript (bibleCorrectionsMissingFromTranscript) and logs an ERROR (gl.error beats_vb_sync_failed) naming each correction the transcript lacks; report.bibleCorrections.unsynced records them. A throw in the correction step is an error, not a warn. The citation compare goes through parseLandmarkPhotoCitation. Test: tests/unit/review-bible-writeback.test.ts. Replay over stored z3fw660ie transcript + Lab 1574 corrections: 3 corrections missing before, 0 after."
     }
   ]
