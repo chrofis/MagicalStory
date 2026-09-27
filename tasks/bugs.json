@@ -2365,7 +2365,7 @@
       "impact": "Every face-gate verdict since 2026-09-15 was given without seeing a face. Stored: 6 char-fixes refused in 4 staging stories and 1 on prod (job_1789945743706_8ayo2w19e p3), plus 4 blind passes; the two manual char-repair routes and the Lab ran the same gate.",
       "status": "fixed",
       "fixedAt": "2026-09-27",
-      "fixedIn": "",
+      "fixedIn": "4bc136e3f",
       "fix": "textModels.js resolveImageInputs: one resolver for data URIs, bare base64, http(s) URLs (fetched) and Buffers, MIME sniffed from the bytes; anything else throws. Gemini sends inline_data parts, xAI and OpenRouter image_url parts, Anthropic base64 blocks; the Gemini-to-Grok fallback carries the images. Streaming Anthropic/Gemini/xAI refuse image inputs (refuseImageInputs). The warn-and-drop path is deleted. Sibling set textmodel-image-inputs. Test: tests/unit/text-model-image-inputs.test.ts."
     }
   ]
