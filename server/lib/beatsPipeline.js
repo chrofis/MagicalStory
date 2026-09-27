@@ -1481,6 +1481,707 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
 }
 
 /**
+ * STEP 4 OF THE BEATS PIPELINE — the ONE review over all scene briefs (the
+ * covers included), its mechanical clothing and brief checks, the fed-back
+ * worn-state round and every post-review guard. Moved verbatim out of
+ * generateStoryViaBeats on 2026-09-27 so the Test Lab scene_review_replay
+ * stage runs the review production runs (owner: "The Lab must use 100%
+ * identical code to production").
+ *
+ * Mutates `expansions` (each reviewed brief) and `visualBible` (the review's
+ * bible corrections), exactly as the inline code did. `labPromptOptions`
+ * ({ template }) and `onCall` are Test Lab knobs; the run passes neither.
+ *
+ * @returns {Promise<{sceneReviewReport: object|null, sceneReviewAnalysis: string, sceneReviewFailed: string|null, bibleSections: string, clothingBefore: Array}>}
+ */
+async function runSceneReview({ inputData, expansions, clothingRequirements, visualBible, briefBeats, beats, bibleSections, meta, sceneReviewModel, stage, onChunk, gl, labPromptOptions = {}, onCall = null }) {
+  let t = Date.now();
+  let sceneReviewAnalysis = '';
+  // Set when the review reply was truncated (textReplyGuard.js): the briefs
+  // shipped unreviewed and the report says so instead of "rewrote nothing".
+  let sceneReviewFailed = null;
+  // Same contract as beatsReviewReport above: null only when the review never
+  // ran; an object with empty pages[] when it ran and rewrote nothing.
+  let sceneReviewReport = null;
+  // What the review's optional ---VISUAL BIBLE--- section changed, so the next
+  // story proves the channel ran (the labelRound lesson).
+  let bibleCorrections = null;
+  // The bible as the reviewer was handed it, kept only when its corrections
+  // changed it (sceneReviewReport.visualBibleIn) — a replay of the review
+  // needs this bible, and the stored one carries the corrections.
+  let visualBibleIn = null;
+  let castRemovalsDeclared = null;
+  let castRemovalAudit = [];
+  // Mechanical clothing faults, computed here and handed to the review — the
+  // ONE place they get fixed (owner decision 2026-08-08). Free: no API call, no
+  // image. Only the findings measured to carry signal are rendered
+  // (outfit_misattributed, removal_unstated); see clothingCheck.js.
+  let clothingFindings = '';
+  let clothingByPage = null;
+  let clothingBefore = [];
+  let clothingUnfixedList = [];
+  // Worn-item states the fed-back round could not get declared. The pages ship
+  // flagged; wornItems.js then defaults them to "worn" (decisions.md 2026-09-06).
+  let wornUnresolved = [];
+  let wornUnresolvedPages = [];
+  let wornRound = null;
+  let briefUnfixedList = [];
+  let briefIntroducedList = [];
+  // The two REWRITE-UNTIL-ZERO types (owner, 2026-09-08): a page declaring two
+  // actions, and a page over the three-element budget. What this adds is a
+  // VISIBLE verdict when they survive the single review round — page numbers per type,
+  // and for the budget which pages the brief itself could not have fixed
+  // (the bible's `appearsInPages` places elements the brief never cited, and
+  // objectsAsked ≤ 3 means the reviewer had nothing left to withdraw).
+  // Null when both types ended at zero. Never kills the run.
+  let rewriteToZeroUnfixed = null;
+  try {
+    const { checkScenes, renderFindingsBlock } = require('./clothingCheck');
+    const checkPages = expansions.map(x => {
+      const meta = extractSceneMetadata(x.brief) || {};
+      return {
+        pageNumber: x.pageNumber,
+        prose: splitBrief(x.brief).prose,
+        cast: (meta.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
+        perCharClothing: meta.characterClothing || {},
+        // Structured worn-item states (server/lib/wornItems.js) — removal_unstated
+        // is a MISSING-FIELD fault since 2026-09-06, not a prose search.
+        wornItems: meta.wornItems || [],
+      };
+    });
+    const res = checkScenes(checkPages, clothingRequirements, { artifacts: (visualBible || {}).artifacts, visualBible });
+    clothingBefore = res.findings;
+    clothingByPage = res.byPage;
+    clothingFindings = renderFindingsBlock(res.byPage);
+    if (clothingFindings) {
+      const pages = [...res.byPage.keys()].sort((a, b) => a - b).join(', ');
+      log.info(`👕 [BEATS] clothing check: ${res.findings.length} finding(s) on page(s) ${pages} — sent to the scene review`);
+      gl.info('beats_clothing_check', `Clothing check found ${res.findings.length} fault(s) on page(s) ${pages}`, null, { findings: res.findings });
+    }
+  } catch (ccErr) {
+    log.warn(`⚠️ [BEATS] clothing check failed (${ccErr.message}) — review runs without findings`);
+  }
+
+  // Brief contradictions — prose vs the brief's own metadata. Same place, same
+  // deal as the clothing faults above: deterministic, free, and handed to the
+  // review rather than auto-repaired (owner decision 2026-08-11 — the reviewer
+  // authored both halves; we must not invent a figure nobody wrote).
+  let briefFindings = '';
+  // The plan line rides along for the element-coverage check: it is the page's
+  // authority on what is in the picture, and the brief's objects[] is the only
+  // route by which any of it reaches the illustrator. Hoisted — the re-check
+  // after the review must compare against the same lines.
+  const planLineOf = (pageNumber) => (briefBeats.find(b => b && b.pageNumber === pageNumber) || {}).planLine || '';
+  // Hoisted for the post-review re-check below, which needs the same cast list
+  // and the pre-review fault set to tell a SURVIVING fault from an INTRODUCED one.
+  let briefCastNames = [];
+  const briefBeforeByPage = new Map();
+  let briefBefore = [];
+  try {
+    const { checkScenes: checkBriefs, renderFindingsBlock: renderBriefBlock } = require('./sceneBriefCheck');
+    // Secondary characters belong in this list too. `inputData.characters` is the
+    // UPLOADED main cast, so a figure the story invents (a mermaid, a shopkeeper)
+    // could never trigger cast_unlisted, and briefFindings came back empty on
+    // every story we looked at. Verified on staging job_1786743927715_kcx0p939w:
+    // the brief's prose describes Lira in full on p3/p4/p9 while its own
+    // characters[] lists only Emma and Noah — three findings the review never saw.
+    // Secondaries are the likeliest omission, since no avatar pipeline forces
+    // them into metadata. Characters only — animals stay out (owner call
+    // 2026-08-16). NOTE: this does not cover the OTHER shape of the same
+    // symptom — job_1786737619634_d66c7bg9g p4 declared Lira correctly in the
+    // brief, and she was dropped later from the stored per-page cast — so the
+    // visual-bible `pages` fallback is still load-bearing for that case.
+    const secondaryList = Array.isArray(visualBible?.secondaryCharacters)
+      ? visualBible.secondaryCharacters
+      : Object.values(visualBible?.secondaryCharacters || {});
+    const seenCast = new Set();
+    const castNames = [
+      ...(inputData.characters || []).map(c => c && c.name),
+      ...secondaryList.map(c => c && c.name),
+    ].filter(Boolean).filter((n) => {
+      const k = String(n).trim().toLowerCase();
+      if (!k || seenCast.has(k)) return false;
+      seenCast.add(k);
+      return true;
+    });
+    briefCastNames = castNames;
+    const res = checkBriefs(
+      expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief, planLine: planLineOf(x.pageNumber) })),
+      castNames,
+      visualBible,
+      { textZoneRules: textZoneRulesActive(inputData) }
+    );
+    for (const [pn, list] of res.byPage) briefBeforeByPage.set(pn, new Set(list.map(f => f.type)));
+    // The findings THEMSELVES, not only their types: the post-review verdict is
+    // briefCorrection.judgeCorrection, the same partition the rewrite path now
+    // runs, and it keys a finding by (page, type). Page 0 is the whole-book
+    // tally and is reported on its own line, so it stays out of both sides.
+    {
+      const { REVIEWABLE: R } = require('./sceneBriefCheck');
+      briefBefore = res.findings.filter(f => f && R.has(f.type) && f.pageNumber !== 0);
+    }
+    briefFindings = renderBriefBlock(res.byPage);
+    if (briefFindings) {
+      // Count only what the block actually carries — diagnostic-only types stay
+      // out of the log line, or it claims to have sent what it withheld.
+      const { REVIEWABLE } = require('./sceneBriefCheck');
+      const sent = res.findings.filter(fd => REVIEWABLE.has(fd.type));
+      const pages = [...new Set(sent.map(fd => fd.pageNumber))].sort((x, y) => x - y).join(', ');
+      log.info(`🧩 [BEATS] brief check: ${sent.length} contradiction(s) on page(s) ${pages} — sent to the scene review`);
+      gl.info('beats_brief_check', `Brief check found ${sent.length} contradiction(s) on page(s) ${pages}`, null, { findings: sent });
+    }
+  } catch (bcErr) {
+    log.warn(`⚠️ [BEATS] brief check failed (${bcErr.message}) — review runs without brief findings`);
+  }
+
+  const srPrompt = buildSceneReviewPrompt(
+    inputData,
+    expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
+    // Locked beats feed the review's check 5 (character in beat vs brief);
+    // the bible feeds check 9f (a stated object's state page ranges).
+    // clothingRequirements: the reviewer's CHARACTER DETAILS is the same cast
+    // block the Art Director wrote from, outfits included (check 3b/10c).
+    { clothingFindings, briefFindings, beats: briefBeats, visualBible, clothingRequirements, ...labPromptOptions }
+  );
+  if (!srPrompt) {
+    log.warn('⚠️ [BEATS] scene-review template unavailable — scene briefs shipped unreviewed');
+    gl.warn('beats_scene_review_failed', 'Scene review template unavailable — briefs shipped unreviewed');
+  } else {
+    t = Date.now();
+    try {
+      // Snapshot every brief as it was SENT. sceneDiffs only captures pages the
+      // reviewer changed, so a run where it rewrote nothing left the dev panel
+      // with nothing to show — exactly the run we needed to inspect
+      // (job_1786235099497_ytd5c7eek: 3 faults handed over, 0 briefs rewritten).
+      const briefsIn = expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief }));
+      // THE PAYLOAD CONTRACT, asserted on this path too (2026-09-17). A
+      // corrector is shown the text it is correcting — this path always has
+      // been, through {ALL_SCENES}, and the rewrite path was not, which is the
+      // defect that made its re-ask a re-roll. One function answers for both
+      // so neither can lose it silently.
+      // Reported, never fatal: a review that runs is worth more than a story
+      // that dies on its own contract check, and this path's whole ruling is
+      // advisory anyway.
+      for (const pn of briefBeforeByPage.keys()) {
+        const faulted = briefsIn.find(b => b.pageNumber === pn);
+        if (!faulted) continue;
+        try {
+          assertCorrectorSeesText(srPrompt, faulted.brief, `scene review p${pn}`);
+        } catch (seeErr) {
+          log.error(`❌ [BEATS] p${pn}: ${seeErr.message} — the reviewer is being asked to correct a brief it cannot see`);
+          gl.warn('beats_brief_unseen', `The scene review prompt does not carry page ${pn}'s brief — its faults cannot be corrected`, null, { pageNumber: pn });
+        }
+      }
+      await stage(42, 'Reviewing scene briefs...', { next: 51, ms: 132000 });
+      const srRes = await textModels.callTextModelStreaming(srPrompt, null, onChunk, sceneReviewModel, { usageLabel: 'beats_scene_review' });
+      if (onCall) onCall(srRes);
+      // "0 briefs rewritten" has meant three different things: a reviewer that
+      // genuinely found nothing, a reviewer TRUNCATED at its token cap (this
+      // story: out=16000, exactly the old budget), and a provider returning
+      // nothing at all (Lab #450: in=0 out=0 after 50s on an 80k prompt). Only
+      // the first is success — separate them or the log reports failure as a pass.
+      const srOutTok = srRes.usage?.output_tokens ?? null;
+      if (!String(srRes.text || '').trim() || srOutTok === 0) {
+        log.error(`❌ [BEATS] Scene review returned an EMPTY response (${srOutTok} output tokens) — briefs ship unreviewed`);
+        gl.warn('beats_scene_review_empty', `Scene review returned nothing (${srOutTok} output tokens) — provider failure, briefs shipped unreviewed`);
+      }
+      // TRUNCATION (textReplyGuard.js): a review cut at the ceiling rewrote the
+      // EARLIEST pages and never reached the ones it named — adopting the pages
+      // that fit would ship a half-review as a review. Fall back to the raw
+      // briefs (the input), exactly as the Lab guard does; the failure is
+      // recorded on the story (sceneReviewFailed) and in the generation log.
+      const srTruncated = !!srRes.truncation?.suspected;
+      if (srTruncated) {
+        sceneReviewFailed = `scene review ${textModels.describeTruncation(srRes.truncation)} — briefs shipped unreviewed`;
+        log.error(`❌ [BEATS] ${sceneReviewFailed}`);
+        gl.warn('beats_scene_review_truncated', sceneReviewFailed, null, srRes.truncation);
+      }
+      // BRIEF_TRAILING_MARKERS: the reply's optional ---VISUAL BIBLE---
+      // block follows the last page, and without a terminator it was appended
+      // to that page's brief and stored as part of it (p17 of
+      // job_1789759147125_p08djwhbl). The block itself is still read, from the
+      // RAW reply, by applyReviewBibleCorrections below.
+      const parsed = srTruncated ? { analysis: '', pages: [] } : parseRefinedText(srRes.text || '', expansions.map(x => x.pageNumber), 'SCENES', BRIEF_TRAILING_MARKERS);
+      sceneReviewAnalysis = parsed.analysis || '';
+      const byPage = new Map(parsed.pages.map(p => [p.pageNumber, p.text]));
+      const changed = [];
+      // Captured at the overwrite, the only moment both briefs exist.
+      const sceneDiffs = [];
+      for (const x of expansions) {
+        const reviewed = byPage.get(x.pageNumber);
+        if (reviewed && reviewed.trim()) {
+          const fixed = keepDeclaredLight(x.pageNumber,
+            keepDeclaredWornRows(x.pageNumber, reviewed, x.brief, 'scene review', gl),
+            x.brief, 'scene review', gl);
+          if (fixed !== x.brief) sceneDiffs.push({ pageNumber: x.pageNumber, before: x.brief, after: fixed });
+          x.brief = fixed;
+          x.reviewRewrote = true;
+          changed.push(x.pageNumber);
+        }
+      }
+      meta.timings.sceneReviewMs = Date.now() - t;
+
+      // FAULTED-BUT-NOT-REWRITTEN (owner, 2026-08-08). The reviewer is told to
+      // rewrite every page a check faulted, and it does not always comply: on
+      // job_1786193650012_7baiaeftb it named defects on pages 4, 8 and 13 and
+      // rewrote only 1, 2 and 3. Those defects then shipped, unremarked.
+      //
+      // Read the reviewer's OWN "FAULTED PAGES:" line (scene-review.txt output
+      // contract), never the free prose. The first version of this check
+      // regex-matched every "page N" in the analysis, so pages mentioned as
+      // PRAISE ("framing peaks on page 12") were reported as unfixed faults
+      // (job_1786277779744 flagged 1 and 13 that way). No line → the reviewer
+      // predates the contract → skip rather than guess.
+      const faultLine = sceneReviewAnalysis.match(/^\s*FAULTED PAGES?:\s*(.+)\s*$/mi);
+      const namedPages = faultLine
+        ? [...new Set((faultLine[1].match(/-?\d+/g) || [])
+            .map(Number)
+            .filter(n => expansions.some(x => x.pageNumber === n)))]
+        : null;
+      if (!faultLine) {
+        log.debug('[BEATS] Scene review analysis has no FAULTED PAGES line — incompleteness check skipped');
+      }
+      // DECLARED REMOVALS (owner decision 2026-09-13). A rewrite that drops a
+      // character used to be expressible only as an absence — no delta, no
+      // reason, and nothing parsed. `REMOVED CAST:` in the output contract is
+      // that channel; this reads it, then checks it against what actually
+      // happened to `characters[]`, page by page. Mechanical name-set
+      // arithmetic over the brief metadata only — never an inference from
+      // description prose.
+      //
+      // Detected AND REVERTED (2026-09-15, superseding the detect-only ruling
+      // of 2026-09-13). Evidence for the detection:
+      // job_1789207854566_l43qgl34w p7/p15, where five commissioned characters
+      // became "five soaked pirates: one in a blue tricorn…" with
+      // `characters: []` / `["Fiona"]` and nothing said. Evidence for the
+      // revert: job_1789420511893_zly5rcdej p16, where the error fired, the
+      // page rendered on the emptied cast anyway, and the corrupt contract
+      // produced a phantom CRITICAL against a child who IS in the prose — three
+      // repair rounds, and a correct original destroyed by the round-2 inpaint.
+      const castRemovals = parseCastRemovals(sceneReviewAnalysis);
+      const metaOf = (brief) => (extractSceneMetadata(brief) || {});
+      castRemovalsDeclared = castRemovals;
+      castRemovalAudit = diffCastRemovals(
+        sceneDiffs.map(d => {
+          const mb = metaOf(d.before), ma = metaOf(d.after);
+          // CAST UNPARSEABLE IS NOT CAST EMPTIED (2026-09-19). A brief whose
+          // parsers all failed comes back from the recovery path with
+          // `isRecovered: true` and an empty `characters[]`
+          // (sceneMetadata.js, describeDegradedSceneMetadata) — and the name
+          // arithmetic below would read that emptiness as the reviewer having
+          // silently dropped the entire page cast, then "restore" rows into a
+          // roster that in fact still lists them. Skip the page instead; a
+          // degraded brief is a known-recorded input, never a fault verdict.
+          if (ma.isRecovered === true) {
+            log.warn(`⚠️ [BEATS] Page ${d.pageNumber}: reviewed brief came back from the metadata recovery path — cast-removal diff skipped for this page (unparseable is not emptied)`);
+            return null;
+          }
+          // `objects[]` carries the Visual Bible secondaries. A name that moved
+          // there is still commissioned — routing, not removal.
+          return {
+            pageNumber: d.pageNumber,
+            beforeCast: mb.characters || [],
+            afterCast: ma.characters || [],
+            afterObjects: (ma.objects || []).map(o => (typeof o === 'string' ? o : (o && (o.id || o.name)))).filter(Boolean),
+          };
+        }).filter(Boolean),
+        castRemovals
+      );
+      if (castRemovals.malformed.length > 0) {
+        log.warn(`⚠️ [BEATS] Scene review REMOVED CAST line has ${castRemovals.malformed.length} unparseable entr(ies): ${castRemovals.malformed.join(' | ')}`);
+        gl.warn('beats_scene_review_removals_malformed', `REMOVED CAST entries could not be parsed: ${castRemovals.malformed.join(' | ')}`, null, castRemovals.malformed);
+      }
+      for (const r of castRemovalAudit) {
+        if (r.declared.length === 0) continue;
+        const why = (castRemovals.pages.find(p => p.pageNumber === r.pageNumber) || {}).reason || '(no reason given)';
+        log.info(`📣 [BEATS] Scene review DECLARED removal on page ${r.pageNumber}: ${r.declared.join(', ')} — ${why}`);
+        gl.info('beats_scene_review_removal_declared', `Page ${r.pageNumber}: reviewer removed ${r.declared.join(', ')} — ${why}`, null, r);
+      }
+      const undeclaredRemovals = castRemovalAudit.filter(r => r.undeclared.length > 0);
+      if (undeclaredRemovals.length > 0) {
+        const detail = undeclaredRemovals.map(r => `page ${r.pageNumber}: ${r.undeclared.join(', ')}`).join('; ');
+        log.error(`❌ [BEATS] Scene review removed cast WITHOUT declaring it — ${detail}`);
+        gl.error('beats_scene_review_removal_undeclared',
+          `Reviewer dropped character(s) from characters[] with no REMOVED CAST declaration — ${detail}`, null, undeclaredRemovals);
+        // The page does NOT render on a cast the reviewer silently emptied —
+        // but only the DROPPED NAMES come back (owner, 2026-09-17), spliced
+        // verbatim out of the pre-review brief's own `characters[]`. The rest
+        // of the reviewed brief stands. The whole-brief revert it supersedes
+        // cost p18 of job_1789584708605_rts4wqupm every other fix that review
+        // made (shipped at 45; the previous run's reviewed p18 scored 95).
+        // A page whose `characters[]` cannot be located structurally still
+        // falls back to the whole-brief revert — `changed` is trimmed there,
+        // before the faulted-but-not-rewritten check reads it.
+        const { restored, reverted } = restoreUndeclaredRemovals(expansions, sceneDiffs, changed, undeclaredRemovals);
+        if (restored.length > 0) {
+          const detail = restored.map(r => `page ${r.pageNumber}: ${r.names.join(', ')}`).join('; ');
+          log.warn(`↩️ [BEATS] Restored undeclared-removed cast into the reviewed brief — ${detail}`);
+          gl.warn('beats_scene_review_removal_restored',
+            `Dropped character(s) put back into the reviewed brief's characters[]; the rest of the review's fixes stand — ${detail}`,
+            null, restored);
+        }
+        if (reverted.length > 0) {
+          const pages = reverted.map(r => r.pageNumber).join(', ');
+          log.error(`↩️ [BEATS] Page(s) ${pages} reverted to the pre-review brief — the reviewed brief has no locatable characters[] to restore into`);
+          gl.warn('beats_scene_review_removal_reverted',
+            `Page(s) ${pages} shipped the PRE-REVIEW brief: the rewrite dropped cast with no declaration and its characters[] could not be located, so that page's review fixes were discarded with it`,
+            null, reverted);
+        }
+      }
+
+      // BIBLE CORRECTIONS (2026-09-14). The review may return an optional
+      // ---VISUAL BIBLE--- section correcting a stated object's state page
+      // ranges — the fault sceneBriefCheck's vb_state_* findings hand it. The
+      // merge is strict and fail-soft; see applyReviewBibleCorrections.
+      if (visualBible && !srTruncated) {
+        try {
+          // The handles the briefs ALREADY cite: a correction that renames one
+          // of them re-points a page at a different look (Lab 1264).
+          const citedHandles = new Set();
+          for (const ex of (Array.isArray(expansions) ? expansions : [])) {
+            const meta = extractSceneMetadata(ex && ex.brief) || {};
+            const objs = Array.isArray(meta.objects) ? meta.objects : [];
+            for (const o of objs) {
+              const h = typeof o === 'string' ? o.trim().toUpperCase() : '';
+              if (h.includes('.')) citedHandles.add(h);
+            }
+          }
+          const bibleBefore = JSON.parse(JSON.stringify(visualBible));
+          const corr = applyReviewBibleCorrections(srRes.text || '', visualBible, beats.length, citedHandles);
+          bibleCorrections = corr;
+          if (corr.applied.length > 0) visualBibleIn = bibleBefore;
+          for (const r of corr.rejected) {
+            log.warn(`⚠️ [BEATS] Scene review bible correction REJECTED for ${r.id}: ${r.reason}`);
+            gl.warn('beats_scene_review_bible_rejected', `Bible correction for ${r.id} rejected: ${r.reason}`, null, r);
+          }
+          if (corr.applied.length > 0) {
+            for (const e of corr.applied) {
+              log.info(`[VB-STATE] ${e.id} "${e.name}" ${e.oldPages} → ${e.newPages}`);
+            }
+            gl.info('beats_scene_review_bible',
+              `Scene review corrected ${corr.applied.length} stated object(s): `
+              + corr.applied.map(e => `${e.id} ${e.oldPages} → ${e.newPages}`).join('; '), null, corr);
+            // ONE SOURCE OF TRUTH: the transcript is what every later reader
+            // re-parses, exactly as the label round and the age clamp do.
+            const synced = syncVisualBibleSection(bibleSections, visualBible);
+            if (synced === bibleSections) {
+              log.warn('⚠️ [BEATS] Scene review bible correction could not be written back into the transcript — downstream re-parses will read the UNCORRECTED bible');
+              gl.warn('beats_vb_sync_failed', 'Scene review bible correction could not be written back into the transcript — stored bible will not reflect it');
+            } else {
+              bibleSections = synced;
+            }
+          }
+        } catch (bcErr) {
+          log.warn(`⚠️ [BEATS] Scene review bible correction failed (${bcErr.message}) — bible unchanged`);
+        }
+      }
+
+      const faultedNotFixed = (namedPages || []).filter(n => !changed.includes(n));
+      if (faultedNotFixed.length > 0) {
+        log.warn(`⚠️ [BEATS] Scene review named page(s) ${faultedNotFixed.join(', ')} but rewrote none of them`);
+        gl.warn('beats_scene_review_incomplete',
+          `Reviewer named page(s) ${faultedNotFixed.join(', ')} in its analysis but rewrote only ${changed.length ? changed.join(', ') : 'nothing'} — those findings shipped unfixed`);
+      }
+
+      // RE-CHECK. The clothing findings were handed to the reviewer above;
+      // whether it acted on them is not a matter of trust. The check is free
+      // and deterministic, so run it again on the rewritten briefs and say what
+      // survived instead of shipping it quietly (owner rule: fail loudly).
+      //
+      // ON EVERY REVIEWED RUN, not only when the pre-review check found
+      // something (2026-09-23). A rewrite can INTRODUCE a clothing fault on a
+      // page that was clean when it was handed over — the same failure mode the
+      // brief re-check below documents. Gated on pre-review findings, a
+      // review-introduced `removal_unstated` could never reach the worn-state
+      // round: on staging job_1790100385959_1nitlympp the pre-review check
+      // found nothing, the review deleted declared rows on p11, p12 and p18,
+      // and nothing looked again.
+      {
+        try {
+          const { checkScenes } = require('./clothingCheck');
+          const after = checkScenes(expansions.map(x => {
+            const m2 = extractSceneMetadata(x.brief) || {};
+            return {
+              pageNumber: x.pageNumber,
+              prose: splitBrief(x.brief).prose,
+              cast: (m2.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
+              perCharClothing: m2.characterClothing || {},
+              wornItems: m2.wornItems || [],
+            };
+          }), clothingRequirements, { artifacts: (visualBible || {}).artifacts, visualBible });
+          const REVIEWABLE = new Set(['outfit_misattributed', 'removal_unstated']);
+          const left = after.findings.filter(f => REVIEWABLE.has(f.type));
+          clothingUnfixedList = left;
+          const before = clothingByPage ? [...clothingByPage.values()].flat().filter(f => REVIEWABLE.has(f.type)).length : 0;
+          if (left.length > 0) {
+            const pages = [...new Set(left.map(f => f.pageNumber))].sort((a, b) => a - b).join(', ');
+            log.warn(`⚠️ [BEATS] clothing check after review: ${left.length} fault(s) present on page(s) ${pages} (${before} handed to the review)`);
+            gl.warn('beats_clothing_unfixed',
+              `Clothing faults present after the scene review on page(s) ${pages} (${before} were handed to it): ${left.map(f => `p${f.pageNumber} ${f.type} (${f.character})`).join('; ')}`);
+          } else if (before > 0) {
+            log.info(`👕 [BEATS] clothing check after review: all ${before} fault(s) resolved`);
+          }
+
+          // FED-BACK WORN-STATE ROUND (owner ruling 2026-09-06). The old prose
+          // finding was handed to the review on 9 pages of
+          // job_1788641639919_mpjwlzkf1 and fixed on 0 of them. It is now a
+          // missing FIELD, so the retry can name exactly what to add and the
+          // re-check can verify it — the same shape as the brief second round
+          // below and the landmark minimum-2 retry (cadd4ee72).
+          //
+          // Exactly ONE extra round. Strike two SHIPS: a WARN, a stored
+          // `wornStateUnresolved` flag on the page, and the state defaults to
+          // "worn" because the avatar reference wears the full outfit. A
+          // guideline never kills a paid run.
+          const wornLeft = left.filter(f => f.type === 'removal_unstated');
+          if (wornLeft.length > 0) {
+            const wornPages = new Set(wornLeft.map(f => f.pageNumber));
+            const subset = expansions.filter(x => wornPages.has(x.pageNumber));
+            const subsetByPage = new Map();
+            for (const [pn, list] of after.byPage) {
+              const rows = list.filter(f => f.type === 'removal_unstated');
+              if (rows.length > 0 && wornPages.has(pn)) subsetByPage.set(pn, rows);
+            }
+            const { renderFindingsBlock: renderClothing2 } = require('./clothingCheck');
+            const wrPrompt = buildSceneReviewPrompt(
+              inputData,
+              subset.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
+              { clothingFindings: renderClothing2(subsetByPage), beats, clothingRequirements, ...labPromptOptions },
+            );
+            const label = [...wornPages].sort((a, b) => a - b).join(', ');
+            if (!wrPrompt) {
+              log.warn(`⚠️ [BEATS] worn-state round skipped (no review template) — page(s) ${label} ship flagged`);
+              wornUnresolved = wornLeft;
+            } else {
+              try {
+                log.info(`🎩 [BEATS] worn-state round on page(s) ${label} (${subset.length}/${expansions.length} briefs)`);
+                const wrRes = await textModels.callTextModelStreaming(wrPrompt, null, onChunk, sceneReviewModel, { usageLabel: 'beats_scene_review_worn' });
+                if (onCall) onCall(wrRes);
+                // A cut round is a failed round — the catch below keeps the
+                // briefs as they were and ships the pages flagged.
+                if (wrRes.truncation?.suspected) throw new Error(`reply ${textModels.describeTruncation(wrRes.truncation)}`);
+                const wrParsed = parseRefinedText(wrRes.text || '', subset.map(x => x.pageNumber), 'SCENES', BRIEF_TRAILING_MARKERS);
+                const wrByPage = new Map(wrParsed.pages.map(pg => [pg.pageNumber, pg.text]));
+                for (const x of subset) {
+                  const reworn = wrByPage.get(x.pageNumber);
+                  const fixed = reworn && reworn.trim()
+                    ? keepDeclaredLight(x.pageNumber, keepDeclaredWornRows(x.pageNumber, reworn, x.brief, 'worn-state round', gl), x.brief, 'worn-state round', gl)
+                    : reworn;
+                  if (fixed && fixed.trim() && fixed !== x.brief) {
+                    sceneDiffs.push({ pageNumber: x.pageNumber, before: x.brief, after: fixed, round: 'worn' });
+                    x.brief = fixed;
+                    x.reviewRewrote = true;
+                  }
+                }
+                const after3 = checkScenes(expansions.map(x => {
+                  const m3 = extractSceneMetadata(x.brief) || {};
+                  return {
+                    pageNumber: x.pageNumber,
+                    prose: splitBrief(x.brief).prose,
+                    cast: (m3.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
+                    perCharClothing: m3.characterClothing || {},
+                    wornItems: m3.wornItems || [],
+                  };
+                }), clothingRequirements, { artifacts: (visualBible || {}).artifacts, visualBible });
+                wornUnresolved = after3.findings.filter(f => f.type === 'removal_unstated');
+                clothingUnfixedList = after3.findings.filter(f => REVIEWABLE.has(f.type));
+                wornRound = {
+                  pages: [...wornPages].sort((a, b) => a - b),
+                  before: wornLeft.length,
+                  after: wornUnresolved.length,
+                  usage: wrRes.usage || null,
+                };
+              } catch (wrErr) {
+                log.warn(`⚠️ [BEATS] worn-state round failed (${wrErr.message}) — page(s) ${label} ship flagged`);
+                wornUnresolved = wornLeft;
+              }
+            }
+            if (wornUnresolved.length === 0) {
+              log.info(`🎩 [BEATS] worn-state round resolved all ${wornLeft.length} fault(s)`);
+              gl.info('beats_worn_state_round', `Worn-state round on page(s) ${label} resolved all ${wornLeft.length} fault(s)`);
+            } else {
+              const d = wornUnresolved.map(f => `p${f.pageNumber} ${f.artifactId || ''} (${f.character})`).join('; ');
+              wornUnresolvedPages = [...new Set(wornUnresolved.map(f => f.pageNumber))].sort((a, b) => a - b);
+              log.warn(`⚠️ [BEATS] worn state STILL undeclared on page(s) ${wornUnresolvedPages.join(', ')} — shipping flagged, state defaults to worn: ${d}`);
+              gl.warn('beats_worn_state_unresolved',
+                `Worn-item state undeclared after the fed-back round on page(s) ${wornUnresolvedPages.join(', ')} — pages ship with wornStateUnresolved and the item defaults to worn: ${d}`,
+                null, { findings: wornUnresolved });
+              for (const x of expansions) {
+                if (wornUnresolvedPages.includes(x.pageNumber)) x.wornStateUnresolved = true;
+              }
+            }
+          }
+        } catch (rcErr) {
+          log.warn(`⚠️ [BEATS] clothing re-check failed (${rcErr.message})`);
+        }
+      }
+
+      // RE-CHECK the brief faults — on EVERY page, not only the ones that
+      // faulted before. This check's failure mode runs the opposite way to
+      // clothing's: the reviewer can CREATE a fault while resolving a
+      // different one, on a page that was clean when it was handed over.
+      //
+      // Measured on staging job_1787638394061_hs70901tfsn p1. Pre-review the
+      // page carried one fault, cast_unlisted — the prose described a
+      // secondary character its own characters[] omitted. The reviewer
+      // resolved it exactly as asked, by adding that character to the page —
+      // and gave them an interaction row with a second action. The page
+      // shipped declaring two actions, on the pipeline whose entire purpose is
+      // one, and scored semantic 40. The checks had run once, before the
+      // review, so nothing ever looked at the rewrite.
+      //
+      // Reports, never repairs: the reviewer authored both halves and the
+      // owner's 2026-08-11 decision keeps this side advisory. An INTRODUCED
+      // fault is the louder of the two — it means the fix instruction itself
+      // is producing defects.
+      try {
+        const { checkScenes: checkBriefs, REVIEWABLE } = require('./sceneBriefCheck');
+        const after = checkBriefs(
+          expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief, planLine: planLineOf(x.pageNumber) })),
+          briefCastNames,
+          visualBible,
+          { textZoneRules: textZoneRulesActive(inputData) }
+        );
+        // pageNumber 0 is the whole-book text-position tally, reported on its
+        // own line below rather than mixed into the per-page fault list.
+        const left = after.findings.filter(f => REVIEWABLE.has(f.type) && f.pageNumber !== 0);
+        const bookLevel = after.findings.filter(f => REVIEWABLE.has(f.type) && f.pageNumber === 0);
+        if (bookLevel.length > 0) {
+          const d = bookLevel.map(f => f.type).join('; ');
+          log.warn(`⚠️ [BEATS] text-position distribution after review: ${d}`);
+          gl.warn('beats_textzone_distribution', `Text-position distribution still off after the scene review: ${d}`, null, { findings: bookLevel });
+        }
+        // THE VERDICT IS SHARED (2026-09-17). This partition — introduced vs
+        // survived, keyed by (page, type) — is briefCorrection.judgeCorrection,
+        // and the rewrite path's corrective re-ask now reaches the same
+        // function through correctFindings. It used to hand-roll
+        // `after.length < before.length` instead, which scores a correction
+        // that swaps one fault for another as EQUAL and rejects it; measured
+        // over 11 stored rounds it resolved nothing on any of them.
+        // `advisory` is this path's ruling (owner, 2026-08-11): the reviewer
+        // authored both halves, so its rewrite stands and its faults are
+        // reported.
+        const { introduced, survived } = judgeCorrection({ before: briefBefore, after: left, acceptance: 'advisory' });
+        briefUnfixedList = left;
+        briefIntroducedList = introduced;
+        if (introduced.length > 0) {
+          const d = introduced.map(f => `p${f.pageNumber} ${f.type}`).join('; ');
+          log.warn(`⚠️ [BEATS] brief check after review: ${introduced.length} fault(s) INTRODUCED by the rewrite — ${d}`);
+          gl.warn('beats_brief_introduced',
+            `The scene review introduced ${introduced.length} new brief fault(s) while rewriting: ${d}`, null, { findings: introduced });
+        }
+        if (survived.length > 0) {
+          const d = survived.map(f => `p${f.pageNumber} ${f.type}`).join('; ');
+          log.warn(`⚠️ [BEATS] brief check after review: ${survived.length} fault(s) survived — ${d}`);
+          gl.warn('beats_brief_unfixed', `Brief faults survived the scene review: ${d}`, null, { findings: survived });
+        }
+        if (left.length === 0) log.info('🧩 [BEATS] brief check after review: clean');
+
+        // NO SECOND MODEL ROUND (owner, 2026-09-11). A targeted second
+        // reviewer call used to re-send the faulted pages here. Measured over
+        // two reruns it broke even: on the dragon rerun it cleared
+        // interaction_object_shared_hands and the p12/p13 trough plate but
+        // INTRODUCED interaction_multiple_actions on p1 (it split one action
+        // back into two), and on the pirate rerun it changed nothing at all.
+        // A paid call that trades one fault for another is not worth making.
+        // The deterministic re-check above stays — it costs nothing and is the
+        // diagnostic signal — so faults are reported and ship flagged, which
+        // is the same contract round 2 had on the pages it failed to fix.
+
+        // REWRITE-UNTIL-ZERO verdict for the two one-moment types, after the
+        // single review round. Measured on staging
+        // job_1788816451791_25b31uqlp: 11 of 18 pages shipped over budget after
+        // two rounds, and on every one of them the brief's own objects[] was
+        // already within three — the surplus came from the bible's
+        // appearsInPages, which no rewrite can withdraw. Saying so per page is
+        // the difference between "the reviewer ignored the fault" and "the
+        // fault is not the reviewer's to fix".
+        const ZERO_TYPES = ['interaction_multiple_actions', 'vb_element_overflow'];
+        const zeroLeft = briefUnfixedList.filter(f => ZERO_TYPES.includes(f.type) && f.pageNumber !== 0);
+        if (zeroLeft.length > 0) {
+          const { rankPageElements, VB_ELEMENT_BUDGET } = require('./vbElementBudget');
+          const pagesOf = (type) => [...new Set(zeroLeft.filter(f => f.type === type).map(f => f.pageNumber))].sort((a, b) => a - b);
+          const overflowDetail = pagesOf('vb_element_overflow').map((pn) => {
+            const x = expansions.find(e => e.pageNumber === pn);
+            const meta = x ? (extractSceneMetadata(x.brief) || {}) : {};
+            const ranked = rankPageElements(pn, meta, visualBible);
+            const objectsAsked = ranked.filter(e => e.fromObjects).length;
+            return { pageNumber: pn, elements: ranked.length, objectsAsked, briefFixable: objectsAsked > VB_ELEMENT_BUDGET };
+          });
+          rewriteToZeroUnfixed = {
+            interaction_multiple_actions: pagesOf('interaction_multiple_actions'),
+            vb_element_overflow: pagesOf('vb_element_overflow'),
+            vbOverflowDetail: overflowDetail,
+            rounds: 1,
+          };
+          const parts = [];
+          if (rewriteToZeroUnfixed.interaction_multiple_actions.length) parts.push(`two actions on page(s) ${rewriteToZeroUnfixed.interaction_multiple_actions.join(', ')}`);
+          if (rewriteToZeroUnfixed.vb_element_overflow.length) {
+            const bibleSide = overflowDetail.filter(d => !d.briefFixable).map(d => d.pageNumber);
+            parts.push(`over the ${VB_ELEMENT_BUDGET}-element budget on page(s) ${rewriteToZeroUnfixed.vb_element_overflow.join(', ')}`
+              + (bibleSide.length ? ` (bible-side on ${bibleSide.join(', ')} — the brief cites ≤${VB_ELEMENT_BUDGET}, the surplus is appearsInPages)` : ''));
+          }
+          log.warn(`⚠️ [BEATS] rewrite-until-zero NOT reached after ${rewriteToZeroUnfixed.rounds} round(s): ${parts.join('; ')} — shipping flagged`);
+          gl.warn('beats_one_moment_unfixed', `Briefs still ${parts.join('; ')} after the review's round budget — shipped flagged, never killed`, null, rewriteToZeroUnfixed);
+        }
+      } catch (rcErr) {
+        log.warn(`⚠️ [BEATS] brief re-check failed (${rcErr.message})`);
+      }
+
+      sceneReviewReport = {
+        model: srRes.modelId || sceneReviewModel,
+        durationMs: meta.timings.sceneReviewMs,
+        changedPages: sceneDiffs.map(d => d.pageNumber),
+        namedButNotRewritten: faultedNotFixed,
+        // The reviewer's declared-removals channel and the mechanical audit of
+        // it (2026-09-13). `castRemovalAudit` holds one row per page that lost
+        // a name, split into `declared` / `undeclared`.
+        castRemovals: castRemovalsDeclared,
+        castRemovalAudit,
+        failed: sceneReviewFailed,
+        analysis: sceneReviewAnalysis,
+        // WITHOUT `before`: every one of those strings was byte-identical to
+        // the same page's entry in `briefsIn` below (17/17 pages, 32k of JSONB,
+        // job_1789853503332_riqncqg1i). `briefsIn` is the pre-review snapshot of
+        // EVERY page, changed or not, so it already holds each row's before —
+        // readers resolve it from there (storyMetrics.churnFromReport,
+        // StoryDisplay's diff panel).
+        pages: sceneDiffs.map(({ before, ...row }) => row), // eslint-disable-line no-unused-vars
+        // Dev-mode inspection (owner request 2026-08-09): the exact prompt the
+        // reviewer received, every brief as sent, and the clothing trail — so
+        // "it rewrote nothing" can be diagnosed without the DB.
+        prompt: srPrompt,
+        briefsIn,
+        clothingFindings: clothingFindings || null,
+        briefFindings: briefFindings || null,
+        clothingUnfixed: clothingUnfixedList,
+        wornUnresolved,
+        wornUnresolvedPages,
+        wornRound,
+        // The VB label round writes its outcome to `meta` at adoption time;
+        // without this line it reached no stored report (job_1789337998754_apslnsq1z
+        // had valid labels and a null labelRound everywhere).
+        labelRound: meta.labelRound || null,
+        // {applied, rejected} from the review's ---VISUAL BIBLE--- section.
+        bibleCorrections,
+        ...(visualBibleIn ? { visualBibleIn } : {}),
+        briefUnfixed: briefUnfixedList,
+        briefIntroduced: briefIntroducedList,
+        rewriteToZeroUnfixed,
+      };
+      gl.info('beats_scene_review', `Scene review by ${srRes.modelId || sceneReviewModel}: ${changed.length} brief(s) rewritten (${(meta.timings.sceneReviewMs / 1000).toFixed(1)}s)`, null, {
+        changedPages: changed, model: srRes.modelId || sceneReviewModel,
+      });
+    } catch (err) {
+      log.warn(`🚨 [BEATS] Scene review failed (${err.message}) — proceeding with unreviewed briefs`);
+      gl.warn('beats_scene_review_failed', `Reviewer ${sceneReviewModel} failed: ${err.message} — briefs shipped unreviewed`);
+    }
+  }
+
+  return { sceneReviewReport, sceneReviewAnalysis, sceneReviewFailed, bibleSections, clothingBefore };
+}
+
+/**
  * Run the beats-first pipeline.
  *
  * @param {Object} inputData - the job's input data (same object the unified path gets)
@@ -2833,676 +3534,12 @@ ${bibleBody}` : bibleBody;
 
   // ── Step 4: ONE review over ALL scene briefs ──────────────────────────────
   await checkCancellation();
-  let sceneReviewAnalysis = '';
-  // Set when the review reply was truncated (textReplyGuard.js): the briefs
-  // shipped unreviewed and the report says so instead of "rewrote nothing".
-  let sceneReviewFailed = null;
-  // Same contract as beatsReviewReport above: null only when the review never
-  // ran; an object with empty pages[] when it ran and rewrote nothing.
-  let sceneReviewReport = null;
-  // What the review's optional ---VISUAL BIBLE--- section changed, so the next
-  // story proves the channel ran (the labelRound lesson).
-  let bibleCorrections = null;
-  let castRemovalsDeclared = null;
-  let castRemovalAudit = [];
-  // Mechanical clothing faults, computed here and handed to the review — the
-  // ONE place they get fixed (owner decision 2026-08-08). Free: no API call, no
-  // image. Only the findings measured to carry signal are rendered
-  // (outfit_misattributed, removal_unstated); see clothingCheck.js.
-  let clothingFindings = '';
-  let clothingByPage = null;
-  let clothingUnfixedList = [];
-  // Worn-item states the fed-back round could not get declared. The pages ship
-  // flagged; wornItems.js then defaults them to "worn" (decisions.md 2026-09-06).
-  let wornUnresolved = [];
-  let wornUnresolvedPages = [];
-  let wornRound = null;
-  let briefUnfixedList = [];
-  let briefIntroducedList = [];
-  // The two REWRITE-UNTIL-ZERO types (owner, 2026-09-08): a page declaring two
-  // actions, and a page over the three-element budget. What this adds is a
-  // VISIBLE verdict when they survive the single review round — page numbers per type,
-  // and for the budget which pages the brief itself could not have fixed
-  // (the bible's `appearsInPages` places elements the brief never cited, and
-  // objectsAsked ≤ 3 means the reviewer had nothing left to withdraw).
-  // Null when both types ended at zero. Never kills the run.
-  let rewriteToZeroUnfixed = null;
-  try {
-    const { checkScenes, renderFindingsBlock } = require('./clothingCheck');
-    const checkPages = expansions.map(x => {
-      const meta = extractSceneMetadata(x.brief) || {};
-      return {
-        pageNumber: x.pageNumber,
-        prose: splitBrief(x.brief).prose,
-        cast: (meta.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
-        perCharClothing: meta.characterClothing || {},
-        // Structured worn-item states (server/lib/wornItems.js) — removal_unstated
-        // is a MISSING-FIELD fault since 2026-09-06, not a prose search.
-        wornItems: meta.wornItems || [],
-      };
-    });
-    const res = checkScenes(checkPages, clothingRequirements, { artifacts: (visualBible || {}).artifacts, visualBible });
-    clothingByPage = res.byPage;
-    clothingFindings = renderFindingsBlock(res.byPage);
-    if (clothingFindings) {
-      const pages = [...res.byPage.keys()].sort((a, b) => a - b).join(', ');
-      log.info(`👕 [BEATS] clothing check: ${res.findings.length} finding(s) on page(s) ${pages} — sent to the scene review`);
-      gl.info('beats_clothing_check', `Clothing check found ${res.findings.length} fault(s) on page(s) ${pages}`, null, { findings: res.findings });
-    }
-  } catch (ccErr) {
-    log.warn(`⚠️ [BEATS] clothing check failed (${ccErr.message}) — review runs without findings`);
-  }
-
-  // Brief contradictions — prose vs the brief's own metadata. Same place, same
-  // deal as the clothing faults above: deterministic, free, and handed to the
-  // review rather than auto-repaired (owner decision 2026-08-11 — the reviewer
-  // authored both halves; we must not invent a figure nobody wrote).
-  let briefFindings = '';
-  // The plan line rides along for the element-coverage check: it is the page's
-  // authority on what is in the picture, and the brief's objects[] is the only
-  // route by which any of it reaches the illustrator. Hoisted — the re-check
-  // after the review must compare against the same lines.
-  const planLineOf = (pageNumber) => (briefBeats.find(b => b && b.pageNumber === pageNumber) || {}).planLine || '';
-  // Hoisted for the post-review re-check below, which needs the same cast list
-  // and the pre-review fault set to tell a SURVIVING fault from an INTRODUCED one.
-  let briefCastNames = [];
-  const briefBeforeByPage = new Map();
-  let briefBefore = [];
-  try {
-    const { checkScenes: checkBriefs, renderFindingsBlock: renderBriefBlock } = require('./sceneBriefCheck');
-    // Secondary characters belong in this list too. `inputData.characters` is the
-    // UPLOADED main cast, so a figure the story invents (a mermaid, a shopkeeper)
-    // could never trigger cast_unlisted, and briefFindings came back empty on
-    // every story we looked at. Verified on staging job_1786743927715_kcx0p939w:
-    // the brief's prose describes Lira in full on p3/p4/p9 while its own
-    // characters[] lists only Emma and Noah — three findings the review never saw.
-    // Secondaries are the likeliest omission, since no avatar pipeline forces
-    // them into metadata. Characters only — animals stay out (owner call
-    // 2026-08-16). NOTE: this does not cover the OTHER shape of the same
-    // symptom — job_1786737619634_d66c7bg9g p4 declared Lira correctly in the
-    // brief, and she was dropped later from the stored per-page cast — so the
-    // visual-bible `pages` fallback is still load-bearing for that case.
-    const secondaryList = Array.isArray(visualBible?.secondaryCharacters)
-      ? visualBible.secondaryCharacters
-      : Object.values(visualBible?.secondaryCharacters || {});
-    const seenCast = new Set();
-    const castNames = [
-      ...(inputData.characters || []).map(c => c && c.name),
-      ...secondaryList.map(c => c && c.name),
-    ].filter(Boolean).filter((n) => {
-      const k = String(n).trim().toLowerCase();
-      if (!k || seenCast.has(k)) return false;
-      seenCast.add(k);
-      return true;
-    });
-    briefCastNames = castNames;
-    const res = checkBriefs(
-      expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief, planLine: planLineOf(x.pageNumber) })),
-      castNames,
-      visualBible,
-      { textZoneRules: textZoneRulesActive(inputData) }
-    );
-    for (const [pn, list] of res.byPage) briefBeforeByPage.set(pn, new Set(list.map(f => f.type)));
-    // The findings THEMSELVES, not only their types: the post-review verdict is
-    // briefCorrection.judgeCorrection, the same partition the rewrite path now
-    // runs, and it keys a finding by (page, type). Page 0 is the whole-book
-    // tally and is reported on its own line, so it stays out of both sides.
-    {
-      const { REVIEWABLE: R } = require('./sceneBriefCheck');
-      briefBefore = res.findings.filter(f => f && R.has(f.type) && f.pageNumber !== 0);
-    }
-    briefFindings = renderBriefBlock(res.byPage);
-    if (briefFindings) {
-      // Count only what the block actually carries — diagnostic-only types stay
-      // out of the log line, or it claims to have sent what it withheld.
-      const { REVIEWABLE } = require('./sceneBriefCheck');
-      const sent = res.findings.filter(fd => REVIEWABLE.has(fd.type));
-      const pages = [...new Set(sent.map(fd => fd.pageNumber))].sort((x, y) => x - y).join(', ');
-      log.info(`🧩 [BEATS] brief check: ${sent.length} contradiction(s) on page(s) ${pages} — sent to the scene review`);
-      gl.info('beats_brief_check', `Brief check found ${sent.length} contradiction(s) on page(s) ${pages}`, null, { findings: sent });
-    }
-  } catch (bcErr) {
-    log.warn(`⚠️ [BEATS] brief check failed (${bcErr.message}) — review runs without brief findings`);
-  }
-
-  const srPrompt = buildSceneReviewPrompt(
-    inputData,
-    expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
-    // Locked beats feed the review's check 5 (character in beat vs brief);
-    // the bible feeds check 9f (a stated object's state page ranges).
-    // clothingRequirements: the reviewer's CHARACTER DETAILS is the same cast
-    // block the Art Director wrote from, outfits included (check 3b/10c).
-    { clothingFindings, briefFindings, beats: briefBeats, visualBible, clothingRequirements }
-  );
-  if (!srPrompt) {
-    log.warn('⚠️ [BEATS] scene-review template unavailable — scene briefs shipped unreviewed');
-    gl.warn('beats_scene_review_failed', 'Scene review template unavailable — briefs shipped unreviewed');
-  } else {
-    t = Date.now();
-    try {
-      // Snapshot every brief as it was SENT. sceneDiffs only captures pages the
-      // reviewer changed, so a run where it rewrote nothing left the dev panel
-      // with nothing to show — exactly the run we needed to inspect
-      // (job_1786235099497_ytd5c7eek: 3 faults handed over, 0 briefs rewritten).
-      const briefsIn = expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief }));
-      // THE PAYLOAD CONTRACT, asserted on this path too (2026-09-17). A
-      // corrector is shown the text it is correcting — this path always has
-      // been, through {ALL_SCENES}, and the rewrite path was not, which is the
-      // defect that made its re-ask a re-roll. One function answers for both
-      // so neither can lose it silently.
-      // Reported, never fatal: a review that runs is worth more than a story
-      // that dies on its own contract check, and this path's whole ruling is
-      // advisory anyway.
-      for (const pn of briefBeforeByPage.keys()) {
-        const faulted = briefsIn.find(b => b.pageNumber === pn);
-        if (!faulted) continue;
-        try {
-          assertCorrectorSeesText(srPrompt, faulted.brief, `scene review p${pn}`);
-        } catch (seeErr) {
-          log.error(`❌ [BEATS] p${pn}: ${seeErr.message} — the reviewer is being asked to correct a brief it cannot see`);
-          gl.warn('beats_brief_unseen', `The scene review prompt does not carry page ${pn}'s brief — its faults cannot be corrected`, null, { pageNumber: pn });
-        }
-      }
-      await stage(42, 'Reviewing scene briefs...', { next: 51, ms: 132000 });
-      const srRes = await textModels.callTextModelStreaming(srPrompt, null, onChunk, sceneReviewModel, { usageLabel: 'beats_scene_review' });
-      // "0 briefs rewritten" has meant three different things: a reviewer that
-      // genuinely found nothing, a reviewer TRUNCATED at its token cap (this
-      // story: out=16000, exactly the old budget), and a provider returning
-      // nothing at all (Lab #450: in=0 out=0 after 50s on an 80k prompt). Only
-      // the first is success — separate them or the log reports failure as a pass.
-      const srOutTok = srRes.usage?.output_tokens ?? null;
-      if (!String(srRes.text || '').trim() || srOutTok === 0) {
-        log.error(`❌ [BEATS] Scene review returned an EMPTY response (${srOutTok} output tokens) — briefs ship unreviewed`);
-        gl.warn('beats_scene_review_empty', `Scene review returned nothing (${srOutTok} output tokens) — provider failure, briefs shipped unreviewed`);
-      }
-      // TRUNCATION (textReplyGuard.js): a review cut at the ceiling rewrote the
-      // EARLIEST pages and never reached the ones it named — adopting the pages
-      // that fit would ship a half-review as a review. Fall back to the raw
-      // briefs (the input), exactly as the Lab guard does; the failure is
-      // recorded on the story (sceneReviewFailed) and in the generation log.
-      const srTruncated = !!srRes.truncation?.suspected;
-      if (srTruncated) {
-        sceneReviewFailed = `scene review ${textModels.describeTruncation(srRes.truncation)} — briefs shipped unreviewed`;
-        log.error(`❌ [BEATS] ${sceneReviewFailed}`);
-        gl.warn('beats_scene_review_truncated', sceneReviewFailed, null, srRes.truncation);
-      }
-      // BRIEF_TRAILING_MARKERS: the reply's optional ---VISUAL BIBLE---
-      // block follows the last page, and without a terminator it was appended
-      // to that page's brief and stored as part of it (p17 of
-      // job_1789759147125_p08djwhbl). The block itself is still read, from the
-      // RAW reply, by applyReviewBibleCorrections below.
-      const parsed = srTruncated ? { analysis: '', pages: [] } : parseRefinedText(srRes.text || '', expansions.map(x => x.pageNumber), 'SCENES', BRIEF_TRAILING_MARKERS);
-      sceneReviewAnalysis = parsed.analysis || '';
-      const byPage = new Map(parsed.pages.map(p => [p.pageNumber, p.text]));
-      const changed = [];
-      // Captured at the overwrite, the only moment both briefs exist.
-      const sceneDiffs = [];
-      for (const x of expansions) {
-        const reviewed = byPage.get(x.pageNumber);
-        if (reviewed && reviewed.trim()) {
-          const fixed = keepDeclaredLight(x.pageNumber,
-            keepDeclaredWornRows(x.pageNumber, reviewed, x.brief, 'scene review', gl),
-            x.brief, 'scene review', gl);
-          if (fixed !== x.brief) sceneDiffs.push({ pageNumber: x.pageNumber, before: x.brief, after: fixed });
-          x.brief = fixed;
-          x.reviewRewrote = true;
-          changed.push(x.pageNumber);
-        }
-      }
-      meta.timings.sceneReviewMs = Date.now() - t;
-
-      // FAULTED-BUT-NOT-REWRITTEN (owner, 2026-08-08). The reviewer is told to
-      // rewrite every page a check faulted, and it does not always comply: on
-      // job_1786193650012_7baiaeftb it named defects on pages 4, 8 and 13 and
-      // rewrote only 1, 2 and 3. Those defects then shipped, unremarked.
-      //
-      // Read the reviewer's OWN "FAULTED PAGES:" line (scene-review.txt output
-      // contract), never the free prose. The first version of this check
-      // regex-matched every "page N" in the analysis, so pages mentioned as
-      // PRAISE ("framing peaks on page 12") were reported as unfixed faults
-      // (job_1786277779744 flagged 1 and 13 that way). No line → the reviewer
-      // predates the contract → skip rather than guess.
-      const faultLine = sceneReviewAnalysis.match(/^\s*FAULTED PAGES?:\s*(.+)\s*$/mi);
-      const namedPages = faultLine
-        ? [...new Set((faultLine[1].match(/-?\d+/g) || [])
-            .map(Number)
-            .filter(n => expansions.some(x => x.pageNumber === n)))]
-        : null;
-      if (!faultLine) {
-        log.debug('[BEATS] Scene review analysis has no FAULTED PAGES line — incompleteness check skipped');
-      }
-      // DECLARED REMOVALS (owner decision 2026-09-13). A rewrite that drops a
-      // character used to be expressible only as an absence — no delta, no
-      // reason, and nothing parsed. `REMOVED CAST:` in the output contract is
-      // that channel; this reads it, then checks it against what actually
-      // happened to `characters[]`, page by page. Mechanical name-set
-      // arithmetic over the brief metadata only — never an inference from
-      // description prose.
-      //
-      // Detected AND REVERTED (2026-09-15, superseding the detect-only ruling
-      // of 2026-09-13). Evidence for the detection:
-      // job_1789207854566_l43qgl34w p7/p15, where five commissioned characters
-      // became "five soaked pirates: one in a blue tricorn…" with
-      // `characters: []` / `["Fiona"]` and nothing said. Evidence for the
-      // revert: job_1789420511893_zly5rcdej p16, where the error fired, the
-      // page rendered on the emptied cast anyway, and the corrupt contract
-      // produced a phantom CRITICAL against a child who IS in the prose — three
-      // repair rounds, and a correct original destroyed by the round-2 inpaint.
-      const castRemovals = parseCastRemovals(sceneReviewAnalysis);
-      const metaOf = (brief) => (extractSceneMetadata(brief) || {});
-      castRemovalsDeclared = castRemovals;
-      castRemovalAudit = diffCastRemovals(
-        sceneDiffs.map(d => {
-          const mb = metaOf(d.before), ma = metaOf(d.after);
-          // CAST UNPARSEABLE IS NOT CAST EMPTIED (2026-09-19). A brief whose
-          // parsers all failed comes back from the recovery path with
-          // `isRecovered: true` and an empty `characters[]`
-          // (sceneMetadata.js, describeDegradedSceneMetadata) — and the name
-          // arithmetic below would read that emptiness as the reviewer having
-          // silently dropped the entire page cast, then "restore" rows into a
-          // roster that in fact still lists them. Skip the page instead; a
-          // degraded brief is a known-recorded input, never a fault verdict.
-          if (ma.isRecovered === true) {
-            log.warn(`⚠️ [BEATS] Page ${d.pageNumber}: reviewed brief came back from the metadata recovery path — cast-removal diff skipped for this page (unparseable is not emptied)`);
-            return null;
-          }
-          // `objects[]` carries the Visual Bible secondaries. A name that moved
-          // there is still commissioned — routing, not removal.
-          return {
-            pageNumber: d.pageNumber,
-            beforeCast: mb.characters || [],
-            afterCast: ma.characters || [],
-            afterObjects: (ma.objects || []).map(o => (typeof o === 'string' ? o : (o && (o.id || o.name)))).filter(Boolean),
-          };
-        }).filter(Boolean),
-        castRemovals
-      );
-      if (castRemovals.malformed.length > 0) {
-        log.warn(`⚠️ [BEATS] Scene review REMOVED CAST line has ${castRemovals.malformed.length} unparseable entr(ies): ${castRemovals.malformed.join(' | ')}`);
-        gl.warn('beats_scene_review_removals_malformed', `REMOVED CAST entries could not be parsed: ${castRemovals.malformed.join(' | ')}`, null, castRemovals.malformed);
-      }
-      for (const r of castRemovalAudit) {
-        if (r.declared.length === 0) continue;
-        const why = (castRemovals.pages.find(p => p.pageNumber === r.pageNumber) || {}).reason || '(no reason given)';
-        log.info(`📣 [BEATS] Scene review DECLARED removal on page ${r.pageNumber}: ${r.declared.join(', ')} — ${why}`);
-        gl.info('beats_scene_review_removal_declared', `Page ${r.pageNumber}: reviewer removed ${r.declared.join(', ')} — ${why}`, null, r);
-      }
-      const undeclaredRemovals = castRemovalAudit.filter(r => r.undeclared.length > 0);
-      if (undeclaredRemovals.length > 0) {
-        const detail = undeclaredRemovals.map(r => `page ${r.pageNumber}: ${r.undeclared.join(', ')}`).join('; ');
-        log.error(`❌ [BEATS] Scene review removed cast WITHOUT declaring it — ${detail}`);
-        gl.error('beats_scene_review_removal_undeclared',
-          `Reviewer dropped character(s) from characters[] with no REMOVED CAST declaration — ${detail}`, null, undeclaredRemovals);
-        // The page does NOT render on a cast the reviewer silently emptied —
-        // but only the DROPPED NAMES come back (owner, 2026-09-17), spliced
-        // verbatim out of the pre-review brief's own `characters[]`. The rest
-        // of the reviewed brief stands. The whole-brief revert it supersedes
-        // cost p18 of job_1789584708605_rts4wqupm every other fix that review
-        // made (shipped at 45; the previous run's reviewed p18 scored 95).
-        // A page whose `characters[]` cannot be located structurally still
-        // falls back to the whole-brief revert — `changed` is trimmed there,
-        // before the faulted-but-not-rewritten check reads it.
-        const { restored, reverted } = restoreUndeclaredRemovals(expansions, sceneDiffs, changed, undeclaredRemovals);
-        if (restored.length > 0) {
-          const detail = restored.map(r => `page ${r.pageNumber}: ${r.names.join(', ')}`).join('; ');
-          log.warn(`↩️ [BEATS] Restored undeclared-removed cast into the reviewed brief — ${detail}`);
-          gl.warn('beats_scene_review_removal_restored',
-            `Dropped character(s) put back into the reviewed brief's characters[]; the rest of the review's fixes stand — ${detail}`,
-            null, restored);
-        }
-        if (reverted.length > 0) {
-          const pages = reverted.map(r => r.pageNumber).join(', ');
-          log.error(`↩️ [BEATS] Page(s) ${pages} reverted to the pre-review brief — the reviewed brief has no locatable characters[] to restore into`);
-          gl.warn('beats_scene_review_removal_reverted',
-            `Page(s) ${pages} shipped the PRE-REVIEW brief: the rewrite dropped cast with no declaration and its characters[] could not be located, so that page's review fixes were discarded with it`,
-            null, reverted);
-        }
-      }
-
-      // BIBLE CORRECTIONS (2026-09-14). The review may return an optional
-      // ---VISUAL BIBLE--- section correcting a stated object's state page
-      // ranges — the fault sceneBriefCheck's vb_state_* findings hand it. The
-      // merge is strict and fail-soft; see applyReviewBibleCorrections.
-      if (visualBible && !srTruncated) {
-        try {
-          // The handles the briefs ALREADY cite: a correction that renames one
-          // of them re-points a page at a different look (Lab 1264).
-          const citedHandles = new Set();
-          for (const ex of (Array.isArray(expansions) ? expansions : [])) {
-            const meta = extractSceneMetadata(ex && ex.brief) || {};
-            const objs = Array.isArray(meta.objects) ? meta.objects : [];
-            for (const o of objs) {
-              const h = typeof o === 'string' ? o.trim().toUpperCase() : '';
-              if (h.includes('.')) citedHandles.add(h);
-            }
-          }
-          const corr = applyReviewBibleCorrections(srRes.text || '', visualBible, beats.length, citedHandles);
-          bibleCorrections = corr;
-          for (const r of corr.rejected) {
-            log.warn(`⚠️ [BEATS] Scene review bible correction REJECTED for ${r.id}: ${r.reason}`);
-            gl.warn('beats_scene_review_bible_rejected', `Bible correction for ${r.id} rejected: ${r.reason}`, null, r);
-          }
-          if (corr.applied.length > 0) {
-            for (const e of corr.applied) {
-              log.info(`[VB-STATE] ${e.id} "${e.name}" ${e.oldPages} → ${e.newPages}`);
-            }
-            gl.info('beats_scene_review_bible',
-              `Scene review corrected ${corr.applied.length} stated object(s): `
-              + corr.applied.map(e => `${e.id} ${e.oldPages} → ${e.newPages}`).join('; '), null, corr);
-            // ONE SOURCE OF TRUTH: the transcript is what every later reader
-            // re-parses, exactly as the label round and the age clamp do.
-            const synced = syncVisualBibleSection(bibleSections, visualBible);
-            if (synced === bibleSections) {
-              log.warn('⚠️ [BEATS] Scene review bible correction could not be written back into the transcript — downstream re-parses will read the UNCORRECTED bible');
-              gl.warn('beats_vb_sync_failed', 'Scene review bible correction could not be written back into the transcript — stored bible will not reflect it');
-            } else {
-              bibleSections = synced;
-            }
-          }
-        } catch (bcErr) {
-          log.warn(`⚠️ [BEATS] Scene review bible correction failed (${bcErr.message}) — bible unchanged`);
-        }
-      }
-
-      const faultedNotFixed = (namedPages || []).filter(n => !changed.includes(n));
-      if (faultedNotFixed.length > 0) {
-        log.warn(`⚠️ [BEATS] Scene review named page(s) ${faultedNotFixed.join(', ')} but rewrote none of them`);
-        gl.warn('beats_scene_review_incomplete',
-          `Reviewer named page(s) ${faultedNotFixed.join(', ')} in its analysis but rewrote only ${changed.length ? changed.join(', ') : 'nothing'} — those findings shipped unfixed`);
-      }
-
-      // RE-CHECK. The clothing findings were handed to the reviewer above;
-      // whether it acted on them is not a matter of trust. The check is free
-      // and deterministic, so run it again on the rewritten briefs and say what
-      // survived instead of shipping it quietly (owner rule: fail loudly).
-      //
-      // ON EVERY REVIEWED RUN, not only when the pre-review check found
-      // something (2026-09-23). A rewrite can INTRODUCE a clothing fault on a
-      // page that was clean when it was handed over — the same failure mode the
-      // brief re-check below documents. Gated on pre-review findings, a
-      // review-introduced `removal_unstated` could never reach the worn-state
-      // round: on staging job_1790100385959_1nitlympp the pre-review check
-      // found nothing, the review deleted declared rows on p11, p12 and p18,
-      // and nothing looked again.
-      {
-        try {
-          const { checkScenes } = require('./clothingCheck');
-          const after = checkScenes(expansions.map(x => {
-            const m2 = extractSceneMetadata(x.brief) || {};
-            return {
-              pageNumber: x.pageNumber,
-              prose: splitBrief(x.brief).prose,
-              cast: (m2.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
-              perCharClothing: m2.characterClothing || {},
-              wornItems: m2.wornItems || [],
-            };
-          }), clothingRequirements, { artifacts: (visualBible || {}).artifacts, visualBible });
-          const REVIEWABLE = new Set(['outfit_misattributed', 'removal_unstated']);
-          const left = after.findings.filter(f => REVIEWABLE.has(f.type));
-          clothingUnfixedList = left;
-          const before = clothingByPage ? [...clothingByPage.values()].flat().filter(f => REVIEWABLE.has(f.type)).length : 0;
-          if (left.length > 0) {
-            const pages = [...new Set(left.map(f => f.pageNumber))].sort((a, b) => a - b).join(', ');
-            log.warn(`⚠️ [BEATS] clothing check after review: ${left.length} fault(s) present on page(s) ${pages} (${before} handed to the review)`);
-            gl.warn('beats_clothing_unfixed',
-              `Clothing faults present after the scene review on page(s) ${pages} (${before} were handed to it): ${left.map(f => `p${f.pageNumber} ${f.type} (${f.character})`).join('; ')}`);
-          } else if (before > 0) {
-            log.info(`👕 [BEATS] clothing check after review: all ${before} fault(s) resolved`);
-          }
-
-          // FED-BACK WORN-STATE ROUND (owner ruling 2026-09-06). The old prose
-          // finding was handed to the review on 9 pages of
-          // job_1788641639919_mpjwlzkf1 and fixed on 0 of them. It is now a
-          // missing FIELD, so the retry can name exactly what to add and the
-          // re-check can verify it — the same shape as the brief second round
-          // below and the landmark minimum-2 retry (cadd4ee72).
-          //
-          // Exactly ONE extra round. Strike two SHIPS: a WARN, a stored
-          // `wornStateUnresolved` flag on the page, and the state defaults to
-          // "worn" because the avatar reference wears the full outfit. A
-          // guideline never kills a paid run.
-          const wornLeft = left.filter(f => f.type === 'removal_unstated');
-          if (wornLeft.length > 0) {
-            const wornPages = new Set(wornLeft.map(f => f.pageNumber));
-            const subset = expansions.filter(x => wornPages.has(x.pageNumber));
-            const subsetByPage = new Map();
-            for (const [pn, list] of after.byPage) {
-              const rows = list.filter(f => f.type === 'removal_unstated');
-              if (rows.length > 0 && wornPages.has(pn)) subsetByPage.set(pn, rows);
-            }
-            const { renderFindingsBlock: renderClothing2 } = require('./clothingCheck');
-            const wrPrompt = buildSceneReviewPrompt(
-              inputData,
-              subset.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
-              { clothingFindings: renderClothing2(subsetByPage), beats, clothingRequirements },
-            );
-            const label = [...wornPages].sort((a, b) => a - b).join(', ');
-            if (!wrPrompt) {
-              log.warn(`⚠️ [BEATS] worn-state round skipped (no review template) — page(s) ${label} ship flagged`);
-              wornUnresolved = wornLeft;
-            } else {
-              try {
-                log.info(`🎩 [BEATS] worn-state round on page(s) ${label} (${subset.length}/${expansions.length} briefs)`);
-                const wrRes = await textModels.callTextModelStreaming(wrPrompt, null, onChunk, sceneReviewModel, { usageLabel: 'beats_scene_review_worn' });
-                // A cut round is a failed round — the catch below keeps the
-                // briefs as they were and ships the pages flagged.
-                if (wrRes.truncation?.suspected) throw new Error(`reply ${textModels.describeTruncation(wrRes.truncation)}`);
-                const wrParsed = parseRefinedText(wrRes.text || '', subset.map(x => x.pageNumber), 'SCENES', BRIEF_TRAILING_MARKERS);
-                const wrByPage = new Map(wrParsed.pages.map(pg => [pg.pageNumber, pg.text]));
-                for (const x of subset) {
-                  const reworn = wrByPage.get(x.pageNumber);
-                  const fixed = reworn && reworn.trim()
-                    ? keepDeclaredLight(x.pageNumber, keepDeclaredWornRows(x.pageNumber, reworn, x.brief, 'worn-state round', gl), x.brief, 'worn-state round', gl)
-                    : reworn;
-                  if (fixed && fixed.trim() && fixed !== x.brief) {
-                    sceneDiffs.push({ pageNumber: x.pageNumber, before: x.brief, after: fixed, round: 'worn' });
-                    x.brief = fixed;
-                    x.reviewRewrote = true;
-                  }
-                }
-                const after3 = checkScenes(expansions.map(x => {
-                  const m3 = extractSceneMetadata(x.brief) || {};
-                  return {
-                    pageNumber: x.pageNumber,
-                    prose: splitBrief(x.brief).prose,
-                    cast: (m3.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
-                    perCharClothing: m3.characterClothing || {},
-                    wornItems: m3.wornItems || [],
-                  };
-                }), clothingRequirements, { artifacts: (visualBible || {}).artifacts, visualBible });
-                wornUnresolved = after3.findings.filter(f => f.type === 'removal_unstated');
-                clothingUnfixedList = after3.findings.filter(f => REVIEWABLE.has(f.type));
-                wornRound = {
-                  pages: [...wornPages].sort((a, b) => a - b),
-                  before: wornLeft.length,
-                  after: wornUnresolved.length,
-                  usage: wrRes.usage || null,
-                };
-              } catch (wrErr) {
-                log.warn(`⚠️ [BEATS] worn-state round failed (${wrErr.message}) — page(s) ${label} ship flagged`);
-                wornUnresolved = wornLeft;
-              }
-            }
-            if (wornUnresolved.length === 0) {
-              log.info(`🎩 [BEATS] worn-state round resolved all ${wornLeft.length} fault(s)`);
-              gl.info('beats_worn_state_round', `Worn-state round on page(s) ${label} resolved all ${wornLeft.length} fault(s)`);
-            } else {
-              const d = wornUnresolved.map(f => `p${f.pageNumber} ${f.artifactId || ''} (${f.character})`).join('; ');
-              wornUnresolvedPages = [...new Set(wornUnresolved.map(f => f.pageNumber))].sort((a, b) => a - b);
-              log.warn(`⚠️ [BEATS] worn state STILL undeclared on page(s) ${wornUnresolvedPages.join(', ')} — shipping flagged, state defaults to worn: ${d}`);
-              gl.warn('beats_worn_state_unresolved',
-                `Worn-item state undeclared after the fed-back round on page(s) ${wornUnresolvedPages.join(', ')} — pages ship with wornStateUnresolved and the item defaults to worn: ${d}`,
-                null, { findings: wornUnresolved });
-              for (const x of expansions) {
-                if (wornUnresolvedPages.includes(x.pageNumber)) x.wornStateUnresolved = true;
-              }
-            }
-          }
-        } catch (rcErr) {
-          log.warn(`⚠️ [BEATS] clothing re-check failed (${rcErr.message})`);
-        }
-      }
-
-      // RE-CHECK the brief faults — on EVERY page, not only the ones that
-      // faulted before. This check's failure mode runs the opposite way to
-      // clothing's: the reviewer can CREATE a fault while resolving a
-      // different one, on a page that was clean when it was handed over.
-      //
-      // Measured on staging job_1787638394061_hs70901tfsn p1. Pre-review the
-      // page carried one fault, cast_unlisted — the prose described a
-      // secondary character its own characters[] omitted. The reviewer
-      // resolved it exactly as asked, by adding that character to the page —
-      // and gave them an interaction row with a second action. The page
-      // shipped declaring two actions, on the pipeline whose entire purpose is
-      // one, and scored semantic 40. The checks had run once, before the
-      // review, so nothing ever looked at the rewrite.
-      //
-      // Reports, never repairs: the reviewer authored both halves and the
-      // owner's 2026-08-11 decision keeps this side advisory. An INTRODUCED
-      // fault is the louder of the two — it means the fix instruction itself
-      // is producing defects.
-      try {
-        const { checkScenes: checkBriefs, REVIEWABLE } = require('./sceneBriefCheck');
-        const after = checkBriefs(
-          expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief, planLine: planLineOf(x.pageNumber) })),
-          briefCastNames,
-          visualBible,
-          { textZoneRules: textZoneRulesActive(inputData) }
-        );
-        // pageNumber 0 is the whole-book text-position tally, reported on its
-        // own line below rather than mixed into the per-page fault list.
-        const left = after.findings.filter(f => REVIEWABLE.has(f.type) && f.pageNumber !== 0);
-        const bookLevel = after.findings.filter(f => REVIEWABLE.has(f.type) && f.pageNumber === 0);
-        if (bookLevel.length > 0) {
-          const d = bookLevel.map(f => f.type).join('; ');
-          log.warn(`⚠️ [BEATS] text-position distribution after review: ${d}`);
-          gl.warn('beats_textzone_distribution', `Text-position distribution still off after the scene review: ${d}`, null, { findings: bookLevel });
-        }
-        // THE VERDICT IS SHARED (2026-09-17). This partition — introduced vs
-        // survived, keyed by (page, type) — is briefCorrection.judgeCorrection,
-        // and the rewrite path's corrective re-ask now reaches the same
-        // function through correctFindings. It used to hand-roll
-        // `after.length < before.length` instead, which scores a correction
-        // that swaps one fault for another as EQUAL and rejects it; measured
-        // over 11 stored rounds it resolved nothing on any of them.
-        // `advisory` is this path's ruling (owner, 2026-08-11): the reviewer
-        // authored both halves, so its rewrite stands and its faults are
-        // reported.
-        const { introduced, survived } = judgeCorrection({ before: briefBefore, after: left, acceptance: 'advisory' });
-        briefUnfixedList = left;
-        briefIntroducedList = introduced;
-        if (introduced.length > 0) {
-          const d = introduced.map(f => `p${f.pageNumber} ${f.type}`).join('; ');
-          log.warn(`⚠️ [BEATS] brief check after review: ${introduced.length} fault(s) INTRODUCED by the rewrite — ${d}`);
-          gl.warn('beats_brief_introduced',
-            `The scene review introduced ${introduced.length} new brief fault(s) while rewriting: ${d}`, null, { findings: introduced });
-        }
-        if (survived.length > 0) {
-          const d = survived.map(f => `p${f.pageNumber} ${f.type}`).join('; ');
-          log.warn(`⚠️ [BEATS] brief check after review: ${survived.length} fault(s) survived — ${d}`);
-          gl.warn('beats_brief_unfixed', `Brief faults survived the scene review: ${d}`, null, { findings: survived });
-        }
-        if (left.length === 0) log.info('🧩 [BEATS] brief check after review: clean');
-
-        // NO SECOND MODEL ROUND (owner, 2026-09-11). A targeted second
-        // reviewer call used to re-send the faulted pages here. Measured over
-        // two reruns it broke even: on the dragon rerun it cleared
-        // interaction_object_shared_hands and the p12/p13 trough plate but
-        // INTRODUCED interaction_multiple_actions on p1 (it split one action
-        // back into two), and on the pirate rerun it changed nothing at all.
-        // A paid call that trades one fault for another is not worth making.
-        // The deterministic re-check above stays — it costs nothing and is the
-        // diagnostic signal — so faults are reported and ship flagged, which
-        // is the same contract round 2 had on the pages it failed to fix.
-
-        // REWRITE-UNTIL-ZERO verdict for the two one-moment types, after the
-        // single review round. Measured on staging
-        // job_1788816451791_25b31uqlp: 11 of 18 pages shipped over budget after
-        // two rounds, and on every one of them the brief's own objects[] was
-        // already within three — the surplus came from the bible's
-        // appearsInPages, which no rewrite can withdraw. Saying so per page is
-        // the difference between "the reviewer ignored the fault" and "the
-        // fault is not the reviewer's to fix".
-        const ZERO_TYPES = ['interaction_multiple_actions', 'vb_element_overflow'];
-        const zeroLeft = briefUnfixedList.filter(f => ZERO_TYPES.includes(f.type) && f.pageNumber !== 0);
-        if (zeroLeft.length > 0) {
-          const { rankPageElements, VB_ELEMENT_BUDGET } = require('./vbElementBudget');
-          const pagesOf = (type) => [...new Set(zeroLeft.filter(f => f.type === type).map(f => f.pageNumber))].sort((a, b) => a - b);
-          const overflowDetail = pagesOf('vb_element_overflow').map((pn) => {
-            const x = expansions.find(e => e.pageNumber === pn);
-            const meta = x ? (extractSceneMetadata(x.brief) || {}) : {};
-            const ranked = rankPageElements(pn, meta, visualBible);
-            const objectsAsked = ranked.filter(e => e.fromObjects).length;
-            return { pageNumber: pn, elements: ranked.length, objectsAsked, briefFixable: objectsAsked > VB_ELEMENT_BUDGET };
-          });
-          rewriteToZeroUnfixed = {
-            interaction_multiple_actions: pagesOf('interaction_multiple_actions'),
-            vb_element_overflow: pagesOf('vb_element_overflow'),
-            vbOverflowDetail: overflowDetail,
-            rounds: 1,
-          };
-          const parts = [];
-          if (rewriteToZeroUnfixed.interaction_multiple_actions.length) parts.push(`two actions on page(s) ${rewriteToZeroUnfixed.interaction_multiple_actions.join(', ')}`);
-          if (rewriteToZeroUnfixed.vb_element_overflow.length) {
-            const bibleSide = overflowDetail.filter(d => !d.briefFixable).map(d => d.pageNumber);
-            parts.push(`over the ${VB_ELEMENT_BUDGET}-element budget on page(s) ${rewriteToZeroUnfixed.vb_element_overflow.join(', ')}`
-              + (bibleSide.length ? ` (bible-side on ${bibleSide.join(', ')} — the brief cites ≤${VB_ELEMENT_BUDGET}, the surplus is appearsInPages)` : ''));
-          }
-          log.warn(`⚠️ [BEATS] rewrite-until-zero NOT reached after ${rewriteToZeroUnfixed.rounds} round(s): ${parts.join('; ')} — shipping flagged`);
-          gl.warn('beats_one_moment_unfixed', `Briefs still ${parts.join('; ')} after the review's round budget — shipped flagged, never killed`, null, rewriteToZeroUnfixed);
-        }
-      } catch (rcErr) {
-        log.warn(`⚠️ [BEATS] brief re-check failed (${rcErr.message})`);
-      }
-
-      sceneReviewReport = {
-        model: srRes.modelId || sceneReviewModel,
-        durationMs: meta.timings.sceneReviewMs,
-        changedPages: sceneDiffs.map(d => d.pageNumber),
-        namedButNotRewritten: faultedNotFixed,
-        // The reviewer's declared-removals channel and the mechanical audit of
-        // it (2026-09-13). `castRemovalAudit` holds one row per page that lost
-        // a name, split into `declared` / `undeclared`.
-        castRemovals: castRemovalsDeclared,
-        castRemovalAudit,
-        failed: sceneReviewFailed,
-        analysis: sceneReviewAnalysis,
-        // WITHOUT `before`: every one of those strings was byte-identical to
-        // the same page's entry in `briefsIn` below (17/17 pages, 32k of JSONB,
-        // job_1789853503332_riqncqg1i). `briefsIn` is the pre-review snapshot of
-        // EVERY page, changed or not, so it already holds each row's before —
-        // readers resolve it from there (storyMetrics.churnFromReport,
-        // StoryDisplay's diff panel).
-        pages: sceneDiffs.map(({ before, ...row }) => row), // eslint-disable-line no-unused-vars
-        // Dev-mode inspection (owner request 2026-08-09): the exact prompt the
-        // reviewer received, every brief as sent, and the clothing trail — so
-        // "it rewrote nothing" can be diagnosed without the DB.
-        prompt: srPrompt,
-        briefsIn,
-        clothingFindings: clothingFindings || null,
-        briefFindings: briefFindings || null,
-        clothingUnfixed: clothingUnfixedList,
-        wornUnresolved,
-        wornUnresolvedPages,
-        wornRound,
-        // The VB label round writes its outcome to `meta` at adoption time;
-        // without this line it reached no stored report (job_1789337998754_apslnsq1z
-        // had valid labels and a null labelRound everywhere).
-        labelRound: meta.labelRound || null,
-        // {applied, rejected} from the review's ---VISUAL BIBLE--- section.
-        bibleCorrections,
-        briefUnfixed: briefUnfixedList,
-        briefIntroduced: briefIntroducedList,
-        rewriteToZeroUnfixed,
-      };
-      gl.info('beats_scene_review', `Scene review by ${srRes.modelId || sceneReviewModel}: ${changed.length} brief(s) rewritten (${(meta.timings.sceneReviewMs / 1000).toFixed(1)}s)`, null, {
-        changedPages: changed, model: srRes.modelId || sceneReviewModel,
-      });
-    } catch (err) {
-      log.warn(`🚨 [BEATS] Scene review failed (${err.message}) — proceeding with unreviewed briefs`);
-      gl.warn('beats_scene_review_failed', `Reviewer ${sceneReviewModel} failed: ${err.message} — briefs shipped unreviewed`);
-    }
-  }
+  const reviewOut = await runSceneReview({
+    inputData, expansions, clothingRequirements, visualBible, briefBeats, beats, bibleSections, meta, sceneReviewModel, stage, onChunk, gl,
+  });
+  const sceneReviewAnalysis = reviewOut.sceneReviewAnalysis;
+  const sceneReviewReport = reviewOut.sceneReviewReport;
+  bibleSections = reviewOut.bibleSections;
 
   // VB ELEMENT BUDGET — REPORTED HERE, NEVER ENFORCED (owner, 2026-09-11).
   // `truncateBriefToBudget` used to cut each brief's `objects[]` down to the
@@ -3876,4 +3913,4 @@ ${bibleBody}` : bibleBody;
   return { title, titleJudge, beats, pages, scenes, coverScenes, rawOutline, visualBible, meta, challengeDrawIds, challengeTakenIds, challengeDraw, arcReviewReport, beatsReviewReport, storyBibleReport, clothingReviewReport, wardrobeBibleReport, sceneExpansionReport, sceneReviewReport };
 }
 
-module.exports = { generateStoryViaBeats, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };
+module.exports = { generateStoryViaBeats, runSceneReview, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };

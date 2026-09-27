@@ -36,7 +36,8 @@ describe('the scene stage keeps the prompt that wrote the briefs', () => {
   it('is built OUTSIDE the scene-review branch, so an unreviewed run still carries it', () => {
     // sceneReviewReport is assigned only where the review template loaded.
     const buildIdx = beats.indexOf('const sceneExpansionReport');
-    const reviewIdx = beats.indexOf('let sceneReviewReport = null;');
+    // The review runs in runSceneReview since 2026-09-27; its call site is the review section.
+    const reviewIdx = beats.indexOf('const reviewOut = await runSceneReview({');
     expect(buildIdx).toBeGreaterThan(-1);
     expect(reviewIdx).toBeGreaterThan(-1);
     expect(buildIdx, 'the AD report must be built before the review section begins').toBeLessThan(reviewIdx);

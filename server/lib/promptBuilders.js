@@ -11669,7 +11669,9 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
   // Check 0 is about the MECHANICAL CLOTHING FAULTS section and is sent only
   // with it (2026-09-23): with no section it told the reviewer about a block
   // that is not there.
-  const rawTemplate = PROMPT_TEMPLATES.sceneReview;
+  // options.template: a Test Lab A/B replacement for the loaded template, for
+  // this call only (PROMPT_TEMPLATES is never mutated). The run passes none.
+  const rawTemplate = options.template || PROMPT_TEMPLATES.sceneReview;
   const template = rawTemplate && (options.clothingFindings
     ? rawTemplate.replace(/<!-- CLOTHING_MECHANICAL_(BEGIN|END) -->\n?/g, '')
     : rawTemplate.replace(/<!-- CLOTHING_MECHANICAL_BEGIN -->[\s\S]*?<!-- CLOTHING_MECHANICAL_END -->\n?/g, ''));

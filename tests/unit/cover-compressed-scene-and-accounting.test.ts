@@ -220,7 +220,10 @@ describe('the scene-review replay is given the Visual Bible, as production is', 
     // OBJECTS` block at all, so a replay can never see a state's page range,
     // never emit a corrected entry, and check 9f under-reports against the
     // production run the stage exists to mirror.
-    expect(testlab).toMatch(/prompt = buildSceneReviewPrompt\(storyData, scenes, \{[\s\S]{0,200}?visualBible: storyData\.visualBible,/);
+    // Since 2026-09-27 the replay runs the run's own review (beatsPipeline.runSceneReview),
+    // handed the bible the reviewer was given (stored `visualBibleIn`, else the story's).
+    expect(testlab).toMatch(/await runSceneReview\(\{/);
+    expect(testlab).toContain('const bibleIn = storedReport.visualBibleIn || storyData.visualBible || null;');
   });
 
   it('the block it unlocks lists a stated object with its state page ranges', async () => {

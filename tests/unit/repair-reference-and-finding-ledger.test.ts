@@ -124,16 +124,20 @@ describe('the scene-review replay passes all four options production passes', ()
   const testlab = read('server/lib/testlab.js');
 
   it('the replay stage passes brief findings alongside clothing, beats and the bible', () => {
-    expect(testlab).toMatch(/prompt = buildSceneReviewPrompt\(storyData, scenes, \{[\s\S]{0,300}?briefFindings: briefFindingsBlock,/);
-    expect(testlab).toMatch(/prompt = buildSceneReviewPrompt\(storyData, scenes, \{[\s\S]{0,300}?visualBible: storyData\.visualBible,/);
+    // Since 2026-09-27 the replay runs the run's own review, which builds all four.
+    expect(testlab).toMatch(/await runSceneReview\(\{/);
+    const beats = read('server/lib/beatsPipeline.js');
+    expect(beats).toMatch(/\{ clothingFindings, briefFindings, beats: briefBeats, visualBible, clothingRequirements, \.\.\.labPromptOptions \}/);
   });
 
   it('it computes them from the same check production runs, with the bible secondaries in the cast', () => {
     // A figure the story invents can never trigger cast_unlisted unless the
     // bible's secondaries are in the name list — the same reason beatsPipeline
     // builds it that way.
-    expect(testlab).toMatch(/require\('\.\/sceneBriefCheck'\)/);
-    expect(testlab).toMatch(/visualBible\?\.secondaryCharacters/);
+    const beats = read('server/lib/beatsPipeline.js');
+    const review = beats.slice(beats.indexOf('async function runSceneReview('), beats.indexOf('return { sceneReviewReport, sceneReviewAnalysis'));
+    expect(review).toMatch(/require\('\.\/sceneBriefCheck'\)/);
+    expect(review).toMatch(/visualBible\?\.secondaryCharacters/);
   });
 
   it('the block only reaches the reviewer when the option is passed', async () => {

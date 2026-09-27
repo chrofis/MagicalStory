@@ -129,7 +129,9 @@ describe('every brief-reply parser passes the terminator', () => {
       }
     }
     // A call site deleted without replacement would pass the loop above.
-    expect(seen.length).toBeGreaterThanOrEqual(6);
+    // The scene-review replay's own parse went with its reimplementation on
+    // 2026-09-27: it runs beatsPipeline.runSceneReview, whose parses are counted above.
+    expect(seen.length).toBeGreaterThanOrEqual(5);
   });
 
   it('the constant names the block the two brief templates actually emit', () => {
