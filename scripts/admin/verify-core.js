@@ -196,7 +196,92 @@ function markVerdict(reg, run, { id, verdict, note, by }, { checkedAt }) {
   return e;
 }
 
+/**
+ * Apply a verdicts file from the review page (scripts/admin/verify-review.js):
+ * every confirmed / failed item becomes a markVerdict; undecided items are
+ * left alone. Throws on a file for another story, before writing anything.
+ * @returns {{ marked: string[], skipped: string[] }}
+ */
+function applyVerdictsFile(reg, run, file, { checkedAt }) {
+  if (!file || file.storyId !== run.storyId) throw new Error(`verdicts file is for ${file?.storyId}, not ${run.storyId}`);
+  if (file.env && file.env !== run.env) throw new Error(`verdicts file is for ${file.env}, not ${run.env}`);
+  const marked = [];
+  const skipped = [];
+  const decided = (file.verdicts || []).filter(v => v.verdict === 'confirmed' || v.verdict === 'failed');
+  for (const v of decided) {
+    if (!reg.entries.some(e => e.id === v.id)) throw new Error(`no entry "${v.id}"`);
+    if (!v.note || !String(v.note).trim()) throw new Error(`verdict for ${v.id} needs a note`);
+  }
+  for (const v of file.verdicts || []) {
+    if (v.verdict === 'confirmed' || v.verdict === 'failed') {
+      markVerdict(reg, run, { id: v.id, verdict: v.verdict, note: String(v.note), by: v.by || 'owner' }, { checkedAt });
+      marked.push(`${v.id}:${v.verdict}`);
+    } else skipped.push(v.id);
+  }
+  return { marked, skipped };
+}
+
+// ---------------------------------------------------------------------------
+// Images for a human look (scripts/admin/verify-review.js)
+// ---------------------------------------------------------------------------
+
+/**
+ * Image kinds an entry's check can name in check.images:
+ *   pages     the version the book shows, per page
+ *   versions  every stored version of each page that has more than one
+ *   plates    the empty_scene plate of each page
+ *   covers    front cover, dedication page, back cover (latest version)
+ *   sheets    each styled avatar sheet generated in the run
+ */
+const IMAGE_KINDS = ['pages', 'versions', 'plates', 'covers', 'sheets'];
+
+function latestRow(rows, type, pn) {
+  return rows.filter(r => r.image_type === type && (pn == null || Number(r.page_number) === pn))
+    .sort((a, b) => b.version_index - a.version_index)[0] || null;
+}
+
+/** [{ label, url }] for the named kinds; an unknown kind throws (a typo must not show nothing). */
+function imagesFor(kinds, ctx) {
+  const rows = ctx.images || [];
+  const meta = ctx.versionMeta || {};
+  const pageNums = [...new Set(rows.filter(r => r.image_type === 'scene' && Number(r.page_number) > 0).map(r => Number(r.page_number)))].sort((a, b) => a - b);
+  const out = [];
+  for (const k of kinds || []) {
+    if (!IMAGE_KINDS.includes(k)) throw new Error(`unknown image kind "${k}" (known: ${IMAGE_KINDS.join(', ')})`);
+    if (k === 'pages') {
+      for (const pn of pageNums) {
+        const active = meta[String(pn)]?.activeVersion;
+        const r = active != null
+          ? rows.find(x => x.image_type === 'scene' && Number(x.page_number) === pn && Number(x.version_index) === Number(active))
+          : latestRow(rows, 'scene', pn);
+        if (r) out.push({ label: `p${pn}${active != null ? ` v${active}` : ''}`, url: r.image_url });
+      }
+    } else if (k === 'versions') {
+      for (const pn of pageNums) {
+        const vs = rows.filter(r => r.image_type === 'scene' && Number(r.page_number) === pn).sort((a, b) => a.version_index - b.version_index);
+        if (vs.length > 1) for (const r of vs) out.push({ label: `p${pn} v${r.version_index}`, url: r.image_url });
+      }
+    } else if (k === 'plates') {
+      for (const pn of pageNums) { const r = latestRow(rows, 'empty_scene', pn); if (r) out.push({ label: `p${pn} plate`, url: r.image_url }); }
+    } else if (k === 'covers') {
+      for (const t of ['frontCover', 'initialPage', 'backCover']) { const r = latestRow(rows, t, null); if (r) out.push({ label: t, url: r.image_url }); }
+    } else if (k === 'sheets') {
+      for (const s of ctx.data?.styledAvatarGeneration || []) {
+        const url = s?.output?.imageUrl;
+        if (url) out.push({ label: `${s.characterName || '?'} sheet${s.clothingCategory ? ` (${s.clothingCategory})` : ''}`, url });
+      }
+    }
+  }
+  return out;
+}
+
+/** Image URLs a check put in its human instruction. */
+function urlsIn(text) {
+  return [...new Set(String(text || '').match(/https?:\/\/[^\s|,)]+?\.(?:jpe?g|png|webp)/gi) || [])];
+}
+
 module.exports = {
-  RESULTS, ASSUME_CONTAINED,
+  RESULTS, ASSUME_CONTAINED, IMAGE_KINDS,
   loadRun, judge, verdictOf, judgeAll, verdictsFromReport, applyVerdicts, recordedStoryIds, markVerdict, noteOf,
+  applyVerdictsFile, imagesFor, urlsIn,
 };

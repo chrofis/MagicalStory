@@ -1,5 +1,5 @@
 {
-  "_readme": "VERIFICATION REGISTRY. A behaviour change whose proof needs a story run gets an entry here in the same push (pre-push gate scripts/admin/check-verify-coupling.js; escape: a `Verify: none (<reason>)` or `Verify: <entry-id>` commit trailer). RULE (owner, 2026-09-27): after EVERY verification run, `node scripts/admin/verify-run.js <storyId> [--env=prod] --write` and commit this file; the pre-push hook warns (never blocks) while a staging run since 2026-09-24 is unrecorded (`verify-run.js --unrecorded`). The checker judges every pending entry against the stored run: CONFIRMED / FAILED / HUMAN / NOT COVERED. A run is evidence only for commits its recorded build (stories.data.analytics.build.commitFull) contains; an absent run shape (no over-the-shoulder page, no iterate repair ...) is NOT COVERED, never a pass. --write (rules in scripts/admin/verify-core.js applyVerdicts): CONFIRMED appends evidence and sets status confirmed; FAILED appends evidence and sets status failed (add a tasks/BACKLOG.md line); HUMAN and NOT COVERED leave the status alone and overwrite lastChecked {storyId, env, build, runDate, checkedAt, result, note}; the run is logged once in runs[]. A person's verdict (Claude or the owner, after looking): `--mark=<id>:confirmed|failed --note=\"what was seen\" --by=claude|owner`. Fields: id; title; commits (every one must be in the run's build); addedAt; claim (what a new run must show, one sentence); runShape (all must hold: any | full-story | trial | age-band:N (or N|M) | needs-shot:<shot> | needs-iterate-repair | needs-char-fix | needs-inpaint | needs-fresh-idea | needs-worn-off | needs-fresh-avatar-sheet | needs-composite | lab-stage — defined in scripts/admin/verify-checks.js SHAPES); check ({kind:'auto', fn} names a function in verify-checks.js, {kind:'human', what} says what to look at); status (pending | confirmed | failed | superseded); evidence[] (appended by --write or --mark; never edited by hand, never deleted); lastChecked (the last run a HUMAN / NOT COVERED verdict was read against); triage (a hand-recorded status decision made from stored data outside the checker: {date, status, note}). Entries are never deleted: a change that is replaced becomes superseded with a note.",
+  "_readme": "VERIFICATION REGISTRY. A behaviour change whose proof needs a story run gets an entry here in the same push (pre-push gate scripts/admin/check-verify-coupling.js; escape: a `Verify: none (<reason>)` or `Verify: <entry-id>` commit trailer). RULE (owner, 2026-09-27): after EVERY verification run, `node scripts/admin/verify-run.js <storyId> [--env=prod] --write` and commit this file; the pre-push hook warns (never blocks) while a staging run since 2026-09-24 is unrecorded (`verify-run.js --unrecorded`). The checker judges every pending entry against the stored run: CONFIRMED / FAILED / HUMAN / NOT COVERED. A run is evidence only for commits its recorded build (stories.data.analytics.build.commitFull) contains; an absent run shape (no over-the-shoulder page, no iterate repair ...) is NOT COVERED, never a pass. --write (rules in scripts/admin/verify-core.js applyVerdicts): CONFIRMED appends evidence and sets status confirmed; FAILED appends evidence and sets status failed (add a tasks/BACKLOG.md line); HUMAN and NOT COVERED leave the status alone and overwrite lastChecked {storyId, env, build, runDate, checkedAt, result, note}; the run is logged once in runs[]. The staging server judges every completed story into story_verify_reports; `verify-run.js --pull` writes those reports here (containment re-checked with git). HUMAN entries a run exercises: `node scripts/admin/verify-review.js <storyId>` writes one local HTML page with the images, the claim and a verdict control; its downloaded verdicts file is recorded with `verify-run.js <storyId> --apply=<file>`. A person's verdict (Claude or the owner, after looking): `--mark=<id>:confirmed|failed --note=\"what was seen\" --by=claude|owner`. Fields: id; title; commits (every one must be in the run's build); addedAt; claim (what a new run must show, one sentence); runShape (all must hold: any | full-story | trial | age-band:N (or N|M) | needs-shot:<shot> | needs-iterate-repair | needs-char-fix | needs-inpaint | needs-fresh-idea | needs-worn-off | needs-fresh-avatar-sheet | needs-composite | lab-stage — defined in scripts/admin/verify-checks.js SHAPES); check ({kind:'auto', fn} names a function in verify-checks.js, {kind:'human', what} says what to look at; optional images: [pages | versions | plates | covers | sheets] names what the review page shows); status (pending | confirmed | failed | superseded); evidence[] (appended by --write or --mark; never edited by hand, never deleted); lastChecked (the last run a HUMAN / NOT COVERED verdict was read against); triage (a hand-recorded status decision made from stored data outside the checker: {date, status, note}). Entries are never deleted: a change that is replaced becomes superseded with a note.",
   "entries": [
     {
       "id": "aerial-not-owed",
@@ -667,7 +667,10 @@
       ],
       "check": {
         "kind": "auto",
-        "fn": "groupedFaceFix"
+        "fn": "groupedFaceFix",
+        "images": [
+          "versions"
+        ]
       },
       "status": "pending",
       "evidence": [
@@ -807,7 +810,10 @@
       ],
       "check": {
         "kind": "human",
-        "what": "sceneReviewReport.analysis [facing_not_per_character] lines and briefUnfixed; then read sceneDescription of each 3+-figure page for a per-figure facing clause"
+        "what": "sceneReviewReport.analysis [facing_not_per_character] lines and briefUnfixed; then read sceneDescription of each 3+-figure page for a per-figure facing clause",
+        "images": [
+          "pages"
+        ]
       },
       "status": "pending",
       "evidence": [
@@ -901,7 +907,10 @@
       ],
       "check": {
         "kind": "human",
-        "what": "read each trial page's emptyScenePrompt for the sentence naming the attached reference; look at the plate (story_images empty_scene) against its landmark photo"
+        "what": "read each trial page's emptyScenePrompt for the sentence naming the attached reference; look at the plate (story_images empty_scene) against its landmark photo",
+        "images": [
+          "plates"
+        ]
       },
       "status": "pending",
       "evidence": [],
@@ -920,7 +929,11 @@
       ],
       "check": {
         "kind": "human",
-        "what": "compare stories.data.season with the trial's styled avatar sheet (styledAvatarGeneration[].output / characterAvatars)"
+        "what": "compare stories.data.season with the trial's styled avatar sheet (styledAvatarGeneration[].output / characterAvatars)",
+        "images": [
+          "sheets",
+          "pages"
+        ]
       },
       "status": "pending",
       "evidence": [],
@@ -939,7 +952,10 @@
       ],
       "check": {
         "kind": "human",
-        "what": "open each styledAvatarGeneration[] output of this run and check the feet on every full-body cell"
+        "what": "open each styledAvatarGeneration[] output of this run and check the feet on every full-body cell",
+        "images": [
+          "sheets"
+        ]
       },
       "status": "pending",
       "evidence": [
@@ -1034,7 +1050,11 @@
       ],
       "check": {
         "kind": "human",
-        "what": "read the story text and look at the pages for age fit (demo-agebands@ family; needs its own rotation entry)"
+        "what": "read the story text and look at the pages for age fit (demo-agebands@ family; needs its own rotation entry)",
+        "images": [
+          "pages",
+          "sheets"
+        ]
       },
       "status": "pending",
       "evidence": [],
@@ -1054,7 +1074,11 @@
       ],
       "check": {
         "kind": "human",
-        "what": "read the story text and look at the pages for age fit"
+        "what": "read the story text and look at the pages for age fit",
+        "images": [
+          "pages",
+          "sheets"
+        ]
       },
       "status": "pending",
       "evidence": [],
@@ -1074,7 +1098,11 @@
       ],
       "check": {
         "kind": "human",
-        "what": "read the story text and look at the pages for age fit"
+        "what": "read the story text and look at the pages for age fit",
+        "images": [
+          "pages",
+          "sheets"
+        ]
       },
       "status": "pending",
       "evidence": [],
@@ -1094,7 +1122,11 @@
       ],
       "check": {
         "kind": "human",
-        "what": "read the story text and look at the pages for age fit"
+        "what": "read the story text and look at the pages for age fit",
+        "images": [
+          "pages",
+          "sheets"
+        ]
       },
       "status": "pending",
       "evidence": [],
@@ -1114,7 +1146,11 @@
       ],
       "check": {
         "kind": "human",
-        "what": "read the story text and look at the pages for age fit"
+        "what": "read the story text and look at the pages for age fit",
+        "images": [
+          "pages",
+          "sheets"
+        ]
       },
       "status": "pending",
       "evidence": [],
@@ -1169,7 +1205,10 @@
       ],
       "check": {
         "kind": "human",
-        "what": "compare each styledAvatarGeneration[] output with clothingRequirements / pageClothing for that character"
+        "what": "compare each styledAvatarGeneration[] output with clothingRequirements / pageClothing for that character",
+        "images": [
+          "sheets"
+        ]
       },
       "status": "pending",
       "evidence": [
@@ -1852,7 +1891,10 @@
       ],
       "check": {
         "kind": "human",
-        "what": "For every inpaint-round-N version: read imageVersions[i].prompt (ends on **LIGHT:** matching the brief's timeOfDay/weather) and look at the pixels next to v0 — the hour and the sky are unchanged"
+        "what": "For every inpaint-round-N version: read imageVersions[i].prompt (ends on **LIGHT:** matching the brief's timeOfDay/weather) and look at the pixels next to v0 — the hour and the sky are unchanged",
+        "images": [
+          "versions"
+        ]
       },
       "status": "pending",
       "evidence": [
@@ -1878,7 +1920,10 @@
       ],
       "check": {
         "kind": "human",
-        "what": "stories.data.generationLog: events image_provider_fallback / prompt_fit_failed / plate_shipped_failed_qc / vantage_plate_qc_retry; sceneImages[].emptySceneModelId|plateDerivedFor|emptySceneQc; compare to staging job_1790277448294_5herh01j7 (p1/p11 plates on Gemini, p10/p14 derived twice)"
+        "what": "stories.data.generationLog: events image_provider_fallback / prompt_fit_failed / plate_shipped_failed_qc / vantage_plate_qc_retry; sceneImages[].emptySceneModelId|plateDerivedFor|emptySceneQc; compare to staging job_1790277448294_5herh01j7 (p1/p11 plates on Gemini, p10/p14 derived twice)",
+        "images": [
+          "plates"
+        ]
       },
       "status": "pending",
       "evidence": [
@@ -2022,7 +2067,10 @@
       ],
       "check": {
         "kind": "human",
-        "what": "stories.data.clothingReviewReport (analysis check 12, changed[].after) and the final clothingRequirements: the handed-over garment appears in the first wearer's outfit only; the receiver's sheet does not wear it"
+        "what": "stories.data.clothingReviewReport (analysis check 12, changed[].after) and the final clothingRequirements: the handed-over garment appears in the first wearer's outfit only; the receiver's sheet does not wear it",
+        "images": [
+          "sheets"
+        ]
       },
       "status": "pending",
       "evidence": []
@@ -2040,7 +2088,10 @@
       ],
       "check": {
         "kind": "human",
-        "what": "sceneImages[p].referencePhotos[].cellPose / photoType for every character whose perspective is over-the-shoulder, back view, rear or facing away; then view the page pixels for identity bleed onto another child"
+        "what": "sceneImages[p].referencePhotos[].cellPose / photoType for every character whose perspective is over-the-shoulder, back view, rear or facing away; then view the page pixels for identity bleed onto another child",
+        "images": [
+          "pages"
+        ]
       },
       "status": "pending",
       "evidence": []
@@ -2058,7 +2109,10 @@
       ],
       "check": {
         "kind": "human",
-        "what": "stories.data.sceneImages[].imageVersions: for each page, chargedCriticalKeys per version (scoring.js) vs activeVersion; repairRounds[].pages[].criticalCleared; replay pickBestVersionIndex over the stored versions. Baseline: job_1790373080139_vnx5l8iy7 p18 shipped v0 (75, rendered_text) over v1 (33, clean)."
+        "what": "stories.data.sceneImages[].imageVersions: for each page, chargedCriticalKeys per version (scoring.js) vs activeVersion; repairRounds[].pages[].criticalCleared; replay pickBestVersionIndex over the stored versions. Baseline: job_1790373080139_vnx5l8iy7 p18 shipped v0 (75, rendered_text) over v1 (33, clean).",
+        "images": [
+          "versions"
+        ]
       },
       "status": "pending",
       "evidence": []
@@ -2076,7 +2130,10 @@
       ],
       "check": {
         "kind": "human",
-        "what": "stories.data.sceneImages[].sceneDescription and imageVersions[].prompt for headline phrases; imageVersions[].letteringInventory.items with placement overlay. Baseline: job_1790373080139_vnx5l8iy7 p18 (\"share a proud moment\" -> caption THE PROUD MOMENT)."
+        "what": "stories.data.sceneImages[].sceneDescription and imageVersions[].prompt for headline phrases; imageVersions[].letteringInventory.items with placement overlay. Baseline: job_1790373080139_vnx5l8iy7 p18 (\"share a proud moment\" -> caption THE PROUD MOMENT).",
+        "images": [
+          "pages"
+        ]
       },
       "status": "pending",
       "evidence": []
@@ -2094,7 +2151,10 @@
       ],
       "check": {
         "kind": "human",
-        "what": "stories.data.visualBible.animals[].description + vb/<id>.jpg; sceneImages[].imageVersions[].prompt REQUIRED OBJECTS line; look at each page image and compare creature height to the named figures. Baseline: job_1790373080139_vnx5l8iy7 (dragon run 8) - grown dragon ANI001 twice-adult-height: large p5, cat-sized p10, child-plus p16/p17, boy-sized p18; ANI001 cell looked like hatchling ANI002."
+        "what": "stories.data.visualBible.animals[].description + vb/<id>.jpg; sceneImages[].imageVersions[].prompt REQUIRED OBJECTS line; look at each page image and compare creature height to the named figures. Baseline: job_1790373080139_vnx5l8iy7 (dragon run 8) - grown dragon ANI001 twice-adult-height: large p5, cat-sized p10, child-plus p16/p17, boy-sized p18; ANI001 cell looked like hatchling ANI002.",
+        "images": [
+          "pages"
+        ]
       },
       "status": "pending",
       "evidence": []
@@ -2112,7 +2172,10 @@
       ],
       "check": {
         "kind": "human",
-        "what": "sceneImages[].imageVersions[].fixableIssues / deductions for type creature_scale vs the pixels; qualityRawOutput shows the CREATURE SIZES input was non-empty on creature pages. Baseline: job_1790373080139_vnx5l8iy7 (dragon run 8) - grown dragon ANI001 twice-adult-height: large p5, cat-sized p10, child-plus p16/p17, boy-sized p18; ANI001 cell looked like hatchling ANI002."
+        "what": "sceneImages[].imageVersions[].fixableIssues / deductions for type creature_scale vs the pixels; qualityRawOutput shows the CREATURE SIZES input was non-empty on creature pages. Baseline: job_1790373080139_vnx5l8iy7 (dragon run 8) - grown dragon ANI001 twice-adult-height: large p5, cat-sized p10, child-plus p16/p17, boy-sized p18; ANI001 cell looked like hatchling ANI002.",
+        "images": [
+          "pages"
+        ]
       },
       "status": "pending",
       "evidence": []
@@ -2131,7 +2194,10 @@
       ],
       "check": {
         "kind": "human",
-        "what": "retryHistory[].source (iterate-round-N) on creature_scale pages; consolidator dropped_issues reasons; retryHistory[].inpaintInstruction for the Sizes clause. Baseline: job_1790373080139_vnx5l8iy7 (dragon run 8) - grown dragon ANI001 twice-adult-height: large p5, cat-sized p10, child-plus p16/p17, boy-sized p18; ANI001 cell looked like hatchling ANI002. p10 v1 inpaint had no size; p16 scale finding orphaned."
+        "what": "retryHistory[].source (iterate-round-N) on creature_scale pages; consolidator dropped_issues reasons; retryHistory[].inpaintInstruction for the Sizes clause. Baseline: job_1790373080139_vnx5l8iy7 (dragon run 8) - grown dragon ANI001 twice-adult-height: large p5, cat-sized p10, child-plus p16/p17, boy-sized p18; ANI001 cell looked like hatchling ANI002. p10 v1 inpaint had no size; p16 scale finding orphaned.",
+        "images": [
+          "versions"
+        ]
       },
       "status": "pending",
       "evidence": []
@@ -2149,7 +2215,11 @@
       ],
       "check": {
         "kind": "human",
-        "what": "View every empty_scene plate image of the run (no people), then the ambient pages (a few small distant passers-by, no cast look-alike) and their stored finalChecks for extra_character / duplicate_identity"
+        "what": "View every empty_scene plate image of the run (no people), then the ambient pages (a few small distant passers-by, no cast look-alike) and their stored finalChecks for extra_character / duplicate_identity",
+        "images": [
+          "plates",
+          "pages"
+        ]
       },
       "status": "pending",
       "evidence": []
@@ -2167,7 +2237,10 @@
       ],
       "check": {
         "kind": "human",
-        "what": "sceneImages[].imageVersions[].prompt REQUIRED OBJECTS lines vs VB scaleClass; look at every page with a cited element and compare its size to the named figure/body part. Baselines: run 7 job_1790277448294_5herh01j7 p9/p11 (egg melon-sized, dragon waist-high), run 8 job_1790373080139_vnx5l8iy7 p10 (grown dragon). A/B bodies: image stage, params.variants current-build (pageScaleScope {types:[animal],bands:[adult-height,twice-adult-height]}) vs new-build."
+        "what": "sceneImages[].imageVersions[].prompt REQUIRED OBJECTS lines vs VB scaleClass; look at every page with a cited element and compare its size to the named figure/body part. Baselines: run 7 job_1790277448294_5herh01j7 p9/p11 (egg melon-sized, dragon waist-high), run 8 job_1790373080139_vnx5l8iy7 p10 (grown dragon). A/B bodies: image stage, params.variants current-build (pageScaleScope {types:[animal],bands:[adult-height,twice-adult-height]}) vs new-build.",
+        "images": [
+          "pages"
+        ]
       },
       "status": "pending",
       "evidence": []
@@ -2185,7 +2258,10 @@
       ],
       "check": {
         "kind": "human",
-        "what": "sceneDescriptions[].description METADATA interactions[] rows naming the small prop id, against the page text; view each page image. Baseline: EXACT POSES rider on job_1789584708605_rts4wqupm - right size 6/6 with contact, oversized 3/3 without."
+        "what": "sceneDescriptions[].description METADATA interactions[] rows naming the small prop id, against the page text; view each page image. Baseline: EXACT POSES rider on job_1789584708605_rts4wqupm - right size 6/6 with contact, oversized 3/3 without.",
+        "images": [
+          "pages"
+        ]
       },
       "status": "pending",
       "evidence": []
@@ -2204,7 +2280,10 @@
       ],
       "check": {
         "kind": "human",
-        "what": "eval_calls kind plate_qc for the story: one row per per-page plate label P<n>; story_images empty_scene plates viewed against their verdicts; stored sceneImages[].emptySceneQc on failed ones. Baseline: staging job_1790277448294_5herh01j7 had no per-page plate QC at all."
+        "what": "eval_calls kind plate_qc for the story: one row per per-page plate label P<n>; story_images empty_scene plates viewed against their verdicts; stored sceneImages[].emptySceneQc on failed ones. Baseline: staging job_1790277448294_5herh01j7 had no per-page plate QC at all.",
+        "images": [
+          "plates"
+        ]
       },
       "status": "pending",
       "evidence": []
@@ -2222,7 +2301,10 @@
       ],
       "check": {
         "kind": "human",
-        "what": "visualBible.locations[].vantages[].landmarkPhoto vs sceneImages[].landmarkPhotos[].variantNumber per page; generationLog for landmark_photo_citation; view the cited photo against the vantage emptyScenePrompt (does it show what the plate frames?). Baseline: staging job_1790277448294_5herh01j7 — p1 (stairs up to the square) was served the chess-square photo, no citation existed."
+        "what": "visualBible.locations[].vantages[].landmarkPhoto vs sceneImages[].landmarkPhotos[].variantNumber per page; generationLog for landmark_photo_citation; view the cited photo against the vantage emptyScenePrompt (does it show what the plate frames?). Baseline: staging job_1790277448294_5herh01j7 — p1 (stairs up to the square) was served the chess-square photo, no citation existed.",
+        "images": [
+          "plates"
+        ]
       },
       "status": "pending",
       "evidence": []
@@ -2259,7 +2341,10 @@
       ],
       "check": {
         "kind": "human",
-        "what": "coverImages.*.imageVersions[].letteringInventory and consolidatedPlan.deduped_issues; finalChecksReport.repairRounds decisions/errors; sceneImages[] finalScore vs unrepairedCritical; view each cover image for painted captions. Baseline: staging job_1790446348343_z3fw660ie — back cover shipped the caption \"THE FIVE FRIENDS STAND TOGETHER\" (MAJOR only), p9 scored 100 with unrepairedCritical setting and a failed no-instruction inpaint."
+        "what": "coverImages.*.imageVersions[].letteringInventory and consolidatedPlan.deduped_issues; finalChecksReport.repairRounds decisions/errors; sceneImages[] finalScore vs unrepairedCritical; view each cover image for painted captions. Baseline: staging job_1790446348343_z3fw660ie — back cover shipped the caption \"THE FIVE FRIENDS STAND TOGETHER\" (MAJOR only), p9 scored 100 with unrepairedCritical setting and a failed no-instruction inpaint.",
+        "images": [
+          "covers"
+        ]
       },
       "status": "pending",
       "evidence": []
@@ -2295,7 +2380,10 @@
       ],
       "check": {
         "kind": "human",
-        "what": "beatsReviewReport.checkReply / modelFindings for check 17; sceneImages[].prompt EXPRESSIONS AND EYES lines; view each whole-cast page image. Baseline: staging job_1790446348343_z3fw660ie p16 (no Q5/Q17 finding, row facing the viewer, one figure with no viewer line)."
+        "what": "beatsReviewReport.checkReply / modelFindings for check 17; sceneImages[].prompt EXPRESSIONS AND EYES lines; view each whole-cast page image. Baseline: staging job_1790446348343_z3fw660ie p16 (no Q5/Q17 finding, row facing the viewer, one figure with no viewer line).",
+        "images": [
+          "pages"
+        ]
       },
       "status": "pending",
       "evidence": []
@@ -2349,7 +2437,10 @@
       ],
       "check": {
         "kind": "human",
-        "what": "sceneImages[].emptySceneQc v1Issues/retryIssues and the generation log plate events for pages whose buildPlateStructuresText is non-empty; look at the plate pixels against the VB description. Fixtures: plate-fiona-p6/p10 (flag), p7/p9 (pass)."
+        "what": "sceneImages[].emptySceneQc v1Issues/retryIssues and the generation log plate events for pages whose buildPlateStructuresText is non-empty; look at the plate pixels against the VB description. Fixtures: plate-fiona-p6/p10 (flag), p7/p9 (pass).",
+        "images": [
+          "plates"
+        ]
       },
       "status": "pending",
       "evidence": []
@@ -2367,7 +2458,10 @@
       ],
       "check": {
         "kind": "human",
-        "what": "sceneReviewReport.briefFindings / briefUnfixed / analysis for [group_staging]; the final sceneDescriptions of 4+ character pages (shot, perspective, looksAt); the page pixels. Baseline: staging job_1790446348343_z3fw660ie p1, p6 (too close) and p16 (posed row)."
+        "what": "sceneReviewReport.briefFindings / briefUnfixed / analysis for [group_staging]; the final sceneDescriptions of 4+ character pages (shot, perspective, looksAt); the page pixels. Baseline: staging job_1790446348343_z3fw660ie p1, p6 (too close) and p16 (posed row).",
+        "images": [
+          "pages"
+        ]
       },
       "status": "pending",
       "evidence": []
@@ -2403,7 +2497,10 @@
       ],
       "check": {
         "kind": "human",
-        "what": "finalChecksReport.entity.characters[*].issues for identity_swap; imageVersions[].consolidatedPlan.deduped_issues and dropped_issues on that page; retryHistory for a char-fix attempt; the head grid pixels against the reference. Fixtures: entity-*-identity-swap (flag), entity-julian-25b-p7-hair-drift-not-swap, entity-levin-1dp-back-cover-hair-drift-not-swap (pass)."
+        "what": "finalChecksReport.entity.characters[*].issues for identity_swap; imageVersions[].consolidatedPlan.deduped_issues and dropped_issues on that page; retryHistory for a char-fix attempt; the head grid pixels against the reference. Fixtures: entity-*-identity-swap (flag), entity-julian-25b-p7-hair-drift-not-swap, entity-levin-1dp-back-cover-hair-drift-not-swap (pass).",
+        "images": [
+          "versions"
+        ]
       },
       "status": "pending",
       "evidence": []

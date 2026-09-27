@@ -21,6 +21,36 @@ superseded and link forward.
 
 ---
 
+## 2026-09-27 — HUMAN verify checks are reviewed on one generated local HTML page per run; its verdicts are applied with --apply
+
+**Context:** Owner, 2026-09-27: for a given story, one page listing every pending HUMAN registry entry the
+story exercises, with the relevant images next to the check and the expected behaviour, a verdict control
+per item, and verdicts that the script writes back. Claude reviews every item after every verification run
+and the owner can overrule.
+
+**Decision:** a generated LOCAL HTML file (`scripts/admin/verify-review.js <storyId>`), not an admin route
+and not a claude.ai artifact. Items = pending entries whose live verdict on this run is HUMAN (same engine,
+git containment). Images = the URLs the check's own instruction names + the kinds in the entry's optional
+`check.images` (`pages | versions | plates | covers | sheets`, resolved from story_images /
+styledAvatarGeneration by `verify-core.imagesFor`; an unknown kind throws). Each item has confirmed / failed /
+not decided + a note; "Download verdicts" / "Copy" export `{storyId, env, verdicts:[{id, verdict, note, by}]}`;
+`verify-run.js <storyId> --apply=<file>` records confirmed / failed as HUMAN-<VERDICT> evidence with `by`
+(validates the whole file before writing; a verdict without a note is refused). `--verdicts=<file>` pre-fills
+the page with Claude's verdicts; an item the owner touches flips to `by: owner`. 30 visual entries got
+`check.images`.
+
+**Rationale:** the simplest form the owner can open and Claude can read back: a file needs no deploy, auth,
+route or client build, and a claude.ai artifact URL 404s for the owner (memory
+feedback_local_html_not_artifact_links). The verdict round-trips through a JSON file, the one thing both can
+produce.
+
+**Validation:** rendered for staging job_1790446348343_z3fw660ie: 37 HUMAN items, 266 images.
+
+**Touched:** scripts/admin/verify-review.js (new), scripts/admin/verify-core.js (imagesFor, urlsIn,
+applyVerdictsFile), scripts/admin/verify-run.js (--apply), tasks/verify.json (check.images, _readme),
+tests/unit/verify-review.test.ts, .claude/skills/running-validation-stories/SKILL.md.
+**Status:** ✅ active.
+
 ## 2026-09-27 — The staging server judges every story it completes against the verification registry; --pull writes it into git
 
 **Context:** Owner, 2026-09-27: the code-checkable verify checks should run by themselves after every

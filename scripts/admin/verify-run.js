@@ -34,6 +34,7 @@
  * Usage:
  *   node scripts/admin/verify-run.js <storyId> [--env=staging|prod] [--write] [--all]
  *   node scripts/admin/verify-run.js <storyId> --mark=<entryId>:confirmed|failed --note="what you saw" [--by=claude|owner] [--env=...]
+ *   node scripts/admin/verify-run.js <storyId> --apply=<verdicts.json> [--env=...]  # verdicts from the review page (verify-review.js)
  *   node scripts/admin/verify-run.js --pull [--all]     # write the reports the staging server stored
  *   node scripts/admin/verify-run.js --unrecorded       # staging runs not yet judged into the registry (warns)
  *   node scripts/admin/verify-run.js --list
@@ -167,7 +168,7 @@ async function pull(env) {
     console.log(`\n!!! ${allFailed.length} FAILED: ${allFailed.join(', ')}`);
     console.log('!!! Investigate each, and add a tasks/BACKLOG.md line for it.');
   }
-  console.log(`\n${fresh.length} run(s) written to tasks/verify.json. Next: look at the HUMAN entries, then`);
+  console.log(`\n${fresh.length} run(s) written to tasks/verify.json. Next: review the HUMAN entries (verify-review.js <storyId>), then`);
   console.log('commit it: git commit -m "chore(verify): verdicts from <storyIds>" -- tasks/verify.json');
 }
 
@@ -237,6 +238,17 @@ async function main() {
     core.markVerdict(reg, run, { id, verdict, note: note === true ? '' : note, by: by === true ? null : by }, { checkedAt });
     saveRegistry(reg);
     console.log(`marked ${id} ${verdict} on ${storyId}`);
+    return;
+  }
+
+  const apply = arg('apply');
+  if (apply) {
+    if (apply === true) throw new Error('--apply needs a file: --apply=<verify-verdicts-<storyId>.json>');
+    const file = JSON.parse(fs.readFileSync(apply, 'utf8'));
+    const { marked, skipped } = core.applyVerdictsFile(reg, run, file, { checkedAt });
+    saveRegistry(reg);
+    console.log(`applied ${marked.length} verdict(s): ${marked.join(', ') || 'none'}${skipped.length ? `; not decided: ${skipped.join(', ')}` : ''}`);
+    console.log('Commit it: git commit -m "chore(verify): review verdicts on <storyId>" -- tasks/verify.json');
     return;
   }
 
