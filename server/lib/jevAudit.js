@@ -9,8 +9,9 @@
  *   - textRefine.refineStoryText runs `runJevTextSource` in parallel with the
  *     arc-informed and blind audits; its FAULT lines join mergeAuditFindings
  *     and the ONE repair pass rewrites only the pages they name;
- *   - the arc machine's re-tell gate (beatsPipeline + the Lab mirrors) adds
- *     `jevCastBeatVoice`: a commissioned character with no act of their own.
+ *   - the arc machine (beatsPipeline + the Lab mirrors): `jevCastBeatVoice`
+ *     names a character with no act of their own; it is FEEDBACK for the one
+ *     re-telling when that runs, never a reason to run it.
  * Which checks run and at which threshold is JEV_CHECKS, set from the
  * evaluation (docs/decisions.md 2026-09-27 "Jev text audit" and "… wired").
  *
@@ -544,71 +545,74 @@ function arcSentencesText(arcBlock) {
 }
 
 /**
- * The cast-beat check as one more voice for promptBuilders.arcRepairFindings:
- * every child on the character list whose Jev "does something that changes
- * what happens" answer falls below the threshold becomes one MAJOR issue in
- * the CAST lens. The generator side is EVERY_CHILD_ACTS_RULE, which the arc
- * create and re-tell already carry; the arc critics had no lens for it.
+ * The cast-beat check over the arc under review: every name on the character
+ * list whose Jev "does something that changes what happens" answer falls below
+ * the threshold. The generator side is EVERY_CHILD_ACTS_RULE, which the arc
+ * create and re-tell already carry.
  *
- * The issue cites every arc sentence (the fault is an absence, there is no one
- * sentence to quote) and carries no quote — it is built here, never parsed
- * from model text, so the quote guard of parseArcIssues does not apply.
+ * FEEDBACK, NEVER A GATE ISSUE (owner, 2026-09-27: "There is one arc rewrite,
+ * add it as feedback there."). A weak name does not open the re-tell gate; when
+ * the gate opens for its own MAJOR/CRITICAL findings, `feedback` rides into the
+ * one re-telling (arcRepairFindingsWithCastCheck). Closed gate: report only.
  *
- * Never throws: on a Jev error it logs an error and returns no voice.
+ * Never throws: on a Jev error it logs an error and returns ok:false, no feedback.
  *
  * @param {string} arcBlock  the committed block's story logic + arc (splitCommittedBlock().arcBlock)
- * @param {string[]} childNames  the commissioned children (the character list, adults excluded)
- * @returns {Promise<{letter:'J', findings:Array, ok:boolean, error?:string, scores?:Object, cost?:number}|null>}
+ * @param {string[]} names   the character list (castCoverage.commissionedCast().listed)
+ * @returns {Promise<{ok:boolean, weak:Array<{name:string,score:number}>, feedback:string, scores?:Object, error?:string, cost?:number}|null>}
  */
-async function jevCastBeatVoice(arcBlock, childNames, { checks = JEV_CHECKS, callImpl = callJev } = {}) {
+async function jevCastBeatVoice(arcBlock, names, { checks = JEV_CHECKS, callImpl = callJev } = {}) {
   const cfg = checks.ARC_CAST_BEAT;
-  const names = [...new Set((childNames || []).map(n => String(n || '').trim()).filter(Boolean))];
-  if (!cfg?.enabled || !names.length) return null;
+  const list = [...new Set((names || []).map(n => String(n || '').trim()).filter(Boolean))];
+  if (!cfg?.enabled || !list.length) return null;
   const arcText = arcSentencesText(arcBlock);
   if (!arcText) return null;
-  const sentenceCount = (arcText.match(/^\s*\d+[.)]/gm) || []).length;
   try {
-    const qs = buildCastBeatQuestions(names);
-    const r = await callImpl({ state: arcText, questions: qs });
-    const scores = Object.fromEntries(names.map((n, i) => [n, yesProb(r.answers[`ARC_CAST_BEAT__${i}`])]));
-    const weak = names.filter(n => scores[n] < cfg.threshold);
-    const cite = sentenceCount > 1 ? `s1-s${sentenceCount}` : 's1';
-    const findings = weak.map((n, i) => ({
-      text: `${i + 1}. [MAJOR] (${cite}) CAST: ${n} is on the character list and does nothing of their own in the arc that changes what happens (automatic cast check). Smallest change: give ${n} one act of their own that matters to the plot, inside an event the arc already has.`,
-      severity: 'MAJOR', rank: i + 1, lens: 'CAST',
-      // No sentence list: arcRepairFindings dedupes on lens + cited sentences, and
-      // two cast findings citing the whole arc would fold into one.
-      sentences: [],
-      quotes: [], verified: [], unverified: [],
-    }));
-    if (weak.length) log.info(`🧮 [ARC/jev] cast-beat: ${weak.map(n => `${n} ${scores[n]}`).join(', ')} below ${cfg.threshold}`);
-    return { letter: 'J', ok: true, findings, scores, cost: r.cost };
+    const r = await callImpl({ state: arcText, questions: buildCastBeatQuestions(list) });
+    const scores = Object.fromEntries(list.map((n, i) => [n, yesProb(r.answers[`ARC_CAST_BEAT__${i}`])]));
+    const weak = list.filter(n => scores[n] < cfg.threshold).map(n => ({ name: n, score: scores[n] }));
+    const feedback = weak.map(w => `- ${w.name} is on the character list and does nothing of their own in this arc that changes what happens. Where it fits, give ${w.name} one act of their own that matters to the plot, inside an event the arc already has.`).join('\n');
+    if (weak.length) log.info(`🧮 [ARC/jev] cast-beat: ${weak.map(w => `${w.name} ${w.score}`).join(', ')} below ${cfg.threshold}`);
+    return { ok: true, weak, feedback, scores, cost: r.cost };
   } catch (e) {
-    log.error(`❌ [ARC/jev] cast-beat check FAILED — no automatic cast finding for this round: ${e.message}`);
-    return { letter: 'J', ok: false, findings: [], error: e.message };
+    log.error(`❌ [ARC/jev] cast-beat check FAILED — no cast feedback for this round: ${e.message}`);
+    return { ok: false, weak: [], feedback: '', error: e.message };
   }
 }
 
+/** The heading the cast feedback carries in the re-tell prompt's findings section. */
+const CAST_FEEDBACK_HEADING = '## AUTOMATIC CAST CHECK (feedback)';
+
 /**
- * THE re-tell gate with the Jev cast check as one more voice — the ONE entry
- * point production (beatsPipeline round loop) and the Lab mirrors (testlab.js
- * arc_effort, arc_panel_replay) all call (sibling set arc-retell-gate). The
- * voice joins only the gate; the panel list the callers report is unchanged.
+ * THE re-tell gate plus the Jev cast check — the ONE entry point production
+ * (beatsPipeline round loop) and the Lab mirrors (testlab.js arc_effort,
+ * arc_panel_replay) all call (sibling set arc-retell-gate).
+ *
+ * The gate is decided by arcRepairFindings on the critique and the panel ALONE
+ * — a cast flag never opens it. When it is open, the cast feedback is appended
+ * to `gate.text`, the section the one re-telling reads; when it is closed,
+ * the flag is only reported (`jevCast`).
  *
  * @param {{critique:string, reviewedArc:string, panel:Array, castNames:string[]}} args
- * @returns {Promise<{gate:Object, jevCast:Object|null}>} gate = arcRepairFindings(); jevCast = what the check said, for the report
+ * @returns {Promise<{gate:Object, jevCast:Object|null}>}
  */
 async function arcRepairFindingsWithCastCheck({ critique, reviewedArc, panel = [], castNames = [] }, opts = {}) {
   const { arcRepairFindings } = require('./promptBuilders');
-  const voice = await jevCastBeatVoice(reviewedArc, castNames, opts);
-  const voices = voice && voice.findings.length ? [...panel, voice] : panel;
-  const gate = arcRepairFindings({ critique, reviewedArc, panel: voices });
-  const jevCast = voice && { ok: voice.ok, scores: voice.scores || null, findings: voice.findings.map(f => f.text), error: voice.error || null, cost: voice.cost ?? null };
+  const gate = arcRepairFindings({ critique, reviewedArc, panel });
+  const cast = await jevCastBeatVoice(reviewedArc, castNames, opts);
+  const handed = !!(gate.retell && cast?.feedback);
+  if (handed) gate.text = `${gate.text}\n\n${CAST_FEEDBACK_HEADING}\n${cast.feedback}`;
+  const jevCast = cast && {
+    ok: cast.ok, scores: cast.scores || null, weak: cast.weak, error: cast.error || null, cost: cast.cost ?? null,
+    // 'retell' = handed to the re-telling as feedback; 'report-only' = the gate stayed shut.
+    delivered: cast.weak.length ? (handed ? 'retell' : 'report-only') : null,
+  };
   return { gate, jevCast };
 }
 
 module.exports = {
   arcRepairFindingsWithCastCheck,
+  CAST_FEEDBACK_HEADING,
   JEV_TEXT_LANGUAGES,
   planLineForJev,
   mechanicalFaultLines,

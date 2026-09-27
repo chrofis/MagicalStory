@@ -11,7 +11,9 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
  *   - an unevaluated language is reported as not run, never silently skipped;
  *   - rejected checks (grammar, appears-without-setup, object continuity,
  *     plan MATCH, shot) are never asked; the cast-beat check is not asked here;
- *   - the writer's STYLE_RULEBOOK carries every slop rule Jev judges.
+ *   - the writer's STYLE_RULEBOOK carries every slop rule Jev judges;
+ *   - the arc cast check never opens the re-tell gate; it is feedback for the
+ *     re-telling when the gate opens on its own findings.
  */
 // @ts-ignore CommonJS
 const textModels = require('../../server/lib/textModels');
@@ -112,7 +114,8 @@ describe('runJevTextSource', () => {
   });
 });
 
-describe('jevCastBeatVoice (the arc re-tell gate)', () => {
+describe('the Jev cast check in the arc machine: feedback for the one re-telling, never a gate', () => {
+  // Owner, 2026-09-27: "There is one arc rewrite, add it as feedback there."
   const ARC_BLOCK = 'STORY LOGIC:\nWANT: the egg\n\nFINAL ARC:\n1. Levin finds an egg.\n2. Julian carries it.\n3. They bring it home.';
   const stub = (scores: Record<string, number>) => async ({ state, questions }: any) => {
     expect(state.startsWith('1. Levin')).toBe(true);
@@ -123,36 +126,58 @@ describe('jevCastBeatVoice (the arc re-tell gate)', () => {
     }
     return { answers, cost: 0 };
   };
+  // A panelist's real MAJOR issue, quoting the arc — what opens the gate on its own.
+  const MAJOR_PANEL = [{ letter: 'A', findings: PB.filterPanelFindings('1. [MAJOR] (s2) CAUSE: "Julian carries it" has no reason. Smallest change: give one.', ARC_BLOCK).findings }];
 
-  it('a child below the threshold becomes one MAJOR CAST issue the gate hands to the re-telling', async () => {
-    const voice = await J.jevCastBeatVoice(ARC_BLOCK, ['Levin', 'Julian', 'Max'], { callImpl: stub({ Levin: 0.95, Julian: 0.9, Max: 0.1 }) });
-    expect(voice.findings).toHaveLength(1);
-    expect(voice.findings[0]).toMatchObject({ severity: 'MAJOR', lens: 'CAST' });
-    expect(voice.findings[0].text).toMatch(/^1\. \[MAJOR\] \(s1-s3\) CAST: Max /);
-    const gate = PB.arcRepairFindings({ critique: '', reviewedArc: ARC_BLOCK, panel: [voice] });
+  it('a weak name alone does NOT open the gate; the flag is recorded report-only', async () => {
+    const { gate, jevCast } = await J.arcRepairFindingsWithCastCheck(
+      { critique: '', reviewedArc: ARC_BLOCK, panel: [], castNames: ['Levin', 'Julian', 'Max'] },
+      { callImpl: stub({ Levin: 0.95, Julian: 0.9, Max: 0.1 }) },
+    );
+    expect(gate.retell).toBe(false);
+    expect(gate.text).not.toContain('Max');
+    expect(jevCast).toMatchObject({ ok: true, delivered: 'report-only', weak: [{ name: 'Max', score: 0.1 }] });
+  });
+
+  it('when the gate opens on its own findings, the weak names ride into the re-tell prompt as feedback', async () => {
+    expect(MAJOR_PANEL[0].findings).toHaveLength(1);
+    const { gate, jevCast } = await J.arcRepairFindingsWithCastCheck(
+      { critique: '', reviewedArc: ARC_BLOCK, panel: MAJOR_PANEL, castNames: ['Levin', 'Julian', 'Max'] },
+      { callImpl: stub({ Levin: 0.95, Julian: 0.2, Max: 0.1 }) },
+    );
     expect(gate.retell).toBe(true);
-    expect(gate.text).toContain('Max is on the character list');
+    expect(gate.count).toBe(1); // the cast flag is not counted as an issue
+    expect(jevCast.delivered).toBe('retell');
+    expect(gate.text).toContain(J.CAST_FEEDBACK_HEADING);
+    expect(gate.text).toContain('- Julian is on the character list');
+    expect(gate.text).toContain('- Max is on the character list');
+    // …and it reaches the built re-tell prompt, in the section the re-telling repairs from.
+    await require('../../server/services/prompts').loadPromptTemplates();
+    const prompt = PB.buildArcRetellPrompt({ characters: [{ name: 'Levin' }, { name: 'Julian' }, { name: 'Max' }], language: 'de', pages: 10 }, 10, ARC_BLOCK, gate.text);
+    expect(prompt).toContain('- Max is on the character list');
   });
 
-  it('two weak children stay two issues (no dedupe on the whole-arc citation)', async () => {
-    const voice = await J.jevCastBeatVoice(ARC_BLOCK, ['Levin', 'Julian', 'Max'], { callImpl: stub({ Levin: 0.95, Julian: 0.2, Max: 0.1 }) });
-    const gate = PB.arcRepairFindings({ critique: '', reviewedArc: ARC_BLOCK, panel: [voice] });
-    expect(gate.count).toBe(2);
-    expect(gate.duplicates).toBe(0);
+  it('all names acting: no feedback even with the gate open', async () => {
+    const { gate, jevCast } = await J.arcRepairFindingsWithCastCheck(
+      { critique: '', reviewedArc: ARC_BLOCK, panel: MAJOR_PANEL, castNames: ['Levin', 'Julian'] },
+      { callImpl: stub({ Levin: 0.95, Julian: 0.9 }) },
+    );
+    expect(gate.retell).toBe(true);
+    expect(gate.text).not.toContain(J.CAST_FEEDBACK_HEADING);
+    expect(jevCast.delivered).toBe(null);
   });
 
-  it('all children acting: no issue, the gate stays shut', async () => {
-    const voice = await J.jevCastBeatVoice(ARC_BLOCK, ['Levin', 'Julian'], { callImpl: stub({ Levin: 0.95, Julian: 0.9 }) });
-    expect(voice.findings).toEqual([]);
-    expect(PB.arcRepairFindings({ critique: '', reviewedArc: ARC_BLOCK, panel: [voice] }).retell).toBe(false);
+  it('a Jev failure: the gate decides as without it, the failure is recorded', async () => {
+    const { gate, jevCast } = await J.arcRepairFindingsWithCastCheck(
+      { critique: '', reviewedArc: ARC_BLOCK, panel: MAJOR_PANEL, castNames: ['Levin'] },
+      { callImpl: async () => { throw new Error('down'); } },
+    );
+    expect(gate.retell).toBe(true);
+    expect(gate.text).not.toContain(J.CAST_FEEDBACK_HEADING);
+    expect(jevCast).toMatchObject({ ok: false, error: 'down' });
   });
 
-  it('a Jev failure returns an empty, failed voice and never throws', async () => {
-    const voice = await J.jevCastBeatVoice(ARC_BLOCK, ['Levin'], { callImpl: async () => { throw new Error('down'); } });
-    expect(voice).toMatchObject({ ok: false, findings: [], error: 'down' });
-  });
-
-  it('no children, no call', async () => {
+  it('no names, no call', async () => {
     expect(await J.jevCastBeatVoice(ARC_BLOCK, [], { callImpl: async () => { throw new Error('no call'); } })).toBe(null);
   });
 });

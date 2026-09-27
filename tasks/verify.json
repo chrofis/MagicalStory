@@ -2197,7 +2197,7 @@
         "82b4b4d2a"
       ],
       "addedAt": "2026-09-27",
-      "claim": "On the next full staging story: textRefineReport.audits holds a jev entry with ok:true and a few FAULT[SLOP|LOGIC|ARC|MECH] lines; every mergedFindings entry sourced jev names a page the repair then returned rewritten (findingLedger outcome page-rewritten), and the rewritten page no longer carries the flagged phrase while keeping its events; no page is rewritten toward a picture instruction. arcReviewReport round gate.jevCast is present with a score per character on the list. Generation time is unchanged within noise (the Jev source finishes inside the audits' wait).",
+      "claim": "On the next full staging story: textRefineReport.audits holds a jev entry with ok:true and a few FAULT[SLOP|LOGIC|ARC|MECH] lines; every mergedFindings entry sourced jev names a page the repair then returned rewritten (findingLedger outcome page-rewritten), and the rewritten page no longer carries the flagged phrase while keeping its events; no page is rewritten toward a picture instruction. arcReviewReport round gate.jevCast is present with a score per character on the list; a weak name never opens the gate on its own (delivered report-only when the gate stays shut) and appears under AUTOMATIC CAST CHECK in the re-tell prompt when the gate opens on its own findings. Generation time is unchanged within noise (the Jev source finishes inside the audits' wait).",
       "runShape": [
         "full-story"
       ],

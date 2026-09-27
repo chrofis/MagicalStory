@@ -61347,3 +61347,27 @@ scripts/analysis/replay-jev-text-merge.js, scripts/analysis/eval-jev-text-audit.
 tests/unit/jev-text-chain-wiring.test.ts, tests/unit/jev-audit.test.ts,
 tests/unit/text-lector.test.ts, tests/unit/truncation-caller-fallbacks.test.ts,
 docs/prompt-inventory.md, docs/codebase-guide.md, tasks/BACKLOG.md, tasks/verify.json.
+
+## 2026-09-27 — The Jev cast check is feedback for the one arc re-telling, never a reason to run it
+
+**Context:** item 4 of "Jev text audit wired" (same day) made every character below 0.35 on
+the Jev cast check a `[MAJOR]` CAST issue for the re-tell gate, flagged as a severity call for
+the owner — a Jev flag alone could open a paid re-telling.
+
+**Decision (owner, verbatim):** "There is one arc rewrite, add it as feedback there."
+`arcRepairFindingsWithCastCheck` now decides the gate from the critique and the panel ALONE
+(`arcRepairFindings`, unchanged). When the gate opens on its own MAJOR/CRITICAL findings, the weak
+names are appended to the re-tell prompt's ISSUES TO REPAIR section under
+`## AUTOMATIC CAST CHECK (feedback)`, one line per name; they are not counted as issues
+(`gate.count` unchanged). When the gate stays shut, the flag is recorded only:
+`arcReviewReport` round `gate.jevCast = {ok, scores, weak, delivered: 'report-only'|'retell'|null}`,
+the generation log `arc_jev_cast`, and the same field in both Lab mirrors (`arc_effort`,
+`arc_panel_replay`). A Jev failure leaves the gate exactly as without it and is logged
+`arc_jev_cast_failed`. On the 9 stored arcs the check flags one name (Max, «Das Ei in den
+Wurzeln», 0.27); under this rule that arc's round would re-tell only if its own findings open
+the gate.
+
+**Replaces:** item 4 of "Jev text audit wired" (2026-09-27) — the MAJOR-issue routing.
+
+**Touched:** server/lib/jevAudit.js (jevCastBeatVoice, arcRepairFindingsWithCastCheck,
+CAST_FEEDBACK_HEADING), server/lib/beatsPipeline.js (log lines), tests/unit/jev-text-chain-wiring.test.ts.

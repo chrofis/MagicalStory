@@ -481,8 +481,8 @@ that rewrites only the pages named, then the diff pass and the lector.
 
 The slop types are ONE source for writer and critic: `proseSlop.SLOP_TYPES` holds each rule
 (→ `SLOP_RULES` → `STYLE_RULEBOOK`) and its Jev question. The Jev cast check runs in the ARC
-machine instead: `arcRepairFindingsWithCastCheck` adds a MAJOR CAST issue per character with no
-act of their own to the re-tell gate. Replay the audit+merge stage over stored stories with
+machine instead: `arcRepairFindingsWithCastCheck` names each character with no act of their own and,
+only when the re-tell gate opens on its own findings, hands them to the re-telling as feedback. Replay the audit+merge stage over stored stories with
 `node scripts/analysis/replay-jev-text-merge.js --env=staging <storyId…>`.
 
 ## Image Model Comparison (Grok vs Gemini)
