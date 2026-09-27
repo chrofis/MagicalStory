@@ -83,9 +83,9 @@ function landmarkItem(l) {
 // ───────────────────────── scoring and drawing ─────────────────────────
 
 /** One Jev call, one noul per item. Returns P(yes) per question id; throws JevDecisionError. */
-async function scoreNouls(key, state, questions, { callImpl, usageLabel }) {
+async function scoreNouls(key, state, questions, { callImpl, usageLabel, outage }) {
   const stats = JD.newStats();
-  const ans = await JD.runJevRequests([{ key, state, questions }], { callImpl, usageLabel, stats });
+  const ans = await JD.runJevRequests([{ key, state, questions }], { callImpl, usageLabel, stats, outage });
   const a = ans.get(key);
   const out = new Map();
   for (const id of Object.keys(questions)) {
@@ -105,9 +105,9 @@ async function scoreChallenges(setup, entries, { callImpl } = {}) {
 }
 
 /** LB1 / LB2 over a landmark list → P(fits) per index. */
-async function scoreLandmarks(state, landmarks, { callImpl, usageLabel = 'jev_selection_landmarks' } = {}) {
+async function scoreLandmarks(state, landmarks, { callImpl, usageLabel = 'jev_selection_landmarks', outage } = {}) {
   const questions = Object.fromEntries(landmarks.map((l, i) => [`l${i}`, { type: 'noul', instructions: Q.LB(landmarkItem(l)) }]));
-  const { scores, stats } = await scoreNouls('landmarks', state, questions, { callImpl, usageLabel });
+  const { scores, stats } = await scoreNouls('landmarks', state, questions, { callImpl, usageLabel, outage });
   return { scores: landmarks.map((_, i) => scores.get(`l${i}`)), stats };
 }
 
@@ -224,7 +224,9 @@ async function selectStoryLandmarks(inputData, { jevReport, gl = null, mode = 'f
   if (!JD.jevActive(jevReport)) return record({ method: 'today', reason: `Jev backup from step "${jevReport.fallback.step}"` });
   let scored;
   try {
-    scored = await scoreLandmarks(premiseState(selectionSetup(inputData)), list, { callImpl, usageLabel: 'jev_selection_story_landmarks' });
+    // The trial's writer waits on this pick: never the 5-minute outage wait.
+    const outage = mode === 'trial' ? JD.TRIAL_JEV_OUTAGE : undefined;
+    scored = await scoreLandmarks(premiseState(selectionSetup(inputData)), list, { callImpl, usageLabel: 'jev_selection_story_landmarks', outage });
   } catch (err) {
     if (!(err instanceof JevDecisionError)) throw err;
     JD.jevFallBack(jevReport, 'landmarks', err, gl);

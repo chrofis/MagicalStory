@@ -2451,6 +2451,18 @@
       "fixedAt": "2026-09-27",
       "fixedIn": "f1d7c57a8",
       "fix": "AGE & PROPORTIONS left PROMPT_CUT_ORDER and joined PROMPT_NEVER_CUT: heading and bullets always ship whole. Replay of 226 staging pages: all fit, worst floor 7,559 (margin 341). Test: tests/unit/page-prompt-fixed-blocks-fit.test.ts."
+    },
+    {
+      "id": "trial-jev-landmarks-five-minute-wait",
+      "title": "A trial whose Jev probe passed but whose landmark call failed waited up to 5 minutes before the writer started",
+      "reportedAt": "2026-09-27",
+      "source": "Owner-requested review of Jev for trial (2026-09-27). Reproduced in tests/unit/jev-selection.test.ts: probe ok + landmark call HTTP 503 logs 'waiting and retrying for up to 300 s' and blocks selectStoryLandmarks.",
+      "rootCause": "jevSelection.selectStoryLandmarks (mode 'trial') called scoreLandmarks → runJevRequests with the story-wide JEV_OUTAGE policy (5-minute retry window, 60 s call timeout); decisions.md 2026-09-27 'Jev selection built' promised the trial at most the 20 s probe.",
+      "impact": "During a partial Jev outage (probe answers, next call fails or hangs), a trial story sat before its writer for up to ~5 minutes on a product whose baseline is ~2 minutes.",
+      "status": "fixed",
+      "fixedAt": "2026-09-27",
+      "fixedIn": "",
+      "fix": "runJevRequests takes a per-caller `outage` override; the trial landmark pick passes jevDecisions.TRIAL_JEV_OUTAGE (waitMs 0, callTimeoutMs = the probe's 20 s) and falls to the backup at step 'landmarks' after one attempt. The full story keeps the 5-minute wait. Test: tests/unit/jev-selection.test.ts."
     }
   ]
 }

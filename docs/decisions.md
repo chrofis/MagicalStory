@@ -275,7 +275,10 @@ the 5-minute outage wait).
      the pin, then a random draw from the top 5. This runs in `processUnifiedStoryJob` before the
      writer call, as the trial's one Jev step. It is probed first (the story-level health check), so
      a Jev outage costs the trial at most the 20 s probe and never the 5-minute wait. A make-believe
-     trial idea makes no call.
+     trial idea makes no call. (Enforced 2026-09-27: until then a probe that PASSED followed by a
+     failing landmark call still took the story steps' 5-minute wait before the writer started. The
+     landmark call now runs under `jevDecisions.TRIAL_JEV_OUTAGE`: one attempt, the probe's 20 s
+     timeout, then the backup at step "landmarks". Test: tests/unit/jev-selection.test.ts.)
    - Both runs are recorded once per job as `stories.data.landmarkSelection`. The landmark-minimum
      retry does not re-rank. `replayInputs.availableLandmarks` stores the Jev order.
 3. **Idea-card landmarks (LB1, no premise yet).** The wizard names 2 places and the trial names 3,

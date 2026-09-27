@@ -147,9 +147,18 @@ function pageState(arc, pages, page) {
  *      (beatsPipeline) switches THAT STEP AND EVERY LATER ONE to the backup,
  *      once per story, logged at error level and stored as `jevFallback`.
  * Every call also has a hard timeout (`callTimeoutMs`), counted as a failure.
+ * A caller whose step cannot afford the wait passes its own `waitMs` /
+ * `callTimeoutMs` (the trial: `TRIAL_JEV_OUTAGE`).
  * Mutable only so tests can shorten the wait.
  */
 const JEV_OUTAGE = { waitMs: 5 * 60 * 1000, maxBackoffMs: 60 * 1000, callTimeoutMs: 60 * 1000, probeTimeoutMs: 20 * 1000 };
+/**
+ * The trial's one Jev step (its landmark pick) runs before the writer, so it
+ * never waits: one attempt, capped at the probe's timeout, then the backup.
+ * A trial outage therefore costs at most the probe plus this one call.
+ * see docs/decisions.md 2026-09-27 "Jev selection built" (trial story landmarks)
+ */
+const TRIAL_JEV_OUTAGE = { waitMs: 0, callTimeoutMs: JEV_OUTAGE.probeTimeoutMs };
 const NOT_AN_OUTAGE = /OPENROUTER_API_KEY is not set|network call blocked in unit tests/;
 
 function withTimeout(promise, ms, what) {
@@ -169,9 +178,10 @@ function withTimeout(promise, ms, what) {
  * @param {{callImpl?:Function, concurrency?:number, usageLabel?:string, stats?:Object, retryDelayMs?:number}} opts
  * @returns {Promise<Map<string, Object[]>>} key → the answers of each rep
  */
-async function runJevRequests(requests, { callImpl, concurrency = JEV_DECISION_CONCURRENCY, usageLabel = 'jev_decisions', stats = newStats(), retryDelayMs = 2000 } = {}) {
+async function runJevRequests(requests, { callImpl, concurrency = JEV_DECISION_CONCURRENCY, usageLabel = 'jev_decisions', stats = newStats(), retryDelayMs = 2000, outage = {} } = {}) {
   // Resolved per call, never captured at require time: tests stub jevAudit.callJev.
   const call = callImpl || ((req) => J.callJev(req));
+  const { waitMs, callTimeoutMs } = { ...JEV_OUTAGE, ...outage };
   const out = new Map();
   let next = 0;
   let failed = null;
@@ -181,7 +191,7 @@ async function runJevRequests(requests, { callImpl, concurrency = JEV_DECISION_C
       if (failed) throw failed;
       const t0 = Date.now();
       try {
-        const r = await withTimeout(call({ state: rq.state, questions: rq.questions }), JEV_OUTAGE.callTimeoutMs, 'Jev call');
+        const r = await withTimeout(call({ state: rq.state, questions: rq.questions }), callTimeoutMs, 'Jev call');
         const ms = Date.now() - t0;
         stats.calls++; stats.cost += Number(r.cost || 0); stats.ms.push(ms);
         recordTextUsage('openrouter', { ...openRouterUsage(r.usage), direct_cost: Number(r.cost || 0), elapsed_ms: ms }, usageLabel, r.model || J.JEV_MODEL);
@@ -192,13 +202,13 @@ async function runJevRequests(requests, { callImpl, concurrency = JEV_DECISION_C
         stats.errors.push({ key: rq.key, attempt, error: msg.slice(0, 300) });
         firstFailAt = firstFailAt || Date.now();
         const waited = Date.now() - firstFailAt;
-        if (NOT_AN_OUTAGE.test(msg) || waited >= JEV_OUTAGE.waitMs) {
+        if (NOT_AN_OUTAGE.test(msg) || waited >= waitMs) {
           stats.failed++;
           throw new JevDecisionError(`Jev decision "${rq.key}" failed after ${attempt} attempt(s) over ${Math.round(waited / 1000)} s: ${msg}`);
         }
         stats.retries++;
-        if (attempt === 1) log.warn(`⏳ [JEV] "${rq.key}" failed (${msg.slice(0, 160)}) — waiting and retrying for up to ${Math.round(JEV_OUTAGE.waitMs / 1000)} s`);
-        const delay = Math.min(retryDelayMs * 2 ** (attempt - 1), JEV_OUTAGE.maxBackoffMs, Math.max(0, JEV_OUTAGE.waitMs - waited));
+        if (attempt === 1) log.warn(`⏳ [JEV] "${rq.key}" failed (${msg.slice(0, 160)}) — waiting and retrying for up to ${Math.round(waitMs / 1000)} s`);
+        const delay = Math.min(retryDelayMs * 2 ** (attempt - 1), JEV_OUTAGE.maxBackoffMs, Math.max(0, waitMs - waited));
         await new Promise(res => setTimeout(res, delay));
       }
     }
@@ -1066,6 +1076,7 @@ function applyVbPages(visualBible, citesByPage, decidedIds) {
 module.exports = {
   JevDecisionError,
   JEV_OUTAGE,
+  TRIAL_JEV_OUTAGE,
   probeJev,
   jevActive,
   jevFallBack,

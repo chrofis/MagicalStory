@@ -150,6 +150,28 @@ describe('landmarks in the story', () => {
     expect(input.availableLandmarks.map((l: any) => l.name)).toEqual(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']);
   });
 
+  it('trial: probe ok, then the landmark call fails — one attempt, backup at "landmarks", never the 5-minute wait', async () => {
+    // JEV_OUTAGE.waitMs stays at its real 5 minutes here: without the trial cap this test would time out.
+    const calls: any[] = [];
+    const probeOkThenDown = async (req: any) => {
+      calls.push(req);
+      if (req.questions.PROBE) return { answers: { PROBE: { noul: 1 } }, cost: 0, model: 'stub', usage: {} };
+      throw new Error('jevAudit: HTTP 503: upstream down');
+    };
+    const input: any = { ...story, trialMode: true, availableLandmarks: town() };
+    const report: any = { fallback: null, probe: null };
+    const rec = await S.selectStoryLandmarks(input, { jevReport: report, mode: 'trial', probe: true, callImpl: probeOkThenDown });
+    expect(report.probe.ok).toBe(true);
+    expect(calls).toHaveLength(2);
+    expect(report.fallback.step).toBe('landmarks');
+    expect(rec.method).toBe('today');
+    expect(input.availableLandmarks.map((l: any) => l.name)).toEqual(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']);
+  });
+
+  it('the trial cap never waits and times a call out at the probe\'s limit', () => {
+    expect(JD.TRIAL_JEV_OUTAGE).toEqual({ waitMs: 0, callTimeoutMs: JD.JEV_OUTAGE.probeTimeoutMs });
+  });
+
   it('a make-believe trial idea asks Jev nothing', async () => {
     const calls: any[] = [];
     const input: any = { ...story, ideaKind: 'fantasy', availableLandmarks: town() };
