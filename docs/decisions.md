@@ -80,6 +80,22 @@ from stored `castPerPage`):** the first division fires on 5 of 15 full books (4-
 shipped division is over on 4 (riqncqg1i, 1nitlympp, 5herh01j7, vnx5l8iy7 — 4 each), 1 page over each. On the 6
 books the real counter reproduces the stored group pages exactly. z3fw660ie has 3 of 3 and does not fire.
 
+**Lab #1556** (`beats_replan` with `planAndCheck` on staging job_1790446348343_z3fw660ie, after deploy d7be5d8d3;
+production planner + gpt-5.6-luna-pro check, $0.074). The built planner prompt carries the budget ("At most 3
+pages") and the group rule.
+- Group pages: 3 before (p1 `medium`, p6 `medium`, p16 `wide`, stored first division) and 3 after (p1 `wide`,
+  p5 `ultra-wide`, p16 `wide`). The count sits at the budget on both sides, because this story was never over it.
+  **Every group page is now a wider shot**, where two of three were `medium` before. The six-figure boarding page
+  (p6) now holds 3.
+- Cast sizes: before 0/1/2/5/6 = 1/4/8/2/1, after 1/2/3/5/6 = 3/7/3/2/1.
+- Coverage holds: every listed child is in frame on at least 3 pages (Saira 4, Sarah 5, Lorena 6, Facundo 9,
+  Fiona 11). There is no UNDER_COVERED_CHARACTER and no NO_FOCAL_PAGE, before or after.
+- This division has no people-free page (NO_PEOPLELESS_PAGE); the stored one had one. That is the planner's
+  run-to-run variance on a must-fix code the re-plan answers, not a budget effect: no group page gave up its cast
+  to an empty one.
+- One story at the budget does not show the count falling. That needs a story that is over it (riqncqg1i,
+  1nitlympp, 5herh01j7 or vnx5l8iy7), or the next full runs (`tasks/verify.json` planner-group-page-budget).
+
 **Touched:** server/lib/castCoverage.js (`groupPageBudget`, `groupPageRule`), server/lib/planCounters.js
 (`GROUP_PAGES_OVER_BUDGET`, `stats.groupPages`, direction), server/lib/promptBuilders.js (`buildBeatsPrompt` fills),
 prompts/story-beats.txt, server/lib/testlab.js (`planAndCheck`), tests/unit/planner-group-pages.test.ts,
