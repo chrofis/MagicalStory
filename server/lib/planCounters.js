@@ -1040,8 +1040,8 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
   //     it ({GROUP_PAGE_BUDGET}), this counts the same `present` list every cast
   //     counter here reads (the who column plus the roster's `covers`). The
   //     finding names every group page — which of them keep their group is the
-  //     story's call, so the re-plan chooses. Reported as "also noted": whether
-  //     it binds a round (must-fix) is the owner's call.
+  //     story's call, so the re-plan chooses. Must-fix (owner, 2026-09-27;
+  //     promptBuilders REPLAN_MUST_FIX_CODES) and counted by the round guard.
   const groupBudget = groupPageBudget({ pageCount, castCount: listed.length, maxCharactersPerScene });
   const groupPages = groupBudget ? rows.filter(r => r.present.length > groupBudget.over).map(r => r.pageNumber) : [];
   if (groupBudget && groupPages.length > groupBudget.max) {

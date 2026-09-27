@@ -63,8 +63,15 @@ gives the image model's ceiling, 6. Measured over the 17 staging books of the 14
 4. `planCounters` `GROUP_PAGES_OVER_BUDGET` counts pages whose `present` holds more than three against the same
    budget. It names every group page and carries its own fix: keep the gathering, climax and ending, cast out who
    the instant does not need, never the obstacle holder or a character who would fall below the floor.
-   `REPLAN_FINDING_DIRECTION` gives 'fewer'. It is **also noted**, not must-fix: ranking is the owner's call
-   (BACKLOG).
+   `REPLAN_FINDING_DIRECTION` gives 'fewer'. It shipped as a noted finding in 1601ca902, not must-fix. **Must-fix
+   since the owner's ruling of 2026-09-27**: it is in `REPLAN_MUST_FIX_CODES` and NOT in
+   `REPLAN_CONVERGENCE_EXEMPT_CODES`, so going over the budget forces a re-plan. `countsTowardConvergence` counts
+   it, so `replanRoundRegressed` discards a round that leaves the book further over, and `replanRoundConverged`
+   needs it gone. It is a cast finding, answered by casting out, not a cheap shot relabel.
+   Free replay (the real counters, ranking and `buildReplanSection` on the stored first division of the four
+   over-budget books): it fires on all four (riqncqg1i 4, 1nitlympp 5, 5herh01j7 4, vnx5l8iy7 4 group pages
+   against 3). It ranks must and lands inside `## MUST FIX`. The cast/focal count the guard starts from rises by
+   one on each: 2→3, 2→3, 3→4 and 1→2.
 5. **Coverage reconciled:** the budget never fights the floor (see point 1), and the re-plan's existing review
    rules (`span` / `castFloor` / `focal` / `obstacle`) refuse a cast-out that would take a character below it. A
    unit test sweeps P 2-30 × C 1-14 × ceiling 4-6 and checks pages of three plus the budget always hold the floor.

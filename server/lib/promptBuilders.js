@@ -7703,6 +7703,13 @@ const REPLAN_MUST_FIX_CODES = new Set([
   // A plan line that breaks the CAST block the planner wrote before dividing
   // (2026-09-25): a deed page, a promised appearance or the ending's cast.
   'CAST_PROMISE_BROKEN',
+  // More pages hold more than three characters than the book's budget
+  // (castCoverage.groupPageBudget, one page in six). Owner ruling 2026-09-27:
+  // going over the budget forces a re-plan. It is a cast finding — a page is
+  // answered by casting out, never by relabelling a shot — so it COUNTS toward
+  // convergence (not in REPLAN_CONVERGENCE_EXEMPT_CODES): a round that leaves
+  // the book further over its budget is discarded by replanRoundRegressed.
+  'GROUP_PAGES_OVER_BUDGET',
   // THE SHOT DISTRIBUTION JOINED 2026-09-20 (owner), the whole block of it:
   // SHOT_MEDIUM_WIDE_EXCESS, SHOT_CLOSEUP_COUNT, SHOT_ULTRAWIDE_COUNT,
   // SHOT_OTS_COUNT and SHOT_NO_CAMERA_POSITION (SHOT_AERIAL_COUNT retired 2026-09-23 with the aerial floor).

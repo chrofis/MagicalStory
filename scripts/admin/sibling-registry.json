@@ -711,7 +711,7 @@
     {
       "id": "group-page-budget-rule-vs-counter",
       "axis": "the group-page budget the planner is told vs the counter that counts it",
-      "reason": "How many pages may hold more than three named characters (owner, 2026-09-27; docs/decisions.md): castCoverage.groupPageBudget is ONE number — one page in six, at least one, raised only when the coverage floor cannot be met on pages of three. story-beats.txt states it ({GROUP_PAGE_BUDGET}, groupPageRule, planner question 3) and planCounters.js counts it (GROUP_PAGES_OVER_BUDGET, direction 'fewer', also noted) on the same `present` list every cast counter reads. A counter holding the book to a number the planner was not told, or a planner told a number nothing counts, is the drift this set exists to catch. tests/unit/planner-group-pages.test.ts.",
+      "reason": "How many pages may hold more than three named characters (owner, 2026-09-27; docs/decisions.md): castCoverage.groupPageBudget is ONE number — one page in six, at least one, raised only when the coverage floor cannot be met on pages of three. story-beats.txt states it ({GROUP_PAGE_BUDGET}, groupPageRule, planner question 3) and planCounters.js counts it (GROUP_PAGES_OVER_BUDGET, direction 'fewer', must-fix since 2026-09-27) on the same `present` list every cast counter reads. A counter holding the book to a number the planner was not told, or a planner told a number nothing counts, is the drift this set exists to catch. tests/unit/planner-group-pages.test.ts.",
       "members": [
         "server/lib/castCoverage.js",
         "server/lib/planCounters.js",

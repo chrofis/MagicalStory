@@ -9,7 +9,8 @@
  *   - the planner (first division AND re-plan) is told that budget and the Art
  *     Director's group-staging rule, from the same constants;
  *   - planCounters GROUP_PAGES_OVER_BUDGET counts against the same budget and
- *     is answered by casting out, as an "also noted" finding.
+ *     is answered by casting out, as a must-fix finding the round guard counts
+ *     (owner, 2026-09-27).
  */
 import { describe, it, beforeAll, expect } from 'vitest';
 
@@ -103,6 +104,24 @@ describe('GROUP_PAGES_OVER_BUDGET', () => {
     expect(f.pages).toEqual([1, 6, 8, 12, 18]);
     expect(f.detail).toContain('at most 3');
     expect(replanChangeDirection({ code: 'GROUP_PAGES_OVER_BUDGET' })).toBe('fewer');
-    expect(PB.replanRank(f)).toBe('also');
+  });
+
+  it('is must-fix and counts toward convergence (owner, 2026-09-27)', () => {
+    const f = { code: 'GROUP_PAGES_OVER_BUDGET', pages: [1, 6, 8, 12, 18], line: 'PLAN[GROUP_PAGES_OVER_BUDGET] ...' };
+    expect(PB.replanRank(f)).toBe('must');
+    expect(PB.countsTowardConvergence(f)).toBe(true);
+    // It reaches the RE-DIVIDE block under MUST FIX.
+    const section = PB.buildReplanSection('Page 1: wide — Ana — x — y', [f], { pageCount: 18 });
+    expect(section.indexOf(f.line)).toBeGreaterThan(section.indexOf('## MUST FIX'));
+  });
+
+  it('the round guard discards a round that leaves more group pages over the budget', () => {
+    const over = (pages: number[]) => ({ findings: [{ code: 'GROUP_PAGES_OVER_BUDGET', pages }] });
+    // Kept: the recheck is within budget.
+    const kept = PB.replanRoundRegressed(over([1, 6, 8, 12, 18]), { findings: [] }, [6, 8]);
+    expect(kept).toMatchObject({ before: 1, after: 0, regressed: false, discard: false });
+    // Discarded: a round that pushes a book within budget over it.
+    const worse = PB.replanRoundRegressed({ findings: [] }, over([1, 6, 8, 12]), [6]);
+    expect(worse).toMatchObject({ before: 0, after: 1, regressed: true, discard: true });
   });
 });
