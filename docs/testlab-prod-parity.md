@@ -12,13 +12,15 @@ Classes:
 - **R**: research-only (no production counterpart).
 
 Parity tests:
-- `tests/unit/lab-prod-call-parity.test.ts`: image, char_repair and the edit_image plate derive,
-  built from the same stored fixture, compared with production's builders, and a source scan
-  that the run still calls them.
+- `tests/unit/lab-prod-call-parity.test.ts`: image, char_repair, the edit_image plate derive
+  and (batch 2) empty_scene, quality_eval, semantic_eval, consolidate and inpaint, built from
+  the same stored fixture, compared with production's builders, and a source scan that the run
+  still calls them.
 - `tests/unit/testlab-prod-prompt-parity.test.ts`: the prompt inputs.
 - `tests/unit/lab-plate-qc-always.test.ts`: plate QC.
-- Sibling sets `lab-vs-prod-page-render` and `lab-vs-prod-char-fix` in
-  `scripts/admin/sibling-registry.json` block a push that moves one side only.
+- Sibling sets `lab-vs-prod-page-render`, `lab-vs-prod-char-fix`, `lab-vs-prod-plate`,
+  `lab-vs-prod-page-eval` and `lab-vs-prod-eval` in `scripts/admin/sibling-registry.json` block a
+  push that moves one side only.
 
 Audit date: 2026-09-27 (staging `c76dac6fc`). Every B/C divergence still open has a line in
 `tasks/BACKLOG.md` under "Test Lab ↔ production parity (2026-09-27)".

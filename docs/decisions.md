@@ -63048,4 +63048,87 @@ testlab, figureDetection, faceIntegrityGate, judgeFixtures, routes/regeneration,
 routes/trial, routes/ai-proxy, storyJobPipeline.js; tests/unit/provider-usage.test.ts (new),
 judge-fixtures.test.ts, face-integrity-gate.test.ts.
 
+## 2026-09-27 — Lab parity, batch 2: plates, page evals, consolidate and inpaint run the run's own code
+
+**Context:** batch 1 ("The Lab runs production code; params are the only difference", above) made the Lab's `image` and `char_repair` stages call
+production's own builders. The audit (`docs/testlab-prod-parity.md`) listed the stages used most
+for decisions after them as still class B/C: `empty_scene`, the eval stages, `consolidate` and
+`inpaint`. Each rebuilt its call itself:
+- **empty_scene** masked the plate with `getTextAreaMask(ctx.textPosition)` (the stored
+  post-detection position, no spread rule), never retried a failed QC, and painted a vantage
+  page's plate from that page's OWN plate text, shot, light and objects. The run paints the
+  vantage's canvas from its representative page and DERIVES an angled or re-lit page's plate from
+  it. Replayed on staging `job_1790446348343_z3fw660ie`: in the run, 7 of its 16 pages wear a
+  canvas painted from another page or a derive of one (p3, p12-p16 share a canvas; p8 gets a
+  low-angle derive of p9's), and p5 (cast 0) gets no plate. The pre-fix Lab painted all eight
+  from their own text.
+- **quality_eval / semantic_eval / eval_variance / the image auto-eval** called
+  `evaluateImageQuality` with `buildEvalReplayOptions`. They sent no `pagePrompt`, so REQUIRED
+  OBJECTS fell back to `objects[]`. They sent the page's references only, never the whole cast.
+  The scene hint was `ctx.outlineHint`, not `resolveEvalSceneHint`, so a cover got its description
+  instead of its brief. They sent no `storyMeta`, so the judges read the language as `en`
+  (the REQUIRED OBJECTS / REQUIRED TEXT labels). They sent a page number the batch does not send.
+  quality_eval skipped the batch's post-eval steps. semantic_eval rebuilt three judge inputs
+  itself and missed the REQUIRED TEXT rules, the cover fidelity reference and the Visual Bible
+  reference cells.
+- **consolidate / inpaint** consolidated with `entityIssues: []`, no `sceneClothing` and no
+  `readerFindings`, on an eval without `requiredTexts`. Inpaint re-consolidated instead of using
+  the plan the version was scored with. It passed no worn clothing and no text position, and it
+  never restamped a repainted cover.
+
+**Decision:** same rule as batch 1. The run's own code moves VERBATIM into exported functions,
+the run calls them, and the Lab stage calls them on inputs rebuilt from stored data with the
+run's builders. No Lab reimplementation stays.
+- Plates → `server/lib/platePipeline.js`: `renderVantagePlates` (Phase 5a-pre-vantage) and
+  `renderPagePlate` (Phase 5a-pre), plus `outlineEmptyScenePromptOf`. The Lab rebuilds
+  `pageDataArray` from the stored pages and picks vantage / per-page / none by the run's rules.
+  It derives only the replayed page (`derivePages`). A failed canvas falls to the page's own
+  plate, as in the run.
+- Page eval → `repairPipeline.buildEvalInput` + `evalStoryMetaOf`,
+  `images.batchEvalQualityCall`, and `evalPipeline.prepareEvalJudgeInputs` +
+  `semanticFidelityOptions`. `testlab.labEvalCall` rebuilds the run's `rawImages` record. A
+  stored version is judged against its own record, as a repair round judges it.
+- Repair round → `repairPipeline.consolidationInputs` and `buildInpaintCall`.
+  `testlab.labStoredPageEval` holds the served version's stored evaluation and plan. It rebuilds
+  `judgedPrompt` and `requiredTexts`, which a version record does not store, with the eval's own
+  builders.
+- Lab-only knobs are explicit fields the run never passes: `derivePages`, `onQc` and
+  `plateTemplate` on the plate env; `evalOptionOverrides` and `recordStats: false` on the batch.
+  The eval_finding_stats sink now honours `recordStats: false`, so Lab re-evals stay out of the
+  aggregate the run's evals build.
+- Guard: `tests/unit/lab-prod-call-parity.test.ts` (each new case fails on the pre-fix Lab, run
+  2026-09-27), and sibling sets `lab-vs-prod-plate` and `lab-vs-prod-page-eval`, plus parity
+  anchors on `lab-vs-prod-eval`.
+
+**Rationale:** as batch 1. A Lab result is evidence about production only if it ran
+production's code.
+
+**Found, not changed:** the run's batch eval passes no `evalOptions.pageNumber`. The judges'
+EXPECTED CAST roster therefore skips page-declared VB secondaries and animals, while the
+detector-side roster in the same batch includes them (BACKLOG). The pre-fix Lab passed the page
+number, so on such pages its evals were stricter than production's.
+
+**Constraints (approximate for OLD stories):** not stored, so defaults stand in:
+`modelOverrides` (sceneRouting, coverTitleMode, generateEmptyScenes) and the route overrides. A
+page whose brief was rewritten after its plate was rendered replays against the final brief. The
+consolidate stage takes entity issues from the stored FINAL entity report; the run consolidates
+with the round's report.
+
+**Past experiments this affects** (staging):
+- `empty_scene` #1073-#1517 (25 in the last 3 weeks, incl. #1478, #1499-#1517): pre-fix plate
+  call. Vantage pages were painted from their own text, and nothing was retried.
+- `image` runs with auto-eval (every #1501-#1568 in batch 1's list, and #1272-#1450): the score
+  came from the thin eval.
+- `quality_eval` #995-#1533 (46 recent, incl. the cover lettering replays #1521/#1533),
+  `semantic_eval` #1395, #1399, #1401, #1471, and `eval_variance` #768-#1001: thin eval inputs.
+- `consolidate` #45-#993 and `inpaint` #1000-#1402 (16, incl. #1360 "why did production inpaint
+  return nothing?" and #1402): consolidated without entity issues, clothing or reader findings.
+- `judge_fixture` #1525-#1567: its eval branches run quality_eval / semantic_eval, so they had the same thin eval.
+
+**Touched:** server/lib/platePipeline.js (new), storyJobPipeline.js, server/lib/images.js,
+server/lib/evalPipeline.js, server/lib/repairPipeline.js, server/lib/testlab.js,
+scripts/admin/sibling-registry.json, tests/unit/lab-prod-call-parity.test.ts and the source-scan
+tests re-pointed at the moved code, docs/testlab-prod-parity.md, docs/lab-divergences.md,
+tasks/BACKLOG.md.
+
 **Status:** ✅ staging.
