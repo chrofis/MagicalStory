@@ -62864,6 +62864,17 @@ estimate ($0.0074 per character) is low by roughly 5–7×.
 **Touched:** server/lib/charRepairReference.js, server/lib/entityConsistency.js,
 tests/unit/entity-judge-reference-faces.test.ts.
 
+**Measured (judge fixtures, entity).** Before (current judge, 7 fixtures + Fiona): Lab 1562 —
+4 TP / 1 FN / 3 TN / 0 FP; Lab 1566 — 3 TP / 2 FN / 2 TN / 1 FP (Max p15 filed as face_mismatch
+MAJOR; Lorena's paint wash filed CRITICAL face_mismatch). Fiona's initial page was FN in both.
+After (this change, Fiona fixture only — the CHF 0.30 cap did not cover two full after-runs, see
+Cost): local smoke over the staging story with the shipped code — the identity grid holding the
+covers and p16 came back "consistent, 10" (no finding on the initial page at all); Lab 1567 on
+staging 7d29c0c9 — FN again (identity_swap filed for p6 and a mast crop on p5, nothing on -2). **The
+larger reference alone does not catch Fiona's swap.** The full 8-fixture after-run (≥2 repeats,
+≈ $0.22 each with thinking tokens) is open.
+
+**Status:** 🟡 staging; unproven on the fixture set.
 
 ## 2026-09-27 — The Lab runs production code; params are the only difference
 
