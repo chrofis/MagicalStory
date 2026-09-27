@@ -61208,3 +61208,62 @@ the physical description from "Burak is a middle-aged man" to "Burak is a young-
 **Touched:** server/lib/trialAge.js, server/routes/trial.js, scripts/admin/sibling-registry.json
 (new set `photo-apparent-age-clamp`), tests/unit/trial-apparent-age-clamp.test.ts,
 tests/unit/trial-age-mandatory.test.ts, tasks/bugs.json.
+
+## 2026-09-27 — Jev text audit: slop ✅, grammar ❌, logic/arc 🟡 — built, measured, NOT wired
+
+**Context:** the owner wants the bad SECTIONS of a story's text found so only those get rewritten.
+Jev (`typesafe/jev-1.13`, TypeSafe decision model on OpenRouter, `POST /api/alpha/decisions`)
+answers yes/no (`noul`) and choice questions over a text "state" for ~$0.00005 a call and
+generates nothing. Question: which of grammar, AI slop, logic, arc fidelity and shot type can it
+detect reliably enough to route a page to the existing repair.
+
+**Built:** `server/lib/jevAudit.js` — fail-loudly client, question builders over the versioned
+`prompts/jev-text-audit.txt` (13 slop types, one question each, so a flag names the problem),
+`auditStoryText()` → per-page flags + `toFaultLines()` in the `FAULT[<CHECK>]: p<N> — …` shape
+`textRefine.parseFaultLines` already reads (its tag is letters only, so the tag is the check and
+the question id leads the text). The measured verdicts live in `JEV_CHECKS`; only enabled
+questions are asked. No pipeline code calls it.
+
+**Evaluation** (dataset `evals/datasets/jev-text-audit-v1`, run `2026-09-27_jev-v1`, results line
+in `evals/results/results.jsonl`; 2,380 items + follow-ups, total Jev spend ≈ $0.11): 20 stored
+stories (16 prod incl. the Burak trial, 4 staging), 55 pages of 8 stories labelled by reading them
+in full, 8 real writer-stage errors the lector later corrected (re-inserted into the final page),
+and hand-written injections into clean pages — 79 grammar mutations, 117 slop insertions (13 types
+× de/fr/en), 28 logic edits, 7 subtle arc contradictions, 147 shuffled plan lines, 57 arcs with one
+cast member cut. Story text is gitignored (GDPR erasure); `--extract` rebuilds it.
+
+| Check | Verdict | Evidence | Adopted |
+|---|---|---|---|
+| Grammar (any granularity) | ❌ | Injected errors separate (paragraph AUC 0.87), REAL ones do not: real pages AUC 0.49–0.57, real writer sentences AUC 0.50. «zur Basteltisch» 0.17, «nicht hers» 0.39, «auf den Trottoir» 0.22 vs clean mean ~0.25. Tried sentence, numbered sentences, paragraph, page, whole story; 7 phrasings incl. an inverted "every sentence is correct" | off |
+| Swiss ß / guillemets, repeated "suddenly" | ✅ ($0) | string facts; `mechanicalChecks` | code |
+| Slop, per type, page state | ✅ | real labelled pages: recall 11/14, precision 11/18 at 0.5 (16/18 after adjudicating 6 labels I had missed — e.g. «Heute war er kein kleiner Bub … Heute war er ein Legionär», «Der schwere Stein in seinem Bauch»); ~20 of 23 flags on unlabelled real pages were real (e.g. «Adan comprend maintenant que le courage, c'est aussi savoir écouter», «Elle n'a pas encore compris ce qui se prépare à l'horizon»); injected 9/9 for 12 of 13 types. Paragraph state scores the same on injections (AUC 0.911 vs 0.912) | 0.5 page; REPETITIVE_OPENINGS 0.7 🟡; STOCK_WONDER / INTENSIFIER / EMOTION_LABEL / RULE_OF_THREE 🟡 (no or 0/2 real occurrences) |
+| Slop: SUDDENLY | ❌ | answers 0.6–0.87 on every page | off → code count |
+| Logic, whole story with the page marked | 🟡 blatant / ❌ subtle | page-alone state AUC 0.66, marked story 0.85. Explicit vanish 4/4, animal acting like a person 4/4 (clean max 0.22), act against a stated want 3/4 (clean max 0.56). APPEAR fires on every legitimate introduction (clean top 0.9) ❌; OBJECT continuity real 0/3 ❌. The 5 real subtle faults found by reading (a ball never put back, laces the friend never lost, a character on the Moon standing on Earth) were all missed | VANISH 0.7, ANIMAL 0.5, MOTIVE 0.55 🟡; APPEAR, OBJECT off |
+| Arc: page text contradicts its plan line | 🟡 | CONTRADICT ≥0.85: subtle contradictions 5/7, originals 1/147 — and that one is real (plan: Lorena holds the map pieces; text: «Sie hatte nichts in den Händen: keine Karte»). MATCH <0.3 flags picture-only plan detail on the August plan format (10/18 pages of one story) | CONTRADICT 0.85; MATCH off |
+| Arc: every cast member has a beat | 🟡 | cut member vs present AUC 0.97 (52/57 below 0.35) — a cut name is also a $0 string check; what Jev adds is paraphrase ("two ravens" for two named ravens) and PASSIVE members: Nia 0.10, Max 0.27, Kachel 0.27 in an arc where they only tag along | 0.35 below |
+| Shot type from a brief | ❌ | 61% and 58% (two phrasings) vs 60% for always "medium"; the earlier 3/3 probe was luck | off → count the brief's own `camera` / `shot` field, $0 |
+
+**Decision:** keep the module unwired. Recommended wiring (owner's call, each step separately):
+(1) slop only, as a third source into `mergeAuditFindings` next to the arc-informed and blind
+audits — its lines already parse and dedupe there, and the ONE repair pass (`runRepairPass`)
+rewrites only the pages it names; (2) before that, every slop type Jev can flag must also be a
+rule the writer was given — today `STYLE_RULEBOOK` covers paired negations and meaning/summary
+sentences but not body clichés, foreshadow teasers, stock wonder, stacked similes or generic
+endings (generator↔critic sync, `syncing-generator-and-critic`); (3) the arc cast-beat flags are
+arc-level, not page-level, and belong to the arc critique, not the text repair. Grammar stays with
+the lector.
+
+**Rationale:** Jev ranks well but fails exactly where the real errors are subtle: a synthetic
+"and" in German is easy, an LLM's wrong gender is not. Slop is lexical and Jev's per-type
+questions hit it with few false flags on real prose, at $0.003 and ~15 s sequential for an 18-page
+story. Calibration holds in aggregate, not per call — thresholds are set from the set, not read as
+probabilities.
+
+**Revisit if:** a new Jev version (`jev-1.14+`) — re-run `scripts/analysis/eval-jev-text-audit.js`
+on the same dataset; or a grammar set of ≥30 real errors shows separation.
+
+**Touched:** server/lib/jevAudit.js, prompts/jev-text-audit.txt, tests/unit/jev-audit.test.ts,
+scripts/analysis/jev-text-audit-dataset.js, scripts/analysis/eval-jev-text-audit.js,
+evals/datasets/jev-text-audit-v1/{injections,real_labels,story_ids}.json,
+evals/runs/2026-09-27_jev-v1/metrics.json, evals/results/results.jsonl, .gitignore,
+docs/prompt-inventory.md, tasks/BACKLOG.md.
