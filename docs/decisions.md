@@ -21,6 +21,114 @@ superseded and link forward.
 
 ---
 
+## 2026-09-27 — Jev picks the challenges and landmarks that fit: yes/no per item on the premise, then a small random draw from the top (measured, NOT built)
+
+**Context.** Owner, 2026-09-27: *"We inject ideas from the 200+ list, as well as landmarks. Now we
+just select randomly which ones. Could we ask Jev to select the ones that fit the story?"* Traced at
+staging `bfb55bea6`:
+- **Challenges.** `drawChallengeIdeas` (`server/lib/promptBuilders.js:7487`) draws **25 at random**
+  from `prompts/challenge-catalogue.txt` (395 entries, 30 categories), filtered by age band
+  (`challengeCatalogueBands`, :6822 — 3-5 → 139, 6-8 → 336, 9-12 → 256 entries; none for the
+  routine/quest/tries bands) and peril (youngest ≤5), category-spread (A/C/D/F/G max 1), minus the
+  ids this account's last ≤12 same-type books were OFFERED (`loadUsedChallengeIds`,
+  `beatsPipeline.js:863`; drawn at :3223). It reaches **arc-create and arc-retell only**. The idea
+  generator lost it on 2026-09-21 ("The idea call gets an idea-shaped guide…"); the trial never had it.
+  The randomness is deliberate: 2026-08-29 "Beats planner draws … random catalogue challenges"
+  (*"'Choose a less obvious one' adds no entropy … Oversupply ~5x is the point: selection, not
+  prohibition, and real randomness per run"*) and 2026-09-19 "variety is a SELECTION rule on the draw".
+- **Landmarks.** `resolveAvailableLandmarks` (`landmarkPhotos.js:4176`) returns the town's 20 by
+  fame (`LANDMARK_RANK_SQL`). The story pipeline shuffles them (`storyJobPipeline.js:7886`) — the arc
+  and Art Director read all 20, the TRIAL story slices the first 3 (`promptBuilders.js:12148`), a
+  premise-named one is pinned first. The wizard idea prompt takes the first **2 unshuffled** (fame
+  rank; `storyIdeas.js:103`). The trial idea prompt calls `getIndexedLandmarks(loc, 3)`
+  (`trial.js:2286`) — limit 3 is below `MIN_OWN_LOCALITY_ROWS = 5`, so it always takes the
+  municipality rung and can name a place (Zürichsee, Reuss) the story's own 20 do not contain.
+
+**Measured** (`scripts/analysis/eval-jev-selection.js`, run `evals/runs/2026-09-27_jev-selection`,
+labels `evals/datasets/jev-selection-v1/reading_labels.json`). 11 staging setups of the last 45 days
+(dragon ×3 premises, adult pirates, screen-time wizard, mermaid ×3, telling-truth ×2, making-friends,
+toddler pirate). Reading labels G/N/B written before any Jev call: 3,226 challenge labels (every
+eligible id of 10 setups, by two fresh reader agents, premise-aware), 214 landmark labels (by me).
+Every design ×3 calls. Jev spend **USD 0.070** (≈ CHF 0.06).
+
+| Challenges (10 setups) | AUC G vs B | bad in the 25 offered | good in the 25 | same-setup repeat (top-25 Jaccard) | 3 dragon premises (top-25 Jaccard) |
+|---|---|---|---|---|---|
+| today: random draw (real builder, 400 draws) | — | **58%** | **10%** | — | — |
+| CB1 noul per entry, setup only | 0.80 | 15% | 34% | 0.82 | 0.82 |
+| **CB2 noul per entry, setup + premise** | **0.89** | **14%** | **48%** | 0.88 | **0.11** |
+| CA one choice (chunked: every pool is 256-336 > the 255 cap) | 0.67 | 28% | 42% | 0.55 | 0.04 |
+
+The bad share is not harmless: of the 20 ids the arc re-telling reported TAKING on 5 stored books,
+**6 were labelled B** — the creator takes what it is offered when the draw holds no good one
+(dka3jpog9's sibling vnx5l8iy7: 0 G in its 25, took B,B,N,N,N). CB2 ranks the taken ids above the
+untaken ones in their own draw (AUC 0.70). Premise text is what gives the ranking variety: without
+it (CB1) the three dragon books share 82% of their top 25, with it 11%.
+
+Account-memory decay (worst case: the SAME premise re-run, offered ids excluded as today; window
+after exclusions, G / B share):
+
+| sampler | book 1 | book 2 | book 3 | book 4 | book 6 |
+|---|---|---|---|---|---|
+| random 25 (today) | 10% / 58% | same | same | same | same |
+| 25 from the top 40 | 40% / 15% | 20% / 28% | 11% / 39% | 11% / 43% | 4% / 58% |
+| **12 from the top 20** | **54% / 13%** | 34% / 17% | 27% / 18% | 20% / 28% | 10% / 37% |
+
+| Landmarks (11 setups, 20 per town) | AUC G vs B | top pick | first 2 (idea prompt) | first 3 (trial story) | top-5 G / B |
+|---|---|---|---|---|---|
+| today | — | — | fame: 8 G / 3 B of 22 | random: 17% G / 38% B | — |
+| LB1 noul per place, setup only | 0.93 | 7 G / 0 B | 12 G / 0 B | 17 G / 1 B of 33 | 44% / 7% |
+| **LB2 noul per place, + premise** | 0.91 | **9 G / 0 B** | **18 G / 0 B** | 18 G / 2 B | 40% / 9% |
+| LC one choice "anchor this story" | 0.89 | 4 G / 0 B | 9 G / 0 B | 17 G / 0 B | 44% / 11% |
+
+Fame gives every Zurich story the same two places (Grossmünster, Zoo); LB2's top 5 across the six
+Zurich setups spans 12 distinct places. Labels for landmarks were written by the same session that
+wrote the question — read that table as indicative; the challenge labels were written blind by
+separate readers.
+
+**Latency / cost.** One call carries every item as a noul: ~330 challenge nouls = USD 0.0008,
+p50 415 ms / p90 650 ms; 20 landmark nouls = USD 0.00008, p50 290 ms / p90 400 ms. A single call is
+enough (repeat Jaccard 0.88; LB2's top pick flipped across the 3 calls on 1 of 11 setups).
+
+**Verdict.** Challenges ✅ **CB2** (premise-aware noul per entry). Landmarks ✅ **LB2** at story
+time, ✅ LB1 at idea time (premise not yet written). Single choice ❌ for both (weaker, flips, and
+the challenge pool never fits one 255-option choice).
+
+**Recommended design (owner call; nothing built).**
+1. **Arc draw** (`drawChallengeIdeas`, beats pipeline): keep age/peril/exclusion filters, then ONE Jev
+   call — state = cast ages, kind of story, home town + the commissioned idea; per eligible entry
+   noul *"A trial or obstacle like this fits this book: it can happen naturally in its world and to
+   its cast, and it serves the kind of story it is. The trial: <challenge> (tests: <x>)"* — rank,
+   and draw **12 at random from the top 20** (3× oversupply of the ~4 the arc takes; `challengeDrawIds`
+   persisted as today). 25-from-40 keeps today's count at a lower fit. Off the latency path (the
+   arc stage runs for minutes); +0.4 s.
+2. **Trial story landmarks** (`storyJobPipeline.js:7886` → `slice(0, 3)`): LB2 noul per place on
+   the chosen idea, 3 at random from the top 5 (premise-named pin stays first). Background job; +0.3 s.
+3. **Idea prompts** (wizard first 2, trial first 3): LB1 on setup, 2 from the top 5. This IS on the
+   happy path: +290 ms p50 / +400 ms p90 as a synchronous round-trip on 100% of idea requests, which
+   feedback_happy_path_latency forbids — so only if it runs OFF the path: fire it when the theme is
+   picked (the trial already prewarms) or cache it per (town, theme, topic, age band). Owner call.
+4. The arc's own 20-landmark list stays as is (the arc chooses; nothing measured says trimming helps).
+5. Jev outage: the story-level probe (`bfb55bea6`) already switches a whole story to today's setup;
+   the random draw IS that setup, so no new fallback path.
+
+**Touches.** 2026-08-29 random-draw entry (the randomness moves inside Jev's top 20 — variety by
+construction stays, the "real randomness per run" survives as the draw); 2026-09-19 variety-as-
+selection (unchanged: exclusions still filter the pool before Jev ranks it; offered-vs-taken
+exclusion is an open question — excluding only TAKEN ids would stop the decay above, but
+`challengeTakenIds` is written only when the re-telling runs); 2026-09-20 MIN_POOL/shedding (pool
+floor unchanged; count 25 → 12 is a change); 2026-08-21/08-25 fame + judged story score (they stay
+the FILTER and the list; Jev only orders the 20); 2026-09-02 premise pin (kept first). No
+`docs/SETTLED.md` line covers either selection.
+
+**Not done.** The optional blind premise comparison: the challenge draw no longer reaches any idea
+prompt (only the arc, a multi-dollar stage), so a cheap-model premise A/B would not measure it.
+
+**Touched:** `scripts/analysis/eval-jev-selection.js`, `evals/datasets/jev-selection-v1/reading_labels.json`,
+`evals/runs/2026-09-27_jev-selection/metrics.json`.
+**Status:** 🟡 measured, owner call pending (tasks/BACKLOG.md).
+
+---
+
 ## 2026-09-27 — A figure shown in part is in the picture; a story page cites the bible figures its who column names (and the plan-line name match stays deleted)
 
 **Context.** Staging `job_1790508305061_dka3jpog9` p11: the instant stood the children "before
