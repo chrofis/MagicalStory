@@ -61267,3 +61267,83 @@ scripts/analysis/jev-text-audit-dataset.js, scripts/analysis/eval-jev-text-audit
 evals/datasets/jev-text-audit-v1/{injections,real_labels,story_ids}.json,
 evals/runs/2026-09-27_jev-v1/metrics.json, evals/results/results.jsonl, .gitignore,
 docs/prompt-inventory.md, tasks/BACKLOG.md.
+
+## 2026-09-27 — Jev text audit wired: slop + logic/arc findings feed the one text repair; the cast check feeds the arc re-tell gate
+
+**Context:** owner decision on the 2026-09-27 "Jev text audit" entry: wire it as "slop + logic/arc
+rewrites"; the eval set's story text stays out of git. That entry's two open questions are
+closed by this one.
+
+**Decision:**
+1. **Generator first.** The slop types Jev judges live in ONE module, `server/lib/proseSlop.js`:
+   each entry carries the writer's rule and Jev's question side by side (the questions are the
+   measured wording, byte-identical). `SLOP_RULES` is appended to `STYLE_RULEBOOK`, so the beats
+   writer, the trial writer, the text repair, the diff pass, the lector and the blind audit all
+   get the rules through `{STYLE_RULEBOOK}`. Types an existing rulebook line already states
+   (moral summary, narrator explaining, paired negation) carry `coveredBy`, not a second rule.
+   **Dropped:** the emotion-label type — it contradicts `MOTIVE_AT_THE_ACT_RULE` ("a feeling
+   named" is an allowed glimpse) and the last-page rule ("lands one feeling, plainly");
+   "suddenly" is a writer rule plus the $0 `MECH_SUDDENLY` count (Jev answered it 0.6–0.87 on
+   every page). The `[SLOP]` section of `prompts/jev-text-audit.txt` moved into proseSlop.js.
+   Sibling set `prose-slop-generator-vs-critic`.
+2. **Text chain.** `refineStoryText` runs `jevAudit.runJevTextSource` as a third auditor in the
+   same `Promise.all` and 900 s deadline as the arc-informed and blind audits, on the writer's
+   text. Asked: the 11 slop types (page as state, 0.5; repetitive openings 0.7), `LOGIC_VANISH`
+   0.7, `LOGIC_ANIMAL` 0.5, `LOGIC_MOTIVE` 0.55 (whole story, page marked), `ARC_PAGE_CONTRADICT`
+   0.8 against the page's PLAN line, and the $0 checks (ß and non-«» quotes on `-ch`, "suddenly"
+   twice on a page). NOT asked: grammar, appears-without-setup, object continuity, plan MATCH,
+   shot type (all ❌). Its lines are `FAULT[SLOP|LOGIC|ARC|MECH]: p<N> — [<ID>] <question>`,
+   categories no other auditor uses, so the merge folds a Jev line only on ≥0.4 word overlap.
+   The one repair pass rewrites only the pages the merged list names.
+3. **Plan contradiction v2.** The question now reads "The events told in the page text contradict
+   the events of this plan line; what a picture shows, frames or leaves out does not count".
+   v1 at 0.85 (subtle 5/7, originals 1/147) flagged `job_1790107559778_fcmlfa8kn` p7 at 0.88,
+   where the plan's "no figures in the frame" is a picture instruction and the prose rightly
+   names the cast — a repair would have been sent to write characters out of the text (the page
+   text is not a checklist for the picture, SETTLED). v2 at 0.8: subtle 4/7, originals 0/147,
+   that page 0.79 (`evals/runs/2026-09-27_jev-v1/followup_arc_contradict_v2.jsonl`).
+4. **Arc.** The re-tell gate is called through `jevAudit.arcRepairFindingsWithCastCheck` in
+   beatsPipeline and both Lab mirrors (`arc_effort`, `arc_panel_replay`; sibling set
+   `arc-retell-gate`, anchor updated). Every name on the character list (`commissionedCast().listed`,
+   the list plan-check Q12 uses) whose "does something that changes what happens" score is below
+   0.35 becomes ONE `[MAJOR]` CAST issue for the gate — the critic side of
+   `EVERY_CHILD_ACTS_RULE`, which the arc create and re-tell already carry and no arc critic had a
+   lens for. **Severity MAJOR is my call, flagged for the owner:** it means a Jev finding alone
+   can open a paid re-telling on an arc that would otherwise ship as created.
+
+**How a Jev outage behaves (NO FALLBACKS):** a non-200, a missing answer, a timeout or a missing
+`OPENROUTER_API_KEY` fails the WHOLE Jev source: `log.error("[TEXT-AUDIT/jev] FAILED — the Jev
+source contributes NO findings …")`, recorded as `textRefineReport.audits[] = {source:'jev',
+ok:false, error}` and shown red in the Lab. The story continues on the other two audits, exactly
+as with a failed arc-informed or blind audit; the $0 string checks are part of the source and go
+with it, so no half-audited Jev result exists. A language outside the evaluation (anything but
+de/fr/en) is recorded as `error: "not run: language … was not in the 2026-09-27 evaluation"`.
+In the arc machine a failed cast check logs `arc_jev_cast_failed` (error level) and adds no issue.
+Trials do not run the text chain at all (decisions.md 2026-08-15, "TRIAL SKIPS REFINEMENT") and
+so get neither the Jev source nor its string checks — unchanged.
+
+**Evidence (rung 1, $0.03 in Jev calls, no paid model call):** `scripts/analysis/replay-jev-text-merge.js`
+merged each story's STORED arc-informed and blind replies with a live Jev run on the same writer
+text (`evals/runs/2026-09-27_jev-v1-replay/`). 7 full stories: the stored audits already send 8–13
+pages per story to the repair; Jev adds one new page on 3 stories (Laub p7 «Das war das Einzige,
+was jetzt zählte.», Lukas p3 «Es wurden keine zwanzig Sekunden. Es wurden gut zehn Minuten», Schuppe
+p14) and adds reasons to pages already going. Spot check of all 15 Jev lines: 8 real, 4 borderline, 3 false. Real, e.g.
+Fiona-Kasten p11 «Sie wusste, warum ihre Nähte hielten: weil …», Liz p7 «Elle dit cela clairement,
+pour que les enfants comprennent bien le danger», Laub p14 «Seinen Teil hatte er gegeben. Jetzt durfte er
+auch essen.» — the rulebook's own example. False: Ei-Wurzeln p9 LOGIC_MOTIVE (Nebla takes the egg,
+which is her want), Ei-Wurzeln p6 LESSON_EXPLAIN on plain dialogue, Schuppe p14 MORAL_SUMMARY on a plot
+rule the ravens follow. Borderline: Drachenei p3/p4, Laub p16 and Lukas p8 (paired phrasing inside dialogue). Latency: 30–54 calls per story, 1.7–3.3 s
+with a pool of 6, inside the audits' multi-minute wait — ~0 added wall clock. Arc cast check: one call,
+~300 ms per arc round; on 9 stored arcs it flags one name (Max in «Das Ei in den Wurzeln», 0.27 —
+he tags along, asks for a Marroni and names the hatchling).
+
+**Revisit if:** the verify entry `jev-text-chain-wired` shows the repair rewriting a page into
+something worse because of a Jev line, or LOGIC_MOTIVE keeps misfiring (1 false of 1 on the replay).
+
+**Touched:** server/lib/proseSlop.js (new), server/lib/jevAudit.js, server/lib/promptBuilders.js,
+server/lib/textRefine.js, server/lib/beatsPipeline.js, server/lib/testlab.js,
+prompts/jev-text-audit.txt, scripts/admin/sibling-registry.json,
+scripts/analysis/replay-jev-text-merge.js, scripts/analysis/eval-jev-text-audit.js,
+tests/unit/jev-text-chain-wiring.test.ts, tests/unit/jev-audit.test.ts,
+tests/unit/text-lector.test.ts, tests/unit/truncation-caller-fallbacks.test.ts,
+docs/prompt-inventory.md, docs/codebase-guide.md, tasks/BACKLOG.md, tasks/verify.json.

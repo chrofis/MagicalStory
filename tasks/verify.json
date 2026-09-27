@@ -2189,6 +2189,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "jev-text-chain-wired",
+      "title": "Jev is the third text auditor; its slop/logic/plan findings reach the one repair pass; its cast check reaches the arc re-tell gate",
+      "commits": [
+        "82b4b4d2a"
+      ],
+      "addedAt": "2026-09-27",
+      "claim": "On the next full staging story: textRefineReport.audits holds a jev entry with ok:true and a few FAULT[SLOP|LOGIC|ARC|MECH] lines; every mergedFindings entry sourced jev names a page the repair then returned rewritten (findingLedger outcome page-rewritten), and the rewritten page no longer carries the flagged phrase while keeping its events; no page is rewritten toward a picture instruction. arcReviewReport round gate.jevCast is present with a score per character on the list. Generation time is unchanged within noise (the Jev source finishes inside the audits' wait).",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "textRefineReport.audits[source=jev] (ok, raw), mergedFindings/findingLedger for jev-sourced lines, roundTrace repair pages before/after for those pages; arcReviewReport.rounds[].gate.jevCast; generationLog text_refine timings. Baseline replay: evals/runs/2026-09-27_jev-v1-replay (8 real / 4 borderline / 3 false of 15 lines on 7 stories)."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }
