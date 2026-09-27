@@ -113,6 +113,18 @@ serves immediately; the three new campaigns ramp as Google reviews their ads (~2
       conflicts but only runs locally). Not a staging->master merge.
 - [ ] End of week: `node scripts/ads/attribution-report.js --days=7`.
 
+## 2026-09-27 — expansion (owner: "more impressions for the cheap ones")
+
+- Week 21-26 Sept: 13 clicks, CHF 10.08, 1 trial (CHF 10.08/trial); 12 of 13 clicks from Deutschschweiz.
+- Quality: 0 of 194 new keywords have a Quality Score yet; ad strength Age 4 GOOD / 2 AVERAGE, the rest
+  AVERAGE. Deutschschweiz QS 5-7 with **landing page BELOW_AVERAGE on all 5 keywords** (the homepage) —
+  surfaced, not acted on.
+- [x] Occasion + LifeChallenge PHRASE -> **BROAD** (no eligible auctions on PHRASE). Age +6 girls' keywords
+      from real search terms; `kinderspielzeug` negative on all three. Engine bug fixed (budget re-run).
+- [ ] **Daily:** `node scripts/ads/search-terms.js` — add negatives for off-target broad queries.
+- [ ] Re-run `set-keyword-bids.js --ceiling=0.50` once the broad keywords have first-page estimates.
+- [ ] Not chosen this round: Age ceiling 0.50 -> 0.80; new keyword-rich ad copy (Google's ad-strength hint).
+
 ## Expectation stated to the owner up front
 
 CHF 10/day × 7 = ~CHF 70. At measured CPCs that is ~100–200 clicks; the historical click→trial rate is
