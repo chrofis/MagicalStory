@@ -36758,6 +36758,10 @@ different person") is the line where automatic repair earns its cost.
 owner-reviewed visual evidence. Re-proposing a lower gate needs new evidence
 (≥3 stories where a MAJOR-only mismatch is objectionable at page scale) and
 the reversal protocol.
+**Superseded in part 2026-09-27:** a figure whose hair AND face both differ from
+the reference is now `identity_swap`, CRITICAL, and takes a char-fix (four
+pages of evidence, owner sign-off). Every single-trait MAJOR stays unrepaired
+as ruled here. See "2026-09-27 — An identity swap …".
 
 ---
 
@@ -62639,3 +62643,70 @@ scripts/admin/sibling-registry.json (`group-staging-generator-vs-critic`),
 tests/unit/group-staging.test.ts, tests/unit/iterate-rewrite-checked-like-authored.test.ts,
 docs/prompt-inventory.md.
 **Status:** ✅ active on staging.
+
+---
+
+## 2026-09-27 — An identity swap (hair AND face both wrong) is CRITICAL and takes a char-fix (REVERSES 2026-09-04 "MAJOR entity findings stay unrepaired" for this one case)
+
+**Context:** The 2026-09-04 entry confirmed that MAJOR entity findings get no repair and that the
+char-fix gate is exactly-`critical`. It named its own reversal bar: "≥3 stories where a MAJOR-only
+mismatch is objectionable at page scale". Staging job_1790446348343_z3fw660ie's initial page (-2)
+drew Fiona as another woman: short dark curly hair and an older, rounder face, where the reference
+has long, straight, light-brown hair. The entity grid filed only `hair_change` MAJOR (the face was
+missed), the consolidator dropped even that as `profile_says_trait_is_correct` (the profile's hair
+words matched the judge's description of the REFERENCE), the page scored 96 and was never repaired.
+
+**Evidence (pixels viewed 2026-09-27 — head grid and body grid from each story's final-checks
+report, the shipped versions):** four pages across four stories where the character's own outfit
+is worn by a figure whose hair AND face both differ from the reference, each filed as a MAJOR
+`hair_change`, so no char-fix could fire, and each shipped with the swap:
+
+| Story (staging) | Page | Character | Filed | What happened next |
+|---|---|---|---|---|
+| job_1790446348343_z3fw660ie | initial (-2) | Fiona | hair_change MAJOR | consolidator dropped it `profile_says_trait_is_correct`; shipped at 96 |
+| job_1788903616404_iqvhj4l8m | 17 | Julian | hair_change MAJOR | quality/semantic CRITICALs made the page bad; two inpaint/iterate rounds, never a char-fix (gate 2 reads the entity report, which said MAJOR) |
+| job_1790373080139_vnx5l8iy7 | 7 | Levin | hair_change MAJOR | consolidator dropped hair and skin `profile_says_trait_is_correct` |
+| job_1789348171785_9oxos7dwv | 15 | Max | hair_change MAJOR | consolidator dropped it `profile_says_trait_is_correct` in two of three versions |
+
+A fifth, borderline (job_1788727233899_1dpnym94p p18, Levin: darker hair plus `face_drift` MAJOR),
+is not counted. Search: every `hair_change` / `face_drift` / `face_mismatch` / `age_shift` entity
+finding on stories of the last 24 days, staging (101) and production (23); candidate grids
+downloaded and viewed. The negative case the rule must not catch is single-trait drift:
+job_1790107559778_fcmlfa8kn p7 Lukas (hair lighter and redder, same face).
+
+**Decision (owner, 2026-09-27, reversal signed off: "Identity swap = CRITICAL"):**
+1. **Classification — prompt.** `prompts/entity-consistency-check.txt` gains the type
+   `identity_swap`: hair and face both differ from the reference in the same cell, so the figure
+   reads as another person. Always CRITICAL. Before filing `hair_change` the judge compares that
+   cell's face with the reference face; `hair_change` is now "same face, different hair".
+   `face_mismatch` narrows to "wrong species, or the face alone reads as another person while the
+   hair matches". A hair-only difference stays `hair_change` MAJOR — the 2026-09-04 ruling still
+   holds for every single-trait finding.
+2. **Severity — code.** `scoring.js` MIN_SEVERITY_TYPES floors `identity_swap` at CRITICAL (client
+   mirror in `useRepairWorkflow.ts`). The closed list (`evalBuckets.ENTITY_CHECK_TYPES`) and bucket
+   (`character_identity`) register it; `NOT_INPAINTABLE_TYPES` keeps it out of inpaint; the
+   char-fix defect phrase is "paint the face and hair from the reference image".
+3. **Routing — unchanged gate.** `decideRepairMethod` gate 2 already routes a CRITICAL entity finding
+   whose type is on the closed list to char-fix (face patch, `character_identity` bucket). Nothing
+   in the gate moved.
+4. **The consolidator cannot drop it — code, scoped to this type.** An `identity_swap` never enters
+   the consolidator model's input: `consolidateFeedback` holds it out by its declared `type` and
+   `appendIdentitySwaps` adds it to `deduped_issues` (the scoring source) exactly as the judge filed
+   it, after the model's guards. A page whose only finding is a swap skips the model call and is
+   still charged. The pre-flattened entity path used to drop the type; it now carries it.
+   **Why code and not a prompt line:** the consolidator never sees an entity finding's type (its
+   input line is `[severity] name: description`), it does not see the picture, and three of the four
+   evidence pages were dropped by exactly the rule a prompt line would have to override — a model
+   exception to its own rule 2 is the shape measured unreliable here. Holding the finding out is a
+   route decision on a declared type, not a reading of the finding's text. The owner did not approve
+   a general change to rule 2, so every other entity finding still goes through the model unchanged.
+
+**Validation:** see the addendum below (entity grid replay, consolidator replay, judge fixtures).
+
+**Touched:** prompts/entity-consistency-check.txt, server/lib/evalBuckets.js, server/lib/scoring.js,
+server/lib/repairLogic.js, server/lib/faceRepair.js, server/lib/feedbackConsolidator.js,
+client/src/hooks/useRepairWorkflow.ts, client/src/types/story.ts,
+tests/unit/identity-swap-critical.test.ts, tests/judge-fixtures/fixtures.json (4 flag + 1 pass),
+docs/SETTLED.md.
+
+**Status:** ✅ active on staging. Supersedes the 2026-09-04 entry for identity swaps only.

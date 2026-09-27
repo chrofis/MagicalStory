@@ -1002,6 +1002,95 @@
         ]
       },
       "source": "Goldene Möwe story p16 shipped plate (per-page, not derived). Its plate text puts the chest in wet sand \"between two wooden ships\", and STRUCTURES gave the author both: the green-hulled Goldene Möwe and the black Schwarze Nadel. The pixels show only the black ship with dark sails (the same image as p15, md5-identical); the green ship the plate text puts in view is missing."
+    },
+    {
+      "id": "entity-fiona-z3f-initialpage-identity-swap",
+      "judge": "entity",
+      "target": {
+        "storyId": "job_1790446348343_z3fw660ie",
+        "character": "Fiona",
+        "pageNumber": -2
+      },
+      "expect": {
+        "verdict": "flag",
+        "character": "Fiona",
+        "types": [
+          "identity_swap"
+        ],
+        "minSeverity": "CRITICAL"
+      },
+      "source": "Initial page (-2), head grid cell B viewed 2026-09-27 against the reference face: short dark curly hair and an older, rounder face, where the reference has long, straight, light-brown hair. Another woman in Fiona's costume. The run's grid filed only hair_change MAJOR (face missed); the consolidator dropped it as profile_says_trait_is_correct and the page shipped at 96 with no repair. Owner, 2026-09-27: an identity swap is CRITICAL and takes a char-fix."
+    },
+    {
+      "id": "entity-julian-iqv-p17-identity-swap",
+      "judge": "entity",
+      "target": {
+        "storyId": "job_1788903616404_iqvhj4l8m",
+        "character": "Julian",
+        "pageNumber": 17
+      },
+      "expect": {
+        "verdict": "flag",
+        "character": "Julian",
+        "types": [
+          "identity_swap"
+        ],
+        "minSeverity": "CRITICAL"
+      },
+      "source": "p17, head grid cell E and body grid cell E viewed 2026-09-27: Julian's yellow T-shirt and jeans on a child with straight dark-brown hair and a different face; the reference has light-blond curls. The run's grid filed hair_change MAJOR, so no char-fix could fire; the page shipped with the swap. Owner rule 2026-09-27: hair and face both differ = identity_swap, CRITICAL."
+    },
+    {
+      "id": "entity-levin-vnx-p7-identity-swap",
+      "judge": "entity",
+      "target": {
+        "storyId": "job_1790373080139_vnx5l8iy7",
+        "character": "Levin",
+        "pageNumber": 7
+      },
+      "expect": {
+        "verdict": "flag",
+        "character": "Levin",
+        "types": [
+          "identity_swap"
+        ],
+        "minSeverity": "CRITICAL"
+      },
+      "source": "p7, head grid cell E and body grid cell E viewed 2026-09-27: Levin's red top and jeans on a child with straight dark-brown hair and a different face; the reference has blond curls. The run's grid filed hair_change MAJOR; the consolidator dropped it (and a skin finding) as profile_says_trait_is_correct. Owner rule 2026-09-27: identity_swap, CRITICAL."
+    },
+    {
+      "id": "entity-max-9ox-p15-identity-swap",
+      "judge": "entity",
+      "target": {
+        "storyId": "job_1789348171785_9oxos7dwv",
+        "character": "Max",
+        "pageNumber": 15
+      },
+      "expect": {
+        "verdict": "flag",
+        "character": "Max",
+        "types": [
+          "identity_swap"
+        ],
+        "minSeverity": "CRITICAL"
+      },
+      "source": "p15, head grid cell E and body grid cell E viewed 2026-09-27: Max's green jumper and orange trousers on a child with straight dark-brown hair and a different face; the reference has reddish-brown curls. The run's grid filed hair_change MAJOR; the consolidator dropped it as profile_says_trait_is_correct in two of three versions. Owner rule 2026-09-27: identity_swap, CRITICAL."
+    },
+    {
+      "id": "entity-lukas-fcm-p7-hair-drift-not-swap",
+      "judge": "entity",
+      "target": {
+        "storyId": "job_1790107559778_fcmlfa8kn",
+        "character": "Lukas",
+        "pageNumber": 7
+      },
+      "expect": {
+        "verdict": "pass",
+        "character": "Lukas",
+        "types": [
+          "identity_swap"
+        ]
+      },
+      "source": "Negative control for identity_swap. p7 head grid cell B viewed 2026-09-27: the hair reads lighter and more reddish than the reference's dark brown, but the face is plainly the same boy (same eyes, nose, face shape). Single-trait hair drift stays hair_change (MAJOR at most, no char-fix); it must not be filed as identity_swap."
     }
   ]
 }

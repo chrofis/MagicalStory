@@ -244,9 +244,15 @@ const MAX_SEVERITY_TYPES = {
 // is also what puts the page into character repair under the settled
 // critical-only routing (2026-09-04). Deliberately NOT in ZERO_POINT_TYPES and
 // NOT capped.
+//
+// `identity_swap` (owner, 2026-09-27, reversing the 2026-09-04 critical-only
+// ruling for this one case): hair AND face both differ from the reference, so
+// the figure reads as another person. The entity prompt defines it as always
+// CRITICAL; the floor keeps a MAJOR slip from billing it as a hair change.
 const MIN_SEVERITY_TYPES = {
   composite_seam: 'catastrophic',
   face_destroyed: 'critical',
+  identity_swap: 'critical',
 };
 
 // NO TEXT MATCHING IN SCORING. Owner rule, 2026-08-09: "you can not build this

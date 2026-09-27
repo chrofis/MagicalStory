@@ -43,6 +43,7 @@ const MAX_SEVERITY_TYPES: Record<string, keyof typeof ENTITY_PENALTIES> = {
 const MIN_SEVERITY_TYPES: Record<string, keyof typeof ENTITY_PENALTIES> = {
   composite_seam: 'catastrophic',
   face_destroyed: 'critical',
+  identity_swap: 'critical',
 };
 
 /** Points one issue costs — severity points bounded by per-type ceiling/floor,

@@ -281,6 +281,10 @@ const TYPE_TO_BUCKET = {
   // put features back without redrawing the page.
   face_destroyed: 'character_identity',
   face_mismatch: 'character_identity', hair_change: 'character_identity',
+  // identity_swap (owner, 2026-09-27): hair AND face both differ from the
+  // reference, so the figure reads as another person. Always CRITICAL
+  // (scoring.js MIN_SEVERITY_TYPES), so it takes a char-fix.
+  identity_swap: 'character_identity',
   skin_tone: 'character_identity', age_shift: 'character_identity',
   clothing_inconsistent: 'clothing', color_change: 'clothing',
   shape_change: 'object_presence',
@@ -443,7 +447,7 @@ const CONSOLIDATED_TYPES = Object.freeze([
 // type is on it. Every value already has its TYPE_TO_BUCKET row — adding one
 // here is a new scored type and needs its bucket row too.
 const ENTITY_CHECK_TYPES = Object.freeze([
-  'face_destroyed', 'face_mismatch', 'face_drift', 'age_shift', 'hair_nuance', 'hair_change',
+  'face_destroyed', 'identity_swap', 'face_mismatch', 'face_drift', 'age_shift', 'hair_nuance', 'hair_change',
   'skin_tone', 'body_build', 'clothing_inconsistent', 'color_change', 'shape_change', 'garment_colour',
   'cutout_artifact',
 ]);

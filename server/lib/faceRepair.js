@@ -649,6 +649,7 @@ const PHRASE_CLOTHING = 'the clothing is wrong — dress the figure as the refer
 const CHAR_FIX_DEFECT_PHRASES = Object.freeze({
   face_mismatch: PHRASE_FACE,
   character_identity: PHRASE_FACE,
+  identity_swap: 'the figure does not read as this character — paint the face and hair from the reference image',
   face_drift: 'the face proportions drift from the reference — match the face shape of the reference image',
   face_destroyed: 'the face is not properly rendered — paint the facial features from the reference image',
   age_shift: 'the apparent age differs from the reference — paint the age shown in the reference image',
