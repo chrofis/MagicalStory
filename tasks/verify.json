@@ -2353,6 +2353,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "group-staging-check",
+      "title": "A group of more than three is staged wider or from behind, and never lined up facing the viewer",
+      "commits": [
+        "ae9d98a5d"
+      ],
+      "addedAt": "2026-09-27",
+      "claim": "On the next staging full story with a page of four or more characters: sceneReviewReport.briefFindings carries group_shot_too_close / group_facing_viewer for every authored brief the check flags, the review answers each (briefUnfixed does not list them), and the final brief of every story page with 4+ characters has a wide / ultra-wide / high-angle / aerial shot or the group in back view, with no group lined up facing the viewer in the pixels.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "sceneReviewReport.briefFindings / briefUnfixed / analysis for [group_staging]; the final sceneDescriptions of 4+ character pages (shot, perspective, looksAt); the page pixels. Baseline: staging job_1790446348343_z3fw660ie p1, p6 (too close) and p16 (posed row)."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }
