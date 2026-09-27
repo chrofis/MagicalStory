@@ -942,7 +942,9 @@
       "parity": {
         "anchors": [
           "buildEvalInput",
-          "evalStoryMetaOf"
+          "evalStoryMetaOf",
+          "consolidationInputs",
+          "buildInpaintCall"
         ]
       }
     },

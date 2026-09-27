@@ -375,6 +375,161 @@ function buildEvalInput(entry, orig, allCharacterPhotos) {
 }
 
 /**
+ * What the repair round hands images.inpaintPage for one page (executeInpaintAction),
+ * moved verbatim on 2026-09-27 so the Test Lab inpaint stage makes the run's
+ * call: the evaluation with the landmark hard guard applied, the plan that
+ * evaluation was scored with, the page's worn clothing, aspect and text
+ * position, the detection, and the cover text contract.
+ *
+ * @param {object} a
+ * @param {object} a.img - the page's first-render record (rawImages entry)
+ * @param {object} a.latestEval - the evaluation being repaired
+ * @param {object|null} a.bestSoFar - the page's best version so far
+ * @param {boolean} a.restampCoverAfter - the textless art layer is repainted and restamped
+ * @returns {{inpaintEval: object, options: object}}
+ */
+function buildInpaintCall({ img, latestEval, bestSoFar = null, roundNum = null, restampCoverAfter = false, storyData, characters, artStyle, jobId }) {
+  const { resolveSceneEra, computeLandmarkProtection, filterProtectedRemovals } = require('./landmarkProtection');
+  // Parse per-character clothing for this page so the avatar lookup picks the
+  // styled+costumed variant matching what's actually drawn on this page.
+  // Without this, inpaint attaches unstyled base photos and Grok has no visual
+  // reference for the current costume/style.
+  const { parseCharacterClothing } = getStoryHelpers();
+  const pageCharacterClothing = parseCharacterClothing(img.sceneDescription || img.description || '') || {};
+  // Same aspect resolution as iteratePage above — the page's stored
+  // imageAspect is the source of truth. Without this, inpaint silently
+  // crops square (advanced/Jugendbuch) pages to 3:4 on round 1.
+  const sceneAspect = img.imageAspect
+    || storyData?.sceneImages?.find(s => s.pageNumber === img.pageNumber)?.imageAspect
+    || null;
+  // Look up the page's locked text-overlay corner so inpaint can warn
+  // Grok not to paint high-contrast detail in that zone. textPosition is
+  // only persisted on overlay layouts (gated at the persistence site in
+  // server.js — see docs/calm-zone-pipeline.md), so a non-null value here
+  // means the story uses overlay and the suffix is correct.
+  const pageTextPosition = (storyData?.sceneImages || []).find(s => s.pageNumber === img.pageNumber)?.textPosition || null;
+  // ---------------------------------------------------------------------
+  // HARD GUARD (owner ruling 2026-09-05). An `object_presence` removal on a
+  // page carrying real landmark photos in a NON-HISTORICAL era must never
+  // execute — inpaint dispatches it as an UNMASKED whole-frame edit
+  // (targetBbox null) that repaints the whole background and erases the real
+  // place. job_1788614817116_vxnu60yjg p2: "Remove red-white transmission
+  // tower and grey-red tower from background" wiped the Uetliberg Fernsehturm
+  // and Uto Kulm spire off the ridge, and the erased version scored HIGHER.
+  // The finding is dropped with a WARN naming the page and the landmark —
+  // loudly, never silently. Belt-and-braces: the compliance eval and the
+  // consolidator already drop it upstream; this is the last gate before Grok.
+  // ---------------------------------------------------------------------
+  let inpaintEval = latestEval || {};
+  {
+    const prot = computeLandmarkProtection({
+      landmarkPhotos: img.landmarkPhotos || null,
+      era: resolveSceneEra(img.sceneMetadata),
+    });
+    if (prot.protect && inpaintEval && typeof inpaintEval === 'object') {
+      const ctx = { pageNumber: img.pageNumber, label: '[INPAINT dispatch]' };
+      const fx = filterProtectedRemovals(inpaintEval.fixableIssues || [], prot, ctx);
+      const sem = filterProtectedRemovals(
+        require('./repairLogic').semanticFindings(inpaintEval.semanticResult), prot, ctx);
+      const cmp = filterProtectedRemovals(inpaintEval.threeStageResult?.fixableIssues || [], prot, ctx);
+      if (fx.dropped.length || sem.dropped.length || cmp.dropped.length) {
+        inpaintEval = { ...inpaintEval, fixableIssues: fx.kept };
+        if (inpaintEval.semanticResult) {
+          inpaintEval.semanticResult = { ...inpaintEval.semanticResult };
+          if (Array.isArray(inpaintEval.semanticResult.semanticIssues)) inpaintEval.semanticResult.semanticIssues = sem.kept;
+        }
+        if (inpaintEval.threeStageResult) {
+          inpaintEval.threeStageResult = { ...inpaintEval.threeStageResult, fixableIssues: cmp.kept };
+        }
+      }
+    }
+  }
+  // THE PLAN THIS EVALUATION WAS SCORED WITH (B2). consolidatePageEval ran it
+  // once when the eval landed; the version carries it and roundEvalPages
+  // mirrors it onto the eval object. Inpaint no longer consolidates.
+  const planForInpaint = inpaintEval.consolidatedPlan
+    || bestSoFar?.consolidatedPlan
+    || null;
+  const options = {
+    visualBible: storyData?.visualBible || null,
+    characters: storyData?.characters || characters || null,
+    consolidatedPlan: planForInpaint,
+    pageNumber: img.pageNumber,
+    sceneDescription: img.sceneDescription || img.description || '',
+    artStyle: storyData?.artStyle || artStyle || null,
+    characterClothing: pageCharacterClothing,
+    // Lets a fix instruction say WHERE a figure stands, not only what it wears.
+    detectedFigures: img?.sharedBboxDetection?.figures || img?.bboxDetection?.figures || null,
+    clothingRequirements: storyData?.clothingRequirements || null,
+    // Thread storyId + round so consolidator calls get persisted
+    storyId: storyData?.id || jobId || null,
+    round: roundNum,
+    aspectRatio: sceneAspect,
+    textPosition: pageTextPosition,
+    // Era-aware landmark protection for inpaint's own consolidator call.
+    landmarkPhotos: img.landmarkPhotos || null,
+    era: resolveSceneEra(img.sceneMetadata),
+    sceneMetadata: img.sceneMetadata || null,
+    // A cover whose lettering lives in the pixels (baked title) must keep it
+    // through the edit — the contract joins the required-text clause. When
+    // the textless art layer is being repainted, the text is restamped
+    // afterward, so the edit is told nothing about it.
+    expectedText: restampCoverAfter ? null : (img.expectedText ?? null),
+    textMode: restampCoverAfter ? null : (img.textMode ?? null),
+  };
+  return { inpaintEval, options };
+}
+
+/**
+ * What the repair round hands the feedback consolidator for ONE evaluation
+ * (consolidatePageEval), moved verbatim on 2026-09-27 so the Test Lab
+ * consolidate and inpaint stages consolidate a stored page as the run does:
+ * the page's entity issues, the clothing the page actually wears, the book
+ * audit's reader findings for this version, the landmark refs and era.
+ *
+ * @param {object} a
+ * @param {object} a.ev - the evaluation
+ * @param {Array} a.entityIssues - entityIssuesForPage(pageNumber, entityReport).issues
+ * @param {object} a.orig - the page's first-render record (rawImages entry)
+ */
+function consolidationInputs({ ev, entityIssues, orig, pageNumber, round, sceneDescriptionOverride = null, readerFindings = [], storyData, characters, artStyle, visualBible, storyId }) {
+  const { resolveSceneEra } = require('./landmarkProtection');
+  // The variant this page actually wears. Inpaint used to resolve this for
+  // its own (now deleted) consolidator call; with one consolidation per
+  // evaluation the single call must carry it, or the consolidator writes
+  // modern-wardrobe fixes for a costumed page.
+  const { parseCharacterClothing, resolveSceneClothingDescriptions } = require('./clothingResolve');
+  const sceneClothing = resolveSceneClothingDescriptions({
+    characterClothing: parseCharacterClothing(orig?.sceneDescription || orig?.description || '') || {},
+    clothingRequirements: storyData?.clothingRequirements || null,
+    characters: characters || [],
+    artStyle: storyData?.artStyle || artStyle || null,
+  });
+  return {
+    evalResult: ev,
+    entityIssues,
+    sceneClothing,
+    readerFindings,
+    // A repaired version is consolidated against ITS OWN contract (an
+    // iterate rewrite resolves spec conflicts — checking the ORIGINAL
+    // description would re-flag the fixed version and loop the repair).
+    sceneDescription: sceneDescriptionOverride || orig?.sceneDescription || '',
+    characters: characters || [],
+    storyId,
+    pageNumber,
+    round,
+    // Resolves raw VB ids out of the consolidator's input AND out of the
+    // instruction fields it writes back (which reach Grok).
+    visualBible,
+    // Era-aware landmark protection: drops `object_presence` removal
+    // findings on a present-day page carrying a real landmark, and seeds
+    // scene_fix.preserve with the landmark names.
+    landmarkPhotos: orig?.landmarkPhotos || null,
+    era: resolveSceneEra(orig?.sceneMetadata),
+  };
+}
+
+/**
  * The story identity evaluateImageBatch records its counters under — shared
  * with the Test Lab eval stages.
  */
@@ -839,39 +994,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   const consolidatePageEval = async (ev, entityIssues, pageNumber, round, sceneDescriptionOverride = null, readerFindings = []) => {
     try {
       const orig = rawImages.find(i => i.pageNumber === pageNumber);
-      // The variant this page actually wears. Inpaint used to resolve this for
-      // its own (now deleted) consolidator call; with one consolidation per
-      // evaluation the single call must carry it, or the consolidator writes
-      // modern-wardrobe fixes for a costumed page.
-      const { parseCharacterClothing, resolveSceneClothingDescriptions } = require('./clothingResolve');
-      const sceneClothing = resolveSceneClothingDescriptions({
-        characterClothing: parseCharacterClothing(orig?.sceneDescription || orig?.description || '') || {},
-        clothingRequirements: storyData?.clothingRequirements || null,
-        characters: characters || [],
-        artStyle: storyData?.artStyle || artStyle || null,
-      });
-      const res = await consolidateEvaluation({
-        evalResult: ev,
-        entityIssues,
-        sceneClothing,
-        readerFindings,
-        // A repaired version is consolidated against ITS OWN contract (an
-        // iterate rewrite resolves spec conflicts — checking the ORIGINAL
-        // description would re-flag the fixed version and loop the repair).
-        sceneDescription: sceneDescriptionOverride || orig?.sceneDescription || '',
-        characters: characters || [],
-        storyId: consolidatorStoryId,
-        pageNumber,
-        round,
-        // Resolves raw VB ids out of the consolidator's input AND out of the
-        // instruction fields it writes back (which reach Grok).
-        visualBible,
-        // Era-aware landmark protection: drops `object_presence` removal
-        // findings on a present-day page carrying a real landmark, and seeds
-        // scene_fix.preserve with the landmark names.
-        landmarkPhotos: orig?.landmarkPhotos || null,
-        era: resolveSceneEra(orig?.sceneMetadata),
-      });
+      const res = await consolidateEvaluation(consolidationInputs({
+        ev, entityIssues, orig, pageNumber, round, sceneDescriptionOverride, readerFindings,
+        storyData, characters, artStyle, visualBible, storyId: consolidatorStoryId,
+      }));
       if (res.usage && usageTracker) {
         usageTracker('anthropic', res.usage, 'eval_consolidation', 'claude-sonnet');
       }
@@ -1204,24 +1330,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // inputOverride carries the garment recolour applied moments ago — the
     // repair must work on the corrected pixels, not the drifted ones.
     let inputImage = inputOverride || bestSoFar?.imageData || img.imageData;
-    // Parse per-character clothing for this page so the avatar lookup picks the
-    // styled+costumed variant matching what's actually drawn on this page.
-    // Without this, inpaint attaches unstyled base photos and Grok has no visual
-    // reference for the current costume/style.
-    const { parseCharacterClothing } = getStoryHelpers();
-    const pageCharacterClothing = parseCharacterClothing(img.sceneDescription || img.description || '') || {};
-    // Same aspect resolution as iteratePage above — the page's stored
-    // imageAspect is the source of truth. Without this, inpaint silently
-    // crops square (advanced/Jugendbuch) pages to 3:4 on round 1.
-    const sceneAspect = img.imageAspect
-      || storyData?.sceneImages?.find(s => s.pageNumber === img.pageNumber)?.imageAspect
-      || null;
-    // Look up the page's locked text-overlay corner so inpaint can warn
-    // Grok not to paint high-contrast detail in that zone. textPosition is
-    // only persisted on overlay layouts (gated at the persistence site in
-    // server.js — see docs/calm-zone-pipeline.md), so a non-null value here
-    // means the story uses overlay and the suffix is correct.
-    const pageTextPosition = (storyData?.sceneImages || []).find(s => s.pageNumber === img.pageNumber)?.textPosition || null;
     // Cover text preservation. Covers render TEXTLESS; the title / dedication /
     // "magicalstory.ch" branding is composited app-side (composeCover). If the
     // post-persist bake has already run (${key}Art row exists → post-generation
@@ -1254,75 +1362,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         }
       } catch (e) { /* fall back: inpaint the served image, no restamp */ }
     }
-    // ---------------------------------------------------------------------
-    // HARD GUARD (owner ruling 2026-09-05). An `object_presence` removal on a
-    // page carrying real landmark photos in a NON-HISTORICAL era must never
-    // execute — inpaint dispatches it as an UNMASKED whole-frame edit
-    // (targetBbox null) that repaints the whole background and erases the real
-    // place. job_1788614817116_vxnu60yjg p2: "Remove red-white transmission
-    // tower and grey-red tower from background" wiped the Uetliberg Fernsehturm
-    // and Uto Kulm spire off the ridge, and the erased version scored HIGHER.
-    // The finding is dropped with a WARN naming the page and the landmark —
-    // loudly, never silently. Belt-and-braces: the compliance eval and the
-    // consolidator already drop it upstream; this is the last gate before Grok.
-    // ---------------------------------------------------------------------
-    let inpaintEval = latestEval || {};
-    {
-      const prot = computeLandmarkProtection({
-        landmarkPhotos: img.landmarkPhotos || null,
-        era: resolveSceneEra(img.sceneMetadata),
-      });
-      if (prot.protect && inpaintEval && typeof inpaintEval === 'object') {
-        const ctx = { pageNumber: img.pageNumber, label: '[INPAINT dispatch]' };
-        const fx = filterProtectedRemovals(inpaintEval.fixableIssues || [], prot, ctx);
-        const sem = filterProtectedRemovals(
-          require('./repairLogic').semanticFindings(inpaintEval.semanticResult), prot, ctx);
-        const cmp = filterProtectedRemovals(inpaintEval.threeStageResult?.fixableIssues || [], prot, ctx);
-        if (fx.dropped.length || sem.dropped.length || cmp.dropped.length) {
-          inpaintEval = { ...inpaintEval, fixableIssues: fx.kept };
-          if (inpaintEval.semanticResult) {
-            inpaintEval.semanticResult = { ...inpaintEval.semanticResult };
-            if (Array.isArray(inpaintEval.semanticResult.semanticIssues)) inpaintEval.semanticResult.semanticIssues = sem.kept;
-          }
-          if (inpaintEval.threeStageResult) {
-            inpaintEval.threeStageResult = { ...inpaintEval.threeStageResult, fixableIssues: cmp.kept };
-          }
-        }
-      }
-    }
-    // THE PLAN THIS EVALUATION WAS SCORED WITH (B2). consolidatePageEval ran it
-    // once when the eval landed; the version carries it and roundEvalPages
-    // mirrors it onto the eval object. Inpaint no longer consolidates.
-    const planForInpaint = inpaintEval.consolidatedPlan
-      || bestSoFar?.consolidatedPlan
-      || null;
-    const result = await images().inpaintPage(inputImage, inpaintEval, {
-      visualBible: storyData?.visualBible || null,
-      characters: storyData?.characters || characters || null,
-      consolidatedPlan: planForInpaint,
-      pageNumber: img.pageNumber,
-      sceneDescription: img.sceneDescription || img.description || '',
-      artStyle: storyData?.artStyle || artStyle || null,
-      characterClothing: pageCharacterClothing,
-      // Lets a fix instruction say WHERE a figure stands, not only what it wears.
-      detectedFigures: img?.sharedBboxDetection?.figures || img?.bboxDetection?.figures || null,
-      clothingRequirements: storyData?.clothingRequirements || null,
-      // Thread storyId + round so consolidator calls get persisted
-      storyId: storyData?.id || jobId || null,
-      round: roundNum,
-      aspectRatio: sceneAspect,
-      textPosition: pageTextPosition,
-      // Era-aware landmark protection for inpaint's own consolidator call.
-      landmarkPhotos: img.landmarkPhotos || null,
-      era: resolveSceneEra(img.sceneMetadata),
-      sceneMetadata: img.sceneMetadata || null,
-      // A cover whose lettering lives in the pixels (baked title) must keep it
-      // through the edit — the contract joins the required-text clause. When
-      // the textless art layer is being repainted, the text is restamped
-      // afterward, so the edit is told nothing about it.
-      expectedText: restampCoverAfter ? null : (img.expectedText ?? null),
-      textMode: restampCoverAfter ? null : (img.textMode ?? null),
+    const { inpaintEval, options: inpaintOptions } = buildInpaintCall({
+      img, latestEval, bestSoFar, roundNum, restampCoverAfter, storyData, characters, artStyle, jobId,
     });
+    const result = await images().inpaintPage(inputImage, inpaintEval, inpaintOptions);
     // Re-composite the cover text onto the repainted textless art (reuses
     // composeCover). The served image keeps its title; artImageData is the new
     // textless source for future no-AI title edits.
@@ -4034,6 +4077,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
 module.exports = {
   buildEvalInput,
+  buildInpaintCall,
+  consolidationInputs,
   evalStoryMetaOf,
   runUnifiedRepairPipeline,
   // Exported for the Test Lab `style_repair` stage: the A/B that decides

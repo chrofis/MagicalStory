@@ -614,7 +614,51 @@ function labEvalCall(ctx, { imageData, render = null, params = null, evalOptionO
     evalOptionOverrides,
     recordStats: false,
   };
-  return { input, options };
+  return { input, options, orig, entry, storyData };
+}
+
+/**
+ * The evaluation a repair round holds for a stored version, as it holds it:
+ * the version's stored findings, detection and the plan it was scored with,
+ * plus the two fields evaluateImageQuality returns and the version record does
+ * not store — `judgedPrompt` and `requiredTexts` — rebuilt by the same builders
+ * (the batch call and prepareEvalJudgeInputs) from the same stored inputs.
+ * Also returns the run's first-render record of the page (`orig`) and the
+ * version record (`version`, null on a story stored before per-version records).
+ */
+function labStoredPageEval(ctx, { imageData, loadedVersion = null }) {
+  const call = labEvalCall(ctx, { imageData, loadedVersion });
+  const versions = ctx.scene.imageVersions || [];
+  const { arrayIndexForDb } = require('./versionManager');
+  const version = loadedVersion != null ? (versions[arrayIndexForDb(versions, loadedVersion, 'scene')] || null) : null;
+  const src = version || ctx.scene;
+  const batchCall = require('./images').batchEvalQualityCall(call.input, call.options);
+  const { judgedSceneText, prepareEvalJudgeInputs } = require('./evalPipeline');
+  const judgedPrompt = judgedSceneText(batchCall.sceneDescription);
+  const pageContext = `testlab-P${ctx.pageNumber}`;
+  const judgeInputs = prepareEvalJudgeInputs({
+    originalPrompt: judgedPrompt, referenceImages: batchCall.referenceImages, evaluationType: batchCall.evaluationType, pageContext,
+    storyText: call.input.pageText || null, sceneHint: call.input.sceneHint || null, sceneCharacters: call.input.sceneCharacters || null,
+    evalOptions: batchCall.evalOptions, notEvaluated: require('./notEvaluated').createNotEvaluatedRecorder({ pageContext }),
+  });
+  const evaluation = {
+    pageNumber: ctx.pageNumber,
+    score: src.finalScore ?? src.evalScore ?? null,
+    qualityScore: src.evalScore ?? src.qualityScore ?? null,
+    fixableIssues: src.fixableIssues || [],
+    fixTargets: src.fixTargets || [],
+    figures: src.figures || [],
+    matches: src.matches || [],
+    objectMatches: src.objectMatches || [],
+    semanticResult: src.semanticResult || null,
+    threeStageResult: src.threeStageResult || null,
+    bboxDetection: src.bboxDetection || null,
+    issuesSummary: src.issuesSummary || src.qualityReasoning || null,
+    consolidatedPlan: src.consolidatedPlan || null,
+    judgedPrompt: judgedPrompt || null,
+    requiredTexts: judgeInputs.requiredTextItems,
+  };
+  return { evaluation, version, orig: call.orig, storyData: call.storyData };
 }
 
 /** Reference photos for eval, guaranteed to carry clothingDescription. */
@@ -5152,28 +5196,46 @@ async function runTextZoneStage(ctx, { experimentId, params = {} }) {
   };
 }
 
-/** Feedback consolidator on the page's stored eval + entity issues (report only). */
+/**
+ * The consolidator call the repair round makes for the page's stored version
+ * (repairPipeline.consolidationInputs, the run's own builder): the version's
+ * evaluation, the page's entity issues from the stored entity report, the
+ * clothing the page wears, the book audit's reader findings for this version,
+ * and the version's own brief. Returns the input object; params overrides are
+ * the caller's.
+ */
+async function labConsolidationInputs(ctx, { evaluation, orig, version, params = {} }) {
+  const { consolidationInputs } = require('./repairPipeline');
+  const { entityIssuesForPage } = require('./scoring');
+  const { storyData } = await loadStoryDataFull(ctx.storyId, { rehydrate: false });
+  const entityIssues = params.entityIssues
+    || entityIssuesForPage(ctx.pageNumber, storyData.finalChecksReport?.entity || null).issues;
+  return consolidationInputs({
+    ev: evaluation, entityIssues, orig, pageNumber: ctx.pageNumber, round: 0,
+    sceneDescriptionOverride: version?.description || null,
+    readerFindings: version?.readerFindings || [],
+    storyData, characters: storyData.characters || [], artStyle: storyData.artStyle || ctx.artStyle,
+    visualBible: ctx.visualBible || null, storyId: ctx.storyId,
+  });
+}
+
+/**
+ * Feedback consolidator on the page's stored evaluation, with the inputs the
+ * repair round hands it (report only). With no params it re-consolidates the
+ * version the page serves; `params.evaluation` / `params.entityIssues` replace
+ * those inputs, `promptOverride` / `params.model` are the A/B knobs.
+ */
 async function runConsolidateStage(ctx, { promptOverride, experimentId, params = {} }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { consolidateEvaluation } = require('./feedbackConsolidator');
-  const { storyData } = await loadStoryDataFull(ctx.storyId, { rehydrate: false });
 
-  const evalResult = params.evaluation || storedEvalFromScene(ctx.scene);
+  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, ctx.versionIndex ?? null);
+  const stored = labStoredPageEval(ctx, { imageData, loadedVersion: getLastPageLoad()?.loadedVersion ?? null });
+  const inputs = await labConsolidationInputs(ctx, { evaluation: params.evaluation || stored.evaluation, orig: stored.orig, version: stored.version, params });
   const t0 = Date.now();
   const result = await consolidateEvaluation({
-    evalResult,
-    entityIssues: params.entityIssues || [],
-    sceneDescription: ctx.scene.sceneDescription || '',
-    characters: storyData.characters || [],
-    storyId: ctx.storyId,
-    pageNumber: ctx.pageNumber,
-    round: 0,
-    // Era-aware landmark protection (2026-09-05) — the page's stored landmark
-    // refs + its scene era, so Lab repair stages reproduce production.
-    visualBible: ctx.visualBible || null,
-    landmarkPhotos: ctx.scene.landmarkPhotos || null,
-    era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
+    ...inputs,
     // A/B knobs: `promptOverride` swaps the consolidator's rules (severity
     // policy, dedupe, MINOR definition); `params.model` swaps the model that
     // applies them (shipped default is the configured eval model).
@@ -5202,69 +5264,70 @@ async function runConsolidateStage(ctx, { promptOverride, experimentId, params =
     issueCount: issues.length,
     severityMix,
     singleSourceAboveModerate,
+    entityIssueCount: (inputs.entityIssues || []).length,
+    readerFindingCount: (inputs.readerFindings || []).length,
   };
 }
 
-/** Targeted inpaint from the stored (or supplied) eval — the pipeline's inpaintPage. */
+/**
+ * Targeted inpaint of the served version — the repair round's inpaint
+ * (repairPipeline.buildInpaintCall → images.inpaintPage, then the cover
+ * restamp). The evaluation is the version's stored one and the plan the one it
+ * was scored with; a supplied `params.evaluation` without a plan is
+ * consolidated first, as the run consolidates every evaluation when it lands.
+ */
 async function runInpaintStage(ctx, { experimentId, params = {} }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { inpaintPage } = require('./images');
-  const { MODEL_DEFAULTS } = require('../config/models');
+  const { buildInpaintCall } = require('./repairPipeline');
   const { storyData } = await loadStoryDataFull(ctx.storyId, { rehydrate: false });
 
-  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
-  const evaluation = params.evaluation || storedEvalFromScene(ctx.scene);
+  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, ctx.versionIndex ?? null);
+  const loaded = getLastPageLoad();
+  const stored = labStoredPageEval(ctx, { imageData, loadedVersion: loaded?.loadedVersion ?? null });
+  let evaluation = params.evaluation || stored.evaluation;
+  if (!evaluation.consolidatedPlan) {
+    const { consolidateEvaluation } = require('./feedbackConsolidator');
+    const res = await consolidateEvaluation(await labConsolidationInputs(ctx, { evaluation, orig: stored.orig, version: stored.version, params }));
+    evaluation = { ...evaluation, consolidatedPlan: res.plan || null };
+  }
+  if (params.consolidatedPlan) evaluation = { ...evaluation, consolidatedPlan: params.consolidatedPlan };
 
-  // inpaintPage takes the consolidated plan as an INPUT (2026-09-21, B2): in
-  // production it is produced once where the evaluation is scored. The Lab
-  // stage starts from a stored eval, so it produces the plan here — one
-  // consolidator call, exactly as before, just made visible at the call site.
-  const { consolidateEvaluation } = require('./feedbackConsolidator');
-  const consolidated = await consolidateEvaluation({
-    evalResult: evaluation,
-    sceneDescription: ctx.scene.sceneDescription || '',
-    characters: storyData.characters || [],
-    storyId: ctx.storyId,
-    pageNumber: ctx.pageNumber,
-    visualBible: ctx.visualBible,
-    landmarkPhotos: ctx.scene.landmarkPhotos || null,
-    era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
+  // The run's page record as the round reads it: the page's first detection
+  // (Phase 5b-pre) and the pipeline storyData's per-page aspect and text
+  // position (storyJobPipeline.js pipelineStoryData.sceneImages).
+  const versions = ctx.scene.imageVersions || [];
+  const img = { ...stored.orig, sharedBboxDetection: versions[0]?.bboxDetection || ctx.scene.bboxDetection || null };
+  const callStoryData = {
+    ...storyData,
+    sceneImages: [{ pageNumber: ctx.pageNumber, imageAspect: ctx.layout?.imageAspect, textPosition: ctx.scene.textPosition || null }],
+  };
+  // A post-generation cover repaints its TEXTLESS art layer and is restamped.
+  const coverKey = COVER_KEY_BY_PAGE[String(ctx.pageNumber)] || null;
+  const restampCoverAfter = !!coverKey && loaded?.coverLayer === 'art';
+  const { inpaintEval, options } = buildInpaintCall({
+    img, latestEval: evaluation, bestSoFar: null, roundNum: null, restampCoverAfter,
+    storyData: callStoryData, characters: storyData.characters || [], artStyle: storyData.artStyle || ctx.artStyle, jobId: ctx.storyId,
   });
-
-  const coverTextContract = buildEvalReplayOptions(ctx, { detectedFigures: null }).options;
   const t0 = Date.now();
-  const result = await inpaintPage(imageData, evaluation, {
-    consolidatedPlan: params.consolidatedPlan || consolidated.plan || null,
-    detectedFigures: ctx.scene?.bboxDetection?.figures || null,
-    visualBible: ctx.visualBible,
-    characters: storyData.characters || [],
-    pageNumber: ctx.pageNumber,
-    sceneDescription: ctx.scene.sceneDescription || '',
-    artStyle: ctx.artStyle,
-    clothingRequirements: storyData.clothingRequirements || null,
-    storyId: ctx.storyId,
-    aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
-    // Era-aware landmark protection (2026-09-05) — the page's stored landmark
-    // refs + its scene era, so Lab repair stages reproduce production.
-    landmarkPhotos: ctx.scene.landmarkPhotos || null,
-    era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
-    sceneMetadata: ctx.scene.sceneMetadata || null,
-    // A cover target's text contract, from the same resolver the Lab evals use,
-    // so a baked title is kept through the edit exactly as in production.
-    expectedText: coverTextContract.expectedText,
-    textMode: coverTextContract.textMode,
-  });
+  const result = await inpaintPage(imageData, inpaintEval, options);
   const elapsedMs = Date.now() - t0;
   if (!result?.repaired || !result?.imageData) {
     throw new Error(result?.error || 'inpaint produced no result (nothing actionable?)');
+  }
+  if (restampCoverAfter) {
+    const { restampCover } = require('./coverTypography');
+    const figures = storyData?.coverImages?.[coverKey]?.bboxDetection?.figures || [];
+    const stamped = await restampCover(storyData, coverKey, result.imageData, { seed: storyData?.title, figures });
+    result.imageData = stamped.titledData;
   }
 
   const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, result.imageData, experimentId);
   return {
     imageType: 'scene', versionIndex, elapsedMs,
     inpaintInstruction: result.instruction || null,
-    plan: result.consolidatedPlan || null,
+    plan: result.consolidatedPlan || inpaintEval.consolidatedPlan || null,
   };
 }
 
@@ -11060,6 +11123,8 @@ module.exports = {
   runQualityEvalStage,
   runSemanticEvalStage,
   runEvalVarianceStage,
+  runConsolidateStage,
+  runInpaintStage,
   runEmptySceneStage,
   runEditImageStage,
   // The page render and the char-fix, exported so "with no params the Lab sends

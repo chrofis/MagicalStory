@@ -589,6 +589,84 @@ describe('eval stages: no params = the run\'s first-round page eval', () => {
   });
 });
 
+// ── consolidate / inpaint: the repair round's consolidator and inpaint calls ──
+const feedbackConsolidator = req('../../server/lib/feedbackConsolidator');
+const { consolidationInputs, buildInpaintCall } = req('../../server/lib/repairPipeline');
+const { entityIssuesForPage } = req('../../server/lib/scoring');
+
+describe('consolidate / inpaint: no params = the repair round\'s calls for the served version', () => {
+  const layout = { mode: 'a4-overlay', imageAspect: '3:4', textInImage: true };
+  const PLAN = { deduped_issues: [{ issue: 'stub', severity: 'major' }], scene_fix: { instruction: 'stub' } };
+  // The page's served version record, as the run stores it.
+  const V0 = {
+    type: 'original', description: BRIEF, prompt: 'the sent prompt', sceneCharacters: [{ name: 'Mira' }, { name: 'Tobias' }], sceneMetadata: META,
+    bboxDetection: STORED_DETECTION, fixableIssues: [{ description: 'the lantern is missing', severity: 'major', type: 'object_presence' }],
+    semanticResult: { semanticIssues: [] }, threeStageResult: null, consolidatedPlan: PLAN, finalScore: 60, evalScore: 70,
+    readerFindings: [{ fault: 'the text says she holds the lantern' }],
+  };
+  const consScene = () => storedScene({ prompt: 'the sent prompt', textPosition: 'bottom-left', imageVersions: [V0] });
+
+  let consCalls: any[] = []; let inpaintCalls: any[] = [];
+  let savedCons: any; let savedInpaint: any;
+  beforeEach(() => {
+    consCalls = []; inpaintCalls = [];
+    savedCons = feedbackConsolidator.consolidateEvaluation; savedInpaint = images.inpaintPage;
+    feedbackConsolidator.consolidateEvaluation = async (args: any) => { consCalls.push(args); return { plan: PLAN, dedupedIssues: PLAN.deduped_issues }; };
+    images.inpaintPage = async (imageData: string, evaluation: any, options: any) => { inpaintCalls.push({ imageData, evaluation, options }); return { repaired: true, imageData: PX, instruction: 'stub' }; };
+  });
+  afterEach(() => { feedbackConsolidator.consolidateEvaluation = savedCons; images.inpaintPage = savedInpaint; });
+
+  it('consolidate: the entity issues, worn clothing, reader findings and version brief the round passes', async () => {
+    const scene = consScene();
+    STORY = storyFor(scene, layout);
+    await testlab.runConsolidateStage(ctxFor(scene, layout), { experimentId: 1, params: {} });
+    expect(consCalls).toHaveLength(1);
+    const lab = consCalls[0];
+    // Production: consolidatePageEval → consolidationInputs on the version's eval.
+    const prod = consolidationInputs({
+      ev: lab.evalResult, entityIssues: entityIssuesForPage(3, STORY.finalChecksReport.entity).issues,
+      orig: { sceneDescription: scene.sceneDescription, landmarkPhotos: [], sceneMetadata: scene.sceneMetadata },
+      pageNumber: 3, round: 0, sceneDescriptionOverride: V0.description, readerFindings: V0.readerFindings,
+      storyData: STORY, characters: STORY.characters, artStyle: STORY.artStyle, visualBible: VISUAL_BIBLE, storyId: 'job_parity',
+    });
+    const { promptOverride, modelOverride, ...labInputs } = lab;
+    expect(labInputs).toEqual(prod);
+    expect(lab.entityIssues.length).toBeGreaterThan(0);                  // pre-fix: []
+    expect(lab.readerFindings).toEqual(V0.readerFindings);              // pre-fix: none
+    expect(lab.sceneClothing).not.toBeUndefined();                      // pre-fix: none
+    // The eval carries what evaluateImageQuality returns and the version does not store.
+    expect(lab.evalResult.requiredTexts).toEqual([]);
+    expect(typeof lab.evalResult.judgedPrompt).toBe('string');
+    expect(lab.evalResult.fixableIssues).toEqual(V0.fixableIssues);
+  });
+
+  it('inpaint: the plan the version was scored with and the round\'s own call options', async () => {
+    const scene = consScene();
+    STORY = storyFor(scene, layout);
+    await testlab.runInpaintStage(ctxFor(scene, layout), { experimentId: 1, params: {} });
+    expect(consCalls).toHaveLength(0);                                   // the stored plan, not a re-consolidation
+    expect(inpaintCalls).toHaveLength(1);
+    const lab = inpaintCalls[0];
+    const prod = buildInpaintCall({
+      img: { pageNumber: 3, sceneDescription: scene.sceneDescription, landmarkPhotos: [], sceneMetadata: scene.sceneMetadata, sharedBboxDetection: STORED_DETECTION },
+      latestEval: lab.evaluation, bestSoFar: null, roundNum: null, restampCoverAfter: false,
+      storyData: { ...STORY, sceneImages: [{ pageNumber: 3, imageAspect: '3:4', textPosition: 'bottom-left' }] },
+      characters: STORY.characters, artStyle: STORY.artStyle, jobId: 'job_parity',
+    });
+    expect(lab.options).toEqual(prod.options);
+    expect(lab.options.consolidatedPlan).toBe(PLAN);
+    expect(lab.options.textPosition).toBe('bottom-left');               // pre-fix: none
+    expect(lab.options.characterClothing).toBeDefined();                // pre-fix: none
+  });
+
+  it('the repair round builds both calls with the shared builders (source scan)', () => {
+    const src = read('server/lib/repairPipeline.js');
+    expect(src).toMatch(/const res = await consolidateEvaluation\(consolidationInputs\(\{/);
+    expect(src).toContain('const result = await images().inpaintPage(inputImage, inpaintEval, inpaintOptions);');
+    expect(src).toMatch(/buildInpaintCall\(\{\s*\n\s*img, latestEval, bestSoFar, roundNum, restampCoverAfter/);
+  });
+});
+
 describe('the run still calls the shared builders (source scan)', () => {
   const pipeline = read('storyJobPipeline.js');
   const repair = read('server/lib/repairPipeline.js');
