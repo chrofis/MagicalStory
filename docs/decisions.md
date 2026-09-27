@@ -62927,6 +62927,18 @@ prompt is byte-identical to production's builders, at 10,024 chars. The same sto
 the char-fix call is identical to `buildCharFixCall`'s for every character with a routable
 finding. The stored run prompt differs only by prompt-builder changes made since the story was
 generated (distinctive features, DEPTH/COUNTS blocks, light wording), not by Lab code.
+Two Lab runs on the deployed code (`f6cb4a0db`), about $0.08 in total:
+- **Lab #1568** (`image` p16, no params) sent 7,871 chars to `grok-imagine-image-2.0`, the
+  production tier. Against the stored 7,659-char run prompt: 46 lines are shared, 10 are only in
+  the stored prompt and 13 only in the Lab's. Every differing line is one of the builder changes
+  listed above.
+- **Lab #1569** (`char_repair` p7 Facundo, no params) ran the production path: the face target
+  from the critical `face_mismatch`, the face cell reference, `grok:cutout:blur:face`, and the
+  face-integrity gate. The gate refused the repair. **Its verdict is blind:** the gate sends its
+  two images through `callTextModel` → `callGeminiTextAPI` (`repairFaceCheck: gemini-2.5-flash`),
+  which drops image inputs ("[GEMINI TEXT] image options are not supported … images were
+  ignored" in the run log). The same gate guards every production char-fix path. This is reported
+  for a fix, not fixed here.
 
 **Past experiments this affects** (staging, 2026-09-26/27):
 - `image` #1501, #1502, #1512, #1516, #1518, #1520, #1523, #1536: grid selection and the
