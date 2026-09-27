@@ -62492,3 +62492,56 @@ every hit is narration; the 53 single-sentence paragraphs that carry a spoken li
 (`text-audit-sighted-vs-blind`), tests/unit/text-stakes-impossible-oneliners.test.ts,
 docs/prompt-inventory.md.
 **Status:** ✅ active on staging.
+
+## 2026-09-27 — A group of more than three is checked: in code from the brief's fields, in the scene review from its prose
+
+**Context:** the Art Director's rule 4 ("more than three characters … one depth in a wider shot, or from
+behind as they move away — never five detailed close foreground faces") was stated twice by hand and
+checked by nothing. Staging job_1790446348343_z3fw660ie: p1 and p6 put five on a `medium` (the planner's
+own shot on both), p6 scored 9, the book's worst page; p16 put five on a `wide`, every `looksAt` the ship
+behind them and nobody turned away, and rendered as a posed row of faces (15). Pixels checked for p1,
+p6, p16.
+
+**Decision (owner, 2026-09-27):**
+1. ONE constant, `shotVocabulary.GROUP_STAGING_RULE` (with `GROUP_WIDER_SHOTS` = wide, ultra-wide,
+   high-angle, aerial, and `GROUP_STAGING_MAX` = 3), filled as `{GROUP_STAGING}` into both Art Director
+   templates (rule 4), both iterate templates and the scene review (new check 6d `[group_staging]`).
+   It adds the facing half: a group turns to each other or to what they look at, never lined up facing
+   the viewer, and a group looking at something deeper in the frame is seen from behind.
+2. `sceneBriefCheck.checkGroupStaging`, structured fields only, REVIEWABLE:
+   `group_shot_too_close` — more than three in `characters[]`, a recognised `shot` not in
+   `GROUP_WIDER_SHOTS`, and not the whole group `perspective: back view` (covers never get the back-view
+   option). A close-up the PLAN LINE asks for is exempt (CLOSEUP_KEPT_RULE, 2026-09-24); a planned
+   `medium` is not — the owner's rule overrides it.
+   `group_facing_viewer` — on a story page, more than half the group `looksAt` the viewer, or `looksAt`
+   a place (`LOC` id) with no back-view `perspective`. Covers (COVER_GAZE_EXCEPTION) and `aerial` are exempt.
+   The iterate rewrite gets only `group_facing_viewer` (introduced-only): its `shot` is carried from
+   the parent in code, so it could not answer the other.
+
+**Why the facing half is narrow:** a first version counted any figure neither turned away nor looking
+at another figure. Over the corpus it flagged 23 of 37 group pages; looked at, most read well — four
+children around an egg in their midst, children running at a ball. A gaze at a thing or `away` carries
+no depth. A place (`LOC`) is always the backdrop behind the group. So p16 (`looksAt` VEH001) is NOT a
+code finding: only its prose says the ship is behind them, and check 6d owns it.
+
+**Evidence (rung 1, free):** replay of the check over the stored briefs of every staging story created in
+the 14 days to 2026-09-27 — 19 stories, 276 pages, 37 with four or more characters: `group_shot_too_close`
+on 8 pages, `group_facing_viewer` on 4 (11 distinct pages, no cover). Fiona p1 (both) and p6 (too close) fire;
+p16 does not, as above. Pixels of 9 flagged pages checked — Fiona p1/p6 (five large figures walking at
+the reader / close faces), vnx5l8iy7 p6 (four large faces on a medium), riqncqg1i p7 (a row of four facing
+out behind the lead), wkt20ckod p18 (four sitting in a row facing out) are real; 1nitlympp p12 (aerial)
+was a false positive and made `aerial` exempt. Final score by cast size over the same pages (story pages
+with a score): 1 → 77.7 (n 91), 2 → 66.6 (n 96), 3 → 55.6 (n 27), 4+ → 45.2 (n 37); the flagged 4+ pages
+average 47.5 against 44.3 for the unflagged, so the check does not by itself separate the low scorers —
+cast size does.
+
+**Open:** the planner (story-beats.txt) chooses the shot and put five on a `medium` on both motivating
+pages; it is not told this rule. `tasks/BACKLOG.md`.
+
+**Touched:** server/lib/shotVocabulary.js, server/lib/sceneBriefCheck.js, server/lib/iterateBeat.js,
+server/lib/promptBuilders.js, prompts/scene-expansion-all.txt, prompts/scene-expansion.txt,
+prompts/scene-iteration.txt, prompts/scene-iteration-free.txt, prompts/scene-review.txt,
+scripts/admin/sibling-registry.json (`group-staging-generator-vs-critic`),
+tests/unit/group-staging.test.ts, tests/unit/iterate-rewrite-checked-like-authored.test.ts,
+docs/prompt-inventory.md.
+**Status:** ✅ active on staging.

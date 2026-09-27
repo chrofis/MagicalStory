@@ -507,6 +507,83 @@ function checkLightDeclared(page, metadata) {
 }
 
 /**
+ * O — a group of more than three not staged the way GROUP_STAGING_RULE asks
+ * (owner, 2026-09-27). Structured fields only — `characters[]`, `shot`,
+ * `perspective`, `looksAt` — never the prose:
+ *
+ *   group_shot_too_close  the shot is not one of GROUP_WIDER_SHOTS and the
+ *     group is not all seen from behind. An unrecognised `shot` is left alone:
+ *     classifyShot cannot say how close it is; so is a close-up the plan line
+ *     asks for (CLOSEUP_KEPT_RULE). A planned `medium` is not exempt — the
+ *     planner put five on a medium on both staging pages that motivated this.
+ *   group_facing_viewer   on a story page, more than half the group faces out
+ *     of the frame: `looksAt` the viewer, or `looksAt` a place (a `LOC` id)
+ *     with no back-view `perspective`. A place is the backdrop the group
+ *     stands in front of, so a figure looking at it and not turned away is
+ *     drawn facing the camera — staging job_1790446348343_z3fw660ie p1, five
+ *     friends `looksAt` the museum they walk into, rendered striding toward
+ *     the reader. Covers are posed for the reader (COVER_GAZE_EXCEPTION), and an
+ *     `aerial` shot sees every head from above; both are exempt.
+ *     DELIBERATELY NARROW (replay over 19 staging stories, 2026-09-27): a gaze
+ *     at a thing (`ART`/`ANI`/`VEH` id) or `away` says nothing about depth —
+ *     four children around an egg in their midst look at it front-on and read
+ *     well — so counting those flagged 23 of 37 group pages, most of them fine.
+ *     p16 of the same story (five figures `looksAt` a ship behind them, drawn
+ *     as a posed row) is that shape; only its prose says the ship is behind
+ *     them, so scene-review check [group_staging] owns it.
+ */
+function checkGroupStaging(page, metadata) {
+  const { GROUP_STAGING_MAX, GROUP_WIDER_SHOTS } = require('./shotVocabulary');
+  const { isCoverPage } = require('./coverBeats');
+  const raw = (metadata && Array.isArray(metadata.fullData && metadata.fullData.characters))
+    ? metadata.fullData.characters
+    : (metadata && Array.isArray(metadata.characters) ? metadata.characters : []);
+  const group = raw.filter(c => c && typeof c === 'object' && String(c.name || '').trim());
+  if (group.length <= GROUP_STAGING_MAX) return [];
+  const cover = isCoverPage(page.pageNumber);
+  const fromBehind = c => /\bback\b|over[-\s]?the[-\s]?shoulder/i.test(String(c.perspective || ''));
+  const wider = GROUP_WIDER_SHOTS.map(id => '`' + id + '`').join(', ');
+  const out = [];
+
+  const shot = briefField(metadata, 'shot');
+  const shotClass = classifyShot(shot);
+  // A close-up the plan line asks for stays a close-up (CLOSEUP_KEPT_RULE,
+  // `shot_widened`); asking to widen it would hand the review two findings
+  // that contradict each other.
+  const planSegs = planSegments(String((page && page.planLine) || ''));
+  const plannedCloseUp = shotClass === 'close-up' && planSegs.length > 0 && classifyShot(planSegs[0]) === 'close-up';
+  if (shot && shotClass !== 'other' && !GROUP_WIDER_SHOTS.includes(shotClass) && !plannedCloseUp && (cover || !group.every(fromBehind))) {
+    out.push({
+      pageNumber: page.pageNumber,
+      type: 'group_shot_too_close',
+      detail: `${group.length} characters share this \`${shot}\` frame; a group of more than three stands together at one depth in a wider shot, or is seen from behind as it moves away. `
+        + `Set \`shot\` to one of ${wider} and bring the group to one depth`
+        + (cover ? '.' : ', or turn the whole group from behind (`perspective: back view`) as it moves away.'),
+    });
+  }
+
+  // An aerial shot sees every figure from over their head (shotVocabulary), so
+  // no face is turned to the reader whatever the gaze.
+  if (!cover && shotClass !== 'aerial') {
+    const facing = group.filter((c) => {
+      const target = String(c.looksAt || '').trim();
+      return /^(viewer|the viewer|camera|reader)$/i.test(target)
+        || (/^LOC\d{3}/i.test(target) && !fromBehind(c));
+    });
+    if (facing.length * 2 > group.length) {
+      out.push({
+        pageNumber: page.pageNumber,
+        type: 'group_facing_viewer',
+        detail: `${facing.length} of the ${group.length} characters face out of the frame: ${facing.map(c => `${c.name} (looksAt "${c.looksAt}"${c.perspective ? `, ${c.perspective}` : ''})`).join(', ')}. `
+          + 'A group of more than three turns to each other or to what they look at, never lined up facing the viewer, and a figure looking at the place looks into the backdrop behind them. '
+          + 'Give each of them `perspective: back view` and say so in their own prose clause, or turn them to each other or to the action.',
+      });
+    }
+  }
+  return out;
+}
+
+/**
  * I — the page's own instant disagrees with the state it resolves to.
  *
  * Reuses `resolveObjectState`, the ONE place a page's state is decided, in
@@ -992,6 +1069,10 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
   const lightMissing = checkLightDeclared(page, metadata);
   if (lightMissing) findings.push(lightMissing);
 
+  // O — a group of more than three staged too close or facing the viewer
+  // (shotVocabulary.GROUP_STAGING_RULE, owner 2026-09-27). Structured fields only.
+  findings.push(...checkGroupStaging(page, metadata));
+
   // F — R4, the text half only. The depth-mismatch half of the old check 24b
   // is deliberately not restored (owner ruling, rule-survival audit 2026-09-03).
   if (opts && opts.textZoneRules) {
@@ -1256,6 +1337,13 @@ const REVIEWABLE = new Set(['cover_cast_dropped', 'cover_location_repeated', 'ca
   // The review owns `timeOfDay` / `weather` (check 3a); a missing value is one
   // field on a page it already rewrites (sceneLight.js, 2026-09-24).
   'light_undeclared',
+  // A group of more than three staged too close or facing the viewer
+  // (checkGroupStaging, owner 2026-09-27). The review owns `shot`, `perspective`
+  // and `looksAt`, and check [group_staging] states the same rule. MEASURED
+  // over 19 staging stories to 2026-09-27 (276 pages, 37 with 4+ characters):
+  // 8 pages too close, 4 facing; Fiona job_1790446348343_z3fw660ie p1 (both)
+  // and p6 (too close). SENT.
+  'group_shot_too_close', 'group_facing_viewer',
   'textzone_character_collision', 'textzone_fullwidth_floor', 'textzone_top_floor', 'textzone_bottom_floor', 'textzone_half_streak',
   // A cover page's two mechanical beat facts (checkCoverBrief, 2026-09-24).
   'cover_gaze_not_viewer', 'cover_text_zone_mismatch']);
@@ -1297,4 +1385,5 @@ module.exports = {
   checkPopulationContradiction,
   checkShotOffPlate,
   checkLightDeclared,
+  checkGroupStaging,
 };

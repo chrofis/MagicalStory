@@ -752,7 +752,38 @@ function buildPlateDeriveInstruction(baseShot, targetShot, { relight = '', keepL
     + `The buildings, walls, roofs, trees, paths and surfaces keep their shape, material and colour and their arrangement relative to each other; ${light} The camera moves; the place stays as it is, and no one is added to it.`;
 }
 
+/**
+ * STAGING A GROUP (owner, 2026-09-27).
+ *
+ * The Art Director's rule 4 said it in prose and no critic checked it. Staging
+ * job_1790446348343_z3fw660ie: p1 and p6 put five figures on a `medium` shot
+ * (p6 scored 9, the book's worst page), and p16 put five on a `wide` shot all
+ * looking at a ship deep in the frame with nobody turned away — a posed row of
+ * faces (score 15).
+ *
+ * ONE sentence, read by both Art Director templates (rule 4), both iterate
+ * templates and scene-review check [group_staging]; the brief check
+ * (sceneBriefCheck.checkGroupStaging) measures the same two halves from the
+ * structured fields: the shot class against GROUP_WIDER_SHOTS, and the gaze /
+ * perspective of each figure.
+ *
+ * Which shots are "wider": the two far distances, and the two camera positions
+ * that look down on the group from above so every figure sits at one depth.
+ * `medium` keeps each figure whole but large, `close-up` is faces, a
+ * `low-angle` makes its subject tower, and an `over-the-shoulder` puts one
+ * figure large in front of the others by definition.
+ */
+const GROUP_STAGING_MAX = 3; // the "three" GROUP_STAGING_RULE states
+const GROUP_WIDER_SHOTS = ['wide', 'ultra-wide', 'high-angle', 'aerial'];
+if (GROUP_WIDER_SHOTS.some(id => !SHOT_TYPES.includes(id))) {
+  throw new Error('shotVocabulary: GROUP_WIDER_SHOTS names a shot that does not exist');
+}
+const GROUP_STAGING_RULE = `When more than three characters share the frame, keep the whole group together at one depth in a wider shot — ${GROUP_WIDER_SHOTS.map(id => '`' + id + '`').join(', ').replace(/, ([^,]*)$/, ' or $1')} — or show them from behind (\`perspective: back view\`) as they move away; never five detailed close foreground faces. The group turns to each other or to what they look at, never lined up facing the viewer: a group looking at something deeper in the frame is seen from behind.`;
+
 module.exports = {
+  GROUP_STAGING_MAX,
+  GROUP_WIDER_SHOTS,
+  GROUP_STAGING_RULE,
   OTS_NEAR_FIGURE_CROP,
   OTS_NO_CONTACT_RULE,
   OTS_NEAR_FIGURE_RULE,

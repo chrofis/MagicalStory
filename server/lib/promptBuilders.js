@@ -18,7 +18,7 @@ const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = requi
 // exported from visualBible.js for coverIterate.js, which still uses it.
 const { REQUIRED_TEXT_AUTHORING_RULE, declaredText } = require('./requiredText');
 const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote, withScaleNote } = require('./visualBible');
-const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE } = require('./shotVocabulary');
+const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE, GROUP_STAGING_RULE } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { castCoverage, castCoverageRule, castActionRule, castTableSpec, castTableFormat, castTableBlock } = require('./castCoverage');
 // REQUIRED IN-IMAGE TEXT: one source for the generator block, the repair
@@ -3235,6 +3235,9 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // The over-the-shoulder near figure is a crop, and never on a contact page
     // (owner, 2026-09-23) — the same constant at all four brief-authoring sites.
     OTS_NEAR_FIGURE: OTS_NEAR_FIGURE_RULE,
+    // Rule 4, the group rule scene-review check 6d and the brief check
+    // checkGroupStaging hold briefs to (shotVocabulary, 2026-09-27).
+    GROUP_STAGING: GROUP_STAGING_RULE,
     // C4 names the two axes separately — the eight-word SHOT_ENUM is not a
     // list of distances, and where the camera stands is no longer the vantage's
     // business but the shot word's own.
@@ -3559,6 +3562,9 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // The over-the-shoulder near figure is a crop, and never on a contact page
     // (owner, 2026-09-23) — the same constant at all four brief-authoring sites.
     OTS_NEAR_FIGURE: OTS_NEAR_FIGURE_RULE,
+    // Rule 4, the group rule scene-review check 6d and the brief check
+    // checkGroupStaging hold briefs to (shotVocabulary, 2026-09-27).
+    GROUP_STAGING: GROUP_STAGING_RULE,
     // C4 names the two axes separately — the eight-word SHOT_ENUM is not a
     // list of distances, and where the camera stands is no longer the vantage's
     // business but the shot word's own.
@@ -4027,6 +4033,8 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       // The over-the-shoulder near figure is a crop, and never on a contact page
       // (owner, 2026-09-23) — the same constant at all four brief-authoring sites.
       OTS_NEAR_FIGURE: OTS_NEAR_FIGURE_RULE,
+      // The group rule the scene review and the brief check hold briefs to.
+      GROUP_STAGING: GROUP_STAGING_RULE,
       // C4 names the two axes separately — the eight-word SHOT_ENUM is not a
       // list of distances, and where the camera stands is no longer the vantage's
       // business but the shot word's own.
@@ -11708,6 +11716,9 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
     // as 11c and `shot_widened` states (shotVocabulary.CLOSEUP_KEPT_RULE).
     CLOSEUP_KEPT: CLOSEUP_KEPT_RULE,
     COVER_GAZE_EXCEPTION,
+    // Check 6d [group_staging], from the rule both Art Director templates state
+    // as rule 4 and the brief check measures (shotVocabulary.GROUP_STAGING_RULE).
+    GROUP_STAGING: GROUP_STAGING_RULE,
     // Check 3a, from the one rule every brief author is given (sceneLight.js).
     SCENE_LIGHT_FIELD: SCENE_LIGHT_FIELD_RULE,
   });

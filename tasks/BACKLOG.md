@@ -90,6 +90,8 @@ Last full sweep: **2026-09-06**.
 
 ## Image quality — unresolved render defects
 
+- [ ] The beats planner (story-beats.txt) is not given GROUP_STAGING_RULE: it chose `medium` for five characters on both pages that motivated the group check (Fiona p1, p6), and the scene review now overrides a planned medium. Owner call whether the planner gets the rule too → docs/decisions.md (2026-09-27 "A group of more than three is checked", Open)
+
 - [ ] An eye-level page grouped into an angled vantage (`shot_off_plate` with the page's shot = the plan's): the fault is the vantage's `shot`, which the scene review cannot edit — needs an Art-Director / bible-side fix (e.g. vantage shot = base class when any of its pages is eye level). Lab 1433 p16 → docs/decisions.md (2026-09-24 entry, item 3)
 - [ ] Plate QC misses a photograph made to look painted: Lab 1505 and 1503 still pass the medium check after the 2026-09-26 prompt fix (2/4 photographic plates caught). Options not yet measured: a stronger judge model, or the medium asked of the plate alone in its own call (latency/cost) → docs/decisions.md (2026-09-26 "The plate QC sees people and a photograph")
 - [ ] Plate QC after the era/framing/detail-view change (2026-09-26): still misses a declared covered sky/fog painted sunny (1/5: LOC005.1, p8 derived and both LOC004.2 plates of job_1790446348343 pass light), a photograph made to look painted (0/4) and 1 of 2 wrong-framing plates; light verdicts vary between samples → docs/decisions.md (2026-09-26 "The plate QC judges the era, the framing and the landmark photo its author was given")

@@ -527,6 +527,10 @@ const INTRODUCED_TYPES = new Set([
   'cover_gaze_not_viewer',
   // …and stages the cast its plan line names (the cover beat).
   'cover_cast_dropped',
+  // A rewrite writes its own `looksAt`, so it can turn a group of more than
+  // three to the viewer (GROUP_STAGING_RULE, 2026-09-27). Its sibling
+  // `group_shot_too_close` stays out: `shot` is carried from the parent in code.
+  'group_facing_viewer',
 ]);
 
 /**

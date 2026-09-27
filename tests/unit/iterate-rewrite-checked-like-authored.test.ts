@@ -134,6 +134,9 @@ describe('which sceneBriefCheck types reach a rewrite', () => {
       // `timeOfDay` / `weather` gets the parent's put back in code
       // (sceneLight.carryForwardLightInBrief, images.js), so it cannot miss them.
       'light_undeclared',
+      // A group's `shot` is the parent's too (2026-09-27), so a rewrite cannot
+      // widen it; its facing half, `group_facing_viewer`, does reach the rewrite.
+      'group_shot_too_close',
       // A cover's copy space is locked to its beat's zone on iterate (images.js
       // lockedTextPosition = COVER_TEXT_POSITION), like the text-zone family.
       'cover_text_zone_mismatch',

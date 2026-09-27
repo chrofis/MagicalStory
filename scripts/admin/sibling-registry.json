@@ -255,6 +255,21 @@
       "severity": "block"
     },
     {
+      "id": "group-staging-generator-vs-critic",
+      "axis": "generator-vs-critic",
+      "reason": "A group of more than three characters is staged at one depth in a wider shot, or seen from behind as it moves away, and never lined up facing the viewer (owner, 2026-09-27; docs/decisions.md). The rule is authored by both Art Director templates (rule 4) and both iterate templates, and judged by scene-review.txt check 6d [group_staging]; all five read ONE constant, shotVocabulary.GROUP_STAGING_RULE, through {GROUP_STAGING}. The brief check sceneBriefCheck.checkGroupStaging measures the same rule from structured fields (GROUP_WIDER_SHOTS, `perspective`, `looksAt`) and sends group_shot_too_close / group_facing_viewer to the review. tests/unit/group-staging.test.ts pins that the constant reaches every built prompt.",
+      "generators": [
+        "prompts/scene-expansion-all.txt",
+        "prompts/scene-expansion.txt",
+        "prompts/scene-iteration.txt",
+        "prompts/scene-iteration-free.txt"
+      ],
+      "critics": [
+        "prompts/scene-review.txt"
+      ],
+      "severity": "block"
+    },
+    {
       "id": "story-text-generator-vs-critic",
       "axis": "generator-vs-critic",
       "reason": "story-text-proofread.txt and story-text-audit.txt judge prose written under story-text-from-beats.txt (the live writer on every full story) and story-trial.txt (the /try funnel); a style or structure rule the auditor enforces must be a rule the writer was given, or every story is corrected after the fact instead of written right. story-text-audit-blind.txt joined 2026-09-23: it reads the same writer text and faults CONTRADICTION and ENDING, which the writer is told (prompt audit 05). The generator was story-unified.txt until 2026-09-15, when that template was deleted as unreachable — it had not been the live prose writer since the beats pipeline shipped.",
