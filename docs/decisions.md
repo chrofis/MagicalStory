@@ -64105,3 +64105,172 @@ follow-up line below.
 **Touched:** server/lib/promptBuilders.js, prompts/arc-panel.txt, prompts/story-text-from-beats.txt,
 prompts/story-trial.txt, prompts/text-refine.txt, prompts/story-text-audit.txt,
 prompts/story-text-audit-blind.txt, tests/unit/text-style-rulebook.test.ts.
+
+## 2026-09-27 — Arc → action list → Jev + code instead of the beats planner: 🟡 NOT a replacement — the page order, text split, climax, shot and cast floors can move to code/Jev; the picture CHOICE cannot yet — measured, nothing built
+
+**Context:** owner, 2026-09-27: "Do we even need the beats? Or can we feed the arc to Jev directly?
+Ask arc to output all actions as a list. Should easily be below the 256 limit of Jev. Then ask Jev
+picture one: which action is in it, which shot, which character and artifact." Research only; the
+Jev decision layer (shots, cast cuts, VB citations, light) is being built separately on
+`feat/jev-decision-layer` and was not touched.
+
+**What the planner does today** (`prompts/story-beats.txt`, `buildBeatsPrompt` promptBuilders.js:8485,
+planCounters, `plan-check.txt`, `runReplanRounds` beatsPipeline.js:1203). Given the arc and a fixed
+page count, it (1) picks ONE instant per page in arc order, and so (2) sets the text split: the
+writer tells "the stretch of the story that leads to its picture's instant … and that instant's
+consequence" (story-text-from-beats.txt:32). It writes (3) the shot, (4) the who column (the complete
+cast), (5) "what is true after". It (6) plans the pictures first: emotional close-ups, the people-free
+page, the most-wanted picture per act. It holds (7-8) shot floors, the cast ceiling and the
+group-page budget; (9) whole-cast staging; (10-11) coverage of 3-4 pages per character, focal pages,
+and the CAST table (a deed page per character); (12) the central figure acting in each third;
+(13) invented figures never dominating. It keeps (14) the story-order rules: causal order, entrances
+named, an about-to-act paid off on the next page, the low point alone, plants and payoffs, an
+exciting start, the ending event, the cast together at the end. It respects (15) the STORY LOGIC
+facts. Plan-check (18 questions, luna-pro) and up to 2 re-plan rounds enforce all of this. Covers,
+clothing, locations and word budgets are NOT planner jobs. Who reads the plan line: wardrobe
+(story-bible-from-beats), the Art Director (the whole line: verb, shot, cast), scene review and
+sceneBriefCheck, the writer, text refine and computePlanTextDrift, the arc-informed text audit,
+Jev ARC_PAGE_CONTRADICT, and the scorecard/metrics.
+
+| Planner job | Covered in the proposed design by | |
+|---|---|---|
+| one instant per page, in arc order | (a) the action list + a code ordered DP | ✅ by construction |
+| which instants get a picture | (b) Jev OWN/PIC/TURN + code | 🟡 weaker than the planner (below) |
+| page text split / pacing | code: page N tells the actions after picture N-1, up to N | 🟡 works; must carry the ARC SENTENCES, not only actions |
+| climax placement | (b) Jev CLIMAX (4/5 top-1) + code forces its picture | ✅ |
+| shot | (b) Jev A1 + (c) the code budget (entry "Jev picks the shot…") | ✅ 0 violations here too |
+| who column (complete cast) | (c) code from the action's who + also-there, then (b) Jev who-to-cut | 🟡 the "needed in frame" noul alone is ❌ (below) |
+| focal pages / CAST-table deeds | (c) a code floor on the action's actor | ✅ when the character HAS an action (a pet with none cannot be met, for the planner either) |
+| group-page budget, cast ceiling | (c) castCoverage over the who column | ✅ |
+| what is true after | (c) the cumulative action/sentence state up to picture N | 🟡 unmeasured; it is a writer and AD input today |
+| people-free page, emotional close-ups, most-wanted picture per act, low point alone, about-to-act paid off | (d) nothing | ❌ lost: these are picture-PLANNING rules, not actions |
+| felt / stake moments (a worried face at the setting sun) | (d) nothing | ❌ lost: the action list drops sentences with no act (vnx5l8iy7 s3 and s13), and the planner pictured one of them (p3) |
+| the instant's wording (what the AD draws) | the action clause | 🟡 thinner than a plan line |
+
+**The Jev limits** (measured with `eval-jev-arc-direct.js limits` and synthetic states):
+- **"256" is the CHOICE option cap.** 255 options answer; 256 return `HTTP 400 "Too many choices.
+  Must have at most 255 choices."`.
+- **Questions per call have no cap at 256.** Calls with 1,000 and with 3,000 nouls answered.
+- **The context is ~32.4k tokens, and it counts the state PLUS the choice options.** A 155k-char
+  state answers (32,367 input tokens); 170k returns `max_tokens_exceeded`. 100k chars plus a
+  255-option choice answers; 140k plus the same choice fails.
+- **An arc (18 sentences) plus a numbered action list is at most 14k chars**, about 10% of the
+  context.
+
+**Action lists.** One gemini-3.7-flash call per story on the stored arc. This is a PROXY for "the arc
+model outputs it": Opus was not re-run.
+- 42, 54, 53, 75 and 74 actions for 18, 15, 18, 18 and 18 sentences (2.3-4.2 per sentence), far
+  below 255.
+- 19-42 s and $0.017-0.033 per call.
+- 1 of 5 lists dropped two sentences that hold no drawable act (a stake, a plan's reasoning).
+
+**Measurement.**
+- **Books:** 5 staging books, 88 pages: dka3jpog9, z3fw660ie, vnx5l8iy7, 5herh01j7, riqncqg1i.
+- **Reading labels:** which actions deserve a picture, which are MUST, and the climax. They were
+  written from the action lists BEFORE any Jev call (`evals/datasets/jev-arc-direct-v1/reading_labels.json`).
+- **Planner pages:** mapped to actions by a second cheap call and spot-checked.
+- **Jev:** 3 reps averaged, 543 calls, $0.115.
+- **Results:** `evals/runs/2026-09-27_jev-arc-direct/metrics.json`.
+
+| | Planner (first plan) | (a) Jev nouls + code DP | (b) Jev choice per page + monotone DP | ORACLE: reading values + the same DP |
+|---|---|---|---|---|
+| MUST actions pictured | **53/83 (64%)** | 43/83 (52%) | 37/83 (45%) | 78/83 |
+| Pictures the reading wants | **66/88 (75%)** | 56/88 (64%) | 50/88 (57%) | 88/88 |
+| Pages agreeing with the planner | — | 52/88 | 59/88 | 65/88 |
+| Climax pictured near the end | 4/5 (p15-17) | 4/5 (p13-18) | 4/5 (p14-17) | 5/5 |
+| Characters short of a focal page (actor proxy) | 7 | 1 (a pet with no action) | 8 | 2 |
+| Most actions told on one page | 6-9 | 3-7 | 6-10 | 6-8 |
+| Blind editor judgement (subagent, sides randomised) | 2 wins | **3 wins** | — | — |
+
+**How good Jev's per-action signals are, against the reading:**
+- OWN ("needs a picture of its own"): AUC 0.74-0.78 on every book, the best single question.
+- PIC: AUC 0.60-0.78. The summed value: AUC 0.57-0.76.
+- CLIMAX top-1 was acceptable on 4/5 books. On 5herh01j7 it picked the hatching over the reading's
+  gift, which is defensible.
+
+The ORACLE row shows the code assignment is sound: the DP places what it is given. The gap is Jev's
+ranking of WHICH actions matter. At AUC ~0.75 it is too weak to pick 18 of 60.
+
+**The blind judge preferred Jev + code on 3 of 5 books, but that overstates (a).** The judge read only
+the two sequences, both rendered in the same action wording. Reduced to the action list, the
+planner's sequences showed "sees / whispers / says" pages and one duplicate. But that rendering
+strips the planner's own staged instant. And the duplicate IS the planner's picture of a stake
+sentence that the action list had lost.
+
+**Who in frame: the "X is needed in the picture" noul at 0.5 drops almost everyone.** The main
+character is in frame on 0 of 18 pages of vnx5l8iy7, and there is no group page in any book. It is
+the who-to-CUT question. It must run on a who column that code builds from the action's who +
+also-there.
+
+**Shots:** on the (a) pictures, A1 + the code budget gave 0 rule violations.
+
+**Text split (step 5, dka3jpog9).** The level is 1st-grade: 25-70 words, and the counter tolerates
+−20% / +50%. Page N tells the actions after picture N-1 up to picture N; the last page also takes the
+tail. Scaled by the stored book's words-per-arc-word ratio (×2.15):
+- 15 of 18 pages land at 49-97 words.
+- p8 is 16 words (one action, below the floor).
+- p5 is 105 words and p14 is 108 (at or over the ceiling).
+- The stored book's pages are 58-82 words.
+
+The split is usable once the DP balances ARC WORDS rather than action counts, and every arc sentence,
+not just its actions, is attached to a page.
+
+**Cost and latency per book (stored).**
+- **Planner stage: $0.14-0.25 (mean $0.18) and 230-460 s wall.**
+  - Sonnet plan $0.035-0.044, 24-32 s.
+  - luna-pro check $0.028-0.031.
+  - Sonnet re-plans $0.044-0.13.
+  - luna-pro rechecks $0.026-0.030.
+  - Check, re-plans and rechecks together take 204-434 s.
+- **Jev + code: about $0.03 and 20-40 s, nearly all of it the action list.**
+  - Action list: $0.02-0.03 and 20-40 s. This is about $0 and 0 s if the arc call writes it.
+  - Jev (a): $0.002, under 1 s.
+  - Per-page shot/who: $0.006, about 1 s in parallel.
+  - Jev (b): $0.015.
+  - The DP is instant.
+- **Spend of this study:** LLM $0.21 + Jev $0.12 + limit probes $0.01 ≈ $0.34 (CHF ~0.30).
+
+**Decision (verdict) 🟡:** the beats planner is NOT replaceable by arc → actions → Jev + code, as
+measured.
+- **What fails:** the picture CHOICE loses 10 more MUST pictures in 83. The picture-planning rules
+  (people-free page, close-ups, most-wanted picture per act, felt moments) have no owner.
+- **What moves cleanly:**
+  - the ORDER and the one-moment-per-page contract (code, by construction);
+  - the page-text split (code, with arc-word balance);
+  - the climax (Jev + a forced picture);
+  - shots (Jev A1 + the budget);
+  - the cast floors and the group budget (code, over a code-built who column);
+  - who-to-cut and VB membership (Jev, measured earlier).
+
+**Proposed flow, if pursued:**
+1. The arc create call writes a numbered action list with the arc: who | act | where | object |
+   also there. Every sentence owns at least one line; a felt or stake sentence gets a "shows" line.
+2. Jev (a) asks OWN + CLIMAX per action, in one call.
+3. A code ordered DP proposes N pictures: arc-word pacing, opening, ending, the climax forced, the
+   focal floor.
+4. Either the PLANNER, shrunk to a picture-planning call over that proposal (swap a picture, stage
+   the instant, the people-free page, close-ups), or Jev per-page shot/who/VB fields on the proposal.
+5. The writer gets page N = the arc sentences between pictures N-1 and N.
+6. AD prose.
+
+**Migration path:**
+1. Make the arc call emit the action list (prompt + parser; a $0 test on stored arcs).
+2. Shadow-run Jev (a) + the DP beside the planner, and log the MUST overlap per book.
+3. Feed the DP proposal to the planner as a draft, and measure plan-check findings and re-plan
+   rounds. The rounds are where the cost is: $0.05-0.13 and 1-3 min per book.
+4. Only if step 3 cuts re-plans, move shot, who and the text split out of the plan line.
+
+**Settled lines this touches:**
+- "Beats is the pipeline": the planner IS the core of the beats pipeline, so replacing it needs the
+  reversal protocol.
+- "Four VB elements per page … a PROMPT rule, no code enforcer": a code who/VB column would be an
+  enforcer.
+- Unaffected: cover gaze, and the brief's `timeOfDay`/`weather` fields, which stay with the AD.
+
+**Revisit if:** a Jev version's OWN question clears AUC ~0.9 against a reading, or the arc model
+itself (Opus) writes the action list. Re-run `scripts/analysis/eval-jev-arc-direct.js`
+(`actions --force`, `run`, `score --blind`) on the same five books.
+
+**Touched:** scripts/analysis/eval-jev-arc-direct.js (new),
+evals/datasets/jev-arc-direct-v1/reading_labels.json, evals/runs/2026-09-27_jev-arc-direct/metrics.json.
+No production code.
