@@ -20,7 +20,7 @@ const { REQUIRED_TEXT_AUTHORING_RULE, declaredText } = require('./requiredText')
 const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote, withScaleNote } = require('./visualBible');
 const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE, GROUP_STAGING_RULE } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
-const { castCoverage, castCoverageRule, castActionRule, castTableSpec, castTableFormat, castTableBlock } = require('./castCoverage');
+const { castCoverage, castCoverageRule, castActionRule, castTableSpec, castTableFormat, castTableBlock, groupPageBudget, groupPageRule } = require('./castCoverage');
 // REQUIRED IN-IMAGE TEXT: one source for the generator block, the repair
 // clause and the judges' TEXT RULES block. Safe as a top-level require --
 // requiredText.js requires promptBuilders LAZILY.
@@ -8538,6 +8538,16 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // the last page's cast. A re-plan keeps the table (castCoverage.castTableSpec).
     CAST_TABLE: castTableSpec(castCoverage({ pageCount, castCount: (inputData?.characters || []).filter(c => c && c.name).length }), pageCount, { replan: !!String(replan || '').trim(), table: castTable }),
     CAST_FORMAT: castTableFormat(castCoverage({ pageCount, castCount: (inputData?.characters || []).filter(c => c && c.name).length }), pageCount, { replan: !!String(replan || '').trim() }),
+    // HOW MANY PAGES MAY HOLD A GROUP (owner, 2026-09-27): one page in six,
+    // from the same castCoverage.groupPageBudget the counter
+    // GROUP_PAGES_OVER_BUDGET measures, on the same ceiling the pipeline
+    // passes the counters (IMAGE_MODELS maxCharactersPerScene).
+    GROUP_PAGE_BUDGET: groupPageRule(groupPageBudget({ pageCount, castCount: (inputData?.characters || []).filter(c => c && c.name).length, maxCharactersPerScene: ctx.MAX_CHARACTERS_PER_SCENE })),
+    // STAGING A GROUP (owner, 2026-09-27): the Art Director's rule 4 and the
+    // scene review's [group_staging] read this constant; the planner picks the
+    // shot, so it reads it too — a page of more than three planned `medium`
+    // left the review to override the plan (z3fw660ie p1, p6).
+    GROUP_STAGING: GROUP_STAGING_RULE,
     // The output scope follows the mode. A first plan (no replan section)
     // owes every page; a re-plan owes only the pages it changes under RE-DIVIDE
     // — the merge in beatsPipeline restores every other page from the division

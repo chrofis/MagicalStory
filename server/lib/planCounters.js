@@ -35,7 +35,7 @@ const {
   SHOT_PATTERNS, SHOT_AXIS, POSITION_SHOTS, MID_DISTANCE_SHOTS, SHOT_FLOOR_CODE,
   shotFloors, MAX_MEDIUM_WIDE_SHARE, closeUpBelowWaistVerbs, PEOPLELESS_SHARED_SHOT,
 } = require('./shotVocabulary');
-const { castCoverage, underCoveredFix, noFocalFix } = require('./castCoverage');
+const { castCoverage, groupPageBudget, underCoveredFix, noFocalFix } = require('./castCoverage');
 
 /** Words that look like names but never are, in the who-column's grammar. */
 const NAME_STOPWORDS = new Set([
@@ -1031,6 +1031,26 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
     }
   }
 
+  // 8c. PAGES THAT HOLD A GROUP, against the budget the planner was told
+  //     (owner, 2026-09-27). The planner is told "Two or three named characters
+  //     carry a page best" beside a ceiling of six, and nothing counted the
+  //     preference: 27 of 241 shipped plan pages over 17 staging books held more
+  //     than three, up to four in one 18-page book, and they score worst.
+  //     castCoverage.groupPageBudget is the ONE number: story-beats.txt states
+  //     it ({GROUP_PAGE_BUDGET}), this counts the same `present` list every cast
+  //     counter here reads (the who column plus the roster's `covers`). The
+  //     finding names every group page — which of them keep their group is the
+  //     story's call, so the re-plan chooses. Reported as "also noted": whether
+  //     it binds a round (must-fix) is the owner's call.
+  const groupBudget = groupPageBudget({ pageCount, castCount: listed.length, maxCharactersPerScene });
+  const groupPages = groupBudget ? rows.filter(r => r.present.length > groupBudget.over).map(r => r.pageNumber) : [];
+  if (groupBudget && groupPages.length > groupBudget.max) {
+    add('GROUP_PAGES_OVER_BUDGET', groupPages,
+      `${groupPages.length} pages hold more than ${groupBudget.over} named characters; this book allows at most ${groupBudget.max}. `
+      + 'Keep the group on the pages where the story brings everyone together — an opening gathering, the climax, the ending — and on the others cast out the characters that page\'s instant does not need, '
+      + `never the character whose action the instant works against${floor > 0 ? `, and never one who would fall below ${floor} page${floor === 1 ? '' : 's'} in frame` : ''}.`);
+  }
+
   // 8a. THE CAST TABLE'S PROMISES (owner, 2026-09-25). The planner wrote, before
   //     its plan lines, each character's deed page and the pages they are in
   //     frame on, and the last page's cast (castCoverage.parsePlanCastBlock).
@@ -1089,6 +1109,8 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
       focalPages: focal,
       coveragePages: coverage,
       castCoverage: coverageRule,
+      // The pages holding more than three, and the budget they were counted against.
+      groupPages: { pages: groupPages, budget: groupBudget ? groupBudget.max : null },
       mainCharacter: main,
       // The table's promises as counted: null when no table was given.
       castTable: castTableResult ? { kept: castTableResult.kept, broken: castTableResult.broken.length, unanswered: castTableResult.unanswered } : null,
@@ -1335,6 +1357,8 @@ const REPLAN_FINDING_DIRECTION = new Map([
   // promised character in (2026-09-25).
   ['CAST_PROMISE_BROKEN', 'more'],
   ['CAST_OVER_CEILING', 'fewer'],
+  // More pages hold a group than the book's budget: answered by casting out.
+  ['GROUP_PAGES_OVER_BUDGET', 'fewer'],
   ['NO_SOLO_PAGE', 'fewer'],
   ['NO_PEOPLELESS_PAGE', 'fewer'],
   // Plan-check questions, by number (prompts/plan-check.txt).

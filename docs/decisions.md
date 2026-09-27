@@ -21,6 +21,73 @@ superseded and link forward.
 
 ---
 
+## 2026-09-27 — The planner carries small casts: at most one page in six holds more than three characters, and the planner reads the Art Director's group rule
+
+**Context:** the owner asked whether the planner already prefers one to three characters a page. It does:
+story-beats.txt says "Two or three named characters carry a page best" (line 47), "Where are three or more
+characters truly unavoidable?" (question 4), "not the whole group on every page" and "Stage a page with two people
+rather than three when two carry it". The preference is visible four times. Nothing counts it, and the same line
+gives the image model's ceiling, 6. Measured over the 17 staging books of the 14 days to 2026-09-27 (241 pages,
+`stories.data.beatsReviewReport`, free):
+- Plan pages by cast (the counters' own `present` list, shipped division): 0 → 13, 1 → 77, 2 → 95, 3 → 29,
+  4 → 15, 5 → 8, 6 → 4. **27 pages hold more than three; 22 of them are whole-cast pages** (every listed
+  character). The rest carry an invented figure on top of three children. The first division had 32; the re-plan
+  took 5 off.
+- Per book: 0-4 such pages; four of the thirteen 15-19-page books ship 4. They sit on the last page in 7 books and
+  on page 1 in 2; the other 18 are mid-book gatherings (walking together, a ring around a found object).
+- Score by the Art Director's cast: 1 → 79.4, 2 → 66.7, 3 → 53.6, 4+ → 49.6 (35 pages). By the plan's cast, 4+
+  averages 53.9.
+- The Art Director has more than three on 35 pages against the plan's 27. Of the 11 pages it took past three, most
+  are a stale roster: older divisions whose who column says "all four boys" or names a fourth child the roster
+  did not expand (before `covers`/`unlisted`, 2026-09-18/23). Three are real additions from the instant or the
+  what-is-true-after column.
+- Shots on the 27 group pages: wide 14, ultra-wide 3, high-angle 2, aerial 1, **medium 6, over-the-shoulder 1**.
+  The planner never saw `GROUP_STAGING_RULE`, and the scene review had to override its `medium` on z3fw660ie p1
+  and p6.
+- What pushes cast onto pages: planner question 3 ("Which pages gather the whole cast") assumes such pages exist.
+  The CAST block's `Ending page N: <everyone the story keeps together at the end>` and `HAPPY_ENDING_DEF` put the
+  whole cast on the last page, by design. Invented figures (a dog, a parent, a caretaker) push a three-child page
+  to four. **Cast coverage does not push cast onto pages:** `castCoverage` computes its floor from two characters
+  a page, so an 18-page, 4-child book needs 18 character-appearances against 51 available on pages of three.
+
+**Decision:**
+1. `castCoverage.groupPageBudget({pageCount, castCount, maxCharactersPerScene})` is one number: at most
+   `max(1, round(P/6))` pages hold more than three named characters. That is three in a 16-18-page book (an opening
+   gathering, the climax, the ending), two in 10-14 pages, and one in a short book. It rises (`forced`) only when
+   the coverage floor cannot be reached on pages of three, by exactly the group pages the floor needs at the model's
+   ceiling. It is null when the ceiling itself is three or less (then `CAST_OVER_CEILING` is the rule).
+2. The planner is told it: question 3 carries `{GROUP_PAGE_BUDGET}` (`groupPageRule`), which also says every other
+   page carries one to three and each character's pages in frame come from those.
+3. The planner reads `GROUP_STAGING_RULE` (`{GROUP_STAGING}`, beside `WHOLE_CAST_DEF` in the one-moment list). The
+   re-plan is the same template with RE-DIVIDE appended, so it reads both.
+4. `planCounters` `GROUP_PAGES_OVER_BUDGET` counts pages whose `present` holds more than three against the same
+   budget. It names every group page and carries its own fix: keep the gathering, climax and ending, cast out who
+   the instant does not need, never the obstacle holder or a character who would fall below the floor.
+   `REPLAN_FINDING_DIRECTION` gives 'fewer'. It is **also noted**, not must-fix: ranking is the owner's call
+   (BACKLOG).
+5. **Coverage reconciled:** the budget never fights the floor (see point 1), and the re-plan's existing review
+   rules (`span` / `castFloor` / `focal` / `obstacle`) refuse a cast-out that would take a character below it. A
+   unit test sweeps P 2-30 × C 1-14 × ceiling 4-6 and checks pages of three plus the budget always hold the floor.
+6. Plan-check: unchanged. It judges no group shot (Q17 reads `WHOLE_CAST_DEF`, which already asks for wide or
+   distant; Q3 asks for a justification of a third character). The budget is arithmetic and belongs to the counter,
+   the same way the appearance floor reaches the planner and the counters and never the checker.
+7. Lab: `beats_replan` gains `params.planAndCheck`. It divides the story's stored arc afresh with production's
+   planner call, runs the plan check and the counters, and stops without a re-plan. This is the cheap measure of a
+   planner prompt change.
+
+**Free replay (the real `runPlanCounters` on the 6 stored divisions that keep `briefsIn` + `rosterLines`; the rest
+from stored `castPerPage`):** the first division fires on 5 of 15 full books (4-5 group pages against 3). The
+shipped division is over on 4 (riqncqg1i, 1nitlympp, 5herh01j7, vnx5l8iy7 — 4 each), 1 page over each. On the 6
+books the real counter reproduces the stored group pages exactly. z3fw660ie has 3 of 3 and does not fire.
+
+**Touched:** server/lib/castCoverage.js (`groupPageBudget`, `groupPageRule`), server/lib/planCounters.js
+(`GROUP_PAGES_OVER_BUDGET`, `stats.groupPages`, direction), server/lib/promptBuilders.js (`buildBeatsPrompt` fills),
+prompts/story-beats.txt, server/lib/testlab.js (`planAndCheck`), tests/unit/planner-group-pages.test.ts,
+scripts/admin/sibling-registry.json, docs/prompt-inventory.md
+**Status:** ✅ active (staging)
+
+---
+
 ## 2026-09-27 — The re-plan answers a whole-cast finding with the checker's own definition, and a whole-cast page rewritten for another finding keeps a shared action
 
 **Context:** Lab #1537 (beats_replan, staging job_1790446348343_z3fw660ie, 2026-09-26 entry "Plan-check Q17 … is

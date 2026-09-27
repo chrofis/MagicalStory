@@ -257,8 +257,9 @@
     {
       "id": "group-staging-generator-vs-critic",
       "axis": "generator-vs-critic",
-      "reason": "A group of more than three characters is staged at one depth in a wider shot, or seen from behind as it moves away, and never lined up facing the viewer (owner, 2026-09-27; docs/decisions.md). The rule is authored by both Art Director templates (rule 4) and both iterate templates, and judged by scene-review.txt check 6d [group_staging]; all five read ONE constant, shotVocabulary.GROUP_STAGING_RULE, through {GROUP_STAGING}. The brief check sceneBriefCheck.checkGroupStaging measures the same rule from structured fields (GROUP_WIDER_SHOTS, `perspective`, `looksAt`) and sends group_shot_too_close / group_facing_viewer to the review. tests/unit/group-staging.test.ts pins that the constant reaches every built prompt.",
+      "reason": "A group of more than three characters is staged at one depth in a wider shot, or seen from behind as it moves away, and never lined up facing the viewer (owner, 2026-09-27; docs/decisions.md). The rule is authored by both Art Director templates (rule 4) and both iterate templates, and judged by scene-review.txt check 6d [group_staging]; all five read ONE constant, shotVocabulary.GROUP_STAGING_RULE, through {GROUP_STAGING}. The brief check sceneBriefCheck.checkGroupStaging measures the same rule from structured fields (GROUP_WIDER_SHOTS, `perspective`, `looksAt`) and sends group_shot_too_close / group_facing_viewer to the review. tests/unit/group-staging.test.ts pins that the constant reaches every built prompt. Since 2026-09-27 the planner (story-beats.txt, first division and re-plan) reads the same constant as {GROUP_STAGING}: it picks each page's shot, and a page of more than three planned `medium` left the scene review to override the plan (tests/unit/planner-group-pages.test.ts).",
       "generators": [
+        "prompts/story-beats.txt",
         "prompts/scene-expansion-all.txt",
         "prompts/scene-expansion.txt",
         "prompts/scene-iteration.txt",
@@ -704,6 +705,17 @@
         "server/lib/planCounters.js",
         "prompts/story-beats.txt",
         "prompts/plan-check.txt"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "group-page-budget-rule-vs-counter",
+      "axis": "the group-page budget the planner is told vs the counter that counts it",
+      "reason": "How many pages may hold more than three named characters (owner, 2026-09-27; docs/decisions.md): castCoverage.groupPageBudget is ONE number — one page in six, at least one, raised only when the coverage floor cannot be met on pages of three. story-beats.txt states it ({GROUP_PAGE_BUDGET}, groupPageRule, planner question 3) and planCounters.js counts it (GROUP_PAGES_OVER_BUDGET, direction 'fewer', also noted) on the same `present` list every cast counter reads. A counter holding the book to a number the planner was not told, or a planner told a number nothing counts, is the drift this set exists to catch. tests/unit/planner-group-pages.test.ts.",
+      "members": [
+        "server/lib/castCoverage.js",
+        "server/lib/planCounters.js",
+        "prompts/story-beats.txt"
       ],
       "severity": "block"
     },
