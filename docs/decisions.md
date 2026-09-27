@@ -21,6 +21,141 @@ superseded and link forward.
 
 ---
 
+## 2026-09-27 — Famous story shapes per age band: Jev picks the shape well, but swapping only the band's beats does not change the arc (measured, NOT built)
+
+**Context.** Owner, 2026-09-27: *"Are there famous story arcs? Start happy, drop to sad, end at
+happy is most famous. Or hero's journey. We have the three challenges. Is there a set of these?"*
+Today the shape is fixed by the oldest main's age band (`resolveAgeBand`; owner rulings 2026-09-04
+and 2026-09-14): 0-1 routine, 2 quest, 3 tries, 4 fear-choice, 5+ journey (MINI hero's journey at
+5-6, full size from 7, no upper cap). The beats sit in `prompts/age-band-journey.txt`
+(`[[premise:subject]]` + `[[mechanics]]`, "Every one of those beats is on the page, in that order")
+and in the arc CHAIN spec (`arcLogicSpec`: "Near the end one happening is the low point"). The arc
+STORY SHAPE block carries no shape. Critics: the arc critique/panel read `arcStakesRules` and
+`ARC_PART_CHECK` (opposition acts), the arc judge's `lost`/`attempts` dims, `story-beats.txt` ("the
+emotional low point gets a page of its own") and `story-trial.txt` (its sibling). No counter
+checks shape (`arcShapeCounts` counts sentences, links, figures). `docs/SETTLED.md` has no band
+line; the band rulings are owner decisions in this file, so changing a band's shape is a reversal.
+
+**Step 1 — the shape set** (`SHAPES`, `BAND_SETS`, `UNSUITABLE` in
+`scripts/analysis/eval-jev-story-shapes.js`; each has a generic definition, curve and ending that
+can go straight into a prompt). Sources: Reagan et al. 2016 (six arcs), Booker's seven plots, the
+hero's journey, picture-book forms. The band's own shape is always first.
+
+| Band | Candidate shapes |
+|---|---|
+| 0-1 routine | **routine-day**, circular, chain (call-and-response) |
+| 2 quest | **search-quest**, cumulative, chain, circular |
+| 3 tries | **three-tries**, cumulative, circular, home-away-home, kishōtenketsu |
+| 4 fear-choice | **fear-choice**, man-in-a-hole, home-away-home, three-tries, cumulative |
+| 5 (MINI) | **hero-journey**, man-in-a-hole, home-away-home, rule-of-three, overcoming-the-monster, cinderella, comedy, rebirth |
+| 6+ | **hero-journey**, man-in-a-hole, home-away-home, quest, rule-of-three, overcoming-the-monster, cinderella, comedy, rebirth, kishōtenketsu |
+
+Never offered, because each ends lower than it began: riches-to-rags, Icarus, Oedipus (Reagan) and
+tragedy (Booker). The telling rules require "the children safe and together" at the end. Reagan's
+rags-to-riches (steady rise) has no tension as a whole-book shape, so it appears only in small, as
+the cumulative tale. Band fit reasoning:
+- **0-3.** Only shapes with no villain and no loss for good (the band files: "nothing frightening",
+  "never a quest, a search, a rescue" at 0-1). Circular and home-away-home keep the rule that a
+  make-believe story opens and closes where the child really is.
+- **4.** The shapes keep one fear resolved by the child's own choice, beaten by wit or kindness.
+- **5.** Comedy needs theory of mind, which starts around 4-5. Overcoming-the-monster stays inside
+  the not-menacing creature tone (appearance only, `creatureToneLevel`). The quest and kishōtenketsu
+  are left to 6+.
+- **"The three challenges"** already exist twice: `tries` at age 3, and "Build the story on about
+  three challenges" in the arc STORY SHAPE. The fairy-tale rule of three is the 5+ form.
+
+**Step 2 — Jev picks the shape.** 19 staging setups: the 11 from the challenge-selection eval,
+4 young-band books (ages 4, 3, 2, 1) and 4 more kinds of story at 6+ (bully, legend, educational,
+short adventure). 14 of the 19 are at 5+. Per setup, one noul per shape in its band, with setup and
+premise as state. Two phrasings, 3 repetitions each. Reading labels (G/N/B per setup×shape) were
+written before any call (`evals/datasets/jev-story-shapes-v1/reading_labels.json`).
+
+| | F1 "best told as X: def" | F2 "… better than any other shape" |
+|---|---|---|
+| AUC G vs B, pooled / within setup | **0.933 / 0.956** | 0.965 / 0.961 |
+| top-1 label (19 setups) | **15 G / 3 N / 1 B** | 14 G / 5 N / 0 B |
+| today's band shape | 6 G / 10 N / 3 B | same |
+| draw P2 (top-3 within 0.1 of top, ∝P): expected labels | **13.2 G / 5.4 N / 0.4 B** | 13.4 G / 5.2 N / 0.3 B |
+| draw P1 (absolute floor 0.5, else band default) | 11.5 / 5.5 / 2.0 | 9.3 / 7.7 / 2.0 |
+| 5+ spread: distinct top-1 of 14 / draw entropy / hero's-journey share | 8 / 2.87 bits / 14 % | 7 / 2.03 bits (P1) / 53 % (P1) |
+| top-1 flip between single calls | 7 % | 10.5 % |
+| cost / latency | $0.000052/call, p50 281 ms | $0.000055, p50 261 ms |
+
+Findings:
+- F2's comparison clause pulls the most general shape (the hero's journey) up.
+- The absolute floor P1 falls back to the hero's journey on weak signals (O1 labelled B), so the
+  relative draw P2 is the policy.
+- Young bands are weak. At 0-1 every P is 0.19-0.32 and G cannot be separated from N. At ages 3
+  and 4 the band's own shape wins clearly (0.82, 0.79).
+- The 3 dragon setups (same family, different premises) got different picks.
+
+**Step 3 — can the arc follow a given shape?** No Lab arc stage can express this: `arc_effort`
+takes a `promptOverride` of the arc-create TEMPLATE only, while the beats live in the band file and
+in the CHAIN spec. The eval therefore uses the REAL builder (`buildArcCreatePrompt`, the story's
+stored challenge draw, or one real draw cached for S8/S9). It swaps four exact anchors: the band
+title, the subject+mechanics span, "come home changed", and the CHAIN low-point line (`swapShape`,
+which throws when an anchor is missing). Generator: `google/gemini-3.7-flash`, not Opus 5.5, for
+cost. 6 books × (baseline + Jev's pick), judged blind by a fresh subagent with all 10 definitions as
+distractors:
+
+| | result |
+|---|---|
+| shape arm identified as the intended shape | 3/6 (rebirth S9, rule-of-three S8, quest S2); the kishōtenketsu arm read as home-away-home, man-in-a-hole as overcoming-the-monster, rebirth S1 as quest |
+| the baseline identified as hero's journey | **1/6**; the others read as overcoming-the-monster ×2, rebirth, man-in-a-hole, quest. The premise already decides the shape |
+| real shift (shape arm identified differently from its baseline) | 1/6 (S8, rule-of-three) |
+| same skeleton, baseline vs shape arm | **6/6 pairs** |
+| quality (1-10) | baseline 6.5, shape 6.33; better: baseline 4, shape 2 |
+| cross-book variety | 6 distinct skeletons either way. The judge saw ONE common template across 4 books: an object brought to or from a magical being before a deadline, one skill per companion, one brave act, a grateful creature |
+
+**Verdict.**
+- ✅ **The shape set** (step 1). It is ready to use as prompt text.
+- ✅ **Jev as the picker** (step 2). F1 nouls with the relative draw P2 give 15/19 top-1 on the
+  reading labels against 6/19 for today's fixed shape. Cost is about $0.0005 per book at 3 calls,
+  one parallel round of ~0.3 s. Single reader's labels, n=19: indicative, not decisive.
+- ❌ **Swapping the band's beats alone** (step 3). The arc keeps its skeleton. The premise, the
+  challenge draw and the rules that stay hero's-journey-shaped decide the arc: "each happening is met
+  at a cost … harder because the last was not clean", `ARC_EXCITING_DEF` (an opponent that presses),
+  and "the opposition presses on the story to the end". The cheap-model arcs are already varied in
+  named shape; their monotony is the shared template. Overall 🟡. Do not build the band-span swap.
+  Caveats: n=6, gemini-3.7-flash rather than Opus 5.5, one judge.
+
+**Proposed design (only if the owner wants shapes; each step needs its own measurement):**
+1. **Where Jev picks.** One parallel call before arc_create, in the same state as the challenge
+   selection (setup + premise), draw P2. Store `storyData.storyShape`. The trial runs the same pick
+   in its story stage.
+2. **One constant, generator and critic.** `STORY_SHAPES[id]` (def, curve, ending, key beat) is
+   filled into:
+   - the arc STORY SHAPE block (`buildStoryShapeSection`, arc variant), replacing the band file's
+     subject+mechanics span (a `{SHAPE_BEATS}` token);
+   - `arcLogicSpec`'s chain line (the shape's curve instead of the fixed low point) and the
+     cost/escalation clause;
+   - `ARC_EXCITING_DEF` and the opposition telling rule, keyed per shape (kishōtenketsu and circular
+     have none);
+   - the critique's `ARC_PART_CHECK` and a panel SHAPE lens: "a beat of the picked shape missing or
+     out of order", the same string;
+   - `story-beats.txt`, plus its sibling `story-trial.txt` and plan-check: "the shape's key beat
+     gets a page of its own", replacing "the emotional low point";
+   - the arc judge's `lost`/`attempts` dims.
+   Counters stay out: a shape is not countable. At most a Jev noul per key beat on the arc, if a
+   critic check is ever needed.
+3. **The challenge draw** is weighted by shape (e.g. rule-of-three wants escalating trials,
+   comedy wants mix-ups). It is the strongest lever on the skeleton today.
+4. **Reversal protocol.** Owner sign-off framed as a reversal of the 2026-09-04 / 2026-09-14 band
+   rulings. The band files keep their age rules (agency, peril ceiling, creature tone, reader line);
+   only their shape span moves. Evidence first: rerun step 3 with the full design on Opus 5.5 via a
+   Lab stage that can override the band file too (≥3 books, blind judge).
+
+**Cost of this eval.** Jev 114 calls $0.0061, 12 arcs $0.1645. Total **$0.171 (≈ CHF 0.15)**.
+
+**Touched.** `scripts/analysis/eval-jev-story-shapes.js` (new),
+`evals/datasets/jev-story-shapes-v1/reading_labels.json`,
+`evals/runs/2026-09-27_jev-story-shapes/metrics.json`. Items, answers, arcs and the judge pack are
+gitignored (story text). No production change.
+
+**Status:** 🟡 measured, NOT built. Owner call pending (`tasks/BACKLOG.md`).
+
+---
+
 ## 2026-09-27 — Jev picks the challenges and landmarks that fit: yes/no per item on the premise, then a small random draw from the top (measured, NOT built)
 
 **Context.** Owner, 2026-09-27: *"We inject ideas from the 200+ list, as well as landmarks. Now we
