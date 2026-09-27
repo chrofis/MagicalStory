@@ -226,7 +226,7 @@ function labels() {
   const out = {}; let story = null;
   for (const line of fs.readFileSync(argv.from, 'utf8').split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'))) {
     const m = line.match(/^(pic|must|climax|opening|ending):\s*(.*)$/);
-    if (m && story) { out[hash(`${story}:${m[1]}`)] = m[2].match(/A\d+/g) || []; continue; }
+    if (m && story) { out[hash(`${story}:${m[1]}`)] = m[2].match(/A\d+[a-z]?/g) || []; continue; }
     story = line;
   }
   fs.mkdirSync(DATASET_DIR, { recursive: true });
@@ -338,8 +338,11 @@ async function run() {
  * character is the actor of ≥ focalPagesNeeded pictures — enforced by raising
  * that character's actions' value until met (at most 8 rounds).
  */
-function selectPictures(it, value, { climax = null, lambda = 0.6 } = {}) {
+const FELT_KINDS = new Set(['felt', 'stake']);
+function selectPictures(it, value, { climax = null, lambda = 0.6, feltPerAct = false, forced = [], sameSentencePenalty = 0 } = {}) {
   const A = it.actions; const K = A.length; const N = it.pageCount;
+  const maxS = Math.max(...A.map(a => a.sentence));
+  const actOf = a => Math.min(2, Math.floor(((a.sentence - 1) * 3) / maxS));
   const load = A.map(a => Math.max(1, words(a.what) + (a.object ? 1 : 0)));
   const totalLoad = load.reduce((s, x) => s + x, 0);
   const target = totalLoad / N;
@@ -352,7 +355,8 @@ function selectPictures(it, value, { climax = null, lambda = 0.6 } = {}) {
   let bonus = new Array(K).fill(0);
   let best = null;
   for (let round = 0; round < 8; round++) {
-    const v = A.map((_, i) => value[i] + bonus[i] + (climax != null && i === climax ? 100 : 0));
+    const forcedSet = new Set([].concat(climax ?? [], forced));
+    const v = A.map((_, i) => value[i] + bonus[i] + (forcedSet.has(i) ? 100 : 0));
     // dp[j][i]: best score with picture j (0-based) on action i
     const NEG = -1e18;
     const dp = Array.from({ length: N }, () => new Array(K).fill(NEG));
@@ -366,7 +370,8 @@ function selectPictures(it, value, { climax = null, lambda = 0.6 } = {}) {
           if (dp[j - 1][h] === NEG) continue;
           let l = segLoad(h + 1, i);
           if (j === N - 1) l += (i + 1 < K ? segLoad(i + 1, K - 1) : 0);
-          const s = dp[j - 1][h] + v[i] - pen(l);
+          // v2 D7: two pictures in a row from one arc sentence read as a duplicate (blind judge)
+          const s = dp[j - 1][h] + v[i] - pen(l) - (sameSentencePenalty && A[h].sentence === A[i].sentence ? sameSentencePenalty : 0);
           if (s > dp[j][i]) { dp[j][i] = s; bp[j][i] = h; }
         }
       }
@@ -378,9 +383,12 @@ function selectPictures(it, value, { climax = null, lambda = 0.6 } = {}) {
     for (let j = N - 1; j > 0; j--) idx[j - 1] = bp[j][idx[j]];
     best = idx;
     const short = it.cast.filter(n => idx.filter(i => actsOf(n, i)).length < need);
-    if (!short.length) break;
+    // v2: at least one felt/stake moment pictured in each act (arc thirds by sentence)
+    const feltShort = feltPerAct ? [0, 1, 2].filter(k => !idx.some(i => FELT_KINDS.has(A[i].kind) && actOf(A[i]) === k)) : [];
+    if (!short.length && !feltShort.length) break;
     for (const n of short) A.forEach((_, i) => { if (actsOf(n, i)) bonus[i] += 0.25; });
-    if (round === 7) best.unmetFocal = short;
+    for (const k of feltShort) A.forEach((a, i) => { if (FELT_KINDS.has(a.kind) && actOf(a) === k) bonus[i] += 0.25; });
+    if (round === 7) { best.unmetFocal = short; best.unmetFelt = feltShort; }
   }
   // page loads (arc-word proxy) for the text split
   const loads = best.map((i, j) => {
@@ -564,10 +572,355 @@ function blindView(items, answers) {
   console.log(`blind pairs → ${path.relative(ROOT, path.join(RUN_DIR, 'blind.md'))} (key in blind-key.json)`);
 }
 
-module.exports = { arcSentences, parseActions, selectPictures, monotonePath };
+// ═════════════════════════ v2: better picture-choice questions (owner, 2026-09-27) ═════════════════════════
+//
+//   node … augment            every sentence ≥1 line, felt/stake/inner lines added, a KIND per line
+//   node … dump2 [--id=]      the augmented list (new lines marked +) for reading labels
+//   node … run2 [--reps=3]    Jev: per-action nouls (ONLYN, SEE, OWN, CLIMAX + six NATURE) and a
+//                             per-sentence WINDOW choice
+//   node … stage              blind-judge staging: planner instants, cheap-LLM instants for the rest
+//   node … score2 [--blind]   designs D1-D5 through the same DP, same metrics as v1
+//
+// New lines keep the old ids' order (A12a follows A12), so the v1 reading labels still apply;
+// new lines were labelled (pic only; the MUST set is unchanged, /83) before any v2 Jev call.
+
+const RUN2_DIR = path.join(ROOT, 'evals/runs', argv.run2 || '2026-09-27_jev-arc-direct-v2');
+const ANSWERS2 = path.join(RUN2_DIR, 'answers.jsonl');
+const LLM2_LOG = path.join(RUN2_DIR, 'llm.jsonl');
+const KINDS = ['act', 'felt', 'stake', 'discovery', 'arrival'];
+
+const AUGMENT_PROMPT = `Below is the finished story of a children's picture book as numbered sentences, and a list of its actions.
+
+1. Give every line a KIND:
+   act — a character does something visible
+   felt — a feeling or inner moment shown on a face or body: fear, worry, shame, joy, pride, a realisation
+   stake — what could be lost, or what must happen, is said or shown
+   discovery — something is found, revealed or noticed
+   arrival — someone or something appears or arrives
+2. Every sentence must own at least one line. Add a line for every felt, stake, inner or decision moment the list leaves out — a worried look, a realisation, a stake stated, a decision made — and for any sentence that has no line. Never add anything the story does not say.
+
+Answer every line in story order, one per line:
+an existing line: <id> | <kind>
+a new line: <id> | <kind> | s<sentence number> | <who> | <what happens, one short clause> | <where, or -> | <object or creature, or -> | <who else is there, or ->
+A new line takes the id of the line it follows plus a letter (A12a, A12b); a line before A1 is A0a. Write in English. Output only the lines.
+
+THE STORY:
+{STORY}
+
+THE ACTIONS:
+{ACTIONS}`;
+
+function parseAugment(text, old) {
+  const byId = new Map(old.map(a => [a.id, a]));
+  const out = [];
+  for (const line of text.split('\n')) {
+    const p = line.split('|').map(s => s.trim());
+    const id = p[0]?.match(/^A\d+[a-z]?$/)?.[0];
+    const kind = (p[1] || '').toLowerCase();
+    if (!id || !KINDS.includes(kind)) continue;
+    if (byId.has(id)) { out.push({ ...byId.get(id), kind }); continue; }
+    const s = p[2]?.match(/^s(\d+)$/);
+    if (!s || p.length < 8) continue;
+    const dash = v => (v === '-' || !v ? '' : v);
+    out.push({ id, sentence: Number(s[1]), who: p[3], what: p[4], where: dash(p[5]), object: dash(p[6]), others: dash(p[7]), kind, added: true });
+  }
+  const missing = old.filter(a => !out.some(x => x.id === a.id));
+  if (missing.length) throw new Error(`augment dropped ${missing.map(a => a.id).join(',')}`);
+  return out;
+}
+
+async function augment() {
+  const items = loadItems();
+  const model = argv.model || 'google/gemini-3.7-flash';
+  fs.mkdirSync(RUN2_DIR, { recursive: true });
+  for (const it of items) {
+    if (it.actions2 && !argv.force) continue;
+    const r = await llm(AUGMENT_PROMPT.replace('{STORY}', it.sentences.map(s => `${s.n}. ${s.text}`).join('\n')).replace('{ACTIONS}', it.actions.map(actionLine).join('\n')), model);
+    it.actions2 = parseAugment(r.text, it.actions);
+    const covered = new Set(it.actions2.map(a => a.sentence));
+    const uncovered = it.sentences.filter(s => !covered.has(s.n)).map(s => s.n);
+    fs.appendFileSync(LLM2_LOG, JSON.stringify({ id: it.id, kind: 'augment', model, cost: r.cost, ms: r.ms }) + '\n');
+    const kinds = it.actions2.reduce((m, a) => ({ ...m, [a.kind]: (m[a.kind] || 0) + 1 }), {});
+    console.log(`${it.id}: ${it.actions.length} → ${it.actions2.length} lines (+${it.actions2.filter(a => a.added).length}) kinds ${JSON.stringify(kinds)} uncovered sentences [${uncovered}] $${r.cost.toFixed(4)}`);
+    saveItems(items);
+  }
+}
+
+const line2 = a => `${actionLine(a)} [${a.kind}]`;
+
+function dump2() {
+  for (const it of loadItems()) {
+    if (argv.id && it.id !== argv.id) continue;
+    console.log(`\n=== ${it.id} (${it.pageCount}p, ${it.actions2.length} lines)`);
+    for (const a of it.actions2) if (!argv.new || a.added) console.log(`${a.added ? '+' : ' '} ${line2(a)}`);
+  }
+}
+
+const v2 = it => ({ ...it, actions: it.actions2 });
+const actorIs = (name, a) => new RegExp(`(^|[^\\p{L}])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^\\p{L}])`, 'iu').test(a.who);
+
+/** D7: the index of each character's deed (averaged or one rep); a single-line character's line is its deed. */
+function deeds2(it, answers, rep) {
+  const out = [];
+  for (const name of it.cast) {
+    const lines = it.actions2.map((a, i) => [a, i]).filter(([a]) => actorIs(name, a));
+    if (!lines.length) continue;
+    if (lines.length === 1) { out.push(lines[0][1]); continue; }
+    const rows = answers.filter(x => x.variant === 'd' && x.id === `${it.id}#d${name}` && (rep == null || x.rep === rep));
+    if (!rows.length) return null;
+    const p = lines.map(([a, i]) => [i, mean(rows.map(r => r.answers.DEED.probabilities?.[a.id] ?? 0))]);
+    out.push(p.reduce((b, x) => (x[1] > b[1] ? x : b))[0]);
+  }
+  return out;
+}
+const state2 = it => `THE STORY, sentence by sentence:\n${it.sentences.map(s => `${s.n}. ${s.text}`).join('\n')}\n\nTHE STORY'S MOMENTS, in order (kind in brackets):\n${it.actions2.map(line2).join('\n')}`;
+
+/** Question wording — generic, no story's names or plot. */
+const Q2 = {
+  ONLYN: (id, N) => `If this story could have only ${N} pictures, the moment ${id} would be one of them.`,
+  SEE: id => `A child listening to this story would most want to SEE the moment ${id} drawn.`,
+  OWN: id => ACTION_Q.OWN(id),
+  CLIMAX: id => ACTION_Q.CLIMAX(id),
+};
+const NATURE2 = {
+  TURN: id => `The moment ${id} is a turning point: after it, what the heroes want, face or can do is different.`,
+  FACE: id => `The moment ${id} is a feeling shown on a face — fear, worry, shame, joy, pride, a sudden realisation — that the reader should see.`,
+  DISC: id => `The moment ${id} is a discovery: something is found, revealed or noticed for the first time.`,
+  ARRIVE: id => `The moment ${id} is an arrival: someone or something new appears in the story.`,
+  DANGER: id => `The moment ${id} is danger: someone is in peril, falls, is chased, or something could be lost right now.`,
+  QUIET: id => `The moment ${id} is a quiet transition: walking on, waiting, a small step between the story's real moments.`,
+};
+/** Code map nature → picture value. Fixed BEFORE any v2 answer was read. */
+const NATURE_VALUE = { TURN: 1, FACE: 0.7, DISC: 0.8, ARRIVE: 0.5, DANGER: 0.8, QUIET: -1 };
+
+function requests2(it) {
+  const S = state2(it); const out = [];
+  const q1 = {}; const q2 = {};
+  for (const a of it.actions2) {
+    for (const [k, f] of Object.entries(Q2)) q1[`${k}_${a.id}`] = { type: 'noul', instructions: f(a.id, it.pageCount) };
+    for (const [k, f] of Object.entries(NATURE2)) q2[`${k}_${a.id}`] = { type: 'noul', instructions: f(a.id) };
+  }
+  out.push({ id: `${it.id}#n1`, variant: 'n1', state: S, questions: q1 });
+  out.push({ id: `${it.id}#n2`, variant: 'n2', state: S, questions: q2 });
+  // D7: each commissioned character's own deed, a choice over the lines they act in
+  if (!argv.only2 || argv.only2 === 'd') for (const name of it.cast) {
+    const lines = it.actions2.filter(a => actorIs(name, a));
+    if (lines.length < 2) continue;
+    out.push({ id: `${it.id}#d${name}`, variant: 'd', state: S, questions: { DEED: { type: 'choice',
+      instructions: `Which of these moments is ${name}'s own deed: the one act the story gives ${name} that matters most?`,
+      criteria: Object.fromEntries(lines.map(a => [a.id, line2(a).slice(0, 220)])) } } });
+  }
+  if (argv.only2 === 'd') return out.filter(r => r.variant === 'd');
+  for (const s of it.sentences) {
+    const lines = it.actions2.filter(a => a.sentence === s.n);
+    if (lines.length < 2) continue;
+    out.push({ id: `${it.id}#w${s.n}`, variant: 'w', state: S, questions: { PICK: { type: 'choice',
+      instructions: `Sentence ${s.n} of the story is told on one page with one picture. Which moment of that sentence is the one picture for it?`,
+      criteria: Object.fromEntries(lines.map(a => [a.id, line2(a).slice(0, 220)])) } } });
+  }
+  return out;
+}
+
+async function run2() {
+  const items = loadItems();
+  const reps = Number(argv.reps || 3);
+  const capUsd = Number(argv.capUsd || 0.2);
+  fs.mkdirSync(RUN2_DIR, { recursive: true });
+  const prior = fs.existsSync(ANSWERS2) ? fs.readFileSync(ANSWERS2, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse) : [];
+  const done = new Set(prior.map(a => `${a.id}|${a.rep}`));
+  let cost = prior.reduce((s, a) => s + (a.cost || 0), 0);
+  const tasks = [];
+  for (const it of items) for (const rq of requests2(it)) for (let rep = 0; rep < reps; rep++) if (!done.has(`${rq.id}|${rep}`)) tasks.push({ rq, rep });
+  console.log(`${tasks.length} calls (spent so far $${cost.toFixed(5)}, cap $${capUsd})`);
+  const out = fs.createWriteStream(ANSWERS2, { flags: 'a' });
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(8, tasks.length) }, async () => {
+    while (next < tasks.length) {
+      if (cost > capUsd) throw new Error(`cap $${capUsd} reached`);
+      const { rq, rep } = tasks[next++];
+      const r = await callWithRetry({ state: rq.state, questions: rq.questions });
+      cost += r.cost;
+      out.write(JSON.stringify({ id: rq.id, variant: rq.variant, rep, answers: r.answers, cost: r.cost, ms: r.ms, nq: Object.keys(rq.questions).length }) + '\n');
+    }
+  }));
+  out.end();
+  console.log(`done, total $${cost.toFixed(5)}`);
+}
+
+/** Per rep (or averaged, rep = null) score vectors over actions2. */
+function vectors2(it, answers, rep) {
+  const pick = (v) => answers.filter(a => a.variant === v && a.id === `${it.id}#${v}` && (rep == null || a.rep === rep));
+  const n1 = pick('n1'); const n2 = pick('n2');
+  if (!n1.length || !n2.length) return null;
+  const avg = (rows, key) => it.actions2.map(a => mean(rows.map(r => r.answers[`${key}_${a.id}`].noul)));
+  const V = {};
+  for (const k of Object.keys(Q2)) V[k] = avg(n1, k);
+  for (const k of Object.keys(NATURE2)) V[k] = avg(n2, k);
+  V.NATURE = it.actions2.map((_, i) => Object.entries(NATURE_VALUE).reduce((s, [k, w]) => s + w * V[k][i], 0));
+  // window: P(line | its sentence); a sentence with one line gives it 1
+  V.WINDOW = it.actions2.map(a => {
+    const lines = it.actions2.filter(x => x.sentence === a.sentence);
+    if (lines.length < 2) return 1;
+    const rows = answers.filter(x => x.variant === 'w' && x.id === `${it.id}#w${a.sentence}` && (rep == null || x.rep === rep));
+    return rows.length ? mean(rows.map(r => r.answers.PICK.probabilities?.[a.id] ?? 0)) : null;
+  });
+  return V;
+}
+
+/** The designs: value vector → DP. Every design forces the CLIMAX argmax and the v1 DP rules. */
+const DESIGNS = {
+  'D1 ONLYN': V => V.ONLYN,
+  'D2 SEE': V => V.SEE,
+  'D3 WINDOW': V => V.WINDOW,
+  'D4 NATURE': V => V.NATURE,
+  'D5 WINDOW+ONLYN': V => V.WINDOW.map((w, i) => w + V.ONLYN[i]),
+  'D6 OWN (v1 best question, new list)': V => V.OWN,
+  // Added after the fair blind judge preferred the planner 5-0: its losses were a named
+  // character's deed left unpictured and two pictures in a row from one sentence.
+  'D7 WINDOW+deeds+no-dup': V => V.WINDOW,
+  'D7b WINDOW+deeds': V => V.WINDOW,
+};
+const DESIGN_OPTS = { 'D7 WINDOW+deeds+no-dup': { deeds: true, sameSentencePenalty: 0.5 }, 'D7b WINDOW+deeds': { deeds: true } };
+
+function pagesFrom(it, picksIdx) {
+  const A = it.actions2; const N = it.pageCount;
+  const sw = new Map(it.sentences.map(s => [s.n, words(s.text)]));
+  const per = new Map(); for (const a of A) per.set(a.sentence, (per.get(a.sentence) || 0) + 1);
+  const arcWords = it.sentences.reduce((s, x) => s + words(x.text), 0);
+  const bookWords = it.pageText.reduce((s, x) => s + x.words, 0);
+  return picksIdx.map((i, j) => {
+    const from = j === 0 ? 0 : picksIdx[j - 1] + 1; const to = j === N - 1 ? A.length - 1 : i;
+    let w = 0; for (let x = from; x <= to; x++) w += sw.get(A[x].sentence) / per.get(A[x].sentence);
+    return Math.round(w * bookWords / arcWords);
+  });
+}
+const WORD_BAND = { '1st-grade': [25, 70], standard: [40, 150], advanced: [250, 300] };
+
+function evalSeq2(it, idx, L) {
+  const A = it.actions2; const N = it.pageCount;
+  const ids = idx.map(i => A[i]?.id);
+  const set = new Set(ids);
+  const must = new Set(L.must); const pic = new Set(L.pic);
+  const fo = focalOf(v2(it), ids.filter(Boolean));
+  const cov = castCoverage({ pageCount: N, castCount: it.cast.length });
+  const focalShort = cov ? it.cast.filter(n => fo[n] < cov.focalPagesNeeded) : [];
+  const maxS = Math.max(...A.map(a => a.sentence));
+  const actOf = a => Math.min(2, Math.floor(((a.sentence - 1) * 3) / maxS));
+  const feltShort = [0, 1, 2].filter(k => !idx.some(i => FELT_KINDS.has(A[i].kind) && actOf(A[i]) === k));
+  const climaxHit = L.climax.find(x => set.has(x));
+  const loads = pagesFrom(it, idx);
+  const [lo, hi] = WORD_BAND[it.level] || [25, 150];
+  const loadOut = loads.filter(w => w < 0.8 * lo || w > 1.5 * hi).length;
+  return {
+    must: [...must].filter(x => set.has(x)).length, mustOf: must.size,
+    wanted: ids.filter(x => pic.has(x)).length,
+    climaxPage: climaxHit ? ids.indexOf(climaxHit) + 1 : null,
+    focalShort, feltShort, loadOut,
+    violations: (climaxHit ? 0 : 1) + focalShort.length + feltShort.length + loadOut,
+    ids,
+  };
+}
+
+async function stage() {
+  // Blind-judge rendering: every picked moment in the planner's staged-instant form.
+  const items = loadItems();
+  const M = JSON.parse(fs.readFileSync(path.join(RUN2_DIR, 'metrics.json'), 'utf8'));
+  const model = argv.model || 'google/gemini-3.7-flash';
+  for (const it of items) {
+    const win = M.winner; const picks = M.stories[it.id].designs[win].ids;
+    const plannerInstant = new Map();
+    for (const p of it.firstPlan) { const id = (it.plannerMap?.[p.page] || [])[0]; if (id && !plannerInstant.has(id)) plannerInstant.set(id, `${p.who} — ${p.instant}`); }
+    // earlier staged lines are kept (a second winner only stages its new picks)
+    it.staged = { ...(it.staged || {}), ...Object.fromEntries([...plannerInstant]) };
+    const need = picks.filter(id => !it.staged[id]);
+    if (need.length) {
+      const byId = new Map(it.actions2.map(a => [a.id, a]));
+      const prompt = `Below are page-plan lines of a children's picture book (who is in frame — the instant the picture shows), and a list of story moments. Write each listed moment as one plan line in exactly the same style: who is in frame — the instant the picture shows. One line each: <id>: <who> — <instant>. Output only those lines.\n\nPLAN LINES (style):\n${it.firstPlan.map(p => `${p.who} — ${p.instant}`).join('\n')}\n\nTHE STORY:\n${it.sentences.map(s => `${s.n}. ${s.text}`).join('\n')}\n\nMOMENTS TO WRITE:\n${need.map(id => actionLine(byId.get(id))).join('\n')}`;
+      const r = await llm(prompt, model);
+      for (const line of r.text.split('\n')) { const m = line.match(/^(A\d+[a-z]?):\s*(.+)$/); if (m) it.staged[m[1]] = m[2].trim(); }
+      fs.appendFileSync(LLM2_LOG, JSON.stringify({ id: it.id, kind: 'stage', model, cost: r.cost, ms: r.ms }) + '\n');
+      const miss = need.filter(id => !it.staged[id]);
+      if (miss.length) throw new Error(`${it.id}: staging missed ${miss}`);
+    }
+    console.log(`${it.id}: ${picks.length - need.length} planner instants reused, ${need.length} staged`);
+  }
+  saveItems(items);
+}
+
+function score2() {
+  const items = loadItems();
+  const answers = fs.readFileSync(ANSWERS2, 'utf8').trim().split('\n').map(JSON.parse);
+  const Lraw = JSON.parse(fs.readFileSync(LABELS, 'utf8'));
+  const M = { run: path.basename(RUN2_DIR), jevCalls: answers.length, jevCostUsd: +answers.reduce((s, a) => s + a.cost, 0).toFixed(5),
+    llm: fs.existsSync(LLM2_LOG) ? fs.readFileSync(LLM2_LOG, 'utf8').trim().split('\n').map(JSON.parse) : [], stories: {}, totals: {} };
+  const add = (name, e, flip) => {
+    const t = M.totals[name] = M.totals[name] || { must: 0, mustOf: 0, wanted: 0, pages: 0, climax: 0, books: 0, focalGaps: 0, feltGaps: 0, loadOut: 0, violations: 0, flips: [] };
+    t.must += e.must; t.mustOf += e.mustOf; t.wanted += e.wanted; t.pages += e.ids.length; t.climax += e.climaxPage ? 1 : 0; t.books++;
+    t.focalGaps += e.focalShort.length; t.feltGaps += e.feltShort.length; t.loadOut += e.loadOut; t.violations += e.violations;
+    if (flip != null) t.flips.push(flip);
+  };
+  for (const it of items) {
+    const L = { must: Lraw[hash(`${it.id}:must`)] || [], pic: Lraw[hash(`${it.id}:pic`)] || [], climax: Lraw[hash(`${it.id}:climax`)] || [] };
+    const I = v2(it); const idxOf = new Map(it.actions2.map((a, i) => [a.id, i]));
+    const V = vectors2(it, answers, null);
+    const climax = V.CLIMAX.reduce((b, x, i) => (x > V.CLIMAX[b] ? i : b), 0);
+    const row = { lines: it.actions2.length, added: it.actions2.filter(a => a.added).length, jevClimax: it.actions2[climax].id, climaxOk: L.climax.includes(it.actions2[climax].id), designs: {}, auc: {} };
+    const pl = it.firstPlan.map(p => (it.plannerMap?.[p.page] || [])[0]).filter(Boolean).map(id => idxOf.get(id));
+    row.designs.planner = evalSeq2(it, pl, L); add('planner', row.designs.planner);
+    const oracle = selectPictures(I, it.actions2.map(a => (L.must.includes(a.id) ? 2 : L.pic.includes(a.id) ? 1 : 0)), { climax: idxOf.get(L.climax[0]) });
+    row.designs.oracle = evalSeq2(it, oracle, L); add('oracle', row.designs.oracle);
+    const auc = (arr, set) => { const pos = []; const neg = []; it.actions2.forEach((a, i) => (set.has(a.id) ? pos : neg).push(arr[i])); let s = 0; for (const p of pos) for (const n of neg) s += p > n ? 1 : p === n ? 0.5 : 0; return +(s / pos.length / neg.length).toFixed(3); };
+    for (const [k, arr] of Object.entries({ ONLYN: V.ONLYN, SEE: V.SEE, OWN: V.OWN, NATURE: V.NATURE, WINDOW: V.WINDOW })) row.auc[k] = { pic: auc(arr, new Set(L.pic)), must: auc(arr, new Set(L.must)) };
+    for (const [name, f] of Object.entries(DESIGNS)) {
+      for (const felt of [false, true]) {
+        const key = `${name}${felt ? ' +felt/act' : ''}`;
+        const o = DESIGN_OPTS[name] || {};
+        const forcedOf = rep => (o.deeds ? deeds2(it, answers, rep) : []);
+        if (o.deeds && !forcedOf(null)) continue;
+        const idx = selectPictures(I, f(V), { climax, feltPerAct: felt, forced: forcedOf(null), sameSentencePenalty: o.sameSentencePenalty || 0 });
+        const e = evalSeq2(it, idx, L);
+        // flip: single-rep picks vs the 3-rep picks
+        const flips = [0, 1, 2].map(rep => { const Vr = vectors2(it, answers, rep); if (!Vr || f(Vr).some(x => x == null)) return null; const cr = Vr.CLIMAX.reduce((b, x, i) => (x > Vr.CLIMAX[b] ? i : b), 0); const r = new Set(selectPictures(I, f(Vr), { climax: cr, feltPerAct: felt, forced: forcedOf(rep) || [], sameSentencePenalty: o.sameSentencePenalty || 0 })); return idx.filter(i => !r.has(i)).length / idx.length; }).filter(x => x != null);
+        e.flip = +mean(flips).toFixed(3);
+        row.designs[key] = e; add(key, e, e.flip);
+      }
+    }
+    M.stories[it.id] = row;
+  }
+  for (const t of Object.values(M.totals)) { t.flip = t.flips.length ? +mean(t.flips).toFixed(3) : null; delete t.flips; }
+  const rank = Object.entries(M.totals).filter(([k]) => /^D\d/.test(k)).sort((a, b) => b[1].must - a[1].must || b[1].wanted - a[1].wanted || a[1].violations - b[1].violations);
+  M.winner = argv.winner || rank[0][0];
+  fs.mkdirSync(RUN2_DIR, { recursive: true });
+  fs.writeFileSync(path.join(RUN2_DIR, 'metrics.json'), JSON.stringify(M, null, 1) + '\n');
+  console.log('design'.padEnd(34), 'must', 'wanted', 'climax', 'focalGap', 'feltGap', 'loadOut', 'viol', 'flip');
+  for (const [k, t] of Object.entries(M.totals)) console.log(k.padEnd(34), `${t.must}/${t.mustOf}`.padEnd(6), `${t.wanted}/${t.pages}`.padEnd(6), `${t.climax}/${t.books}`.padEnd(6), String(t.focalGaps).padEnd(8), String(t.feltGaps).padEnd(7), String(t.loadOut).padEnd(7), String(t.violations).padEnd(4), t.flip ?? '');
+  console.log('winner', M.winner, '| climax top-1 ok', Object.values(M.stories).filter(r => r.climaxOk).length, '/5');
+  for (const [id, r] of Object.entries(M.stories)) console.log(id, JSON.stringify(r.auc));
+  if (argv.blind) blind2(items, M);
+}
+
+function blind2(items, M) {
+  const out = []; const key = {};
+  for (const it of items) {
+    if (!it.staged) throw new Error(`${it.id}: run "stage" first`);
+    const jev = M.stories[it.id].designs[M.winner].ids;
+    const planner = it.firstPlan.map(p => `${p.who} — ${p.instant}`);
+    const J2 = jev.map(id => it.staged[id]);
+    const flip = parseInt(hash(`v2${it.id}`).slice(0, 2), 16) % 2 === 1;
+    key[it.id] = flip ? { X: 'jev', Y: 'planner' } : { X: 'planner', Y: 'jev' };
+    const [X, Y] = flip ? [J2, planner] : [planner, J2];
+    const fmt = seq => seq.map((s, i) => `  Page ${i + 1}: ${s}`).join('\n');
+    out.push(`### Book ${it.id} (${it.pageCount} pages; cast ${it.cast.join(', ')})\nSTORY:\n${it.sentences.map(s => `${s.n}. ${s.text}`).join('\n')}\n\nSEQUENCE X:\n${fmt(X)}\n\nSEQUENCE Y:\n${fmt(Y)}\n`);
+  }
+  fs.writeFileSync(path.join(RUN2_DIR, 'blind.md'), out.join('\n'));
+  fs.writeFileSync(path.join(RUN2_DIR, 'blind-key.json'), JSON.stringify(key, null, 1));
+  console.log(`blind pairs (winner ${M.winner}) → ${path.relative(ROOT, path.join(RUN2_DIR, 'blind.md'))}`);
+}
+
+module.exports = { arcSentences, parseActions, selectPictures, monotonePath, parseAugment };
 
 if (require.main === module) {
-  const fns = { limits, extract, actions, dump, labels, run, score };
+  const fns = { limits, extract, actions, dump, labels, run, score, augment, dump2, run2, stage, score2 };
   if (!fns[mode]) { console.error(`mode: ${Object.keys(fns).join('|')}`); process.exit(1); }
   Promise.resolve(fns[mode]()).catch(e => { console.error(e); process.exit(1); });
 }

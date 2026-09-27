@@ -64274,6 +64274,78 @@ itself (Opus) writes the action list. Re-run `scripts/analysis/eval-jev-arc-dire
 **Touched:** scripts/analysis/eval-jev-arc-direct.js (new),
 evals/datasets/jev-arc-direct-v1/reading_labels.json, evals/runs/2026-09-27_jev-arc-direct/metrics.json.
 No production code.
+
+### Follow-up, same day — better picture-choice questions (owner: "try better questions", cap CHF 0.30): ❌ Jev + code still loses to the planner in a fair blind comparison, although the best design now beats it on the per-action labels
+
+**Setup.** The same five books, reading labels and DP as above (`score2` in
+`scripts/analysis/eval-jev-arc-direct.js`, results in
+`evals/runs/2026-09-27_jev-arc-direct-v2/metrics.json`).
+
+**The action list.** A cheap call (gemini-3.7-flash) re-derived the lists:
+- Every line is tagged with a kind: act / felt / stake / discovery / arrival.
+- Every sentence now owns at least one line. The call added 3-7 felt, stake and inner lines per book, e.g. "is too shy to call out", "fears for the boy", "realises they are the warm place now". The planner's vnx5l8iy7 "worried face at the setting sun" is now line A6a.
+- New lines take letter ids (A12a), so the v1 labels still apply. The new lines were labelled before any v2 Jev call, for "wanted" only. The MUST set is unchanged at /83.
+- The planner's mapping to actions is unchanged from v1, so the planner is never credited with a felt line. Its felt-gap count below is therefore unfair to it.
+
+**Designs.** All run through the same ordered DP, with the Jev CLIMAX argmax forced as a picture. "Felt/act" means the DP must picture at least one felt or stake line in each third of the arc, enforced as a bonus the same way as the focal floor.
+
+| Design | Wording (generic) | MUST /83 | Wanted /88 | Climax | Focal gaps | Rule violations* | Flip |
+|---|---|---|---|---|---|---|---|
+| Planner (first plan) | — | 53 | 66 | 4/5 | 7 | 35 | — |
+| Oracle (reading values + DP) | — | 77 | 87 | 5/5 | 2 | 24 | — |
+| D1 ONLY-N | "If this story could have only N pictures, the moment A12 would be one of them." | 42 | 53 | 4/5 | 1 | 18 | 0.045 |
+| D2 SEE | "A child listening to this story would most want to SEE the moment A12 drawn." | 43 | 55 | 5/5 | 1 | 18 | 0.056 |
+| **D3 WINDOW** | one CHOICE per arc sentence over that sentence's lines: "Sentence S of the story is told on one page with one picture. Which moment of that sentence is the one picture for it?" | **55** | **73** | **5/5** | 1 | 19 | **0.016** |
+| D4 NATURE | six nouls (turning point / feeling on a face / discovery / arrival / danger / quiet transition), mapped to a value by code with weights fixed before any answer was read | 32 | 50 | 4/5 | 1 | 19 | 0.044 |
+| D5 WINDOW + ONLY-N | sum of the two | 56 | 70 | 5/5 | 1 | 20 | 0.052 |
+| D6 OWN (the v1 best), on the new list | — | 39 | 50 | 5/5 | 1 | 18 | 0.141 |
+| D3 + felt/act | — | 51 | 65 | 4/5 | 1 | 13 | 0.038 |
+| D7 WINDOW + deeds + no-dup | D3, plus one CHOICE per character, "Which of these moments is X's own deed: the one act the story gives X that matters most?", forced as a picture, plus a DP penalty of 0.5 for two pictures in a row from one sentence | 52 | 68 | 5/5 | 1 | 21 | 0.004 |
+
+*Rule violations = climax missing + focal gaps + acts with no felt picture + pages whose estimated word count falls outside the level band (−20% / +50%). The planner's word estimate uses the same picture-ends-the-page split. Its real pages are written to budget, so that part of its count is not a real fault.
+
+**Per-action signal, AUC against the reading** (pic / must):
+- WINDOW: 0.78-0.96 / 0.78-0.94 on every book. This is the best signal measured, and the "code-built list → one CHOICE" lesson from gaze holds again.
+- ONLY-N: 0.65-0.87.
+- SEE: 0.68-0.79.
+- OWN: 0.70-0.77.
+- NATURE: 0.52-0.62 ❌.
+
+CLIMAX top-1 is acceptable on 4/5 books.
+
+**What the felt/act floor does.** It costs 4 MUST pictures on D3. This is partly a label artefact: the MUST set was written against the v1 list, which had no felt lines.
+
+**The fair blind judge, with the planner's staged instant rendered on BOTH sides.**
+- **How the pages were rendered.** A Jev picture that the planner also picked carries the planner's own "who — instant". Every other Jev picture was written in the same style by a cheap call that was shown the planner's lines as the style.
+- **Could the judge tell the sides apart?** A fresh subagent read only `blind.md`, with the sides randomised. It reported the lines as mostly word-identical, and said it could not tell the two sources apart by style.
+- **D3 WINDOW: the planner won 5-0.** The judge's reasons were:
+  - a named character's own deed left without a picture (a hiding/stalling deed, a catch, the climax gift, the lift that opens the way);
+  - two pictures in a row of one sentence (holding the egg twice, curling around it twice);
+  - whole-cast crowding on the staged pages.
+- **D7, built from those reasons (deeds forced, repeats penalised): the planner won 4-1.** The one Jev win was z3fw660ie, where Jev had the climax deed (lifting the chest out) and the payoff. The judge's remaining reasons were setups and payoffs that come in pairs (a tool that cracks early and fails later), the opening scene dropped, and the ending line not pictured.
+- **Caveat.** D7 was designed after reading the D3 verdicts, and the second judge was a new instance. Even so, it lost.
+
+**Verdict ❌.** Jev + code does not match the planner's picture choice. On per-action labels the best design edges past the planner: D3 has 55/83 MUST vs 53, and 73/88 wanted vs 66. A reader judging the whole sequence prefers the planner 5-0 and 4-1.
+
+The label metric scores moments one at a time. The planner designs the sequence: an opening that sets the place, a setup picture that its payoff answers, one deed per character, no repeated beat, and the ending line. Those are properties of the whole sequence, and neither the per-moment nor the per-window Jev questions see them.
+
+**What still transfers:**
+- **WINDOW is the right shape for "which moment of this stretch".** Its AUC is ~0.85, flips are 1.6%, and it costs about $0.004 per book per rep.
+- **Deed and climax choices work** (a CHOICE over code-listed lines).
+- **The DP holds the pacing** (the oracle reaches 77/83).
+
+Used as a DRAFT that the planner corrects, this could shorten the re-plan loop (migration step 3 above). It is not a replacement.
+
+**Do not re-run as-is:**
+- per-action graded nouls (ONLY-N, SEE, OWN, NATURE) as the picture choice;
+- scoring a picture sequence only by per-action labels. The blind sequence judge disagreed with them on every book.
+
+**Cost of the follow-up:**
+- Jev: 339 calls, $0.074.
+- LLM: $0.18 (augment $0.10, staging $0.08).
+- Total ≈ $0.25 (CHF ~0.22).
+- The blind judges were subagents, with no paid API calls.
+
 ## 2026-09-27 — Jev decision layer wired, Part 1: code writes every page's shot (Jev picks, code holds the budget); the planner writes the placeholder `SHOT`
 
 **Context:** owner approval 2026-09-27 (AskUserQuestion, framed as reversals) to wire the decision
