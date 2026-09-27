@@ -2377,7 +2377,7 @@
       "impact": "Per-function cost of thinking judges under-reported 3-8x (entity check ~$0.03 recorded vs ~$0.09-0.27 billed on the Fiona story); story totals low by ~2-5% (Fiona: ~$0.13-0.33 of $6.55). Judge-fixture entity estimate low ~5-7x.",
       "status": "fixed",
       "fixedAt": "2026-09-27",
-      "fixedIn": "",
+      "fixedIn": "535baec85",
       "fix": "server/lib/providerUsage.js: geminiUsage / xaiUsage / openRouterUsage normalise every provider usage object to { input_tokens, output_tokens, thinking_tokens }; every call site reads through it and the per-site parsers are deleted. Entity report carries thinkingTokens; eval aggregates sum every component's thinking; sceneValidator prices from MODEL_PRICING; regeneration uses calculateTextCost; face gate relies on the textModels chokepoint. Test: tests/unit/provider-usage.test.ts (incl. a guard that no server file reads a raw usage field), judge-fixtures.test.ts, face-integrity-gate.test.ts."
     }
   ]
