@@ -121,9 +121,8 @@ Grok image cap: **7,900 characters** (`server/config/models.js` `maxPromptLength
 4. **DEPTH AND SIZE** (~647 chars) — the foreground / midground / background definitions. *Why here:* defines the brief's depth words; the prose still places every figure.
 5. **Composition: ground** (~600 chars) — the feet-on-the-ground bullet (the header goes with it). *Why here:* the one feet-on-the-ground rule for pages and covers; kept longer than the generic rules above.
 6. **HEIGHT ORDER** (~140 chars) — the shortest-to-tallest line. *Why here:* a page fact: the relative size the height judge compares.
-7. **AGE & PROPORTIONS** (~485 chars) — the per-age head-count proportions. *Why here:* a page fact: without it an infant is drawn as a preschooler.
-8. **reference-photo rule** (~512 chars) — which attached photo is a place and which is a person. *Why here:* a page fact: the plate-vs-identity binding of the attached images.
-9. **single-illustration rule** (~503 chars) — one full-bleed picture, no lettering, ids are not painted. *Why here:* the frame rule; the very last block the cut may spend.
+7. **reference-photo rule** (~512 chars) — which attached photo is a place and which is a person. *Why here:* a page fact: the plate-vs-identity binding of the attached images.
+8. **single-illustration rule** (~503 chars) — one full-bleed picture, no lettering, ids are not painted. *Why here:* the frame rule; the very last block the cut may spend.
 
 **Never cut, and neither is the page's scene before the protected tail (from the first of REQUIRED OBJECTS / SEASON / LIGHT / COMPOSITION GUIDELINES / ART STYLE): THIS IMAGE DEPICTS, the cast lines and the brief's prose. If the prompt still does not fit once every step has run, the render fails loudly.**
 
@@ -136,6 +135,7 @@ Grok image cap: **7,900 characters** (`server/config/models.js` `maxPromptLength
 - **LIGHT** — the page's declared time of day and weather, which wins over the plate's light (sceneLight.js)
 - **COMPOSITION GUIDELINES** — a cover's own composition: title-safe top third, group, bottom margin
 - **ART STYLE** — the style the book is commissioned in
+- **AGE & PROPORTIONS** — the per-age head-count proportions, heading and bullets (owner, 2026-09-27): without them an infant is drawn as a preschooler
 - **SHOT** — the page's declared framing (a cover carries none)
 - **EXACT POSES / EXPRESSIONS AND EYES** — the declared pose and gaze per figure
 <!-- END prompt-cut-order -->

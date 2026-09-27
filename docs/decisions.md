@@ -65091,3 +65091,22 @@ server/lib/promptBuilders.js (buildReferenceCardColours, DISTINCTIVE FEATURES he
 ELEMENT_SIZE_PRECEDENCE_LINE, the rough-images line, REQUIRED_CAST_*, EXPRESSIONS AND EYES header),
 server/lib/season.js (buildSeasonNote), server/lib/sceneLight.js (buildLightLine, page variant),
 scripts/admin/verify-checks.js (pagePromptsFit), tests.
+
+## 2026-09-27 — AGE & PROPORTIONS is never cut (owner: "keep the lines, stop cutting")
+
+**Context:** the shrink's AGE & PROPORTIONS step (`regexUnit(/^AGE & PROPORTIONS[\s\S]*?(?=\n\n|$)/m)`)
+removed only the heading — under the `m` flag `$` matches the heading's own line end — logged
+"#7 AGE & PROPORTIONS (-97)", and shipped the per-character bullets headless (every cut page of
+staging job_1790529840433_ar4u7qry3, Lab 1580). Registered as bug `age-proportions-cut-removes-heading-only`.
+
+**Decision:** the step leaves PROMPT_CUT_ORDER and the block joins PROMPT_NEVER_CUT: heading and
+bullets always ship whole, and the log no longer reports a cut that did not happen.
+
+**Evidence (replay, 226 staging pages, compacted fixed blocks):** 0 fit failures; worst floor 7,559
+(margin 341 under 7,900); smoke p1 floor 7,559, p4 7,414. Three pages now spend one more ranked
+step to cover the 97 chars the phantom cut used to report: staging 1790107559778 p8 and
+1790446348343 p1 lose the reference-photo rule, smoke p4 loses the single-illustration (frame) rule.
+
+**Touched:** server/lib/images.js (PROMPT_CUT_ORDER, PROMPT_NEVER_CUT), docs synced by
+scripts/admin/sync-prompt-cut-order-docs.js, tests/unit/page-prompt-fixed-blocks-fit.test.ts,
+tests/unit/prompt-says-each-thing-once.test.ts, tasks/bugs.json.

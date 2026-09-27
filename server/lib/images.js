@@ -962,13 +962,11 @@ const PROMPT_CUT_ORDER = [
     approxChars: 140,
     unit: () => regexUnit(/^\*\*HEIGHT ORDER[^\n]*\n/m),
   },
-  {
-    label: 'AGE & PROPORTIONS',
-    what: 'the per-age head-count proportions',
-    why: 'a page fact: without it an infant is drawn as a preschooler',
-    approxChars: 485,
-    unit: () => regexUnit(/^AGE & PROPORTIONS[\s\S]*?(?=\n\n|$)/m),
-  },
+  // AGE & PROPORTIONS left the cut order on 2026-09-27 (owner: "keep the lines,
+  // stop cutting"). Its unit's `$` matched the heading's own line end under the
+  // `m` flag, so the step removed only the heading and logged a cut while the
+  // per-character bullets shipped headless (staging job_1790529840433_ar4u7qry3,
+  // Lab 1580). The block now always ships whole — PROMPT_NEVER_CUT.
   {
     label: 'reference-photo rule',
     what: 'which attached photo is a place and which is a person',
@@ -1009,6 +1007,7 @@ const PROMPT_NEVER_CUT = [
   { label: 'LIGHT', why: "the page's declared time of day and weather, which wins over the plate's light (sceneLight.js)", marker: '**LIGHT:**' },
   { label: 'COMPOSITION GUIDELINES', why: 'a cover\'s own composition: title-safe top third, group, bottom margin', marker: '**COMPOSITION GUIDELINES:**' },
   { label: 'ART STYLE', why: 'the style the book is commissioned in', marker: '**ART STYLE' },
+  { label: 'AGE & PROPORTIONS', why: 'the per-age head-count proportions, heading and bullets (owner, 2026-09-27): without them an infant is drawn as a preschooler' },
   { label: 'SHOT', why: 'the page\'s declared framing (a cover carries none)' },
   { label: 'EXACT POSES / EXPRESSIONS AND EYES', why: 'the declared pose and gaze per figure' },
 ];

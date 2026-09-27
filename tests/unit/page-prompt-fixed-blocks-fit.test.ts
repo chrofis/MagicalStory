@@ -21,13 +21,13 @@ const worn = require('../../server/lib/wornItems.js');
 const { IMAGE_MODELS } = require('../../server/config/models.js');
 const { loadPromptTemplates } = require('../../server/services/prompts.js');
 // @ts-expect-error - JS module without types
-import { shrinkPromptForModel } from '../../server/lib/images.js';
+import { shrinkPromptForModel, PROMPT_CUT_ORDER, PROMPT_NEVER_CUT } from '../../server/lib/images.js';
 
 /** Room the floor must leave under the cap: a page one citation longer still fits. */
 const MARGIN = 300;
 
 /** Paragraph openings of the ranked PROMPT_CUT_ORDER blocks — the only text the shrink may drop. */
-const CUT_ORDER_PREFIXES = ['Generate a SINGLE', 'When the FIRST reference', '**HEIGHT ORDER', 'AGE & PROPORTIONS', '**Composition', '**DEPTH AND SIZE', '**COUNTS'];
+const CUT_ORDER_PREFIXES = ['Generate a SINGLE', 'When the FIRST reference', '**HEIGHT ORDER', '**Composition', '**DEPTH AND SIZE', '**COUNTS'];
 
 function build(page: any) {
   const inputData = { artStyle: FX.artStyle, language: FX.language, languageLevel: FX.languageLevel, layout: FX.layout };
@@ -88,6 +88,20 @@ describe.each(FX.pages.map((p: any) => [p.pageNumber, p]))('smoke page %i', (_n,
     }
     // Every card still maps a colour to its person.
     for (const p of page.referencePhotos) expect(sent).toMatch(new RegExp(`[A-Z]+ = ${p.name}\\b`));
+  });
+});
+
+describe('AGE & PROPORTIONS ships whole on a cut page (owner, 2026-09-27)', () => {
+  it('is not a cut step, and a page cut to its floor keeps the heading and every bullet', async () => {
+    expect(PROMPT_CUT_ORDER.map((s: any) => s.label)).not.toContain('AGE & PROPORTIONS');
+    expect(PROMPT_NEVER_CUT.map((s: any) => s.label)).toContain('AGE & PROPORTIONS');
+    const page = FX.pages[0];
+    const { prompt, cap, model } = build(page);
+    const block = prompt.match(/^AGE & PROPORTIONS[^\n]*\n(?:- [^\n]+\n?)+/m)![0].trim();
+    expect(block.split('\n').length).toBeGreaterThan(1);
+    const sent = await shrinkPromptForModel(prompt, cap, 'test', model);
+    expect(sent.length).toBeLessThan(prompt.length); // this page IS cut
+    expect(sent).toContain(block);
   });
 });
 

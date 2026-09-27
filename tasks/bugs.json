@@ -2439,6 +2439,18 @@
       "fixedAt": "2026-09-27",
       "fixedIn": "2f2a0d881",
       "fix": "Both the route and the Lab mirror call jevSelection.trialIdeaLandmarks, which resolves the story's own list (resolveTrialIdeaLandmarks = resolveAvailableLandmarks with the story's STORY_LANDMARK_LIMIT) and names 3 of it (Jev's top 5 when ready). Replayed against the staging DB: the new list equals the story's list for Zürich, Baden, Lausanne, Luzern, Dübendorf, Turgi. Test: tests/unit/jev-selection.test.ts."
+    },
+    {
+      "id": "age-proportions-cut-removes-heading-only",
+      "title": "The shrink's AGE & PROPORTIONS step removed only the block heading, logged it as a cut, and shipped the per-character age bullets headless",
+      "reportedAt": "2026-09-27",
+      "source": "Found in the fixed-blocks work (Lab 1580, staging job_1790529840433_ar4u7qry3): every cut page logged \"#7 AGE & PROPORTIONS (-97)\" while the sent prompt still carried the age bullets without their heading. Owner decision 2026-09-27: keep the lines, stop cutting.",
+      "rootCause": "server/lib/images.js PROMPT_CUT_ORDER unit regexUnit(/^AGE & PROPORTIONS[\\s\\S]*?(?=\\n\\n|$)/m): under the m flag `$` matches the heading line's own end, so the lazy match stops after the heading.",
+      "impact": "Every over-cap page that reached step 7: the log and the prompt_shrink event reported a block dropped that was still (headless) in the prompt; the age bullets lost the \"render each character at their real age\" instruction.",
+      "status": "fixed",
+      "fixedAt": "2026-09-27",
+      "fixedIn": null,
+      "fix": "AGE & PROPORTIONS left PROMPT_CUT_ORDER and joined PROMPT_NEVER_CUT: heading and bullets always ship whole. Replay of 226 staging pages: all fit, worst floor 7,559 (margin 341). Test: tests/unit/page-prompt-fixed-blocks-fit.test.ts."
     }
   ]
 }
