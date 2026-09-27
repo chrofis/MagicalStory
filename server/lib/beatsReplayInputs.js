@@ -251,7 +251,50 @@ function resolveArcFromExperiment(row, { expId, storyId, arcPhase, arcEffort } =
   };
 }
 
+/**
+ * The landmark list a run's writer prompts were built with, as it is STORED
+ * for a replay: every text field kept, every image byte string dropped (the
+ * prompt sections read names, types, extracts and photo descriptions — never
+ * pixels; IRON RULE: no images in JSONB).
+ *
+ * @param {Array|undefined} landmarks - inputData.availableLandmarks
+ * @returns {Array|null}
+ */
+function landmarksForReplay(landmarks) {
+  if (!Array.isArray(landmarks) || landmarks.length === 0) return null;
+  const isBytes = (v) => typeof v === 'string'
+    && (v.startsWith('data:') || (v.length > 2000 && /^[A-Za-z0-9+/=\s]+$/.test(v.slice(0, 2000))));
+  return JSON.parse(JSON.stringify(landmarks, (key, value) => (isBytes(value) ? undefined : value)));
+}
+
+/**
+ * THE INPUTS A REPLAY NEEDS THAT THE RUN HELD ONLY IN MEMORY (2026-09-27, Test
+ * Lab parity): the resolved, shuffled landmark list every writer prompt read
+ * (arc create / panel / re-tell, planner, plan check, Art Director) and the
+ * run's model overrides. storyJobPipeline stores them as `replayInputs`; this
+ * returns the story as the run's `inputData` for a replayed prompt. Under its
+ * own key on purpose: post-generation paths hand `stories.data` to the same
+ * prompt builders, and a top-level `availableLandmarks` would change them.
+ *
+ * A story stored before 2026-09-27 has none: the replay runs with no landmark
+ * section and the default models, and `replayInputsStored` says so.
+ *
+ * @param {Object} storyData - stories.data
+ * @returns {Object} storyData with `availableLandmarks` / `modelOverrides` restored
+ */
+function resolveReplayInputData(storyData) {
+  const stored = storyData?.replayInputs || null;
+  return {
+    ...(storyData || {}),
+    availableLandmarks: stored?.availableLandmarks || undefined,
+    modelOverrides: stored?.modelOverrides || {},
+    replayInputsStored: !!stored,
+  };
+}
+
 module.exports = {
+  landmarksForReplay,
+  resolveReplayInputData,
   resolveArcFromExperiment,
   resolveReplayArc,
   resolveReplayArcHints,

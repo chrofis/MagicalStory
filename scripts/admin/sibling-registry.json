@@ -555,7 +555,8 @@
       "severity": "block",
       "parity": {
         "anchors": [
-          "arcRepairFindings("
+          "arcRepairFindings(",
+          "makeArcCreatorCall"
         ]
       }
     },

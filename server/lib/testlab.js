@@ -24,7 +24,7 @@ const { assessSceneReview, assertReviewedArtifactUsable, pickReviewedBrief } = r
 // Production's arguments for the beats writer/Art-Director calls, resolved from
 // a stored story. Every replay stage builds its inputs through these so a
 // divergent, thinner expression cannot be written a fourth time.
-const { buildReplayTextArgs, buildReplaySceneOptions, resolveReplayArc, resolveReplayArcHints, resolveReplayCentralFigure, resolveReplayStoryLogic, resolveArcFromExperiment } = require('./beatsReplayInputs');
+const { buildReplayTextArgs, buildReplaySceneOptions, resolveReplayArc, resolveReplayArcHints, resolveReplayCentralFigure, resolveReplayStoryLogic, resolveArcFromExperiment, resolveReplayInputData } = require('./beatsReplayInputs');
 // Production's evalOptions for evaluateImageQuality, resolved from a stored
 // story. Same rule as above: every eval stage builds its options through this
 // so a thinner, silently-check-disabling expression cannot be written again.
@@ -7820,7 +7820,8 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
   const { buildCoverBeats } = require('./coverBeats');
   const { coverTypesFor } = require('./coverKeys');
 
-  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  // The run's inputData (the stored landmark list and model overrides; 2026-09-27).
+  const storyData = resolveReplayInputData((await loadStoryDataFull(target.storyId, { rehydrate: false })).storyData);
   const storedReport = storyData.sceneReviewReport || {};
   const notes = [];
   // BRANCH MODE — "＋ next round": review a SELECTED round's stored briefs
@@ -7865,7 +7866,8 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
     notes.push(`the review corrected ${storedReport.bibleCorrections.applied.length} stated object(s) and the pre-review bible predates its storage — the replay reviews against the corrected bible`);
   }
 
-  const models = String(params.reviewModel || MODEL_DEFAULTS.sceneReviewModel || MODEL_DEFAULTS.outlineReviewModel)
+  const mo = storyData.modelOverrides;
+  const models = String(params.reviewModel || mo.sceneReviewModel || MODEL_DEFAULTS.sceneReviewModel || mo.outlineReviewModel || MODEL_DEFAULTS.outlineReviewModel)
     .split(',').map(x => x.trim()).filter(Boolean);
   for (const m of models) if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
   const labPromptOptions = promptOverride ? { template: promptOverride } : {};
@@ -9337,6 +9339,10 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
   const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
 
   const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  // THE RUN'S inputData for the arc prompts: the stored landmark list the
+  // panel and the re-telling read, and the run's model overrides
+  // (beatsReplayInputs.resolveReplayInputData; stored since 2026-09-27).
+  const inputData = resolveReplayInputData(storyData);
   const report = storyData.arcReviewReport || {};
   // The committed block is what production handed the panel, verbatim. Without
   // it there is nothing to replay against and a reconstruction would not be the
@@ -9350,7 +9356,7 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
   if (promptOverride) PROMPT_TEMPLATES.arcPanel = promptOverride;
   let prompt;
   try {
-    prompt = H.buildArcPanelPrompt(storyData, committed);
+    prompt = H.buildArcPanelPrompt(inputData, committed);
   } finally {
     PROMPT_TEMPLATES.arcPanel = orig;
   }
@@ -9360,8 +9366,8 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
     .split(',').map(x => x.trim()).filter(Boolean);
   if (!models.length) throw new Error('no panel models resolved');
   for (const m of models) if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
-  const tempFor = (model, temp) =>
-    (temp == null || TEXT_MODELS[model]?.provider === 'anthropic') ? {} : { temperature: temp };
+  // The run's temperature rule and creator call (beatsPipeline, shared).
+  const { arcTempFor: tempFor, makeArcCreatorCall } = require('./beatsPipeline');
 
   const runs = [];
   for (const model of models) {
@@ -9418,26 +9424,37 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
       if (!gate.retell) {
         retell = { ok: true, skipped: gate.skipReason, gate: gateReport };
       } else {
-        const pageCount = (storyData.sceneImages || []).length || parseInt(storyData.pages, 10) || 14;
-        const retellPrompt = H.buildArcRetellPrompt(storyData, pageCount, arcBlock, gate.text);
+        // The run's page count, and the challenge draw the run offered its
+        // re-telling (stored in the create prompt; storedChallengeSection).
+        const pageCount = parseInt(storyData.pages, 10) || (storyData.sceneImages || []).length || 10;
+        const retellPrompt = H.buildArcRetellPrompt(inputData, pageCount, arcBlock, gate.text, { challengeIdeas: storedChallengeSection(storyData) });
         if (!retellPrompt) throw new Error('arc-retell template unavailable');
         // Production's re-tell model (MODEL_DEFAULTS.arcRetellModel), never the
         // stored story's creator: since 2026-09-25 create and re-tell are
         // separate keys, and the create model is not the one that re-tells.
-        const retellModel = String(params.retellModel || MODEL_DEFAULTS.arcRetellModel);
+        const retellModel = String(params.retellModel || inputData.modelOverrides.arcRetellModel || MODEL_DEFAULTS.arcRetellModel);
         if (!TEXT_MODELS[retellModel]) throw new Error(`Unknown model "${retellModel}"`);
         const t = Date.now();
-        const res = await callTextModelStreaming(retellPrompt, null, null, retellModel, {
-          usageLabel: 'testlab_arc_retell_replay', ...tempFor(retellModel, MODEL_DEFAULTS.arcRetellTemperature),
-          // Production's re-tell effort, so the replay reproduces the shipped call.
-          ...(MODEL_DEFAULTS.arcRetellEffort ? { effort: MODEL_DEFAULTS.arcRetellEffort } : {}),
-        });
-        const parsed = H.parseArcRetell(res.text || '');
+        // The run's creator call (one retry; a truncated reply is a failed
+        // attempt) and its parse retry: one more telling on a parse miss.
+        const retellCalls = [];
+        const creatorCall = makeArcCreatorCall(null, (res) => retellCalls.push(res));
+        let res = null;
+        let parsed = null;
+        for (let attempt = 1; attempt <= 2 && !parsed; attempt++) {
+          res = await creatorCall(retellPrompt, 'testlab_arc_retell_replay', retellModel, MODEL_DEFAULTS.arcRetellTemperature, MODEL_DEFAULTS.arcRetellEffort);
+          try {
+            parsed = H.parseArcRetell(res.text || '');
+          } catch (parseErr) {
+            if (attempt === 2) throw parseErr;
+          }
+        }
         retell = {
           ok: true,
           model: retellModel, modelId: res.modelId,
           elapsedMs: Date.now() - t,
-          cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
+          cost: retellCalls.reduce((a, c) => a + (c.usage?.direct_cost ?? calculateTextCost(c.modelId || '', c.usage || {})), 0),
+          attempts: retellCalls.length,
           fixing: parsed.fixing, keeping: parsed.keeping, used: parsed.used,
           logic: parsed.logic.text,
           finalArc: parsed.finalArc, critique: parsed.critique,
@@ -9457,6 +9474,9 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
     title: storyData.title || null,
     creatorModel: report.creatorModel || null,
     productionPanel: report.panelModels || null,
+    // False for a story stored before 2026-09-27: no landmark list was kept,
+    // so the replayed prompts carry no landmark section.
+    replayInputsStored: inputData.replayInputsStored,
     // The frozen input, so a reader can see the panel was handed the same arc.
     committed,
     promptChars: prompt.length,
@@ -10406,7 +10426,9 @@ async function runBeatsReplanStage(target, { params = {} }) {
   // no PEOPLELESS pick, no review of declared changes, one round only.
   const { makePlanReader, planCheckInputs, createPlanCheckRunner, runReplanRounds, shippedReplanState } = require('./beatsPipeline');
 
-  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  // The run's inputData: the stored landmark list the planner and the check
+  // read, and the run's model overrides (resolveReplayInputData, 2026-09-27).
+  const storyData = resolveReplayInputData((await loadStoryDataFull(target.storyId, { rehydrate: false })).storyData);
 
   // Lab A/B (2026-09-25): the planner may add a deed (castActionRule
   // `mayAddDeeds`) — the same sentence reaches the plan check.
@@ -10415,7 +10437,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
   // modelOverrides are not stored: the run's defaults, as planCheckInputs and
   // generateStoryViaBeats resolve them. params.planModel / params.checkModel
   // are the A/B knobs.
-  const planModel = params.planModel || MODEL_DEFAULTS.outline;
+  const planModel = params.planModel || storyData.modelOverrides.outlineModel || MODEL_DEFAULTS.outline;
 
   const calls = [];
   const onCall = (res) => calls.push(res);
@@ -10520,7 +10542,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
   // The focus character, as production passes it (MAIN_UNDER_HALF, 2026-09-25).
   const mainName = pickMainCharacters(storyData).focus?.name || null;
 
-  const inputs = planCheckInputs(storyData, { arcPremiseNames, modelOverrides: {} });
+  const inputs = planCheckInputs(storyData, { arcPremiseNames, modelOverrides: storyData.modelOverrides });
   const { commission, commissionedNames, maxCast } = inputs;
   const checkModel = params.checkModel || inputs.planCheckModel;
   for (const m of [checkModel, planModel]) if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
@@ -10554,6 +10576,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
     plannerMayAddDeeds: mayAddDeeds, planAndCheck, arcSource: expArc ? expArc.source : 'stored story arc',
     firstDivision: firstPlan ? 'planned by this stage' : (plannerReply ? 'the run\'s stored planner reply' : 'the stored briefsIn'),
     castTable, ...(castTableNote ? { castTableNote } : {}),
+    replayInputsStored: storyData.replayInputsStored,
   };
   const base = {
     storyId: target.storyId,
@@ -11027,6 +11050,7 @@ module.exports = {
   runInpaintStage,
   runBeatsReplanStage,
   runSceneReviewReplayStage,
+  runArcPanelReplayStage,
   runEmptySceneStage,
   runEditImageStage,
   // The page render and the char-fix, exported so "with no params the Lab sends

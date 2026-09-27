@@ -873,6 +873,41 @@ function shippedReplanState(rounds = []) {
   return { changedPages: [...changed].sort((a, b) => a - b), recheck, discardedRounds, declaredChanges, changeRefusals, replanPrompts, replanReplies };
 }
 
+// ── THE ARC CREATOR'S CALL, SHARED WITH THE TEST LAB ───────────────────────
+// Moved out of generateStoryViaBeats on 2026-09-27 so the Lab's arc replays
+// make the creator call the run makes (one retry, a truncated reply is a failed
+// attempt). `onCall` hands the Lab each reply; the run passes none.
+
+/** OpenRouter/xAI take a temperature; the Anthropic path sends none. */
+function arcTempFor(model, temp) {
+  return (temp == null || TEXT_MODELS[model]?.provider === 'anthropic') ? {} : { temperature: temp };
+}
+
+/** Creator-side call: one retry, then throw — the creator is not advisory. */
+// `model` and `effort` are this call's (MODEL_DEFAULTS.arcCreateModel +
+// arcCreateEffort, or arcRetellModel + arcRetellEffort); null max_tokens =
+// the model's own ceiling.
+function makeArcCreatorCall(onChunk, onCall = null) {
+  return async (prompt, label, model, temp, effort) => {
+    let lastErr = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const res = await textModels.callTextModelStreaming(prompt, null, onChunk, model, { usageLabel: label, ...arcTempFor(model, temp), ...(effort ? { effort } : {}) });
+        if (onCall) onCall(res);
+        if (!String(res?.text || '').trim()) throw new Error('empty response');
+        // A cut arc parses as a shorter arc (missing critique lines, a short
+        // chain) — treat it as a failed attempt, never as the creator's answer.
+        if (res.truncation?.suspected) throw new Error(`reply ${textModels.describeTruncation(res.truncation)}`);
+        return res;
+      } catch (err) {
+        lastErr = err;
+        log.warn(`⚠️ [ARC] ${label} attempt ${attempt} failed: ${err.message}`);
+      }
+    }
+    throw new Error(`${label} failed after retry: ${lastErr?.message || 'unknown error'}`);
+  };
+}
+
 // ── STEP 2 OF THE BEATS PIPELINE, SHARED WITH THE TEST LAB ─────────────────
 // The plan check (counters + the one model call) and the re-plan rounds, moved
 // verbatim out of generateStoryViaBeats on 2026-09-27 so the Lab's
@@ -2345,31 +2380,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // every later stage divides and dresses what this one decided.
   let t = Date.now();
   try {
-    // OpenRouter/xAI take a temperature; the Anthropic path sends none.
-    const tempFor = (model, temp) =>
-      (temp == null || TEXT_MODELS[model]?.provider === 'anthropic') ? {} : { temperature: temp };
-
-    /** Creator-side call: one retry, then throw — the creator is not advisory. */
-    // `model` and `effort` are this call's (MODEL_DEFAULTS.arcCreateModel +
-    // arcCreateEffort, or arcRetellModel + arcRetellEffort); null max_tokens =
-    // the model's own ceiling.
-    const creatorCall = async (prompt, label, model, temp, effort) => {
-      let lastErr = null;
-      for (let attempt = 1; attempt <= 2; attempt++) {
-        try {
-          const res = await textModels.callTextModelStreaming(prompt, null, onChunk, model, { usageLabel: label, ...tempFor(model, temp), ...(effort ? { effort } : {}) });
-          if (!String(res?.text || '').trim()) throw new Error('empty response');
-          // A cut arc parses as a shorter arc (missing critique lines, a short
-          // chain) — treat it as a failed attempt, never as the creator's answer.
-          if (res.truncation?.suspected) throw new Error(`reply ${textModels.describeTruncation(res.truncation)}`);
-          return res;
-        } catch (err) {
-          lastErr = err;
-          log.warn(`⚠️ [ARC] ${label} attempt ${attempt} failed: ${err.message}`);
-        }
-      }
-      throw new Error(`${label} failed after retry: ${lastErr?.message || 'unknown error'}`);
-    };
+    const tempFor = arcTempFor;
+    const creatorCall = makeArcCreatorCall(onChunk);
 
     // CREATE: ONE arc, its STORY LOGIC first (owner, 2026-09-24). A parse miss
     // (no or incomplete logic block, no ARC block) gets one full re-create,
@@ -3913,4 +3925,4 @@ ${bibleBody}` : bibleBody;
   return { title, titleJudge, beats, pages, scenes, coverScenes, rawOutline, visualBible, meta, challengeDrawIds, challengeTakenIds, challengeDraw, arcReviewReport, beatsReviewReport, storyBibleReport, clothingReviewReport, wardrobeBibleReport, sceneExpansionReport, sceneReviewReport };
 }
 
-module.exports = { generateStoryViaBeats, runSceneReview, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };
+module.exports = { generateStoryViaBeats, arcTempFor, makeArcCreatorCall, runSceneReview, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };

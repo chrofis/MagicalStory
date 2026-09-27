@@ -817,6 +817,76 @@ describe('scene_review_replay: no params = the run\'s review of the briefs it wa
   });
 });
 
+// ── arc_panel_replay: the run's panel and re-telling on the stored arc ───────
+describe('arc_panel_replay: no params = the run\'s panel and re-telling calls', () => {
+  const LOGIC = ['STORY LOGIC:', 'Want and stakes: Mila wants to return the egg before night.', 'Opposition: the cold.', 'Facts:',
+    '- Mila (commissioned) — can carry the egg; cannot climb the wall', 'Central figure: the egg', 'Chain:',
+    '- because the egg is cold, Mila carries it home', '- but the door is shut, so she warms it in her coat'].join('\n');
+  const CREATE = [LOGIC, '', 'ARC:', '1. The child finds a lost egg.', '2. The child returns it.', 'CRITIQUE:', 'Logic:', '- none', 'Faults:',
+    '1. [MAJOR] (s2) the ending is unearned — "The child returns it"'].join('\n');
+  const RETELL = [LOGIC, 'Fixing: the unearned ending.', 'Keeping: the return.', 'Used: Panelist A', 'FINAL ARC:',
+    '1. The child finds a lost egg.', '2. The child carries it back to its mother.', 'CRITIQUE:', '1. [MINOR] (s2) quiet — "carries it back"'].join('\n');
+  const PANEL = '1. [MAJOR] (s1, s2) CAUSE: nothing says where the nest is — "The child returns it" Smallest change: name the nest.';
+  const CREATE_PROMPT = ['# THE COMMISSION', 'x', '# CHALLENGE IDEAS (drawn at random)', 'old heading line', '', '- [C12] cross a river on stones (tests: balance)', '- [C40] find the way in fog (tests: patience)', '# NEXT', 'y'].join('\n');
+  const LANDMARKS = [{ name: 'Kapellbrücke', type: 'bridge', wikipediaExtract: 'A covered wooden footbridge.' }];
+  let modelCalls: any[] = []; let savedStream: any;
+  beforeEach(() => {
+    modelCalls = [];
+    savedStream = textModelsMod.callTextModelStreaming;
+    textModelsMod.callTextModelStreaming = async (prompt: string, _s: any, _c: any, model: string, opts: any) => {
+      modelCalls.push({ prompt, model, temperature: opts?.temperature, effort: opts?.effort });
+      const text = /retell/.test(opts?.usageLabel || '') ? RETELL : PANEL;
+      return { text, modelId: model, usage: { input_tokens: 1, output_tokens: 5 }, truncation: null };
+    };
+  });
+  afterEach(() => { textModelsMod.callTextModelStreaming = savedStream; });
+
+  it('panel and re-telling prompts carry the run\'s landmarks and challenge draw; the re-telling is the run\'s creator call', async () => {
+    const commit = PB.parseArcCreate(CREATE);
+    STORY = {
+      ...storyFor(storedScene(), { textInImage: false }), pages: 4,
+      characters: [{ id: 1, name: 'Mila', age: 5, gender: 'female', isMainCharacter: true }],
+      arcReviewReport: { committed: commit.committed, createPrompt: CREATE_PROMPT },
+      replayInputs: { availableLandmarks: LANDMARKS, modelOverrides: null },
+    };
+    const r = await testlab.runArcPanelReplayStage({ storyId: 'job_parity' }, { params: { retell: true } });
+    const inputData = { ...STORY, availableLandmarks: LANDMARKS, modelOverrides: {}, replayInputsStored: true };
+    const panelPrompt = PB.buildArcPanelPrompt(inputData, commit.committed);
+    const panelists = modelCalls.filter(c => c.prompt === panelPrompt);
+    expect(panelists.length).toBe((MODEL_DEFAULTS.arcPanelModels || []).length);
+    expect(panelPrompt).toContain('Kapellbrücke');                              // pre-fix: no landmark section
+    for (const c of panelists) expect(c.temperature).toEqual(BP.arcTempFor(c.model, MODEL_DEFAULTS.arcPanelTemperature).temperature);
+    const retellCall = modelCalls[modelCalls.length - 1];
+    const { arcBlock, critique } = PB.splitCommittedBlock(commit.committed);
+    const panel = r.runs.filter((x: any) => x.ok);
+    const gate = PB.arcRepairFindings({ critique, reviewedArc: arcBlock, panel });
+    const challengeIdeas = [...PB.CHALLENGE_IDEAS_HEADING, '', '- [C12] cross a river on stones (tests: balance)', '- [C40] find the way in fog (tests: patience)'].join('\n');
+    expect(retellCall.prompt).toBe(PB.buildArcRetellPrompt(inputData, 4, arcBlock, gate.text, { challengeIdeas }));   // pre-fix: a fresh draw
+    expect(retellCall.model).toBe(MODEL_DEFAULTS.arcRetellModel);
+    expect(retellCall.effort).toBe(MODEL_DEFAULTS.arcRetellEffort);
+    expect(r.retell.ok).toBe(true);
+    expect(r.replayInputsStored).toBe(true);
+  });
+
+  it('the stored landmark list keeps every text field and no image bytes', () => {
+    const { landmarksForReplay, resolveReplayInputData } = req('../../server/lib/beatsReplayInputs');
+    const stored = landmarksForReplay([{ name: 'Kapellbrücke', photoData: `data:image/jpeg;base64,${'A'.repeat(3000)}`, photoVariants: [{ description: 'the bridge at dusk', photoData: 'B'.repeat(5000) }] }]);
+    expect(stored).toEqual([{ name: 'Kapellbrücke', photoVariants: [{ description: 'the bridge at dusk' }] }]);
+    expect(landmarksForReplay(undefined)).toBeNull();
+    // A story stored before replayInputs replays with none, and says so.
+    const old = resolveReplayInputData({ title: 't' });
+    expect(old.availableLandmarks).toBeUndefined();
+    expect(old.replayInputsStored).toBe(false);
+  });
+
+  it('the run makes its creator calls through makeArcCreatorCall (source scan)', () => {
+    const src = read('server/lib/beatsPipeline.js');
+    expect(src).toContain('const creatorCall = makeArcCreatorCall(onChunk);');
+    expect(src).toContain('const tempFor = arcTempFor;');
+    expect(read('storyJobPipeline.js')).toMatch(/replayInputs: \{\s*\n\s*availableLandmarks: require\('\.\/server\/lib\/beatsReplayInputs'\)\.landmarksForReplay\(inputData\.availableLandmarks\),/);
+  });
+});
+
 describe('the run still calls the shared builders (source scan)', () => {
   const pipeline = read('storyJobPipeline.js');
   const repair = read('server/lib/repairPipeline.js');

@@ -6839,6 +6839,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       challengeDrawIds,
       challengeTakenIds, // which of them the arc built on, by catalogue id
       challengeDraw, // the random catalogue menu the arc plan was offered (beats mode)
+      // What a Test Lab replay needs and the run held only in memory
+      // (2026-09-27): the shuffled landmark list every writer prompt read, and
+      // the run's model overrides. Text only. Read by beatsReplayInputs
+      // .resolveReplayInputData, never as a top-level input of a later path.
+      replayInputs: {
+        availableLandmarks: require('./server/lib/beatsReplayInputs').landmarksForReplay(inputData.availableLandmarks),
+        modelOverrides: modelOverrides || null,
+      },
       beatsReviewReport, // per-page before/after from the beats review (beats mode)
       storyBibleReport, // wardrobe contract call: prompt + raw reply (beats mode)
       clothingReviewReport, // per-outfit before/after from the wardrobe review (beats mode)
