@@ -2389,6 +2389,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "identity-swap-critical",
+      "title": "A figure with another person's hair AND face is filed identity_swap CRITICAL, charged, and char-fixed",
+      "commits": [
+        "defe4eefc"
+      ],
+      "addedAt": "2026-09-27",
+      "claim": "On the next staging full story where a character is drawn with both hair and face differing from the reference: finalChecksReport.entity files identity_swap at CRITICAL for that page (never hair_change alone), the page's consolidatedPlan.deduped_issues carries the identity_swap row (no profile_says_trait_is_correct drop of it), the page is marked bad and the repair round routes it to char-fix. A hair-only difference with the same face stays hair_change and gets no char-fix.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "finalChecksReport.entity.characters[*].issues for identity_swap; imageVersions[].consolidatedPlan.deduped_issues and dropped_issues on that page; retryHistory for a char-fix attempt; the head grid pixels against the reference. Fixtures: entity-*-identity-swap (flag), entity-lukas-fcm-p7-hair-drift-not-swap (pass)."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ]
 }
