@@ -3619,6 +3619,24 @@
         "status": "pending",
         "note": "Needs the next staging full story on a build with defe4eefc where a character is drawn with both hair and face differing from the reference."
       }
+    },
+    {
+      "id": "verify-auto-check-report",
+      "title": "The staging server stores a verify report for every story it completes",
+      "commits": [
+        "95cd3c7d8"
+      ],
+      "addedAt": "2026-09-27",
+      "claim": "The next story completed on staging on a build with this commit has a story_verify_reports row (written within a minute of completion, no [VERIFY] auto-check failed log line) whose verdicts, after verify-run.js --pull re-checks containment, match verify-run.js <storyId> run by hand; the story itself completed normally.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "SELECT counts, report FROM story_verify_reports WHERE story_id = '<storyId>' on staging; run node scripts/admin/verify-run.js <storyId> (dry) and compare verdict per entry; then node scripts/admin/verify-run.js --pull and confirm it records the run (registry runs[] via 'pull'); Railway log: '[VERIFY] <storyId>: N registry entries judged' after 'completed successfully', no 'auto-check failed'."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
