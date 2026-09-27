@@ -72,6 +72,16 @@ gives the image model's ceiling, 6. Measured over the 17 staging books of the 14
    over-budget books): it fires on all four (riqncqg1i 4, 1nitlympp 5, 5herh01j7 4, vnx5l8iy7 4 group pages
    against 3). It ranks must and lands inside `## MUST FIX`. The cast/focal count the guard starts from rises by
    one on each: 2→3, 2→3, 3→4 and 1→2.
+   **Lab #1558** (`beats_replan` on staging job_1790373080139_vnx5l8iy7, stored first division, after deploy
+   68b51eb4e, $0.113):
+   - The first check filed `GROUP_PAGES_OVER_BUDGET` on pages 1, 6, 7 and 18 (4 against 3) as must-fix.
+   - The re-plan answered it with five declared cast-outs, tagged to the finding, on pages 5, 6 and 7. p6 went to
+     "Levin and Julian run", p7 to "Kiaan whispers to Levin", and p5 holds two. p1 lost only the parent.
+   - p18 (protected) kept its cast: the review refused the noted-finding changes there.
+   - Group pages went **4 → 2** (p1, p18), which is within budget. The recheck files no `GROUP_PAGES_OVER_BUDGET`.
+   - **Coverage holds:** Levin 9, Julian 11, Max 4, Kiaan 4 (floor 3). The recheck has no UNDER_COVERED_CHARACTER
+     and no NO_FOCAL_PAGE, and every child keeps an ACTION page.
+   - The guard counted cast/focal must-fix 2 → 0 and KEPT the round.
 5. **Coverage reconciled:** the budget never fights the floor (see point 1), and the re-plan's existing review
    rules (`span` / `castFloor` / `focal` / `obstacle`) refuse a cast-out that would take a character below it. A
    unit test sweeps P 2-30 × C 1-14 × ceiling 4-6 and checks pages of three plus the budget always hold the floor.
