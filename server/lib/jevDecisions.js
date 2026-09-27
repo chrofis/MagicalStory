@@ -32,11 +32,12 @@
  * State: the arc and the plan (the page text does not exist when these run —
  * it is written after the scene review), the page marked.
  *
- * NO FALLBACKS. A transient HTTP error is retried as the evals retried it
- * (429 / 5xx / network, 3 attempts); anything else, or a retry budget spent,
- * throws JevDecisionError and the story step fails. There is no second author
- * to fall back to — the planner's shot rules and the Art Director's citation
- * choice are gone.
+ * OUTAGES (owner, 2026-09-27 — an explicit exception to NO FALLBACKS): a
+ * failing call waits and retries for up to 5 minutes (JEV_OUTAGE), then throws
+ * JevDecisionError; beatsPipeline then runs that step and every later one on
+ * the backup — today's setup before the layer — once per story, logged at
+ * error level and stored as `jevFallback`. A pre-start probe (probeJev) sends a
+ * whole story to the backup when Jev is down before it begins.
  *
  * see DECISIONS: docs/decisions.md 2026-09-27 "Jev decision layer wired"
  */
@@ -54,9 +55,6 @@ class JevDecisionError extends Error {
 
 /** Calls in flight at once. */
 const JEV_DECISION_CONCURRENCY = 8;
-/** The evals' retry: transient HTTP / network errors only. */
-const TRANSIENT_JEV_ERROR = /HTTP (429|5\d\d)|fetch failed|ECONNRESET|ETIMEDOUT/;
-const JEV_ATTEMPTS = 4; // 1 + 3 retries, as callWithRetry in both eval scripts
 
 /**
  * Thresholds and repetitions, from the 2026-09-27 evaluations.
@@ -138,12 +136,37 @@ function pageState(arc, pages, page) {
 // ───────────────────────── the call pool ─────────────────────────
 
 /**
+ * THE OUTAGE POLICY (owner, 2026-09-27: B + C + A).
+ *   B  before a beats story starts, `probeJev` asks one tiny question; Jev down
+ *      → the whole story runs the backup (today's setup before the layer).
+ *   C  mid-story, a failing call is retried with backoff (2 s, 4 s, … capped at
+ *      60 s) for up to `waitMs` (5 min) from its first failure — the step waits
+ *      and resumes where it stood; the story is never restarted. A missing
+ *      OPENROUTER_API_KEY is configuration, not an outage: never retried.
+ *   A  a call still failing after the wait throws JevDecisionError; the caller
+ *      (beatsPipeline) switches THAT STEP AND EVERY LATER ONE to the backup,
+ *      once per story, logged at error level and stored as `jevFallback`.
+ * Every call also has a hard timeout (`callTimeoutMs`), counted as a failure.
+ * Mutable only so tests can shorten the wait.
+ */
+const JEV_OUTAGE = { waitMs: 5 * 60 * 1000, maxBackoffMs: 60 * 1000, callTimeoutMs: 60 * 1000, probeTimeoutMs: 20 * 1000 };
+const NOT_AN_OUTAGE = /OPENROUTER_API_KEY is not set|network call blocked in unit tests/;
+
+function withTimeout(promise, ms, what) {
+  let timer;
+  return Promise.race([
+    promise.finally(() => clearTimeout(timer)),
+    new Promise((_, rej) => { timer = setTimeout(() => rej(new Error(`${what} timed out after ${ms} ms`)), ms); }),
+  ]);
+}
+
+/**
  * Run a list of Jev requests with bounded concurrency. Every answer is kept;
- * any request that still fails after the transient retries throws, and nothing
- * partial is returned.
+ * a request still failing after the outage wait (C) throws JevDecisionError,
+ * the other workers stop, and nothing partial is returned.
  *
  * @param {Array<{key:string, state:string, questions:Object}>} requests
- * @param {{callImpl?:Function, concurrency?:number, usageLabel?:string, stats?:Object}} opts
+ * @param {{callImpl?:Function, concurrency?:number, usageLabel?:string, stats?:Object, retryDelayMs?:number}} opts
  * @returns {Promise<Map<string, Object[]>>} key → the answers of each rep
  */
 async function runJevRequests(requests, { callImpl, concurrency = JEV_DECISION_CONCURRENCY, usageLabel = 'jev_decisions', stats = newStats(), retryDelayMs = 2000 } = {}) {
@@ -151,36 +174,67 @@ async function runJevRequests(requests, { callImpl, concurrency = JEV_DECISION_C
   const call = callImpl || ((req) => J.callJev(req));
   const out = new Map();
   let next = 0;
+  let failed = null;
   const one = async (rq) => {
+    let firstFailAt = null;
     for (let attempt = 1; ; attempt++) {
+      if (failed) throw failed;
       const t0 = Date.now();
       try {
-        const r = await call({ state: rq.state, questions: rq.questions });
+        const r = await withTimeout(call({ state: rq.state, questions: rq.questions }), JEV_OUTAGE.callTimeoutMs, 'Jev call');
         const ms = Date.now() - t0;
         stats.calls++; stats.cost += Number(r.cost || 0); stats.ms.push(ms);
         recordTextUsage('openrouter', { ...openRouterUsage(r.usage), direct_cost: Number(r.cost || 0), elapsed_ms: ms }, usageLabel, r.model || J.JEV_MODEL);
         return r.answers;
       } catch (e) {
-        stats.errors.push({ key: rq.key, attempt, error: String(e.message || e).slice(0, 300) });
-        if (!TRANSIENT_JEV_ERROR.test(String(e.message)) || attempt >= JEV_ATTEMPTS) {
+        if (e instanceof JevDecisionError && e === failed) throw e;
+        const msg = String(e.message || e);
+        stats.errors.push({ key: rq.key, attempt, error: msg.slice(0, 300) });
+        firstFailAt = firstFailAt || Date.now();
+        const waited = Date.now() - firstFailAt;
+        if (NOT_AN_OUTAGE.test(msg) || waited >= JEV_OUTAGE.waitMs) {
           stats.failed++;
-          throw new JevDecisionError(`Jev decision "${rq.key}" failed after ${attempt} attempt(s): ${e.message}`);
+          throw new JevDecisionError(`Jev decision "${rq.key}" failed after ${attempt} attempt(s) over ${Math.round(waited / 1000)} s: ${msg}`);
         }
         stats.retries++;
-        await new Promise(res => setTimeout(res, retryDelayMs * attempt));
+        if (attempt === 1) log.warn(`⏳ [JEV] "${rq.key}" failed (${msg.slice(0, 160)}) — waiting and retrying for up to ${Math.round(JEV_OUTAGE.waitMs / 1000)} s`);
+        const delay = Math.min(retryDelayMs * 2 ** (attempt - 1), JEV_OUTAGE.maxBackoffMs, Math.max(0, JEV_OUTAGE.waitMs - waited));
+        await new Promise(res => setTimeout(res, delay));
       }
     }
   };
   const workers = Array.from({ length: Math.min(concurrency, requests.length) }, async () => {
-    while (next < requests.length) {
+    while (next < requests.length && !failed) {
       const rq = requests[next++];
-      const answers = await one(rq);
-      if (!out.has(rq.key)) out.set(rq.key, []);
-      out.get(rq.key).push(answers);
+      try {
+        const answers = await one(rq);
+        if (!out.has(rq.key)) out.set(rq.key, []);
+        out.get(rq.key).push(answers);
+      } catch (e) {
+        failed = failed || e;
+        throw failed;
+      }
     }
   });
   await Promise.all(workers);
   return out;
+}
+
+/**
+ * B — the pre-start health check: one tiny question. Never throws.
+ * @returns {Promise<{ok:boolean, ms:number, error?:string}>}
+ */
+async function probeJev({ callImpl } = {}) {
+  const call = callImpl || ((req) => J.callJev(req));
+  const t0 = Date.now();
+  try {
+    const r = await withTimeout(call({ state: 'A picture book page: a child holds a red kite on a hill.', questions: { PROBE: { type: 'noul', instructions: 'The page shows a kite.' } } }), JEV_OUTAGE.probeTimeoutMs, 'Jev probe');
+    J.yesProb(r.answers.PROBE);
+    recordTextUsage('openrouter', { ...openRouterUsage(r.usage), direct_cost: Number(r.cost || 0), elapsed_ms: Date.now() - t0 }, 'jev_decisions_probe', r.model || J.JEV_MODEL);
+    return { ok: true, ms: Date.now() - t0 };
+  } catch (e) {
+    return { ok: false, ms: Date.now() - t0, error: String(e.message || e).slice(0, 300) };
+  }
 }
 
 function newStats() { return { calls: 0, cost: 0, ms: [], retries: 0, failed: 0, errors: [] }; }
@@ -849,6 +903,15 @@ async function decideGaze({ arc, pages, perPage }, opts = {}) {
  */
 const JEV_FIXED_FIELDS_RULE = 'Fields decided upstream are FIXED: a page whose plan carries a FIXED line takes its `timeOfDay` from it exactly, and its `weather` is `none` when the line says indoors and never `none` when it says outdoors. After the briefs are written, code sets each story page\'s cited Visual Bible elements in `objects[]` (locations excepted), its `population`, its `aboard` and every character\'s `looksAt`; the prose renders those values and no rewrite changes them.';
 
+/**
+ * The rule as a brief author / the review is given it. On the Jev-outage
+ * backup nothing is decided upstream; the one thing left to say is who picks a
+ * shot the plan still carries as the placeholder (a story that fell back after
+ * its plan was written).
+ */
+const JEV_BACKUP_SHOT_RULE = `A plan line whose first field is still the word ${SV.PLAN_SHOT_PLACEHOLDER} leaves that page's camera shot to you.`;
+function fixedFieldsRule(jevBackup = false) { return jevBackup ? JEV_BACKUP_SHOT_RULE : JEV_FIXED_FIELDS_RULE; }
+
 /** The FIXED line under a page's PLAN line in the Art Director's plan block. */
 function fixedLine(fixed) {
   if (!fixed || !fixed.timeOfDay) return '';
@@ -967,7 +1030,11 @@ function applyVbPages(visualBible, citesByPage, decidedIds) {
 
 module.exports = {
   JevDecisionError,
+  JEV_OUTAGE,
+  probeJev,
   JEV_FIXED_FIELDS_RULE,
+  JEV_BACKUP_SHOT_RULE,
+  fixedFieldsRule,
   fixedLine,
   pinBrief,
   fixedFieldFinding,

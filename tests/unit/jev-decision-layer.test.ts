@@ -5,7 +5,7 @@
  * wording in server/lib/jevDecisions.js, measured by the eval scripts).
  * see docs/decisions.md 2026-09-27 "Jev decision layer wired"
  */
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createRequire } from 'node:module';
 
 const req = createRequire(import.meta.url);
@@ -96,7 +96,10 @@ describe('decideShots: Jev scores, code assigns under the budget', () => {
   });
 });
 
-describe('Jev failure policy: NO FALLBACKS', () => {
+describe('Jev outage policy: wait, then the caller switches to the backup', () => {
+  const saved = { ...JD.JEV_OUTAGE };
+  beforeAll(() => { JD.JEV_OUTAGE.waitMs = 50; JD.JEV_OUTAGE.maxBackoffMs = 5; });
+  afterAll(() => { Object.assign(JD.JEV_OUTAGE, saved); });
   it('retries a transient HTTP error, then answers', async () => {
     let n = 0;
     const impl = async ({ questions }: any) => {
@@ -108,17 +111,23 @@ describe('Jev failure policy: NO FALLBACKS', () => {
     expect(out.get('k')).toHaveLength(1);
     expect(stats.retries).toBe(1);
   });
-  it('a non-transient error fails the step at once, as a JevDecisionError', async () => {
-    const impl = async () => { throw new Error('jevAudit: reply lacks answers for Q'); };
+  it('a missing API key is configuration, not an outage: it fails at once, as a JevDecisionError', async () => {
+    const impl = async () => { throw new Error('jevAudit: OPENROUTER_API_KEY is not set'); };
     await expect(JD.runJevRequests([{ key: 'k', state: 's', questions: { Q: { type: 'noul', instructions: 'q' } } }], { callImpl: impl, retryDelayMs: 1 }))
       .rejects.toThrow(JD.JevDecisionError);
   });
-  it('a transient error that persists fails after the retry budget', async () => {
+  it('an error that persists is retried until the outage wait is spent, then fails', async () => {
     let n = 0;
-    const impl = async () => { n++; throw new Error('jevAudit: HTTP 429: slow down'); };
+    const impl = async () => { n++; throw new Error('jevAudit: HTTP 503: down'); };
     await expect(JD.runJevRequests([{ key: 'k', state: 's', questions: { Q: { type: 'noul', instructions: 'q' } } }], { callImpl: impl, retryDelayMs: 1 }))
-      .rejects.toThrow(/after 4 attempt/);
-    expect(n).toBe(4);
+      .rejects.toThrow(JD.JevDecisionError);
+    expect(n).toBeGreaterThan(2);
+  });
+  it('the probe answers ok, or reports the error — it never throws', async () => {
+    expect((await JD.probeJev({ callImpl: async ({ questions }: any) => ({ answers: Object.fromEntries(Object.keys(questions).map(k => [k, { noul: 0.9 }])), cost: 0, usage: {} }) })).ok).toBe(true);
+    const down = await JD.probeJev({ callImpl: async () => { throw new Error('HTTP 502'); } });
+    expect(down.ok).toBe(false);
+    expect(down.error).toMatch(/502/);
   });
 });
 

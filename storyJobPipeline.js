@@ -4132,6 +4132,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // VB citations, aboard, population, gaze — every decision per page, so a
     // run can be replayed. docs/decisions.md "Jev decision layer wired".
     const jevDecisions = beatsResult?.jevDecisions || null;
+    // Set when the Jev-outage backup ran (owner exception, 2026-09-27): {step, reason, at}.
+    const jevFallback = beatsResult?.jevFallback || null;
     // Drafted arc + the arc reviewer's analysis, so a shipped story can be read
     // back against the arc it promised.
     const arcReviewReport = beatsResult?.arcReviewReport || null;
@@ -6853,6 +6855,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       },
       beatsReviewReport, // per-page before/after from the beats review (beats mode)
       jevDecisions, // the Jev decision layer's per-page decisions (beats mode)
+      jevFallback, // the Jev-outage backup ran from this step (null = Jev-authored)
       storyBibleReport, // wardrobe contract call: prompt + raw reply (beats mode)
       clothingReviewReport, // per-outfit before/after from the wardrobe review (beats mode)
       wardrobeBibleReport, // wardrobe contract vs Visual Bible: adopt / conflict findings (beats mode)

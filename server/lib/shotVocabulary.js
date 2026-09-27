@@ -272,6 +272,65 @@ function buildShotDefinitions(shotHint, sceneText = null) {
  */
 const MAX_MEDIUM_WIDE_SHARE = 0.5;
 
+// ───────────────────────── THE JEV-OUTAGE BACKUP (owner exception, 2026-09-27) ─────────────────────────
+// The planner-authored shot path as it stood before the Jev decision layer:
+// used ONLY when a story runs its backup (jevDecisions: the pre-start probe
+// found Jev down). One copy each — the Jev path reads shotFloors, never these.
+// see docs/decisions.md 2026-09-27 "Jev outage: wait, then today's setup as backup"
+
+/**
+ * The two middle distances the cap is about — the default framings a book falls
+ * back on when no page earns anything else. Declared here so the counters read a
+ * name instead of spelling the two words out for themselves.
+ */
+const MID_DISTANCE_SHOTS = ['medium', 'wide'];
+
+/**
+ * THE PEOPLELESS PAGE MAY BE THE ULTRA-WIDE PAGE (owner, 2026-09-20).
+ *
+ * "Books of 10 page allow a bit of freedom, for example put ultra-wide and no
+ * person together as 1, so only 5 or so are spoken for."
+ *
+ * A short book had NO slack. At 9-13 pages the floors mandate close-up 2 +
+ * ultra-wide 1 + aerial 1 + over-the-shoulder 1 = 5 shot pages, and
+ * `NO_PEOPLELESS_PAGE` (must-fix) demands a sixth page with no cast in it,
+ * against a medium/wide ceiling of 4 at nine pages and 5 at ten. Six mandated
+ * pages plus a ceiling of 5 needs an 11-page book; 9 and 10 were therefore
+ * UNSATISFIABLE, and the planner could only ship one finding or the other.
+ *
+ * The two demands are orthogonal and always were: `shot` is a camera word, and
+ * peopleless is a property of the CAST. An ultra-wide landscape with nobody in
+ * it is the natural page to be both, so one page discharges both.
+ *
+ * AT EVERY LENGTH, not below a threshold. Joint satisfaction is only NEEDED at
+ * 9-10 pages (see the arithmetic in tests/unit/shot-distribution-floors.test.ts,
+ * which walks 4-40), but it is a PERMISSION, not a quota. A permission that is
+ * legal at ten pages and illegal at eighteen would be an arbitrary threshold
+ * with nothing behind it and one more number to maintain; at the longer lengths
+ * it simply buys slack the book is free not to spend.
+ *
+ * ONLY THE CAST PROPERTY COMBINES. `shot` is one-of, so aerial, over-the-
+ * shoulder, close-up and ultra-wide can never share a page with each other, and
+ * nothing here lets them.
+ */
+const PEOPLELESS_SHARED_SHOT = 'ultra-wide';
+
+if (!SHOT_TYPES.includes(PEOPLELESS_SHARED_SHOT)) {
+  throw new Error('shotVocabulary: PEOPLELESS_SHARED_SHOT names an unknown shot');
+}
+
+/**
+ * id → the finding code planCounters raises when a book is short of that shot.
+ * One code per floored shot, so a re-plan is told WHICH shot is missing rather
+ * than that the spread is wrong. `ultra-wide` is a DISTANCE and `aerial` a
+ * POSITION: different shots on different axes, never folded together.
+ */
+const SHOT_FLOOR_CODE = {
+  'close-up': 'SHOT_CLOSEUP_COUNT',
+  'ultra-wide': 'SHOT_ULTRAWIDE_COUNT',
+  'over-the-shoulder': 'SHOT_OTS_COUNT',
+};
+
 /**
  * FIELD 0 OF A PLAN LINE BEFORE CODE WRITES IT (owner, 2026-09-27). The beats
  * planner divides the book and writes this literal word where the shot goes;
@@ -312,6 +371,9 @@ for (const tier of SHOT_FLOOR_TIERS) {
     if (!SHOT_TYPES.includes(id)) {
       throw new Error(`shotVocabulary: SHOT_FLOOR_TIERS floors an unknown shot \`${id}\``);
     }
+    if (!SHOT_FLOOR_CODE[id]) {
+      throw new Error(`shotVocabulary: no finding code for the floored shot \`${id}\` — the backup path's counters could not report it`);
+    }
   }
 }
 
@@ -347,6 +409,30 @@ function shotFloors(pageCount) {
     mandatedPages,
     slack: pages - mandatedPages - maxMediumWide,
   };
+}
+
+/**
+ * The same table as one sentence for the planner. Built from shotFloors, so the
+ * words the planner reads and the numbers the counters enforce cannot drift.
+ */
+function shotDistributionPhrase(pageCount) {
+  const { floors, requiredPositions, maxMediumWide } = shotFloors(pageCount);
+  const list = SHOT_TYPES
+    .filter(id => floors[id])
+    .map(id => `${floors[id]} ${id} page${floors[id] === 1 ? '' : 's'}`)
+    .join(', ');
+  // A short book is asked for no angle, but it is still SHOWN the words — the
+  // page that earns one may take it at any length.
+  const positions = requiredPositions
+    ? ` ${requiredPositions} page${requiredPositions === 1 ? '' : 's'} in total leave eye level for a camera position (${SHOT_POSITIONS}).`
+    : ` A page may leave eye level for a camera position (${SHOT_POSITIONS}) where it earns one.`;
+  // The permission is stated only where the shot it rides is actually floored;
+  // a short book that owes no ultra-wide is not told to put its people-free
+  // page on one.
+  const shared = floors[PEOPLELESS_SHARED_SHOT]
+    ? ` The page with no people in frame may BE the ${PEOPLELESS_SHARED_SHOT} page — a landscape with nobody in it answers both at once, and that is one page spoken for, not two. No two shot words ever share a page.`
+    : '';
+  return `Across the ${pageCount} pages: at most ${maxMediumWide} of them medium or wide — half the book at most, and never only two camera distances across the book. At least ${list}.${positions} These are floors, not targets: spend the remaining pages on whichever of the eight words each page earns, and keep the angled pages few enough that an angle still reads as one.${shared}`;
 }
 
 /**
@@ -740,10 +826,14 @@ module.exports = {
   resolveShotId,
   MAX_MEDIUM_WIDE_SHARE,
   PLAN_SHOT_PLACEHOLDER,
+  MID_DISTANCE_SHOTS,
+  PEOPLELESS_SHARED_SHOT,
+  SHOT_FLOOR_CODE,
   SHOT_FLOOR_TIERS,
   CLOSEUP_BELOW_WAIST_VERBS,
   CLOSEUP_KEPT_RULE,
   CLOSEUP_BELOW_WAIST_PHRASE,
   closeUpBelowWaistVerbs,
   shotFloors,
+  shotDistributionPhrase,
 };

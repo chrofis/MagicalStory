@@ -161,7 +161,7 @@ describe('runReplanRounds: code writes the who column; a rewrite naming a remove
     }
   });
 
-  it('a Jev failure in the cut fails the step — the first division never ships in its place', async () => {
+  it('Jev down after the wait: the round switches to the backup — the planner gets the counter\'s own finding', async () => {
     await loadPromptTemplates();
     const { pages } = groupBook();
     const castPerPage = pages.map(p => ({ pageNumber: p.pageNumber, names: [1, 3, 6].includes(p.pageNumber) ? [...KIDS] : ['Ana', 'Ben'] }));
@@ -171,17 +171,29 @@ describe('runReplanRounds: code writes the who column; a rewrite naming a remove
       counters: { lines: ['x'], findings: [], cast: { all: KIDS, aliases: {} }, stats: { castPerPage, groupPages: { pages: [1, 3, 6], budget: 1 }, focalPages: {} } },
     };
     const savedJev = jevAuditMod.callJev;
-    jevAuditMod.callJev = async () => { throw new Error('jevAudit: reply lacks answers for TOGETHER'); };
+    const savedWait = JD.JEV_OUTAGE.waitMs;
+    JD.JEV_OUTAGE.waitMs = 20;
+    jevAuditMod.callJev = async () => { throw new Error('jevAudit: HTTP 503: down'); };
+    const saved = textModelsMod.callTextModelStreaming;
+    let replanPrompt = '';
+    textModelsMod.callTextModelStreaming = async (prompt: string) => { replanPrompt = prompt; return { text: '---PAGE PLAN---', modelId: 'stub', usage: {} }; };
+    const jevReport: any = { castCuts: [] };
     try {
-      await expect(BP.runReplanRounds({
+      await BP.runReplanRounds({
         inputData: { characters: KIDS.map(n => ({ name: n })), language: 'en', pages: 6 }, pageCount: 6, plan: { pages }, check1, replanRounds: [],
         approvedArc: 'A', arcHints: '', arcStoryLogic: '', arcCentralFigure: null, castTable: null,
         commission: { listed: ['Ana', 'Ben'], all: KIDS }, commissionedNames: KIDS, maxCast: 6, planModel: 'stub',
         readPlan: BP.makePlanReader([1, 2, 3, 4, 5, 6], 'A'), runCheck: async () => check1, onChunk: null,
-        gl: { info() {}, warn() {}, debug() {}, error() {} }, stage: async () => {}, checkCancellation: async () => {}, beats: pages, pagePlan: '', jevReport: { castCuts: [] },
-      })).rejects.toThrow(JD.JevDecisionError);
+        gl: { info() {}, warn() {}, debug() {}, error() {} }, stage: async () => {}, checkCancellation: async () => {}, beats: pages, pagePlan: '', jevReport,
+      });
+      expect(jevReport.fallback.step).toBe('cast_cuts');
+      expect(jevReport.castCuts).toEqual([]);
+      expect(replanPrompt).toContain('PLAN[GROUP_PAGES_OVER_BUDGET]');
+      expect(replanPrompt).not.toContain('CAST CUT');
     } finally {
       jevAuditMod.callJev = savedJev;
+      JD.JEV_OUTAGE.waitMs = savedWait;
+      textModelsMod.callTextModelStreaming = saved;
     }
   });
 });

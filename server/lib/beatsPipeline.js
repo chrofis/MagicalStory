@@ -1134,7 +1134,7 @@ function createPlanCheckRunner({ inputData, approvedArc, arcHints, arcStoryLogic
       log.error(`❌ [BEATS] Plan check (${label}) failed (${err.message}) — NO ROSTER, so the entire plan-counter layer is skipped this round`);
       gl.error(`${label}_failed`, `Plan check failed: ${err.message} — no roster, so every plan counter (cast, invented cast, shot variety, focal pages) is skipped this round`, null, { error: err.message, model: planCheckModel });
     }
-    const counters = runPlanCounters({ pages, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit, roster, peoplelessPick, centralFigure: arcCentralFigure, centralPages, mainName, castTable, actions });
+    const counters = runPlanCounters({ pages, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit, roster, peoplelessPick, centralFigure: arcCentralFigure, centralPages, mainName, castTable, actions, legacyShots: !!labPromptOptions.legacyShots });
     // The central-figure counter counts on the CENTRAL line alone; a check
     // that named no pages for a named figure leaves it uncounted — loudly.
     if (counters.stats?.centralFigure?.unanswered) {
@@ -1269,8 +1269,9 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
       let roundFindings = pendingCheck.findings || [];
       let castCut = null;
       const groupFinding = roundFindings.find(f => f && f.code === 'GROUP_PAGES_OVER_BUDGET');
-      if (groupFinding) {
+      if (groupFinding && jevActive(jevReport)) {
         const st = pendingCheck.counters.stats || {};
+        try {
         castCut = await jevDecisions.decideGroupCuts({
           arc: approvedArc,
           pages: beats,
@@ -1287,6 +1288,15 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
           castTable,
           sameName,
         });
+        } catch (jevErr) {
+          if (!(jevErr instanceof JevDecisionError)) throw jevErr;
+          // The backup: the planner chooses the cuts from the counter's own
+          // finding, as before the layer.
+          jevFallBack(jevReport, 'cast_cuts', jevErr, gl);
+          castCut = null;
+        }
+      }
+      if (castCut) {
         if (jevReport) jevReport.castCuts.push({ round, ...castCut });
         const instructions = jevDecisions.castCutFindings(castCut);
         roundFindings = [...roundFindings.filter(f => f !== groupFinding), ...instructions];
@@ -1302,6 +1312,7 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
         storyLogic: arcStoryLogic,
         centralFigure: arcCentralFigure,
         castTable,
+        legacyShots: legacyShotsOf(jevReport),
         ...labPromptOptions,
         replan: buildReplanSection(pagePlan, roundFindings, { pageCount: beats.length, keep, refused: lastRefusals, castFloor: coverageRule ? coverageRule.appearances.min : null, castTable }),
       });
@@ -1691,6 +1702,30 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
 }
 
 /**
+ * THE JEV-OUTAGE BACKUP (owner, 2026-09-27: "Can we keep today's setup as
+ * backup if Jev is down?" — an explicit exception to NO FALLBACKS).
+ *
+ * `jevReport.fallback` is the one switch. It is set once per story, at the
+ * pre-start probe (step 'start': the whole story runs today's setup before the
+ * layer — the planner authors shots, cuts and the Art Director its fields) or
+ * at the first step whose Jev calls still fail after the 5-minute wait
+ * (jevDecisions.JEV_OUTAGE): that step and every later one run the backup.
+ * Logged at error level (`jev_fallback`) and stored on the story.
+ */
+function jevActive(jevReport) { return !(jevReport && jevReport.fallback); }
+
+function jevFallBack(jevReport, step, err, gl) {
+  if (!jevReport) throw err;
+  if (jevReport.fallback) return;
+  jevReport.fallback = { step, reason: String((err && err.message) || err).slice(0, 500), at: new Date().toISOString() };
+  log.error(`🚨 [JEV] BACKUP PATH from step "${step}" — the Jev decision layer is unavailable (${jevReport.fallback.reason}); this step and every later decision run today's setup before the layer`);
+  if (gl) gl.error('jev_fallback', `Jev unavailable from step "${step}": this story runs the backup path (the planner / Art Director author the decisions) — ${jevReport.fallback.reason}`, null, jevReport.fallback);
+}
+
+/** Shots authored by the planner: only a story that started on the backup. */
+function legacyShotsOf(jevReport) { return !!(jevReport && jevReport.fallback && jevReport.fallback.step === 'start'); }
+
+/**
  * THE SHOT OF EVERY PAGE — the Jev decision layer's Part 1 (owner, 2026-09-27).
  * The planner writes the placeholder; after the re-plan, Jev scores each shot's
  * fit per page and code assigns them under the budget (jevDecisions.decideShots),
@@ -1702,7 +1737,23 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
  *
  * @returns {Promise<{beats: Array, pagePlan: string, report: object}>}
  */
-async function finalizePlanShots({ approvedArc, beats, check, gl, callImpl }) {
+async function finalizePlanShots({ approvedArc, beats, check, gl, callImpl, jevReport = null }) {
+  const unchanged = (why) => ({ beats, pagePlan: beats.map(pg => `Page ${pg.pageNumber}: ${pg.planLine || ''}`).join(String.fromCharCode(10)), report: { skipped: why } });
+  // The backup from the start: the planner wrote the shots.
+  if (legacyShotsOf(jevReport)) return unchanged('backup path: the planner authored the shots');
+  // The backup from a later step: the plan carries the placeholder and the Art
+  // Director picks each shot (JEV_FIXED_FIELDS_RULE's placeholder sentence).
+  if (!jevActive(jevReport)) return unchanged(`backup path from "${jevReport.fallback.step}": the Art Director picks each shot`);
+  try {
+    return await finalizePlanShotsJev({ approvedArc, beats, check, gl, callImpl });
+  } catch (err) {
+    if (!(err instanceof JevDecisionError) || !jevReport) throw err;
+    jevFallBack(jevReport, 'shots', err, gl);
+    return unchanged(`backup path from "shots": the Art Director picks each shot`);
+  }
+}
+
+async function finalizePlanShotsJev({ approvedArc, beats, check, gl, callImpl }) {
   const perPage = check && check.counters && check.counters.stats && check.counters.stats.castPerPage;
   if (!Array.isArray(perPage) || !perPage.length) {
     throw new JevDecisionError(`no head count for the shipped division (${check && check.counters && check.counters.skipped ? `plan counters skipped: ${check.counters.skipped}` : 'the plan check gave no roster'}) — the shot assignment cannot apply the group rule, so no page gets a shot`);
@@ -1893,6 +1944,7 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
         clothingRequirements,
         // Decides whether the text-zone rule family is asked for at all.
         story: inputData,
+        jevBackup: !jevActive(jevReport),
       }
     );
     let lastErr = null;
@@ -1942,7 +1994,7 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
   // story page, from the arc and the plan. Each reaches the Art Director as the
   // page's FIXED line; weather stays the Art Director's, Jev's answer logged
   // beside it. A Jev failure throws — no second author for the light.
-  {
+  if (jevActive(jevReport)) try {
     const light = await jevDecisions.decideLight({ arc: approvedArc, pages: beats });
     const byNum = new Map(light.pages.map(r => [r.pageNumber, r]));
     for (const b of beats) {
@@ -1951,6 +2003,11 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
     }
     if (jevReport) jevReport.light = light;
     gl.info('beats_jev_light', `Light by Jev + code: ${light.pages.map(r => `p${r.pageNumber} ${r.timeOfDay}${r.indoor ? '/in' : ''}`).join(', ')}${light.clockHeld.length ? ` — clock held on ${light.clockHeld.map(h => `p${h.pageNumber} (${h.jev}→${h.held})`).join(', ')}` : ''}`, null, { pages: light.pages, clockHeld: light.clockHeld, stats: light.stats });
+  } catch (err) {
+    if (!(err instanceof JevDecisionError) || !jevReport) throw err;
+    // The backup: the Art Director authors the light, as before the layer.
+    for (const b of beats) delete b.fixed;
+    jevFallBack(jevReport, 'light', err, gl);
   }
   // COVERS ARE PAGES (owner, 2026-09-24). Each cover the job renders is a page
   // whose BEAT code writes (coverBeats.js: purpose, cast, costumes, the landmark
@@ -1979,6 +2036,7 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
   // labForcePerPage (Test Lab only): the historical per-page comparison runs
   // every page through the per-page fallback below. The run never passes it.
   const allPrompt = labForcePerPage ? null : buildSceneExpansionAllPrompt(inputData, briefBeats, {
+      jevBackup: !jevActive(jevReport),
       availableAvatars,
       maxCharactersPerScene,
       // The whole story, read-only, for the Art Director's judgment — it
@@ -2246,7 +2304,7 @@ ${bibleBody}` : bibleBody;
   meta.timings.sceneExpansionMs = Date.now() - t;
 
   // ── The decision layer after the Art Director (Parts 3-5) ────────────────
-  {
+  if (jevActive(jevReport)) try {
     const decided = await applyJevBriefDecisions({ expansions, beats, visualBible, bibleSections, approvedArc, inputData, gl });
     bibleSections = decided.bibleSections;
     if (jevReport) Object.assign(jevReport, { vb: decided.report.vb, population: decided.report.population, gaze: decided.report.gaze, fixedChanges: decided.report.fixedChanges });
@@ -2259,6 +2317,13 @@ ${bibleBody}` : bibleBody;
       return f.weather && f.weather !== b.fixed.weatherAdvice ? `p${b.pageNumber} AD ${f.weather} / Jev ${b.fixed.weatherAdvice}` : null;
     }).filter(Boolean);
     if (disagree.length) gl.info('beats_jev_weather_advice', `Weather, Art Director vs Jev (advisory): ${disagree.join(', ')}`, null, { disagree });
+  } catch (err) {
+    if (!(err instanceof JevDecisionError) || !jevReport) throw err;
+    // The backup: the Art Director's own citations, population, aboard and
+    // gaze ship. Nothing was written into a brief before the last decision
+    // returned, so only the per-page decision records are cleared.
+    for (const b of beats) { delete b.jevFixed; delete b.jevChanges; delete b.jevFinding; }
+    jevFallBack(jevReport, 'brief_fields', err, gl);
   }
 
   // THE PROMPT THAT WROTE THE BRIEFS (2026-09-19).
@@ -2480,7 +2545,7 @@ async function runSceneReview({ inputData, expansions, clothingRequirements, vis
     // the bible feeds check 9f (a stated object's state page ranges).
     // clothingRequirements: the reviewer's CHARACTER DETAILS is the same cast
     // block the Art Director wrote from, outfits included (check 3b/10c).
-    { clothingFindings, briefFindings, beats: briefBeats, visualBible, clothingRequirements, ...labPromptOptions }
+    { clothingFindings, briefFindings, beats: briefBeats, visualBible, clothingRequirements, jevBackup: !(briefBeats || []).some(b => b && b.jevFixed), ...labPromptOptions }
   );
   if (!srPrompt) {
     log.warn('⚠️ [BEATS] scene-review template unavailable — scene briefs shipped unreviewed');
@@ -3115,6 +3180,20 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   const started = Date.now();
   log.info(`🪜 [BEATS] job=${jobId} pages=${pageCount} plan=${planModel} arcCreate=${arcCreateModel} arcRetell=${arcRetellModel} arcPanel=${arcPanelModels.join('+')} arcRounds=${arcRounds} planCheck=${modelOverrides.planCheckModel || MODEL_DEFAULTS.planCheckModel} review=${reviewModel} sceneReview=${sceneReviewModel} wardrobeReview=${clothingReviewModel} scenes=${sceneModel} text=${textModel}`);
 
+  // THE JEV DECISION LAYER'S REPORT (owner, 2026-09-27): every decision the
+  // layer makes on this story — cast cuts per re-plan round, shots, light, VB
+  // citations, aboard, population, gaze — stored as `stories.data.jevDecisions`
+  // so a run can be replayed; `fallback` is the backup switch (jevFallBack).
+  const jevReport = { castCuts: [], shots: null, light: null, vb: null, population: null, gaze: null, fixedChanges: null, fallback: null, probe: null };
+  // B — THE PRE-START HEALTH CHECK: one tiny Jev question. Down → the whole
+  // story runs the backup (today's setup before the layer), never refused.
+  {
+    const probe = await jevDecisions.probeJev();
+    jevReport.probe = probe;
+    if (probe.ok) log.info(`🩺 [JEV] probe ok (${probe.ms} ms) — the decision layer is live for this story`);
+    else jevFallBack(jevReport, 'start', new Error(`pre-start probe failed: ${probe.error}`), gl);
+  }
+
   // ── Step 0: THE ARC MACHINE — create → panel → re-tell ────────────────────
   // Replaces the arc write → audit → child critic → review → re-audit chain
   // (owner, 2026-08-30). Forensics on that chain showed the patch step
@@ -3569,7 +3648,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // 2026-09-02 the stage emits ONE thing per page: the plan line. The beat
   // prose it used to write measured as the lossiest step in the chain
   // (Lab #973) and is gone — see docs/decisions.md.
-  const planPrompt = buildBeatsPrompt(inputData, pageCount, { finalArc: approvedArc, arcHints, storyLogic: arcStoryLogic, centralFigure: arcCentralFigure });
+  const planPrompt = buildBeatsPrompt(inputData, pageCount, { finalArc: approvedArc, arcHints, storyLogic: arcStoryLogic, centralFigure: arcCentralFigure, legacyShots: legacyShotsOf(jevReport) });
   if (!planPrompt) throw new Error('story-beats template unavailable — beats pipeline cannot run');
 
   /**
@@ -3653,6 +3732,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   const runCheck = createPlanCheckRunner({
     inputData, approvedArc, arcHints, arcStoryLogic, arcCentralFigure, castTable, commission, commissionedNames, placeNames,
     maxCast, arcInventedNames, arcInventedLimit, mainName, planCheckModel, onChunk, gl,
+    labPromptOptions: legacyShotsOf(jevReport) ? { legacyShots: true } : {},
   });
 
 
@@ -3663,11 +3743,6 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // canonical fields are derived from it by shippedReplanState() so they can
   // only ever describe the division that shipped.
   const replanRounds = [];
-  // THE JEV DECISION LAYER'S REPORT (owner, 2026-09-27): every decision the
-  // layer makes on this story — cast cuts per re-plan round, shots, light, VB
-  // citations, aboard, population — stored as `stories.data.jevDecisions` so a
-  // run can be replayed. docs/decisions.md "Jev decision layer wired".
-  const jevReport = { castCuts: [], shots: null, light: null, vb: null, population: null, fixedChanges: null };
   // The check whose roster describes the shipped division: the head count the
   // shot assignment reads.
   let shippedCheck = check1;
@@ -3681,11 +3756,11 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // ── Step 2b: THE SHOTS — Jev picks, code assigns and writes field 0 ───────
   await checkCancellation();
   {
-    const shot = await finalizePlanShots({ approvedArc, beats, check: shippedCheck, gl });
+    const shot = await finalizePlanShots({ approvedArc, beats, check: shippedCheck, gl, jevReport });
     beats = shot.beats;
     pagePlan = shot.pagePlan;
     jevReport.shots = shot.report;
-    meta.timings.jevShotsMs = shot.report.elapsedMs;
+    meta.timings.jevShotsMs = shot.report.elapsedMs || 0;
   }
 
   {
@@ -4380,7 +4455,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // trimmed, age-clamped, landmark-linked. The caller prefers it over a
   // re-parse of rawOutline so the two can never diverge (the transcript is
   // kept in step by syncVisualBibleSection; the re-parse is the fallback).
-  return { title, titleJudge, beats, pages, scenes, coverScenes, rawOutline, visualBible, meta, challengeDrawIds, challengeTakenIds, challengeDraw, arcReviewReport, beatsReviewReport, jevDecisions: jevReport, storyBibleReport, clothingReviewReport, wardrobeBibleReport, sceneExpansionReport, sceneReviewReport };
+  // The backup marker rides on the report the dev panel already shows.
+  if (beatsReviewReport) beatsReviewReport.jevFallback = jevReport.fallback;
+  return { title, titleJudge, beats, pages, scenes, coverScenes, rawOutline, visualBible, meta, challengeDrawIds, challengeTakenIds, challengeDraw, arcReviewReport, beatsReviewReport, jevDecisions: jevReport, jevFallback: jevReport.fallback, storyBibleReport, clothingReviewReport, wardrobeBibleReport, sceneExpansionReport, sceneReviewReport };
 }
 
 module.exports = { generateStoryViaBeats, finalizePlanShots, applyJevBriefDecisions, pinJevFixedFields, runArtDirector, arcTempFor, makeArcCreatorCall, runSceneReview, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, bibleCorrectionsMissingFromTranscript, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };

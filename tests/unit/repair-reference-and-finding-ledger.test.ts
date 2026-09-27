@@ -127,7 +127,7 @@ describe('the scene-review replay passes all four options production passes', ()
     // Since 2026-09-27 the replay runs the run's own review, which builds all four.
     expect(testlab).toMatch(/await runSceneReview\(\{/);
     const beats = read('server/lib/beatsPipeline.js');
-    expect(beats).toMatch(/\{ clothingFindings, briefFindings, beats: briefBeats, visualBible, clothingRequirements, \.\.\.labPromptOptions \}/);
+    expect(beats).toMatch(/\{ clothingFindings, briefFindings, beats: briefBeats, visualBible, clothingRequirements, jevBackup: [^}]*\.\.\.labPromptOptions \}/);
   });
 
   it('it computes them from the same check production runs, with the bible secondaries in the cast', () => {

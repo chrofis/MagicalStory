@@ -235,7 +235,7 @@ describe('wiring — production still passes what the resolver mirrors', () => {
   });
 
   it('production hands the beats planner the approved arc, arcHints, the story logic and the central figure', () => {
-    expect(beatsSrc).toContain('buildBeatsPrompt(inputData, pageCount, { finalArc: approvedArc, arcHints, storyLogic: arcStoryLogic, centralFigure: arcCentralFigure })');
+    expect(beatsSrc).toContain('buildBeatsPrompt(inputData, pageCount, { finalArc: approvedArc, arcHints, storyLogic: arcStoryLogic, centralFigure: arcCentralFigure, legacyShots: legacyShotsOf(jevReport) })');
   });
 
   it('the replay resolves the story logic the arc stored, and nothing for an older story', () => {

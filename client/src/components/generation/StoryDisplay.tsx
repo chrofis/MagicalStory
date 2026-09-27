@@ -2485,6 +2485,13 @@ export function StoryDisplay({
         </div>
       )}
 
+      {/* The Jev-outage backup ran on this story (owner exception, 2026-09-27) */}
+      {developerMode && beatsReviewReport?.jevFallback && (
+        <div className="mt-2 rounded border border-red-400 bg-red-50 px-3 py-2 text-xs text-red-800">
+          Jev backup path: the decision layer was unavailable from step &quot;{beatsReviewReport.jevFallback.step}&quot; on — {beatsReviewReport.jevFallback.reason}
+        </div>
+      )}
+
       {/* Developer Mode Buttons */}
       {developerMode && (
         <div className="flex flex-wrap gap-2 mt-2">

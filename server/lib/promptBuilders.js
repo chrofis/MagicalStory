@@ -18,7 +18,7 @@ const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = requi
 // exported from visualBible.js for coverIterate.js, which still uses it.
 const { REQUIRED_TEXT_AUTHORING_RULE, declaredText } = require('./requiredText');
 const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote, withScaleNote } = require('./visualBible');
-const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, PLAN_SHOT_PLACEHOLDER, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE, GROUP_STAGING_RULE } = require('./shotVocabulary');
+const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, PLAN_SHOT_PLACEHOLDER, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE, GROUP_STAGING_RULE } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { SLOP_RULES } = require('./proseSlop');
 const { castCoverage, castCoverageRule, castActionRule, castTableSpec, castTableFormat, castTableBlock, groupPageBudget, groupPageRule } = require('./castCoverage');
@@ -3210,7 +3210,7 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     SCENE_LIGHT_FIELD: SCENE_LIGHT_FIELD_RULE,
     // The Jev decision layer's fixed fields (2026-09-27) — one constant for the
     // brief authors and the scene review (jevDecisions.JEV_FIXED_FIELDS_RULE).
-    JEV_FIXED_FIELDS: require('./jevDecisions').JEV_FIXED_FIELDS_RULE,
+    JEV_FIXED_FIELDS: require('./jevDecisions').fixedFieldsRule(options.jevBackup),
     // No TEXT_NOT_A_CHECKLIST: the page text is written AFTER these briefs, so
     // this call never sees it and a rule about it cannot apply (owner,
     // 2026-09-23). The per-page Art Director and both iterate templates see
@@ -3544,7 +3544,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     SCENE_LIGHT_FIELD: SCENE_LIGHT_FIELD_RULE,
     // The Jev decision layer's fixed fields (2026-09-27) — one constant for the
     // brief authors and the scene review (jevDecisions.JEV_FIXED_FIELDS_RULE).
-    JEV_FIXED_FIELDS: require('./jevDecisions').JEV_FIXED_FIELDS_RULE,
+    JEV_FIXED_FIELDS: require('./jevDecisions').fixedFieldsRule(options.jevBackup),
     // ONE rule for every template that authors or judges a page against its
     // text — see TEXT_NOT_A_CHECKLIST_RULE. The brief author's half is the
     // PERMISSION: the page text may name more than the frame stages.
@@ -7632,7 +7632,8 @@ function buildChallengeIdeasSection(inputData, count = 25) {
 // asks for one shared action on that same page — a relabel of the instant,
 // never a page spent or moved. On staging job_1790446348343_z3fw660ie p16 the
 // advisory reading let a posed row facing the viewer ship.
-const REPLAN_MUST_FIX_CHECKS = new Set([4, 8, 12, 15, 16, 17]);
+// 14 is asked only on the Jev-outage backup (checkerShotFills).
+const REPLAN_MUST_FIX_CHECKS = new Set([4, 8, 12, 14, 15, 16, 17]);
 
 /**
  * THE CHEAP-RELABEL BLOCK, declared ONCE (2026-09-20; shot codes removed 2026-09-27).
@@ -7663,6 +7664,10 @@ const REPLAN_MUST_FIX_CHECKS = new Set([4, 8, 12, 15, 16, 17]);
 // SHOT_*_COUNT, SHOT_NO_CAMERA_POSITION) are DELETED (2026-09-27): code writes
 // every shot after the re-plan (jevDecisions), so no shot finding exists.
 const REPLAN_CONVERGENCE_EXEMPT_CODES = new Set([
+  // The Jev-outage backup's shot counters (legacyShots) — produced only when the
+  // planner authored the shots; exempt from convergence, must-fix, as before.
+  'SHOT_MEDIUM_WIDE_EXCESS', 'SHOT_CLOSEUP_COUNT', 'SHOT_ULTRAWIDE_COUNT',
+  'SHOT_OTS_COUNT', 'SHOT_NO_CAMERA_POSITION',
   // A figure the instant names and the who column leaves out (2026-09-23). It
   // is cleared by writing one name into one column, or deleting it from the
   // instant — cheap like a shot relabel, so it may not buy a lost picture.
@@ -8462,7 +8467,50 @@ ${body}`;
 // central figure (arcReviewReport.centralFigure), null when it named none.
 // `castTable`: the CAST block the first division wrote (parsePlanCastBlock);
 // a re-plan is told it stands. The first division is asked to write one.
-function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', storyLogic = '', replan = '', centralFigure = null, mayAddDeeds = false, castTable = null } = {}) {
+/**
+ * WHO AUTHORS THE SHOT, as the planner and the plan check are told it.
+ *
+ * The Jev decision layer writes every page's shot after the re-plan (owner,
+ * 2026-09-27): the planner writes the placeholder and the checker asks nothing
+ * about shots. ONLY on the Jev-outage backup (`legacyShots`, owner exception
+ * 2026-09-27: "Can we keep today's setup as backup if Jev is down?") the
+ * planner authors the shot again under the pre-Jev rules and plan-check Q14
+ * asks the over-the-shoulder contact question — the pre-Jev text, one copy
+ * each, never on a Jev-authored story.
+ * see docs/decisions.md 2026-09-27 "Jev outage: wait, then today's setup as backup"
+ */
+function plannerShotFills(pageCount, legacyShots = false) {
+  if (!legacyShots) {
+    return {
+      SHOT_PLANNING: '',
+      PLAN_SHOT_FIELD: PLAN_SHOT_PLACEHOLDER,
+      PLAN_SHOT_FORMAT: PLAN_SHOT_PLACEHOLDER,
+      PLAN_SHOT_NOTE: ` The first field is always the word ${PLAN_SHOT_PLACEHOLDER}: each page's camera shot is chosen after the plan is final, never here.`,
+      PLANNER_GROUP_STAGING: '',
+    };
+  }
+  return {
+    SHOT_PLANNING: `Where does each close-up land, where does each ultra-wide? And which pages are worth leaving eye level for — looking down into a place from above, up at something from below, past one character's shoulder at what they face, or straight down on the whole place from the air? ${shotDistributionPhrase(pageCount)} The shot field takes a camera position in place of a distance, so a page that declares one states no distance and spends its word on where the camera stands. A page looking UP at a grown-up or a creature standing over a child is not one of them; look up at a thing, a height or a sky instead. ${OTS_NO_CONTACT_RULE} A figure inside, below or at the bottom of something — a shaft, a pit, a hollow, a hold — gets a shot that looks INTO it: high angle down into it, or from inside looking up. Never a wide exterior of the thing that contains them. A close-up page is a waist-up moment (holding, reading, reacting) — a character may be sitting, kneeling or crouching in one, the legs are simply out of frame. What it is never is a page whose subject is ${CLOSEUP_BELOW_WAIST_PHRASE}: the picture cannot show what the frame ends above.\n`,
+    PLAN_SHOT_FIELD: 'shot',
+    PLAN_SHOT_FORMAT: '<shot>',
+    PLAN_SHOT_NOTE: '',
+    PLANNER_GROUP_STAGING: ` ${GROUP_STAGING_RULE}`,
+  };
+}
+
+function checkerShotFills(legacyShots = false) {
+  return legacyShots ? {
+    PLAN_LINE_HEAD: 'One line per page: shot — who is in frame — the instant the picture shows — what is true after this page that was not before.',
+    CHECK_COUNT: 'eighteen',
+    OTS_CHECK: `14. Over-the-shoulder. ${OTS_NO_CONTACT_RULE} Name every over-the-shoulder page whose instant has the figure nearest the camera touching what they face, and ask for another shot.`,
+  } : {
+    PLAN_LINE_HEAD: `One line per page: ${PLAN_SHOT_PLACEHOLDER} — who is in frame — the instant the picture shows — what is true after this page that was not before. The first field is a placeholder: each page's camera shot is chosen after this check, so no point below is about a shot.`,
+    CHECK_COUNT: 'seventeen',
+    OTS_CHECK: '',
+  };
+}
+
+function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', storyLogic = '', replan = '', centralFigure = null, mayAddDeeds = false, castTable = null, legacyShots = false } = {}) {
   const template = PROMPT_TEMPLATES.storyBeats;
   if (!template) {
     log.error('[PROMPT] storyBeats template not loaded — beats planning unavailable');
@@ -8501,7 +8549,7 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // (owner, 2026-09-27; jevDecisions.decideShots). The planner's shot rules
     // (SHOT_DISTRIBUTION, SHOT_POSITIONS, OTS_NO_CONTACT, the close-up waist
     // sentence) went with the authorship.
-    PLAN_SHOT_PLACEHOLDER,
+    ...plannerShotFills(pageCount, legacyShots),
     PAGE_COUNT: pageCount,
     // HOW MUCH OF THE BOOK EACH COMMISSIONED CHARACTER GETS (owner,
     // 2026-09-23): a focal page each when the book has room, 3-4 pages in
@@ -10870,7 +10918,7 @@ function critiqueMaxSeverity(critique) {
  * here so the signature states the contract: this prompt's inputs are the arc
  * and the page plan, and the counting happens downstream of its answer.
  */
-function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHints = '', storyLogic = '', centralFigure = null, mayAddDeeds = false, castTable = null } = {}) {
+function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHints = '', storyLogic = '', centralFigure = null, mayAddDeeds = false, castTable = null, legacyShots = false } = {}) {
   const template = PROMPT_TEMPLATES.planCheck;
   if (!template) {
     log.error('[PROMPT] planCheck template not loaded — plan check unavailable');
@@ -10913,7 +10961,7 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHi
     // contact rule rides in the Jev over-the-shoulder question and the Art
     // Director / iterate templates. The numbering keeps its gap so stored
     // CHECK[n] rows stay comparable.
-    PLAN_SHOT_PLACEHOLDER,
+    ...checkerShotFills(legacyShots),
     // THE CAST TABLE the planner wrote before its plan lines (2026-09-25). The
     // checker reads it beside the plan; every answer still comes from the plan
     // lines, and the counters hold each line to the table (CAST_PROMISE_BROKEN).
@@ -11778,7 +11826,7 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
     SCENE_LIGHT_FIELD: SCENE_LIGHT_FIELD_RULE,
     // The Jev decision layer's fixed fields (2026-09-27) — one constant for the
     // brief authors and the scene review (jevDecisions.JEV_FIXED_FIELDS_RULE).
-    JEV_FIXED_FIELDS: require('./jevDecisions').JEV_FIXED_FIELDS_RULE,
+    JEV_FIXED_FIELDS: require('./jevDecisions').fixedFieldsRule(options.jevBackup),
   });
 }
 
@@ -12927,6 +12975,8 @@ module.exports = {
   replanRoundRegressed,
   replanFindingKey,
   REPLAN_CONVERGENCE_EXEMPT_CODES,
+  plannerShotFills,
+  checkerShotFills,
   findingPages,
   buildArcReviewPrompt,
   buildArcAuditPrompt,

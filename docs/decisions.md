@@ -64549,3 +64549,63 @@ prompts/scene-expansion-all.txt, prompts/scene-expansion.txt, prompts/scene-revi
 scripts/analysis/replay-jev-decision-layer.js, tests (jev-brief-fields.test.ts new,
 helpers/jev-stub.ts new, lab-prod-call-parity, testlab-beats-scenes-recovery,
 iterate-rewrite-checked-like-authored), docs/SETTLED.md, docs/prompt-inventory.md.
+
+## 2026-09-27 — Jev outage: wait, then today's setup as backup (owner exception to NO FALLBACKS)
+
+**Context:** the Jev decision layer (entries above) runs on an OpenRouter ALPHA endpoint. As built it
+failed a whole story on any Jev outage. Owner, 2026-09-27, approving B + C + A: "Can we keep today's
+setup as backup if Jev is down?" This is an explicit, owner-approved EXCEPTION to the NO FALLBACKS
+rule in CLAUDE.md, for this layer only.
+
+**Decision:**
+- **B, pre-start health check.** `generateStoryViaBeats` (beats only; trials never run Jev) calls
+  `jevDecisions.probeJev` first — one tiny noul, 20 s timeout. Down → the WHOLE story runs the backup
+  (step `start`); the story is never refused.
+- **C, wait and resume.** Every Jev call (`runJevRequests`) has a 60 s timeout; a failing call is
+  retried with backoff (2 s, doubling, capped at 60 s) for up to 5 minutes from its first failure
+  (`JEV_OUTAGE`). The step waits where it stands and resumes; nothing is restarted. A missing
+  `OPENROUTER_API_KEY` is configuration, not an outage — never waited for. One failed request stops
+  the pool's other workers.
+- **A, the backup.** A step whose Jev calls still fail after the wait switches THAT step and every
+  later one to the backup: the pre-layer authoring path, restored behind one switch
+  (`jevReport.fallback`), no second copy of any logic:
+  - `start` → the planner writes real shots under the pre-Jev rules (`plannerShotFills(…, true)`:
+    the question, `shotDistributionPhrase`, the camera-position / low-angle / OTS-contact /
+    looks-INTO / close-up-waist sentences, `GROUP_STAGING_RULE`); plan-check Q14 and its header come
+    back (`checkerShotFills`); the shot counters run again (`runPlanCounters({ legacyShots })`, the
+    pre-Jev block verbatim, incl. CONSECUTIVE and the focal close-up clause); the re-plan answers
+    GROUP_PAGES_OVER_BUDGET itself from the counter's finding (whose planner text is restored);
+    the Art Director authors light, citations, population, aboard and gaze.
+  - `cast_cuts` → the planner chooses the cuts from the counter's finding.
+  - `shots` → the plan keeps the placeholder and the Art Director picks each shot
+    (`JEV_BACKUP_SHOT_RULE`, filled in place of `JEV_FIXED_FIELDS_RULE`).
+  - `light` / `brief_fields` → the Art Director's own values ship; per-page decision records are
+    cleared so nothing half-decided is pinned.
+  The switch is set once per story (`jevFallBack`), logged at ERROR (`jev_fallback`, generation log
+  and run log), stored as `stories.data.jevFallback = {step, reason, at}` and on
+  `beatsReviewReport.jevFallback`, which the dev-mode story view shows as a red banner. A
+  Jev-authored story has `jevFallback: null` and a filled `jevDecisions`.
+- **Kept from rotting:** `tests/unit/jev-outage-backup.test.ts` runs the real beats pipeline (arc
+  machine → plan → check → re-plan → shots → wardrobe → AD → review) with every model mocked and Jev
+  down: the probe fails once, the planner prompt carries the pre-Jev shot rules, plan-check carries
+  Q14, the shot counters fire, no Jev step runs; a second case loses Jev after the probe and checks
+  the mid-story switch; a third runs with Jev live.
+
+**Drift risk (stated, owner accepted):** the backup is a second author the main path no longer
+exercises. The pre-Jev planner text, Q14 and the shot counters will not be improved alongside the
+Jev path, and a regression in them shows only in a story that fell back. The end-to-end test pins
+that the backup still RUNS and still says what it said; it does not pin that its output is good.
+Revisit when the Jev endpoint leaves alpha or `jevFallback` is seen on real stories.
+
+**Also in this change (Lab 1577 follow-up, owner-approved):** the group cuts keep every character
+the CAST block promises on the page, and the CAST CUT instruction states that the cast-out stay in
+the story outside the picture (`CUT_STILL_IN_STORY`) — see the commit "a cut keeps the CAST block's
+promised characters".
+
+**Touched:** server/lib/jevDecisions.js (JEV_OUTAGE, runJevRequests, probeJev, fixedFieldsRule,
+JEV_BACKUP_SHOT_RULE), server/lib/beatsPipeline.js (jevActive, jevFallBack, legacyShotsOf,
+finalizePlanShots, runReplanRounds, runArtDirector, generateStoryViaBeats),
+server/lib/promptBuilders.js (plannerShotFills, checkerShotFills, re-plan ranking sets),
+server/lib/planCounters.js (legacyShots), server/lib/shotVocabulary.js (the pre-Jev distribution,
+restored), prompts/story-beats.txt, prompts/plan-check.txt, storyJobPipeline.js (jevFallback),
+client/src/types/story.ts, client/src/components/generation/StoryDisplay.tsx, tests.

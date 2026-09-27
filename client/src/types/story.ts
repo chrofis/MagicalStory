@@ -1169,6 +1169,11 @@ export interface ClothingReviewReport {
 }
 
 export interface ReviewDiffReport {
+  /**
+   * Set when the Jev decision layer was unavailable and this story ran the
+   * backup path (owner exception, 2026-09-27): the step where it switched and why.
+   */
+  jevFallback?: { step: string; reason: string; at?: string } | null;
   model?: string | null;
   durationMs?: number;
   changedPages?: number[];

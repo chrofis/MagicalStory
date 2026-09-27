@@ -782,7 +782,7 @@ describe('beats_replan: no params = the run\'s plan check and re-plan rounds', (
     expect(src).toMatch(/planCheckInputs\(inputData, \{ arcPremiseNames, modelOverrides \}\)/);
     expect(src).toMatch(/const runCheck = createPlanCheckRunner\(\{/);
     expect(src).toMatch(/\(\{ beats, pagePlan, check: shippedCheck \} = await runReplanRounds\(\{/);
-    expect(src).toMatch(/await finalizePlanShots\(\{ approvedArc, beats, check: shippedCheck, gl \}\)/);
+    expect(src).toMatch(/await finalizePlanShots\(\{ approvedArc, beats, check: shippedCheck, gl, jevReport \}\)/);
   });
 });
 

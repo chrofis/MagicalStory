@@ -35,14 +35,14 @@ Before dividing, plan the pictures — simple pages first:
 4. Where are three or more characters truly unavoidable? Bypass it where the story allows; keep it only where the story demands it. Where one is kept, the plan line itself carries what the third character does that the page cannot show without them — repeating the action, naming the place, or asserting the characters are needed does not hold.
 5. For each act — setup, middle, ending — which picture does a child most want to see there, and which page stages it as its instant? {ACT_SPANS} The ending's own event — the reunion, the goodbye, the parting — is always one of them. A picture that falls between two pages, or that only a page's change reports as already done, is not staged.
 6. {CAST_TABLE}
-Then one line per page: {PLAN_SHOT_PLACEHOLDER} — who is in frame — the instant the picture shows — what is true after this page that was not before. The first field is always the word {PLAN_SHOT_PLACEHOLDER}: each page's camera shot is chosen after the plan is final, never here.
+{SHOT_PLANNING}Then one line per page: {PLAN_SHOT_FIELD} — who is in frame — the instant the picture shows — what is true after this page that was not before.{PLAN_SHOT_NOTE}
 A complicated page — much action, many characters at once — is a fault: simplify the picture, never the story. A page after which nothing is true that was not before is filler: give it a change or give its material to a neighbouring page. {PAGE_CHANGE}
 
 The plan line's instant is a single drawable moment:
 - One moment — no montage, no before-and-after, no "then", no passage of time inside one picture, no sequence of actions by one character; when a beat contains a change, pick the single moment that shows it.
 - Two consecutive actions by one character give the picture one of them: plan the dominant moment and leave the other out, rather than joining both into one instant with "and then", "before turning to", or a trailing clause carrying the second action.
 - One action: one thing is being done, and everyone else watches it or does that same thing in the same place. Two characters given different actions at one instant lose one of them.
-- Two or three named characters carry a page best; {MAX_CHARACTERS_PER_SCENE} is the ceiling the image model can hold, and a named animal that acts in the story counts as one of them. {WHOLE_CAST_DEF} Add no unnamed figures — no crew, crowd, onlookers or extra animals.
+- Two or three named characters carry a page best; {MAX_CHARACTERS_PER_SCENE} is the ceiling the image model can hold, and a named animal that acts in the story counts as one of them.{PLANNER_GROUP_STAGING} {WHOLE_CAST_DEF} Add no unnamed figures — no crew, crowd, onlookers or extra animals.
 - {PLAN_LINE_FIELDS}
 - One centre of action: never two vehicles, vessels or creatures each with its own state or its own crew.
 - One camera position: an instant is seen from one spot — never inside a vehicle or structure and its exterior at once.
@@ -89,5 +89,5 @@ Only what the format below shows. No preamble, no commentary. {OUTPUT_SCOPE}
 
 {CAST_FORMAT}
 ---PAGE PLAN---
-Page <N>: {PLAN_SHOT_PLACEHOLDER} — <who is in frame> — <the instant the picture shows> — <what is true after this page that was not before>
+Page <N>: {PLAN_SHOT_FORMAT} — <who is in frame> — <the instant the picture shows> — <what is true after this page that was not before>
 {CHANGES_FORMAT}
