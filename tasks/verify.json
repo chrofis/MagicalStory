@@ -3677,7 +3677,10 @@
     {
       "id": "closing-moment-and-restore-replaces",
       "title": "The main relationship closes on the page; a shown callback survives the audits; a grammar-check RESTORE replaces what took the writer sentence's place",
-      "commits": [],
+      "commits": [
+        "99e91d68b",
+        "e2dc93fb1"
+      ],
       "addedAt": "2026-09-27",
       "claim": "On the next full staging story with a companion figure (creature, helper, friend): the committed arc's last sentences carry a goodbye, thanks or moment of warmth between the main character(s) and that figure, and the shipped last pages show it as an act or a spoken line; the last page does not end on getting somewhere or on a narrator summary. No FAULT[ENDING] from either audit asks to cut a callback shown as an act. Every textRefineReport diff RESTORE line names REPLACING …; no shipped page carries a writer sentence beside the rewrite sentence that replaced it (diffDropped may show duplicates-A<k>).",
       "runShape": [
