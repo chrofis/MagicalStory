@@ -1,6 +1,6 @@
 
 
-const { runPlanCounters, collectPlaceNames, castLostByReplan, reviewPlanChanges, refreshPlanShot } = require('./planCounters');
+const { runPlanCounters, collectPlaceNames, castLostByReplan, reviewPlanChanges, refreshPlanShot, namesIn } = require('./planCounters');
 const { commissionedCast, castCoverage, parsePlanCastBlock } = require('./castCoverage');
 const { arcRepairFindingsWithCastCheck } = require('./jevAudit');
 const jevDecisions = require('./jevDecisions');
@@ -1255,6 +1255,46 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
         actions: pendingCheck.actions,
         focalPages: (pendingCheck.counters.stats && pendingCheck.counters.stats.focalPages) || {},
       });
+      // THE GROUP-PAGE CUTS ARE DECIDED, NOT LEFT TO THE PLANNER (owner,
+      // 2026-09-27). When the check counts more group pages than the budget,
+      // Jev ranks them (TOGETHER) and scores who each page needs (NEEDED);
+      // code keeps the top `budget`, cuts below 0.5 and puts back what the
+      // constraints need (jevDecisions.decideGroupCuts). The aggregate finding
+      // is replaced by one CAST CUT instruction per page; code writes the who
+      // column after the reply, and the planner only re-words the instant.
+      // A Jev failure throws JevDecisionError — no free choice to fall back to.
+      const castAliases = (pendingCheck.counters.cast && pendingCheck.counters.cast.aliases) || {};
+      const sameName = (a, b) => namesIn(String(a || ''), [String(b || '')], castAliases).length > 0
+        || namesIn(String(b || ''), [String(a || '')], castAliases).length > 0;
+      let roundFindings = pendingCheck.findings || [];
+      let castCut = null;
+      const groupFinding = roundFindings.find(f => f && f.code === 'GROUP_PAGES_OVER_BUDGET');
+      if (groupFinding) {
+        const st = pendingCheck.counters.stats || {};
+        castCut = await jevDecisions.decideGroupCuts({
+          arc: approvedArc,
+          pages: beats,
+          present: new Map((st.castPerPage || []).map(r => [Number(r.pageNumber), r.names || []])),
+          groupPages: (st.groupPages && st.groupPages.pages) || [],
+          budget: st.groupPages ? st.groupPages.budget : null,
+          obstacles: pendingCheck.obstacles || new Map(),
+          focalPages: st.focalPages || {},
+          listed: commission.listed,
+          floor: coverageRule ? coverageRule.appearances.min : 0,
+          mainName: st.mainCharacter || null,
+          centralFigure: arcCentralFigure,
+          centralPages: st.centralFigure ? st.centralFigure.pages : null,
+          sameName,
+        });
+        if (jevReport) jevReport.castCuts.push({ round, ...castCut });
+        const instructions = jevDecisions.castCutFindings(castCut);
+        roundFindings = [...roundFindings.filter(f => f !== groupFinding), ...instructions];
+        const summary = castCut.decisions.filter(d => d.remove && d.remove.length).map(d => `p${d.pageNumber} keeps ${d.keep.join(', ')}, out ${d.remove.join(', ')}`).join(' | ');
+        gl.info('beats_jev_cast_cuts', `Round ${round}: ${castCut.groupPages.length} group page(s), budget ${castCut.budget} — keep the group on ${castCut.keepGroup.join(', ') || 'none'}; ${summary || 'no cut'}`, null, { round, decisions: castCut.decisions, stats: castCut.stats });
+        for (const d of castCut.decisions.filter(x => x.unsatisfiable)) {
+          gl.error('beats_jev_cast_cut_unsatisfiable', `Round ${round}: page ${d.pageNumber} keeps its group — ${d.unsatisfiable}`, null, { round, pageNumber: d.pageNumber });
+        }
+      }
       const replanPrompt = buildBeatsPrompt(inputData, pageCount, {
         finalArc: approvedArc,
         arcHints,
@@ -1262,7 +1302,7 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
         centralFigure: arcCentralFigure,
         castTable,
         ...labPromptOptions,
-        replan: buildReplanSection(pagePlan, pendingCheck.findings, { pageCount: beats.length, keep, refused: lastRefusals, castFloor: coverageRule ? coverageRule.appearances.min : null, castTable }),
+        replan: buildReplanSection(pagePlan, roundFindings, { pageCount: beats.length, keep, refused: lastRefusals, castFloor: coverageRule ? coverageRule.appearances.min : null, castTable }),
       });
       if (!replanPrompt) throw new Error('story-beats template unavailable');
       const rpRes = await textModels.callTextModelStreaming(replanPrompt, null, onChunk, planModel, { usageLabel: 'beats_replan' });
@@ -1308,7 +1348,7 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
       // gone). Pages no finding named are restored from the division that
       // stands, so a round can only change what it was asked to change.
       const namedPages = new Set();
-      for (const nf of (pendingCheck.findings || [])) for (const n of findingPages(nf)) namedPages.add(Number(n));
+      for (const nf of roundFindings) for (const n of findingPages(nf)) namedPages.add(Number(n));
       // A DECLARED PAGE IS IN SCOPE. Splitting a page's second action onto a
       // picture of its own needs two pages rewritten — the one a finding
       // named and the neighbour whose number now stages the new moment — and
@@ -1376,20 +1416,58 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
       //      MAJOR IMG fault for an antagonist the page text describes and no
       //      picture shows, and the only way anyone found it was diffing two
       //      who-columns after the book was finished.
+      // CODE WRITES THE WHO COLUMN OF EVERY CUT PAGE (2026-09-27). The
+      // re-planner was asked to re-word the instant and what is true after for
+      // the cast code keeps. A returned line that still names a character code
+      // cast out — or that did not come back rewritten — is REJECTED: the page
+      // stands as it was, the error is logged, and the budget finding survives
+      // to the recheck. Code never patches the planner's text.
+      const codeOwned = new Map();
+      const cutRejects = [];
+      if (castCut) {
+        const standingByPage = new Map(beats.map(b => [Number(b.pageNumber), b]));
+        for (const d of castCut.decisions.filter(x => x.remove && x.remove.length)) {
+          const n = Number(d.pageNumber);
+          const idx = second.parsed.pages.findIndex(pg => Number(pg.pageNumber) === n);
+          const line = idx >= 0 ? String(second.parsed.pages[idx].planLine || '') : '';
+          const before = String((standingByPage.get(n) || {}).planLine || '');
+          const told = jevDecisions.planParts(line).slice(2).join(' — ');
+          const stillNamed = namesIn(told, d.remove, castAliases);
+          let reason = null;
+          if (!line || line === before) reason = 'the re-plan did not rewrite this page';
+          else if (stillNamed.length) reason = `its instant or what is true after still names ${stillNamed.join(', ')}, whom code cast out`;
+          let written = null;
+          if (!reason) {
+            try { written = jevDecisions.withWho(line, d.keep); } catch (e) { reason = e.message; }
+          }
+          if (reason) {
+            cutRejects.push({ pageNumber: n, reason, keep: d.keep, remove: d.remove });
+            if (idx >= 0 && standingByPage.has(n)) second.parsed.pages[idx] = standingByPage.get(n);
+            log.error(`❌ [BEATS] Round ${round}: CAST CUT on page ${n} REJECTED — ${reason}; the page stands as it was and the group budget finding survives`);
+            gl.error('beats_jev_cast_cut_rejected', `Round ${round}: page ${n}'s rewrite for its cast cut was rejected — ${reason}. The page stands as it was.`, null, { round, pageNumber: n, reason, keep: d.keep, remove: d.remove });
+            continue;
+          }
+          second.parsed.pages[idx] = { ...second.parsed.pages[idx], planLine: written };
+          codeOwned.set(n, { planLine: written, remove: d.remove });
+        }
+        if (jevReport) jevReport.castCuts[jevReport.castCuts.length - 1].applied = { pages: [...codeOwned.keys()], rejected: cutRejects };
+      }
       let reviewRefusals = [];
       {
         const guardCast = (pendingCheck.counters.cast && pendingCheck.counters.cast.all) || commissionedNames;
         const guardAliases = (pendingCheck.counters.cast && pendingCheck.counters.cast.aliases) || {};
         const standing = new Map(beats.map(b => [b.pageNumber, b]));
         const restore = (pageNumbers) => {
-          const want = new Set(pageNumbers.map(Number));
+          const want = new Set(pageNumbers.map(Number).filter(n => !codeOwned.has(n)));
           second.parsed.pages = second.parsed.pages.map(pg => (
             want.has(Number(pg.pageNumber)) && standing.has(pg.pageNumber) ? standing.get(pg.pageNumber) : pg
           ));
         };
 
         const review = reviewPlanChanges({
-          changes: declared.changes,
+          // A code-cut page is decided, not proposed: the planner's own
+          // declarations on it are not reviewed (code wrote its who column).
+          changes: declared.changes.filter(c => !codeOwned.has(Number(c.pageNumber))),
           standing: beats,
           returned: second.parsed.pages,
           castNames: guardCast,
@@ -1415,7 +1493,12 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
           gl.warn('beats_replan_change_refused', `Round ${round}: the review refused ${review.refusals.length} declared change(s) — ${detail}; ${review.refusals.length === 1 ? 'that page was' : 'those pages were'} restored from the division that stands`, null, { round, refusals: review.refusals });
         }
 
-        const lost = castLostByReplan(beats, second.parsed.pages, guardCast, guardAliases, review.declaredOut);
+        // The code's cast cuts are declared removals: they are the decision.
+        const declaredOut = new Map(review.declaredOut instanceof Map
+          ? review.declaredOut
+          : Object.entries(review.declaredOut || {}).map(([k, v]) => [Number(k), v]));
+        for (const [n, c] of codeOwned) declaredOut.set(n, [...(declaredOut.get(n) || []), ...c.remove]);
+        const lost = castLostByReplan(beats, second.parsed.pages, guardCast, guardAliases, declaredOut);
         if (lost.length) {
           restore(lost.map(l => l.pageNumber));
           const detail = lost.map(l => `p${l.pageNumber}: ${l.lost.join(', ')}`).join('; ');

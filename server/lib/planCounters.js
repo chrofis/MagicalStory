@@ -944,16 +944,18 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
   //     castCoverage.groupPageBudget is the ONE number: story-beats.txt states
   //     it ({GROUP_PAGE_BUDGET}), this counts the same `present` list every cast
   //     counter here reads (the who column plus the roster's `covers`). The
-  //     finding names every group page — which of them keep their group is the
-  //     story's call, so the re-plan chooses. Must-fix (owner, 2026-09-27;
-  //     promptBuilders REPLAN_MUST_FIX_CODES) and counted by the round guard.
+  //     finding names every group page. WHICH keep their group and who leaves
+  //     the others is decided by the Jev decision layer, not the re-plan
+  //     (owner, 2026-09-27: jevDecisions.decideGroupCuts in runReplanRounds,
+  //     code writes the who column); this counter only measures the budget.
+  //     Must-fix (promptBuilders REPLAN_MUST_FIX_CODES) and counted by the
+  //     round guard.
   const groupBudget = groupPageBudget({ pageCount, castCount: listed.length, maxCharactersPerScene });
   const groupPages = groupBudget ? rows.filter(r => r.present.length > groupBudget.over).map(r => r.pageNumber) : [];
   if (groupBudget && groupPages.length > groupBudget.max) {
     add('GROUP_PAGES_OVER_BUDGET', groupPages,
       `${groupPages.length} pages hold more than ${groupBudget.over} named characters; this book allows at most ${groupBudget.max}. `
-      + 'Keep the group on the pages where the story brings everyone together — an opening gathering, the climax, the ending — and on the others cast out the characters that page\'s instant does not need, '
-      + `never the character whose action the instant works against${floor > 0 ? `, and never one who would fall below ${floor} page${floor === 1 ? '' : 's'} in frame` : ''}.`);
+      + 'Which pages keep their group and who leaves the others is decided in code (the CAST CUT lines).');
   }
 
   // 8a. THE CAST TABLE'S PROMISES (owner, 2026-09-25). The planner wrote, before

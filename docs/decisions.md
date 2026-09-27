@@ -64335,3 +64335,56 @@ tests (jev-decision-layer.test.ts new; plan-counters, shot-*, camera-position-gu
 closeup-below-waist, plan-replan-ranking, stage2-cast-coverage, plan-check-question-count,
 plan-shared-definitions, planner-group-pages, ots-near-figure-crop, lab-prod-call-parity),
 docs/prompt-inventory.md.
+
+## 2026-09-27 — Jev decision layer wired, Part 2: which group pages keep their group, and who leaves the others, is decided by Jev + code; code writes the who column
+
+**Context:** Part 2 of the owner-approved decision layer (plan tasks/jev-decision-layer-2026-09-27.md;
+measurement "Jev as the plan's DECISION layer": TOGETHER as a ranking 7/7, NEEDED AUC 0.98, 51 cuts
+0 wrong). The motivating failure: dka3jpog9's re-plan DECLARED "cast out Max, Julian" on p6 and never
+wrote it, and cast the dragon out of p11 instead; the group budget shipped unmet.
+
+**Decision:** inside `runReplanRounds`, a round whose check carries GROUP_PAGES_OVER_BUDGET runs
+`jevDecisions.decideGroupCuts` before the re-plan prompt is built:
+1. Code finds the group pages and the budget (the counter's `present` > 3 and
+   `castCoverage.groupPageBudget`). Jev TOGETHER per group page ("the opening gathering, the
+   climax, or the ending"), 3 calls averaged; code keeps the top `budget` — a ranking, never a
+   fixed threshold.
+2. On each page to reduce, Jev NEEDED per character (the evaluated definition), 3 calls averaged;
+   code cuts every name below 0.5, then keeps whoever a constraint needs: the character the page's
+   instant works against (the check's OBSTACLES line), a listed character the cut would leave under
+   the coverage floor, the main character where the cut would leave them on fewer than half the
+   pages, the central figure's only page in its third, a character's focal page; and — added on
+   the replay — the highest-scored name when every name scored below 0.5 (a cut never empties a
+   page; a people-free page is its own decision). Then trims the lowest-P non-required names to ≤ 3.
+   Required names alone > 3 → the page keeps its group, logged as an error (no loop).
+3. The aggregate finding is replaced by one must-fix CAST CUT line per page ("keeps A and B,
+   casts out C and D; code writes its who column…"). The RE-DIVIDE text says a CAST CUT line is
+   decided: rewrite only the instant and what is true after, for the kept cast, naming no one cast
+   out; declare nothing for it.
+4. After the reply, code writes the who column (`withWho`). A page that did not come back
+   rewritten, or whose instant / after still NAMES a removed character, is REJECTED — logged
+   `beats_jev_cast_cut_rejected` (error), the page stands, the budget finding survives to the
+   recheck; code never patches the text. The code cuts are declared removals for
+   `castLostByReplan`; the planner's own declarations on a cut page are not reviewed, and the
+   review's `restore` never undoes a code-cut page. The round guard (`replanRoundRegressed`) and
+   the convergence test count the GROUP finding exactly as before.
+5. `stories.data.jevDecisions.castCuts[]` records per round the ranking, the scores, the required
+   reasons, what was applied and what was rejected.
+
+**Evidence (rung 1, $0.014):** `replay-jev-decision-layer.js cuts` — production `decideGroupCuts` on
+the 5 over-budget stored books: budget met **5/5**, the 7 pages it reduces are all pages the
+reading cuts (**7/7**), 19 names removed — 12 the reading marks not needed, 7 unlabelled, **0 the
+reading marks needed**; coverage floor held on every book. dka3jpog9: keeps p1/p17/p18, p6 → Levin
+alone (every child scored < 0.5; the never-empty rule keeps the top name), p11 → Sura alone (0.71;
+the four children 0.19–0.39). 153 calls, 0 errors. The obstacle / focal / main-character
+constraints are not exercised by the replay (the eval items store no roster data for them) — unit
+tests pin them.
+
+**Reverses:** planCounters 8c "which of them keep their group is the story's call, so the re-plan
+chooses"; the GROUP_PAGES_OVER_BUDGET finding text that told the planner how to choose; memory "AD
+trims cast by design" for group pages.
+
+**Touched:** server/lib/jevDecisions.js, server/lib/beatsPipeline.js (runReplanRounds),
+server/lib/promptBuilders.js (buildReplanSection), server/lib/planCounters.js (finding text, 8c),
+scripts/analysis/replay-jev-decision-layer.js, tests/unit/jev-group-cuts.test.ts (new),
+tests/unit/beats-replan-cast-lost.test.ts.

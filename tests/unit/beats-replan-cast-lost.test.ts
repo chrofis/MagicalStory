@@ -171,7 +171,9 @@ describe('castLostByReplan — multi-page rounds', () => {
  */
 describe('the beats re-plan wiring', () => {
   it('runs the guard on the merged return, before the round is measured', () => {
-    expect(BEATS_SRC).toMatch(/const lost = castLostByReplan\(beats, second\.parsed\.pages, guardCast, guardAliases, review\.declaredOut\);/);
+    // The declared removals are the review's plus the Jev cast cuts code applied (2026-09-27).
+    expect(BEATS_SRC).toMatch(/const lost = castLostByReplan\(beats, second\.parsed\.pages, guardCast, guardAliases, declaredOut\);/);
+    expect(BEATS_SRC).toMatch(/for \(const \[n, c\] of codeOwned\) declaredOut\.set/);
     const guardAt = BEATS_SRC.indexOf('castLostByReplan(beats, second.parsed.pages');
     const changedAt = BEATS_SRC.indexOf('const changedThisRound = second.parsed.pages');
     expect(guardAt).toBeGreaterThan(0);

@@ -391,7 +391,9 @@ const NEEDED_DEF = n => `${n} is needed in the picture of the page to judge: its
  *   - the main character where the cut would leave them in frame on fewer than
  *     half the pages, and the central figure where it would leave a third of
  *     the book without it;
- *   - any name on a page that is one of that character's focal pages.
+ *   - any name on a page that is one of that character's focal pages;
+ *   - the highest-scored name when every name scored below 0.5 (a cut never
+ *     empties a page).
  * Then trims the lowest-P non-required names until ≤ GROUP_STAGING_MAX remain.
  * A page whose REQUIRED names alone exceed it keeps its group, reported — no loop.
  *
@@ -466,6 +468,13 @@ async function decideGroupCuts(input, opts = {}) {
       const focal = Object.entries(input.focalPages || {}).find(([k]) => sameName(k, name));
       if (focal && (focal[1] || []).map(Number).includes(n)) why.push('one of their focal pages');
       if (why.length) required[name] = why.join('; ');
+    }
+    // A cut never empties a page: the instant was staged with people, and a
+    // people-free page is its own decision (NO_PEOPLELESS_PAGE), never a
+    // by-product of this one. The highest-P name stays.
+    if (names.length && !names.some(name => scores[name] >= JEV_DECISIONS.needed.cutBelow || required[name])) {
+      const top = [...names].sort((a, b) => scores[b] - scores[a])[0];
+      required[top] = 'a cut never empties a page — the highest-scored name stays';
     }
     let keep = names.filter(name => scores[name] >= JEV_DECISIONS.needed.cutBelow || required[name]);
     // Trim to the staging maximum: lowest P first, never a required name.

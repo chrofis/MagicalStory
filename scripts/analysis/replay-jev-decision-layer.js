@@ -69,8 +69,52 @@ async function shots() {
     measuredEval: { acceptable: 0.918, readingGroupAcceptable: 0.938, best: 0.615, violations: 0 }, rows };
 }
 
+/**
+ * The group-page cut on the over-budget books of the decision-layer eval.
+ * Present per page: the group items' rosters for the group pages; the other
+ * pages' who columns matched against the book's commissioned names (the
+ * replay has no plan-check roster). No obstacle / focal / main data is stored
+ * with the items, so those constraints are not exercised here — the coverage
+ * floor is.
+ */
+async function cuts() {
+  const L = labelsOf('evals/datasets/jev-decision-layer-v1/reading_labels.json');
+  const { castCoverage } = require('../../server/lib/castCoverage');
+  const { parsePlanLine, rosterOf } = require('./eval-jev-decision-layer');
+  const gp = loadItems().filter(i => i.kind === 'grouppage' && i.overBudget && (!only || only.has(i.story)));
+  const stories = [...new Set(gp.map(i => i.story))];
+  const out = []; let pagesCut = 0; let pagesCutReadingCut = 0; let removed = 0; let removedNotNeeded = 0; let removedUnlabelled = 0;
+  for (const sid of stories) {
+    const its = gp.filter(i => i.story === sid);
+    const names = [...new Set(its.flatMap(i => i.roster))];
+    const pages = its[0].planText.split('\n').map(l => { const m = l.match(/^Page (\d+): (.*)$/); return m && { pageNumber: Number(m[1]), planLine: `${P} — ${parsePlanLine(m[2]).who} — ${parsePlanLine(m[2]).instant} — ${parsePlanLine(m[2]).after}` }; }).filter(Boolean);
+    const present = new Map(pages.map(p => [p.pageNumber, rosterOf(parsePlanLine(its[0].planText.split('\n').find(l => l.startsWith(`Page ${p.pageNumber}:`)).replace(/^Page \d+: /, '')).who, names)]));
+    for (const i of its) present.set(i.page, i.roster);
+    const cov = castCoverage({ pageCount: pages.length, castCount: names.length });
+    const d = await JD.decideGroupCuts({ arc: its[0].arc, pages, present, groupPages: its[0].groupPages, budget: its[0].budget,
+      listed: names, floor: cov ? cov.appearances.min : 0 });
+    addStats(d.stats);
+    const rows = d.decisions.map(x => {
+      const readKeep = L[hash(`gp:${sid}:${x.pageNumber}`)];
+      if (!x.keepsGroup && x.remove && x.remove.length) {
+        pagesCut++; if (readKeep === false) pagesCutReadingCut++;
+        for (const n of x.remove) { removed++; const r = L[hash(`cd:${sid}:${x.pageNumber}:${n}`)]; if (r === false) removedNotNeeded++; if (r == null) removedUnlabelled++; }
+      }
+      return { page: x.pageNumber, together: x.together, keepsGroup: x.keepsGroup, readingKeep: readKeep ?? null, keep: x.keep || null, remove: x.remove || null, scores: x.scores || null, required: x.required || null, unsatisfiable: x.unsatisfiable || null };
+    });
+    const after = new Map(present); for (const x of d.decisions) if (x.keep) after.set(x.pageNumber, x.keep);
+    const groupAfter = [...after.values()].filter(v => v.length > SV.GROUP_STAGING_MAX).length;
+    const coverageAfter = Object.fromEntries(names.map(n => [n, [...after.values()].filter(v => v.includes(n)).length]));
+    console.log(`${sid}: budget ${d.budget}, group pages ${d.groupPages.join(',')} → keep ${d.keepGroup.join(',')}; ${rows.filter(r => r.remove).map(r => `p${r.page} −${r.remove.join('/')} (reading ${r.readingKeep === false ? 'cut' : r.readingKeep === true ? 'KEEP' : '?'})`).join('; ')} | group pages after ${groupAfter} | coverage ${JSON.stringify(coverageAfter)} floor ${cov && cov.appearances.min}`);
+    out.push({ story: sid, budget: d.budget, groupAfter, budgetMet: groupAfter <= d.budget, coverageAfter, floor: cov && cov.appearances.min, rows });
+  }
+  return { mode: 'cuts', stories: stories.length, pagesCut, pagesCutThatReadingCuts: pagesCutReadingCut, charactersRemoved: removed, removedReadingNotNeeded: removedNotNeeded, removedUnlabelled,
+    budgetMet: `${out.filter(o => o.budgetMet).length}/${out.length}`,
+    measuredEval: { togetherInBudget: '7/7 reading-cut pages', neededBelow05: '51 cuts, 0 wrong' }, rows: out };
+}
+
 async function main() {
-  const fn = { shots }[mode];
+  const fn = { shots, cuts }[mode];
   if (!fn) { console.log('usage: shots | cuts | light | vb | pop | gaze  --items=<items.jsonl>'); return; }
   const t0 = Date.now();
   const res = await fn();

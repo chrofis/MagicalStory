@@ -8017,6 +8017,12 @@ function buildReplanSection(pagePlan, findingLines, { pageCount = null, keep = [
     ...(keepList.length ? [`These pages keep their instant and their cast, and change only for a must-fix finding that names them — except that a commissioned character a cast finding asks for may join one: ${keepList}.`] : []),
     'A noted finding is answered only where the answer removes nothing the story\'s sentences stage.',
     'A finding that names a page names a candidate, not an order. A finding asking the book for a page with no people in frame names the page best suited to give up its cast: empty that one, unless a figure on it is one of the two that stay — then empty another page and say in the declaration why that one could not.',
+    // THE CAST CUT IS DECIDED (2026-09-27): which group pages keep their group
+    // and who leaves the others is the Jev decision layer's call
+    // (jevDecisions.decideGroupCuts), and code writes the who column. The
+    // re-plan only re-words the instant for the cast that stays; a line that
+    // still names a character cast out is rejected (beatsPipeline).
+    ...(items.some(f => f.castCut) ? ['A CAST CUT line is already decided: code writes that page\'s who column exactly as the line says. Return the page with its instant and what is true after rewritten for the characters it keeps — they alone act — and naming no one it casts out, whether by name, as part of a group or by a count. Declare nothing for a CAST CUT page.'] : []),
     'Declare every change you make under ---CHANGES---, with the finding it answers and why. A change you do not declare is undone.',
     '',
     // THE CAST TABLE STANDS (2026-09-25). The round repairs the plan lines
