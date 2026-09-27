@@ -21,6 +21,50 @@ superseded and link forward.
 
 ---
 
+## 2026-09-27 — The re-plan answers a whole-cast finding with the checker's own definition, and a whole-cast page rewritten for another finding keeps a shared action
+
+**Context:** Lab #1537 (beats_replan, staging job_1790446348343_z3fw660ie, 2026-09-26 entry "Plan-check Q17 … is
+must-fix" below). `CHECK[17]: page 16 … only has them standing together` reached MUST FIX, but the RE-DIVIDE block
+gave no definition beside it. `WHOLE_CAST_DEF` reached the planner only in the one-moment list. The same list says
+"One action: one thing is being done, and everyone else watches it or does that same thing". The planner used the
+"watches it" half: one figure pressing the chart into another's hands, "that all six share in response to". On p6 it
+answered a different must-fix finding (`CENTRAL_FIGURE_ABSENT_THIRD`, which names pages 6-11 as candidates) and traded
+"all moving together" for a two-figure haul. The recheck filed Q17 on both pages, the count went 3 → 4, and the guard
+discarded the round.
+p6 was NOT an unflagged page. The keep-unflagged rule already exists in both places: the prompt says "for no other
+page", and the merge in `beatsPipeline.js` / `analyzeReplanCompliance` restores any page that no finding names and no
+change declares. No page-scope code guard would have stopped p6. Telling "a shared action" from prose is
+classification, so that belongs to the prompt.
+
+**Decision:** (1) `WHOLE_CAST_DEF` gains a last sentence: one of them acting while the rest look on (a hand-over
+between two, one speaking, one laughing) is not a shared action. It is one constant, so the planner and plan-check
+Q17 read the same words. (2) `buildReplanSection` restates `WHOLE_CAST_DEF` for the page a whole-cast finding names
+AND for any whole-cast page the round rewrites for another finding. Production and the Lab stage share the builder.
+A prompt sentence limiting changes to named pages was drafted and dropped. A cast finding names the pages a character
+is ALREADY on, never the page the fix belongs on, so that sentence would forbid the correct answer to an
+under-covered character.
+
+**Measured, Lab #1550** (same story, after deploy 510c0fca2; claude-sonnet-4-6 planner, gpt-5.6-luna-pro checker;
+$0.34, which leaves no room under the CHF 0.35 cap for the second story):
+- This time the first check filed Q17 on p6 as well as on p16.
+- p6 became "all five haul themselves over the Seeschwalbe's rail together". The recheck no longer flags it.
+- p16 became "all six stand on the landing facing the Limmat as the Seeschwalbe fades into the fog". The planner
+  took this for the definition's own example "all turned toward one thing ahead of them". The recheck still files
+  Q17 ("only a standing pose").
+- Every applied page (2, 6, 10, 12, 15, 16) carries a declared change and is named by a finding. The merge
+  restored pages 13 and 14, which lost cast without declaring it. No unflagged page changed.
+- The guard KEPT the round: cast/focal must-fix went 5 → 1, and the one survivor is the p16 Q17.
+- Open for the owner: the planner and the checker read "all turned toward one thing" differently. For the planner,
+  watching together is a shared action. For the checker, standing and watching is a pose. That ambiguity is inside
+  `WHOLE_CAST_DEF` itself. Tightening or dropping that example changes what Q17 flags, so it is a classification
+  call and is not made here.
+
+**Touched:** server/lib/promptBuilders.js (`WHOLE_CAST_DEF`, `buildReplanSection`),
+tests/unit/plan-shared-definitions.test.ts (510c0fca2)
+**Status:** ✅ active (staging)
+
+---
+
 ## 2026-09-26 — Recorded features: the entity grid judge reports only the skin marks the character's record names, and the page render states that same record
 
 **Context:** on staging job_1790446348343_z3fw660ie the entity grid judge read the pale highlight washes of
