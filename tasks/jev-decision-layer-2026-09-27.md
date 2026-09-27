@@ -70,7 +70,12 @@ Measured e3c329da1 ("Gaze, depth, story relevance asked as fit", scripts/analysi
 - [x] Trial path: unchanged (trials run the unified pipeline, no plan) — decisions.md.
 - [x] Lab parity: beats_replan / beats_scenes / scene_review_replay call the same functions; tests.
 - [x] Jev failure rate measured on the replays; production risk flagged.
-- [ ] Lab runs ≤ CHF 1.00 total; staging idle before each launch.
+- [x] Lab runs ≤ CHF 1.00 total; staging idle before each launch (1577 $0.106, 1578 $0.177, 1579 $0.266).
+
+## Follow-up (coordinator, owner-approved 2026-09-27)
+- [x] Group-cut side effects: CAST-block promises are required names; CUT_STILL_IN_STORY in the CAST CUT line (e4adde229). Replay 5/5 budget, 0 promise breaks; Lab 1578: 0 CAST_PROMISE_BROKEN, 0 CHECK[18].
+- [x] Outage plan B+C+A: probe, 5-min wait, the backup behind one switch, e2e test (bfb55bea6).
+- [x] Lab beats_scenes (1579): every decided field survives the review (re-pinned on 7 pages), p11 cites the dragon.
 - [ ] FINAL: one full staging story (rerun-story-on-staging vnx5l8iy7 --regenerate-idea), verify-run --pull/--write, review page, per-page pixel review, compare dka3jpog9.
 
 ## Review (2026-09-27)

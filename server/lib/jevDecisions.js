@@ -844,7 +844,12 @@ function gazeCandidates({ roster, elements, named }, name) {
   const out = [];
   roster.filter(o => o !== name).forEach(o => out.push({ target: o, label: o }));
   const rosterSet = new Set(roster);
-  [...elements, ...(named || [])].filter(e => !rosterSet.has(e.name)).forEach(e => out.push({ target: e.id, label: e.kind === 'place' ? `the place itself: ${e.name}` : `${e.name} (${e.desc.slice(0, 80)})` }));
+  // Never the figure itself: an Art Director roster entry can be a secondary
+  // character's id (smoke story job_1790529840433_ar4u7qry3 p3: "CHR001" was
+  // offered CHR001 and looked at itself).
+  const self = String(name || '').trim().toUpperCase();
+  [...elements, ...(named || [])].filter(e => !rosterSet.has(e.name) && baseId(e.id) !== baseId(self) && String(e.name || '').trim().toUpperCase() !== self)
+    .forEach(e => out.push({ target: e.id, label: e.kind === 'place' ? `the place itself: ${e.name}` : `${e.name} (${e.desc.slice(0, 80)})` }));
   out.push({ target: GAZE_AWAY, label: GAZE_AWAY_LABEL });
   return out;
 }
@@ -999,9 +1004,15 @@ function fixedFieldFinding(pageNumber, changes, labelOf = id => id) {
 }
 
 /**
- * The Visual Bible's `pages` for the elements Jev decided, made to agree with
- * the briefs' citations (story pages only; a cover's negative page stays), and
- * a state's `pages` gains a page cited in that state.
+ * The Visual Bible's page table for the elements Jev decided, made to agree
+ * with the briefs' citations (story pages only; a cover's negative page stays),
+ * and each state's pages made to agree with the pages cited IN that state.
+ *
+ * The parsed bible keeps an element's pages in `appearsInPages` (the parser
+ * renames the authored `pages`; syncVisualBibleSection projects it back) —
+ * writing `pages` changed nothing any reader saw (smoke story
+ * job_1790529840433_ar4u7qry3: the review was sent vb_page_uncited for a state
+ * Jev had already dropped, and the transcript sync reported no change).
  */
 function applyVbPages(visualBible, citesByPage, decidedIds) {
   const decided = new Set(decidedIds.map(baseId));
@@ -1011,17 +1022,19 @@ function applyVbPages(visualBible, citesByPage, decidedIds) {
     for (const e of (Array.isArray(visualBible?.[k]) ? visualBible[k] : [])) {
       if (!e || !decided.has(baseId(e.id))) continue;
       const own = [...citesByPage.entries()].filter(([, cs]) => cs.some(c => baseId(c) === baseId(e.id))).map(([n]) => n).sort((a, b) => a - b);
-      const keep = (Array.isArray(e.pages) ? e.pages : []).filter(n => Number(n) <= 0);
-      const next = [...keep, ...own];
-      if (JSON.stringify(next) !== JSON.stringify(e.pages || [])) { e.pages = next; changed++; }
+      const field = Array.isArray(e.appearsInPages) || !Array.isArray(e.pages) ? 'appearsInPages' : 'pages';
+      const before = Array.isArray(e[field]) ? e[field].map(Number) : [];
+      const next = [...before.filter(n => n <= 0), ...own];
+      if (JSON.stringify(next) !== JSON.stringify(before)) { e[field] = next; changed++; }
       if (Array.isArray(e.states)) {
-        for (const [n, cs] of citesByPage) {
-          const cite = cs.find(c => baseId(c) === baseId(e.id) && c.includes('.'));
-          if (!cite) continue;
-          const i = Number(cite.split('.')[1]) - 1;
-          const st = e.states[i];
-          if (st && Array.isArray(st.pages) && !st.pages.map(Number).includes(n)) { st.pages = [...st.pages, n].sort((a, b) => a - b); changed++; }
-        }
+        e.states.forEach((st, i) => {
+          if (!st) return;
+          const stateId = st.id && String(st.id).includes('.') ? String(st.id).toUpperCase() : `${baseId(e.id)}.${i + 1}`;
+          const stOwn = [...citesByPage.entries()].filter(([, cs]) => cs.some(c => String(c).toUpperCase() === stateId)).map(([n]) => n).sort((a, b) => a - b);
+          const stBefore = Array.isArray(st.pages) ? st.pages.map(Number) : [];
+          const stNext = [...stBefore.filter(n => n <= 0), ...stOwn];
+          if (JSON.stringify(stNext) !== JSON.stringify(stBefore)) { st.pages = stNext; changed++; }
+        });
       }
     }
   }

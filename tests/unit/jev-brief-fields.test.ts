@@ -131,12 +131,16 @@ describe('pinBrief: code writes the decided fields; the review is told what chan
     expect(f.detail).toMatch(/Ana looks at ANI001/);
     expect(req('../../server/lib/sceneBriefCheck').REVIEWABLE.has('jev_fixed_field')).toBe(true);
   });
-  it('the bible\'s pages agree with the citations; a cover page stays', () => {
-    const vb: any = { animals: [{ id: 'ANI001', pages: [2, -1] }], artifacts: [{ id: 'ART001', pages: [1], states: [{ pages: [1] }, { pages: [3] }] }] };
-    JD.applyVbPages(vb, new Map([[1, ['ANI001']], [2, ['ART001.1']]]), ['ANI001', 'ART001']);
-    expect(vb.animals[0].pages).toEqual([-1, 1]);
-    expect(vb.artifacts[0].pages).toEqual([2]);
-    expect(vb.artifacts[0].states[0].pages).toEqual([1, 2]);
+  it('the bible\'s page table (appearsInPages, as parsed) agrees with the citations, state by state; a cover page stays', () => {
+    const vb: any = { animals: [{ id: 'ANI001', appearsInPages: [2, -1] }], artifacts: [{ id: 'ART001', appearsInPages: [1, 3, 4], states: [{ pages: [1] }, { pages: [3] }, { pages: [4] }] }] };
+    JD.applyVbPages(vb, new Map([[1, ['ANI001']], [2, ['ART001.1']], [3, ['ART001.2']], [4, []]]), ['ANI001', 'ART001']);
+    expect(vb.animals[0].appearsInPages).toEqual([-1, 1]);
+    expect(vb.artifacts[0].appearsInPages).toEqual([2, 3]);
+    expect(vb.artifacts[0].states.map((s: any) => s.pages)).toEqual([[2], [3], []]);
+  });
+  it('a figure is never offered itself as a gaze target, by name or by id', () => {
+    const c = JD.gazeCandidates({ roster: ['Noah', 'CHR001'], elements: [{ id: 'CHR001', kind: 'figure', name: 'the captain', desc: 'a captain' }], named: [] }, 'CHR001').map((k: any) => k.target);
+    expect(c).toEqual(['Noah', 'away']);
   });
 });
 
