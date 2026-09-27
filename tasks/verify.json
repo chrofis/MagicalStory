@@ -2403,7 +2403,7 @@
       ],
       "check": {
         "kind": "human",
-        "what": "finalChecksReport.entity.characters[*].issues for identity_swap; imageVersions[].consolidatedPlan.deduped_issues and dropped_issues on that page; retryHistory for a char-fix attempt; the head grid pixels against the reference. Fixtures: entity-*-identity-swap (flag), entity-lukas-fcm-p7-hair-drift-not-swap (pass)."
+        "what": "finalChecksReport.entity.characters[*].issues for identity_swap; imageVersions[].consolidatedPlan.deduped_issues and dropped_issues on that page; retryHistory for a char-fix attempt; the head grid pixels against the reference. Fixtures: entity-*-identity-swap (flag), entity-julian-25b-p7-hair-drift-not-swap, entity-levin-1dp-back-cover-hair-drift-not-swap (pass)."
       },
       "status": "pending",
       "evidence": []

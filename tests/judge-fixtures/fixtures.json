@@ -1076,21 +1076,38 @@
       "source": "p15, head grid cell E and body grid cell E viewed 2026-09-27: Max's green jumper and orange trousers on a child with straight dark-brown hair and a different face; the reference has reddish-brown curls. The run's grid filed hair_change MAJOR; the consolidator dropped it as profile_says_trait_is_correct in two of three versions. Owner rule 2026-09-27: identity_swap, CRITICAL."
     },
     {
-      "id": "entity-lukas-fcm-p7-hair-drift-not-swap",
+      "id": "entity-julian-25b-p7-hair-drift-not-swap",
       "judge": "entity",
       "target": {
-        "storyId": "job_1790107559778_fcmlfa8kn",
-        "character": "Lukas",
+        "storyId": "job_1788816451791_25b31uqlp",
+        "character": "Julian",
         "pageNumber": 7
       },
       "expect": {
         "verdict": "pass",
-        "character": "Lukas",
+        "character": "Julian",
         "types": [
           "identity_swap"
         ]
       },
-      "source": "Negative control for identity_swap. p7 head grid cell B viewed 2026-09-27: the hair reads lighter and more reddish than the reference's dark brown, but the face is plainly the same boy (same eyes, nose, face shape). Single-trait hair drift stays hair_change (MAJOR at most, no char-fix); it must not be filed as identity_swap."
+      "source": "Negative control for identity_swap. p7, head grid cell E viewed 2026-09-27: the hair is wavier and a lighter gold than the reference's curls, the face is plainly the same toddler (same eyes, nose, mouth, face shape). Single-trait hair drift stays hair_change or hair_nuance; it must not be filed as identity_swap."
+    },
+    {
+      "id": "entity-levin-1dp-back-cover-hair-drift-not-swap",
+      "judge": "entity",
+      "target": {
+        "storyId": "job_1788727233899_1dpnym94p",
+        "character": "Levin",
+        "pageNumber": -3
+      },
+      "expect": {
+        "verdict": "pass",
+        "character": "Levin",
+        "types": [
+          "identity_swap"
+        ]
+      },
+      "source": "Negative control for identity_swap. Back cover (-3), head grid cell A viewed 2026-09-27: the curls read golden blond against the reference's light-brown curls, the face is the same boy. The run filed hair_change MAJOR. Single-trait hair drift; it must not be filed as identity_swap."
     }
   ]
 }

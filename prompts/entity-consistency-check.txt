@@ -169,7 +169,7 @@ If a defect could match multiple `type` values, pick the most specific:
 - Object color drift → `color_change`
 - Object proportions drift → `shape_change`
 
-Before filing `hair_change` for a cell, compare that cell's face with the reference face. If the face also reads as a different person, the finding is one `identity_swap`, not a `hair_change`.
+Before filing `hair_change` for a cell, compare that cell's face with the reference face: face shape, eyes, nose, mouth and apparent age. If the face differs too, the finding is one `identity_swap`, not a `hair_change` beside a face finding. Expression alone is not a face difference.
 
 If two types apply equally, list the primary visual change first.
 

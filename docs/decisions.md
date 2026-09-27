@@ -62705,7 +62705,8 @@ A fifth, borderline (job_1788727233899_1dpnym94p p18, Levin: darker hair plus `f
 is not counted. Search: every `hair_change` / `face_drift` / `face_mismatch` / `age_shift` entity
 finding on stories of the last 24 days, staging (101) and production (23); candidate grids
 downloaded and viewed. The negative case the rule must not catch is single-trait drift:
-job_1790107559778_fcmlfa8kn p7 Lukas (hair lighter and redder, same face).
+job_1788816451791_25b31uqlp p7 Julian and job_1788727233899_1dpnym94p back cover Levin (hair a
+different shade or wave, same face).
 
 **Decision (owner, 2026-09-27, reversal signed off: "Identity swap = CRITICAL"):**
 1. **Classification — prompt.** `prompts/entity-consistency-check.txt` gains the type
@@ -62739,7 +62740,7 @@ job_1790107559778_fcmlfa8kn p7 Lukas (hair lighter and redder, same face).
 **Touched:** prompts/entity-consistency-check.txt, server/lib/evalBuckets.js, server/lib/scoring.js,
 server/lib/repairLogic.js, server/lib/faceRepair.js, server/lib/feedbackConsolidator.js,
 client/src/hooks/useRepairWorkflow.ts, client/src/types/story.ts,
-tests/unit/identity-swap-critical.test.ts, tests/judge-fixtures/fixtures.json (4 flag + 1 pass),
+tests/unit/identity-swap-critical.test.ts, tests/judge-fixtures/fixtures.json (4 flag + 2 pass),
 docs/SETTLED.md.
 
 **Status:** ✅ active on staging. Supersedes the 2026-09-04 entry for identity swaps only.
