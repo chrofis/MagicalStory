@@ -63777,6 +63777,139 @@ TOGETHER wording changes (re-run `run --only=chardrop,grouppage`).
 evals/datasets/jev-decision-layer-v1/reading_labels.json (new),
 evals/runs/2026-09-27_jev-decision-layer/metrics.json (new), docs/decisions.md, tasks/BACKLOG.md.
 
+## 2026-09-27 — Jev picks the shot, code holds the budget: per-shot "fit" nouls + a budgeted assignment ✅ (supersedes "shot ❌" above) — measured, NOT built; population per LOCATION ✅, aboard 🟡✅, looksAt / depth / storyRelevant ❌ (stay with the AD)
+
+**Context:** owner, 2026-09-27: "Jev can also do the shot size (over the shoulder, extra-wide etc.).
+Just think how you ask Jev. It gets the budget how many shots of each type, and per shot it can rank
+which shots are best. Or just per shot rank which shot type is best and then pick per code. Try 3-4
+things." Both earlier shot tests asked Jev to CLASSIFY the shot a text describes (❌ 61% vs 60%, and
+60% vs 36% in the entry above). This asks a different question — which shot SERVES the page — and
+leaves the budget to code. Owner-approved shape: "code writes the who-column and shot word".
+
+**Data.** The 17 most recent staging beats books with a commissioned cast (`m3uam0nxi` …
+`dka3jpog9`, 2026-09-11 → 09-27, 291 pages, 16 de-CH / 1 fr-CH), the FIRST plan (`briefsIn`) of each,
+the plan line's shot token stripped (17 of 291 lines still name a camera in the prose — "seen from
+above", "past X's shoulder" — left as written). Every call carries the arc + the whole stripped plan
+with the page marked. `scripts/analysis/eval-jev-shot-budget.js`, run `2026-09-27_jev-shot-budget`,
+`evals/runs/2026-09-27_jev-shot-budget/metrics.json`; 3,273 Jev calls (3 reps each), **$0.375 total**
+($0.345 shots + $0.031 fields).
+
+**Truth.** The evaluator's reading, written from the plan line + arc BEFORE any Jev call
+(`evals/datasets/jev-shot-budget-v1/reading_labels.json`, hashed keys, no story text): per page a BEST
+shot and the SET of acceptable shots (mean 2.7 of 8 — chance 0.34), and a group flag (> 3 figures in
+frame by reading, 53 pages). The reading applies the rules the vocabulary states: a group page takes
+`GROUP_WIDER_SHOTS`; no over-the-shoulder where the near figure touches what it faces
+(`OTS_NO_CONTACT_RULE`); no low angle up at a grown-up or creature over a child; no close-up whose
+subject is the ground. It is one reader's taste — the acceptable-set rate is the robust number, the
+best-shot rate is indicative only.
+
+**The approaches** (identical states; code does the same assignment for each):
+
+| # | Question | Wording |
+|---|---|---|
+| A1 | per page, one noul per shot (8 in one call) | `The picture of the page to judge is best told as a <shot> shot, better than by any other camera shot. <SHOTS[shot].definition>` — the vocabulary's own definition constant, plus `OTS_NO_CONTACT_RULE` on over-the-shoulder |
+| A2 | per book and shot, a choice over the book's pages | `Which page of this book is the best one to draw as a <look line>?` (options: `Page N: <line>`) |
+| A3 | per page, one choice over the 8 shots | `Which camera shot tells the instant of the page to judge best?` (options: one look line per shot, e.g. `over-the-shoulder: from behind one figure, cropped at the shoulder, toward what that figure faces, small and far across the frame; never when that figure touches what it faces`) |
+| A4 | per page, 7 nouls on the MOMENT, mapped to shots in code | FACE / PLACE / FACING / UP / DOWN / OVERVIEW / BODY ("The instant … is one figure facing another figure, creature or thing across a gap … without touching it" → over-the-shoulder, etc.) |
+| CODE | $0, rules only | who-column head count (0 → ultra-wide, 1 → close-up, 2 → medium/OTS, > 3 → wide), first/last page wide |
+
+**The assignment (code, `assign()` in the script).** Scores S[page][shot] (A1: the noul P). Slots are
+built from `shotVocabulary.shotFloors(P)`: each floored shot's mandatory slots, the position pool the
+tier's total still owes, then optional slots up to caps — medium+wide share ONE pool of
+`maxMediumWide`, close-up ≤ ⌈P/3⌉, ultra-wide ≤ floor+1, aerial ≤ 1, camera positions ≤ required+1
+("an angle still reads as one"). A group page (> `GROUP_STAGING_MAX` in the who column) may only take a
+`GROUP_WIDER_SHOTS` slot. Mandatory slots carry a +10 bonus so they always fill. An exact Hungarian
+assignment of pages to slots maximises the summed score; then a local repair clears
+`CONSECUTIVE_SAME_SHOT_CAST` pairs (same shot and same head count on neighbours) with the cheapest
+single change or swap that breaks no other rule. Every planCounters shot rule holds by construction.
+
+**Measured** (mean of 3 calls per item unless stated; "rules" = planCounters shot findings the result
+would raise: floors, positions total, medium/wide cap, group rule, consecutive):
+
+| Method | Acceptable (reading) | Best | Rule violations / books clean | Group pages not wider (reading) | Flip rate (assigned shot, 3 single calls) | Per book (1 rep) |
+|---|---|---|---|---|---|---|
+| **Planner's own shots** (first plan) | 0.856 | 0.550 | **72** / 0 of 17 | 14 / 53 | — | — |
+| — the 7 books planned under the current 8-word vocabulary | 0.798 | — | 24 (12 consecutive, 8 group, 2 cap, 2 floor) | — | — | — |
+| Art Director's `shot` (152 pages whose final line = the first) | 0.842 | 0.507 | — | — | — | — |
+| CODE baseline (rules only) | 0.694 | 0.426 | 0 / 17 | 11 / 53 | 0 | $0 |
+| **A1 fit nouls + assignment** | **0.918** (1 call: 0.921) | **0.615** | **0 / 17 of 17** | 8 / 53 (0 / 53 with a correct head count) | 0.12 (raw argmax 0.08) | 17 calls, **$0.0021** |
+| — current-vocabulary books only | 0.904 | — | 0 | — | — | — |
+| A2 rank pages per shot | 0.849 | 0.560 | 0 (1 book leaves a floor unmet) | 9 / 53 | 0.15 | 8 calls, $0.0011 |
+| A3 choice per page | 0.849 (raw argmax 0.907) | 0.553 | 0 | 6 / 53 | **0.06** | 17 calls, $0.0018 |
+| A4 moment nature → shot | 0.780 | 0.478 | 0 | 12 / 53 | 0.06 | 17 calls, $0.0018 |
+| A1 + A3 averaged | 0.890 | 0.564 | 0 | — | 0.10 | 34 calls, $0.0039 |
+
+Discrimination of the raw score, (page, shot) acceptable vs not: A1 AUC **0.89** (best-shot AUC 0.91;
+per shot: close-up 0.95, wide 0.94, ultra-wide 0.95, low-angle 0.86, aerial 0.88, over-the-shoulder
+0.81, medium 0.74, high-angle 0.74); A3 0.86 / 0.93; A4 0.77; A2 0.74. Latency p50 **275 ms**, p90 325
+ms per call; a book's 17 calls (or 51 averaged) run in parallel in < 1 s / ~2 s at 8 in flight.
+
+**Where Jev and the planner disagree** (A1, 146 pages): only Jev acceptable 33, only the planner 15,
+both 92, neither 6. **With the reading's group flag as the head count** (`score --readingGroup` —
+stands in for planCounters' `present`, which also reads "all four boys"; the eval's own name match
+cannot): A1 **0.938** acceptable, 0.632 best, 0 / 53 group pages not wider. All 8 group misses above
+are who columns like "all four boys", "the four", or a dog/crew not named — a head-count bug of the
+eval's regex, not a Jev error.
+
+**Why A1 wins.** A3's choice is peaky: excellent top pick (raw 0.907, best-shot AUC 0.93) but ~0 for
+every other shot, so when the budget moves a page off its top shot the assignment has nothing to
+rank by (0.849 after assignment). A1's independent nouls give a graded score for every shot — exactly
+what a budgeted assignment needs — and the assignment costs it nothing (raw 0.911 → assigned 0.918,
+while clearing every rule). A2 (rank pages per shot) is the weakest ranker (AUC 0.74): one choice over
+16-18 pages spreads its probability thin and normalising per shot does not recover a page order. A4's
+mapping loses medium (AUC 0.42): "a whole-body action" is not what makes a page medium. Averaging A1
+with A3 is worse than A1 alone. Of A1's 24 misses, 14 are the over-the-shoulder FLOOR forced onto a
+weak page (the floor is a rule, so this is the budget's price) or a head-count miss (below).
+
+**Stability.** Jev has no temperature: 12% of pages change their assigned shot between single calls
+(8% of raw top picks); accuracy does not move (one call 0.921, averaged 0.918), so the flips are
+between shots of similar fit.
+Production should average 3 calls (51 calls, ~$0.006 a book) so the plan is reproducible run to run.
+
+**Proposed wiring (NOT built).** Jev picks, code enforces, code writes:
+1. After the first plan AND the group-page roster cuts (the head count must be final — the group rule
+   reads it), run A1 per page: 8 nouls, the SHOTS definition constants (+ `OTS_NO_CONTACT_RULE`) — one
+   declaration shared with the planner prompt, so generator and question cannot drift.
+2. Head count = planCounters' `present` (named + covered), never a name regex.
+3. `assign()` with `shotFloors`, `GROUP_WIDER_SHOTS`, the consecutive rule and the caps above.
+4. Code writes the shot word into field 0 of every plan line; the re-planner is never sent
+   `SHOT_*` / `CONSECUTIVE_SAME_SHOT_CAST` findings (they cannot fire). The planner's own shot word
+   becomes unused — the planner prompt's shot-distribution rules can then be removed rather than kept
+   as a second, weaker author (NO FALLBACKS). The Art Director keeps copying the plan's shot (70/70 today).
+5. What code cannot see stays a prompt rule: over-the-shoulder on contact, close-up below the waist,
+   low angle over a child — Jev's A1 definitions carry them, and the AD/iterate templates keep them.
+
+**Extra decision-layer fields** (the four books whose briefs carry them, 70 pages; labelled before the
+field calls; 3 reps):
+
+| Field | Question | Verdict | Jev vs reading | AD vs reading | Agree with AD | Flips |
+|---|---|---|---|---|---|---|
+| **population per LOCATION** | noul PUBLIC "a place the public can walk into: a street, a square, a park, a bridge, a station, a shop, a museum hall" + noul CROWD "the story sets this place around a crowd" → code: crowd ≥ 0.5 → `crowd`, else public ≥ 0.5 → `ambient`, else `cast_only` | ✅ (thin: 13 places, no crowd place in the data) | **13 / 13** | AD pages 48 / 72 (it writes `cast_only` on 17 pages of one public square) | — | 0 |
+| — the same as one choice | choice cast_only / ambient / crowd | ❌ | 5 / 13 (defaults to cast_only) | — | — | 0 |
+| **aboard** | noul per vehicle "the camera stands on or inside X: its deck, floor or interior is the ground the picture is taken from" | 🟡 ✅ (one ship book) | **9 / 10** | 4 / 10 — the AD set `aboard: null` on EVERY page of the ship book, rule 11d notwithstanding | 0.50 | 0 / 16 |
+| looksAt | choice (the other characters on the page / the thing the instant is about / the viewer / away) | ❌ stays with the AD | 118 / 136 | **126 / 136** | 0.61 | 9 / 139 |
+| depth | choice foreground / midground / background | ❌ stays with the AD (depth follows the shot) | 16 / 17 | 17 / 17 | 0.59 | 11 / 139 |
+| storyRelevant | noul per interaction row "is part of what the page's story moment is about, not background business" | ❌ stays with the AD | 60 / 73 (AUC 0.71) | **70 / 73** | 0.78 | 4 / 81 |
+
+**Risks.** (a) One reader's taste on 17 books, nearly all one family's dragon plots in German; the
+acceptable-set rate is the defensible number. (b) The OTS floor is the main source of residual
+errors — that is the owner's floor doing its job, not Jev; a Lab page-level look at the forced OTS
+pages would say whether the floor should stay at 2 for 14+ pages. (c) The aboard and population
+verdicts rest on 10 and 13 items; no crowd location exists in the data. (d) SETTLED "Eval judges run at
+temperature 0" cannot hold for Jev; replaced by 3-call averaging on a decision that writes the plan.
+
+**Owner decisions:** (i) wire A1 + `assign()` so code writes the shot word (and drop the planner's
+shot rules, or keep them as a hint the assignment ignores); (ii) one call or 3 averaged; (iii) take
+population per location (PUBLIC/CROWD → code) and `aboard` into the decision layer; leave looksAt,
+depth and storyRelevant with the Art Director.
+
+**Revisit if:** a new Jev version; a SHOTS definition changes (re-run `run --only=A1`); a book set
+outside the dragon family; the floors change.
+
+**Touched:** scripts/analysis/eval-jev-shot-budget.js (new),
+evals/datasets/jev-shot-budget-v1/reading_labels.json (new),
+evals/runs/2026-09-27_jev-shot-budget/metrics.json (new), docs/decisions.md, tasks/BACKLOG.md.
+
 ## 2026-09-27 — A grammar-check RESTORE names what it replaces; it can never leave both
 
 **Context:** staging `job_1790508305061_dka3jpog9` p2. The repair rewrote writer sentence B4
