@@ -63502,3 +63502,81 @@ the gate.
 
 **Touched:** server/lib/jevAudit.js (jevCastBeatVoice, arcRepairFindingsWithCastCheck,
 CAST_FEEDBACK_HEADING), server/lib/beatsPipeline.js (log lines), tests/unit/jev-text-chain-wiring.test.ts.
+
+## 2026-09-27 — Jev for the re-plan guard: whole-cast Q17 ✅, finding ledger 🟡, pairwise plan choice ❌ — measured, NOT wired
+
+**Context:** the re-plan convergence guard (`promptBuilders.replanRoundRegressed`, called from
+`beatsPipeline` `runReplanRounds`) keeps a round only when the cast/focal must-fix COUNT
+(`countsTowardConvergence`) of its recheck does not rise. On staging `job_1790508305061_dka3jpog9`
+round 2 was discarded (3 → 4) and the group-page budget (5 pages over a budget of 3) and the
+whole-cast findings on p11/p17 shipped unfixed; Lab #1558 on `vnx5l8iy7` did fix the budget.
+Owner, 2026-09-27: "Test if we can use Jev for this." Jev = the decision model already wrapped by
+`server/lib/jevAudit.js` (`callJev`, reused, no second client; see the three "Jev text audit"
+entries above).
+
+**What Jev is NOT for, stated once:** the counter findings — group-page budget, coverage, focal
+pages, who column, shot floors — are arithmetic over the roster and exact in code. Jev was asked
+none of them. Only the checker's MODEL findings (`CHECK[n]`) and the pages behind them were.
+
+**Measured** (`scripts/analysis/eval-jev-replan-guard.js`, run `2026-09-27_jev-replan-guard`,
+`evals/runs/2026-09-27_jev-replan-guard/metrics.json`; 2,382 Jev calls, $0.115; every item asked
+3× because Jev has no temperature knob). Data: every staging re-plan round of the last 21 days that
+stored its before and after division — 5 story rounds (`5herh01j7` r1, `vnx5l8iy7` r1, `z3fw660ie`
+r1, `dka3jpog9` r1 + discarded r2) and 13 Lab rounds (#1488, #1489, #1491, #1493–#1498, #1537,
+#1550, #1553, #1558; #1556 is a plan-and-check without a re-plan). Three older story rounds
+(`1nitlympp` r1, `fcmlfa8kn` r1/r2) stored neither the reply nor the rechecked plan and cannot be
+measured. 290 model findings handed to a round (33 must-fix), 18 old/new division pairs, 89
+whole-cast page judgements over 56 distinct plan lines (15 carry a checker Q17 verdict).
+
+**The recheck is not a clean truth.** Reading all 33 must-fix findings against the before/after
+plan lines, the recheck is wrong on 8 (24%): it calls a finding resolved on a byte-identical page 4
+times (the checker disagreeing with itself — the case `replanRoundRegressed`'s noise rule already
+drops), and misjudges a changed page 4 times. On the 23 strongest Jev-vs-recheck disagreements
+among the also-noted findings, reading sides with Jev 14 times and with the recheck 9. Findings are
+therefore scored three ways: `recheck` (as stored), `rule` (a page-local check on an unchanged page
+is still there — $0, unbiased) and `corrected` (`rule` + the reading labels, which lean toward Jev
+because the disagreements were what got read). Labels: `evals/datasets/jev-replan-guard-v1/reading_labels.json`
+(hashed keys, no story text); the whole-cast lines were labelled against `WHOLE_CAST_DEF` before
+any Jev score was looked at.
+
+| Use | Verdict | Evidence | Flip rate (3 reps, crosses 0.5) |
+|---|---|---|---|
+| (c) Q17 per whole-cast page: "does the instant give everyone in frame one shared action?" (question = `WHOLE_CAST_DEF`, the planner's own definition, + an inverse phrasing, averaged) | ✅ | vs reading, 56 lines, 25 faults: AUC 0.95; P(fault) ≥0.5 → recall 23/25, precision 23/28; ≥0.7 → 16/16 precision, recall 16/25. vs the checker's own Q17 (15 lines): AUC 0.96, ≥0.5 → 10/10 recall, 1 false flag. The checker itself flipped on one identical line (Lab #1537 vs #1550 p6) and differs from reading on 2 of 15 | 3 of 178 |
+| (a) per finding: "is this finding fixed in the revised plan?" (+ "still there", averaged) | 🟡 | all 290: AUC 0.67 (recheck) / 0.75 (rule) / 0.79 (corrected). The $0 baseline "a named page's line changed" already gets recall 0.84 at precision 0.56 (rule truth). Jev's only added value is INSIDE the changed pages: AUC 0.69 (recheck) / 0.76 (corrected), n = 158. Must-fix on changed pages, n = 24 (17 resolved): ≥0.6 → 14 TP / 2 FP / 3 FN (recheck), 15/1/2 (corrected) — promising, too small to gate on, and 11 of the 24 are Q14 over-the-shoulder findings whose fix is a shot word | 54 of 580 (9%) |
+| (b) pairwise: "which plan has fewer of these must-fix problems while every character keeps their pages?", both orders | ❌ | 16 decided rounds: accuracy 0.63, AUC 0.69; P(new plan better) sits at 0.46–0.80 on every round, including all 5 rounds the recheck scores as worse (0.48–0.65); order-consistent on 13 of 18; it leans toward the new plan in either position | 4 of 36 choices |
+
+**The dragon round, re-read:** discarding round 2 was right by every measure. The counters show
+the group budget untouched (5 pages before and after — exact, no judge involved) and Jev's Q17
+agrees with the checker that round 2 made p17 worse ("Sura leads the four children … all moving
+together" 0.25 → "Sura breathes a warm flame ahead of the four children as they follow" 0.52). At a
+0.7 threshold Jev flags neither page, and the round still fails the strict-reduction rule for
+rounds ≥2 on the counters alone. A page-level merge would not have saved it either: the only
+given must-fix the round resolved was the who-column finding, which is exempt from convergence.
+What shipped the budget unfixed is the planner not casting out on the over-budget pages, not the
+guard.
+
+**Decision:** nothing wired. Recommendation for the owner:
+1. **(c) is the one use worth wiring:** Jev answers Q17 per whole-cast page — the pages found in
+   CODE from the counter roster (every commissioned name in frame) — and its verdict enters the
+   convergence count as a structured finding (code + page), in place of the checker's `CHECK[17]`
+   lines. One judge per rule (no second path): the checker would stop being counted for Q17.
+   Generator↔critic stays in sync because the question IS `WHOLE_CAST_DEF`, the constant the
+   planner is given. Cost ~$0.00003 per whole-cast page per check (the stored books have 1–4).
+2. **The finding ledger needs no Jev.** Build it from structured data: `replanFindingKey`
+   (code/check + pages), plus "a page-local finding on an unchanged page is still there" — that
+   rule alone moved 37 recheck verdicts and is $0. Jev (a) may later break ties on CHANGED pages
+   (P ≥ 0.6), but 24 must-fix items are not enough to gate a paid round on.
+3. **Never (b).** Jev cannot rank two 18-page divisions against a finding list.
+
+**Owner decisions left:** (i) whether Jev replaces the checker's Q17 in the convergence count
+(and, separately, in the re-plan's MUST FIX list, which changes what the planner is asked to fix);
+(ii) threshold — 0.5 (recall 23/25, 5 false flags in 56) or 0.7 (no false flag, 9 misses);
+(iii) the planner not cutting over-budget group pages (dragon round 2) is a planner problem this
+measurement does not touch.
+
+**Revisit if:** a new Jev version, or ≥50 must-fix findings on changed pages are stored (then
+re-run `score` for (a)); the Q17 wording (`WHOLE_CAST_DEF`) changes — re-run `run --only=wholecast`.
+
+**Touched:** scripts/analysis/eval-jev-replan-guard.js (new),
+evals/datasets/jev-replan-guard-v1/reading_labels.json (new),
+evals/runs/2026-09-27_jev-replan-guard/metrics.json (new), docs/decisions.md, tasks/BACKLOG.md.
