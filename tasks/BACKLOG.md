@@ -366,6 +366,8 @@ them by deleting an emotional or characterising sentence. Text refine alone: 14 
 
 ## Tests
 
+- [ ] (2026-09-27) **`tests/unit/compliance-judge-off.test.ts` fails when `OPENROUTER_API_KEY` is set in the shell** — not a network call (fetch is stubbed): with the key present the P1 inventory and compliance model route to OpenRouter, the Gemini-shaped stub replies parse as empty, stage 2 skips, and the test sees no compliance call. Fix: delete `OPENROUTER_API_KEY` in its `beforeAll` next to the existing `GEMINI_API_KEY` handling, restore in `afterAll`; other tests may share the key-dependent routing. → `tests/unit/compliance-judge-off.test.ts`
+
 - [x] (2026-09-06) **3 unit tests fail on `staging` HEAD: `tests/unit/active-version-recompute.test.ts`** —
       re-ran 2026-09-06: 10 passed / 10, 0 failed (vitest 4.0.17). No longer reproduces.
       `recomputeAllActiveVersions` leaves `sceneImages[0].activeVersion` undefined where the test
