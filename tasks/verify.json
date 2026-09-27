@@ -19,11 +19,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: Read data.beatsReviewReport.pagePlan: for each page whose instant names a creature entry's name with a body part, confirm the who column carries it; then for those pages confirm sceneImages[].sceneDescription objects[] cites the ANI id and imageVersions[0].prompt has the creature's REQUIRED OBJECTS line; sceneReviewReport.briefFindings has no plan_cast_uncited left in briefUnfi"
       }
@@ -341,11 +341,11 @@
       "evidence": [],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — over-the-shoulder / ultra-wide line",
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "NOT COVERED",
         "note": "needs-shot:ultra-wide: no ultra-wide page"
       },
@@ -863,11 +863,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "NOT COVERED",
         "note": "needs-inpaint: no inpaint repair ran"
       },
@@ -994,13 +994,13 @@
       ],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — vb_element_overflow at birth",
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
-        "note": "1/4 pages over the VB element budget after the scene review (p4: 5) | LOOK: owner decision: count one side, or make the AD cite from the trimmed claims (docs/decisions.md 2026-09-08 \"Art Director second pass\")"
+        "note": "0/4 pages over the VB element budget after the scene review (none) | LOOK: owner decision: count one side, or make the AD cite from the trimmed claims (docs/decisions.md 2026-09-08 \"Art Director second pass\")"
       },
       "triage": {
         "date": "2026-09-27",
@@ -1184,11 +1184,11 @@
       "evidence": [],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — 2026-09-13 commits line",
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "NOT COVERED",
         "note": "trial: not a trial run"
       },
@@ -1445,11 +1445,11 @@
       "evidence": [],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — Five age bands unrun",
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "NOT COVERED",
         "note": "trial: not a trial run"
       },
@@ -1571,11 +1571,11 @@
       "evidence": [],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — Five age bands unrun",
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "NOT COVERED",
         "note": "trial: not a trial run"
       },
@@ -1726,11 +1726,11 @@
       ],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — one /figure-mask call",
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "NOT COVERED",
         "note": "needs-char-fix: no char-fix repair ran"
       },
@@ -1794,11 +1794,11 @@
       ],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — One full showcase re-run to confirm redo counts drop",
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "NOT COVERED",
         "note": "no runMetrics | no runMetrics"
       },
@@ -2083,11 +2083,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: Start a story on staging as a NON-dev account (or dev mode off): first ~7 s a large panel says the story takes about an hour and an email follows; then it shrinks to a small line under the spinner and tips/avatars rotate. The modal must not close when the first image exists; after completion the reader lands on the finished story. Nav % and My Stories card show only a percentag"
       },
@@ -2115,11 +2115,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "NOT COVERED",
         "note": "needs-fresh-idea: idea_source is \"user-written\", not a generated idea"
       },
@@ -2175,11 +2175,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: Start a story on staging, click Continue in Background, browse elsewhere; return after 60+ minutes: the nav % button and the My Stories generating card are still there and advancing; on completion the Ready badge appears and opens the finished story."
       },
@@ -2595,11 +2595,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: Lab arc_effort stage=pipeline on the #1473-1476 story: read panel[].raw beside findings/malformedFindings/droppedFindings/overflowFindings, gate (repair, duplicates, panelRepair) and retellSkipped; where a re-telling ran, diff arms[retell].arc against arms[create].arc sentence by sentence"
       },
@@ -2689,11 +2689,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: stories.data.generationLog: events image_provider_fallback / prompt_fit_failed / plate_shipped_failed_qc / vantage_plate_qc_retry; sceneImages[].emptySceneModelId|plateDerivedFor|emptySceneQc; compare to staging job_1790277448294_5herh01j7 (p1/p11 plates on Gemini, p10/p14 derived twice)"
       },
@@ -2721,13 +2721,13 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "NOT COVERED",
-        "note": "build bfb55bea6 lacks 49ae547ec | human check"
+        "note": "build 9a6696011 lacks 49ae547ec | undecided — human check | LOOK: stories.data.finalChecksReport.repairRounds (method iterate: error null, after set) and sceneImages[].imageVersions[].source ^iterate; compare to staging job_1790277448294_5herh01j7 (p7, p14 iterate errored)"
       },
       "triage": {
         "date": "2026-09-27",
@@ -2929,11 +2929,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: stories.data.clothingReviewReport (analysis check 12, changed[].after) and the final clothingRequirements: the handed-over garment appears in the first wearer's outfit only; the receiver's sheet does not wear it"
       },
@@ -2964,11 +2964,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: sceneImages[p].referencePhotos[].cellPose / photoType for every character whose perspective is over-the-shoulder, back view, rear or facing away; then view the page pixels for identity bleed onto another child"
       },
@@ -2999,11 +2999,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "NOT COVERED",
         "note": "needs-inpaint: no inpaint repair ran"
       },
@@ -3034,11 +3034,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: stories.data.sceneImages[].sceneDescription and imageVersions[].prompt for headline phrases; imageVersions[].letteringInventory.items with placement overlay. Baseline: job_1790373080139_vnx5l8iy7 p18 (\"share a proud moment\" -> caption THE PROUD MOMENT)."
       },
@@ -3069,11 +3069,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: stories.data.visualBible.animals[].description + vb/<id>.jpg; sceneImages[].imageVersions[].prompt REQUIRED OBJECTS line; look at each page image and compare creature height to the named figures. Baseline: job_1790373080139_vnx5l8iy7 (dragon run 8) - grown dragon ANI001 twice-adult-height: large p5, cat-sized p10, child-plus p16/p17, boy-sized p18; ANI001 cell looked like hatch"
       },
@@ -3104,11 +3104,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: sceneImages[].imageVersions[].fixableIssues / deductions for type creature_scale vs the pixels; qualityRawOutput shows the CREATURE SIZES input was non-empty on creature pages. Baseline: job_1790373080139_vnx5l8iy7 (dragon run 8) - grown dragon ANI001 twice-adult-height: large p5, cat-sized p10, child-plus p16/p17, boy-sized p18; ANI001 cell looked like hatchling ANI002."
       },
@@ -3140,11 +3140,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "NOT COVERED",
         "note": "needs-iterate-repair: no iterate repair ran"
       },
@@ -3176,11 +3176,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: View every empty_scene plate image of the run (no people), then the ambient pages (a few small distant passers-by, no cast look-alike) and their stored finalChecks for extra_character / duplicate_identity"
       },
@@ -3211,11 +3211,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: sceneImages[].imageVersions[].prompt REQUIRED OBJECTS lines vs VB scaleClass; look at every page with a cited element and compare its size to the named figure/body part. Baselines: run 7 job_1790277448294_5herh01j7 p9/p11 (egg melon-sized, dragon waist-high), run 8 job_1790373080139_vnx5l8iy7 p10 (grown dragon). A/B bodies: image stage, params.variants current-build (pageScaleS"
       },
@@ -3246,11 +3246,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: sceneDescriptions[].description METADATA interactions[] rows naming the small prop id, against the page text; view each page image. Baseline: EXACT POSES rider on job_1789584708605_rts4wqupm - right size 6/6 with contact, oversized 3/3 without."
       },
@@ -3282,11 +3282,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: eval_calls kind plate_qc for the story: one row per per-page plate label P<n>; story_images empty_scene plates viewed against their verdicts; stored sceneImages[].emptySceneQc on failed ones. Baseline: staging job_1790277448294_5herh01j7 had no per-page plate QC at all."
       },
@@ -3317,11 +3317,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: visualBible.locations[].vantages[].landmarkPhoto vs sceneImages[].landmarkPhotos[].variantNumber per page; generationLog for landmark_photo_citation; view the cited photo against the vantage emptyScenePrompt (does it show what the plate frames?). Baseline: staging job_1790277448294_5herh01j7 — p1 (stairs up to the square) was served the chess-square photo, no citation existed."
       },
@@ -3349,11 +3349,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: stories.data sceneImages[].retryHistory (type round_repair_failed, method char-fix) and repairRounds[].pages[].error; the Railway log line \"🚫 [CHAR-FIX] Page N <name>: …\". Baseline: staging job_1790446348343_z3fw660ie carried the bare sentence."
       },
@@ -3385,11 +3385,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: coverImages.*.imageVersions[].letteringInventory and consolidatedPlan.deduped_issues; finalChecksReport.repairRounds decisions/errors; sceneImages[] finalScore vs unrepairedCritical; view each cover image for painted captions. Baseline: staging job_1790446348343_z3fw660ie — back cover shipped the caption \"THE FIVE FRIENDS STAND TOGETHER\" (MAJOR only), p9 scored 100 with unrepai"
       },
@@ -3417,11 +3417,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: textRefineReport.oneSentenceParagraphs writer vs shipped; mergeStats.bySource['style-counter']; roundTrace[].arcFaults and the rewritten pages; arcReviewReport panel raw replies for STAKES / CLAIM issues and their tags. Baseline: staging job_1790446348343_z3fw660ie shipped 5 one-sentence narration paragraphs (p1, p8, p9, p15, p16), the rope CLAIM was tagged MINOR and filtered, "
       },
@@ -3452,11 +3452,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: beatsReviewReport.checkReply / modelFindings for check 17; sceneImages[].prompt EXPRESSIONS AND EYES lines; view each whole-cast page image. Baseline: staging job_1790446348343_z3fw660ie p16 (no Q5/Q17 finding, row facing the viewer, one figure with no viewer line)."
       },
@@ -3484,11 +3484,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: beatsReviewReport.modelFindings check 17; the round-1 re-plan prompt's MUST FIX block; beatsReviewReport.pages before/after for the named page; recheck findings; discardedRounds. Baseline: staging job_1790446348343_z3fw660ie p16 and job_1790373080139_vnx5l8iy7 p18 (\"stand together\") shipped unanswered while Q17 did not exist / was advisory."
       },
@@ -3516,11 +3516,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: beatsReviewReport.plannerPrompt / .prompt / replanPrompts contain arcReviewReport.logic verbatim; modelFindings with check 18 read against the logic Facts; plan lines vs Facts. Baseline: staging job_1790446348343_z3fw660ie (logic dropped by the hints step, coat-rope contradiction)."
       },
@@ -3551,11 +3551,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: sceneImages[].emptySceneQc v1Issues/retryIssues and the generation log plate events for pages whose buildPlateStructuresText is non-empty; look at the plate pixels against the VB description. Fixtures: plate-fiona-p6/p10 (flag), p7/p9 (pass)."
       },
@@ -3586,11 +3586,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: sceneReviewReport.briefFindings / briefUnfixed / analysis for [group_staging]; the final sceneDescriptions of 4+ character pages (shot, perspective, looksAt); the page pixels. Baseline: staging job_1790446348343_z3fw660ie p1, p6 (too close) and p16 (posed row)."
       },
@@ -3618,11 +3618,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: beatsReviewReport.counterStats.groupPages and recheck.counterStats.groupPages; counterFindings for GROUP_PAGES_OVER_BUDGET, UNDER_COVERED_CHARACTER, NO_FOCAL_PAGE; the shot of each plan line whose castPerPage holds more than three. Baseline: 4 of 15 staging full books shipped 4 group pages against a budget of 3 (riqncqg1i, 1nitlympp, 5herh01j7, vnx5l8iy7)."
       },
@@ -3653,11 +3653,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: finalChecksReport.entity.characters[*].issues for identity_swap; imageVersions[].consolidatedPlan.deduped_issues and dropped_issues on that page; retryHistory for a char-fix attempt; the head grid pixels against the reference. Fixtures: entity-*-identity-swap (flag), entity-julian-25b-p7-hair-drift-not-swap, entity-levin-1dp-back-cover-hair-drift-not-swap (pass)."
       },
@@ -3685,11 +3685,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: SELECT counts, report FROM story_verify_reports WHERE story_id = '<storyId>' on staging; run node scripts/admin/verify-run.js <storyId> (dry) and compare verdict per entry; then node scripts/admin/verify-run.js --pull and confirm it records the run (registry runs[] via 'pull'); Railway log: '[VERIFY] <storyId>: N registry entries judged' after 'completed successfully', no 'auto"
       }
@@ -3712,11 +3712,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: textRefineReport.audits[source=jev] (ok, raw), mergedFindings/findingLedger for jev-sourced lines, roundTrace repair pages before/after for those pages; arcReviewReport.rounds[].gate.jevCast; generationLog text_refine timings. Baseline replay: evals/runs/2026-09-27_jev-v1-replay (8 real / 4 borderline / 3 false of 15 lines on 7 stories)."
       }
@@ -3740,11 +3740,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1790529840433_ar4u7qry3",
+        "storyId": "job_1790536739048_ruynosw80",
         "env": "staging",
-        "build": "bfb55bea6379cc73e93a433d0c0deba84a81592a",
-        "runDate": "2026-09-27 19:24:00 CH",
-        "checkedAt": "2026-09-27 20:10:58 CH",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: arcReviewReport.finalArc last 2-3 sentences + panel issues (ENDING lens); textRefineReport.pages last 2 pages after; audits raw FAULT[ENDING] lines; roundTrace diff rawResponse (REPLACING form) and diffDropped reasons."
       }
@@ -3765,7 +3765,7 @@
         "kind": "human",
         "what": "stories.data.jevDecisions; sceneImages[].sceneMetadata fields vs jevDecisions; sceneReviewReport.briefFindings (jev_fixed_field) and jevRepinned; per-page pixels. Replays: scripts/analysis/replay-jev-decision-layer.js (shots 0.935 / 0 violations; cuts 5/5 budget, 7/7; VB creatures 31/31; light indoor 69/70; population 13/13; aboard 9/10; gaze 124/139). Lab 1577 (beats_replan, dragon book)."
       },
-      "status": "failed",
+      "status": "confirmed",
       "evidence": [
         {
           "storyId": "job_1790529840433_ar4u7qry3",
@@ -3776,6 +3776,16 @@
           "result": "HUMAN-FAILED",
           "by": "claude",
           "note": "4-page smoke ar4u7qry3 (bfb55bea6): jevFallback null, probe ok 267 ms; shots written (0 violations), light morning/fog on every page, VB: p3 cites CHR001 captain + VEH001 aboard, p4 Pepe/ladder/Tuch/boat aboard VEH002; population ambient on the quay; gaze written. Pixels p2/p3: fog light, passers-by, boat, deck-aboard camera, captain + kite drawn, gazes match. FAILED: pages 1 and 4 produced NO image — prompt_fit_failed (scene 3.6k + must-keep 4.6k > Grok cap 7.9k); Jev's population cast_only->ambient lengthens REQUIRED CAST on both and p4 gained VEH002. Also found and fixed: bible page table written to the wrong field (vb_page_uncited sent), a figure offered itself as gaze target (CHR001->CHR001)."
+        },
+        {
+          "storyId": "job_1790536739048_ruynosw80",
+          "env": "staging",
+          "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+          "runDate": "2026-09-27 21:18:59 CH",
+          "checkedAt": "2026-09-27 21:55:47 CH",
+          "result": "HUMAN-CONFIRMED",
+          "by": "claude",
+          "note": "4-page smoke ruynosw80 (9a6696011): all 4 pages + 3 covers rendered, 0 prompt_fit_failed; jevFallback null, probe ok 442 ms; shots medium/OTS/close-up/wide, 0 violations; 1 cast cut (p1 Emma+Noah out, Daniel+Pico kept, text agrees); light afternoon on every page, weather none on the indoor p3; VB citations per page with appearsInPages written (Pico -1,1,3,4; ship 2,3; rowboat 4); aboard VEH001 p2/p3, VEH002 p4; population ambient on the quay, cast_only in the hold; no self-gaze; jev_fixed_field repinned once. Pixels: cage+parrot p1, captain+key+ship p2, hatch+Pico below p3, rowboat+Pico on shoulder p4, afternoon light throughout, passers-by on quay pages. Minor: p4 Emma looks at Noah, not at Pico as decided. Jev cost total USD 0.0029 over 46 calls. Smoke shape, not the full-story shape the claim names."
         }
       ],
       "lastChecked": {
@@ -3805,7 +3815,16 @@
         "what": "stories.data.challengeSelection / landmarkSelection / challengeDrawIds / replayInputs.availableLandmarks / jevFallback; the generation log's jev_challenge_selection and jev_landmark_selection lines. Free replay over the eval's 11 staging setups with stored Jev answers: picks 100% inside the top-k (docs/decisions.md 2026-09-27 \"Jev selection built\")."
       },
       "status": "pending",
-      "evidence": []
+      "evidence": [],
+      "lastChecked": {
+        "storyId": "job_1790536739048_ruynosw80",
+        "env": "staging",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
+        "result": "NOT COVERED",
+        "note": "trial: not a trial run"
+      }
     },
     {
       "id": "page-prompt-fixed-blocks-fit",
@@ -3822,8 +3841,18 @@
         "kind": "auto",
         "fn": "pagePromptsFit"
       },
-      "status": "pending",
-      "evidence": [],
+      "status": "confirmed",
+      "evidence": [
+        {
+          "storyId": "job_1790536739048_ruynosw80",
+          "env": "staging",
+          "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+          "runDate": "2026-09-27 21:18:59 CH",
+          "checkedAt": "2026-09-27 21:54:59 CH",
+          "result": "CONFIRMED",
+          "note": "0 prompt_fit_failed event(s); 7 render(s) needed the ranked cut; longest built page prompt 7887 chars"
+        }
+      ],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — FAILED verify jev-decision-layer-wired smoke p1/p4 line"
     },
     {
@@ -3842,7 +3871,16 @@
         "what": "stories.data.challengeTakenIds / challengeDrawIds / arcReviewReport.create + retellSkipped; generationLog arc_variety, arc_challenges_taken_missing, arc_challenges_taken_undrawn. Free replay 2026-09-27: 4/4 current-format stored re-tell replies re-derive their stored takenIds; the create block is unproven until a real run."
       },
       "status": "pending",
-      "evidence": []
+      "evidence": [],
+      "lastChecked": {
+        "storyId": "job_1790536739048_ruynosw80",
+        "env": "staging",
+        "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+        "runDate": "2026-09-27 21:18:59 CH",
+        "checkedAt": "2026-09-27 21:54:59 CH",
+        "result": "HUMAN",
+        "note": "human check | LOOK: stories.data.challengeTakenIds / challengeDrawIds / arcReviewReport.create + retellSkipped; generationLog arc_variety, arc_challenges_taken_missing, arc_challenges_taken_undrawn. Free replay 2026-09-27: 4/4 current-format stored re-tell replies re-derive their stored takenIds; the create block is unproven until a real run."
+      }
     }
   ],
   "runs": [
@@ -4040,6 +4078,20 @@
         "FAILED": 0,
         "HUMAN": 30,
         "NOT COVERED": 11
+      }
+    },
+    {
+      "storyId": "job_1790536739048_ruynosw80",
+      "env": "staging",
+      "build": "9a6696011bfa7dd5ff01752283d0e30b66260c49",
+      "runDate": "2026-09-27 21:18:59 CH",
+      "checkedAt": "2026-09-27 21:54:59 CH",
+      "via": "write",
+      "counts": {
+        "CONFIRMED": 1,
+        "FAILED": 0,
+        "HUMAN": 30,
+        "NOT COVERED": 12
       }
     }
   ]
