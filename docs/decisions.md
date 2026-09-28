@@ -65271,3 +65271,135 @@ unchanged. The band list in the text is built from the code set, never typed.
 **Touched:** server/lib/promptBuilders.js (CREATURE_TONE_LEVELS.cute, GROWN_BANDS_TEXT),
 tests/unit/creature-grown-entry-and-state-gate.test.ts, tests/unit/creature-tone-youngest-main.test.ts
 (its band detector keys on the cute level's new opening).
+
+## 2026-09-28 — Over-the-shoulder needs two in frame; its near figure looks toward the far one; the shot is a pinned Jev field (owner)
+
+**Context:** staging job_1790539784661_6mjcny1c7. The book owes two over-the-shoulder pages
+(`SHOT_FLOOR_TIERS`, 14+ pages; a mandatory slot carries a +10 bonus in `jevDecisions.assign`), and
+the only per-page restriction was the group rule (`allowedShot`). Jev scored over-the-shoulder
+highest on p4 and p15, whose who column holds the creature alone, and the assignment put both floor
+pages there. p15's brief came back `medium` from the Art Director — `pinBrief` did not pin `shot`,
+and only a console line in `refreshPlanShot` recorded it. On p12 (the creature turns its face away
+from the child) the brief made the creature the near crop, a head turned away from the only other
+figure.
+
+**Decision (owner, 2026-09-28):**
+1. `jevDecisions.allowedShot` offers over-the-shoulder only on a page whose `present` list (the plan
+   check's who column + covers) holds at least `shotVocabulary.OTS_MIN_IN_FRAME` (2). The floor moves
+   to an eligible page; a book with none leaves it unmet — reported by `violations` → `unmet` and the
+   existing `beats_jev_shots_unmet` error, never forced. `violations` names such a page `ots:pN`.
+2. The shot is a pinned Jev field: `applyJevBriefDecisions` puts the plan line's field-0 shot into
+   `jevFixed.shot`, `pinBrief` writes it like the other decided fields, a brief that differs is
+   restored and logged (`beats_jev_shot_restored`, generation-log warning), the review is told
+   (`jev_fixed_field`: "shot is X"), and `pinJevFixedFields` re-pins it after the review.
+   `JEV_FIXED_FIELDS_RULE` says the shot is fixed. A plan still carrying the placeholder (a story
+   that fell back after its plan) pins no shot — the Art Director picks it there, as before.
+3. `shotVocabulary.OTS_NEAR_FIGURE_FACING`: the near figure is the one whose look runs into the
+   picture toward the far figure, never one turning away; when one figure turns away from another,
+   the one left looking stands nearest the camera. It rides in the shot definition (the illustrator
+   and the Jev fit question) and `OTS_NEAR_FIGURE_RULE` (both Art Director templates, both iterate
+   templates). No judge checks over-the-shoulder today, so no critic carries it.
+
+**Replay (free, stored Jev scores and head counts of the three Jev stories):** dragon OTS
+p4/p12/p15 → p9/p12 (p4 → low-angle, p15 → wide), no unmet; ruynosw80 and ar4u7qry3 unchanged.
+Shot restores across the three stories: exactly dragon p15.
+
+**Known conflict left open (BACKLOG):** on the Jev path several Art Director / review rules still
+tell the author to change `shot` — GAP_ACTION_FRAMING ("set `shot` to over-the-shoulder / ultra-wide"),
+CLOSEUP_KEPT_RULE's below-waist `medium`, the group rule's "wider shot", review 6d. The fixed-fields
+rule now says the shot is fixed and code restores it; those rules still apply on the Jev-outage
+backup, where the Art Director picks the shot.
+
+**Touched:** server/lib/shotVocabulary.js, server/lib/jevDecisions.js, server/lib/beatsPipeline.js
+(applyJevBriefDecisions), tests/unit/jev-decision-layer.test.ts, tests/unit/jev-brief-fields.test.ts,
+tests/unit/ots-near-figure-crop.test.ts.
+
+## 2026-09-28 — A discarded re-plan round keeps its good pages (owner)
+
+**Context:** the never-regress guard (`replanRoundRegressed`, owner 2026-09-24) judges a round
+whole. Staging job_1790539784661_6mjcny1c7 round 1 cast Levin into p4 (CAST_NOT_IN_WHO_COLUMN) and
+p7 (CHECK[18]) and all four boys into p12 — a fourth group page over a budget of three. Cast/focal
+must-fix 6 → 8; the round was discarded and p4 / p7 shipped without Levin. `decideGroupCuts` acts only
+on the check a round is GIVEN, never on the overflow a round creates.
+
+**Decision:** when the guard would discard a round, `replanSalvage.salvageReplanRound` puts back
+the fewest changed pages — greedy, each step the page whose return lowers the cast/focal count most —
+until the rest no longer regresses. Candidates are judged without a model call: every line in the mix
+is either the round's (judged by the recheck) or the standing one (judged by the given check), so each
+page's roster, obstacles, central membership and model verdicts come from the check that saw that
+line, and the counters re-run on the mix (`createPlanCheckRunner` returns its parsed facts and gains
+`compose`). The chosen division then gets ONE real plan check and the same guard; the composite never
+ships as a verdict. Logged `beats_replan_salvaged` / `beats_replan_salvage_failed`, stored on the
+round as `salvage`.
+
+**Considered:** letting `decideGroupCuts` resolve the round's group overflow before the guard counts
+it (the owner's alternative). It answers one finding code and needs another planner call to re-word
+each cut page (a cut writes only the who column; code never patches the planner's instant), while the
+dragon round also minted CAST_PROMISE_BROKEN p10 and three CHECK[17] lines. Putting pages back answers
+any minted finding the same way and writes no new text.
+
+**Replay (tests/unit/replan-salvage.test.ts, stored replies through the production functions, no
+model call):** the composed checks reproduce the stored counter findings; the salvage puts back p12
+only, keeps 1,3,4,5,6,7,10,13,14,16,17,18 — p4 and p7 keep Levin, group pages 1,7,18 within the budget
+of 3, cast/focal must-fix 6 → 6 (round 1 may tie). job_1790508305061_dka3jpog9 round 2 (3 → 4): no
+subset reduces, so it is discarded as before.
+
+**Cost:** one extra plan check (~$0.03, ~70 s on the dragon run) only on a round the guard would
+discard and a salvage exists for.
+
+**Revisit if:** the real recheck of salvaged divisions disagrees with the composite often (stored
+as `salvage.compositeAfter` vs `salvage.after` on each round) — the cross-page model findings are the
+one fact the composite cannot see.
+
+**Touched:** server/lib/replanSalvage.js (new), server/lib/beatsPipeline.js (createPlanCheckRunner,
+runReplanRounds), tests/unit/replan-salvage.test.ts, tests/unit/fixtures/replan-salvage-job_1790539784661_6mjcny1c7.json,
+tests/unit/beats-replan-cast-lost.test.ts (source-order pin: `let changedThisRound`).
+
+## 2026-09-28 — A page's text counts only whom its picture holds (owner)
+
+**Context:** staging job_1790539784661_6mjcny1c7 p10: "Sie gehen los, alle vier zusammen" beside a
+picture of three boys — the fourth is with them in the story, but the who column leaves him out.
+Measured over the last 6 staging beats books: about a dozen pages state a group count or an "all"
+while the picture holds fewer (dragon p5, p9, p10, p12; dka p4, p7; vnx p8, p9; z3f p9, p15). The
+word list used for that count is analysis only, never code.
+
+**Decision:** one constant, `promptBuilders.PICTURE_COUNT_RULE` — when a page's picture leaves out
+someone the story has with the others at that moment (whoever the page's plan line or scene does not
+put in frame), the text gives that group no number and never says all, both or every one of them, in
+whatever language; it names who acts, or speaks of the rest without a count. Stated as kinds of words,
+never one language's. Filled into the beats writer (story-text-from-beats.txt), the trial writer
+(story-trial.txt), the rewriter (text-refine.txt: how a COUNT fault is closed) and the arc-informed
+audit's new question 15 COUNT (story-text-audit.txt, judged against the plan lines it shows; HINT
+moves to 16). The blind audit sees no plan lines and does not ask it.
+
+**Not exercised by a paid run** (the task's one Lab run went to the Art Director change); pending in
+tasks/verify.json `text-picture-count-2026-09-28`.
+
+**Touched:** server/lib/promptBuilders.js, prompts/story-text-from-beats.txt, prompts/story-trial.txt,
+prompts/text-refine.txt, prompts/story-text-audit.txt, tests/unit/picture-count-rule.test.ts,
+tests/unit/text-audit-rules-reach-writer.test.ts, tests/unit/text-stage-counter-and-specs.test.ts.
+
+## 2026-09-28 — The scene review never removes a character the who column names (bug scene-review-removes-who-column-cast)
+
+**Context:** staging job_1790539784661_6mjcny1c7 p2 and p7: both who columns name Mama (Visual Bible
+secondary CHR001, cited in `objects[]`). The brief check `cast_unlisted` matched `characters[]` names
+only and reported "The prose names Mama; characters[] lists Julian, Max, Kiaan"; the review declared
+"REMOVED CAST: page 7 = CHR001: plan line names Mama in a clause that places her as context" and p7 was
+drawn with a woman from no reference. All 4 `cast_unlisted` hits over the three Jev stories (and a 5th
+on vnx5l8iy7 p1) were this false positive.
+
+**Decision:** (1) `cast_unlisted` resolves ids cited in `objects[]` or as a `characters[]` row to the
+bible entry's name and label (`sceneBriefCheck.vbFigureNamesCited`); (2) `PLAN_LINE_CAST_RULE`: every
+second-field name is in the picture whatever the rest of the line says, and no rewrite removes one;
+only a person absent from the second field is context; (3) code refuses a declared removal of a
+who-column name (`sceneReviewGuard.whoColumnRemovals`): the page ships its pre-review brief — the
+rewrite un-named the figure in the prose too, so splicing the id back would leave a cited figure the
+prose never draws — logged `beats_scene_review_who_removal_refused`.
+
+**Replay (last 6 staging beats books):** 5 of 5 stored `cast_unlisted` hits clear, 0 new; the refusal
+fires on exactly dragon p2 and p7, on none of the 3 other stored declarations.
+
+**Touched:** server/lib/sceneBriefCheck.js, server/lib/sceneMetadata.js (findCastMissingFromMetadata
+`alsoListed`), server/lib/sceneReviewGuard.js, server/lib/beatsPipeline.js (runSceneReview),
+server/lib/promptBuilders.js (PLAN_LINE_CAST_RULE), tasks/bugs.json,
+tests/unit/scene-review-who-column-cast.test.ts.

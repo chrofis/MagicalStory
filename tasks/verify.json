@@ -4196,6 +4196,64 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "jev-shot-ots-and-pin-2026-09-28",
+      "title": "Over-the-shoulder only on a page with two in frame, its near figure the one looking toward the other; the Jev shot is pinned in the brief",
+      "commits": [
+        "2d1a7d74b"
+      ],
+      "addedAt": "2026-09-28",
+      "claim": "On the next full staging story on the Jev path: every over-the-shoulder page in jevDecisions.shots has headCount >= 2 (or the floor is reported unmet); every story brief's `shot` equals its plan line's field 0 (any Art Director change shows as a beats_jev_shot_restored warning, never a silent difference); on each over-the-shoulder page the near crop (`perspective: over-the-shoulder`) is the figure looking toward the other one, never a figure turning away.",
+      "runShape": [
+        "full-story",
+        "needs-shot:over-the-shoulder"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "jevDecisions.shots.pages (shot, headCount, unmet); each page's brief `shot` vs its plan line; generationLog beats_jev_shot_restored; each over-the-shoulder brief's near figure and its looksAt, and the rendered page.",
+        "images": [
+          "pages"
+        ]
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "text-picture-count-2026-09-28",
+      "title": "A page's text gives no count and no all/both/every for a group its picture leaves someone out of",
+      "commits": [
+        "7b77af244"
+      ],
+      "addedAt": "2026-09-28",
+      "claim": "On the next full staging story (any language): no page whose plan line's who column leaves out someone the story has with the group at that moment states a number for that group or all/both/every of them; where the writer did, the arc-informed audit files a FAULT[COUNT] on that page and the text refine recasts the sentence.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "storyText page by page against beatsReviewReport.pagePlan who columns; textRefineReport.audits (FAULT[COUNT] lines) and the refine's changed pages."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "replan-salvage-keeps-good-pages-2026-09-28",
+      "title": "A re-plan round the guard would discard keeps the pages that do not cause the regression",
+      "commits": [
+        "861278897"
+      ],
+      "addedAt": "2026-09-28",
+      "claim": "On the next staging story whose re-plan round regresses as a whole: the stored round carries `salvage` (reverted, kept, compositeAfter, after); when the salvaged division's real recheck does not regress it ships (generationLog beats_replan_salvaged) with the kept pages' changes, otherwise beats_replan_salvage_failed and the whole round is discarded as before.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "beatsReviewReport rounds / discardedRounds (`salvage`), generationLog beats_replan_salvaged / beats_replan_salvage_failed / beats_replan_discarded, and the shipped pagePlan against the round's kept pages."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
