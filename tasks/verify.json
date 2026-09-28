@@ -4117,6 +4117,85 @@
       "status": "pending",
       "evidence": [],
       "backlog": "tasks/BACKLOG.md dragon front-cover line; supersedes nothing — page-prompt-fixed-blocks-fit FAILED on job_1790539784661_6mjcny1c7 (front cover + p18 repair)"
+    },
+    {
+      "id": "jev-picks-state-look",
+      "title": "Jev picks the look (state) a page shows for every cited element with more than one look; state page lists follow the cites",
+      "commits": [
+        "102aad4cc"
+      ],
+      "addedAt": "2026-09-28",
+      "claim": "On the next staging beats story with a stated element: stories.data.jevDecisions.vb.pages[].elements[] carries `looks` for every cited element with more than one state and its `cite` is the top look; every state's pages in the stored bible equal the story pages citing that dotted id (after the scene review); a page whose plan line shows the change cites the changed look (the replay case: a creature turned grey on that page cites the grey state).",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "stories.data.jevDecisions.vb.pages[].elements[] (cite, looks, stateP); visualBible states[].pages vs sceneImages objects[]; plan lines of the pages where a state changes; generationLog beats_jev_state_vs_brief / beats_jev_state_pages_repinned. Free replay 2026-09-28 (77 Jev calls, $0.0066): dragon 6mjcny1c7 p3 -> ANI001.2 at 0.997, other creature pages unchanged; the scale object moved to its dull look on p3/p5 (0.80/0.74, contestable)."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "vb-creature-anatomy",
+      "title": "A creature's VB entry carries `anatomy` (every body part the story uses, counted) and its reference cells draw it",
+      "commits": [
+        "ecd30715e"
+      ],
+      "addedAt": "2026-09-28",
+      "claim": "On the next staging story with a creature: its visualBible.animals[] entry has a non-empty `anatomy` that names every body part the arc and plan give it (a creature that flies has wings; stated counts kept), its `description` contains that text, and its reference cell(s) draw those parts.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "visualBible.animals[].anatomy + description; the stored reference cells (vb/ANI*.jpg) against the anatomy; the arc/plan lines that use the body parts.",
+        "images": [
+          "sheets"
+        ]
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "vb-state-gate-listed-changes",
+      "title": "The VB state-consistency gate does not fail a state for the change its delta names, and runs on gemini-2.5-flash",
+      "commits": [
+        "ecd30715e"
+      ],
+      "addedAt": "2026-09-28",
+      "claim": "On the next staging story with a stated element whose states change its colour or surface: its cellGates `state_cells` record does not fail for a change a state names (a reason citing a named change is a false fail), and the gate call is made on gemini-2.5-flash (usage label vb_cell_gate).",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "visualBible.*[].cellGates where gate=state_cells (reason, recheckReason) against the states[].delta; tokenUsage vb_cell_gate models include gemini-2.5-flash. Replay 2026-09-28 on 6mjcny1c7 stored cells: lite 0/6 pass on the correct creature set, flash 3/3 pass, both mismatch controls fail 6/6."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "grown-creature-adult-body",
+      "title": "Under the cute tone a grown creature keeps an adult build and size; only its face is cute",
+      "commits": [
+        "ecd30715e"
+      ],
+      "addedAt": "2026-09-28",
+      "claim": "On the next staging story whose youngest main is 0-4 (cute tone) with a creature at adult-height or above: its VB entry authors an adult build (no baby-body cues such as a soft rounded body or a child-sized scale), its reference cells show an adult-proportioned creature with a friendly face, and the pages draw it at its grown size — not the chibi hatchling of 6mjcny1c7 p1/p3/p4/p13/p15/p16.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "visualBible.animals[] (scaleClass, features, anatomy, description); the reference cells; every page the creature is on (size against the children, body proportions, face).",
+        "images": [
+          "sheets",
+          "pages"
+        ]
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
