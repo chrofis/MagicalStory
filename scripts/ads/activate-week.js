@@ -3,8 +3,8 @@
  * Activate (or pause) the week's four Search campaigns at a KNOWN TOTAL daily budget.
  *
  *   node scripts/ads/activate-week.js               # DRY-RUN: prints the plan and the current live state
- *   node scripts/ads/activate-week.js --apply       # set budgets + flip all four to ENABLED
- *   node scripts/ads/activate-week.js --pause --apply   # flip all four back to PAUSED (budgets untouched)
+ *   node scripts/ads/activate-week.js --apply       # set budgets + set each arm to its declared status (ARMS[].status, default ENABLED)
+ *   node scripts/ads/activate-week.js --pause --apply   # pause every arm (budgets untouched)
  *
  * Owner mandate 2026-09-21: "activate the campaigns, try at least 3 different ones, total CHF 10 a day
  * for this week to get a bit of signal." The four arms and the split are below; the script REFUSES to run
@@ -21,9 +21,14 @@ const PAUSE = process.argv.includes('--pause');
 const CHF = n => Math.round(n * 1e6);
 const TOTAL_CAP = 10.00;
 
-// The four arms. `budget` is CHF/day.
+// The four arms. `budget` is CHF/day. `status` is the arm's intended state (default ENABLED); a paused arm
+// keeps its budget reserved so resuming it is one edit, and the TOTAL_CAP check still holds.
 const ARMS = [
-  { name: 'Search-Deutschschweiz-v1', budget: 3, why: 'existing high-intent converter (all 9 account conversions came from here)' },
+  // PAUSED 2026-09-28 (owner): 26-27 Sept = 14 clicks / CHF 11.85 / 0 trials. The clicks were the right people
+  // (5 of 14 opened /try) but the pages lose them on phones: 8 of 14 never left the homepage (Google rates its
+  // landing-page experience BELOW_AVERAGE on all 5 keywords) and 4 of the 5 who opened /try left on its first
+  // screen without a tap. Resume once the phone first screen is fixed.
+  { name: 'Search-Deutschschweiz-v1', budget: 3, status: 'PAUSED', why: 'existing high-intent converter (all 9 account conversions came from here)' },
   { name: 'Search-Cheap-Age-CH', budget: 3, why: 'age-gift cluster, CPC cap 0.20 - the most clicks per franc' },
   { name: 'Search-Cheap-Occasion-CH', budget: 2, why: 'Goettikind / Einschulung / Geschwisterkind, mostly unbid tails' },
   { name: 'Search-LifeChallenge-CH', budget: 2, why: 'life-challenge topics (Trotzphase, Schnuller, Eingewoehnung, Aengste) - zero advertisers bidding' },
@@ -43,8 +48,9 @@ async function main() {
   const { customer } = getClient();
   if (!customer) throw new Error('Missing refresh_token in scripts/ads/config.json');
 
-  const target = PAUSE ? 'PAUSED' : 'ENABLED';
-  console.log(`Target status: ${target} - total CHF ${sum.toFixed(2)}/day across ${ARMS.length} campaigns`);
+  const targetOf = (arm) => (PAUSE ? 'PAUSED' : (arm.status || 'ENABLED'));
+  const enabledArms = ARMS.filter((a) => targetOf(a) === 'ENABLED');
+  console.log(`Target: ${PAUSE ? 'ALL PAUSED' : `${enabledArms.length} of ${ARMS.length} enabled`} - budgets total CHF ${sum.toFixed(2)}/day, CHF ${enabledArms.reduce((a, x) => a + x.budget, 0).toFixed(2)}/day on enabled arms`);
   console.log(`Mode: ${APPLY ? 'LIVE' : 'DRY-RUN - nothing is sent (pass --apply to execute)'}\n`);
 
   const names = ARMS.map(a => `'${q(a.name)}'`).join(',');
@@ -69,6 +75,7 @@ async function main() {
     const curBudget = r.campaign_budget.amount_micros / 1e6;
     const curStatus = enumName('CampaignStatus', r.campaign.status);
     const wantBudget = CHF(arm.budget);
+    const target = targetOf(arm);
     console.log(`${arm.name}`);
     console.log(`  ${arm.why}`);
     console.log(`  budget CHF ${curBudget.toFixed(2)} -> ${arm.budget.toFixed(2)}/day${curBudget === arm.budget ? '  (unchanged)' : ''}`);
@@ -83,7 +90,7 @@ async function main() {
   if (!APPLY) { console.log('DRY-RUN - nothing was sent to Google Ads.'); return; }
 
   if (budgetOps.length) { await customer.campaignBudgets.update(budgetOps); console.log('  budgets updated'); }
-  if (campaignOps.length) { await customer.campaigns.update(campaignOps); console.log(`  campaigns set ${target}`); }
+  if (campaignOps.length) { await customer.campaigns.update(campaignOps); console.log(`  ${campaignOps.length} campaign status(es) updated`); }
   console.log(`\nDone. Read results with: node scripts/ads/attribution-report.js --days=7`);
 }
 
