@@ -2483,7 +2483,10 @@
       "source": "Stored evidence, staging job_1790529840433_ar4u7qry3: clothingReviewReport.rawResponse ends \"## Noah / costumed (costume: pirate)\nNONE\"; clothingReviewReport.changed records Noah costumed:pirate before = a full pirate outfit (blue linen shirt, brown canvas trousers, belt, socks, boots), after = \"NONE\"; stories.data.clothingRequirements.Noah.costumed.description = \"NONE\". The Art Director read \"Noah … Wearing: NONE\" and wrote \"Noah … wearing no clothing\" on three pages; the scene review had to catch it.",
       "rootCause": "promptBuilders.parseClothingReview treats NONE as \"no rewrites\" only when it is the whole ---CLOTHING--- body; a heading followed by NONE parsed as an entry whose description is the word NONE, and the beats merge wrote it over the outfit.",
       "impact": "Any story whose wardrobe reviewer writes a heading and then NONE for a character it did not rewrite: that character loses their outfit in the contract, the avatar costume, the Art Director cast block and every page.",
-      "status": "open"
+      "status": "fixed",
+      "fixedAt": "2026-09-28",
+      "fixedIn": "d1ed5efca",
+      "fix": "parseClothingReview skips a heading whose body is only the no-change marker (CLOTHING_NO_CHANGE_RE); beatsPipeline logs beats_outfit_absent (error) when a commissioned character leaves the wardrobe with no outfit (clothingCheck.outfitAbsent). Replay over the 7 stored staging replies: only this story carries a heading+NONE body. Test: tests/unit/clothing-review-none-body.test.ts (the stored reply)."
     }
   ]
 }
