@@ -5,6 +5,7 @@ const { commissionedCast, castCoverage, parsePlanCastBlock } = require('./castCo
 const { arcRepairFindingsWithCastCheck } = require('./jevAudit');
 const jevDecisions = require('./jevDecisions');
 const { resolveShotId } = require('./shotVocabulary');
+const { salvageReplanRound } = require('./replanSalvage');
 const { JevDecisionError } = jevDecisions;
 const jevSelection = require('./jevSelection');
 const { lookupByName } = require('./castResolver');
@@ -1115,7 +1116,15 @@ function planCheckInputs(inputData, { arcPremiseNames = [], modelOverrides = {} 
 // call answers it as a ROSTER, and the counters do arithmetic on that answer
 // instead of re-deriving the cast from the prose with a grammar heuristic.
 function createPlanCheckRunner({ inputData, approvedArc, arcHints, arcStoryLogic, arcCentralFigure, castTable, commission, commissionedNames, placeNames, maxCast, arcInventedNames, arcInventedLimit, mainName, planCheckModel, onChunk, gl, labPromptOptions = {}, onCall = null }) {
-  return async (label, pages, planText) => {
+  // The counters over one division's parsed check facts — shared by the real
+  // check below and `compose` (a division mixing two checks' pages, judged
+  // without a model call: replanSalvage.js).
+  const countersFor = (pages, p) => runPlanCounters({ pages, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit, roster: p.roster, peoplelessPick: p.peoplelessPick, centralFigure: arcCentralFigure, centralPages: p.centralPages, mainName, castTable, actions: p.actions, legacyShots: !!labPromptOptions.legacyShots });
+  const structure = (counters, modelFindings) => [
+    ...counters.findings.map((f, i) => ({ kind: 'counter', code: f.code, line: counters.lines[i] })),
+    ...modelFindings.map(f => ({ kind: 'check', check: f.check, line: `CHECK[${f.check}]: ${f.text}` })),
+  ];
+  const run = async (label, pages, planText) => {
     let modelFindings = [];
     let roster = null;
     // The check's OBSTACLES block: per page, the character whose action that
@@ -1189,7 +1198,8 @@ function createPlanCheckRunner({ inputData, approvedArc, arcHints, arcStoryLogic
       log.error(`❌ [BEATS] Plan check (${label}) failed (${err.message}) — NO ROSTER, so the entire plan-counter layer is skipped this round`);
       gl.error(`${label}_failed`, `Plan check failed: ${err.message} — no roster, so every plan counter (cast, invented cast, shot variety, focal pages) is skipped this round`, null, { error: err.message, model: planCheckModel });
     }
-    const counters = runPlanCounters({ pages, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit, roster, peoplelessPick, centralFigure: arcCentralFigure, centralPages, mainName, castTable, actions, legacyShots: !!labPromptOptions.legacyShots });
+    const parsed = { roster, obstacles, peoplelessPick, wanted, actions, centralPages };
+    const counters = countersFor(pages, parsed);
     // The central-figure counter counts on the CENTRAL line alone; a check
     // that named no pages for a named figure leaves it uncounted — loudly.
     if (counters.stats?.centralFigure?.unanswered) {
@@ -1212,16 +1222,20 @@ function createPlanCheckRunner({ inputData, approvedArc, arcHints, arcStoryLogic
     // model finding the check number it answered, so buildReplanSection can rank
     // them without reading their prose. `lines` stays the flat rendering the
     // report and the logs have always carried.
-    const structured = [
-      ...counters.findings.map((f, i) => ({ kind: 'counter', code: f.code, line: counters.lines[i] })),
-      ...modelFindings.map(f => ({ kind: 'check', check: f.check, line: `CHECK[${f.check}]: ${f.text}` })),
-    ];
+    const structured = structure(counters, modelFindings);
     const all = structured.map(f => f.line);
     gl.info(label, `Plan check by ${checkModelId || planCheckModel}: ${counters.lines.length} counter finding(s), ${modelFindings.length} model finding(s)`, null, {
       counterFindings: counters.lines, modelFindings, model: checkModelId, stats: counters.stats, cast: counters.cast,
     });
-    return { counters, modelFindings, findings: structured, lines: all, checkModelId, prompt, obstacles, reply, rosterLines, wanted, actions };
+    return { counters, modelFindings, findings: structured, lines: all, checkModelId, prompt, obstacles, reply, rosterLines, wanted, actions, parsed };
   };
+  /** A division judged from parsed facts already held — no model call, no log. */
+  run.compose = (pages, parsed, modelFindings) => {
+    const counters = countersFor(pages, parsed);
+    const findings = structure(counters, modelFindings);
+    return { counters, modelFindings, findings, lines: findings.map(f => f.line), obstacles: parsed.obstacles || new Map(), wanted: parsed.wanted || [], actions: parsed.actions || [], parsed, composite: true };
+  };
+  return run;
 }
 
 function recheckRecord(c) {
@@ -1614,7 +1628,7 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
         break;
       }
       const before = new Map(beats.map(p => [p.pageNumber, p.planLine || '']));
-      const changedThisRound = second.parsed.pages
+      let changedThisRound = second.parsed.pages
         .filter(p => (before.get(p.pageNumber) || '') !== (p.planLine || ''))
         .map(p => p.pageNumber);
       beats = second.parsed.pages;
@@ -1629,7 +1643,7 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
       gl.info('beats_replan', `Round ${round}: planner re-divided ${changedThisRound.length} page(s) for ${pendingCheck.lines.length} finding(s)`, null, {
         round, replannedPages: changedThisRound, findings: pendingCheck.lines.length,
       });
-      const check2 = await runCheck(round === 1 ? 'plan_recheck' : `plan_recheck_r${round}`, beats, pagePlan);
+      let check2 = await runCheck(round === 1 ? 'plan_recheck' : `plan_recheck_r${round}`, beats, pagePlan);
       // Entered KEPT and demoted below if the round is thrown away, so the
       // ledger records the round whichever way the verdict goes.
       const roundRecord = {
@@ -1653,12 +1667,6 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
         changeRefusals: reviewRefusals,
       };
       replanRounds.push(roundRecord);
-      // Every surviving must-fix finding — what the NEXT round is mandated to
-      // answer, and what the ships-as-it-stands warning names.
-      const stillMustFix = (check2.findings || []).filter(f => replanRank(f) === 'must');
-      // The subset the round-keeping decision is made on: cast/focal only.
-      const stillConverging = stillMustFix.filter(countsTowardConvergence);
-      const shotOnly = stillMustFix.length - stillConverging.length;
       // THE GUARD — every round, round 1 included (owner, 2026-09-24). Until
       // then `&& round > 1` exempted round 1, and 8 of 32 stored books shipped
       // a round-1 division with MORE cast/focal must-fix findings than the
@@ -1667,7 +1675,46 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
       // (it is bought only to mop up). See `replanRoundRegressed` for the
       // measure, which sets aside a model verdict that flips on a page the
       // round never touched.
-      const verdict = replanRoundRegressed(pendingCheck, check2, changedThisRound, { round });
+      let verdict = replanRoundRegressed(pendingCheck, check2, changedThisRound, { round });
+      // A DISCARDED ROUND KEEPS ITS GOOD PAGES (owner, 2026-09-28). Before the
+      // round is thrown away, code puts back the fewest changed pages that
+      // make the rest stop regressing (replanSalvage.salvageReplanRound, judged
+      // from the two checks' per-page facts without a model call), then the
+      // division it picked gets one real plan check and the same guard.
+      // Staging job_1790539784661_6mjcny1c7 round 1: p4 and p7 cast Levin in,
+      // p12 took the book over its group budget, and the whole round went.
+      if (verdict.discard) {
+        const salvage = salvageReplanRound({ standing: bestBeats, returned: beats, changedPages: changedThisRound, given: pendingCheck, recheck: check2, compose: runCheck.compose, round });
+        if (salvage) {
+          const salvagedPlan = salvage.pages.map(pg => `Page ${pg.pageNumber}: ${pg.planLine || ''}`).join(String.fromCharCode(10));
+          log.info(`🩹 [BEATS] Round ${round}: putting back page(s) ${salvage.reverted.join(', ')} and keeping ${salvage.kept.join(', ')} clears the regression on the per-page facts (cast/focal must-fix ${verdict.before} → ${salvage.verdict.after}) — rechecking that division`);
+          const check3 = await runCheck(`plan_recheck_salvage_r${round}`, salvage.pages, salvagedPlan);
+          const v3 = replanRoundRegressed(pendingCheck, check3, salvage.kept, { round });
+          roundRecord.salvage = { reverted: salvage.reverted, kept: salvage.kept, steps: salvage.steps, compositeAfter: salvage.verdict.after, recheck: recheckRecord(check3), before: v3.before, after: v3.after, salvaged: !v3.discard };
+          if (!v3.discard) {
+            gl.info('beats_replan_salvaged', `Round ${round} regressed as a whole (cast/focal must-fix ${verdict.before} → ${verdict.after}); page(s) ${salvage.reverted.join(', ')} were put back and its changes on page(s) ${salvage.kept.join(', ')} kept — rechecked ${v3.before} → ${v3.after}`, null, {
+              round, reverted: salvage.reverted, kept: salvage.kept, wholeRoundAfter: verdict.after, compositeAfter: salvage.verdict.after, before: v3.before, after: v3.after,
+            });
+            beats = salvage.pages;
+            pagePlan = salvagedPlan;
+            check2 = check3;
+            changedThisRound = salvage.kept;
+            verdict = v3;
+            roundRecord.changedPages = salvage.kept;
+            roundRecord.recheck = recheckRecord(check3);
+          } else {
+            gl.warn('beats_replan_salvage_failed', `Round ${round}: keeping page(s) ${salvage.kept.join(', ')} cleared the regression on the per-page facts, but their recheck did not (cast/focal must-fix ${v3.before} → ${v3.after}); the whole round is discarded`, null, {
+              round, reverted: salvage.reverted, kept: salvage.kept, compositeAfter: salvage.verdict.after, before: v3.before, after: v3.after,
+            });
+          }
+        }
+      }
+      // Every surviving must-fix finding — what the NEXT round is mandated to
+      // answer, and what the ships-as-it-stands warning names.
+      const stillMustFix = (check2.findings || []).filter(f => replanRank(f) === 'must');
+      // The subset the round-keeping decision is made on: cast/focal only.
+      const stillConverging = stillMustFix.filter(countsTowardConvergence);
+      const shotOnly = stillMustFix.length - stillConverging.length;
       if (verdict.discard) {
         const noiseNote = verdict.noise.length ? `, ${verdict.noise.length} checker verdict(s) on untouched pages set aside` : '';
         const detail = `cast/focal must-fix ${verdict.before} → ${verdict.after}${noiseNote}`

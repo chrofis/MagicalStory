@@ -175,7 +175,7 @@ describe('the beats re-plan wiring', () => {
     expect(BEATS_SRC).toMatch(/const lost = castLostByReplan\(beats, second\.parsed\.pages, guardCast, guardAliases, declaredOut\);/);
     expect(BEATS_SRC).toMatch(/for \(const \[n, c\] of codeOwned\) declaredOut\.set/);
     const guardAt = BEATS_SRC.indexOf('castLostByReplan(beats, second.parsed.pages');
-    const changedAt = BEATS_SRC.indexOf('const changedThisRound = second.parsed.pages');
+    const changedAt = BEATS_SRC.indexOf('let changedThisRound = second.parsed.pages');
     expect(guardAt).toBeGreaterThan(0);
     expect(changedAt).toBeGreaterThan(guardAt);
   });
