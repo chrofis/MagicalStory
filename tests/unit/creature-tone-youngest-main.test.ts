@@ -27,7 +27,7 @@ const story = (chars: Array<{ id: number; name: string; age: number }>, mainIds?
 
 const band = (prompt: string) => {
   const formidable = /claws and teeth visible rather than hidden/.test(prompt);
-  const notMenacing = /a neutral or gentle mouth that shows no teeth/.test(prompt);
+  const notMenacing = /a neutral or gentle mouth with the lips over the teeth/.test(prompt);
   // The cute level's opening (its body clause is scoped to creatures smaller than a grown-up since 2026-09-28).
   const cute = /drawn cute: soft faces, large round friendly eyes/.test(prompt);
   if (formidable) return 'formidable';

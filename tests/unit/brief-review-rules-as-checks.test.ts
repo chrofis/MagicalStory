@@ -128,6 +128,22 @@ describe('clothing_incomplete: the prose names each character\'s top, bottom and
   });
 });
 
+describe('the creature-tone rule names no absence the brief check would flag (owner, 2026-09-28)', () => {
+  // The Art Director copied "no teeth showing" from the rule into 4 of the 23
+  // stored negation_named fires; the rule now states what IS drawn.
+  const { buildCreatureToneSection } = req('../../server/lib/promptBuilders');
+  const story = (age: number) => ({ characters: [{ id: 1, name: 'Ana', age }], mainCharacters: [1], pages: 4, language: 'en', artStyle: 'watercolor' });
+  // Scoped to the creature's face and body: the section's page-rule sentence
+  // ("an entry does not travel to the page") is about the pipeline, not the
+  // picture, and nobody copies it into a brief.
+  it.each([3, 5])('the band for a %i-year-old lead names no absent feature of the creature', (age) => {
+    const text = String(buildCreatureToneSection(story(age)) || '');
+    expect(text.length).toBeGreaterThan(100);
+    const phrases = SBC.checkNegationNamed({ pageNumber: 1, brief: text }, {}).flatMap((f: any) => f.phrases);
+    expect(phrases.filter((p: string) => /teeth|claw|fang|bared|displayed|raised|mouth|paw/i.test(p))).toEqual([]);
+  });
+});
+
 describe('collectBriefFindings sends the new checks to the re-ask', () => {
   it('reads the beat\'s head count and its READ answer', () => {
     const vb = { artifacts: [{ id: 'ART001', name: 'sign', description: 'a sign' }] };
