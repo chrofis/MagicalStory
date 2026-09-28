@@ -1883,7 +1883,14 @@ async function applyJevBriefDecisions({ expansions, beats, visualBible, bibleSec
     b.jevFixed.looksAt = Object.fromEntries(g.characters.map(c => [c.name, c.looksAt]));
   }
   // Write every decided field into the briefs, and the bible's pages to agree.
-  const labelOf = (id) => { const e = gIndex[id] || gIndex[baseOf(id)]; return e ? e.name : id; };
+  // A dotted cite names the look too, so a look Jev switched reads as one.
+  const lookOf = new Map(els.flatMap(e => jevDecisions.stateOptions(e.entry).map(o => [o.id, o.label])));
+  const labelOf = (id) => {
+    const e = gIndex[id] || gIndex[baseOf(id)];
+    const name = e ? e.name : id;
+    const look = lookOf.get(String(id).toUpperCase());
+    return look ? `${name}, ${look}` : name;
+  };
   const citesByPage = new Map();
   const fixedChanges = [];
   for (const b of storyBeats) {
@@ -1935,6 +1942,27 @@ function pinJevFixedFields(expansions, briefBeats, gl, pass) {
     gl.warn('beats_jev_fields_repinned', `The ${pass} changed decided fields on ${moved.length} page(s); code re-wrote them`, null, { pass, pages: moved });
   }
   return moved;
+}
+
+/**
+ * Rebuild the decided elements' page tables — each state's pages included —
+ * from the cites Jev decided, after a pass that may have moved them (the scene
+ * review's ---VISUAL BIBLE--- corrections). A no-op off the Jev path. Returns
+ * the (synced) transcript sections.
+ */
+function repinJevStatePages(visualBible, bibleSections, briefBeats, gl) {
+  const decidedBeats = (briefBeats || []).filter(b => b && b.jevFixed && Array.isArray(b.jevFixed.cites));
+  if (!visualBible || decidedBeats.length === 0) return bibleSections;
+  const citesByPage = new Map(decidedBeats.map(b => [Number(b.pageNumber), b.jevFixed.cites]));
+  const decidedIds = [...new Set(decidedBeats.flatMap(b => b.jevFixed.decidedIds || []))];
+  const moved = jevDecisions.applyVbPages(visualBible, citesByPage, decidedIds);
+  if (!moved) return bibleSections;
+  log.warn(`📌 [BEATS] the scene review moved ${moved} decided page table(s) — rebuilt from Jev's cites`);
+  gl.warn('beats_jev_state_pages_repinned', `The scene review moved ${moved} decided page table(s); code rebuilt them from Jev's cites`, null, { moved });
+  if (!bibleSections) return bibleSections;
+  const synced = syncVisualBibleSection(bibleSections, visualBible);
+  if (synced === bibleSections) gl.warn('beats_vb_sync_failed', 'The re-pinned element pages could not be written back into the transcript');
+  return synced;
 }
 
 /**
@@ -2540,6 +2568,11 @@ async function runSceneReview({ inputData, expansions, clothingRequirements, vis
     // it after the review), so it is withheld from the reviewer and logged as
     // the disagreement it is: the who column names a figure Jev did not put
     // in the picture.
+    // The same holds for the two state-range types (2026-09-28): on a Jev page
+    // the look each cite shows is Jev's and every state's pages are rebuilt
+    // from the cites, so a finding asking the review to move a state's pages
+    // asks for an edit code overwrites. It is logged as the disagreement it is.
+    const JEV_OWNED = new Set(['plan_cast_uncited', 'vb_state_contradicted', 'vb_state_no_base']);
     for (const b of (briefBeats || [])) {
       if (!b || !b.jevFixed) continue;
       const list = res.byPage.get(b.pageNumber) || [];
@@ -2547,10 +2580,14 @@ async function runSceneReview({ inputData, expansions, clothingRequirements, vis
       if (uncited.length) {
         gl.error('beats_jev_vb_vs_who_column', `Page ${b.pageNumber}: the who column names a figure Jev did not put in the picture — ${uncited.map(f => f.detail.split('.')[0]).join('; ')}`, null, { pageNumber: b.pageNumber });
       }
-      const next = list.filter(f => f.type !== 'plan_cast_uncited');
+      const stateRange = list.filter(f => f.type === 'vb_state_contradicted' || f.type === 'vb_state_no_base');
+      if (stateRange.length) {
+        gl.warn('beats_jev_state_vs_brief', `Page ${b.pageNumber}: the brief disagrees with the look Jev cited — ${stateRange.map(f => `${f.type}: ${f.detail.split('. ')[0]}`).join('; ')}`, null, { pageNumber: b.pageNumber, findings: stateRange });
+      }
+      const next = list.filter(f => !JEV_OWNED.has(f.type));
       if (b.jevFinding) next.push(b.jevFinding);
       if (next.length) res.byPage.set(b.pageNumber, next); else res.byPage.delete(b.pageNumber);
-      res.findings = [...res.findings.filter(f => !(f.pageNumber === b.pageNumber && f.type === 'plan_cast_uncited')), ...(b.jevFinding ? [b.jevFinding] : [])];
+      res.findings = [...res.findings.filter(f => !(f.pageNumber === b.pageNumber && JEV_OWNED.has(f.type))), ...(b.jevFinding ? [b.jevFinding] : [])];
     }
     for (const [pn, list] of res.byPage) briefBeforeByPage.set(pn, new Set(list.map(f => f.type)));
     // The findings THEMSELVES, not only their types: the post-review verdict is
@@ -3128,6 +3165,9 @@ async function runSceneReview({ inputData, expansions, clothingRequirements, vis
   // The review (and its worn-state round) may not change a decided field.
   const repinned = pinJevFixedFields(expansions, briefBeats, gl, 'scene review');
   if (sceneReviewReport) sceneReviewReport.jevRepinned = repinned;
+  // …nor a state's pages: the review's ---VISUAL BIBLE--- corrections may move
+  // them, and on the Jev path they follow from Jev's cites (2026-09-28).
+  bibleSections = repinJevStatePages(visualBible, bibleSections, briefBeats, gl);
   return { sceneReviewReport, sceneReviewAnalysis, sceneReviewFailed, bibleSections, clothingBefore };
 }
 
@@ -4533,4 +4573,4 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   return { title, titleJudge, beats, pages, scenes, coverScenes, rawOutline, visualBible, meta, challengeDrawIds, challengeTakenIds, challengeDraw, challengeSelection, arcReviewReport, beatsReviewReport, jevDecisions: jevReport, jevFallback: jevReport.fallback, storyBibleReport, clothingReviewReport, wardrobeBibleReport, sceneExpansionReport, sceneReviewReport };
 }
 
-module.exports = { generateStoryViaBeats, reportChallengeMemoryBreach, finalizePlanShots, applyJevBriefDecisions, pinJevFixedFields, runArtDirector, arcTempFor, makeArcCreatorCall, runSceneReview, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, bibleCorrectionsMissingFromTranscript, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };
+module.exports = { generateStoryViaBeats, reportChallengeMemoryBreach, finalizePlanShots, applyJevBriefDecisions, pinJevFixedFields, repinJevStatePages, runArtDirector, arcTempFor, makeArcCreatorCall, runSceneReview, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, bibleCorrectionsMissingFromTranscript, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };

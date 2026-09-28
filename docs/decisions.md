@@ -65150,3 +65150,42 @@ server/lib/promptBuilders.js (bakedTitleLine, buildTextZoneInstruction, headers,
 SPLIT_STATE_MARKINGS_RULE), server/lib/images.js (iteratePageCore), server/lib/pageRenderCall.js
 (doc), scripts/admin/sibling-registry.json, tests/unit/cover-prompt-fixed-blocks-fit.test.ts
 (+ fixture), tests/unit/cover-title-trim-margin.test.ts.
+
+## 2026-09-28 — Jev picks the look of a stated element; the Art Director's state page lists no longer decide it (owner)
+
+**Context:** staging dragon run job_1790539784661_6mjcny1c7 p3. The plan line reads "the scale has
+fallen and <the creature> beside the wall is grey instead of red". Jev cited the creature on p3
+correctly (P 0.86), but the LOOK came from code (`jevDecisions.stateIdFor`): the state whose
+Art-Director-authored `pages` held the page, else "the latest state begun before it". p3 was in
+no state's list, the inference returned state .1 (red, glowing), `applyVbPages` then wrote p3 into
+state .1's pages, and the page was built from the red reference cell a page after the story
+turned the creature grey.
+
+**Decision (owner, 2026-09-28, replacing the first plan of an Art Director rule + brief check):**
+for every story page where Jev cites an element whose `states[]` holds more than one look, Jev
+answers ONE choice question over that element's looks — each option the look's own
+`name: delta`, code-built, in story order — on the same state as every other decision
+(`pageState`: the arc and the plan, the page marked), 3 calls with the probabilities averaged
+(as gaze). Code writes the dotted cite; `applyVbPages` rebuilds every state's `pages` from the
+cites. `stateIdFor` and its "latest state before" inference are deleted. The cite is a Jev-fixed
+field: `pinBrief` writes it, `pinJevFixedFields` re-pins it after the scene review, and the new
+`repinJevStatePages` rebuilds the state page tables after the review's `---VISUAL BIBLE---`
+corrections. On a Jev page the brief-check types that ask for a state-range edit
+(`vb_state_contradicted`, `vb_state_no_base`) are withheld from the review and logged
+(`beats_jev_state_vs_brief`), like `plan_cast_uncited`. A cite that changes only its dotted suffix
+is reported to the review as the same element in another look, not as a removal plus an addition.
+The Art Director still authors the looks (name, delta); the Jev-outage backup (path A) keeps its
+own citations, untouched. `JEV_FIXED_FIELDS_RULE` (Art Director templates + scene review, one
+constant) states that code sets the look and the state pages follow.
+
+**Evidence (free replay, production `decideVbAndAboard`, stored staging plans, 77 Jev calls,
+$0.0066):** job_1790539784661_6mjcny1c7 p3 creature → state .2 (grey) at 0.997, was .1; every
+other creature page unchanged (.1 p1, .2 p4-p16, .3 p17-p18). Its scale object moves to "cooling"
+on p3 (0.80) and p5 (0.74) where the Art Director had "unaltered" — contestable (p5's plan line
+says "still-warm"). job_1790536739048_ruynosw80 (birdcage) and job_1790529840433_ar4u7qry3 (kite)
+unchanged.
+
+**Touched:** server/lib/jevDecisions.js (stateOptions, stateQuestion, decideStates,
+decideVbAndAboard, fixedFieldFinding, JEV_FIXED_FIELDS_RULE, JEV_DECISIONS.state),
+server/lib/beatsPipeline.js (labelOf, the Jev-owned brief-check types, repinJevStatePages),
+tests/unit/jev-brief-fields.test.ts.

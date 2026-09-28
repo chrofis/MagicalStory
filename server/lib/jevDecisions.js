@@ -24,6 +24,10 @@
  *                  0.7, vehicles 0.5, secondaries 0.5, objects 0.7 (0.5–0.7 only
  *                  when the Art Director cited it, the measured band) → code:
  *                  known ids, the page's state, the element budget
+ *   state          per page and cited element with more than one look: a choice
+ *                  over its looks, each option the look's own name and delta
+ *                  (3 calls averaged) → code writes the dotted cite, and each
+ *                  state's pages follow from the cites (applyVbPages)
  *   aboard         per page and vehicle, 0.5
  *   population     per LOCATION: PUBLIC / CROWD nouls → code maps
  *   gaze           per character: a choice over code-listed targets "what are X's
@@ -71,6 +75,7 @@ const JEV_DECISIONS = {
   aboard: { reps: 1, at: 0.5 },     // 9/10 on the one ship book
   population: { reps: 1, publicAt: 0.5, crowdAt: 0.5 }, // 13/13
   gaze: { reps: 3 },                // G2 128/139 averaged (owner: 3 calls for this field)
+  state: { reps: 3 },               // a choice, averaged as gaze is (owner, 2026-09-28)
 };
 
 // ───────────────────────── the plan line ─────────────────────────
@@ -712,21 +717,90 @@ function aboardQuestion(v) {
 }
 
 /**
- * The dotted state id an element with `states[]` is cited by on a page: the
- * state whose `pages` include it, else the latest state begun before it, else
- * the first (the pages before an object's first change are its first state).
+ * THE LOOK A PAGE SHOWS IS JEV'S (owner, 2026-09-28).
+ *
+ * An element whose `states[]` lists more than one look is cited on a page by
+ * the dotted id of ONE of them. Code used to pick it from the Art Director's
+ * state page lists — the state whose `pages` held the page, else "the latest
+ * state begun before it". Staging job_1790539784661_6mjcny1c7 p3: the plan line
+ * says the creature by the wall is grey now instead of red, the page sat in no
+ * state's list, and the inference cited the red look. Jev now picks the look
+ * from the same state as every other decision (the arc and the plan, the page
+ * marked): one choice per cited element, each option that look's own name and
+ * delta, 3 calls averaged. Code writes the dotted cite and rebuilds every
+ * state's `pages` from the picks (applyVbPages). The Art Director authors the
+ * looks, never which page shows which; the Jev-outage backup keeps its own
+ * citations.
+ *
+ * see docs/decisions.md 2026-09-28 "Jev picks the look of a stated element"
  */
-function stateIdFor(entry, pageNumber) {
+function stateId(entry, s, i) {
+  return s && s.id && String(s.id).includes('.') ? String(s.id).toUpperCase() : `${baseId(entry.id)}.${i + 1}`;
+}
+
+/** An element's looks as the choice lists them, in the order the story reaches them: { id, label }. */
+function stateOptions(entry) {
   const states = Array.isArray(entry?.states) ? entry.states.filter(Boolean) : [];
-  if (!states.length) return { id: baseId(entry.id), addPage: false };
-  const n = Number(pageNumber);
-  const pagesOf = s => (Array.isArray(s.pages) ? s.pages : []).map(Number);
-  const idOf = (s, i) => (s.id && String(s.id).includes('.') ? String(s.id).toUpperCase() : `${baseId(entry.id)}.${i + 1}`);
-  const hit = states.findIndex(s => pagesOf(s).includes(n));
-  if (hit >= 0) return { id: idOf(states[hit], hit), addPage: false, stateIndex: hit };
-  let best = 0; let bestStart = -Infinity;
-  states.forEach((s, i) => { const lo = Math.min(...pagesOf(s)); if (Number.isFinite(lo) && lo <= n && lo > bestStart) { best = i; bestStart = lo; } });
-  return { id: idOf(states[best], best), addPage: true, stateIndex: best };
+  return states.map((s, i) => ({
+    id: stateId(entry, s, i),
+    label: [s.name, s.delta].map(x => String(x || '').replace(/\s+/g, ' ').trim()).filter(Boolean).join(': ') || stateId(entry, s, i),
+  }));
+}
+
+function stateQuestion(e) {
+  const what = e.type === 'creature' || e.type === 'secondary'
+    ? `${e.name}${e.species ? `, the ${e.species}` : ''}`
+    : `the ${e.label || e.name}`;
+  return `In the instant of the page to judge, which look does ${what} show? Its looks are listed in the order the story reaches them.`;
+}
+
+/**
+ * Per page, the look each cited element with more than one state shows. One
+ * call per page carries every such element; `JEV_DECISIONS.state.reps` calls
+ * with the choice probabilities averaged; code takes the top look. An element
+ * with one state is cited by it, one with none by its base id — neither asked.
+ *
+ * @param {{arc:string, pages:Array<{pageNumber:number, planLine:string}>,
+ *          perPage:Array<{pageNumber:number, elements:Array}>}} input
+ *   `elements` — the page's cited vbElements() rows (each carries its `entry`).
+ * @returns {Promise<{byPage: Map<number, Map<string, {cite:string, p:number|null, looks?:Object}>>, stats:Object}>}
+ */
+async function decideStates({ arc, pages, perPage }, opts = {}) {
+  const stats = opts.stats || newStats();
+  const byNum = new Map(pages.map(p => [Number(p.pageNumber), p]));
+  const plans = perPage.filter(p => byNum.has(Number(p.pageNumber))).map(p => ({
+    pageNumber: Number(p.pageNumber),
+    elements: p.elements,
+    asked: p.elements.map(e => ({ e, looks: stateOptions(e.entry) })).filter(x => x.looks.length > 1),
+  }));
+  const reqs = plans.filter(p => p.asked.length).flatMap((p) => {
+    const qs = {};
+    p.asked.forEach((x, i) => {
+      qs[`STATE${i}`] = { type: 'choice', instructions: stateQuestion(x.e), criteria: Object.fromEntries(x.looks.map((k, j) => [`s${j}`, k.label])) };
+    });
+    return repeat({ key: `state:p${p.pageNumber}`, state: pageState(arc, pages, byNum.get(p.pageNumber)), questions: qs }, JEV_DECISIONS.state.reps);
+  });
+  const ans = reqs.length ? await runJevRequests(reqs, { ...opts, usageLabel: 'jev_decisions_state', stats }) : new Map();
+  const byPage = new Map();
+  for (const p of plans) {
+    const a = ans.get(`state:p${p.pageNumber}`) || [];
+    const picks = new Map();
+    for (const e of p.elements) {
+      const i = p.asked.findIndex(x => x.e === e);
+      if (i < 0) { const only = stateOptions(e.entry)[0]; picks.set(e.id, { cite: only ? only.id : e.id, p: null }); continue; }
+      const looks = p.asked[i].looks;
+      if (!a.length) throw new JevDecisionError(`Jev state decision for ${e.id} on page ${p.pageNumber} has no answers`);
+      const probs = looks.map((k, j) => mean(a.map((x) => {
+        const q = x[`STATE${i}`];
+        if (!q || !q.probabilities) throw new JevDecisionError(`Jev state answer STATE${i} on page ${p.pageNumber} carries no probabilities`);
+        return Number(q.probabilities[`s${j}`] || 0);
+      })));
+      const top = probs.indexOf(Math.max(...probs));
+      picks.set(e.id, { cite: looks[top].id, p: +probs[top].toFixed(3), looks: Object.fromEntries(looks.map((k, j) => [k.id, +probs[j].toFixed(3)])) });
+    }
+    byPage.set(p.pageNumber, picks);
+  }
+  return { byPage, stats: summarise(stats) };
 }
 
 /**
@@ -763,15 +837,26 @@ async function decideVbAndAboard({ arc, pages, visualBible, commissionedNames = 
     }).sort((x, y) => y.p - x.p);
     const overBudget = inPicture.slice(VB_ELEMENT_BUDGET).map(x => x.e.id);
     const kept = inPicture.slice(0, VB_ELEMENT_BUDGET);
-    const elements = kept.map(({ e, p: P }) => { const st = stateIdFor(e.entry, n); return { id: e.id, cite: st.id, addStatePage: st.addPage, stateIndex: st.stateIndex, type: e.type, p: +P.toFixed(3) }; });
     const aboardScores = vehicles.map((v, i) => ({ id: v.id, p: meanNoul(a, `ABOARD${i}`) })).sort((x, y) => y.p - x.p);
     const aboard = aboardScores.length && aboardScores[0].p >= JEV_DECISIONS.aboard.at ? aboardScores[0].id : null;
     return {
-      pageNumber: n, elements, overBudget, aboard,
+      pageNumber: n, kept, overBudget, aboard,
       scores: Object.fromEntries(scored.map(({ e, p: P }) => [e.id, +P.toFixed(3)])),
       aboardScores: Object.fromEntries(aboardScores.map(x => [x.id, +x.p.toFixed(3)])),
     };
   });
+  // The look each element in the picture shows: a second round, on what the
+  // first one kept.
+  const looks = await decideStates({ arc, pages, perPage: out.map(r => ({ pageNumber: r.pageNumber, elements: r.kept.map(k => k.e) })) }, { ...opts, stats });
+  for (const r of out) {
+    const picks = looks.byPage.get(r.pageNumber) || new Map();
+    r.elements = r.kept.map(({ e, p: P }) => {
+      const pick = picks.get(e.id);
+      if (!pick) throw new JevDecisionError(`no look decided for ${e.id} on page ${r.pageNumber}`);
+      return { id: e.id, cite: pick.cite, type: e.type, p: +P.toFixed(3), ...(pick.looks ? { stateP: pick.p, looks: pick.looks } : {}) };
+    });
+    delete r.kept;
+  }
   for (const r of out) if (r.overBudget.length) log.warn(`🧱 [JEV/vb] page ${r.pageNumber}: ${r.elements.length + r.overBudget.length} elements in the picture, budget ${VB_ELEMENT_BUDGET} — left out (lowest P): ${r.overBudget.join(', ')}`);
   log.info(`🧩 [JEV/vb] ${out.map(r => `p${r.pageNumber}:[${r.elements.map(e => e.cite).join(',')}]${r.aboard ? `@${r.aboard}` : ''}`).join(' ')} (${stats.calls} calls)`);
   return { pages: out, stats: summarise(stats) };
@@ -928,7 +1013,7 @@ async function decideGaze({ arc, pages, perPage }, opts = {}) {
  * `population`, `aboard` and `looksAt` are written by code after the Art
  * Director and handed to the review as `jev_fixed_field` lines.
  */
-const JEV_FIXED_FIELDS_RULE = 'Fields decided upstream are FIXED: a page whose plan carries a FIXED line takes its `timeOfDay` from it exactly, and its `weather` is `none` when the line says indoors and never `none` when it says outdoors. After the briefs are written, code sets each story page\'s cited Visual Bible elements in `objects[]` (locations excepted), its `population`, its `aboard` and every character\'s `looksAt`; the prose renders those values and no rewrite changes them.';
+const JEV_FIXED_FIELDS_RULE = 'Fields decided upstream are FIXED: a page whose plan carries a FIXED line takes its `timeOfDay` from it exactly, and its `weather` is `none` when the line says indoors and never `none` when it says outdoors. After the briefs are written, code sets each story page\'s cited Visual Bible elements in `objects[]` (locations excepted) — for an element with states, the dotted id of the look it shows on that page, and every state\'s `pages` follow from those citations — its `population`, its `aboard` and every character\'s `looksAt`; the prose renders those values and no rewrite changes them.';
 
 /**
  * The rule as a brief author / the review is given it. On the Jev-outage
@@ -1012,8 +1097,14 @@ function fixedFieldFinding(pageNumber, changes, labelOf = id => id) {
   const parts = [];
   for (const c of changes) {
     if (c.field === 'objects') {
-      if (c.added.length) parts.push(`objects[] now cites ${c.added.map(id => `${id} (${labelOf(id)})`).join(', ')} — stage ${c.added.length > 1 ? 'them' : 'it'} in the prose, even where only part is in frame`);
-      if (c.removed.length) parts.push(`objects[] no longer cites ${c.removed.map(id => `${id} (${labelOf(id)})`).join(', ')} — take ${c.removed.length > 1 ? 'them' : 'it'} out of the prose`);
+      // A cite that only changes the dotted suffix is the same element in
+      // another look: the prose keeps it and renders that look.
+      const relooked = c.added.filter(id => c.removed.some(r => baseId(r) === baseId(id)));
+      const added = c.added.filter(id => !relooked.includes(id));
+      const removed = c.removed.filter(r => !relooked.some(id => baseId(id) === baseId(r)));
+      for (const id of relooked) parts.push(`objects[] cites ${id} (${labelOf(id)}) in place of ${c.removed.find(r => baseId(r) === baseId(id))} — the prose stages it in that look`);
+      if (added.length) parts.push(`objects[] now cites ${added.map(id => `${id} (${labelOf(id)})`).join(', ')} — stage ${added.length > 1 ? 'them' : 'it'} in the prose, even where only part is in frame`);
+      if (removed.length) parts.push(`objects[] no longer cites ${removed.map(id => `${id} (${labelOf(id)})`).join(', ')} — take ${removed.length > 1 ? 'them' : 'it'} out of the prose`);
     } else if (c.field === 'timeOfDay') parts.push(`timeOfDay is ${c.to} — the prose's light is that hour's`);
     else if (c.field === 'weather' && c.problem === 'outdoors') parts.push('the page is outdoors — `weather` is one of the outdoor values, never `none`; choose the story\'s sky and write it into the prose');
     else if (c.field === 'weather') parts.push('the page is indoors — `weather` is `none` and the prose shows no sky weather except through a window');
@@ -1115,7 +1206,9 @@ module.exports = {
   vbElements,
   vbQuestion,
   aboardQuestion,
-  stateIdFor,
+  stateOptions,
+  stateQuestion,
+  decideStates,
   decideVbAndAboard,
   decidePopulation,
 };

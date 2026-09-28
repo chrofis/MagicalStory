@@ -61,12 +61,83 @@ describe('VB citations: Jev per element, code holds ids, states and the budget',
     expect(p1.elements.length).toBe(VB_ELEMENT_BUDGET);                        // lamp .9, map .8, key .75, Drako .72 — bell .71 over budget
     expect(p1.elements.map((e: any) => e.id)).toEqual(['ART001', 'ART003', 'ART004', 'ANI001']);
     expect(p1.overBudget).toEqual(expect.arrayContaining(['ART005', 'VEH001']));
-    expect(p1.elements.find((e: any) => e.id === 'ART001').cite).toBe('ART001.1');   // the state for page 1
-    expect(p2.elements.find((e: any) => e.id === 'ART001').cite).toBe('ART001.1');   // page 2: the state begun before it
+    expect(p1.elements.find((e: any) => e.id === 'ART001').cite).toBe('ART001.1');   // Jev's pick (the stub takes the first look)
+    expect(p2.elements.find((e: any) => e.id === 'ART001').cite).toBe('ART001.1');
     expect(p1.elements.some((e: any) => e.id === 'ART002')).toBe(false);          // 0.6, not cited on p1
     expect(p2.scores.ART002).toBe(0.6);
     expect(p1.aboard).toBe('VEH001');                                             // aboard noul 0.6 ≥ 0.5
     expect(p1.elements.some((e: any) => e.id === 'CHR001')).toBe(false);          // 0.45 < 0.5
+  });
+});
+
+describe('the look a page shows is Jev\'s, never inferred from the Art Director\'s state pages (2026-09-28)', () => {
+  // Staging job_1790539784661_6mjcny1c7 p3: the plan line turns the creature
+  // grey, the page sat in no state's list, and "the latest state begun before
+  // it" cited the red look. This stub answers a look choice the way the plan
+  // line of the page to judge reads: the look whose label shares a word with it.
+  const lookStub = () => {
+    const calls: any[] = [];
+    const impl = async ({ state, questions }: any) => {
+      calls.push({ state, questions });
+      const page = String(state).split('PAGE TO JUDGE:')[1] || '';
+      const answers: any = {};
+      for (const [id, q] of Object.entries<any>(questions)) {
+        if (q.type === 'noul') { answers[id] = { noul: 0.9 }; continue; }
+        const keys = Object.keys(q.criteria || {});
+        const hit = keys.find(k => String(q.criteria[k]).split(/[^a-z]+/i).some(w => w.length > 3 && page.includes(w))) || keys[0];
+        answers[id] = { choice: hit, probabilities: Object.fromEntries(keys.map(k => [k, k === hit ? 0.8 : 0.2 / Math.max(1, keys.length - 1)])) };
+      }
+      return { answers, cost: 0, model: 'stub', usage: {} };
+    };
+    return { impl, calls };
+  };
+  const VB = {
+    animals: [{ id: 'ANI001', name: 'Drako', species: 'dragon', description: 'a dragon',
+      states: [{ id: 'ANI001.1', name: 'unaltered', delta: 'vibrant scales', pages: [1] }, { id: 'ANI001.2', name: 'cold', delta: 'dull grey scales', pages: [4] }] }],
+    artifacts: [{ id: 'ART001', name: 'lamp', description: 'a lamp', states: [{ name: 'only', delta: 'unlit', pages: [1] }] },
+      { id: 'ART002', name: 'rope', description: 'a rope' }],
+  };
+  const P = [
+    { pageNumber: 1, planLine: 'wide — Ana — Ana greets Drako by the wall — they are friends' },
+    { pageNumber: 2, planLine: 'wide — Ana — the lamp, the rope and Drako by the wall — Drako is grey instead of red' },
+  ];
+  it('cites the look Jev picks for the page, on a page no state lists', async () => {
+    const stub = lookStub();
+    const d = await JD.decideVbAndAboard({ arc: 'A', pages: P, visualBible: VB }, { callImpl: stub.impl });
+    const cite = (n: number, id: string) => d.pages.find((r: any) => r.pageNumber === n).elements.find((e: any) => e.id === id).cite;
+    expect(cite(1, 'ANI001')).toBe('ANI001.1');
+    expect(cite(2, 'ANI001')).toBe('ANI001.2');                 // page 2 is in neither state's pages; the plan line decides
+    expect(cite(2, 'ART001')).toBe('ART001.1');                 // one look: cited by it, never asked
+    expect(cite(2, 'ART002')).toBe('ART002');                   // no states: the base id
+    const stateCalls = stub.calls.filter(c => Object.keys(c.questions).some(k => k.startsWith('STATE')));
+    expect(stateCalls).toHaveLength(2 * JD.JEV_DECISIONS.state.reps);   // one call per page, averaged over the reps
+    expect(Object.keys(stateCalls[0].questions)).toEqual(['STATE0']);   // only the element with more than one look
+    expect(Object.values<any>(stateCalls[0].questions)[0].criteria).toEqual({ s0: 'unaltered: vibrant scales', s1: 'cold: dull grey scales' });
+  });
+  it('the bible\'s state pages are rebuilt from those cites', async () => {
+    const vb: any = JSON.parse(JSON.stringify(VB));
+    const d = await JD.decideVbAndAboard({ arc: 'A', pages: P, visualBible: vb }, { callImpl: lookStub().impl });
+    const cites = new Map(d.pages.map((r: any) => [r.pageNumber, r.elements.map((e: any) => e.cite)]));
+    JD.applyVbPages(vb, cites, ['ANI001', 'ART001', 'ART002']);
+    expect(vb.animals[0].states.map((s: any) => s.pages)).toEqual([[1], [2]]);
+  });
+  it('a cite that changes only its look reads as the same element in another look, not as a removal', () => {
+    const p = JD.pinBrief(brief({ characters: [], objects: ['LOC001', 'ANI001.1'] }), { cites: ['ANI001.2'], decidedIds: ['ANI001'] });
+    expect(metaOf(p.brief).objects).toEqual(['LOC001', 'ANI001.2']);
+    const f = JD.fixedFieldFinding(3, p.changes, (id: string) => id);
+    expect(f.detail).toMatch(/cites ANI001\.2 .* in place of ANI001\.1/);
+    expect(f.detail).not.toMatch(/no longer cites/);
+  });
+  it('after the scene review, a moved state page table is rebuilt from the decided cites', () => {
+    const { repinJevStatePages } = req('../../server/lib/beatsPipeline');
+    const vb: any = { animals: [{ id: 'ANI001', appearsInPages: [1, 2], states: [{ id: 'ANI001.1', pages: [1, 2] }, { id: 'ANI001.2', pages: [] }] }] };
+    const beats = [{ pageNumber: 1, jevFixed: { cites: ['ANI001.1'], decidedIds: ['ANI001'] } }, { pageNumber: 2, jevFixed: { cites: ['ANI001.2'], decidedIds: ['ANI001'] } }];
+    const gl = { info() {}, warn() {}, error() {}, debug() {} };
+    repinJevStatePages(vb, null, beats, gl);
+    expect(vb.animals[0].states.map((s: any) => s.pages)).toEqual([[1], [2]]);
+    const untouched: any = JSON.parse(JSON.stringify(vb));
+    repinJevStatePages(untouched, null, [{ pageNumber: 1 }], gl);            // off the Jev path: nothing moves
+    expect(untouched).toEqual(vb);
   });
 });
 
