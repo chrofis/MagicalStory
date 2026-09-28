@@ -4096,6 +4096,27 @@
         "result": "HUMAN",
         "note": "human check | LOOK: stories.data.challengeTakenIds / challengeDrawIds / arcReviewReport.create + retellSkipped; generationLog arc_variety, arc_challenges_taken_missing, arc_challenges_taken_undrawn. Free replay 2026-09-27: 4/4 current-format stored re-tell replies re-derive their stored takenIds; the create block is unproven until a real run."
       }
+    },
+    {
+      "id": "page-and-cover-prompts-fit",
+      "title": "Pages, full-story covers (incl. the baked front cover) and repairs all fit the Grok cap after the compaction and the cover-block / worn-row fix",
+      "commits": [
+        "9c897bc16",
+        "f1d7c57a8",
+        "4677059d0"
+      ],
+      "addedAt": "2026-09-27",
+      "claim": "On the next full staging beats story no page, cover or repair logs prompt_fit_failed, the front cover exists (missingCovers empty), and the grouped worn lines render every listed garment on its wearer.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "pagePromptsFit"
+      },
+      "status": "pending",
+      "evidence": [],
+      "backlog": "tasks/BACKLOG.md dragon front-cover line; supersedes nothing — page-prompt-fixed-blocks-fit FAILED on job_1790539784661_6mjcny1c7 (front cover + p18 repair)"
     }
   ],
   "runs": [
