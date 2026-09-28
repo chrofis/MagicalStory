@@ -2463,6 +2463,18 @@
       "fixedAt": "2026-09-28",
       "fixedIn": "4677059d0",
       "fix": "Worn rows of one character share one line and a description no longer repeats the item name; the baked-title line, the OPEN AREA, the WORN / EXPRESSIONS / REQUIRED OBJECTS headers and the split-state rule say the same in fewer words. iteratePageCore builds through pageRenderCall.makePageImagePrompt (sibling set page-prompt-one-construction). Dragon front cover floor 8,378 → 7,685 (margin 215). Test: tests/unit/cover-prompt-fixed-blocks-fit.test.ts. NOT covered: the p18 repair of the same run (rewrite brief not stored; estimated still over) — BACKLOG."
+    },
+    {
+      "id": "scene-review-removes-who-column-cast",
+      "title": "The scene review removed a character the page's who column names (as \"context\"), and the page was drawn with that figure from no reference",
+      "reportedAt": "2026-09-28",
+      "source": "Owner decision 6, 2026-09-28: staging dragon run job_1790539784661_6mjcny1c7 — sceneReviewReport.castRemovals \"page 7 = CHR001: plan line names Mama in a clause that places her as context\" and \"page 2 = CHR001: plan line names only Mama but not as a character\"; both who columns name Mama (VB secondary CHR001). briefFindings carried [cast_unlisted] \"The prose names Mama; characters[] lists Julian, Max, Kiaan\" on p2 and p7. Read-only measurement: all 4 cast_unlisted hits over the three Jev stories were this false positive (ar4u7qry3 p3, ruynosw80 p2, 6mjcny1c7 p2, p7); the replay finds a 5th on vnx5l8iy7 p1.",
+      "rootCause": "sceneBriefCheck cast_unlisted (findCastMissingFromMetadata) matched characters[] NAMES only, so a Visual Bible secondary cited by its id (objects[] CHR001) read as unlisted, and the finding told the review \"whoever is only mentioned should not read as present\". PLAN_LINE_CAST_RULE (scene-review 5a) then gave the review a reading under which a who-column name placed by a clause is \"context\". Nothing in code refused a declared removal of a who-column name.",
+      "impact": "Any page whose who column names a Visual Bible secondary cited by id: a false cast_unlisted, and the review may un-name and un-cite the figure; the page then renders a person with no reference image (p7: \"a raised hand\").",
+      "status": "fixed",
+      "fixedAt": "2026-09-28",
+      "fixedIn": "(this commit — see the chore(bugs) follow-up)",
+      "fix": "cast_unlisted resolves ids cited in objects[] or characters[] to their bible name/label (sceneBriefCheck.vbFigureNamesCited; replay: 5 of 5 stored hits cleared, 0 new). PLAN_LINE_CAST_RULE: every second-field name is in the picture whatever the line says about them, and no rewrite removes one; only a person absent from the second field is context. Code: sceneReviewGuard.whoColumnRemovals refuses a declared removal of a who-column name and the page ships its pre-review brief (gl.error beats_scene_review_who_removal_refused; replay refuses exactly dragon p2 and p7, none of the 3 other stored declarations). Test: tests/unit/scene-review-who-column-cast.test.ts (p7 inputs)."
     }
   ]
 }

@@ -1447,16 +1447,20 @@ function isSameFigureName(a, b) {
  * @param {string} sceneDescription - Prose + ---METADATA--- block
  * @param {string[]} castNames - Story cast names
  * @param {Object|null} [sceneMetadata] - Already-parsed metadata, when the caller has it
+ * @param {string[]} [alsoListed] - names the brief lists by another handle (a VB figure cited by id)
  * @returns {string[]} Cast names described in the prose but not listed (cast order)
  */
-function findCastMissingFromMetadata(sceneDescription, castNames, sceneMetadata = null) {
+function findCastMissingFromMetadata(sceneDescription, castNames, sceneMetadata = null, alsoListed = []) {
   if (!sceneDescription || typeof sceneDescription !== 'string') return [];
   if (!Array.isArray(castNames) || castNames.length === 0) return [];
   const metadata = sceneMetadata || extractSceneMetadata(sceneDescription);
   if (!metadata || !Array.isArray(metadata.characters)) return [];
 
   const prose = splitBrief(sceneDescription).prose;
-  const listed = metadata.characters
+  // `alsoListed`: names the brief carries by another handle — a Visual Bible
+  // figure cited by its id resolves to its authored name (sceneBriefCheck
+  // vbFigureNamesCited, 2026-09-28).
+  const listed = [...metadata.characters, ...(Array.isArray(alsoListed) ? alsoListed : [])]
     .map(c => String(typeof c === 'string' ? c : (c && c.name) || '').trim())
     .filter(Boolean);
 

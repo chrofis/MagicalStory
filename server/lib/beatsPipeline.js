@@ -141,7 +141,7 @@ const {
   getHistoricalLocations,
   getHistoricalObjects,
 } = require('./storyHelpers');
-const { parseCastRemovals, diffCastRemovals, restoreUndeclaredRemovals } = require('./sceneReviewGuard');
+const { parseCastRemovals, diffCastRemovals, whoColumnRemovals, revertUndeclaredRemovals, restoreUndeclaredRemovals } = require('./sceneReviewGuard');
 const { carryForwardWornItemsInBrief } = require('./wornItems');
 
 /**
@@ -2780,6 +2780,22 @@ async function runSceneReview({ inputData, expansions, clothingRequirements, vis
       if (castRemovals.malformed.length > 0) {
         log.warn(`⚠️ [BEATS] Scene review REMOVED CAST line has ${castRemovals.malformed.length} unparseable entr(ies): ${castRemovals.malformed.join(' | ')}`);
         gl.warn('beats_scene_review_removals_malformed', `REMOVED CAST entries could not be parsed: ${castRemovals.malformed.join(' | ')}`, null, castRemovals.malformed);
+      }
+      // THE WHO COLUMN IS NEVER REMOVED (2026-09-28, bug
+      // scene-review-removes-who-column-cast). A declared removal of a name the
+      // page's who column carries is refused: the page ships its pre-review
+      // brief, which staged that figure. The rewrite un-named them in the prose
+      // as well, so splicing the id back would leave a cited figure the prose
+      // never draws (staging job_1790539784661_6mjcny1c7 p7: "a raised hand").
+      const whoRemoved = whoColumnRemovals(castRemovals, planLineOf, visualBible);
+      if (whoRemoved.length > 0) {
+        const undone = revertUndeclaredRemovals(expansions, sceneDiffs, changed, whoRemoved.map(r => ({ pageNumber: r.pageNumber, undeclared: r.names })));
+        const detail = whoRemoved.map(r => `page ${r.pageNumber}: ${r.names.join(', ')}`).join('; ');
+        log.error(`❌ [BEATS] Scene review removed cast the who column names — ${detail}; page(s) ${undone.map(u => u.pageNumber).join(', ') || 'none'} reverted to the pre-review brief`);
+        gl.error('beats_scene_review_who_removal_refused',
+          `The review declared removing character(s) the page's who column names — ${detail}. Refused: ${undone.length ? `page(s) ${undone.map(u => u.pageNumber).join(', ')} ship the pre-review brief, which stages them` : 'no rewrite of those pages was captured to undo'}.`,
+          null, { refused: whoRemoved, reverted: undone.map(u => u.pageNumber) });
+        castRemovalsDeclared = { ...castRemovals, refused: whoRemoved };
       }
       for (const r of castRemovalAudit) {
         if (r.declared.length === 0) continue;

@@ -367,4 +367,49 @@ function restoreUndeclaredRemovals(expansions, sceneDiffs, changed, audit) {
   return { restored, reverted: revertRows };
 }
 
-module.exports = { parseCastRemovals, castNameSet, diffCastRemovals, revertUndeclaredRemovals, restoreUndeclaredRemovals, castArraySpan, castEntriesFor, assessSceneReview, assertReviewedArtifactUsable, pickReviewedBrief };
+/**
+ * A DECLARED REMOVAL OF A WHO-COLUMN NAME IS REFUSED (2026-09-28, bug
+ * scene-review-removes-who-column-cast).
+ *
+ * The plan line's second field is the complete cast of the picture; the review
+ * may take out a figure the brief ADDED, never one the who column names.
+ * Staging job_1790539784661_6mjcny1c7 p2 and p7: both who columns name Mama (a
+ * Visual Bible secondary, cited as CHR001), and the review declared
+ * "REMOVED CAST: page 7 = CHR001: plan line names Mama in a clause that places
+ * her as context", un-named her in the prose and dropped the id; the page was
+ * then drawn with a woman from no reference.
+ *
+ * Structured throughout: the declared names (a VB id resolves to its entry's
+ * authored name and label) are matched against the who column, the plan line's
+ * second field, by the plan counters' own name matcher. No prose is read.
+ *
+ * @param {ReturnType<typeof parseCastRemovals>} declared
+ * @param {(pageNumber:number) => string} planLineOf
+ * @param {Object|null} visualBible
+ * @returns {Array<{pageNumber:number, names:string[]}>} the declared names the who column carries, per page
+ */
+function whoColumnRemovals(declared, planLineOf, visualBible) {
+  const { planSegments, namesIn } = require('./planCounters');
+  const { findVbIds, baseVbId } = require('./vbIdGuard');
+  const figures = [];
+  for (const key of ['secondaryCharacters', 'animals']) {
+    const list = visualBible && (Array.isArray(visualBible[key]) ? visualBible[key] : Object.values(visualBible[key] || {}));
+    for (const e of list || []) if (e && e.id) figures.push(e);
+  }
+  const handlesOf = (name) => {
+    const ids = findVbIds(String(name || '')).map(baseVbId).filter(Boolean);
+    if (!ids.length) return [String(name || '').trim()].filter(Boolean);
+    const e = figures.find(f => ids.includes(String(f.id).trim().toUpperCase().split('.')[0]));
+    return e ? [e.name, e.label].map(h => String(h || '').trim()).filter(Boolean) : [];
+  };
+  const out = [];
+  for (const p of (declared && declared.pages) || []) {
+    const who = planSegments(String(planLineOf(p.pageNumber) || '').replace(/^\s*PLAN:\s*/i, ''))[1] || '';
+    if (!who) continue;
+    const names = p.names.filter(n => namesIn(who, handlesOf(n)).length > 0);
+    if (names.length) out.push({ pageNumber: p.pageNumber, names });
+  }
+  return out;
+}
+
+module.exports = { parseCastRemovals, castNameSet, diffCastRemovals, whoColumnRemovals, revertUndeclaredRemovals, restoreUndeclaredRemovals, castArraySpan, castEntriesFor, assessSceneReview, assertReviewedArtifactUsable, pickReviewedBrief };

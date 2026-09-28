@@ -795,6 +795,31 @@ function bibleEntries(visualBible) {
  * in the third. Every 6-page story in the corpus is written that way, and
  * reading them anchored flagged every element on every page.
  */
+/**
+ * The authored names (and labels) of the Visual Bible figures — secondary
+ * characters and animals — a brief cites by id, in `objects[]` or as a
+ * `characters[]` row. An identity lookup between the brief's ids and the
+ * bible's entries; no prose is read.
+ */
+function vbFigureNamesCited(metadata, visualBible) {
+  if (!visualBible) return [];
+  const { findVbIds, baseVbId } = require('./vbIdGuard');
+  const ids = new Set(citedBaseIds(metadata).keys());
+  for (const c of ((metadata && Array.isArray(metadata.characters)) ? metadata.characters : [])) {
+    const row = String(typeof c === 'string' ? c : (c && c.name) || '');
+    for (const hit of findVbIds(row)) { const base = baseVbId(hit); if (base) ids.add(base); }
+  }
+  const out = [];
+  for (const key of ['secondaryCharacters', 'animals']) {
+    const list = Array.isArray(visualBible[key]) ? visualBible[key] : Object.values(visualBible[key] || {});
+    for (const e of list) {
+      if (!e || !e.id || !ids.has(String(e.id).trim().toUpperCase().split('.')[0])) continue;
+      for (const h of [e.name, e.label]) if (h && String(h).trim()) out.push(String(h).trim());
+    }
+  }
+  return out;
+}
+
 function citedBaseIds(metadata) {
   const objects = (metadata && Array.isArray(metadata.objects)) ? metadata.objects : [];
   const { findVbIds, baseVbId } = require('./vbIdGuard');
@@ -918,7 +943,15 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
   // construction: `Hans's attic` and `Daniel's phone torch` name a place and a
   // prop, not a person in the frame, and counting them produced 4 false
   // positives out of 5 across three stories.
-  const missing = findCastMissingFromMetadata(brief, castNames, metadata);
+  // A Visual Bible figure cited by its id — in `objects[]`, or as a
+  // `characters[]` row reading `CHR001` — is listed under its authored name
+  // (2026-09-28). Matching names only, the check read every id-cited secondary
+  // as unlisted: all 4 hits over the three Jev stories to 2026-09-28 were this
+  // false positive (staging job_1790539784661_6mjcny1c7 p2 / p7 "The prose names
+  // Mama; characters[] lists Julian, Max, Kiaan" while objects[] cited CHR001),
+  // and on p2 and p7 the scene review answered it by removing Mama, whom both
+  // who columns name.
+  const missing = findCastMissingFromMetadata(brief, castNames, metadata, vbFigureNamesCited(metadata, visualBible));
   if (missing.length > 0) {
     const listed = (metadata && Array.isArray(metadata.characters) ? metadata.characters : [])
       .map(c => String(typeof c === 'string' ? c : (c && c.name) || '').trim())
