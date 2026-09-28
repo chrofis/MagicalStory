@@ -685,6 +685,14 @@ const MODEL_DEFAULTS = {
   // one ("reasoning is mandatory", evalPipeline.js:255) and the gate then failed
   // open on every single call.
   repairFaceCheck: 'gemini-2.5-flash',
+  // The Visual Bible STATE-consistency gate (referenceSheets.checkStateCellsConsistency):
+  // one entry's state cells side by side, each state's change named. Moved off
+  // gemini-2.5-flash-lite (owner, 2026-09-28): on staging job_1790539784661_6mjcny1c7's
+  // stored cells lite failed a correct three-state set 6 of 6 times, with the old
+  // prompt and with "each listed change is intended", reading the named colour
+  // change as a fault; gemini-2.5-flash with the same new prompt passed it 3 of 3
+  // and still failed both mismatch controls 6 of 6. The other cell gates stay on lite.
+  vbStateCellGate: 'gemini-2.5-flash',
 
   // IDENTITY ARBITER — the only witness allowed to overrule the figure detector
   // on who-is-who (identityAgreement.arbitrateVeto, 2026-09-21).

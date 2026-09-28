@@ -232,6 +232,7 @@ First, exactly:
       "generic": "[OMIT unless generic — see the generic rule]",
       "species": "[type and breed]",
       "coloring": "[exact colours and full pattern]",
+      "anatomy": "{ANIMAL_ANATOMY_SPEC}",
       "features": "[collar, markings, accessories]",
       "states": "[OMIT unless the story changes this one's own look. Same shape and limits as above.]"
     }

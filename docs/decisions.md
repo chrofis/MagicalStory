@@ -65189,3 +65189,85 @@ unchanged.
 decideVbAndAboard, fixedFieldFinding, JEV_FIXED_FIELDS_RULE, JEV_DECISIONS.state),
 server/lib/beatsPipeline.js (labelOf, the Jev-owned brief-check types, repinJevStatePages),
 tests/unit/jev-brief-fields.test.ts.
+
+## 2026-09-28 — A creature's body parts are an authored field, `anatomy` (owner)
+
+**Context:** staging job_1790539784661_6mjcny1c7. The story has its grown creature spread its
+wings and fly off (p4, p13, p15), and its Visual Bible entry named no wings: the `animals` schema
+offered `species`, `coloring` and `features: "[collar, markings, accessories]"`, and no slot for
+the body itself. All three reference cells (ANI001.1-.3) drew a wingless creature.
+
+**Decision:** `animals[]` gains `anatomy`, filled from ONE string, `visualBible.ANIMAL_ANATOMY_SPEC`,
+at both Visual Bible authoring sites (scene-expansion-all.txt and story-trial.txt, placeholder
+`{ANIMAL_ANATOMY_SPEC}`, the SCALE_CLASS_SPEC pattern): every body part the story gives the creature
+or implies, each with its count — a flyer has wings, a stated number of heads, horns, legs or tails
+is that number; body parts only. `buildAnimalDescription` writes it into the entry description
+after the colouring, so it reaches the reference cell's paint prompt and every cell gate that
+reads the entry (element + state gates). The page prompt's REQUIRED OBJECTS line stays name-only
+(2026-09-02 ruling); the page gets the body from the cell and from the Art Director's own prose.
+
+**Touched:** server/lib/visualBible.js (ANIMAL_ANATOMY_SPEC, buildAnimalDescription),
+server/lib/promptBuilders.js (fill at buildSceneExpansionAllPrompt + buildTrialStoryPrompt),
+prompts/scene-expansion-all.txt, prompts/story-trial.txt, docs/prompt-inventory.md,
+tests/unit/creature-grown-entry-and-state-gate.test.ts.
+
+## 2026-09-28 — The VB state-consistency gate reads each listed change as intended, and runs on gemini-2.5-flash (owner)
+
+**Context:** staging job_1790539784661_6mjcny1c7, ANI001 (three states: red → dull grey with a
+hollow chest → red again). The state gate (`stateCellsGatePrompt`, gemini-2.5-flash-lite) passed the
+first render and failed the recheck: "grey in the second image, indicating a color change not
+described" — while the second state's delta says "dull grey scales". Its question asked for "the
+same … colour — differing only in the named state", and the judge read the colour clause as a rule
+every cell must obey.
+
+**Evidence (replay on the stored cells, 3 calls per arm, ~$0.02):**
+
+| case (stored cells) | old prompt, lite | new prompt, lite | new prompt, gemini-2.5-flash |
+|---|---|---|---|
+| creature, 3 correct states (expect pass) | FAIL 3/3 | FAIL 3/3 | **pass 3/3** |
+| scale object, 2 states (expect pass) | FAIL 3/3 | FAIL 3/3 | FAIL 3/3 ("watercolor, not metallic") |
+| control: third cell swapped for another element (expect fail) | FAIL 3/3 | FAIL 3/3 | FAIL 3/3 |
+| control: grey cell labelled as the restored look (expect fail) | FAIL 3/3 | FAIL 3/3 | FAIL 3/3 |
+
+The prompt change alone did not cure it (lite then blamed the description's "red dragon"), so the
+prompt also says a state wins over the description in its cell, and the gate moved to the stronger
+model — the owner's "and/or a stronger vision model". The scale case stays failing on every arm for
+a different reason (its cell reads as a painted heart, not a metallic scale — the element gate said
+the same at generation); that is the gate being strict about the object, not about the states.
+
+**Decision:** `stateCellsGatePrompt`: "Each listed change is intended: whatever a state names … is
+expected in that cell, and where it differs from the description the state wins for that cell";
+"the same colour except where a state names a colour change". `askCellGate` takes a model key;
+`checkStateCellsConsistency` passes `MODEL_DEFAULTS.vbStateCellGate` (`gemini-2.5-flash`). The
+character and element cell gates stay on flash-lite. Fail-open and the one re-render are unchanged.
+
+**Touched:** server/lib/referenceSheets.js (stateCellsGatePrompt, askCellGate,
+checkStateCellsConsistency), server/config/models.js (vbStateCellGate), docs/prompt-inventory.md,
+tests/unit/creature-grown-entry-and-state-gate.test.ts.
+
+## 2026-09-28 — The `cute` creature tone is a grown creature's FACE, never its body or size (owner)
+
+**Context:** the creature-tone levels (2026-09-09 "Creature appearance is softened by the focus
+child's age", keyed on the youngest main since 2026-09-13, `cute` relaxed 2026-09-26 "A large
+creature is measured against the people in frame") told the Art Director, for a reader of 0-4:
+"rounded forms throughout … For size, lean toward a creature near the child's own size — a scale a
+child could stand beside or hug". It applied to every creature. On staging
+job_1790539784661_6mjcny1c7 (youngest main 3 → `cute`) the grown creature (`twice-adult-height`,
+entry opening "a fully grown adult dragon with adult body proportions", the 2026-09-26 maturity fix)
+was authored "large golden eyes, rounded friendly snout, soft rounded body"; its three reference
+cells came out a chibi hatchling (the element gate itself said "depicted as a baby, not an adult"),
+and pages 1, 3, 4, 13, 15 and 16 drew it baby-shaped and small. docs/SETTLED.md carries no line on
+the creature tone, so this is a change of an owner ruling, not a SETTLED reversal.
+
+**Decision (owner-approved 2026-09-28):** `cute` keeps its face rules for every creature (soft face,
+large round friendly eyes, no teeth, no displayed claws, one short blunt pair of horns at most). Its
+BODY rules — rounded forms, leaning toward a child-sized scale — now apply only to a creature smaller
+than a grown-up. A grown creature — `scaleClass` in `GROWN_CREATURE_SCALE_CLASSES` (adult-height,
+twice-adult-height, house-height, landmark: the same set that gives the entry its maturity phrase)
+— keeps a grown adult's build, body proportions and full size; the tone governs its face and
+expression only (a soft smile, friendly eyes, no bared teeth). `not-menacing` and `formidable` are
+unchanged. The band list in the text is built from the code set, never typed.
+
+**Touched:** server/lib/promptBuilders.js (CREATURE_TONE_LEVELS.cute, GROWN_BANDS_TEXT),
+tests/unit/creature-grown-entry-and-state-gate.test.ts, tests/unit/creature-tone-youngest-main.test.ts
+(its band detector keys on the cute level's new opening).

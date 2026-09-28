@@ -17,7 +17,7 @@ const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = requi
 // this module was the prose worn-vs-held matcher deleted 2026-09-18. It stays
 // exported from visualBible.js for coverIterate.js, which still uses it.
 const { REQUIRED_TEXT_AUTHORING_RULE, declaredText } = require('./requiredText');
-const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote, withScaleNote } = require('./visualBible');
+const { SCALE_CLASS_SPEC, ANIMAL_ANATOMY_SPEC, GROWN_CREATURE_SCALE_CLASSES, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote, withScaleNote } = require('./visualBible');
 const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, PLAN_SHOT_PLACEHOLDER, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE, GROUP_STAGING_RULE } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { SLOP_RULES } = require('./proseSlop');
@@ -3225,6 +3225,8 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // ONE scale vocabulary for every Visual-Bible authoring site (the
     // all-pages Art Director and the trial writer) — see SCALE_CLASS_SPEC.
     SCALE_CLASS_SPEC,
+    // ONE creature body-part slot for both authoring sites (visualBible.js).
+    ANIMAL_ANATOMY_SPEC,
     // ONE authoring contract for readable in-image lettering, shared by both
     // Visual Bible authoring sites and the scene reviewer that faults a
     // missing declaration — see REQUIRED_TEXT_AUTHORING_RULE.
@@ -6772,8 +6774,19 @@ function buildTopicWindowSection(inputData = {}) {
  * eye level" — a size cap the page prompt's computed ratio contradicts. The
  * camera stays at the child's eye level; the creature keeps its full size.
  */
+// `cute` FACE ONLY FOR A GROWN CREATURE (owner, 2026-09-28). "Rounded forms
+// throughout" and "near the child's own size" were written for every creature,
+// and the Art Director obeyed them on a grown one: staging
+// job_1790539784661_6mjcny1c7's grown dragon (twice-adult-height, entry "a fully
+// grown adult dragon with adult body proportions") was authored "large golden
+// eyes, rounded friendly snout, soft rounded body", its cells came out a chibi
+// hatchling, and pages 1, 3, 4, 13, 15 and 16 drew it baby-shaped and small. A
+// creature at or above a grown-up's height (GROWN_CREATURE_SCALE_CLASSES, the
+// same bands that give the entry its maturity) keeps its adult build and size;
+// the tone governs its face and expression only. decisions.md 2026-09-28.
+const GROWN_BANDS_TEXT = [...GROWN_CREATURE_SCALE_CLASSES].join(', ');
 const CREATURE_TONE_LEVELS = {
-  cute: "Animals, creatures and non-human characters are drawn cute: rounded forms throughout, soft faces, large round friendly eyes, a calm or smiling mouth with no teeth showing, no displayed claws, an open upright posture, warm colours. A horned, spined or crested one carries a single pair at most, short and blunt-tipped — never a crown of horns around the head or rows of spikes down it. A non-human character reads as a playmate. For size, lean toward a creature near the child's own size — a scale a child could stand beside or hug — and go bigger only where the story needs it: a being that is ridden, carries characters or fills a doorway is that size. A being may be large — state its size in metres or against a familiar room, never as a multiple of a child. A being the story makes large is drawn at that full size and may tower gently over a child: calm and soft-faced, its head lowered toward them, never looming, lunging or menacing.",
+  cute: `Animals, creatures and non-human characters are drawn cute: soft faces, large round friendly eyes, a calm or smiling mouth with no teeth showing, no displayed claws, an open upright posture, warm colours. A horned, spined or crested one carries a single pair at most, short and blunt-tipped — never a crown of horns around the head or rows of spikes down it. A non-human character reads as a playmate. A creature smaller than a grown-up is cute in body too: rounded forms throughout, and for size lean toward one near the child's own size — a scale a child could stand beside or hug — going bigger only where the story needs it: a being that is ridden, carries characters or fills a doorway is that size. A grown creature — one the story makes as tall as a grown-up or taller (scaleClass ${GROWN_BANDS_TEXT}) — keeps a grown adult's build, body proportions and full size: the cute tone governs its face and expression only — a soft smile, friendly eyes, no bared teeth — never its body or its size. A being may be large — state its size in metres or against a familiar room, never as a multiple of a child. A being the story makes large is drawn at that full size and may tower gently over a child: calm and soft-faced, its head lowered toward them, never looming, lunging or menacing.`,
   'not-menacing': "Animals, creatures and non-human characters carry an open friendly face and clearly kind eyes: a level brow rather than a heavy or overhanging one, open rather than deep-set eyes, a neutral or gentle mouth that shows no teeth, open or smiling included. Claws may exist but are not raised or displayed. A horned, spined or crested one carries a single pair at most, kept short and smooth-tipped — never a crown of horns around the head or rows of spikes down it. For size, a creature may be clearly bigger than a child; prefer one that still fits in frame beside them and reads as approachable over an overwhelming one, unless the story needs otherwise — a being that is ridden, carries characters or blocks a way is that size. A being may be large — state its size in metres, not as a multiple of a child. The camera stays at the child's eye level; a being the story makes large stands at its full size beside them, calm and upright, never looming over them.",
   formidable: "A creature the story gives a powerful, wild or formidable nature is drawn as one: claws and teeth visible rather than hidden, real physical weight and presence, weathered or rugged hide, scale, fur or feather where they suit it. No rounded, toy-like or plush softening of such a creature. It may loom, and its size may be stated against a child. A creature the story means as gentle — a pet, a domestic animal, a comic one — stays gentle and friendly-looking; the story's own nature for each creature decides which of the two it gets. Size may be whatever the story wants; a genuinely huge creature is welcome.",
 };
@@ -12307,6 +12320,8 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       // ONE scale vocabulary for every Visual-Bible authoring site — the trial
       // writer authors its own bible, so it declares the same placeholder.
       SCALE_CLASS_SPEC,
+      // ONE creature body-part slot for both authoring sites (visualBible.js).
+      ANIMAL_ANATOMY_SPEC,
     // ONE authoring contract for readable in-image lettering, shared by both
     // Visual Bible authoring sites and the scene reviewer that faults a
     // missing declaration — see REQUIRED_TEXT_AUTHORING_RULE.
