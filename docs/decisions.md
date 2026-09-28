@@ -65304,6 +65304,13 @@ figure.
 p4/p12/p15 → p9/p12 (p4 → low-angle, p15 → wide), no unmet; ruynosw80 and ar4u7qry3 unchanged.
 Shot restores across the three stories: exactly dragon p15.
 
+**Lab 1585 (beats_scenes, dragon stored plan, staging ece2fcb2, Art Director $0.36):** p12
+(the creature turns away from the child) now makes the CHILD the near crop, `perspective:
+over-the-shoulder`, looking toward the creature — the stored run had made the creature the crop
+turning away. p4 and p15 still carry over-the-shoulder because the stored plan predates the
+eligibility gate; the replay above moves them. The run's scene review failed on a provider error
+(OpenRouter/Alibaba `finish_reason=error`), so only the Art Director half was exercised.
+
 **Known conflict left open (BACKLOG):** on the Jev path several Art Director / review rules still
 tell the author to change `shot` — GAP_ACTION_FRAMING ("set `shot` to over-the-shoulder / ultra-wide"),
 CLOSEUP_KEPT_RULE's below-waist `medium`, the group rule's "wider shot", review 6d. The fixed-fields
