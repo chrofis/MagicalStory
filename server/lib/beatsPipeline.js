@@ -4205,6 +4205,20 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     }
   }
 
+  // THE OUTFIT GUARD (owner, 2026-09-28): every commissioned character leaves
+  // the wardrobe with an outfit. A character without one is handed to every
+  // brief author as "Wearing: NONE" and drawn undressed (bug
+  // clothing-review-none-body-erases-outfit). Code invents no garment, so this
+  // is loud, never a silent default.
+  if (clothingRequirements && Object.keys(clothingRequirements).length > 0) {
+    const { outfitAbsent } = require('./clothingCheck');
+    const absent = outfitAbsent(clothingRequirements, (inputData.characters || []).map(c => c && c.name).filter(Boolean));
+    if (absent.length > 0) {
+      log.error(`❌ [BEATS] No outfit in the wardrobe contract for ${absent.join(', ')} — every brief will describe them undressed`);
+      gl.error('beats_outfit_absent', `The wardrobe contract gives ${absent.join(', ')} no outfit to wear`, null, { characters: absent });
+    }
+  }
+
   // ── Styled avatars start HERE, not after the pipeline ─────────────────────
   // Their only input is clothingRequirements, which now exists. They are the
   // long pole in front of every cover and page image, so they run concurrently

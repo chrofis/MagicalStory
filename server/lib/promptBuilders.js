@@ -11613,6 +11613,9 @@ function buildClothingReviewPrompt(inputData, clothingRequirements, beats = []) 
  * as parseBeats: analysis before the marker, entries after, omission allowed
  * (the review returns only the outfits it rewrote).
  */
+/** The clothing-review template's no-change marker, as a whole answer. */
+const CLOTHING_NO_CHANGE_RE = /^\s*NONE\s*\.?\s*$/i;
+
 function parseClothingReview(raw) {
   const full = String(raw || '');
   const marker = full.match(/---\s*CLOTHING\s*---/i);
@@ -11661,6 +11664,10 @@ function parseClothingReview(raw) {
     const end = i + 1 < marks.length ? marks[i + 1].headStart : body.length;
     const description = body.slice(marks[i].bodyStart, end).trim();
     if (!marks[i].name || !description) continue;
+    // A heading answered with the template's own no-change marker is not a
+    // rewrite (bug clothing-review-none-body-erases-outfit: staging
+    // job_1790529840433_ar4u7qry3 wrote "NONE" over Noah's pirate outfit).
+    if (CLOTHING_NO_CHANGE_RE.test(description)) continue;
     const key = `${marks[i].name.toLowerCase()}/${marks[i].category}`;
     byKey.set(key, { name: marks[i].name, category: marks[i].category, costume: marks[i].costume || null, description });
   }

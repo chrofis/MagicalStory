@@ -816,7 +816,31 @@ function applyWardrobeBibleCorrections(clothingRequirements, visualBible, opts =
   return { findings, applied, versions, unresolved };
 }
 
+/**
+ * THE OUTFIT GUARD (owner, 2026-09-28). Which of `names` has no outfit to be
+ * drawn in: no contract entry, no `used` category, or a used category whose
+ * description is empty or the review template's no-change marker. Every brief
+ * author reads the contract's text, so a character listed here is described
+ * "wearing no clothing" (staging job_1790529840433_ar4u7qry3, bug
+ * clothing-review-none-body-erases-outfit). Reports; never invents a garment.
+ */
+function outfitAbsent(clothingRequirements, names = []) {
+  const absent = [];
+  for (const name of names || []) {
+    const reqs = resolveCharacterReqs(clothingRequirements, name);
+    const used = reqs && typeof reqs === 'object'
+      ? Object.values(reqs).filter(v => v && v.used === true)
+      : [];
+    const dressed = used.some(v => {
+      const d = String(v.description || '').trim();
+      return d && !/^NONE\.?$/i.test(d);
+    });
+    if (!dressed) absent.push(name);
+  }
+  return absent;
+}
+
 // slotStated + missingGarments are exported so the image-prompt clothing check
 // (storyHelpers buildImagePrompt) uses THIS definition of "is this garment in
 // the prose" rather than growing a second one.
-module.exports = { REVIEWABLE, GARMENT_NOUNS, checkPage, checkWardrobeAgainstBible, applyWardrobeBibleCorrections, outfitClauses, checkScenes, renderFindingsBlock, splitSlots, slotStated, missingGarments, characterProse, characterWindow, tokens, contractPairs, colourBefore };
+module.exports = { REVIEWABLE, GARMENT_NOUNS, outfitAbsent, checkPage, checkWardrobeAgainstBible, applyWardrobeBibleCorrections, outfitClauses, checkScenes, renderFindingsBlock, splitSlots, slotStated, missingGarments, characterProse, characterWindow, tokens, contractPairs, colourBefore };

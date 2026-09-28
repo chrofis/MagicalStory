@@ -2475,6 +2475,15 @@
       "fixedAt": "2026-09-28",
       "fixedIn": "98fcc2ff2",
       "fix": "cast_unlisted resolves ids cited in objects[] or characters[] to their bible name/label (sceneBriefCheck.vbFigureNamesCited; replay: 5 of 5 stored hits cleared, 0 new). PLAN_LINE_CAST_RULE: every second-field name is in the picture whatever the line says about them, and no rewrite removes one; only a person absent from the second field is context. Code: sceneReviewGuard.whoColumnRemovals refuses a declared removal of a who-column name and the page ships its pre-review brief (gl.error beats_scene_review_who_removal_refused; replay refuses exactly dragon p2 and p7, none of the 3 other stored declarations). Test: tests/unit/scene-review-who-column-cast.test.ts (p7 inputs)."
+    },
+    {
+      "id": "clothing-review-none-body-erases-outfit",
+      "title": "The wardrobe review answered NONE under a character heading and the merge wrote \"NONE\" as that character's outfit",
+      "reportedAt": "2026-09-28",
+      "source": "Stored evidence, staging job_1790529840433_ar4u7qry3: clothingReviewReport.rawResponse ends \"## Noah / costumed (costume: pirate)\nNONE\"; clothingReviewReport.changed records Noah costumed:pirate before = a full pirate outfit (blue linen shirt, brown canvas trousers, belt, socks, boots), after = \"NONE\"; stories.data.clothingRequirements.Noah.costumed.description = \"NONE\". The Art Director read \"Noah … Wearing: NONE\" and wrote \"Noah … wearing no clothing\" on three pages; the scene review had to catch it.",
+      "rootCause": "promptBuilders.parseClothingReview treats NONE as \"no rewrites\" only when it is the whole ---CLOTHING--- body; a heading followed by NONE parsed as an entry whose description is the word NONE, and the beats merge wrote it over the outfit.",
+      "impact": "Any story whose wardrobe reviewer writes a heading and then NONE for a character it did not rewrite: that character loses their outfit in the contract, the avatar costume, the Art Director cast block and every page.",
+      "status": "open"
     }
   ]
 }
