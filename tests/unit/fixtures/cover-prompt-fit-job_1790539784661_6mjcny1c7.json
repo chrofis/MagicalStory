@@ -1,0 +1,2102 @@
+{
+ "source": "staging stories.data job_1790539784661_6mjcny1c7 (dragon run, build 15489e69): the front cover (page -1) shipped with no image — prompt_fit_failed twice, 8,378 chars after every allowed cut (scene 3,620 + must-keep 4,758) against Grok 7,900. brief = sceneReviewReport.pages[-1].after; cast and photos as storyJobPipeline preparePageData derives them (unionPageCast / getCharacterPhotoDetails), image URLs stripped.",
+ "title": "Das Feuer von Funkenherz",
+ "dedication": null,
+ "artStyle": "watercolor",
+ "language": "de-ch",
+ "languageLevel": "1st-grade",
+ "layout": {
+  "mode": "square-below",
+  "imageAspect": "1:1",
+  "textInImage": false
+ },
+ "visualBible": {
+  "animals": [
+   {
+    "id": "ANI001",
+    "name": "Funkenherz",
+    "pages": [
+     -1,
+     1,
+     3,
+     4,
+     11,
+     12,
+     13,
+     15,
+     16,
+     17,
+     18
+    ],
+    "states": [
+     {
+      "id": "ANI001.1",
+      "held": null,
+      "name": "unaltered",
+      "delta": "vibrant red scales, a glowing golden scale set in her chest, warm shimmering air rising from her back",
+      "pages": [
+       -1,
+       1,
+       3
+      ],
+      "referenceImageData": null
+     },
+     {
+      "id": "ANI001.2",
+      "held": null,
+      "name": "cold",
+      "delta": "dull grey scales, a hollow empty depression on her chest, completely clear air above her back",
+      "pages": [
+       4,
+       11,
+       12,
+       13,
+       15,
+       16
+      ],
+      "referenceImageData": null
+     },
+     {
+      "id": "ANI001.3",
+      "held": null,
+      "name": "restored",
+      "delta": "vibrant red scales, warm shimmering air rising from her back, the glowing golden scale back in her chest",
+      "pages": [
+       17,
+       18
+      ],
+      "referenceImageData": null
+     }
+    ],
+    "species": "dragon",
+    "coloring": "red scales",
+    "features": "large golden eyes, rounded friendly snout, soft rounded body, no sharp teeth or spikes, long thick tail",
+    "cellGates": [
+     {
+      "at": "2026-09-27T20:33:15.192Z",
+      "ok": false,
+      "gate": "element_cell",
+      "cellId": "ANI001.1",
+      "reason": "The dragon is depicted as a baby, not an adult as described.",
+      "recheckOk": false,
+      "rerendered": true,
+      "recheckReason": "The dragon depicted is a baby, not an adult as described."
+     },
+     {
+      "at": "2026-09-27T20:33:15.192Z",
+      "ok": true,
+      "gate": "state_cells",
+      "cellId": "ANI001.1",
+      "reason": "The object is the same dragon in all three cells, with only the specified state changes applied.",
+      "recheckOk": false,
+      "rerendered": true,
+      "recheckReason": "The dragon's scales are red in the first and third images, but grey in the second image, indicating a color change not described in the prompt."
+     }
+    ],
+    "scaleClass": "twice-adult-height",
+    "description": "a fully grown adult dragon with adult body proportions. red scales. large golden eyes, rounded friendly snout, soft rounded body, no sharp teeth or spikes, long thick tail",
+    "appearsInPages": [
+     -1,
+     1,
+     3,
+     4,
+     11,
+     12,
+     13,
+     15,
+     16,
+     17,
+     18
+    ],
+    "referenceImageGenerated": true
+   }
+  ],
+  "clothing": [
+   {
+    "id": "CLO001",
+    "name": "red long-sleeve shirt",
+    "label": "red shirt",
+    "pages": [
+     1,
+     3,
+     5,
+     7,
+     12,
+     14,
+     18,
+     -1,
+     -2,
+     -3
+    ],
+    "wornBy": "Levin",
+    "howWorn": "top",
+    "scaleClass": null,
+    "description": "A red long-sleeve shirt with a round neckline",
+    "appearsInPages": [
+     1,
+     3,
+     5,
+     7,
+     12,
+     14,
+     18,
+     -1,
+     -2,
+     -3
+    ]
+   },
+   {
+    "id": "CLO002",
+    "name": "green corduroy trousers",
+    "label": "green trousers",
+    "pages": [
+     1,
+     3,
+     5,
+     7,
+     12,
+     14,
+     18,
+     -1,
+     -2,
+     -3
+    ],
+    "wornBy": "Levin",
+    "howWorn": "bottom",
+    "scaleClass": null,
+    "description": "green corduroy trousers with a straight leg",
+    "appearsInPages": [
+     1,
+     3,
+     5,
+     7,
+     12,
+     14,
+     18,
+     -1,
+     -2,
+     -3
+    ]
+   },
+   {
+    "id": "CLO003",
+    "name": "brown lace-up ankle boots",
+    "label": "brown laced boots",
+    "pages": [
+     1,
+     3,
+     5,
+     7,
+     12,
+     14,
+     18,
+     -1,
+     -2,
+     -3
+    ],
+    "wornBy": "Levin",
+    "howWorn": "footwear",
+    "scaleClass": null,
+    "description": "brown lace-up ankle boots",
+    "appearsInPages": [
+     1,
+     3,
+     5,
+     7,
+     12,
+     14,
+     18,
+     -1,
+     -2,
+     -3
+    ]
+   },
+   {
+    "id": "CLO004",
+    "name": "blue zip-up fleece jacket",
+    "label": "blue fleece jacket",
+    "pages": [
+     1,
+     6,
+     7,
+     9,
+     10,
+     16,
+     18,
+     -1,
+     -2,
+     -3
+    ],
+    "wornBy": "Julian",
+    "howWorn": "outer layer",
+    "scaleClass": null,
+    "description": "A blue zip-up fleece jacket — front zip running from hem to chin, two patch pockets at the hips",
+    "appearsInPages": [
+     1,
+     6,
+     7,
+     9,
+     10,
+     16,
+     18,
+     -1,
+     -2,
+     -3
+    ]
+   },
+   {
+    "id": "CLO005",
+    "name": "white long-sleeve top",
+    "label": "white top",
+    "pages": [
+     1,
+     6,
+     7,
+     9,
+     10,
+     16,
+     18,
+     -1,
+     -2,
+     -3
+    ],
+    "wornBy": "Julian",
+    "howWorn": "top",
+    "scaleClass": null,
+    "description": "a white long-sleeve top",
+    "appearsInPages": [
+     1,
+     6,
+     7,
+     9,
+     10,
+     16,
+     18,
+     -1,
+     -2,
+     -3
+    ]
+   },
+   {
+    "id": "CLO006",
+    "name": "grey knitted pull-on trousers",
+    "label": "grey trousers",
+    "pages": [
+     1,
+     6,
+     7,
+     9,
+     10,
+     16,
+     18,
+     -1,
+     -2,
+     -3
+    ],
+    "wornBy": "Julian",
+    "howWorn": "bottom",
+    "scaleClass": null,
+    "description": "grey knitted pull-on trousers with a ribbed waistband",
+    "appearsInPages": [
+     1,
+     6,
+     7,
+     9,
+     10,
+     16,
+     18,
+     -1,
+     -2,
+     -3
+    ]
+   },
+   {
+    "id": "CLO007",
+    "name": "blue rubber-soled ankle boots",
+    "label": "blue boots",
+    "pages": [
+     1,
+     6,
+     7,
+     9,
+     10,
+     16,
+     18,
+     -1,
+     -2,
+     -3
+    ],
+    "wornBy": "Julian",
+    "howWorn": "footwear",
+    "scaleClass": null,
+    "description": "blue rubber-soled ankle boots",
+    "appearsInPages": [
+     1,
+     6,
+     7,
+     9,
+     10,
+     16,
+     18,
+     -1,
+     -2,
+     -3
+    ]
+   },
+   {
+    "id": "CLO008",
+    "name": "yellow crew-neck sweatshirt",
+    "label": "yellow sweatshirt",
+    "pages": [
+     1,
+     7,
+     9,
+     10,
+     18,
+     -1,
+     -2,
+     -3
+    ],
+    "wornBy": "Max",
+    "howWorn": "top",
+    "scaleClass": null,
+    "description": "A yellow crew-neck sweatshirt with dropped shoulders",
+    "appearsInPages": [
+     1,
+     7,
+     9,
+     10,
+     18,
+     -1,
+     -2,
+     -3
+    ]
+   },
+   {
+    "id": "CLO009",
+    "name": "brown denim dungaree shorts",
+    "label": "brown dungarees",
+    "pages": [
+     1,
+     7,
+     9,
+     10,
+     18,
+     -1,
+     -2,
+     -3
+    ],
+    "wornBy": "Max",
+    "howWorn": "bottom",
+    "scaleClass": null,
+    "description": "brown denim dungaree shorts — square bib panel over the chest held by two adjustable shoulder straps with metal buckles, a single front chest pocket on the bib",
+    "appearsInPages": [
+     1,
+     7,
+     9,
+     10,
+     18,
+     -1,
+     -2,
+     -3
+    ]
+   },
+   {
+    "id": "CLO010",
+    "name": "white high-top canvas trainers",
+    "label": "white trainers",
+    "pages": [
+     1,
+     7,
+     9,
+     10,
+     18,
+     -1,
+     -2,
+     -3
+    ],
+    "wornBy": "Max",
+    "howWorn": "footwear",
+    "scaleClass": null,
+    "description": "white high-top canvas trainers",
+    "appearsInPages": [
+     1,
+     7,
+     9,
+     10,
+     18,
+     -1,
+     -2,
+     -3
+    ]
+   },
+   {
+    "id": "CLO011",
+    "name": "green hooded anorak",
+    "label": "green anorak",
+    "pages": [
+     1,
+     5,
+     7,
+     8,
+     10,
+     18,
+     -1,
+     -2,
+     -3
+    ],
+    "wornBy": "Kiaan",
+    "howWorn": "top",
+    "scaleClass": null,
+    "description": "A green hooded anorak with a front kangaroo pocket and a drawstring hood",
+    "appearsInPages": [
+     1,
+     5,
+     7,
+     8,
+     10,
+     18,
+     -1,
+     -2,
+     -3
+    ]
+   },
+   {
+    "id": "CLO012",
+    "name": "black elasticated-waist jogger trousers",
+    "label": "black joggers",
+    "pages": [
+     1,
+     5,
+     7,
+     8,
+     10,
+     18,
+     -1,
+     -2,
+     -3
+    ],
+    "wornBy": "Kiaan",
+    "howWorn": "bottom",
+    "scaleClass": null,
+    "description": "black elasticated-waist jogger trousers",
+    "appearsInPages": [
+     1,
+     5,
+     7,
+     8,
+     10,
+     18,
+     -1,
+     -2,
+     -3
+    ]
+   },
+   {
+    "id": "CLO013",
+    "name": "grey rubber-toe trainers",
+    "label": "grey trainers",
+    "pages": [
+     1,
+     5,
+     7,
+     8,
+     10,
+     18,
+     -1,
+     -2,
+     -3
+    ],
+    "wornAs": "Julian.footwear",
+    "wornBy": "Kiaan",
+    "howWorn": "footwear",
+    "scaleClass": null,
+    "description": "grey rubber-toe trainers",
+    "outfitVersion": {
+     "slot": "footwear",
+     "outfit": "A blue zip-up fleece jacket — front zip running from hem to chin, two patch pockets at the hips — worn over a white long-sleeve top, grey knitted pull-on trousers with a ribbed waistband, and grey rubber-toe trainers.",
+     "garment": "grey rubber-toe trainers",
+     "category": "standard",
+     "replaces": "and blue rubber-soled ankle boots",
+     "character": "Julian"
+    },
+    "appearsInPages": [
+     1,
+     5,
+     7,
+     8,
+     10,
+     18,
+     -1,
+     -2,
+     -3
+    ]
+   },
+   {
+    "id": "CLO014",
+    "name": "beige trench coat",
+    "label": "beige trench coat",
+    "pages": [
+     2,
+     7
+    ],
+    "wornBy": "Mama",
+    "howWorn": "outer layer",
+    "scaleClass": null,
+    "description": "A beige trench coat",
+    "appearsInPages": [
+     2,
+     7
+    ]
+   },
+   {
+    "id": "CLO015",
+    "name": "navy blue sweater",
+    "label": "navy sweater",
+    "pages": [
+     2,
+     7
+    ],
+    "wornBy": "Mama",
+    "howWorn": "top",
+    "scaleClass": null,
+    "description": "a navy blue sweater",
+    "appearsInPages": [
+     2,
+     7
+    ]
+   },
+   {
+    "id": "CLO016",
+    "name": "dark blue jeans",
+    "label": "dark blue jeans",
+    "pages": [
+     2,
+     7
+    ],
+    "wornBy": "Mama",
+    "howWorn": "bottom",
+    "scaleClass": null,
+    "description": "dark blue jeans",
+    "appearsInPages": [
+     2,
+     7
+    ]
+   },
+   {
+    "id": "CLO017",
+    "name": "brown leather ankle boots",
+    "label": "brown leather boots",
+    "pages": [
+     2,
+     7
+    ],
+    "wornBy": "Mama",
+    "howWorn": "footwear",
+    "scaleClass": null,
+    "description": "brown leather ankle boots",
+    "appearsInPages": [
+     2,
+     7
+    ]
+   }
+  ],
+  "vehicles": [
+   {
+    "id": "VEH001",
+    "name": "blue city tram",
+    "label": "tram",
+    "pages": [
+     6
+    ],
+    "scaleClass": "twice-adult-height",
+    "description": "a blue passenger tram cabin with large glass windows and grey interior details. Signature: large blue metal tram cabin",
+    "appearsInPages": [
+     6
+    ],
+    "colorAndDetails": "a blue passenger tram cabin with large glass windows and grey interior details",
+    "signatureElement": "large blue metal tram cabin"
+   }
+  ],
+  "artifacts": [
+   {
+    "id": "ART001",
+    "name": "golden heart-shaped scale",
+    "type": "artifact",
+    "label": "golden scale",
+    "pages": [
+     1,
+     3,
+     5,
+     6,
+     9,
+     10,
+     16
+    ],
+    "states": [
+     {
+      "id": "ART001.1",
+      "held": null,
+      "name": "unaltered",
+      "delta": "bright, intensely glowing golden surface",
+      "pages": [
+       1,
+       3,
+       5
+      ],
+      "referenceImageData": null
+     },
+     {
+      "id": "ART001.2",
+      "held": null,
+      "name": "cooling",
+      "delta": "dull golden surface, no longer glowing",
+      "pages": [
+       6,
+       9,
+       10,
+       16
+      ],
+      "referenceImageData": null
+     }
+    ],
+    "cellGates": [
+     {
+      "at": "2026-09-27T20:33:32.729Z",
+      "ok": false,
+      "gate": "element_cell",
+      "cellId": "ART001.1",
+      "reason": "The object is a heart-shaped watercolor painting, not a golden scale with a metallic surface.",
+      "recheckOk": false,
+      "rerendered": true,
+      "recheckReason": "The object is heart-shaped and golden, but it is clearly a heart shape and not a scale."
+     },
+     {
+      "at": "2026-09-27T20:33:32.729Z",
+      "ok": true,
+      "gate": "state_cells",
+      "cellId": "ART001.1",
+      "reason": "The object is a golden heart-shaped scale, differing only in its glow, as described.",
+      "recheckOk": false,
+      "rerendered": true,
+      "recheckReason": "The color of the heart-shaped object is different in the two images, with the first image showing a bright, glowing golden surface and the second image showing a duller, brown-toned surface."
+     }
+    ],
+    "scaleClass": "hand-sized",
+    "description": "a golden heart-shaped scale with a smooth, curved metallic surface and rounded edges",
+    "appearsInPages": [
+     1,
+     3,
+     5,
+     6,
+     9,
+     10,
+     16
+    ],
+    "referenceImageGenerated": true
+   }
+  ],
+  "locations": [
+   {
+    "id": "LOC001",
+    "name": "Grossmünster",
+    "label": "Grossmünster",
+    "pages": [
+     -1,
+     1,
+     3,
+     5
+    ],
+    "colors": "pale cream stone, grey paving",
+    "setting": "outdoor, church exterior",
+    "features": "twin romanesque towers, stone walls, paved square",
+    "vantages": [
+     {
+      "id": "LOC001.1",
+      "name": "wide square",
+      "shot": "wide",
+      "pages": [
+       1,
+       5
+      ],
+      "description": "The broad paved square beside the twin-towered romanesque minster, bright afternoon sunlight warming the pale stone walls and the flat grey flagstones, clear autumn sky above. The foreground and midground offer open stone paving.",
+      "landmarkPhoto": "1",
+      "emptyScenePrompt": "Wide shot. The broad paved square beside the twin-towered romanesque minster, bright afternoon sunlight warming the pale stone walls and the flat grey flagstones, clear autumn sky above. The foreground and midground offer open stone paving extending horizontally."
+     },
+     {
+      "id": "LOC001.2",
+      "name": "high angle pavement",
+      "shot": "high-angle",
+      "pages": [
+       3
+      ],
+      "description": "Looking steeply down at the flat grey paving stones at the base of the church's pale stone wall. A few dry brown autumn leaves lie scattered on the horizontal ground.",
+      "landmarkPhoto": "none",
+      "emptyScenePrompt": "High-angle shot. Looking steeply down at the flat grey paving stones at the base of the church's pale stone wall. A few dry brown autumn leaves lie scattered on the horizontal ground."
+     },
+     {
+      "id": "LOC001.3",
+      "name": "front cover",
+      "shot": "wide",
+      "pages": [
+       -1
+      ],
+      "description": "The broad paved square beside the twin-towered romanesque minster in the bright afternoon sun, the stone walls filling the lower midground. The top third of the frame is entirely clear, unbroken blue autumn sky.",
+      "landmarkPhoto": "1",
+      "emptyScenePrompt": "Wide shot. The broad paved square beside the twin-towered romanesque minster in the bright afternoon sun, the pale stone walls filling the lower midground. The top third of the frame is entirely clear, unbroken blue autumn sky."
+     },
+     {
+      "id": "LOC001.4",
+      "name": "inside cover",
+      "shot": "wide",
+      "pages": [],
+      "description": "The twin-towered romanesque minster stands in the sunny midground against a clear sky. The bottom fifth of the frame is entirely clear, smooth grey paving stones extending across the foreground.",
+      "landmarkPhoto": "1",
+      "emptyScenePrompt": "Wide shot. The twin-towered romanesque minster stands in the sunny midground against a clear sky. The bottom fifth of the frame is entirely clear, smooth grey paving stones extending horizontally across the foreground."
+     },
+     {
+      "id": "LOC001.5",
+      "name": "back cover",
+      "shot": "wide",
+      "pages": [],
+      "description": "The twin-towered romanesque minster stands in the sunny midground against a clear sky. The bottom tenth of the frame is entirely clear, smooth grey paving stones.",
+      "landmarkPhoto": "1",
+      "emptyScenePrompt": "Wide shot. The twin-towered romanesque minster stands in the sunny midground against a clear sky. The bottom tenth of the frame is entirely clear, smooth grey paving stones."
+     }
+    ],
+    "scaleClass": "landmark",
+    "description": "outdoor, church exterior. Colors: pale cream stone, grey paving. twin romanesque towers, stone walls, paved square. Signature: twin cream-colored church towers with pyramidal cupolas",
+    "photoSource": "wikimedia",
+    "landmarkQuery": "Grossmünster",
+    "photoVariants": [
+     {
+      "kind": "exterior",
+      "framing": "medium",
+      "vantage": "exterior",
+      "judgedView": "twin-towered romanesque minster with flags, lit warm in evening sun",
+      "photoScore": 85,
+      "attribution": "Wikimedia Commons",
+      "description": "[tower, green, day] Twin cream-colored church towers with pyramidal cupolas topped by Swiss flags and cross finials.",
+      "variantNumber": 1
+     },
+     {
+      "kind": "exterior",
+      "framing": "medium",
+      "vantage": "exterior",
+      "judgedView": "twin-towered romanesque minster with flags above the river",
+      "photoScore": 90,
+      "attribution": "Roland zh, CC BY-SA 3.0, via Wikimedia Commons",
+      "description": "[tower, green, day] Twin stone towers with ornamental cupolas and Swiss flags, viewed across waterfront from lower elevation.",
+      "variantNumber": 2
+     },
+     {
+      "kind": "exterior",
+      "framing": "medium",
+      "vantage": "exterior",
+      "judgedView": "twin-towered romanesque minster against blue sky",
+      "photoScore": 82,
+      "attribution": "Robert Scarth, CC BY-SA 2.0, via Wikimedia Commons",
+      "description": "[tower, green, day] Pair of stone church towers with distinctive architectural details, contemporary structures flanking at right.",
+      "variantNumber": 3
+     },
+     {
+      "kind": "interior",
+      "framing": "interior",
+      "vantage": "interior",
+      "judgedView": "romanesque crypt columns with the crowned Charlemagne statue",
+      "photoScore": 70,
+      "attribution": "Andrew Bossi, CC BY-SA 2.5, via Wikimedia Commons",
+      "description": "[interior, unclear, day] Interior nave with stone columns supporting ornate gilded ceiling; stone statue of Charlemagne above altar.",
+      "variantNumber": 4
+     }
+    ],
+    "appearsInPages": [
+     -1,
+     1,
+     3,
+     5
+    ],
+    "isRealLandmark": true,
+    "swissLandmarkId": 2384,
+    "photoAttribution": "Roland zh, CC BY-SA 3.0, via Wikimedia Commons",
+    "photoFetchStatus": "pending_lazy",
+    "signatureElement": "twin cream-colored church towers with pyramidal cupolas",
+    "isSwissPreIndexed": true,
+    "extractedDescription": "[tower, green, day] Twin stone towers with ornamental cupolas and Swiss flags, viewed across waterfront from lower elevation.",
+    "firstAppearanceAnalyzed": true
+   },
+   {
+    "id": "LOC002",
+    "name": "Wasserkirche",
+    "label": "Wasserkirche",
+    "pages": [
+     -3,
+     -2,
+     2,
+     4
+    ],
+    "colors": "cream stone, copper",
+    "setting": "outdoor, church exterior",
+    "features": "pointed limestone spire, stone quay",
+    "vantages": [
+     {
+      "id": "LOC002.1",
+      "name": "ultra-wide riverside",
+      "shot": "ultra-wide",
+      "pages": [
+       -3,
+       2
+      ],
+      "description": "The riverside gothic church with its tall pointed spire on the open paved Limmat quay, bright autumn afternoon sunlight.",
+      "landmarkPhoto": "2",
+      "emptyScenePrompt": "Ultra-wide shot. The riverside gothic church with its tall pointed spire standing on the open paved Limmat quay under bright autumn sunlight, the wide horizontal stone ground filling the foreground."
+     },
+     {
+      "id": "LOC002.2",
+      "name": "skyward wall",
+      "shot": "over-the-shoulder",
+      "pages": [
+       -2,
+       4
+      ],
+      "description": "Looking up past the pale stone wall of the gothic church toward the bright autumn sky.",
+      "landmarkPhoto": "none",
+      "emptyScenePrompt": "Over-the-shoulder shot. Looking up past the pale stone wall of the gothic church toward the clear, bright autumn sky."
+     }
+    ],
+    "scaleClass": "landmark",
+    "description": "outdoor, church exterior. Colors: cream stone, copper. pointed limestone spire, stone quay. Signature: tall pointed spire on a riverside church",
+    "photoSource": "wikimedia",
+    "landmarkQuery": "Wasserkirche",
+    "photoVariants": [
+     {
+      "kind": "exterior",
+      "framing": "medium",
+      "vantage": "exterior",
+      "judgedView": "gothic church with tall spire on a busy square with cyclists",
+      "photoScore": 75,
+      "attribution": "Ikiwaner, CC BY-SA 3.0, via Wikimedia Commons",
+      "description": "[whole, green, day] Wasserkirche church with pointed limestone spire and Helmhaus Renaissance building adjacent, street-level view showing cream facades and medieval church architecture.",
+      "variantNumber": 1
+     },
+     {
+      "kind": "exterior",
+      "framing": "medium",
+      "vantage": "exterior",
+      "judgedView": "riverside gothic church with arcaded house, clear sunlight",
+      "photoScore": 80,
+      "attribution": "Roland zh, CC BY-SA 3.0, via Wikimedia Commons",
+      "description": "[whole, green, day] Wasserkirche church exterior from Limmat waterfront with tall spire, stone masonry walls, Gothic windows, Helmhaus building alongside, urban Zurich setting.",
+      "variantNumber": 2
+     },
+     {
+      "kind": "exterior",
+      "framing": "medium",
+      "vantage": "exterior",
+      "judgedView": "gothic riverside church with white annexe on the Limmat quay",
+      "photoScore": 85,
+      "attribution": "Roland zh, CC BY-SA 3.0, via Wikimedia Commons",
+      "description": "[whole, green, day] Riverside view of Wasserkirche church and Helmhaus from Limmat river, showing cream facades, pointed spire with copper roof, Renaissance building with dormers.",
+      "variantNumber": 3
+     },
+     {
+      "kind": "interior",
+      "framing": "interior",
+      "vantage": "interior",
+      "judgedView": "vaulted church interior with tall stained-glass windows and rows of chairs",
+      "photoScore": 80,
+      "attribution": "Roland zh, CC BY-SA 3.0, via Wikimedia Commons",
+      "description": "[interior, unclear, day] Wasserkirche interior sanctuary showing ribbed Gothic vault ceiling, tall stained glass windows with geometric color patterns, modern black seating, bright daylit space.",
+      "variantNumber": 4
+     }
+    ],
+    "appearsInPages": [
+     -3,
+     -2,
+     2,
+     4
+    ],
+    "isRealLandmark": true,
+    "swissLandmarkId": 1613,
+    "photoAttribution": "Roland zh, CC BY-SA 3.0, via Wikimedia Commons",
+    "photoFetchStatus": "pending_lazy",
+    "signatureElement": "tall pointed spire on a riverside church",
+    "isSwissPreIndexed": true,
+    "extractedDescription": "[whole, green, day] Riverside view of Wasserkirche church and Helmhaus from Limmat river, showing cream facades, pointed spire with copper roof, Renaissance building with dormers.",
+    "firstAppearanceAnalyzed": true
+   },
+   {
+    "id": "LOC003",
+    "name": "tram interior",
+    "label": "tram interior",
+    "pages": [
+     6
+    ],
+    "colors": "grey, blue, yellow",
+    "setting": "indoor, vehicle",
+    "features": "grey seats, metal handrails, large windows",
+    "scaleClass": "twice-adult-height",
+    "description": "indoor, vehicle. Colors: grey, blue, yellow. grey seats, metal handrails, large windows. Signature: row of simple grey transit seats",
+    "landmarkQuery": null,
+    "appearsInPages": [
+     6
+    ],
+    "isRealLandmark": false,
+    "emptyScenePrompt": "Close-up shot. The interior of a tram cabin featuring a simple grey transit seat and yellow metal handrails. The floor is flat grey rubber, and calm light filters through the large windows.",
+    "signatureElement": "row of simple grey transit seats"
+   },
+   {
+    "id": "LOC004",
+    "name": "Zürich Zoologischer Garten",
+    "label": "Zürich Zoo",
+    "pages": [
+     7,
+     8,
+     9,
+     10
+    ],
+    "colors": "brown mud, green water, orange leaves",
+    "setting": "outdoor, zoo park",
+    "features": "shallow pond, muddy bank, paved path",
+    "vantages": [
+     {
+      "id": "LOC004.1",
+      "name": "wide pond",
+      "shot": "wide",
+      "pages": [
+       7
+      ],
+      "description": "A flat paved park path beside a shallow green pond, a flock of pink flamingos wading in the distant water. The muddy edge is covered in wet, brown autumn leaves.",
+      "landmarkPhoto": "1",
+      "emptyScenePrompt": "Wide shot. A flat paved park path runs horizontally beside a shallow green pond, a flock of pink flamingos wading in the distant water. The muddy edge in the foreground is covered in wet, brown autumn leaves."
+     },
+     {
+      "id": "LOC004.2",
+      "name": "close edge",
+      "shot": "close-up",
+      "pages": [
+       8
+      ],
+      "description": "The muddy edge of the pond, thickly covered in wet, brown autumn leaves. Soft afternoon light reflects on the shallow water just beyond the mud.",
+      "landmarkPhoto": "none",
+      "emptyScenePrompt": "Close-up shot. The muddy edge of the pond, thickly covered in wet, brown autumn leaves. Soft afternoon light reflects on the shallow water just beyond the horizontal mud."
+     },
+     {
+      "id": "LOC004.3",
+      "name": "medium edge",
+      "shot": "medium",
+      "pages": [
+       9,
+       10
+      ],
+      "description": "The muddy horizontal bank of the zoo pond, scattered with slippery wet autumn leaves, the shallow green water lying just behind it.",
+      "landmarkPhoto": "none",
+      "emptyScenePrompt": "Medium shot. The muddy horizontal bank of the zoo pond, scattered with slippery wet autumn leaves, the shallow green water lying horizontally just behind it."
+     }
+    ],
+    "scaleClass": "landmark",
+    "description": "outdoor, zoo park. Colors: brown mud, green water, orange leaves. shallow pond, muddy bank, paved path. Signature: shallow green pond surrounded by landscaped dirt",
+    "photoSource": "wikimedia",
+    "landmarkQuery": "Zürich Zoologischer Garten",
+    "photoVariants": [
+     {
+      "kind": "exterior",
+      "framing": "medium",
+      "vantage": "exterior",
+      "judgedView": "flock of pink flamingos wading in a zoo pond",
+      "photoScore": 80,
+      "attribution": "Photo by Armineaghayan, Wikimedia Commons",
+      "description": "[whole, green, day] Large flock of pink flamingos wading in shallow water pond; green landscaped park with trees in background.",
+      "variantNumber": 1
+     },
+     {
+      "kind": "interior",
+      "framing": "medium",
+      "vantage": "interior",
+      "judgedView": "dugout canoes on a green pond inside the zoo's jungle enclosure",
+      "photoScore": 55,
+      "attribution": "Yannick Bammert, CC BY 2.0, via Wikimedia Commons",
+      "description": "[detail, green, day] Recreational canoes and tropical vegetation in zoo setting; palm fronds and dense greenery frame the water sports area.",
+      "variantNumber": 2
+     }
+    ],
+    "appearsInPages": [
+     7,
+     8,
+     9,
+     10
+    ],
+    "isRealLandmark": true,
+    "swissLandmarkId": 1930,
+    "photoAttribution": "Photo by Armineaghayan, Wikimedia Commons",
+    "photoFetchStatus": "pending_lazy",
+    "signatureElement": "shallow green pond surrounded by landscaped dirt",
+    "isSwissPreIndexed": true,
+    "extractedDescription": "[whole, green, day] Large flock of pink flamingos wading in shallow water pond; green landscaped park with trees in background.",
+    "firstAppearanceAnalyzed": true
+   },
+   {
+    "id": "LOC005",
+    "name": "foggy woods",
+    "label": "foggy woods",
+    "pages": [
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18
+    ],
+    "colors": "white fog, brown leaves, dark trunks",
+    "setting": "outdoor, forest",
+    "features": "tall bare tree trunks, high metal wire fence, thick fog",
+    "vantages": [
+     {
+      "id": "LOC005.1",
+      "name": "wide woods",
+      "shot": "wide",
+      "pages": [
+       11,
+       18
+      ],
+      "description": "A dark autumn wood filled with thick, rolling white fog. The ground is flat and covered in a carpet of dry brown leaves.",
+      "landmarkPhoto": "none",
+      "emptyScenePrompt": "Wide shot. A dark autumn wood filled with thick, rolling white fog between tall bare trunks. The horizontal ground is covered in a carpet of dry brown leaves."
+     },
+     {
+      "id": "LOC005.2",
+      "name": "ots woods",
+      "shot": "over-the-shoulder",
+      "pages": [
+       12
+      ],
+      "description": "A misty clearing in the autumn woods. Thick white fog obscures the background, leaving only the flat leaf-covered ground visible in the foreground.",
+      "landmarkPhoto": "none",
+      "emptyScenePrompt": "Over-the-shoulder shot. A misty clearing in the autumn woods. Thick white fog obscures the background, leaving only the flat leaf-covered ground visible in the foreground."
+     },
+     {
+      "id": "LOC005.3",
+      "name": "wide fence",
+      "shot": "wide",
+      "pages": [
+       13
+      ],
+      "description": "A tall metal wire zoo fence cuts across the flat leaf-covered ground, vanishing upward into dense, opaque white fog.",
+      "landmarkPhoto": "none",
+      "emptyScenePrompt": "Wide shot. A tall metal wire zoo fence cuts across the flat leaf-covered ground, vanishing upward into dense, opaque white fog among bare tree trunks."
+     },
+     {
+      "id": "LOC005.4",
+      "name": "medium fence",
+      "shot": "medium",
+      "pages": [
+       14,
+       15
+      ],
+      "description": "Close against the high metal wire zoo fence rising from the leaf-strewn ground. Thick white fog hides everything on the other side.",
+      "landmarkPhoto": "none",
+      "emptyScenePrompt": "Medium shot. Close against the high metal wire zoo fence rising from the flat leaf-strewn ground. Thick white fog completely hides everything on the other side."
+     },
+     {
+      "id": "LOC005.5",
+      "name": "close woods",
+      "shot": "close-up",
+      "pages": [
+       16,
+       17
+      ],
+      "description": "Thick white fog rolling low over a carpet of brown autumn leaves.",
+      "landmarkPhoto": "none",
+      "emptyScenePrompt": "Close-up shot. Thick white fog rolling low over a horizontal carpet of brown autumn leaves."
+     }
+    ],
+    "scaleClass": "landmark",
+    "description": "outdoor, forest. Colors: white fog, brown leaves, dark trunks. tall bare tree trunks, high metal wire fence, thick fog. Signature: thick white mist between bare autumn tree trunks",
+    "landmarkQuery": null,
+    "appearsInPages": [
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18
+    ],
+    "isRealLandmark": false,
+    "signatureElement": "thick white mist between bare autumn tree trunks"
+   }
+  ],
+  "genericObjects": [],
+  "mainCharacters": [
+   {
+    "id": 1786902471660,
+    "age": "5",
+    "name": "Levin",
+    "gender": "male",
+    "physical": {
+     "face": "rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips",
+     "hair": "light blonde, wavy, short, tousled",
+     "build": "average",
+     "other": "none",
+     "glasses": "none",
+     "eyeColor": "green",
+     "skinTone": "light",
+     "hairColor": "light blonde",
+     "facialHair": "none",
+     "apparentAge": "preschooler",
+     "eyeColorHex": "#6A7B54",
+     "skinToneHex": "#F0D2BC",
+     "hairColorHex": "#D4B27C",
+     "detailedHairAnalysis": {
+      "type": "wavy",
+      "density": "full",
+      "parting": "none",
+      "styling": "tousled",
+      "texture": "fine",
+      "lengthTop": "short",
+      "bangsEndAt": "no bangs",
+      "salonLevel": 8,
+      "lengthSides": "same as top",
+      "baseColorHex": "#E8C690",
+      "highlightsHex": "none"
+     }
+    },
+    "referenceOutfit": null,
+    "generatedOutfits": {}
+   },
+   {
+    "id": 1786902747333,
+    "age": "3",
+    "name": "Julian",
+    "gender": "male",
+    "physical": {
+     "face": "rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips",
+     "hair": "light blonde, curly, ear-length",
+     "build": "average",
+     "other": "none",
+     "glasses": "none",
+     "eyeColor": "blue",
+     "skinTone": "light",
+     "hairColor": "light blonde",
+     "facialHair": "none",
+     "apparentAge": "toddler",
+     "eyeColorHex": "#6F9ECF",
+     "skinToneHex": "#E8BEAC",
+     "hairColorHex": "#DDC29E",
+     "detailedHairAnalysis": {
+      "type": "curly",
+      "parting": "none",
+      "styling": "natural",
+      "texture": "medium",
+      "lengthTop": "ear-length",
+      "bangsEndAt": "no bangs",
+      "lengthSides": "same as top",
+      "baseColorHex": "#DDC29E",
+      "highlightsHex": "none"
+     }
+    },
+    "referenceOutfit": null,
+    "generatedOutfits": {}
+   },
+   {
+    "id": 1786904058132,
+    "age": "3",
+    "name": "Max",
+    "gender": "male",
+    "physical": {
+     "face": "soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, medium lips",
+     "hair": "light brown, curly, short",
+     "build": "average",
+     "other": "none",
+     "glasses": "none",
+     "eyeColor": "brown",
+     "skinTone": "light",
+     "hairColor": "light brown",
+     "facialHair": "none",
+     "apparentAge": "preschooler",
+     "eyeColorHex": "#6B4423",
+     "skinToneHex": "#E8BEAC",
+     "hairColorHex": "#B58C5A",
+     "detailedHairAnalysis": {
+      "type": "curly",
+      "density": "full",
+      "parting": "none",
+      "styling": "natural",
+      "texture": "medium",
+      "lengthTop": "short",
+      "bangsEndAt": "no bangs",
+      "salonLevel": 6,
+      "lengthSides": "short",
+      "baseColorHex": "#A07E5B",
+      "highlightsHex": "none"
+     }
+    },
+    "referenceOutfit": null,
+    "generatedOutfits": {}
+   },
+   {
+    "id": 1786904387136,
+    "age": "3",
+    "name": "Kiaan",
+    "gender": "male",
+    "physical": {
+     "face": "soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, medium lips",
+     "hair": "dark brown, straight, short, bangs at eyebrows",
+     "build": "average",
+     "other": "none",
+     "glasses": "none",
+     "eyeColor": "brown",
+     "skinTone": "light",
+     "hairColor": "dark brown",
+     "facialHair": "none",
+     "apparentAge": "preschooler",
+     "eyeColorHex": "#4A2C1F",
+     "skinToneHex": "#E8BEAC",
+     "hairColorHex": "#3A251C",
+     "detailedHairAnalysis": {
+      "type": "straight",
+      "density": "full",
+      "parting": "none",
+      "styling": "natural",
+      "texture": "medium",
+      "lengthTop": "short",
+      "bangsEndAt": "at eyebrows",
+      "salonLevel": 4,
+      "lengthSides": "short",
+      "baseColorHex": "#5C4131",
+      "highlightsHex": "none"
+     }
+    },
+    "referenceOutfit": null,
+    "generatedOutfits": {}
+   }
+  ],
+  "secondaryCharacters": [
+   {
+    "id": "CHR001",
+    "age": 35,
+    "face": "green eyes, kind calm expression",
+    "hair": "dark brown, shoulder-length, tied in a low ponytail",
+    "name": "Mama",
+    "peer": "no",
+    "build": "a woman, average height and slim build",
+    "pages": [
+     2,
+     7
+    ],
+    "clothing": "A beige trench coat over a navy blue sweater and dark blue jeans, with brown leather ankle boots.",
+    "cellGates": [
+     {
+      "at": "2026-09-27T20:32:55.765Z",
+      "ok": true,
+      "gate": "character_cell",
+      "cellId": "CHR001",
+      "reason": "The figure matches the description in terms of clothing, age, sex, and art style, with visible brushstrokes and watercolor textures.",
+      "rerendered": false
+     }
+    ],
+    "scaleClass": "adult-height",
+    "description": "35. a woman, average height and slim build. hair: dark brown, shoulder-length, tied in a low ponytail. green eyes, kind calm expression. Signature: beige trench coat. Clothing: A beige trench coat over a navy blue sweater and dark blue jeans, with brown leather ankle boots.",
+    "signatureLook": "beige trench coat",
+    "appearsInPages": [
+     2,
+     7
+    ],
+    "referenceImageData": null,
+    "referenceImageGenerated": true
+   }
+  ]
+ },
+ "brief": "On the broad paved square beside the twin-towered romanesque minster in the bright afternoon sun, four boys and a huge red dragon stand together in a bright, welcoming group on the pale stone walls' lower midground, leaving the entire top third of the frame completely clear with unbroken blue autumn sky. The preschooler Levin—average build, short wavy light blonde hair, green eyes, wearing a red long-sleeve shirt, green corduroy trousers, and brown lace-up ankle boots—stands smiling on the left. Beside him is the toddler Julian—average build, curly ear-length light blonde hair, blue eyes, wearing a blue zip-up fleece jacket over a white long-sleeve top, grey pull-on trousers, and blue rubber-soled ankle boots. Next stands the preschooler Max—average build, short curly light brown hair, brown eyes, wearing a yellow crew-neck sweatshirt, brown denim dungaree shorts, and white high-top trainers. On the right stands the preschooler Kiaan—average build, short straight dark brown hair with bangs, brown eyes, wearing a green hooded anorak, black jogger trousers, and grey rubber-toe trainers. Funkenherz—the huge dragon with vibrant red scales, a glowing golden scale set in her chest, warm shimmering air rising from her back, and large golden eyes—stands proudly behind them. A few distant passers-by cross the far edge of the square.\n\n---METADATA---\n{\"sceneIntent\": \"Four boys and a huge red dragon stand together in a bright portrait on a paved square beside a pale stone church. The entire top third of the sky is left completely clear and open. A few distant passers-by cross the far edge. Bright afternoon sunlight washes the scene.\", \"characters\": [{\"name\": \"Levin\", \"clothing\": \"standard\", \"position\": \"left foreground\", \"depth\": \"foreground\", \"looksAt\": \"viewer\", \"expression\": \"broad wide smile, bright eyes, raised cheerful brows\", \"emotion\": \"happy\"}, {\"name\": \"Julian\", \"clothing\": \"standard\", \"position\": \"center left foreground\", \"depth\": \"foreground\", \"looksAt\": \"viewer\", \"expression\": \"wide happy smile, bright clear eyes, relaxed jaw\", \"emotion\": \"happy\"}, {\"name\": \"Max\", \"clothing\": \"standard\", \"position\": \"center right foreground\", \"depth\": \"foreground\", \"looksAt\": \"viewer\", \"expression\": \"warm smile, soft joyful eyes, calm brows\", \"emotion\": \"happy\"}, {\"name\": \"Kiaan\", \"clothing\": \"standard\", \"position\": \"right foreground\", \"depth\": \"foreground\", \"looksAt\": \"viewer\", \"expression\": \"big bright smile, wide eyes, relaxed face\", \"emotion\": \"happy\"}], \"shot\": \"wide\", \"population\": \"ambient\", \"era\": \"present day\", \"timeOfDay\": \"afternoon\", \"weather\": \"clear\", \"objects\": [\"LOC001.3\", \"ANI001\"], \"interactions\": [{\"character\": \"Levin + Julian + Max + Kiaan\", \"object\": \"LOC001.3\", \"where\": \"stand together on the open paving\", \"action\": \"standing\", \"hands\": false, \"storyRelevant\": true, \"priority\": \"essential\"}, {\"character\": \"ANI001\", \"object\": \"LOC001.3\", \"where\": \"stands proudly behind the boys\", \"action\": \"standing\", \"hands\": false, \"storyRelevant\": true, \"priority\": \"essential\"}], \"wornItems\": [{\"id\": \"CLO001\", \"owner\": \"Levin\", \"state\": \"worn\"}, {\"id\": \"CLO002\", \"owner\": \"Levin\", \"state\": \"worn\"}, {\"id\": \"CLO003\", \"owner\": \"Levin\", \"state\": \"worn\"}, {\"id\": \"CLO004\", \"owner\": \"Julian\", \"state\": \"worn\"}, {\"id\": \"CLO005\", \"owner\": \"Julian\", \"state\": \"worn\"}, {\"id\": \"CLO006\", \"owner\": \"Julian\", \"state\": \"worn\"}, {\"id\": \"CLO007\", \"owner\": \"Julian\", \"state\": \"worn\"}, {\"id\": \"CLO008\", \"owner\": \"Max\", \"state\": \"worn\"}, {\"id\": \"CLO009\", \"owner\": \"Max\", \"state\": \"worn\"}, {\"id\": \"CLO010\", \"owner\": \"Max\", \"state\": \"worn\"}, {\"id\": \"CLO011\", \"owner\": \"Kiaan\", \"state\": \"worn\"}, {\"id\": \"CLO012\", \"owner\": \"Kiaan\", \"state\": \"worn\"}, {\"id\": \"CLO013\", \"owner\": \"Kiaan\", \"state\": \"worn\"}]}",
+ "sceneCharacters": [
+  {
+   "id": 1786902471660,
+   "age": "5",
+   "name": "Levin",
+   "gender": "male",
+   "height": "110",
+   "photos": {},
+   "traits": {
+    "flaws": [
+     "Schüchtern",
+     "Unentschlossen",
+     "Leichtgläubig",
+     "Petze",
+     "Gesprächig",
+     "Vergesslich",
+     "Tollpatschig"
+    ],
+    "strengths": [
+     "Fröhlich",
+     "Freundlich",
+     "Hilfsbereit",
+     "Beschützend",
+     "Nachsichtig",
+     "Treu",
+     "Gerecht",
+     "Ehrlich",
+     "Vertrauenswürdig",
+     "Geduldig",
+     "Neugierig",
+     "Fantasievoll",
+     "Klug",
+     "Kreativ",
+     "Aufmerksam",
+     "Einfallsreich",
+     "Abenteuerlustig",
+     "Schnell",
+     "Stark",
+     "Fleissig",
+     "Leader",
+     "Mutig",
+     "Grosszügig",
+     "Selbstbewusst",
+     "Lustig"
+    ],
+    "challenges": [],
+    "specialDetails": "Lieb Dinosaurier und Drachen. Sein Bruder ist Julian und Max und Kiaan sind seine guten Freunde. Er kann gut Velofahren und Unihockey spielen"
+   },
+   "avatars": {
+    "stale": true,
+    "status": "complete",
+    "clothing": {
+     "summer": "white short-sleeved t-shirt, light brown shorts, dark sneakers",
+     "winter": "white hooded winter jacket, grey gloves, khaki snow pants, dark grey winter boots",
+     "standard": "white hooded sweatshirt, khaki pants, white sneakers"
+    },
+    "faceMatch": {
+     "summer": {
+      "lpips": null,
+      "score": 9,
+      "details": "Face Shape: 9/10 - Very similar oval face shape.\nForehead/Cheek/Jaw: 9/10 - Forehead height, cheekbone prominence, and jawline angle are consistent.\nEyes: 9/10 - Eye shape, spacing, and lid type are a good match.\nNose: 9/10 - Nose bridge profile, tip, and nostril shape are very similar.\nMouth: 9/10 - Lip thickness, width, and cupid's bow are consistent.\nOverall: 9/10 - The overall face geometry and structure are a very strong match to the reference.\nFinal Score: 9/10"
+     },
+     "winter": {
+      "lpips": null,
+      "score": 7,
+      "details": "Face Shape: 8/10 - Similar oval shape, but avatar's face is slightly rounder.\nForehead/Cheek/Jaw: 7/10 - Cheekbones appear less prominent in the avatar; jawline is softer.\nEyes: 9/10 - Same shape, spacing, and lid type.\nNose: 7/10 - Bridge profile is slightly different, and the tip is a bit rounder in the avatar.\nMouth: 8/10 - Lip thickness and width are similar, and cupid's bow matches.\nOverall: 8/10 - Overall facial proportions and structure are very similar.\nFinal Score: 7/10"
+     },
+     "standard": {
+      "lpips": null,
+      "score": 9,
+      "details": "Face Shape: 9/10 - Similar oval face shape.\nForehead/Cheek/Jaw: 9/10 - Consistent forehead height, cheekbone prominence, and jawline shape.\nEyes: 9/10 - Matching shape, spacing, and lid type.\nNose: 9/10 - Consistent bridge profile, tip, and nostril shape.\nMouth: 9/10 - Matching lip thickness, width, and cupid's bow.\nOverall: 9/10 - Strong resemblance in overall facial structure and proportions.\nFinal Score: 9/10"
+     }
+    },
+    "generatedAt": "2026-08-16T18:37:01.461Z",
+    "generationLog": {
+     "summer": {
+      "attempts": 1
+     },
+     "winter": {
+      "attempts": 1
+     },
+     "standard": {
+      "attempts": 1
+     }
+    },
+    "styledAvatars": {
+     "watercolor": {}
+    },
+    "generationRefs": {},
+    "extractedTraits": {
+     "build": "average",
+     "eyeColor": "green",
+     "skinTone": "light",
+     "hairColor": "blonde",
+     "facialHair": "none",
+     "apparentAge": "preschooler",
+     "eyeColorHex": "#6A7B54",
+     "skinToneHex": "#E8C1A8",
+     "hairColorHex": "#D4B27C",
+     "detailedHairAnalysis": {
+      "type": "curly",
+      "parting": "none",
+      "styling": "tousled",
+      "texture": "medium",
+      "lengthTop": "short",
+      "bangsEndAt": "at eyebrows",
+      "lengthSides": "short",
+      "baseColorHex": "#D4B27C",
+      "highlightsHex": "none"
+     }
+    },
+    "structuredClothing": {
+     "summer": {
+      "shoes": "dark sneakers",
+      "fullBody": null,
+      "lowerBody": "light brown shorts",
+      "upperBody": "white short-sleeved t-shirt"
+     },
+     "winter": {
+      "shoes": "dark grey winter boots",
+      "fullBody": null,
+      "lowerBody": "khaki snow pants",
+      "upperBody": "white hooded winter jacket, grey gloves"
+     },
+     "standard": {
+      "shoes": "white sneakers",
+      "fullBody": null,
+      "lowerBody": "khaki pants",
+      "upperBody": "white hooded sweatshirt"
+     }
+    }
+   },
+   "body_box": {
+    "x": 48.93333333333334,
+    "y": 14.933333333333335,
+    "width": 32.6,
+    "height": 70.4888888888889
+   },
+   "physical": {
+    "face": "rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips",
+    "build": "average",
+    "other": "none",
+    "glasses": "none",
+    "eyeColor": "green",
+    "skinTone": "light",
+    "hairColor": "light blonde",
+    "facialHair": "none",
+    "apparentAge": "preschooler",
+    "eyeColorHex": "#6A7B54",
+    "skinToneHex": "#F0D2BC",
+    "hairColorHex": "#D4B27C",
+    "detailedHairAnalysis": {
+     "type": "wavy",
+     "density": "full",
+     "parting": "none",
+     "styling": "tousled",
+     "texture": "fine",
+     "lengthTop": "short",
+     "bangsEndAt": "no bangs",
+     "salonLevel": 8,
+     "lengthSides": "same as top",
+     "baseColorHex": "#E8C690",
+     "highlightsHex": "none"
+    }
+   },
+   "ageCategory": "kindergartner",
+   "structuredClothing": {
+    "shoes": "black and white sneakers",
+    "fullBody": null,
+    "lowerBody": "dark blue jeans",
+    "upperBody": "yellow long-sleeve sweatshirt with a dinosaur graphic"
+   },
+   "physicalTraitsSource": {
+    "face": "extracted",
+    "build": "user",
+    "other": "extracted",
+    "height": "user",
+    "glasses": "extracted",
+    "eyeColor": "extracted",
+    "skinTone": "extracted",
+    "hairColor": "extracted",
+    "facialHair": "extracted",
+    "hairLength": "user",
+    "apparentAge": "user",
+    "eyeColorHex": "extracted",
+    "skinToneHex": "extracted",
+    "hairColorHex": "extracted"
+   }
+  },
+  {
+   "id": 1786902747333,
+   "age": "3",
+   "name": "Julian",
+   "gender": "male",
+   "height": "102",
+   "photos": {},
+   "traits": {
+    "flaws": [
+     "Schüchtern",
+     "Leichtgläubig",
+     "Unentschlossen",
+     "Tollpatschig",
+     "Ängstlich",
+     "Stur"
+    ],
+    "strengths": [
+     "Fröhlich",
+     "Freundlich",
+     "Hilfsbereit",
+     "Lustig",
+     "Nachsichtig",
+     "Beschützend",
+     "Treu",
+     "Grosszügig",
+     "Gerecht",
+     "Ehrlich",
+     "Vertrauenswürdig",
+     "Abenteuerlustig",
+     "Aufmerksam",
+     "Kreativ",
+     "Klug"
+    ],
+    "challenges": [],
+    "specialDetails": "Seine freunde: levin, julian, max. Er isst sehr gerne, liebt es mit seinem Bruder und seinen Freunden zu spielen, hat gerne Ballspiele"
+   },
+   "avatars": {
+    "stale": true,
+    "status": "complete",
+    "clothing": {
+     "summer": "white polo shirt with brown shoulders and blue and white horizontal stripes across the chest, light brown shorts, brown sandals",
+     "winter": "A hooded winter jacket with horizontal panels in shades of brown, light blue, and white, featuring a zipper closure., Khaki or light brown pants., Dark brown or black winter boots.",
+     "standard": "white-collared polo shirt with brown shoulders and light blue and white horizontal stripes, light brown khaki pants, gray sneakers with white soles"
+    },
+    "faceMatch": {
+     "summer": {
+      "lpips": null,
+      "score": 7,
+      "details": "Face Shape: 9/10 - Both have a similar oval/round face shape.\nForehead/Cheek/Jaw: 7/10 - The avatar's cheeks appear slightly less full and the jawline a bit more defined compared to the reference.\nEyes: 9/10 - Eye shape, spacing, and color are consistent.\nNose: 9/10 - Nose shape, bridge, and tip are very similar.\nMouth: 9/10 - Lip thickness, width, and overall mouth shape with a wide smile are consistent.\nOverall: 9/10 - The overall facial structure and proportions are a good match.\nFinal Score: 7/10"
+     },
+     "winter": {
+      "lpips": null,
+      "score": 8,
+      "details": "Face Shape: 8/10 - Similar round/oval shape, but avatar's face is slightly less round.\nForehead/Cheek/Jaw: 8/10 - Forehead and cheekbones are consistent; jawline is slightly softer in the avatar.\nEyes: 9/10 - Eye shape, spacing, and lid type are very consistent.\nNose: 9/10 - Nose bridge, tip, and nostril shape are very similar.\nMouth: 9/10 - Lip thickness, width, and cupid's bow are consistent with a wide smile.\nOverall: 9/10 - Overall facial proportions and structure are very similar.\nFinal Score: 8/10"
+     },
+     "standard": {
+      "lpips": null,
+      "score": 9,
+      "details": "Face Shape: 9/10 - Both have a similar round/oval face shape typical of a toddler.\nForehead/Cheek/Jaw: 9/10 - Consistent forehead height, cheekbone width, and jawline angle for a toddler.\nEyes: 9/10 - Eye shape, spacing, and lid type are consistent.\nNose: 9/10 - Nose bridge, tip, and nostril shape are consistent.\nMouth: 9/10 - Lip thickness, width, and cupid's bow are consistent, especially the wide open smile.\nOverall: 9/10 - The overall facial structure and proportions are very similar, indicating the same person.\nFinal Score: 9/10"
+     }
+    },
+    "generatedAt": "2026-08-16T18:37:18.768Z",
+    "generationLog": {
+     "summer": {
+      "attempts": 1
+     },
+     "winter": {
+      "attempts": 1
+     },
+     "standard": {
+      "attempts": 1
+     }
+    },
+    "styledAvatars": {
+     "watercolor": {}
+    },
+    "generationRefs": {},
+    "extractedTraits": {
+     "build": "average",
+     "eyeColor": "blue",
+     "skinTone": "light",
+     "hairColor": "light blonde",
+     "facialHair": "none",
+     "apparentAge": "toddler",
+     "eyeColorHex": "#6F9ECF",
+     "skinToneHex": "#E8BEAC",
+     "hairColorHex": "#DDC29E",
+     "detailedHairAnalysis": {
+      "type": "curly",
+      "parting": "none",
+      "styling": "natural",
+      "texture": "medium",
+      "lengthTop": "ear-length",
+      "bangsEndAt": "no bangs",
+      "lengthSides": "same as top",
+      "baseColorHex": "#DDC29E",
+      "highlightsHex": "none"
+     }
+    },
+    "structuredClothing": {
+     "summer": {
+      "shoes": "brown sandals",
+      "fullBody": null,
+      "lowerBody": "light brown shorts",
+      "upperBody": "white polo shirt with brown shoulders and blue and white horizontal stripes across the chest"
+     },
+     "winter": {
+      "shoes": "Dark brown or black winter boots.",
+      "fullBody": null,
+      "lowerBody": "Khaki or light brown pants.",
+      "upperBody": "A hooded winter jacket with horizontal panels in shades of brown, light blue, and white, featuring a zipper closure."
+     },
+     "standard": {
+      "shoes": "gray sneakers with white soles",
+      "fullBody": null,
+      "lowerBody": "light brown khaki pants",
+      "upperBody": "white-collared polo shirt with brown shoulders and light blue and white horizontal stripes"
+     }
+    }
+   },
+   "body_box": {
+    "x": 36.13333333333333,
+    "y": 10.755555555555556,
+    "width": 63.866666666666674,
+    "height": 80.71111111111111
+   },
+   "physical": {
+    "face": "rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips",
+    "build": "average",
+    "other": "none",
+    "glasses": "none",
+    "eyeColor": "blue",
+    "skinTone": "light",
+    "hairColor": "light blonde",
+    "facialHair": "none",
+    "apparentAge": "toddler",
+    "eyeColorHex": "#6F9ECF",
+    "skinToneHex": "#E8BEAC",
+    "hairColorHex": "#DDC29E",
+    "detailedHairAnalysis": {
+     "type": "curly",
+     "parting": "none",
+     "styling": "natural",
+     "texture": "medium",
+     "lengthTop": "ear-length",
+     "bangsEndAt": "no bangs",
+     "lengthSides": "same as top",
+     "baseColorHex": "#DDC29E",
+     "highlightsHex": "none"
+    }
+   },
+   "ageCategory": "preschooler",
+   "structuredClothing": {
+    "shoes": "gray sneakers with white soles",
+    "fullBody": null,
+    "lowerBody": "light brown khaki pants",
+    "upperBody": "white-collared polo shirt with brown shoulders and light blue and white horizontal stripes"
+   },
+   "physicalTraitsSource": {
+    "build": "extracted",
+    "height": "user",
+    "eyeColor": "extracted",
+    "skinTone": "extracted",
+    "hairColor": "extracted",
+    "facialHair": "extracted",
+    "apparentAge": "extracted",
+    "eyeColorHex": "extracted",
+    "skinToneHex": "extracted",
+    "hairColorHex": "extracted"
+   }
+  },
+  {
+   "id": 1786904058132,
+   "age": "3",
+   "name": "Max",
+   "gender": "male",
+   "height": "98",
+   "photos": {
+    "bodyBox": {
+     "x": 4.266666666666667,
+     "y": 14.933333333333335,
+     "width": 48.66666666666667,
+     "height": 82.84444444444445
+    },
+    "faceBox": {
+     "x": 15.25,
+     "y": 30,
+     "id": 1,
+     "width": 9.166666666666666,
+     "height": 16.444444444444446,
+     "confidence": 1
+    }
+   },
+   "traits": {
+    "flaws": [
+     "Gesprächig",
+     "Leichtgläubig"
+    ],
+    "strengths": [
+     "Fröhlich",
+     "Freundlich",
+     "Lustig",
+     "Ehrlich",
+     "Selbstbewusst",
+     "Mutig",
+     "Vertrauenswürdig",
+     "Entschlossen",
+     "Fleissig",
+     "Fantasievoll",
+     "Neugierig",
+     "Kreativ",
+     "Aufmerksam",
+     "Abenteuerlustig",
+     "Stark",
+     "Schnell"
+    ],
+    "challenges": [],
+    "specialDetails": "Spielt gerne mit seinen Freunden Kiaan, Levin, Max. Seine Hündin heisst Nia. Er spielt gerne Fussball und fährt gerne Velo"
+   },
+   "avatars": {
+    "status": "complete",
+    "clothing": {
+     "summer": "brown and off-white striped t-shirt, light brown shorts, brown sandals",
+     "winter": "brown and white striped hooded jacket, dark brown pants, dark brown gloves, dark brown boots",
+     "standard": "brown and white striped t-shirt, khaki pants, dark brown lace-up shoes"
+    },
+    "faceMatch": {
+     "summer": {
+      "lpips": null,
+      "score": 9,
+      "details": "Face Shape: 9/10 - Both have a similar oval/round face shape.\nForehead/Cheek/Jaw: 9/10 - Forehead, cheekbones, and jawline geometry are consistent.\nEyes: 9/10 - Eye shape, spacing, and lid type are consistent.\nNose: 9/10 - Nose bridge, tip, and nostril shape are consistent.\nMouth: 9/10 - Lip thickness, width, and cupid's bow are consistent.\nOverall: 9/10 - The overall facial structure and proportions are very similar.\nFinal Score: 9/10"
+     },
+     "winter": {
+      "lpips": null,
+      "score": 7,
+      "details": "Face Shape: 8/10 - Similar oval shape\nForehead/Cheek/Jaw: 7/10 - The avatar's cheekbones appear slightly less prominent and the jawline a bit softer compared to the reference.\nEyes: 9/10 - Eye shape, spacing, and lid type are consistent.\nNose: 9/10 - Nose bridge profile and tip are very similar.\nMouth: 9/10 - Lip thickness, width, and cupid's bow are consistent, especially with the wide smile.\nOverall: 9/10 - The overall facial proportions and structure are a strong match.\nFinal Score: 7/10"
+     },
+     "standard": {
+      "lpips": null,
+      "score": 9,
+      "details": "Face Shape: 9/10 - Consistent oval face shape.\nForehead/Cheek/Jaw: 9/10 - Forehead height, cheek prominence, and jawline are well-matched.\nEyes: 9/10 - Eye shape, spacing, and lid type are consistent.\nNose: 9/10 - Nose shape, bridge, and tip are accurately replicated.\nMouth: 9/10 - Lip thickness, width, and smile expression match well.\nOverall: 9/10 - The overall facial structure and proportions are a very strong match.\nFinal Score: 9/10"
+     }
+    },
+    "generatedAt": "2026-08-16T18:15:11.245Z",
+    "generationLog": {
+     "summer": {
+      "attempts": 1
+     },
+     "winter": {
+      "attempts": 1
+     },
+     "standard": {
+      "attempts": 1
+     }
+    },
+    "styledAvatars": {
+     "watercolor": {}
+    },
+    "generationRefs": {},
+    "extractedTraits": {
+     "face": "soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, medium lips",
+     "build": "average",
+     "other": "none",
+     "glasses": "none",
+     "eyeColor": "brown",
+     "skinTone": "light",
+     "hairColor": "light brown",
+     "facialHair": "none",
+     "apparentAge": "preschooler",
+     "eyeColorHex": "#6B4423",
+     "skinToneHex": "#E8BEAC",
+     "hairColorHex": "#B58C5A",
+     "detailedHairAnalysis": {
+      "type": "curly",
+      "density": "full",
+      "parting": "none",
+      "styling": "natural",
+      "texture": "medium",
+      "lengthTop": "short",
+      "bangsEndAt": "no bangs",
+      "salonLevel": 6,
+      "lengthSides": "short",
+      "baseColorHex": "#A07E5B",
+      "highlightsHex": "none"
+     }
+    },
+    "structuredClothing": {
+     "summer": {
+      "shoes": "brown sandals",
+      "fullBody": null,
+      "lowerBody": "light brown shorts",
+      "upperBody": "brown and off-white striped t-shirt"
+     },
+     "winter": {
+      "shoes": null,
+      "fullBody": "brown and white striped hooded jacket, dark brown pants, dark brown gloves, dark brown boots",
+      "lowerBody": null,
+      "upperBody": null
+     },
+     "standard": {
+      "shoes": "dark brown lace-up shoes",
+      "fullBody": null,
+      "lowerBody": "khaki pants",
+      "upperBody": "brown and white striped t-shirt"
+     }
+    }
+   },
+   "body_box": {
+    "x": 4.266666666666667,
+    "y": 14.933333333333335,
+    "width": 48.66666666666667,
+    "height": 82.84444444444445
+   },
+   "physical": {
+    "face": "soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, medium lips",
+    "build": "average",
+    "other": "none",
+    "glasses": "none",
+    "eyeColor": "brown",
+    "skinTone": "light",
+    "hairColor": "light brown",
+    "facialHair": "none",
+    "apparentAge": "preschooler",
+    "eyeColorHex": "#6B4423",
+    "skinToneHex": "#E8BEAC",
+    "hairColorHex": "#B58C5A",
+    "detailedHairAnalysis": {
+     "type": "curly",
+     "density": "full",
+     "parting": "none",
+     "styling": "natural",
+     "texture": "medium",
+     "lengthTop": "short",
+     "bangsEndAt": "no bangs",
+     "salonLevel": 6,
+     "lengthSides": "short",
+     "baseColorHex": "#A07E5B",
+     "highlightsHex": "none"
+    }
+   },
+   "ageCategory": "preschooler",
+   "structuredClothing": {
+    "shoes": "dark brown lace-up shoes",
+    "fullBody": null,
+    "lowerBody": "khaki pants",
+    "upperBody": "brown and white striped t-shirt"
+   },
+   "physicalTraitsSource": {
+    "height": "user"
+   }
+  },
+  {
+   "id": 1786904387136,
+   "age": "3",
+   "name": "Kiaan",
+   "gender": "male",
+   "height": "102",
+   "photos": {
+    "bodyBox": {
+     "x": 0,
+     "y": 63.58333333333332,
+     "width": 46.22222222222222,
+     "height": 36.41666666666667
+    },
+    "faceBox": {
+     "x": 24.666666666666668,
+     "y": 72.91666666666666,
+     "id": 1,
+     "width": 18.22222222222222,
+     "height": 18.666666666666668,
+     "confidence": 1
+    }
+   },
+   "traits": {
+    "flaws": [
+     "Vergesslich",
+     "Petze",
+     "Unentschlossen",
+     "Schüchtern"
+    ],
+    "strengths": [
+     "Fröhlich",
+     "Freundlich",
+     "Hilfsbereit",
+     "Lustig",
+     "Nachsichtig",
+     "Beschützend",
+     "Treu",
+     "Grosszügig",
+     "Gerecht",
+     "Ehrlich",
+     "Selbstbewusst",
+     "Vertrauenswürdig",
+     "Mutig",
+     "Geduldig",
+     "Fantasievoll",
+     "Neugierig",
+     "Klug",
+     "Kreativ",
+     "Aufmerksam",
+     "Abenteuerlustig"
+    ],
+    "challenges": [],
+    "specialDetails": "Spielt gerne mit Levin, Julian, Max. Liesst gerne oder spielt gerne Ball oder auf dem Spielplatz"
+   },
+   "avatars": {
+    "status": "complete",
+    "clothing": {
+     "summer": "gray and black camouflage short-sleeve t-shirt, light brown shorts, brown flip-flops",
+     "winter": "Gray and black camouflage hooded winter jacket with a zipper and snap buttons, Dark gray winter pants, Black winter boots",
+     "standard": "grey camouflage hoodie, dark blue jeans, grey sneakers"
+    },
+    "faceMatch": {
+     "summer": {
+      "lpips": null,
+      "score": 9,
+      "details": "Face Shape: 9/10 - Both have a similar oval/round face shape.\nForehead/Cheek/Jaw: 9/10 - Forehead height, cheekbone prominence, and jawline shape are consistent.\nEyes: 9/10 - Eye shape, spacing, and lid type are well-matched.\nNose: 9/10 - Nose bridge, tip, and nostril shape are very similar.\nMouth: 9/10 - Lip thickness, width, and cupid's bow are consistent.\nOverall: 9/10 - The overall facial structure and proportions strongly match the reference.\nFinal Score: 9/10"
+     },
+     "winter": {
+      "lpips": null,
+      "score": 9,
+      "details": "Face Shape: 9/10 - Both have a similar oval face shape.\nForehead/Cheek/Jaw: 9/10 - Forehead height, cheekbone prominence, and jawline shape are consistent.\nEyes: 9/10 - Eye shape, spacing, and lid type are very similar.\nNose: 9/10 - Nose bridge profile, tip, and nostril shape match well.\nMouth: 9/10 - Lip thickness, width, and cupid's bow are consistent.\nOverall: 9/10 - The overall facial structure and proportions are a strong match.\nFinal Score: 9/10"
+     },
+     "standard": {
+      "lpips": null,
+      "score": 9,
+      "details": "Face Shape: 9/10 - Both have a similar round/oval face shape.\nForehead/Cheek/Jaw: 9/10 - Forehead height, cheekbone width/prominence, and jawline angle are consistent.\nEyes: 9/10 - Eye shape, spacing, and lid type are very similar.\nNose: 9/10 - Nose bridge profile, tip, and nostril shape are very similar.\nMouth: 9/10 - Lip thickness, width, and cupid's bow are very similar, especially with the wide smile.\nOverall: 9/10 - The overall facial structure and proportions are a very good match.\nFinal Score: 9/10"
+     }
+    },
+    "generatedAt": "2026-08-16T18:21:19.817Z",
+    "generationLog": {
+     "summer": {
+      "attempts": 1
+     },
+     "winter": {
+      "attempts": 1
+     },
+     "standard": {
+      "attempts": 1
+     }
+    },
+    "styledAvatars": {
+     "watercolor": {}
+    },
+    "generationRefs": {},
+    "extractedTraits": {
+     "face": "soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, medium lips",
+     "build": "average",
+     "other": "none",
+     "glasses": "none",
+     "eyeColor": "brown",
+     "skinTone": "light",
+     "hairColor": "dark brown",
+     "facialHair": "none",
+     "apparentAge": "preschooler",
+     "eyeColorHex": "#4A2C1F",
+     "skinToneHex": "#E8BEAC",
+     "hairColorHex": "#3A251C",
+     "detailedHairAnalysis": {
+      "type": "straight",
+      "density": "full",
+      "parting": "none",
+      "styling": "natural",
+      "texture": "medium",
+      "lengthTop": "short",
+      "bangsEndAt": "at eyebrows",
+      "salonLevel": 4,
+      "lengthSides": "short",
+      "baseColorHex": "#5C4131",
+      "highlightsHex": "none"
+     }
+    },
+    "structuredClothing": {
+     "summer": {
+      "shoes": "brown flip-flops",
+      "fullBody": null,
+      "lowerBody": "light brown shorts",
+      "upperBody": "gray and black camouflage short-sleeve t-shirt"
+     },
+     "winter": {
+      "shoes": "Black winter boots",
+      "fullBody": null,
+      "lowerBody": "Dark gray winter pants",
+      "upperBody": "Gray and black camouflage hooded winter jacket with a zipper and snap buttons"
+     },
+     "standard": {
+      "shoes": "grey sneakers",
+      "fullBody": null,
+      "lowerBody": "dark blue jeans",
+      "upperBody": "grey camouflage hoodie"
+     }
+    }
+   },
+   "body_box": {
+    "x": 0,
+    "y": 63.58333333333332,
+    "width": 46.22222222222222,
+    "height": 36.41666666666667
+   },
+   "physical": {
+    "face": "soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, medium lips",
+    "build": "average",
+    "other": "none",
+    "glasses": "none",
+    "eyeColor": "brown",
+    "skinTone": "light",
+    "hairColor": "dark brown",
+    "facialHair": "none",
+    "apparentAge": "preschooler",
+    "eyeColorHex": "#4A2C1F",
+    "skinToneHex": "#E8BEAC",
+    "hairColorHex": "#3A251C",
+    "detailedHairAnalysis": {
+     "type": "straight",
+     "density": "full",
+     "parting": "none",
+     "styling": "natural",
+     "texture": "medium",
+     "lengthTop": "short",
+     "bangsEndAt": "at eyebrows",
+     "salonLevel": 4,
+     "lengthSides": "short",
+     "baseColorHex": "#5C4131",
+     "highlightsHex": "none"
+    }
+   },
+   "ageCategory": "preschooler",
+   "structuredClothing": {
+    "shoes": "grey sneakers",
+    "fullBody": null,
+    "lowerBody": "dark blue jeans",
+    "upperBody": "grey camouflage hoodie"
+   },
+   "physicalTraitsSource": {
+    "height": "user"
+   }
+  }
+ ],
+ "referencePhotos": [
+  {
+   "name": "Levin",
+   "id": 1786902471660,
+   "photoType": "styled-standard",
+   "photoHash": "b1591911",
+   "clothingCategory": "standard",
+   "requestedClothingCategory": "standard",
+   "clothingDescription": "A red long-sleeve shirt with a round neckline, green corduroy trousers with a straight leg, and brown lace-up ankle boots.",
+   "variantUrls": {
+    "face": null,
+    "body": null
+   },
+   "hasPhoto": true
+  },
+  {
+   "name": "Julian",
+   "id": 1786902747333,
+   "photoType": "styled-standard",
+   "photoHash": "666f7b01",
+   "clothingCategory": "standard",
+   "requestedClothingCategory": "standard",
+   "clothingDescription": "A blue zip-up fleece jacket — front zip running from hem to chin, two patch pockets at the hips — worn over a white long-sleeve top, grey knitted pull-on trousers with a ribbed waistband, and blue rubber-soled ankle boots.",
+   "variantUrls": {
+    "face": null,
+    "body": null
+   },
+   "hasPhoto": true
+  },
+  {
+   "name": "Max",
+   "id": 1786904058132,
+   "photoType": "styled-standard",
+   "photoHash": "27041cb9",
+   "clothingCategory": "standard",
+   "requestedClothingCategory": "standard",
+   "clothingDescription": "A yellow crew-neck sweatshirt with dropped shoulders, brown denim dungaree shorts — square bib panel over the chest held by two adjustable shoulder straps with metal buckles, a single front chest pocket on the bib — worn over the sweatshirt, and white high-top canvas trainers.",
+   "variantUrls": {
+    "face": null,
+    "body": null
+   },
+   "hasPhoto": true
+  },
+  {
+   "name": "Kiaan",
+   "id": 1786904387136,
+   "photoType": "styled-standard",
+   "photoHash": "7d11b858",
+   "clothingCategory": "standard",
+   "requestedClothingCategory": "standard",
+   "clothingDescription": "A green hooded anorak with a front kangaroo pocket and a drawstring hood, black elasticated-waist jogger trousers, and grey rubber-toe trainers.",
+   "variantUrls": {
+    "face": null,
+    "body": null
+   },
+   "hasPhoto": true
+  }
+ ],
+ "vbRefElementIds": [
+  "ANI001"
+ ]
+}

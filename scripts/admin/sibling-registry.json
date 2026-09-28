@@ -907,7 +907,7 @@
     {
       "id": "cover-page-render-baked-title",
       "axis": "full-story cover first render (shared page-render builder) vs full-story cover iterate",
-      "reason": "The REQUIRED TEXT tail of a baked-title cover (withBakedTitle) is appended by pageRenderCall.makePageImagePrompt on the first render (story run Phase 5a and the Test Lab image stage) and by images.js iteratePageCore on every iterate/repair. A cover that gets the tail on one path only renders its title the first time and loses it after a repair, or the reverse.",
+      "reason": "The REQUIRED TEXT tail of a baked-title cover (withBakedTitle) is appended by pageRenderCall.makePageImagePrompt on the first render (story run Phase 5a and the Test Lab image stage) and, since 2026-09-28, iteratePageCore (images.js) builds its prompt through that same closure instead of calling buildImagePrompt + withBakedTitle itself — the anchor is the shared call. A cover that gets the tail on one path only renders its title the first time and loses it after a repair, or the reverse.",
       "members": [
         "server/lib/pageRenderCall.js",
         "server/lib/images.js"
@@ -915,7 +915,7 @@
       "severity": "block",
       "parity": {
         "anchors": [
-          "withBakedTitle"
+          "makePageImagePrompt"
         ]
       }
     },
@@ -1025,6 +1025,23 @@
       "parity": {
         "anchors": [
           "buildCharFixCall"
+        ]
+      }
+    },
+    {
+      "id": "page-prompt-one-construction",
+      "axis": "first render (story run) vs cover page vs iterate/repair vs Test Lab image stage",
+      "members": [
+        "storyJobPipeline.js",
+        "server/lib/images.js",
+        "server/lib/testlab.js",
+        "server/lib/pageRenderCall.js"
+      ],
+      "severity": "block",
+      "reason": "Every page and full-story cover image prompt is built by ONE closure, pageRenderCall.makePageImagePrompt (buildImagePrompt + the Grok VB-prose skip + a cover's baked-title tail). The story run (Phase 5a), the Test Lab image stage and, since 2026-09-28, iteratePageCore (every iterate/repair and the cover iterate) call it. The fixed blocks of that prompt are never cut, so a copy of the construction on one path drifts in size as well as wording: staging job_1790539784661_6mjcny1c7 lost its front cover and a p18 repair to prompt_fit_failed after the page compaction (docs/decisions.md 2026-09-28). A path that builds a page prompt another way joins this set or is deleted.",
+      "parity": {
+        "anchors": [
+          "makePageImagePrompt"
         ]
       }
     }

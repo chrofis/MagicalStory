@@ -4368,7 +4368,6 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   const {
     getPageText,
     buildSceneDescriptionPrompt,
-    buildImagePrompt,
     getCharacterPhotoDetails,
     buildAvailableAvatarsForPrompt,
     extractSceneMetadata,
@@ -5360,16 +5359,20 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // The iterate output is prose + ---METADATA--- + JSON (same shape as initial
   // expansion). buildImagePrompt's prose branch strips the metadata block and
   // uses only the prose for the image prompt — no JSON-scene extraction needed.
-  let imagePrompt = buildImagePrompt(newSceneDescription, storyData, sceneCharacters, visualBible, pageNumber, referencePhotos, {
-    imageBackend: iterateImageBackend,
-    textPositionOverride: lockedTextPosition,
-    // Grid is already built above — pass exactly the elements it contains so
-    // the REQUIRED OBJECTS checklist can point at the attached references.
-    vbRefElementIds: (visualBibleGrid?.rawElements || []).map(e => e.id).filter(Boolean),
-  });
-  // A baked front cover's REQUIRED TEXT block, at the prompt's absolute end —
-  // the same tail the generation path appends.
-  if (coverOpts?.bakeTitle) imagePrompt = getStoryHelpers().withBakedTitle(imagePrompt, coverOpts.bakeTitle);
+  //
+  // ONE PROMPT CONSTRUCTION (2026-09-28): the repair builds its prompt through
+  // the same closure the first render and the Lab use (pageRenderCall
+  // .makePageImagePrompt) — the Grok VB-prose skip and a cover's baked title
+  // included. It called buildImagePrompt itself until this date, without the
+  // skip, so a Grok repair could carry a Visual Bible block the first render
+  // never sent (staging job_1790539784661_6mjcny1c7 p18's repair missed the cap).
+  // Grid is already built above — pass exactly the elements it contains so the
+  // REQUIRED OBJECTS checklist can point at the attached references.
+  let imagePrompt = require('./pageRenderCall').makePageImagePrompt({
+    sceneDescription: newSceneDescription, inputData: storyData, sceneCharacters, visualBible, pageNumber,
+    characterPhotos: referencePhotos, pageImageModel: imageModelOverride, coverOpts,
+    extraOptions: { imageBackend: iterateImageBackend, textPositionOverride: lockedTextPosition },
+  })((visualBibleGrid?.rawElements || []).map(e => e.id).filter(Boolean));
 
   // Eval feedback was already routed to Claude via previewFeedback.fixIssues
   // (see Step 2 above). The image API gets a prose-only prompt — it cannot

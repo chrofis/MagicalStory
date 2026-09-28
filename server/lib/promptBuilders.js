@@ -822,7 +822,9 @@ function buildTextZoneInstruction(textPosition, textZoneDescription, areaPct, op
   const surface = textZoneDescription && String(textZoneDescription).trim()
     ? String(textZoneDescription).trim()
     : 'an uninterrupted expanse of the surrounding scene material (sky, wall, water, foliage, or ground)';
-  let body = `**COMPOSITION — OPEN AREA:** In the ${corner} of the image (roughly ${areaPct}) the scene continues as ${surface}, the same paint carrying through it with no edge, band or panel where it meets the rest of the picture. Keep character heads, faces, and high-contrast detail (hats, embroidery, patterns, weapon edges) out of this area — figures belong ${displacement}.`;
+  // Terse (2026-09-28): it rides the never-cut tail of every text-in-image page
+  // and cover. Same content words, still no flatness vocabulary (see above).
+  let body = `**COMPOSITION — OPEN AREA:** The ${corner} (roughly ${areaPct}) continues the scene as ${surface}, in the same paint, with no edge, band or panel. Keep heads, faces and high-contrast detail (hats, embroidery, patterns, weapon edges) out of it — figures belong ${displacement}.`;
   if (isEmptyScene) {
     body += ' If a layout reference image is attached, the slightly darker grey region marks this area.';
   }
@@ -2787,7 +2789,9 @@ function withBakedTitle(prompt, bakedTitle) {
 // job_1788802404497_i1mm4yn6h) — the margin is stated as a FRACTION because
 // the raster size varies by book format.
 function bakedTitleLine(title) {
-  return `Paint "${title}" in the upper third of the canvas as three-dimensional letters that sit as physical objects in the scene, catching its lighting and shadows. Hand-crafted lettering in the story's own materials, never a standard computer font. It is the only text in the image, painted on the illustration itself, never in a band, strip or caption area. Every letter, accent and descender stays at least 8% of the canvas width clear of the left and right edges. A long title breaks onto more lines rather than reaching that margin.`;
+  // Terse (2026-09-28): the REQUIRED TEXT block is never cut, and the front
+  // cover of staging job_1790539784661_6mjcny1c7 missed Grok's cap by 478 chars.
+  return `Paint "${title}" in the upper third of the canvas as three-dimensional letters standing in the scene as physical objects, lit and shadowed by it, hand-crafted from the story's own materials, never a computer font. It is the only text in the image, painted into the illustration, never in a band, strip or caption area. Every letter, accent and descender stays at least 8% of the canvas width from the left and right edges; a long title breaks onto more lines instead.`;
 }
 
 function buildReferenceCardColours(chars, referencePhotos) {
@@ -4941,7 +4945,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       // de/fr variants. (The localized headers also broke the downstream
       // parseVisualBibleObjects, which matches /REQUIRED OBJECTS/ to build
       // the expected-objects list for eval/bbox.)
-      const header = '**REQUIRED OBJECTS IN THIS SCENE (each appears exactly as the scene description places it):**';
+      const header = '**REQUIRED OBJECTS IN THIS SCENE (each where the scene description places it):**';
 
       // Skip location entries — the location is either visually attached
       // as the empty-scene / vantage backdrop reference image OR named in
@@ -5832,7 +5836,7 @@ function buildExactPosesBlock(interactions, sceneCharacters = [], visualBible = 
   const exprBlock = exprLines.length > 0
     // Each line names its own gaze and the viewer rule, so the header does not
     // repeat them (2026-09-27, owner: "shorten the fixed blocks").
-    ? `EXPRESSIONS AND EYES (each face shows exactly this, no default smiles; a face turned away shows its expression in profile or three-quarter view):\n${exprLines.join('\n')}`
+    ? `EXPRESSIONS AND EYES (exactly these, no default smiles; a face turned away shows its expression in profile or three-quarter view):\n${exprLines.join('\n')}`
     : '';
 
   if (lines.length === 0 && !exprBlock) return '';
@@ -9025,7 +9029,7 @@ function buildCompositionBlock({ cover = false } = {}) {
 
 // MARKINGS DO NOT MULTIPLY WITH THE OBJECT — emitted in REQUIRED OBJECTS only
 // when a listed element has declared states (see the emission site).
-const SPLIT_STATE_MARKINGS_RULE = 'A state that divides, opens or breaks an object does not multiply its markings: a device, emblem or pattern on the surface is one marking, and the split runs through it — each part shows only its share.';
+const SPLIT_STATE_MARKINGS_RULE = 'Dividing, opening or breaking an object never multiplies its markings: a device, emblem or pattern stays one marking, the split runs through it, and each part shows only its share.';
 
 /**
  * COUNTING — one string for both Art Director templates (owner, 2026-09-15:

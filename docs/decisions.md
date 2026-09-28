@@ -65110,3 +65110,43 @@ step to cover the 97 chars the phantom cut used to report: staging 1790107559778
 **Touched:** server/lib/images.js (PROMPT_CUT_ORDER, PROMPT_NEVER_CUT), docs synced by
 scripts/admin/sync-prompt-cut-order-docs.js, tests/unit/page-prompt-fixed-blocks-fit.test.ts,
 tests/unit/prompt-says-each-thing-once.test.ts, tasks/bugs.json.
+
+## 2026-09-28 — The cover's own fixed blocks are compact too, and the repair builds its prompt through the shared closure
+
+**Context:** staging dragon run job_1790539784661_6mjcny1c7 (build 15489e69, after the page
+compaction) shipped with NO front cover: page -1 hit `prompt_fit_failed` twice, 8,378 chars after
+every allowed cut (scene 3,620 + must-keep 4,758) against Grok's 7,900. The cover renders through the
+page builder, so the page compaction had reached it; the overshoot was in blocks a page does not
+carry or rarely fills: the baked-title line (564), the copy-space OPEN AREA (448), and a WORN ITEMS
+block of 1,344 chars listing whole outfits — one "X IS wearing this on this page:" prefix per garment,
+six garment names said twice ("red long-sleeve shirt — A red long-sleeve shirt with …"). Bug
+`front-cover-over-grok-cap-after-compaction`. A p18 repair of the same run also failed
+(8,618 = scene 4,707 + must-keep 3,911).
+
+**Decision (same rules: no scene content cut, no element cap, no budget raise, no truncation):**
+- WORN ITEMS: plain worn rows of one character share one line ("X IS wearing these on this page:
+  A; B; C."), and a description that opens with the item's own name keeps only its remainder.
+  Handover and off rows keep one line each. Header: "(these win over the attached references)".
+- Baked title line, COMPOSITION — OPEN AREA (no flatness words added — 2026-08-21), EXPRESSIONS AND
+  EYES and REQUIRED OBJECTS headers, the split-state markings rule: terser, same instruction.
+- ONE CONSTRUCTION: `iteratePageCore` (every iterate/repair and the full-story cover iterate) builds
+  its prompt through `pageRenderCall.makePageImagePrompt` — the same closure as the story run and the
+  Lab — instead of its own buildImagePrompt + withBakedTitle call, which lacked the Grok VB-prose skip.
+  (On the 213 stored staging briefs the skip changes nothing — every one has REQUIRED OBJECTS — so this
+  is parity, not the size fix.) New sibling set `page-prompt-one-construction`.
+
+**Evidence:** dragon front cover, rebuilt byte-exact from `sceneReviewReport.pages[-1].after`: floor
+8,378 → **7,685** (margin 215). Replay over the 14 latest staging stories (214 pages, 18 stored covers,
+production builder): 0 fit failures; worst page floor 7,872 → 7,470 (margin 430); worst stored cover
+6,786; no prompt got longer (saved 0-596, median 67).
+
+**Not fixed — the p18 repair:** its rewritten brief was not stored (the render failed before any
+version was written), so it cannot be replayed. The same page's first-render prompt saves 542 chars
+under this change; applied to the failed 8,618 that is ~8,080, still over. The rewrite's scene
+(4,707) is ~1.1k longer than any stored brief of that page. Open: BACKLOG.
+
+**Touched:** server/lib/wornItems.js (wornItemClause, buildWornStateLines grouping, WORN_ITEMS_HEADER),
+server/lib/promptBuilders.js (bakedTitleLine, buildTextZoneInstruction, headers,
+SPLIT_STATE_MARKINGS_RULE), server/lib/images.js (iteratePageCore), server/lib/pageRenderCall.js
+(doc), scripts/admin/sibling-registry.json, tests/unit/cover-prompt-fixed-blocks-fit.test.ts
+(+ fixture), tests/unit/cover-title-trim-margin.test.ts.
