@@ -25,11 +25,26 @@ Built (see decisions.md 2026-09-28 "Jev first, then no scene review"):
       `no-output-caps` failure (BACKLOG).
 - [x] decisions.md entry, SETTLED factual refresh (lines 46, 66, 67), prompt-inventory, verify
       entry `jev-first-briefs`, BACKLOG ticks.
-- [ ] NOT DONE, waits for Q9: delete `runSceneReview`, `scene-review.txt`, the review prompt builder,
-      `sceneReviewModel`, the `scene_review_replay` Lab stage, the review sibling sets; re-point the six
-      verify entries that name the review.
-- [ ] NOT DONE, waits for the Q9 report: rung 2 (Lab `beats_scenes` on the dragon book, to images, cap
-      CHF 1.00).
+- [x] (2026-09-28, after the owner's Q9 answer) Five review checks + a required-text check are code
+      checks feeding the re-ask (results below); the review is deleted — `runSceneReview`,
+      `scene-review.txt`, the builder, `sceneReviewModel`, the `scene_review_replay` Lab stage, the review
+      sibling sets; the six verify entries superseded. docs/decisions.md "The scene review is deleted".
+- [ ] OPEN: rung 2 (Lab `beats_scenes` on the dragon book, to images, cap CHF 1.00) — stopped for the
+      owner before the run, with the Lab image-stage bible-id mismatch proposal.
+
+## Q9 checks — precision replay before wiring (2026-09-28, 251 stored pre-review briefs, 15 stories)
+
+`scripts/analysis/replay-jev-first-briefs.js newchecks`:
+- `negation_named` 23 fires / 23 pages — all name an absence (1 non-visual); 4 copy the creature-tone
+  rule's "no teeth showing" (owner call in BACKLOG).
+- `element_uncited` 12 fires — 6 of 10 judged true (worn garments excluded: 29 → 12).
+- `character_fields` 7 fires / 6 pages — all mood words on a readable face (faceless shots exempt).
+- `cast_not_in_plan` 17 fires on the who column, ~13 true; production reads the head count
+  (`beat.inFrame`), which resolves the collective who columns behind the false ones.
+- `clothing_incomplete` 21 fires / 15 pages, ~17 true (any garment of the slot counts; close-up = top).
+- `required_text_undeclared`: quote heuristic 0 recall (21 false fires on cover lines) → Jev READ noul
+  on 674 stored plan lines (staging + prod, $0.065): 7 flagged, all reading pages; the check fires on 5
+  of them (no cited element declares text), passes the 2 that declare it.
 
 ## Rung 1 results (2026-09-28, `scripts/analysis/replay-jev-first-briefs.js`)
 

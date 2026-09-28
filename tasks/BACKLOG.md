@@ -681,7 +681,7 @@ Run verifications now live in **`tasks/verify.json`** (judge a stored run: `node
 
 ### Failed on a stored run — registry triage 2026-09-27 (evidence in each entry's `evidence[]`)
 - [ ] `ots-crop-no-contact` + `plan-check-ots-contact`: an over-the-shoulder page still ships a near figure with a `hands:true` interaction — z3fw660ie p12 (Facundo grips the rope; the PLAN line only said "bracing at the rail", the Art Director added the grip, so plan-check Q14 had nothing to flag) and 5herh01j7 p12 (Kiaan presses his ear to the egg) → `tasks/verify.json` ots-crop-no-contact
-- [ ] `facing-per-character-remeasure`: riqncqg1i p6 — the scene review flagged `facing_not_per_character` and rewrote the page, but the prose still gives Max and Kiaan one collective facing ("each seen from behind") → `tasks/verify.json` facing-per-character-remeasure
+- [x] (superseded 2026-09-28, the scene review is deleted; `facing_not_per_character` is a lost critic listed under the Jev-first block) `facing-per-character-remeasure`: riqncqg1i p6 — the scene review flagged `facing_not_per_character` and rewrote the page, but the prose still gives Max and Kiaan one collective facing ("each seen from behind") → `tasks/verify.json` facing-per-character-remeasure
 - [ ] `text-style-rulebook`: vnx5l8iy7 p12 ships the stacked-negation set-piece "kein Laut mehr zu hören, kein Flügelschlag, kein Rufen" (the rulebook's "no paired negations"); owner may rule a triple acceptable → `tasks/verify.json` text-style-rulebook
 - [ ] `trial-sheet-season`: prod trial m9pp92go3 (autumn) — the standard sheet's head row wears a sleeveless top over bare arms while its body row wears a cardigan; the costumed sheet has a bare-chested infant in head cell 1 → `tasks/verify.json` trial-sheet-season
 - [ ] `age-band-1`: prod trial m9pp92go3 — the age-0-1 ROUTINE BOOK story turns the costume into a detective mission across all 6 pages, and the one-year-old is drawn as a walking toddler of ~2-3 (sheet prompt says "not yet walking"); pbxibjv0r fits the band → `tasks/verify.json` age-band-1
@@ -719,7 +719,7 @@ Run verifications now live in **`tasks/verify.json`** (judge a stored run: `node
       is false on 8/10 pages although the brief could withdraw its citations; round 2 ADDED ids on dragon p12/13/16.
       Decide: count only one side, or make the AD cite from the trimmed claims. → `docs/decisions.md` 2026-09-08 "Art Director second pass"
       **2026-09-11: the 5/5 was measured on the UNTRIMMED bible — the trim never reached the stored outline (fixed, docs/decisions.md 2026-09-11 "Visual Bible trim was never persisted"). Re-measure the union count on a post-fix story before deciding.**
-- [ ] (registry: `tasks/verify.json` facing-per-character-remeasure) **`facing_not_per_character` fixes are partial on crowded pages** — dragon p18 (Max, Kiaan) and pirate p16 (three
+- [x] (superseded 2026-09-28 with the scene review) (registry: `tasks/verify.json` facing-per-character-remeasure) **`facing_not_per_character` fixes are partial on crowded pages** — dragon p18 (Max, Kiaan) and pirate p16 (three
       background figures) still had no facing clause after the reviewer's own rewrite. Re-measure on the next two
       stories before touching the check. → `docs/decisions.md` 2026-09-08 "Art Director second pass"
 - [ ] Run a full trial on staging as admin; query `trial_events` for the complete ordered row
@@ -775,7 +775,7 @@ Run verifications now live in **`tasks/verify.json`** (judge a stored run: `node
 - [ ] FAILED verify idea-pick-recorded on job_1790508305061_dka3jpog9 (pulled 2026-09-27 by verify-run --pull; not investigated in the Jev session) → tasks/verify.json idea-pick-recorded
 - [ ] **Failed on staging dragon run 6mjcny1c7 (2026-09-27, build 15489e699, fresh idea "Das Feuer von Funkenherz"):**
       `page-prompt-fixed-blocks-fit`: the FRONT COVER shipped missing: page -1 prompt_fit_failed twice (scene 3620 + must-keep 4758 = 8378 > Grok cap 7900); a p18 repair also hit prompt_fit_failed (4707 + 3911); 13 renders needed the ranked cut.
-      `group-staging-check`: p18 lines the four boys up facing the camera again (score 35, CRITICAL unrepaired — the tail never encircles them).
+      `group-staging-check` (entry superseded 2026-09-28 with the scene review; checkGroupStaging still sends it to the re-ask — verify on rung 2): p18 lines the four boys up facing the camera again (score 35, CRITICAL unrepaired — the tail never encircles them).
       `creature-size-page-ratio`: size lines reach the prompts ("about three times the height of Levin"), but the dragon renders at ~1-1.6x the boys (p3, p16), as a cute juvenile on p11/p13/p15, and the hand-sized scale renders torso-sized (p5, p9, p10, p16); p4/p13/p15 draw the empty chest hollow as a through-hole.
       `ots-crop-no-contact` + `plan-check-ots-contact`: p4 and p12 are over-the-shoulder by plan but no brief character has perspective over-the-shoulder.
       `idea-pick-recorded`: same harness gap as dka3jpog9 (the rerun script sends no ideaPick).
@@ -786,9 +786,45 @@ Run verifications now live in **`tasks/verify.json`** (judge a stored run: `node
 - [x] BUILT 2026-09-27 on staging (owner approved 12-from-top-20, trial 3-from-top-5, idea cards off the request path) — Jev picks the challenges and landmarks that fit, measured 2026-09-27: challenges CB2 (noul per catalogue entry on the premise) → offered bad 58% → 14%, good 10% → 48% (AUC 0.89); the arc took 6 B-labelled challenges of 20 from today's random draws; landmarks LB2 first-2 18G/0B vs fame 8G/3B. Decide: arc draw 12-from-top-20 vs 25-from-top-40; trial story 3-from-top-5; idea-prompt landmarks only off the happy path (prewarm/cache, +290 ms if synchronous); exclude offered vs taken ids → docs/decisions.md (2026-09-27 "Jev picks the challenges and landmarks that fit")
 - [ ] BUILDING 2026-09-27 (owner approved) — Jev decision layer wired into beats: shots (A1 + assign, code writes field 0), group-page cast cuts (TOGETHER + NEEDED, code writes the who column), VB citations per page, timeOfDay/indoor/aboard/population per location → tasks/jev-decision-layer-2026-09-27.md:1
 - [ ] BUILDING 2026-09-28 (owner: "Jev first, then remove the scene review"; answers Q1-Q8 recorded in the plan) — two-phase Art Director (VB call → Jev → briefs call with a FIXED block), code checks + two new checks, one batched AD re-ask, Jev-outage backup without the review, iterate re-pin → tasks/jev-first-briefs-2026-09-28.md:1
-- [ ] OWNER CALL PENDING (Q9) — which of the scene review's ~35 prose checks come back as a code check or a Jev question; the review's DELETION commit waits for this answer (rung-1 table in the plan) → tasks/jev-first-briefs-2026-09-28.md (Q9)
+- [x] (2026-09-28) OWNER ANSWERED Q9 — back as code checks feeding the one re-ask: negation_named, element_uncited, character_fields, clothing_incomplete, cast_not_in_plan, plus required_text_undeclared (Jev READ noul); every other check is a line below → tasks/jev-first-briefs-2026-09-28.md (Q9)
+- [x] (2026-09-28) The scene review is DELETED — runSceneReview, scene-review.txt, buildSceneReviewPrompt, sceneReviewModel, the scene_review_replay Lab stage, the review sibling sets, 6 verify entries superseded → docs/decisions.md (2026-09-28 "The scene review is deleted")
 - [ ] Rung 2 of the Jev-first briefs — one Lab beats_scenes run on the dragon book carried through to images, cap CHF 1.00, only after the owner has the Q9 table → tasks/jev-first-briefs-2026-09-28.md (Validation ladder)
 - [ ] Re-ask volume (Jev-first briefs, rung 1): on stored pre-review briefs the code checks flag ~half of every book (8-12 pages on the newest stories; interaction_multiple_actions the largest type) — measure the real rate on briefs written with the FIXED block in rung 2 before judging cost/latency → tasks/jev-first-briefs-2026-09-28.md (Rung 1 results)
+### Scene-review checks NOT brought back (owner Q9, 2026-09-28; review deleted the same day)
+Counts from the rung-1 table over 15 staging stories: stories naming pages / pages named / named & rewritten / named by this tag alone / …and rewritten. Each stays a generator rule in the Art Director templates; bring one back as a code check or a Jev question only with evidence.
+- [ ] Lost critic `gaze_budget`: 12 / 40 / 38 / 4 / 4 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `closeup_below_waist`: 8 / 11 / 11 / 2 / 2 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `facing_not_per_character`: 9 / 17 / 16 / 1 / 1 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `page_repetition`: 5 / 14 / 10 / 2 / 1 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `themed_setting_bare`: 3 / 7 / 7 / 1 / 1 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `scene_intent`: 6 / 18 / 18 / 0 / 0 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `gaze_missing`: 8 / 17 / 17 / 0 / 0 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `critique_in_brief`: 3 / 20 / 17 / 0 / 0 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `force_at_rest`: 9 / 16 / 16 / 0 / 0 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `continuity`: 6 / 18 / 15 / 0 / 0 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `landmark_photo_mismatch (the only critic of the landmarkPhoto citation; its generator-vs-critic sibling set was removed)`: 2 / 17 / 14 / 0 / 0 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `depth_unearned`: 7 / 13 / 13 / 0 / 0 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `contact_not_pose`: 8 / 15 / 13 / 0 / 0 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `cast_over_cap`: 5 / 12 / 12 / 0 / 0 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `drawability`: 5 / 13 / 12 / 0 / 0 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `element_stranded`: 3 / 13 / 12 / 0 / 0 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `light_fields (code check light_undeclared still sends a missing value)`: 1 / 12 / 11 / 0 / 0 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `vb_state_range (Jev owns the state pages; code checks vb_state_contradicted / vb_state_no_base remain)`: 7 / 13 / 10 / 1 / 0 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `plate_contains_effect`: 6 / 12 / 10 / 1 / 0 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `footing`: 1 / 9 / 8 / 0 / 0 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `prop_unheld`: 4 / 10 / 8 / 1 / 0 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `scale_unanchored`: 6 / 8 / 8 / 0 / 0 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `elevation_unsupported`: 4 / 8 / 7 / 0 / 0 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `closeup_environment`: 6 / 8 / 7 / 1 / 0 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `era_landmark_named`: 3 / 9 / 7 / 0 / 0 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `group_staging (code check checkGroupStaging remains)`: 3 / 5 / 4 / 0 / 0 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `cast_crowded`: 3 / 7 / 3 / 1 / 0 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `extras_undescribed`: 2 / 3 / 3 / 0 / 0 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `visual_arc`: 1 / 1 / 1 / 0 / 0 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `clothing_owner`: 1 / 1 / 1 / 0 / 0 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] Lost critic `result_not_at_contact`: 1 / 1 / 1 / 0 / 0 → tasks/jev-first-briefs-2026-09-28.md (Q9 table)
+- [ ] OWNER CALL (generator vs critic, found 2026-09-28): the creature-tone rule tells the Art Director "a calm or smiling mouth with no teeth showing, no displayed claws", and the new `negation_named` check flags that wording when copied into a brief — 4 of its 23 fires on 251 stored briefs. Reword the tone rule positively (a closed or smiling mouth, paws at rest) or leave it and let the re-ask rewrite those pages → server/lib/promptBuilders.js:6851
+- [ ] CHECK before the next deploy: `briefCorrectionModel` no longer reads `SCENE_REVIEW_MODEL` (removed with the review, 2026-09-28). If a Railway environment sets SCENE_REVIEW_MODEL but not BRIEF_CORRECTION_MODEL, its iterate corrector falls back to the code default deepseek-v4-pro → server/config/models.js (briefCorrectionModel)
 - [ ] Critic inputs (critic-input audit 2026-09-26): nine inputs a critic lacks or reads derived (DONE 2026-09-26: plate QC STRUCTURES/VB grid, plate QC 300/800 cuts — decisions.md "The judges read what the generator was given, whole"; compressedScene vs whole brief settled the other way the same day — the judges AND the consolidator read the SENT prompt, the shrink never cuts the scene: decisions.md "The judges read the prompt the image model was SENT"; whether a mismatched structure should FAIL: DONE 2026-09-27, soft key `structures`, decisions.md 2026-09-27) — compressedScene vs whole brief (quality/semantic vs consolidator), plan-check STORY LOGIC + CHARACTER_DETAILS, text-audit CHARACTER_DETAILS, EXPECTED CAST vs VB secondaries listing the page, object entity grid without VB reference (and >9 cells dropped), plate QC without STRUCTURES/VB grid, worn-state scene-review round without VB, panel quote check against the critique, compliance STORY_TEXT 2000 cut; plus the plate QC EXPECTED SCENE 300 cap (replay against the 1506 result) → docs/decisions.md:24
   - [x] 2026-09-26: plan-check + arc-informed text audit get CHARACTER_DETAILS; object grid gets its VB reference cell, description and states, every cell judged → docs/decisions.md (2026-09-26 "Critic inputs, round two")
 - [ ] Owner decision: the judges' CLOTHING CONTRACT names outfit details the page prompt's text never carries — Fiona p3 (`job_1790446348343_z3fw660ie`): "sewing scissors hang from the sash knot" reached the semantic judge from the costumed avatar's `clothingDescription`, while the sent prompt's WORN ITEMS look is cut at "a black cotton knee-length ski…" (the generator had the costumed reference image). Send the whole outfit text, or judge only what the WORN ITEMS line carries → docs/decisions.md (2026-09-26 "The judges read the prompt the image model was SENT", fairness)

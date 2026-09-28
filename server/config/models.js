@@ -474,14 +474,10 @@ const MODEL_DEFAULTS = {
   // create vs $0.42-0.75 for Opus 5 at high.
   arcCreateEffort: 'xhigh',
   arcRetellEffort: 'medium',
-  // The three reviews used to share outlineReviewModel, so switching the BEATS
-  // reviewer silently moved the scene and wardrobe reviews too. They are
-  // separate decisions with separate evidence and now separate keys.
-  // Scene: measured on a stored story (Lab 677/680/681/682, three judges) —
-  // reviewers cannot beat leaving good briefs alone (baseline 8.6/7.8/9.2), and
-  // grok was the WORST arm (8.6 neutral) because it rewrites most. deepseek is
-  // best-or-tied under two judges, and is what produced these briefs.
-  sceneReviewModel: process.env.SCENE_REVIEW_MODEL || 'deepseek-v4-pro',
+  // The reviews used to share outlineReviewModel, so switching the BEATS
+  // reviewer silently moved the wardrobe review too; separate keys since.
+  // (sceneReviewModel went with the scene review, 2026-09-28 — docs/decisions.md
+  // "The scene review is deleted".)
   // Wardrobe review: never measured. Pinned to the pre-2026-08-15 model so it
   // does not inherit a reviewer chosen on beats evidence.
   clothingReviewModel: process.env.CLOTHING_REVIEW_MODEL || 'deepseek-v4-pro',
@@ -566,15 +562,15 @@ const MODEL_DEFAULTS = {
   sceneIteration: process.env.SCENE_ITERATE_MODEL || 'qwen-plus',
   // THE BRIEF CORRECTOR — the one call that answers a brief's mechanical
   // findings, on BOTH paths (owner, 2026-09-17: "All 3 same as pipeline").
-  // The authored path has always answered them with sceneReviewModel and it
-  // works (15 pages changed, 5 unfixed, 3 introduced on the reference story);
+  // The authored path answered them with the scene reviewer's model and it
+  // worked (15 pages changed, 5 unfixed, 3 introduced on the reference story);
   // the rewrite path answered them with `sceneIteration` — the same model that
   // had just failed the contract — and resolved nothing on 11 of 11 stored
-  // rounds. Correcting a brief against a fault list is the scene review's job,
-  // so it is the scene reviewer's model, not the rewriter's. The REWRITE itself
-  // stays on sceneIteration: that is a separate decision with its own evidence
-  // (the 2026-07-12 cost A/B).
-  briefCorrectionModel: process.env.BRIEF_CORRECTION_MODEL || process.env.SCENE_REVIEW_MODEL || 'deepseek-v4-pro',
+  // rounds. So the corrector is that reviewer model, not the rewriter's. The
+  // REWRITE itself stays on sceneIteration: that is a separate decision with
+  // its own evidence (the 2026-07-12 cost A/B). The authored path's brief
+  // re-ask runs on the Art Director's model since 2026-09-28 (owner, Q2).
+  briefCorrectionModel: process.env.BRIEF_CORRECTION_MODEL || 'deepseek-v4-pro',
 
   // Eval/consolidation model — the swappable, cost-sensitive stage (NOT story
   // prose). Changed to Qwen for the cost A/B (2026-07-12). resolveEvalModel()
@@ -1459,7 +1455,7 @@ const MODEL_PRICING = {
   'qwen/qwen3.8-max': { input: 2.00, output: 6.00 },
   'deepseek/deepseek-chat': { input: 0.32, output: 0.89 },  // was 0.2574/1.0287 (that is the StreamLake endpoint; the default route is DeepInfra)
   // 3.68x UNDER before 2026-09-18 (0.435/0.87), and this is the reviewer on
-  // sceneReviewModel + clothingReviewModel + briefCorrectionModel, so every
+  // clothingReviewModel + briefCorrectionModel (and the scene review), so every
   // per-story figure that included it was low. Confirmed twice: OpenRouter's
   // catalogue says 1.60/3.20, and 4.27M in / 6.38M out billed $27.18 across
   // prod+staging, which 1.60/3.20 predicts to within 0.1%.

@@ -59,7 +59,6 @@ describe('the text-is-not-a-checklist rule is cut to its reader', () => {
     const TEXT = 'The lamp guttered twice and then went out.';
 
     let authored: Record<string, string>;
-    let judged: string;
 
     beforeAll(async () => {
       await require('../../server/services/prompts').loadPromptTemplates();
@@ -74,7 +73,6 @@ describe('the text-is-not-a-checklist rule is cut to its reader', () => {
         'scene-iteration': iterate(false),
         'scene-iteration-free': iterate(true),
       };
-      judged = PB.buildSceneReviewPrompt(inputData, [{ pageNumber: 1, text: TEXT, sceneDescription: 'Mira lifts the lantern.' }]);
     });
 
     it('every template that AUTHORS a brief gets the permission and no verdict', () => {
@@ -84,15 +82,13 @@ describe('the text-is-not-a-checklist rule is cut to its reader', () => {
       }
     });
 
-    // 2026-09-23 (owner): the scene review and the all-pages Art Director are
-    // shown no page text (it is written after them), so neither half reaches
-    // them. The judges that are shown the text keep the whole rule
-    // (text-not-a-checklist-reach.test.ts).
-    it('the two stages shown no page text carry neither half', () => {
-      for (const prompt of [judged, PB.buildSceneBriefsAllPrompt(inputData, BEATS, {})]) {
-        expect(prompt).not.toContain(PERMISSION);
-        expect(prompt).not.toContain(VERDICT);
-      }
+    // 2026-09-23 (owner): the all-pages Art Director is shown no page text (it
+    // is written after it), so neither half reaches it. The judges that are
+    // shown the text keep the whole rule (text-not-a-checklist-reach.test.ts).
+    it('the stage shown no page text carries neither half', () => {
+      const prompt = PB.buildSceneBriefsAllPrompt(inputData, BEATS, {});
+      expect(prompt).not.toContain(PERMISSION);
+      expect(prompt).not.toContain(VERDICT);
     });
   });
 });

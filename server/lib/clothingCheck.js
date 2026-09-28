@@ -12,8 +12,8 @@
  *
  * This module is PURE and free — no API call, no image. It compares the
  * canonical `clothingRequirements` text against the prose and returns findings
- * for the scene review to fix (owner decision 2026-08-08: findings go to the
- * scene review, and nowhere else).
+ * for the one brief re-ask to fix (briefChecks.js; the scene review until its
+ * deletion on 2026-09-28).
  *
  * Four findings, in the order they matter:
  *   outfit_missing       the prose never names this character's outfit
@@ -27,9 +27,10 @@
  * A fifth, `outfit_misattributed`, lived here from 2026-08-08 to 2026-09-18 and
  * is DELETED — see the block above REVIEWABLE. It decided from prose that one
  * character had been put in another's clothes, which is a language judgement;
- * the rule now lives in prompts/scene-review.txt as `[clothing_owner]`.
+ * the rule then lived in prompts/scene-review.txt as `[clothing_owner]`, deleted
+ * with the review on 2026-09-28 (a lost critic, tasks/BACKLOG.md).
  *
- * Deliberately NOT a fixer. It reports; the review rewrites; the caller re-runs
+ * Deliberately NOT a fixer. It reports; the re-ask rewrites; the caller re-runs
  * it afterwards and logs whatever survived rather than shipping it silently.
  */
 

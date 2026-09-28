@@ -147,9 +147,6 @@ describe('the waist-up rule is one constant, not five sentences', () => {
     'prompts/scene-briefs-all.txt',
     'prompts/scene-iteration.txt',
     'prompts/scene-iteration-free.txt',
-    // The CRITIC. Check 7b spelled the list out by hand until 2026-09-20, which
-    // is how it went on naming poses after the rule stopped forbidding them.
-    'prompts/scene-review.txt',
   ];
 
   it.each(templates)('%s states the verbs from the shared placeholder', (rel) => {
@@ -166,7 +163,7 @@ describe('the waist-up rule is one constant, not five sentences', () => {
   });
 
   it('NO SITE STILL FORBIDS A POSE (reversed 2026-09-20)', () => {
-    // The generator sites, the critic, and the Art-Director-less paths that get
+    // The generator sites and the Art-Director-less paths that get
     // the rule as a JS constant. A pose word surviving anywhere means one stage
     // is still deducting for what another stage now allows.
     const sources = [...templates, 'server/lib/promptBuilders.js', 'server/lib/planCounters.js'];

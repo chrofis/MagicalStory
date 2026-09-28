@@ -116,9 +116,9 @@ describe('the post-review clothing re-check runs on every reviewed run', () => {
   it('is no longer gated on pre-review findings', () => {
     expect(src).not.toContain('if (clothingByPage && clothingByPage.size > 0) {');
   });
-  it('both review adopt points keep the declared rows', () => {
-    expect(src).toContain("keepDeclaredWornRows(x.pageNumber, reviewed, x.brief, 'scene review', gl)");
-    expect(src).toContain("keepDeclaredWornRows(x.pageNumber, reworn, x.brief, 'worn-state round', gl)");
+  it('the brief re-ask keeps the declared rows (the scene review\'s successor, 2026-09-28)', () => {
+    const checks = fs.readFileSync(path.join(process.cwd(), 'server/lib/briefChecks.js'), 'utf8');
+    expect(checks).toContain("keepDeclaredWornRows(n, raw, prior, 'brief re-ask', gl)");
   });
 });
 

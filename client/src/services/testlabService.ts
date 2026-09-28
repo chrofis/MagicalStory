@@ -559,7 +559,6 @@ export const TESTLAB_STAGES = [
   // Replays the scene review over a story's STORED briefs, so a reviewer-prompt
   // change is measurable: the clothing findings are deterministic, and the
   // briefs are frozen, so the only variable is the prompt (or the model).
-  { id: 'scene_review_replay', label: 'Scene review replay (frozen briefs → does it fix the faults?)', producesImage: false, overridable: true, storyLevel: true },
   // Re-derives the clothing contract for an existing story and puts the new
   // costume descriptions next to the ones it shipped with — the way to measure a
   // change to the costume/distinguishability rules without generating a book.

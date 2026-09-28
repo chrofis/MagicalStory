@@ -124,20 +124,7 @@ describe('the look a page shows is Jev\'s, never inferred from the Art Director\
   it('a cite that changes only its look reads as the same element in another look, not as a removal', () => {
     const p = JD.pinBrief(brief({ characters: [], objects: ['LOC001', 'ANI001.1'] }), { cites: ['ANI001.2'], decidedIds: ['ANI001'] });
     expect(metaOf(p.brief).objects).toEqual(['LOC001', 'ANI001.2']);
-    const f = JD.fixedFieldFinding(3, p.changes, (id: string) => id);
-    expect(f.detail).toMatch(/cites ANI001\.2 .* in place of ANI001\.1/);
-    expect(f.detail).not.toMatch(/no longer cites/);
-  });
-  it('after the scene review, a moved state page table is rebuilt from the decided cites', () => {
-    const { repinJevStatePages } = req('../../server/lib/beatsPipeline');
-    const vb: any = { animals: [{ id: 'ANI001', appearsInPages: [1, 2], states: [{ id: 'ANI001.1', pages: [1, 2] }, { id: 'ANI001.2', pages: [] }] }] };
-    const beats = [{ pageNumber: 1, jevFixed: { cites: ['ANI001.1'], decidedIds: ['ANI001'] } }, { pageNumber: 2, jevFixed: { cites: ['ANI001.2'], decidedIds: ['ANI001'] } }];
-    const gl = { info() {}, warn() {}, error() {}, debug() {} };
-    repinJevStatePages(vb, null, beats, gl);
-    expect(vb.animals[0].states.map((s: any) => s.pages)).toEqual([[1], [2]]);
-    const untouched: any = JSON.parse(JSON.stringify(vb));
-    repinJevStatePages(untouched, null, [{ pageNumber: 1 }], gl);            // off the Jev path: nothing moves
-    expect(untouched).toEqual(vb);
+    expect(p.changes.find((c: any) => c.field === 'objects')).toMatchObject({ added: ['ANI001.2'], removed: ['ANI001.1'] });
   });
 });
 
@@ -193,15 +180,6 @@ describe('pinBrief: code writes the decided fields; the review is told what chan
     expect(metaOf(p.brief).timeOfDay).toBe('midday');
     expect(p.changes.find((c: any) => c.field === 'weather').problem).toBe('outdoors');
   });
-  it('the finding names what code set, for the prose to follow', () => {
-    const p = JD.pinBrief(before, fixed);
-    const f = JD.fixedFieldFinding(3, p.changes, (id: string) => ({ ANI001: 'Drako', ART009: 'the lamp' } as any)[id] || id);
-    expect(f.type).toBe('jev_fixed_field');
-    expect(f.detail).toMatch(/now cites ANI001 \(Drako\)/);
-    expect(f.detail).toMatch(/no longer cites ART009 \(the lamp\)/);
-    expect(f.detail).toMatch(/Ana looks at ANI001/);
-    expect(req('../../server/lib/sceneBriefCheck').REVIEWABLE.has('jev_fixed_field')).toBe(true);
-  });
   it('the bible\'s page table (appearsInPages, as parsed) agrees with the citations, state by state; a cover page stays', () => {
     const vb: any = { animals: [{ id: 'ANI001', appearsInPages: [2, -1] }], artifacts: [{ id: 'ART001', appearsInPages: [1, 3, 4], states: [{ pages: [1] }, { pages: [3] }, { pages: [4] }] }] };
     JD.applyVbPages(vb, new Map([[1, ['ANI001']], [2, ['ART001.1']], [3, ['ART001.2']], [4, []]]), ['ANI001', 'ART001']);
@@ -224,7 +202,6 @@ describe('the shot is a pinned Jev field', () => {
     const p = JD.pinBrief(adBrief, { shot: 'over-the-shoulder' });
     expect(metaOf(p.brief).shot).toBe('over-the-shoulder');
     expect(p.changes).toContainEqual({ field: 'shot', from: 'medium', to: 'over-the-shoulder' });
-    expect(JD.fixedFieldFinding(15, p.changes).detail).toMatch(/shot is over-the-shoulder/);
     expect(JD.pinBrief(p.brief, { shot: 'over-the-shoulder' }).brief).toBe(p.brief);
   });
   it('the fixed-fields rule names the shot as fixed, and no other rule may change it', () => {
@@ -249,13 +226,12 @@ describe('the shot is a pinned Jev field', () => {
   });
 });
 
-describe('the fixed-fields rule reaches the brief authors and the critic from one constant', () => {
+describe('the fixed-fields rule reaches the brief authors from one constant', () => {
   beforeAll(async () => { await loadPromptTemplates(); });
-  it('both Art Director templates and the scene review carry it, filled', () => {
+  it('both Art Director templates carry it, filled', () => {
     const all = String(PB.buildSceneBriefsAllPrompt({ characters: [], language: 'en' }, [{ pageNumber: 1, planLine: 'wide — Ana — x — y' }], {}));
     const one = String(PB.buildSceneExpansionPrompt(1, 'PLAN: x', [], 'en', null, '', null, {}));
-    const review = String(PB.buildSceneReviewPrompt({ characters: [], language: 'en' }, [{ pageNumber: 1, brief: brief({}) }], {}));
-    for (const [site, p] of [['all', all], ['one', one], ['review', review]] as [string, string][]) {
+    for (const [site, p] of [['all', all], ['one', one]] as [string, string][]) {
       expect(p, site).toContain(JD.JEV_FIXED_FIELDS_RULE);
       expect(p, site).not.toContain('{JEV_FIXED_FIELDS}');
     }

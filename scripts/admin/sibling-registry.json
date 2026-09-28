@@ -248,34 +248,20 @@
     {
       "id": "scene-brief-generator-vs-critic",
       "axis": "generator-vs-critic",
-      "reason": "scene-review.txt critiques the briefs scene-briefs-all.txt authors; a check the reviewer applies that the Art Director was never given produces a finding no rewrite can satisfy.",
+      "reason": "The brief checks (sceneBriefCheck.js, and briefChecks.js, which adds the scene review's rules the owner kept as code checks on 2026-09-28: negation_named, element_uncited, character_fields, cast_not_in_plan, required_text_undeclared, clothing_incomplete) critique the briefs scene-briefs-all.txt authors and send them back in the one re-ask; a check the critic applies that the Art Director was never given produces a finding no rewrite can satisfy. The scene review (scene-review.txt) was this set's critic until it was deleted on 2026-09-28.",
       "generators": [
         "prompts/scene-briefs-all.txt"
       ],
       "critics": [
-        "prompts/scene-review.txt"
-      ],
-      "severity": "block"
-    },
-    {
-      "id": "landmark-photo-generator-vs-critic",
-      "axis": "generator-vs-critic",
-      "reason": "A real landmark's photo is the one its plate's author cites in `landmarkPhoto` (docs/decisions.md 2026-09-26). The citation is authored at three sites - the all-pages Art Director per vantage (inside {AVAILABLE_LANDMARKS_SECTION}), the trial writer per location (inside {LANDMARKS}), an iterate rewrite per page (`{LANDMARK_PHOTO_CITE}`) - and judged by scene-review.txt check 10ab [landmark_photo_mismatch] (`{LANDMARK_PHOTO_CITE}`). All four read ONE constant, promptBuilders.LANDMARK_PHOTO_CITE_RULE; tests/unit/landmark-photo-citation.test.ts pins that it reaches every built prompt. A citation rule the reviewer applies that an author was never given is a correction no author can pre-empt.",
-      "generators": [
-        "prompts/visual-bible.txt",
-        "prompts/story-trial.txt",
-        "prompts/scene-iteration.txt",
-        "prompts/scene-iteration-free.txt"
-      ],
-      "critics": [
-        "prompts/scene-review.txt"
+        "server/lib/sceneBriefCheck.js",
+        "server/lib/briefChecks.js"
       ],
       "severity": "block"
     },
     {
       "id": "group-staging-generator-vs-critic",
       "axis": "generator-vs-critic",
-      "reason": "A group of more than three characters is staged at one depth in a wider shot, or seen from behind as it moves away, and never lined up facing the viewer (owner, 2026-09-27; docs/decisions.md). The rule is authored by both Art Director templates (rule 4) and both iterate templates, and judged by scene-review.txt check 6d [group_staging]; all five read ONE constant, shotVocabulary.GROUP_STAGING_RULE, through {GROUP_STAGING}. The brief check sceneBriefCheck.checkGroupStaging measures the same rule from structured fields (GROUP_WIDER_SHOTS, `perspective`, `looksAt`) and sends group_shot_too_close / group_facing_viewer to the review. tests/unit/group-staging.test.ts pins that the constant reaches every built prompt. The planner (story-beats.txt) read it too while it picked the shot; since 2026-09-27 (later the same day) code writes every shot and holds the group rule in the Jev shot assignment (jevDecisions.assign, GROUP_WIDER_SHOTS), so the planner is no longer a generator of this rule.",
+      "reason": "A group of more than three characters is staged at one depth in a wider shot, or seen from behind as it moves away, and never lined up facing the viewer (owner, 2026-09-27; docs/decisions.md). The rule is authored by both Art Director templates (rule 4) and both iterate templates, and judged by the brief check (scene-review.txt check 6d [group_staging] until the review was deleted on 2026-09-28); the four templates read ONE constant, shotVocabulary.GROUP_STAGING_RULE, through {GROUP_STAGING}. The brief check sceneBriefCheck.checkGroupStaging measures the same rule from structured fields (GROUP_WIDER_SHOTS, `perspective`, `looksAt`) and sends group_shot_too_close / group_facing_viewer to the one brief re-ask. tests/unit/group-staging.test.ts pins that the constant reaches every built prompt. The planner (story-beats.txt) read it too while it picked the shot; since 2026-09-27 (later the same day) code writes every shot and holds the group rule in the Jev shot assignment (jevDecisions.assign, GROUP_WIDER_SHOTS), so the planner is no longer a generator of this rule.",
       "generators": [
         "prompts/scene-briefs-all.txt",
         "prompts/scene-expansion.txt",
@@ -283,7 +269,7 @@
         "prompts/scene-iteration-free.txt"
       ],
       "critics": [
-        "prompts/scene-review.txt"
+        "server/lib/sceneBriefCheck.js"
       ],
       "severity": "block"
     },
@@ -587,10 +573,10 @@
     {
       "id": "brief-corrective-loops",
       "axis": "authored-brief correction vs rewritten-brief correction",
-      "reason": "A brief's mechanical findings are answered on two paths — the scene review on the authored path (beatsPipeline.js) and the corrective re-ask on the rewrite path (images.js iteratePageCore) — and the second was a hand-rolled copy of the first that measurably did not work: over the 11 stored iterate rounds of staging job_1789584708605_rts4wqupm and job_1789506283204_3kxqshifx it fired once per page and resolved findings on ZERO of them, because it sent the findings without the text being corrected, accepted on a COUNT (a correction that swaps one fault for another scores equal and is rejected), and re-asked the same model that had just failed the contract. Owner, 2026-09-17: 'All 3 same as pipeline. These should be siblings or even identical code.' The payload contract (assertCorrectorSeesText), the introduced-vs-survived verdict (judgeCorrection) and the model name (MODEL_DEFAULTS.briefCorrectionModel) are now ONE implementation in server/lib/briefCorrection.js; this set is what stops a call site drifting off it again.",
+      "reason": "A brief's mechanical findings are answered on two paths — the one brief re-ask on the authored path (briefChecks.js; the scene review in beatsPipeline.js until 2026-09-28) and the corrective re-ask on the rewrite path (images.js iteratePageCore) — and the second was a hand-rolled copy of the first that measurably did not work: over the 11 stored iterate rounds of staging job_1789584708605_rts4wqupm and job_1789506283204_3kxqshifx it fired once per page and resolved findings on ZERO of them, because it sent the findings without the text being corrected, accepted on a COUNT (a correction that swaps one fault for another scores equal and is rejected), and re-asked the same model that had just failed the contract. Owner, 2026-09-17: 'All 3 same as pipeline. These should be siblings or even identical code.' The payload contract (assertCorrectorSeesText), the introduced-vs-survived verdict (judgeCorrection) and the model name (MODEL_DEFAULTS.briefCorrectionModel) are now ONE implementation in server/lib/briefCorrection.js; this set is what stops a call site drifting off it again.",
       "members": [
         "server/lib/images.js",
-        "server/lib/beatsPipeline.js"
+        "server/lib/briefChecks.js"
       ],
       "severity": "block",
       "parity": {
@@ -640,11 +626,10 @@
     {
       "id": "clothing-findings-producer-vs-consumers",
       "axis": "mechanical clothing findings: producer vs the prompt that fixes them vs the Lab mirror",
-      "reason": "clothingCheck.js decides WHICH clothing faults are sendable (REVIEWABLE) and words each one as its own fix; scene-review.txt check 0 is the only consumer and states what a reviewer may do about them; testlab.js's scene-review replay keeps a THIRD, hand-copied set of the same type list for its faults-in/faults-out measurement. A type added, removed or re-worded in one is silently absent or stale in the others - on 2026-09-18 the deletion of outfit_misattributed left check 0 instructing a garment move that can never be asked for, and left the Lab counting a type the module no longer emits.",
+      "reason": "clothingCheck.js decides WHICH clothing faults are sendable (REVIEWABLE) and words each one as its own fix; briefChecks.js sends them, with REASK_CLOTHING_EXTRA and clothing_incomplete, to the one brief re-ask. A type added, removed or re-worded in one is silently absent or stale in the other - on 2026-09-18 the deletion of outfit_misattributed left the scene review's check 0 instructing a garment move that could never be asked for. The scene review and its Lab replay (a hand-copied type list) were members until both were deleted on 2026-09-28.",
       "members": [
         "server/lib/clothingCheck.js",
-        "prompts/scene-review.txt",
-        "server/lib/testlab.js"
+        "server/lib/briefChecks.js"
       ],
       "severity": "block"
     },
@@ -978,21 +963,6 @@
           "evalStoryMetaOf",
           "consolidationInputs",
           "buildInpaintCall"
-        ]
-      }
-    },
-    {
-      "id": "lab-vs-prod-scene-review",
-      "axis": "Lab vs prod",
-      "reason": "The Test Lab scene_review_replay stage and the beats pipeline's scene review (Step 4) run the SAME function, beatsPipeline.runSceneReview (owner 2026-09-27: the Lab must use 100% identical code to production). A change to the review's checks, prompt, merge or guards lands there, where both call it; tests/unit/lab-prod-call-parity.test.ts compares the two calls.",
-      "members": [
-        "server/lib/beatsPipeline.js",
-        "server/lib/testlab.js"
-      ],
-      "severity": "block",
-      "parity": {
-        "anchors": [
-          "runSceneReview"
         ]
       }
     },

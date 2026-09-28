@@ -350,11 +350,20 @@ async function runBriefChecks({ inputData, expansions, briefBeats, visualBible, 
       const guard = assessSceneBrief(candidate);
       const recheck = (text) => collectBriefFindings(expansions.map(e => (e.pageNumber === n ? { pageNumber: n, brief: text } : e)), ctx)
         .findings.filter(f => f.pageNumber === n);
-      const verdict = await correctFindings({
-        label: `brief re-ask page ${n}`, priorText: prior, payload: prompt, before: byPage.get(n),
-        completed: { text: candidate, usable: guard.usable, reason: guard.usable ? null : describeSceneBrief(guard) },
-        recheck, acceptance: 'strict',
-      });
+      // A contract violation (the payload does not carry the brief it corrects)
+      // stops this page's correction, loudly — never the story.
+      let verdict;
+      try {
+        verdict = await correctFindings({
+          label: `brief re-ask page ${n}`, priorText: prior, payload: prompt, before: byPage.get(n),
+          completed: { text: candidate, usable: guard.usable, reason: guard.usable ? null : describeSceneBrief(guard) },
+          recheck, acceptance: 'strict',
+        });
+      } catch (err) {
+        gl.error('beats_brief_reask_contract', `Page ${n}: ${err.message} — the page keeps its brief`, null, { pageNumber: n });
+        report.verdicts.push({ pageNumber: n, accepted: false, reason: `refused: ${err.message}` });
+        continue;
+      }
       let accepted = verdict.accepted;
       let reason = verdict.reason;
       if (accepted) {

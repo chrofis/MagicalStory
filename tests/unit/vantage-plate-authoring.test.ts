@@ -222,37 +222,3 @@ describe('the degraded-brief record', () => {
     expect(d.emptyInputs).toEqual([]);
   });
 });
-
-describe('the scene reviewer can still see the plate it grades', () => {
-  let buildSceneReviewBibleBlock: any;
-  beforeAll(async () => {
-    await require('../../server/services/prompts').loadPromptTemplates();
-    ({ buildSceneReviewBibleBlock } = require('../../server/lib/promptBuilders.js'));
-  });
-
-  it('renders one VANTAGE PLATES row per vantage with its pages', () => {
-    const block = buildSceneReviewBibleBlock({
-      locations: [
-        {
-          id: 'LOC001', name: 'Market square', label: 'market square', pages: [1, 2, 3],
-          vantages: [
-            { id: 'LOC001.1', name: 'from the fountain', shot: 'wide', pages: [1, 2], emptyScenePrompt: 'The wide square from the fountain.' },
-            { id: 'LOC001.2', name: 'under the arcade', shot: 'medium', pages: [3], emptyScenePrompt: 'The arcade, columns receding left.' },
-          ],
-        },
-        { id: 'LOC002', name: 'Lane', label: 'narrow lane', pages: [4], emptyScenePrompt: 'A narrow lane climbing away.' },
-      ],
-    });
-    expect(block).toContain('# VANTAGE PLATES');
-    expect(block).toContain('LOC001.1');
-    expect(block).toContain('pages [1,2]: The wide square from the fountain.');
-    expect(block).toContain('LOC001.2');
-    expect(block).toContain('LOC002.1'); // single viewpoint, synthesized id
-    expect(block).toContain('A narrow lane climbing away.');
-  });
-
-  it('emits nothing for a legacy bible that authored no plates', () => {
-    const block = buildSceneReviewBibleBlock({ locations: [{ id: 'LOC001', name: 'Square', pages: [1] }] });
-    expect(block).toBe('');
-  });
-});

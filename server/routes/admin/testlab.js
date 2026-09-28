@@ -135,8 +135,6 @@ const STAGE_TEMPLATE_KEYS = {
   // trial's one-call story template.
   trial_idea_variety: 'trialIdea',
   trial_challenge_draw: 'storyTrial',
-  // Scene review replay runs the scene-review critic over frozen briefs.
-  scene_review_replay: 'sceneReview',
   // Story bible replay re-authors the VB from the locked beats.
   story_bible_replay: 'storyBibleFromBeats',
   // Story text replay re-writes the page text from the locked beats.

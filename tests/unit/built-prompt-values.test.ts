@@ -197,10 +197,10 @@ const CASES: Case[] = [
     blind: () => PB.buildSceneBriefsAllPrompt(inputData, BEATS, {}),
   },
   {
-    name: 'buildSceneReviewPrompt (all briefs at once)',
+    name: 'buildBriefReaskPrompt (the one brief re-ask)',
     probe: BRIEF_PROSE,
-    build: () => PB.buildSceneReviewPrompt(inputData, SCENES, { beats: BEATS, visualBible: VISUAL_BIBLE }),
-    blind: () => PB.buildSceneReviewPrompt(inputData, [{ pageNumber: 1, brief: 'An empty room.' }], { beats: BEATS, visualBible: VISUAL_BIBLE }),
+    build: () => PB.buildBriefReaskPrompt({ contextPrompt: 'the page-brief prompt', pages: [{ pageNumber: 1, brief: SCENES[0].brief, findings: '- [negation_named] a fault' }] }),
+    blind: () => PB.buildBriefReaskPrompt({ contextPrompt: 'the page-brief prompt', pages: [{ pageNumber: 1, brief: 'An empty room.', findings: '- [negation_named] a fault' }] }),
   },
   {
     name: 'buildBeatsPrompt (page planner)',

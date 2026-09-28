@@ -202,9 +202,8 @@ describe('a newly reported finding does not refuse the correction', () => {
   });
 
   it('the authored path still gets its introduced list, which is what it logs', () => {
-    // beatsPipeline destructures { introduced, survived } and raises
-    // `beats_brief_introduced` from it. Deleting the refusal must not delete
-    // the field.
+    // The authored path (briefChecks.runBriefChecks, the one re-ask) logs each
+    // verdict's introduced list. Deleting the refusal must not delete the field.
     const v = BC.judgeCorrection({
       before: [{ pageNumber: 1, type: 'a' }],
       after: [{ pageNumber: 1, type: 'b' }],
@@ -212,7 +211,7 @@ describe('a newly reported finding does not refuse the correction', () => {
     });
     expect(v).toHaveProperty('introduced');
     expect(v).toHaveProperty('survived');
-    expect(read('server/lib/beatsPipeline.js')).toContain('const { introduced, survived } = judgeCorrection(');
+    expect(read('server/lib/briefChecks.js')).toContain('introduced: verdict.introduced');
   });
 });
 
@@ -330,7 +329,8 @@ describe('correctFindings over the real stored rounds', () => {
 
 describe('both call sites go through the one routine', () => {
   const imagesJs = read('server/lib/images.js');
-  const beatsJs = read('server/lib/beatsPipeline.js');
+  // The authored path's one re-ask (the scene review's successor, 2026-09-28).
+  const beatsJs = read('server/lib/briefChecks.js');
 
   it('each path requires the shared module', () => {
     expect(imagesJs).toContain("require('./briefCorrection')");
@@ -342,9 +342,8 @@ describe('both call sites go through the one routine', () => {
     expect(imagesJs).toContain('renderCorrectionRequest(');
   });
 
-  it('the authored path takes its verdict from judgeCorrection', () => {
-    expect(beatsJs).toContain('judgeCorrection(');
-    expect(beatsJs).toContain('assertCorrectorSeesText(');
+  it('the authored path takes its verdict from correctFindings', () => {
+    expect(beatsJs).toContain('correctFindings(');
   });
 
   it('neither path hand-rolls a count comparison over its findings', () => {
@@ -365,9 +364,9 @@ describe('both call sites go through the one routine', () => {
     expect(tail).toContain('return { accepted: false };');
   });
 
-  it('the authored path reports a payload violation instead of killing the review', () => {
-    const at = beatsJs.indexOf('assertCorrectorSeesText(');
-    expect(beatsJs.slice(Math.max(0, at - 400), at + 400)).toMatch(/try \{[\s\S]*assertCorrectorSeesText\([\s\S]*\} catch/);
+  it('the authored path reports a payload violation instead of killing the story', () => {
+    const at = beatsJs.indexOf('verdict = await correctFindings(');
+    expect(beatsJs.slice(Math.max(0, at - 400), at + 800)).toMatch(/try \{[\s\S]*correctFindings\([\s\S]*\} catch/);
   });
 
   it('the rewrite path issues exactly one corrective re-ask', () => {
@@ -383,8 +382,8 @@ describe('the corrector runs on the pipeline model, from a named constant', () =
     expect(MODEL_DEFAULTS.briefCorrectionModel).not.toBe(MODEL_DEFAULTS.sceneIteration);
   });
 
-  it('it defaults to the scene reviewer — the model that answers these findings on the authored path', () => {
-    expect(MODEL_DEFAULTS.briefCorrectionModel).toBe(MODEL_DEFAULTS.sceneReviewModel);
+  it('it defaults to the model the scene reviewer ran on (the review is deleted, 2026-09-28)', () => {
+    expect(MODEL_DEFAULTS.briefCorrectionModel).toBe('deepseek-v4-pro');
   });
 
   it('the rewrite path resolves the model through that key, never a literal', () => {

@@ -786,58 +786,11 @@ describe('beats_replan: no params = the run\'s plan check and re-plan rounds', (
   });
 });
 
-// ── scene_review_replay: the run's scene review on the briefs as sent ────────
-describe('scene_review_replay: no params = the run\'s review of the briefs it was sent', () => {
-  const COVER_BRIEF = 'Mira and Tobias stand on the quay holding the lantern between them, facing the viewer.';
-  const SENT = [{ pageNumber: 1, brief: BRIEF }, { pageNumber: -1, brief: COVER_BRIEF }];
-  const STORED_REVIEW = () => ({
-    ...storyFor(storedScene({ pageNumber: 1, sceneDescription: `${BRIEF}\n(the brief as it shipped, after the review)` }), { textInImage: false }),
-    pages: 1,
-    arcReviewReport: { centralFigure: ['Mira'] },
-    beatsReviewReport: { pagePlan: 'Page 1: medium — Mira, Tobias — Mira holds the lantern up — the way is lit' },
-    sceneReviewReport: { briefsIn: SENT },
-  });
-  let modelCalls: any[] = [];
-  let savedStream: any;
-  beforeEach(() => {
-    modelCalls = [];
-    savedStream = textModelsMod.callTextModelStreaming;
-    textModelsMod.callTextModelStreaming = async (prompt: string, _s: any, _c: any, model: string, opts: any) => {
-      modelCalls.push({ prompt, model, label: opts?.usageLabel });
-      return { text: 'ANALYSIS:\nFAULTED PAGES: none\n', modelId: model, usage: { input_tokens: 1, output_tokens: 1 } };
-    };
-  });
-  afterEach(() => { textModelsMod.callTextModelStreaming = savedStream; });
-
-  it('reviews briefsIn (covers included) with the beats and cover beats the run held', async () => {
-    STORY = STORED_REVIEW();
-    const { buildCoverBeats } = req('../../server/lib/coverBeats');
-    const { coverTypesFor } = req('../../server/lib/coverKeys');
-    const beats = BP.makePlanReader([1], '')(STORY.beatsReviewReport.pagePlan).parsed.pages;
-    const briefBeats = [...beats, ...buildCoverBeats(STORY, { coverTypes: coverTypesFor(STORY), clothingRequirements: STORY.clothingRequirements, centralFigure: ['Mira'] })];
-    const gl = { info() {}, warn() {}, error() {}, debug() {} };
-    await BP.runSceneReview({
-      inputData: STORY, expansions: SENT.map(x => ({ ...x })), clothingRequirements: STORY.clothingRequirements,
-      visualBible: JSON.parse(JSON.stringify(VISUAL_BIBLE)), briefBeats, beats, bibleSections: '', meta: { timings: {}, labelRound: null },
-      sceneReviewModel: MODEL_DEFAULTS.sceneReviewModel || MODEL_DEFAULTS.outlineReviewModel, stage: async () => {}, onChunk: null, gl,
-    });
-    const prodCalls = modelCalls.splice(0);
-    expect(prodCalls).toHaveLength(1);
-    const r = await testlab.runSceneReviewReplayStage({ storyId: 'job_parity' }, { params: {} });
-    expect(modelCalls.map(c => [c.label, c.model, c.prompt])).toEqual(prodCalls.map(c => [c.label, c.model, c.prompt]));
-    expect(modelCalls[0].model).toBe(MODEL_DEFAULTS.sceneReviewModel || MODEL_DEFAULTS.outlineReviewModel);
-    // The briefs as SENT, the cover among them — never the shipped ones.
-    expect(modelCalls[0].prompt).toContain(COVER_BRIEF);
-    expect(modelCalls[0].prompt).not.toContain('(the brief as it shipped, after the review)');
-    expect(r.briefsIn.map((b: any) => b.pageNumber)).toEqual([1, -1]);
-  });
-
-  it('the stored-review replay still reviews through runSceneReview; the run no longer calls it (source scan)', () => {
-    // 2026-09-28: the run's briefs are checked and re-asked once
-    // (briefChecks.runBriefChecks); the review's code stays until the owner's
-    // Q9 answer, for replaying the reviews stored on earlier stories.
-    expect(read('server/lib/testlab.js')).toMatch(/const out = await runSceneReview\(\{/);
-    expect(read('server/lib/beatsPipeline.js')).not.toMatch(/await runSceneReview\(\{/);
+// ── the scene review: deleted, with its Lab replay stage ─────────────────────
+describe('the scene review is gone from both paths (2026-09-28)', () => {
+  it('neither the run nor the Lab calls it, and the Lab has no replay stage for it', () => {
+    expect(read('server/lib/beatsPipeline.js')).not.toMatch(/runSceneReview/);
+    expect(read('server/lib/testlab.js')).not.toMatch(/runSceneReview|scene_review_replay/);
   });
 });
 

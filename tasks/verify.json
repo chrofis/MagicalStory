@@ -16,7 +16,7 @@
         "kind": "human",
         "what": "Read data.beatsReviewReport.pagePlan: for each page whose instant names a creature entry's name with a body part, confirm the who column carries it; then for those pages confirm sceneImages[].sceneDescription objects[] cites the ANI id and imageVersions[0].prompt has the creature's REQUIRED OBJECTS line; sceneReviewReport.briefFindings has no plan_cast_uncited left in briefUnfixed."
       },
-      "status": "pending",
+      "status": "superseded",
       "evidence": [],
       "lastChecked": {
         "storyId": "job_1790539784661_6mjcny1c7",
@@ -26,6 +26,11 @@
         "checkedAt": "2026-09-27 23:04:04 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: Read data.beatsReviewReport.pagePlan: for each page whose instant names a creature entry's name with a body part, confirm the who column carries it; then for those pages confirm sceneImages[].sceneDescription objects[] cites the ANI id and imageVersions[0].prompt has the creature's REQUIRED OBJECTS line; sceneReviewReport.briefFindings has no plan_cast_uncited left in briefUnfi"
+      },
+      "supersededBy": {
+        "date": "2026-09-28",
+        "entry": "jev-first-briefs",
+        "note": "The scene review these claims read (sceneReviewReport, its checks, its re-pin) is deleted (docs/decisions.md 2026-09-28 \"The scene review is deleted\"); the brief checks and the one re-ask (entry jev-first-briefs) replace it."
       }
     },
     {
@@ -1070,7 +1075,7 @@
         "kind": "auto",
         "fn": "vbElementOverflowCount"
       },
-      "status": "pending",
+      "status": "superseded",
       "evidence": [
         {
           "storyId": "job_1790100385959_1nitlympp",
@@ -1123,6 +1128,11 @@
         "date": "2026-09-27",
         "status": "pending",
         "note": "Owner decision pending. Measured over the scene review: z3fw660ie 0/16, vnx5l8iy7 0/18, 5herh01j7 0/18, 1nitlympp 4/18 pages over the VB element budget. The owner chooses one-side counting vs the AD citing from the trimmed claims."
+      },
+      "supersededBy": {
+        "date": "2026-09-28",
+        "entry": "jev-first-briefs",
+        "note": "The scene review these claims read (sceneReviewReport, its checks, its re-pin) is deleted (docs/decisions.md 2026-09-28 \"The scene review is deleted\"); the brief checks and the one re-ask (entry jev-first-briefs) replace it."
       }
     },
     {
@@ -1143,7 +1153,7 @@
           "pages"
         ]
       },
-      "status": "failed",
+      "status": "superseded",
       "evidence": [
         {
           "storyId": "job_1790100385959_1nitlympp",
@@ -1201,6 +1211,11 @@
         "checkedAt": "2026-09-27 23:04:04 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: sceneReviewReport.analysis [facing_not_per_character] lines and briefUnfixed; then read sceneDescription of each 3+-figure page for a per-figure facing clause"
+      },
+      "supersededBy": {
+        "date": "2026-09-28",
+        "entry": "jev-first-briefs",
+        "note": "The scene review these claims read (sceneReviewReport, its checks, its re-pin) is deleted (docs/decisions.md 2026-09-28 \"The scene review is deleted\"); the brief checks and the one re-ask (entry jev-first-briefs) replace it."
       }
     },
     {
@@ -3756,7 +3771,7 @@
           "pages"
         ]
       },
-      "status": "failed",
+      "status": "superseded",
       "evidence": [
         {
           "storyId": "job_1790539784661_6mjcny1c7",
@@ -3782,6 +3797,11 @@
         "date": "2026-09-27",
         "status": "pending",
         "note": "Needs the next staging full story on a build with ae9d98a5d with a page of four or more characters."
+      },
+      "supersededBy": {
+        "date": "2026-09-28",
+        "entry": "jev-first-briefs",
+        "note": "The scene review these claims read (sceneReviewReport, its checks, its re-pin) is deleted (docs/decisions.md 2026-09-28 \"The scene review is deleted\"); the brief checks and the one re-ask (entry jev-first-briefs) replace it."
       }
     },
     {
@@ -3960,7 +3980,7 @@
         "kind": "human",
         "what": "stories.data.jevDecisions; sceneImages[].sceneMetadata fields vs jevDecisions; sceneReviewReport.briefFindings (jev_fixed_field) and jevRepinned; per-page pixels. Replays: scripts/analysis/replay-jev-decision-layer.js (shots 0.935 / 0 violations; cuts 5/5 budget, 7/7; VB creatures 31/31; light indoor 69/70; population 13/13; aboard 9/10; gaze 124/139). Lab 1577 (beats_replan, dragon book)."
       },
-      "status": "confirmed",
+      "status": "superseded",
       "evidence": [
         {
           "storyId": "job_1790529840433_ar4u7qry3",
@@ -3991,6 +4011,11 @@
         "checkedAt": "2026-09-27 23:04:04 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: stories.data.jevDecisions; sceneImages[].sceneMetadata fields vs jevDecisions; sceneReviewReport.briefFindings (jev_fixed_field) and jevRepinned; per-page pixels. Replays: scripts/analysis/replay-jev-decision-layer.js (shots 0.935 / 0 violations; cuts 5/5 budget, 7/7; VB creatures 31/31; light indoor 69/70; population 13/13; aboard 9/10; gaze 124/139). Lab 1577 (beats_replan, d"
+      },
+      "supersededBy": {
+        "date": "2026-09-28",
+        "entry": "jev-first-briefs",
+        "note": "The scene review these claims read (sceneReviewReport, its checks, its re-pin) is deleted (docs/decisions.md 2026-09-28 \"The scene review is deleted\"); the brief checks and the one re-ask (entry jev-first-briefs) replace it."
       }
     },
     {
@@ -4133,8 +4158,13 @@
         "kind": "human",
         "what": "stories.data.jevDecisions.vb.pages[].elements[] (cite, looks, stateP); visualBible states[].pages vs sceneImages objects[]; plan lines of the pages where a state changes; generationLog beats_jev_state_vs_brief / beats_jev_state_pages_repinned. Free replay 2026-09-28 (77 Jev calls, $0.0066): dragon 6mjcny1c7 p3 -> ANI001.2 at 0.997, other creature pages unchanged; the scale object moved to its dull look on p3/p5 (0.80/0.74, contestable)."
       },
-      "status": "pending",
-      "evidence": []
+      "status": "superseded",
+      "evidence": [],
+      "supersededBy": {
+        "date": "2026-09-28",
+        "entry": "jev-first-briefs",
+        "note": "The scene review these claims read (sceneReviewReport, its checks, its re-pin) is deleted (docs/decisions.md 2026-09-28 \"The scene review is deleted\"); the brief checks and the one re-ask (entry jev-first-briefs) replace it."
+      }
     },
     {
       "id": "vb-creature-anatomy",

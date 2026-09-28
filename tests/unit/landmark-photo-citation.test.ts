@@ -15,8 +15,8 @@
  *     unlisted citation is an error, a miss, and no photo — nothing picks one;
  *   - the Art Director sees EVERY servable photo, numbered, its description
  *     whole (it was cut at 110 chars and merged by framing);
- *   - the one citation rule reaches every author and the scene review;
- *   - the scene review's correction is adopted only when it is servable.
+ *   - the one citation rule reaches every author (the scene review that also
+ *     judged and corrected the citation is deleted, 2026-09-28).
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { createRequire } from 'node:module';
@@ -31,7 +31,6 @@ landmarkPhotos.loadLandmarkPhotoVariant = async (_vb: any, _id: string, n: numbe
 const SH = nodeRequire('../../server/lib/storyHelpers.js');
 const PB = nodeRequire('../../server/lib/promptBuilders.js');
 const { loadPromptTemplates } = nodeRequire('../../server/services/prompts.js');
-const { applyReviewBibleCorrections } = nodeRequire('../../server/lib/beatsPipeline.js');
 
 const LONG_DESC = '[whole, autumn, day] A broad terrace square under old trees, a low stone wall along its far edge, '
   + 'benches in a row, a chess board painted on the gravel, and beyond the wall the roofs of the old town '
@@ -144,19 +143,11 @@ describe('the Art Director sees every photo, numbered and whole', () => {
   });
 });
 
-describe('one citation rule reaches every author and the critic', () => {
+describe('one citation rule reaches every author', () => {
   beforeAll(async () => { await loadPromptTemplates(); });
   const vb = { locations: [{ ...landmark(), emptyScenePrompt: undefined,
     vantages: landmark().vantages.map((v: any) => ({ ...v, emptyScenePrompt: 'a plate', shot: 'wide' })) }] };
 
-  it('the scene review is given the rule, each plate\'s citation and the numbered photos', () => {
-    const p = PB.buildSceneReviewPrompt({ characters: [], language: 'en' }, [{ pageNumber: 2, brief: 'A brief.' }], { visualBible: vb });
-    expect(p).toContain(PB.LANDMARK_PHOTO_CITE_RULE);
-    expect(p).toMatch(/LOC001\.3[^\n]*landmarkPhoto: 2/);
-    expect(p).toMatch(/LOC001\.1[^\n]*landmarkPhoto: "none"/);
-    expect(p).toContain(LONG_DESC);
-    expect(p).not.toMatch(/\{LANDMARK_PHOTO_CITE\}/);
-  });
   it('the trial writer lists the numbered photos and gets the rule', () => {
     const p = PB.buildTrialStoryPrompt({
       characters: [{ name: 'Mia', age: 6, isMainCharacter: true }], mainCharacters: [], language: 'en',
@@ -172,27 +163,5 @@ describe('one citation rule reaches every author and the critic', () => {
     expect(text).toContain('Photo 3 (exterior');
     expect(text).toMatch(/LOC001\.3 "far view" → Photo 2/);
     expect(text).not.toMatch(/\[LOC001\.\d\] \((?:exterior|interior)\)/);
-  });
-});
-
-describe('the scene review corrects a citation only to a servable photo', () => {
-  const review = (json: any) => `analysis\n---VISUAL BIBLE---\n\`\`\`json\n${JSON.stringify(json)}\n\`\`\``;
-  it('a vantage row sets that vantage\'s landmarkPhoto', () => {
-    const vb: any = { locations: [landmark()] };
-    const out = applyReviewBibleCorrections(review({ locations: [{ id: 'LOC001', vantages: [{ id: 'LOC001.1', landmarkPhoto: 3 }] }] }), vb, 3);
-    expect(vb.locations[0].vantages[0].landmarkPhoto).toBe(3);
-    expect(out.applied).toHaveLength(1);
-    expect(out.rejected).toEqual([]);
-  });
-  it('a top-level dotted row is the same correction', () => {
-    const vb: any = { locations: [landmark()] };
-    applyReviewBibleCorrections(review({ locations: [{ id: 'LOC001.3', landmarkPhoto: 'none' }] }), vb, 3);
-    expect(vb.locations[0].vantages[2].landmarkPhoto).toBe('none');
-  });
-  it('an unlisted photo is rejected and the authored citation stands', () => {
-    const vb: any = { locations: [landmark()] };
-    const out = applyReviewBibleCorrections(review({ locations: [{ id: 'LOC001', vantages: [{ id: 'LOC001.2', landmarkPhoto: 7 }] }] }), vb, 3);
-    expect(vb.locations[0].vantages[1].landmarkPhoto).toBe(1);
-    expect(out.rejected).toHaveLength(1);
   });
 });

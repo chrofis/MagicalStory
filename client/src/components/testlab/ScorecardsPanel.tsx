@@ -13,10 +13,11 @@ const SCORER_NAMES: Record<string, string> = { '2.1': 'sonnet', '2.2': 'grok', '
 const scorerLabel = (v: string) => (SCORER_NAMES[v] ? `${v} ${SCORER_NAMES[v]}` : `v${v}`);
 
 // beats_review_replay retired 2026-09-01 (beats-review/audit machinery
-// deleted, docs/decisions.md) — "beats" keeps no rerun stage, but its scores
-// stay visible above; only the "＋ next round" control is suppressed for it.
+// deleted, docs/decisions.md), scene_review_replay 2026-09-28 (the scene review
+// deleted) — "beats" and "scene" keep no rerun stage, but their scores stay
+// visible above; only the "＋ next round" control is suppressed for them.
 const PART_STAGE: Record<string, string | null> = {
-  full: 'story_scorecard', beats: null, scene: 'scene_review_replay',
+  full: 'story_scorecard', beats: null, scene: null,
   storyText: 'story_text_replay', visualBible: 'story_bible_replay',
 };
 

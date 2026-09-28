@@ -65508,3 +65508,86 @@ server/lib/beatsReplayInputs.js, server/lib/storyMetrics.js, server/lib/storySco
 server/lib/storyHelpers.js, server/services/prompts.js, server/routes/stories.js, storyJobPipeline.js,
 client (story types, StoryDisplay, StoryWizard, storyService, TestLab), scripts/admin/sibling-registry.json,
 scripts/analysis/replay-jev-first-briefs.js, tests.
+
+## 2026-09-28 — The scene review is deleted; five of its checks and a required-text check return as code checks feeding the one re-ask (owner, Q9)
+
+**Context:** the entry above ("Jev first, then no scene review") stopped calling the review and kept
+its code until the owner had read what each of its ~40 tagged checks actually changed (Q9). The
+rung-1 count over the 15 latest staging stories with a stored review is the table in
+`tasks/jev-first-briefs-2026-09-28.md` (Q9 table): per check, the stories naming pages, pages
+named, pages named and rewritten, and pages only that tag named. Owner, 2026-09-28: bring back
+`negation_named`, `element_uncited`, `character_fields`, `clothing_incomplete` and
+`cast_not_in_plan` as code checks feeding the batched re-ask; "Text should also get its own check";
+every other check becomes a BACKLOG line with its counts; then delete the review.
+
+**Decision:**
+1. **The checks** (`sceneBriefCheck.js`, `clothingCheck.js`, collected by
+   `briefChecks.collectBriefFindings`, so production and the Lab `beats_scenes` stage run them alike).
+   Each was replayed over 251 stored pre-review briefs before wiring
+   (`scripts/analysis/replay-jev-first-briefs.js newchecks`):
+   - `negation_named` — the review's word list ("no …", "without …", "empty of …", "does not …" and
+     the n't forms; `bare` left out, it names a surface), over the prose and every metadata string:
+     23 fires, all name an absence (one non-visual). 4 of them copy the creature-tone rule's own "no
+     teeth showing" — a generator-vs-critic conflict left to the owner (BACKLOG).
+   - `element_uncited` — NOT the head-noun check deleted 2026-09-18 (75% false): only an entry's
+     whole authored `label`, `properName` or (creature, figure) `name`, a possessive excluded, generic
+     and worn (`wornAs`, `wornItems`) entries excluded: 12 fires, 6 of 10 judged true.
+   - `character_fields` — each characters[] row carries `depth` and an `expression` naming a face part
+     (brows, eyes, "-eyed", stare, mouth, lips, smile, grin, frown …); no face is asked on a wide,
+     ultra-wide or aerial shot, a plain back view or an over-the-shoulder crop: 7 fires, all mood words.
+   - `cast_not_in_plan` — a commissioned character in characters[] whom the page's head count
+     (`beat.inFrame`, the shipped plan check's `present`, set in `runArtDirector` on the Jev path and
+     the backup) does not put in frame; covers and pages without a head count are not checked.
+     Replayed on the who column (stored `present` predates the current counters): 17 fires, about 13
+     true; the false ones are collective who columns ("all four boys"), which `present` resolves.
+   - `clothing_incomplete` — the character's own stretch of prose leaves out the outfit's top, bottom
+     or footwear; a slot counts as named when the prose names any garment of that slot
+     (`wornItems.deriveSlotFromName`), a tail or fin asks no bottom or footwear, and a close-up (ends
+     at the waist, shotVocabulary) asks the top only: 21 fires, about 17 true.
+   - `required_text_undeclared` — plan lines never quote the lettering (the quote heuristic caught 0
+     of the reading pages and fired 21 times falsely), so the page is found by a Jev noul,
+     `jevDecisions.READ_TEXT_Q`, riding the per-page element call (`decideVbAndAboard`, threshold
+     0.5, stored as `jevFixed.readsText`). Measured on 674 stored plan lines (staging + prod, $0.065):
+     7 flagged, all reading pages. The check fires when no element the brief cites declares `text`: 5
+     fires on those pages, 0 where text was declared. The re-ask may answer with a
+     `---VISUAL BIBLE---` block `{"text": [{id, text}]}`, taken only for an element a flagged page
+     cites (`briefChecks.applyBibleTextLane`) and synced into the transcript. Not checked on the
+     Jev-outage backup (no READ answer there) — the backup also has no other text critic.
+2. **Deleted, not demoted:** `runSceneReview`, `applyReviewBibleCorrections` (state, text and
+   landmark-photo corrections), `bibleCorrectionsMissingFromTranscript`, `pinJevFixedFields`,
+   `repinJevStatePages`, `jevDecisions.fixedFieldFinding` and the `jev_fixed_field` type,
+   `prompts/scene-review.txt`, `buildSceneReviewPrompt` and its bible block, the review halves of
+   `sceneReviewGuard.js` (cast-removal audit, truncation assessment), `MODEL_DEFAULTS.sceneReviewModel`
+   (and `SCENE_REVIEW_MODEL` in the `briefCorrectionModel` chain), the Lab `scene_review_replay`
+   stage (server, route, client list, scorecard "next round"), the sibling sets
+   `lab-vs-prod-scene-review` and `landmark-photo-generator-vs-critic` (it has no critic left); the
+   other review sets now name `sceneBriefCheck.js` / `briefChecks.js` as the critic. Six verify
+   entries are `superseded` (creature-part-in-who-column, vb-element-overflow-remeasure,
+   facing-per-character-remeasure, group-staging-check, jev-decision-layer-wired, jev-picks-state-look).
+3. **Kept for stored data:** `sceneReviewGuard.assertReviewedArtifactUsable` / `pickReviewedBrief`
+   (the Lab hazard count reads `reviewedBrief` artifacts of experiments stored before today),
+   `storyMetrics` churn from stored `sceneReviewReport`, and the stories route field.
+4. **Lost critics** (no code check, no Jev question): the other 31 rows of the Q9 table, one BACKLOG
+   line each. Largest by pages named: `gaze_budget` 40, `critique_in_brief` 20, `scene_intent` 18,
+   `continuity` 18, `landmark_photo_mismatch` 17 (the only critic of the `landmarkPhoto` citation),
+   `gaze_missing` 17, `facing_not_per_character` 17, `force_at_rest` 16. Each stays a generator
+   rule in the Art Director templates. SETTLED line on the composite trigger: check 6c
+   (`depth_unearned`, 13 pages) no longer has a critic, so `background` declarations may rise.
+
+**Rationale:** the owner's Q9 ruling on measured counts. Each kept check reads structured fields or a
+fixed list and was replayed on stored briefs first; the required-text check uses a question because
+the structural signal the review relied on does not exist in plan lines.
+
+**Status:** ✅ active. Replaces the scene review in "Jev first, then no scene review" (above), and
+with it the review-side halves of earlier entries: the declared cast removals and their restore
+guard, the review's object-state corrections, its required-text lane (check 9g) and its
+landmark-photo judge (check 10ab). Rung 2 (Lab dragon, cap CHF 1.00) is open.
+
+**Touched:** server/lib/sceneBriefCheck.js, server/lib/clothingCheck.js, server/lib/briefChecks.js,
+server/lib/jevDecisions.js, server/lib/jevBriefFields.js, server/lib/beatsPipeline.js,
+server/lib/promptBuilders.js, server/lib/storyHelpers.js, server/lib/sceneReviewGuard.js,
+server/lib/testlab.js, server/routes/admin/testlab.js, server/config/models.js,
+server/services/prompts.js, prompts/brief-reask.txt, prompts/scene-review.txt (deleted),
+client/src/services/testlabService.ts, client/src/components/testlab/ScorecardsPanel.tsx,
+scripts/admin/sibling-registry.json, scripts/analysis/replay-jev-first-briefs.js, tasks/verify.json,
+tests.

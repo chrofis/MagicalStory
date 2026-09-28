@@ -13,9 +13,9 @@
  *     the picture a LATER plan line calls for. The page cited that state, and
  *     what the page showed overrode its own plan line.
  *
- * The fix is two JS constants reaching the two Art Director templates AND the
- * scene review through one placeholder each — generator and critic given the
- * same contract. What is pinned here is ARRIVAL and SAMENESS (all three built
+ * The fix is two JS constants reaching the two Art Director templates (and,
+ * until its deletion on 2026-09-28, the scene review) through one placeholder
+ * each. What is pinned here is ARRIVAL and SAMENESS (both built
  * prompts carry the identical string, no placeholder survives), never the
  * prompt's wording: reword the rules freely, they may not stop arriving.
  *
@@ -74,7 +74,6 @@ describe('the plan-line cast rule and the multi-picture prop rule each reach eve
       'all-pages Art Director': PB.buildSceneBriefsAllPrompt(inputData, BEATS, {}),
       'per-page Art Director': PB.buildSceneExpansionPrompt(
         1, 'The lamp guttered twice and then went out.', CHARACTERS, 'en', VISUAL_BIBLE, '', null, {}),
-      'scene review': PB.buildSceneReviewPrompt(inputData, SCENES, { beats: BEATS, visualBible: VISUAL_BIBLE }),
     };
   });
 
@@ -85,13 +84,13 @@ describe('the plan-line cast rule and the multi-picture prop rule each reach eve
     expect(PB.MULTI_PICTURE_PROP_RULE.length).toBeGreaterThan(40);
   });
 
-  it('both Art Director prompts and the scene review carry the cast rule, from that one constant', () => {
+  it('both Art Director prompts carry the cast rule, from that one constant', () => {
     for (const [site, prompt] of Object.entries(built)) {
       expect(prompt.includes(PB.PLAN_LINE_CAST_RULE), `${site} lost the plan-line cast rule`).toBe(true);
     }
   });
 
-  it('both Art Director prompts and the scene review carry the multi-picture prop rule, from that one constant', () => {
+  it('both Art Director prompts carry the multi-picture prop rule, from that one constant', () => {
     for (const [site, prompt] of Object.entries(built)) {
       expect(prompt.includes(PB.MULTI_PICTURE_PROP_RULE), `${site} lost the multi-picture prop rule`).toBe(true);
     }

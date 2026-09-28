@@ -364,7 +364,6 @@ async function loadPromptTemplates() {
     // Chooses the shipped title from the writer's candidates.
     // One review over ALL scene briefs at once — repetition, visual arc and
     // continuity are only visible across pages, never per-scene.
-    ['sceneReview', 'scene-review.txt'],
     // Lab measurement only: counts render hazards per page across a book's
     // briefs (or its beats' SCENE lines). Report-only — nothing consumes it in
     // the pipeline.

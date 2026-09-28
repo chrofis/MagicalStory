@@ -111,12 +111,11 @@ describe('the plate prompt and its judge read the same two fields', () => {
   });
 });
 
-describe('one rule for every brief author and the scene review', () => {
-  it('reaches the all-pages AD, the review and the trial writer, filled', () => {
+describe('one rule for every brief author', () => {
+  it('reaches the all-pages AD and the trial writer, filled', () => {
     const beats = [{ pageNumber: 1, planLine: 'wide — Mira — she lifts the lantern — it glows' }];
     const built = [
       String(PB.buildSceneBriefsAllPrompt(inputData, beats, {})),
-      String(PB.buildSceneReviewPrompt(inputData, [{ pageNumber: 1, brief: brief('A pier.') }], { beats })),
       String(PB.buildTrialStoryPrompt(inputData, 4)),
     ];
     for (const text of built) {

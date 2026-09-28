@@ -3,7 +3,6 @@ import { createRequire } from 'node:module';
 
 const require_ = createRequire(import.meta.url);
 const { resolveWornItemsForPage, buildWornStateLines, buildWornStateBlock, WORN_ITEMS_HEADER } = require_('../../server/lib/wornItems.js');
-const { restoreUndeclaredRemovals } = require_('../../server/lib/sceneReviewGuard.js');
 
 /**
  * THE CAST GATE TESTS THE PERSON THE ROW CHANGES, NOT ONLY THE OWNER.
@@ -96,62 +95,5 @@ describe('ordinary non-handover rows are untouched', () => {
     );
     expect(out[0].handedOver).toBe(false);
     expect(buildWornStateLines(out).join('\n')).toContain('Owner IS wearing this on this page:');
-  });
-});
-
-/**
- * `restoreUndeclaredRemovals` spliced blind, so a name the reviewed brief
- * already listed was appended a SECOND time — staging
- * job_1789759147125_p08djwhbl p17 shipped `characters: ["Julian","Julian"]`.
- * The parse failure that triggered it is fixed (b5443396a); the guard must not
- * depend on a parser succeeding upstream.
- */
-describe('the cast restore guard is idempotent', () => {
-  const brief = (cast: string[], prose: string) =>
-    `${prose}\n---METADATA---\n${JSON.stringify({ characters: cast.map(name => ({ name })), objects: [] })}`;
-
-  const run = (afterCastInBrief: string[], undeclared: string[]) => {
-    const BEFORE = brief(['Julian', 'Mara'], 'Julian and Mara stand on the quay.');
-    const AFTER = brief(afterCastInBrief, 'Two children stand on the quay.');
-    const expansions = [{ pageNumber: 17, brief: AFTER, reviewRewrote: true }];
-    const sceneDiffs = [{ pageNumber: 17, before: BEFORE, after: AFTER }];
-    const changed = [17];
-    const audit = [{ pageNumber: 17, lost: undeclared, rerouted: [], declared: [], undeclared }];
-    const res = restoreUndeclaredRemovals(expansions, sceneDiffs, changed, audit);
-    const meta = JSON.parse(String(expansions[0].brief).split('---METADATA---')[1]);
-    return { ...res, cast: meta.characters.map((c: any) => c.name), changed, expansions };
-  };
-
-  it('does not append a name the reviewed brief already lists', () => {
-    const r = run(['Julian'], ['Julian']);
-    expect(r.cast).toEqual(['Julian']);
-    expect(r.restored).toEqual([]);
-    expect(r.reverted).toEqual([]);
-    expect(r.changed).toEqual([17]);
-  });
-
-  it('still restores a name that is genuinely missing', () => {
-    const r = run(['Julian'], ['Julian', 'Mara']);
-    expect(r.cast).toEqual(['Julian', 'Mara']);
-    expect(r.restored).toEqual([{ pageNumber: 17, names: ['Mara'] }]);
-  });
-
-  it('compares canonically, not by raw string equality', () => {
-    const r = run(['julian'], ['Julian']);
-    expect(r.cast).toEqual(['julian']);
-    expect(r.restored).toEqual([]);
-  });
-
-  it('the whole-brief revert still stands when characters[] cannot be located', () => {
-    const BEFORE = brief(['Julian', 'Mara'], 'Julian and Mara stand on the quay.');
-    const AFTER = 'Two children stand on the quay. No metadata at all.';
-    const expansions = [{ pageNumber: 17, brief: AFTER, reviewRewrote: true }];
-    const sceneDiffs = [{ pageNumber: 17, before: BEFORE, after: AFTER }];
-    const changed = [17];
-    const audit = [{ pageNumber: 17, lost: ['Julian'], rerouted: [], declared: [], undeclared: ['Julian'] }];
-    const { reverted } = restoreUndeclaredRemovals(expansions, sceneDiffs, changed, audit);
-    expect(reverted).toEqual([{ pageNumber: 17, undeclared: ['Julian'] }]);
-    expect(expansions[0].brief).toBe(BEFORE);
-    expect(changed).toEqual([]);
   });
 });

@@ -95,24 +95,19 @@ describe('shot_off_plate', () => {
 
 // The plan's close-up wins (2026-09-24, Lab 1433 p8): the reviewer widened a
 // planned close-up under 7b while `shot_widened` reported that very widening.
-describe('one close-up rule for the Art Director, the review and shot_widened', () => {
+describe('one close-up rule for the Art Director and shot_widened', () => {
   const { CLOSEUP_KEPT_RULE } = require_('../../server/lib/shotVocabulary');
   it('shot_widened states the rule', () => {
     const hit = checkPage({ pageNumber: 8, planLine: 'close-up — Mira — Mira presses the bag against the shell — it is warm', brief: brief({ shot: 'medium' }) }, [], bible(), {})
       .find((x: any) => x.type === 'shot_widened');
     expect(hit.detail).toContain(CLOSEUP_KEPT_RULE);
   });
-  it('the review no longer turns a planned close-up into a medium', async () => {
+  it('the Art Director keeps a planned close-up', async () => {
     await loadPromptTemplates();
     const inputData = { language: 'en', pages: 1, characters: [{ id: 1, name: 'Mira' }], mainCharacters: [1] };
-    const review = String(PB.buildSceneReviewPrompt(inputData, [{ pageNumber: 1, brief: brief({}) }], { beats: [{ pageNumber: 1, planLine: 'close-up — Mira — x — y' }] }));
     const ad = String(PB.buildSceneBriefsAllPrompt(inputData, [{ pageNumber: 1, planLine: 'close-up — Mira — x — y' }], {}));
-    for (const text of [review, ad]) {
-      expect(text).toContain(CLOSEUP_KEPT_RULE);
-      expect(text).not.toContain('{CLOSEUP_KEPT}');
-    }
-    expect(review).not.toContain("Rewrite that page's `shot` to `medium` and change nothing else.");
-    expect(review).not.toContain('or changing `shot` to `medium`');
+    expect(ad).toContain(CLOSEUP_KEPT_RULE);
+    expect(ad).not.toContain('{CLOSEUP_KEPT}');
     expect(ad).not.toContain('or make the page a `medium` shot');
   });
 });
@@ -125,11 +120,9 @@ describe('built prompts', () => {
   };
   const BEATS = [{ pageNumber: 1, planLine: 'medium — Mira — Mira lifts the lantern — it glows' }, { pageNumber: 2, planLine: 'wide — Tom — Tom runs — he is gone' }];
   let ad = '';
-  let review = '';
   beforeAll(async () => {
     await loadPromptTemplates();
     ad = String(PB.buildSceneBriefsAllPrompt(inputData, BEATS, {}));
-    review = String(PB.buildSceneReviewPrompt(inputData, [{ pageNumber: 1, brief: brief({}) }], { beats: BEATS }));
   });
 
   it('a cast with no primary characters never reads "and None" in the cover beats', () => {
@@ -142,30 +135,13 @@ describe('built prompts', () => {
     expect(beats.find((b: any) => b.coverKey === 'initialPage').planLine).toMatch(/^wide — Mira, Tom — /);
   });
 
-  it('eyes-open and the creature face reach the generator and the critic from one constant', () => {
-    for (const text of [ad, review]) {
-      expect(text).toContain(PB.EYES_OPEN_RULE);
-      expect(text).toContain(PB.CREATURE_FACE_RULE);
-    }
+  it('eyes-open and the creature face reach the generator from one constant', () => {
+    expect(ad).toContain(PB.EYES_OPEN_RULE);
+    expect(ad).toContain(PB.CREATURE_FACE_RULE);
   });
 
-  it('the critic states the object-state citation the way the Art Director does', () => {
+  it('the Art Director cites an object state dotted', () => {
     expect(ad).toMatch(/always cited dotted, the pages before its first change included/);
-    expect(review).toContain('Every page cites the dotted id of its state, the pages before the first change included.');
-    expect(review).not.toContain('cites the bare id');
-  });
-
-  it('check 4 lets the plan line scatter a group', () => {
-    expect(review).not.toContain('never split across separate spots');
-    expect(review).toContain('each at their own spot when the plan line scatters them');
-  });
-
-  it('check 0 is sent only with the mechanical clothing section it is about', () => {
-    expect(review).not.toContain('[clothing_mechanical]');
-    const withFaults = String(PB.buildSceneReviewPrompt(inputData, [{ pageNumber: 1, brief: brief({}) }],
-      { beats: BEATS, clothingFindings: '# MECHANICAL CLOTHING FAULTS\n- Page 1: x' }));
-    expect(withFaults).toContain('[clothing_mechanical]');
-    expect(withFaults).not.toContain('CLOTHING_MECHANICAL');
   });
 
   it('the Art Director gets no rule about the page text or the art style it is never shown', () => {
@@ -188,15 +164,6 @@ describe('built prompts', () => {
   });
 });
 
-describe('the scene review block with nothing declared', () => {
-  it('says so in one line instead of one per element', () => {
-    const vb = { artifacts: [{ id: 'ART001', name: 'egg' }, { id: 'ART002', name: 'scale' }], animals: [], vehicles: [], clothing: [], locations: [] };
-    const block = PB.buildSceneReviewBibleBlock ? PB.buildSceneReviewBibleBlock(vb) : null;
-    if (block === null) return; // not exported
-    expect(block).toContain('- every element: text: (none declared)');
-    expect(block).not.toContain('ART001');
-  });
-});
 
 // A place is not a grip (2026-09-23): p9 / p12 of the same run were faulted
 // "2 characters have hands on loc002.3" for banking leaves on the ground.
@@ -244,9 +211,8 @@ describe('the hand-off counters never count a location id as a one-grip object',
   it('a row with no action label is never the sole action', () => {
     expect(typesD([{ character: 'Levin + Kiaan', object: 'ART002.1', hands: true }])).toContain('interaction_object_shared_hands');
   });
-  it('the Art Director and the reviewer carry the same rule', () => {
+  it('the Art Director carries the rule', () => {
     const { SHARED_GRIP_RULE } = require_('../../server/lib/sceneMetadata');
     expect(String(PB.buildSceneBriefsAllPrompt({ language: 'en', characters: [{ id: 1, name: 'Mira' }], mainCharacters: [1] }, [{ pageNumber: 1, planLine: 'medium \u2014 Mira \u2014 x \u2014 y' }], {}))).toContain(SHARED_GRIP_RULE);
-    expect(String(PB.buildSceneReviewPrompt({ language: 'en', characters: [{ id: 1, name: 'Mira' }], mainCharacters: [1] }, [{ pageNumber: 1, brief: 'x' }], {}))).toContain(SHARED_GRIP_RULE);
   });
 });

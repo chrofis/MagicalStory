@@ -10,23 +10,12 @@
  *
  * Rows stored before 2026-09-21 still carry their own copy and must keep
  * rendering — that is stored data in an old shape, not a second code path.
+ * The scene review itself is deleted (2026-09-28); its stored reports keep
+ * their churn.
  */
 import { describe, it, expect } from 'vitest';
-import fs from 'fs';
-import path from 'path';
 
 const { computeMetrics } = require("../../server/lib/storyMetrics");
-
-const BEATS_SRC = fs.readFileSync(path.join(__dirname, '../../server/lib/beatsPipeline.js'), 'utf-8');
-
-describe('the scene review report stores each brief once', () => {
-  it('strips `before` from the stored rows', () => {
-    // The rows keep `before` in memory (the cast-removal diff reads it); it is
-    // dropped where the report is assembled.
-    expect(BEATS_SRC).toContain('pages: sceneDiffs.map(({ before, ...row }) => row)');
-    expect(BEATS_SRC).not.toContain('pages: sceneDiffs,');
-  });
-});
 
 describe('churn is computed from briefsIn', () => {
   const metricsFor = (report: any) => computeMetrics({

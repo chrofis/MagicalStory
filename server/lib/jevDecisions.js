@@ -1031,11 +1031,10 @@ async function decideGaze({ arc, pages, perPage }, opts = {}) {
 // ───────────────────────── the FIXED fields in the brief ─────────────────────────
 
 /**
- * The fields the decision layer owns, stated once to every brief author and to
- * the scene review (generator ↔ critic from one constant). `timeOfDay` and
- * indoors reach the Art Director as the page's FIXED line; the cited elements,
- * `population`, `aboard` and `looksAt` are written by code after the Art
- * Director and handed to the review as `jev_fixed_field` lines. The `shot` is
+ * The fields the decision layer owns, stated once to every brief author (the
+ * page-brief call, the re-ask and iterate). Every decided field reaches the Art
+ * Director as the page's FIXED block, and code pins it after each author
+ * (pinBrief). The `shot` is
  * field 0 of the plan line the Art Director reads, and code pins it the same
  * way (owner, 2026-09-28): on the Jev path a rule that would change the shot —
  * a close-up widened for below-waist staging, a gap action reframed, a group
@@ -1170,35 +1169,6 @@ function pinBrief(brief, fixed) {
 }
 
 /**
- * The review line for a page whose fixed fields differ from what its brief
- * was written with: what code set, so the prose can follow. Null when nothing
- * the prose must follow changed.
- */
-function fixedFieldFinding(pageNumber, changes, labelOf = id => id) {
-  const parts = [];
-  for (const c of changes) {
-    if (c.field === 'objects') {
-      // A cite that only changes the dotted suffix is the same element in
-      // another look: the prose keeps it and renders that look.
-      const relooked = c.added.filter(id => c.removed.some(r => baseId(r) === baseId(id)));
-      const added = c.added.filter(id => !relooked.includes(id));
-      const removed = c.removed.filter(r => !relooked.some(id => baseId(id) === baseId(r)));
-      for (const id of relooked) parts.push(`objects[] cites ${id} (${labelOf(id)}) in place of ${c.removed.find(r => baseId(r) === baseId(id))} — the prose stages it in that look`);
-      if (added.length) parts.push(`objects[] now cites ${added.map(id => `${id} (${labelOf(id)})`).join(', ')} — stage ${added.length > 1 ? 'them' : 'it'} in the prose, even where only part is in frame`);
-      if (removed.length) parts.push(`objects[] no longer cites ${removed.map(id => `${id} (${labelOf(id)})`).join(', ')} — take ${removed.length > 1 ? 'them' : 'it'} out of the prose`);
-    } else if (c.field === 'shot') parts.push(`shot is ${c.to} — the prose stages the moment in that framing`);
-    else if (c.field === 'timeOfDay') parts.push(`timeOfDay is ${c.to} — the prose's light is that hour's`);
-    else if (c.field === 'weather' && c.problem === 'outdoors') parts.push('the page is outdoors — `weather` is one of the outdoor values, never `none`; choose the story\'s sky and write it into the prose');
-    else if (c.field === 'weather') parts.push('the page is indoors — `weather` is `none` and the prose shows no sky weather except through a window');
-    else if (c.field === 'population') parts.push(`population is ${c.to} — ${c.to === 'cast_only' ? 'no one but the listed figures is in the prose' : c.to === 'crowd' ? 'the prose is written around unnamed background people' : 'the prose shows a few distant, unnamed passers-by'}`);
-    else if (c.field === 'aboard') parts.push(c.to ? `the camera is aboard ${c.to} (${labelOf(c.to)}) — its deck, floor or interior is the ground the picture is taken from (rule 11d)` : `the camera is not aboard ${c.from} — it is seen from outside`);
-    else if (c.field === 'looksAt') parts.push(`${c.name} looks at ${c.to === GAZE_AWAY ? 'nothing in particular (away)' : `${c.to}${c.to !== labelOf(c.to) ? ` (${labelOf(c.to)})` : ''}`}`);
-  }
-  if (!parts.length) return null;
-  return { pageNumber, type: 'jev_fixed_field', detail: `Code set this page's fixed fields; rewrite the prose to render them and leave the fields as they are: ${parts.join('; ')}.` };
-}
-
-/**
  * The Visual Bible's page table for the elements Jev decided, made to agree
  * with the briefs' citations (story pages only; a cover's negative page stays),
  * and each state's pages made to agree with the pages cited IN that state.
@@ -1253,7 +1223,6 @@ module.exports = {
   fixedBlock,
   vantageShotRule,
   pinBrief,
-  fixedFieldFinding,
   applyVbPages,
   gazeIndex,
   gazePageMaterial,

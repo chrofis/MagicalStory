@@ -339,13 +339,12 @@ describe('the constant reaches all six BUILT prompts', () => {
     expect(gaps).toEqual([]);
   });
 
-  // 2026-09-23 (owner): the all-pages Art Director and the scene review run
-  // before any page text is written and are shown none, so a rule about the
-  // page text cannot apply there. Neither half may reach them.
-  it('the two stages that never see the page text carry neither half', () => {
+  // 2026-09-23 (owner): the all-pages Art Director runs before any page text
+  // is written and is shown none, so a rule about the page text cannot apply
+  // there. Neither half may reach it.
+  it('the stage that never sees the page text carries neither half', () => {
     const blind = [
       String(PB.buildSceneBriefsAllPrompt(inputData, BEATS, {})),
-      String(PB.buildSceneReviewPrompt(inputData, [{ pageNumber: 1, brief: BRIEF }, { pageNumber: 2, brief: BRIEF }], { beats: BEATS })),
     ];
     for (const text of blind) {
       expect(text.length).toBeGreaterThan(400);

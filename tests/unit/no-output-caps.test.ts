@@ -140,12 +140,12 @@ describe('no output caps — direct provider calls (max_tokens / maxOutputTokens
 
 describe('callers that must react to a truncated reply (source-level wiring)', () => {
   const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8');
-  it('beatsPipeline: the scene review falls back to the raw briefs; worn throws into its catch; arc creator retries', () => {
+  it('beatsPipeline: the arc creator retries; briefChecks: a truncated re-ask ships the briefs as written', () => {
+    // The scene review and its worn-state round (srRes / wrRes) were deleted
+    // 2026-09-28; the one brief re-ask took their place.
+    expect(read('server/lib/briefChecks.js')).toMatch(/else if \(res\.truncation\?\.suspected\) failed = /);
     const src = read('server/lib/beatsPipeline.js');
-    expect(src).toMatch(/const srTruncated = !!srRes\.truncation\?\.suspected;/);
-    expect(src).toMatch(/const parsed = srTruncated \? \{ analysis: '', pages: \[\] \} : parseRefinedText\(srRes\.text/);
-    expect(src).toMatch(/failed: sceneReviewFailed,/);
-    expect(src).toMatch(/if \(wrRes\.truncation\?\.suspected\) throw new Error/);
+    expect(src).not.toMatch(/\b(srRes|wrRes)\b/);
     expect(src).toMatch(/if \(res\.truncation\?\.suspected\) throw new Error\(`reply \$\{textModels\.describeTruncation\(res\.truncation\)\}`\);/);
     // The `rrRes` guard that used to be asserted here belonged to the scene
     // review's SECOND reviewer round, deleted in 27c37dfd9 ("kill the scene

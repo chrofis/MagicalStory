@@ -142,9 +142,6 @@ describe('which sceneBriefCheck types reach a rewrite', () => {
       'cover_text_zone_mismatch',
       // Whole-book (compares the covers with each other), like vb_state_no_base.
       'cover_location_repeated',
-      // Produced by the Jev decision layer before the scene review only (never by
-      // checkPage): what code set on a page after the Art Director (2026-09-27).
-      'jev_fixed_field',
       'textzone_character_collision', 'textzone_fullwidth_floor', 'textzone_top_floor',
       'textzone_bottom_floor', 'textzone_half_streak'];
     for (const t of SBC.REVIEWABLE) {
