@@ -6212,6 +6212,7 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     DO_NOT_WRITE_SECTION: doNotWriteSection,
     STYLE_RULEBOOK,
     MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
+    PICTURE_COUNT: PICTURE_COUNT_RULE,
     CLOSING_MOMENT: CLOSING_MOMENT_RULE,
     PAYOFF_KEEP: PAYOFF_KEEP_RULE,
     MECHANISM_FIX: MECHANISM_FIX_RULE,
@@ -9831,6 +9832,19 @@ const STYLE_RULEBOOK = [
  * writer's no-invention rule. Filled into both live writers and the repair,
  * which closes the audit's widened INFERRED findings.
  */
+/**
+ * A PAGE'S TEXT COUNTS ONLY WHOM ITS PICTURE HOLDS (owner, 2026-09-28).
+ * Staging job_1790539784661_6mjcny1c7 p10: the text said "alle vier" beside a
+ * picture of three boys — the fourth is with them in the story at that moment,
+ * but the page's who column leaves him out of frame. Stated as the KIND of
+ * word (a number, all, both, every), never a language's words, so it holds in
+ * every story language. One constant for the writers (story-text-from-beats.txt,
+ * story-trial.txt — both read who is in frame from the page's own plan line or
+ * scene), the rewriter (text-refine.txt) and the arc-informed audit's COUNT
+ * question (story-text-audit.txt), which reads the same plan lines.
+ */
+const PICTURE_COUNT_RULE = 'When a page\'s picture leaves out someone the story has with the others at that moment — whoever that page\'s plan line or scene does not put in frame — the page\'s text gives that group no number and never says all, both or every one of them, in whatever language it is written: it names who acts, or speaks of the rest without a count';
+
 const MOTIVE_AT_THE_ACT_RULE = 'Where a character refuses, demands, flees, hides or lies for a reason the story reveals only later, the reader gets a glimpse of that reason at or before the act (a look, a half-said word, a feeling named) without giving the later reveal away. The reason is the story\'s own, so this invents nothing';
 
 /**
@@ -11431,13 +11445,16 @@ function buildTextAuditPrompt(inputData, pages = [], arc = '', { arcHints = '' }
     CHARACTER_DETAILS: storyCharacterDetails(inputData),
     CHARACTER_DETAILS_USE,
     PLAN_LINES: planLines || '(no page plan was recorded)',
+    // Question 15 COUNT (owner, 2026-09-28): the writer's own rule, judged
+    // against the plan lines' who columns shown above.
+    PICTURE_COUNT: PICTURE_COUNT_RULE,
     PULL_QUESTION: simpleBand
       ? 'skip this question — this book is built from self-contained moments, so a page that leaves nothing open is correct.'
       : 'does anything remain open at the end of the page that the next page answers? The last page is exempt.',
     // Owner 2026-09-23: a hint the writer dropped is a finding the refine
     // fixes. Asked only when the story has hints.
     HINT_QUESTION: String(arcHints || '').trim()
-      ? '15. HINT: is every hint under HINTS applied on the pages it concerns? Name each hint no page follows, on the page where it belongs.'
+      ? '16. HINT: is every hint under HINTS applied on the pages it concerns? Name each hint no page follows, on the page where it belongs.'
       : '',
     // The ENDING question reads the writer's own strings (2026-09-27).
     CLOSING_MOMENT: CLOSING_MOMENT_RULE,
@@ -12033,6 +12050,7 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     PAGE_OPENING_VARIETY: PAGE_OPENING_VARIETY_RULE,
     STYLE_RULEBOOK,
     MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
+    PICTURE_COUNT: PICTURE_COUNT_RULE,
     CLOSING_MOMENT: CLOSING_MOMENT_RULE,
   });
 }
@@ -12294,6 +12312,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       PAGE_OPENING_VARIETY: PAGE_OPENING_VARIETY_RULE,
       STYLE_RULEBOOK,
       MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
+      PICTURE_COUNT: PICTURE_COUNT_RULE,
       CLOSING_MOMENT: CLOSING_MOMENT_RULE,
       // Trial has no Art Director either: the scene-hint composition rules
       // reach a trial page only through the writer prompt.
@@ -13062,6 +13081,7 @@ module.exports = {
   PAGE_OPENING_VARIETY_RULE,
   STYLE_RULEBOOK,
   MOTIVE_AT_THE_ACT_RULE,
+  PICTURE_COUNT_RULE,
   PAYOFF_KEEP_RULE,
   CLOSING_MOMENT_RULE,
   SHOWN_CALLBACK_RULE,

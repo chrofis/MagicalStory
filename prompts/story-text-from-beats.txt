@@ -44,6 +44,7 @@ Write the text for all {PAGE_COUNT} pages, in page order, plus a title.
 Each page covers its own stretch of the story and nothing that belongs to a later page.
 The illustration already shows the instant, so write what it cannot show: the interior, the dialogue, the turn, the causes, the move that got them there.
 Never contradict a page's illustration, and never mention pages, plans or illustrations.
+{PICTURE_COUNT}.
 Never use an em-dash or an en-dash, except where the LANGUAGE block above names one use for it. Use a comma, a full stop, a colon or parentheses.
 Style, on every page:
 {STYLE_RULEBOOK}

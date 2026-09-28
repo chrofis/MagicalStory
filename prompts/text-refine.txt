@@ -81,6 +81,8 @@ A STYLE finding quotes one sentence that breaks one of these rules. One you acce
 
 A fault that a character acts on a reason the page has not given is closed this way: {MOTIVE_AT_THE_ACT}.
 
+A COUNT fault is closed by the rule it names, recasting only the sentence that counts: {PICTURE_COUNT}.
+
 An ENDING fault is closed by what the ending owes, never by cutting what the ending shows: {CLOSING_MOMENT}
 
 A sentence longer than the reading level allows, a subordinate clause inside another subordinate clause, or a word a child at that level does not already use: recast it for that level.

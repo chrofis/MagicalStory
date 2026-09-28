@@ -96,7 +96,7 @@ describe('built prompts', () => {
   it('the arc-informed audit asks whether each hint was applied, only when there are hints', () => {
     const withHints = PB.buildTextAuditPrompt({ language: 'en' }, pages, 'An arc.', { arcHints: 'ISSUE: x → CHANGE: y' });
     const without = PB.buildTextAuditPrompt({ language: 'en' }, pages, 'An arc.');
-    expect(withHints).toMatch(/^15\. HINT:/m);
+    expect(withHints).toMatch(/^16\. HINT:/m);
     expect(without).not.toMatch(/HINT:/);
   });
 });
