@@ -125,6 +125,15 @@ serves immediately; the three new campaigns ramp as Google reviews their ads (~2
 - [ ] Re-run `set-keyword-bids.js --ceiling=0.50` once the broad keywords have first-page estimates.
 - [ ] Not chosen this round: Age ceiling 0.50 -> 0.80; new keyword-rich ad copy (Google's ad-strength hint).
 
+## 2026-09-28 — Deutschschweiz PAUSED; the leak is the phone pages, not the ads
+
+- 26-27 Sept: 14 clicks / CHF 11.85 / 0 trials. Paid /try visitors since 21 Sept (6): 1 finished story, 1 left after
+  the avatar (73 s), **4 left on /try's first screen with no tap**. 8 of 14 clickers never left the homepage.
+- iPhone screenshots (production): homepage first screen = text only, no picture; /try first screen = headline +
+  a stock girl photo, **no button** — "Los geht's" is ~2.5 screens down; the finished-book image is 3rd, below the fold.
+- [x] `activate-week.js` per-arm `status`; Deutschschweiz PAUSED (resume = flip its status back + --apply).
+- [ ] Owner to choose the phone-page fixes (proposed 2026-09-28). No code yet.
+
 ## Expectation stated to the owner up front
 
 CHF 10/day × 7 = ~CHF 70. At measured CPCs that is ~100–200 clicks; the historical click→trial rate is
