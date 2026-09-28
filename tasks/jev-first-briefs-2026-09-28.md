@@ -2,8 +2,23 @@
 
 **Owner decision (2026-09-28):** "Jev first, then remove the scene review."
 
-**STATUS: STEP 1 (this plan) only. Nothing is implemented. The open choices at the end need the
-owner's answers before Step 2 starts.**
+**STATUS: Step 2 (build) under way.**
+
+**Owner answers (2026-09-28, AskUserQuestion, relayed by the coordinator):**
+- Q1 = A (two-phase AD: VB call → Jev → briefs call). Q-split = two template files.
+- Q2/Q3: the re-ask uses the AD model (gemini-3.1-pro), in one batched call, at most one round.
+  The iterate corrector stays as it is.
+- Q4–Q8 = the recommendations:
+  - strict acceptance plus the who-column refusal;
+  - gaze decided before the briefs if the rung-1 agreement holds;
+  - iterate re-pin of all fields on strict iterate, all but the shot on free iterate;
+  - the wardrobe root-cause fix for "Wearing: NONE", plus the input guard, plus `outfit_missing`
+    after its precision is measured (the bug goes into bugs.json when confirmed and is fixed in
+    the same push);
+  - code writes the location id from the VB vantage pages.
+- Q9 = measure first. Rung 1 counts, for each lost review check, what it actually changed on stored
+  stories. Then STOP and report that table. **The review is not deleted until the owner has answered
+  Q9.** Rung 2 (Lab dragon, cap CHF 1.00) also waits for that report.
 
 ## Why (measured, not assumed)
 
