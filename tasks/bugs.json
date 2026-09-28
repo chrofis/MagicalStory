@@ -2461,7 +2461,7 @@
       "impact": "Any full-story front cover (baked title) with a group cast and declared outfits: no front cover at all (it is never retried with a shorter prompt). Same class on text-in-image pages with long worn lists.",
       "status": "fixed",
       "fixedAt": "2026-09-28",
-      "fixedIn": null,
+      "fixedIn": "4677059d0",
       "fix": "Worn rows of one character share one line and a description no longer repeats the item name; the baked-title line, the OPEN AREA, the WORN / EXPRESSIONS / REQUIRED OBJECTS headers and the split-state rule say the same in fewer words. iteratePageCore builds through pageRenderCall.makePageImagePrompt (sibling set page-prompt-one-construction). Dragon front cover floor 8,378 → 7,685 (margin 215). Test: tests/unit/cover-prompt-fixed-blocks-fit.test.ts. NOT covered: the p18 repair of the same run (rewrite brief not stored; estimated still over) — BACKLOG."
     }
   ]
