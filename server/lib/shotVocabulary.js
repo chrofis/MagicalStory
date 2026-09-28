@@ -41,6 +41,19 @@
 const OTS_NEAR_FIGURE_CROP = 'the back of the head, one shoulder and the upper arm, large in a front corner and cut by the frame edge; nothing below the shoulder blades is in frame. The camera sees the back of their head and their hair; their face is turned away from us, into the picture';
 
 /**
+ * WHICH FIGURE IS THE NEAR ONE (owner, 2026-09-28). Staging
+ * job_1790539784661_6mjcny1c7 p12: the plan line had the creature turn its
+ * face away from the child, and the brief made the creature the near crop —
+ * a back of a head turned away from the only other figure, so the picture's
+ * axis pointed at nothing. The near figure is the one whose look carries the
+ * camera's axis to the far figure. One sentence, in the shot's definition (the
+ * illustrator and the Jev fit question), OTS_NEAR_FIGURE_RULE (both Art
+ * Director templates, both iterate templates) and the scene review's
+ * over-the-shoulder check.
+ */
+const OTS_NEAR_FIGURE_FACING = 'The near figure is the one whose look runs into the picture toward the far figure — never a figure turning away from the far one; when the moment has one figure turn away from another, the one left looking stands nearest the camera.';
+
+/**
  * The shots, TIGHTEST FIRST. `id` is the word every stage writes and reads,
  * `match` recognises it in a free-text plan line, `definition` is what the
  * illustrator is told the word means, and `axis` says WHICH QUESTION the word
@@ -89,7 +102,7 @@ const SHOTS = [
     id: 'over-the-shoulder',
     axis: 'position',
     match: /\b(?:over[-\s]?the[-\s]?shoulder|over[-\s]?shoulder)\b/i,
-    definition: `An over-the-shoulder shot stands behind one figure, who is a crop: ${OTS_NEAR_FIGURE_CROP}. What they face sits far across the frame, small and deep in the opposite corner, several body lengths away. The camera's own axis is the line between them, so the picture states who is acting on whom without having to work it out.`,
+    definition: `An over-the-shoulder shot stands behind one figure, who is a crop: ${OTS_NEAR_FIGURE_CROP}. What they face sits far across the frame, small and deep in the opposite corner, several body lengths away. The camera's own axis is the line between them, so the picture states who is acting on whom without having to work it out. ${OTS_NEAR_FIGURE_FACING}`,
   },
   {
     id: 'high-angle',
@@ -140,11 +153,27 @@ const SHOTS = [
 const OTS_NO_CONTACT_RULE = "Over-the-shoulder never goes on a page where the near figure touches what they face — a hand laid on it, a grip, a lean against it, a hand-over: whatever is touched is within arm's reach and cannot sit small and deep in the far corner. Such a page takes another shot.";
 
 /**
+ * AN OVER-THE-SHOULDER NEEDS A NEAR FIGURE AND SOMEONE IT FACES (owner,
+ * 2026-09-28). Staging job_1790539784661_6mjcny1c7: the Jev shot assignment
+ * put the book's two mandatory over-the-shoulder pages on p4 and p15, whose
+ * who column holds one figure each (the creature alone). With nobody to stand
+ * behind, the Art Director either drew the lone figure as the near crop
+ * turning away from nothing or quietly changed the shot to `medium` (p15).
+ *
+ * The assignment (jevDecisions.allowedShot) therefore offers the shot only on
+ * a page whose who column puts at least this many figures in frame; the floor
+ * moves to an eligible page, and a book with none leaves the floor unmet
+ * (logged, never forced). A count, read from the plan check's structured
+ * `present` list — never from the plan line's prose.
+ */
+const OTS_MIN_IN_FRAME = 2;
+
+/**
  * The Art Director / iterate half: which perspective the near figure gets and
  * what its prose may describe. Filled into scene-expansion.txt,
  * scene-expansion-all.txt, scene-iteration.txt and scene-iteration-free.txt.
  */
-const OTS_NEAR_FIGURE_RULE = `On an \`over-the-shoulder\` page the figure nearest the camera gets \`perspective: over-the-shoulder\` — never \`back view\` and never a glance over the shoulder — and is seen as a crop: ${OTS_NEAR_FIGURE_CROP}. Describe only what that crop shows: the hair, the collar and sleeve of the upper garment, anything held up into frame. That figure's prose names no legs, trousers, footwear or stance, and it looks straight ahead into the scene toward what it faces — never up at it. ${OTS_NO_CONTACT_RULE}`;
+const OTS_NEAR_FIGURE_RULE = `On an \`over-the-shoulder\` page the figure nearest the camera gets \`perspective: over-the-shoulder\` — never \`back view\` and never a glance over the shoulder — and is seen as a crop: ${OTS_NEAR_FIGURE_CROP}. Describe only what that crop shows: the hair, the collar and sleeve of the upper garment, anything held up into frame. That figure's prose names no legs, trousers, footwear or stance, and it looks straight ahead into the scene toward what it faces — never up at it. ${OTS_NEAR_FIGURE_FACING} ${OTS_NO_CONTACT_RULE}`;
 
 /**
  * Whether a character annotation declares the over-the-shoulder near figure.
@@ -796,6 +825,8 @@ module.exports = {
   GROUP_WIDER_SHOTS,
   GROUP_STAGING_RULE,
   OTS_NEAR_FIGURE_CROP,
+  OTS_NEAR_FIGURE_FACING,
+  OTS_MIN_IN_FRAME,
   OTS_NO_CONTACT_RULE,
   OTS_NEAR_FIGURE_RULE,
   isOverTheShoulderPerspective,

@@ -348,7 +348,13 @@ function budgetOf(P) {
 // who-columns (the eval's --readingGroup); production passes `roster` = the
 // planCounters `present` list, which already does.
 const isGroup = p => (p.groupOverride != null ? p.groupOverride : p.roster.length > SV.GROUP_STAGING_MAX);
-const allowedShot = (p, s) => !isGroup(p) || SV.GROUP_WIDER_SHOTS.includes(s);
+const groupAllows = (p, s) => !isGroup(p) || SV.GROUP_WIDER_SHOTS.includes(s);
+// OVER-THE-SHOULDER NEEDS A NEAR FIGURE AND SOMEONE IT FACES (owner,
+// 2026-09-28, shotVocabulary.OTS_MIN_IN_FRAME): a page with fewer in frame
+// never takes it, so a floor slot moves to an eligible page — or stays empty
+// and is reported unmet (violations → `unmet`), never forced onto a lone figure.
+const otsAllows = (p, s) => s !== 'over-the-shoulder' || p.roster.length >= SV.OTS_MIN_IN_FRAME;
+const allowedShot = (p, s) => groupAllows(p, s) && otsAllows(p, s);
 
 /** The shot rules an assignment must hold; returns the broken ones. */
 function violations(pages, shots) {
@@ -357,7 +363,10 @@ function violations(pages, shots) {
   for (const [s, n] of Object.entries(b.floors)) if (count(s) < n) out.push(`floor:${s}`);
   if (shots.filter(s => SV.POSITION_SHOTS.includes(s)).length < b.requiredPositions) out.push('floor:positions');
   if (count('medium') + count('wide') > b.maxMediumWide) out.push('cap:medium+wide');
-  pages.forEach((p, i) => { if (!allowedShot(p, shots[i])) out.push(`group:p${p.page}`); });
+  pages.forEach((p, i) => {
+    if (!groupAllows(p, shots[i])) out.push(`group:p${p.page}`);
+    if (!otsAllows(p, shots[i])) out.push(`ots:p${p.page}`);
+  });
   for (let i = 1; i < pages.length; i++) {
     if (shots[i] === shots[i - 1] && pages[i].roster.length === pages[i - 1].roster.length) out.push(`consecutive:p${pages[i].page}`);
   }
@@ -378,7 +387,9 @@ function capBreaks(pages, shots) {
  * total still owes (any camera position), then optional slots up to the caps —
  * medium and wide share one pool of maxMediumWide. Mandatory slots carry a
  * bonus so they always fill. A group page (> GROUP_STAGING_MAX in frame) may
- * only take a GROUP_WIDER_SHOTS shot. Hungarian assignment of pages to slots is
+ * only take a GROUP_WIDER_SHOTS shot, and a page with fewer than
+ * OTS_MIN_IN_FRAME in frame never takes over-the-shoulder — a mandatory slot
+ * no page may take stays empty and its floor is reported unmet. Hungarian assignment of pages to slots is
  * exact for all of that. The consecutive rule (same shot and same cast count on
  * neighbours) is not a quota, so a local repair runs after: the cheapest single
  * change or swap that clears it and breaks nothing else; the aerial cap is
@@ -1011,9 +1022,13 @@ async function decideGaze({ arc, pages, perPage }, opts = {}) {
  * the scene review (generator ↔ critic from one constant). `timeOfDay` and
  * indoors reach the Art Director as the page's FIXED line; the cited elements,
  * `population`, `aboard` and `looksAt` are written by code after the Art
- * Director and handed to the review as `jev_fixed_field` lines.
+ * Director and handed to the review as `jev_fixed_field` lines. The `shot` is
+ * field 0 of the plan line the Art Director reads, and code pins it the same
+ * way (owner, 2026-09-28): on the Jev path a rule that would change the shot —
+ * a close-up widened for below-waist staging, a gap action reframed, a group
+ * pulled wider — applies to the staging inside it, never to the field.
  */
-const JEV_FIXED_FIELDS_RULE = 'Fields decided upstream are FIXED: a page whose plan carries a FIXED line takes its `timeOfDay` from it exactly, and its `weather` is `none` when the line says indoors and never `none` when it says outdoors. After the briefs are written, code sets each story page\'s cited Visual Bible elements in `objects[]` (locations excepted) — for an element with states, the dotted id of the look it shows on that page, and every state\'s `pages` follow from those citations — its `population`, its `aboard` and every character\'s `looksAt`; the prose renders those values and no rewrite changes them.';
+const JEV_FIXED_FIELDS_RULE = 'Fields decided upstream are FIXED: every story page\'s `shot` is the first field of its plan line exactly — the moment is staged within that framing, and no other rule changes it; a page whose plan carries a FIXED line takes its `timeOfDay` from it exactly, and its `weather` is `none` when the line says indoors and never `none` when it says outdoors. After the briefs are written, code sets each story page\'s cited Visual Bible elements in `objects[]` (locations excepted) — for an element with states, the dotted id of the look it shows on that page, and every state\'s `pages` follow from those citations — its `population`, its `aboard` and every character\'s `looksAt`; the prose renders those values and no rewrite changes them.';
 
 /**
  * The rule as a brief author / the review is given it. On the Jev-outage
@@ -1033,6 +1048,7 @@ function fixedLine(fixed) {
 /**
  * Write the decided fields into one brief's metadata. Pure: returns the new
  * brief and what changed. `fixed`:
+ *   shot                           — the page's plan-line shot (Jev's)
  *   timeOfDay, indoor              — the light (weather: `none` indoors; an
  *                                    outdoor `none` is reported, never guessed)
  *   cites, decidedIds              — the element citations Jev decided and the
@@ -1056,6 +1072,10 @@ function pinBrief(brief, fixed) {
     if (to === null) delete m[field]; else m[field] = to;
     changes.push({ field, from, to, ...extra });
   };
+  // THE SHOT IS JEV'S (owner, 2026-09-28): staging job_1790539784661_6mjcny1c7
+  // p15 — Jev assigned over-the-shoulder, the Art Director wrote `medium`, and
+  // only a console line (refreshPlanShot) recorded it. Pinned like the rest.
+  if (fixed.shot) set('shot', fixed.shot);
   if (fixed.timeOfDay) set('timeOfDay', fixed.timeOfDay);
   if (fixed.indoor === true) set('weather', 'none');
   else if (fixed.indoor === false && (!m.weather || m.weather === 'none')) changes.push({ field: 'weather', from: m.weather || null, to: null, problem: 'outdoors' });
@@ -1105,7 +1125,8 @@ function fixedFieldFinding(pageNumber, changes, labelOf = id => id) {
       for (const id of relooked) parts.push(`objects[] cites ${id} (${labelOf(id)}) in place of ${c.removed.find(r => baseId(r) === baseId(id))} — the prose stages it in that look`);
       if (added.length) parts.push(`objects[] now cites ${added.map(id => `${id} (${labelOf(id)})`).join(', ')} — stage ${added.length > 1 ? 'them' : 'it'} in the prose, even where only part is in frame`);
       if (removed.length) parts.push(`objects[] no longer cites ${removed.map(id => `${id} (${labelOf(id)})`).join(', ')} — take ${removed.length > 1 ? 'them' : 'it'} out of the prose`);
-    } else if (c.field === 'timeOfDay') parts.push(`timeOfDay is ${c.to} — the prose's light is that hour's`);
+    } else if (c.field === 'shot') parts.push(`shot is ${c.to} — the prose stages the moment in that framing`);
+    else if (c.field === 'timeOfDay') parts.push(`timeOfDay is ${c.to} — the prose's light is that hour's`);
     else if (c.field === 'weather' && c.problem === 'outdoors') parts.push('the page is outdoors — `weather` is one of the outdoor values, never `none`; choose the story\'s sky and write it into the prose');
     else if (c.field === 'weather') parts.push('the page is indoors — `weather` is `none` and the prose shows no sky weather except through a window');
     else if (c.field === 'population') parts.push(`population is ${c.to} — ${c.to === 'cast_only' ? 'no one but the listed figures is in the prose' : c.to === 'crowd' ? 'the prose is written around unnamed background people' : 'the prose shows a few distant, unnamed passers-by'}`);
@@ -1194,6 +1215,7 @@ module.exports = {
   shotFitQuestions,
   hungarian,
   budgetOf,
+  allowedShot,
   violations,
   assign,
   decideShots,

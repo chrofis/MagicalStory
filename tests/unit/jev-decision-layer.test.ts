@@ -71,6 +71,40 @@ describe('decideShots: Jev scores, code assigns under the budget', () => {
     pages.forEach((p, i) => { if (present.get(p.pageNumber)!.length > SV.GROUP_STAGING_MAX) expect(SV.GROUP_WIDER_SHOTS).toContain(d.shots[i]); });
   });
 
+  // OWNER 2026-09-28: over-the-shoulder needs a near figure and someone it
+  // faces. Staging job_1790539784661_6mjcny1c7 put both mandatory pages on
+  // one-figure pages (p4, p15), because Jev scored them highest there.
+  it('never puts over-the-shoulder on a page with fewer than two in frame; the floor moves to an eligible page', async () => {
+    const { pages, present } = book(18, p => (p === 9 || p === 12 ? 2 : 1));
+    const { impl } = stubJev({ noul: (q, st) => {
+      const lone = !/PAGE TO JUDGE: Page (9|12) /.test(st);
+      if (/ over-the-shoulder shot/.test(q)) return lone ? 0.95 : 0.3;
+      return 0.4;
+    } });
+    const d = await JD.decideShots({ arc: '1. A thing.', pages, present }, { callImpl: impl });
+    pages.forEach((p, i) => { if (present.get(p.pageNumber)!.length < SV.OTS_MIN_IN_FRAME) expect(d.shots[i]).not.toBe('over-the-shoulder'); });
+    expect(d.shots[8]).toBe('over-the-shoulder');
+    expect(d.shots[11]).toBe('over-the-shoulder');
+    expect(d.unmet).toBeNull();
+  });
+
+  it('a book with no eligible page leaves the over-the-shoulder floor unmet — logged, never forced', async () => {
+    const { pages, present } = book(18, () => 1);
+    const { impl } = stubJev({ noul: (q) => (/ over-the-shoulder shot/.test(q) ? 0.95 : 0.4) });
+    const d = await JD.decideShots({ arc: '1. A thing.', pages, present }, { callImpl: impl });
+    expect(d.shots).not.toContain('over-the-shoulder');
+    expect(d.shots.every((s: string) => SV.SHOT_TYPES.includes(s))).toBe(true);
+    expect(d.unmet).toContain('floor:over-the-shoulder');
+  });
+
+  it('the violation list names an over-the-shoulder page with one figure', () => {
+    const rows = [{ page: 1, roster: ['A'] }, { page: 2, roster: ['A', 'B'] }];
+    expect(JD.violations(rows, ['over-the-shoulder', 'over-the-shoulder'])).toContain('ots:p1');
+    expect(JD.violations(rows, ['over-the-shoulder', 'over-the-shoulder'])).not.toContain('ots:p2');
+    expect(JD.allowedShot(rows[0], 'over-the-shoulder')).toBe(false);
+    expect(JD.allowedShot(rows[1], 'over-the-shoulder')).toBe(true);
+  });
+
   it('the questions never see a shot, and carry the page marked', async () => {
     const { pages, present } = book(6, () => 1);
     const { impl, calls } = stubJev();

@@ -4,6 +4,7 @@ const { runPlanCounters, collectPlaceNames, castLostByReplan, reviewPlanChanges,
 const { commissionedCast, castCoverage, parsePlanCastBlock } = require('./castCoverage');
 const { arcRepairFindingsWithCastCheck } = require('./jevAudit');
 const jevDecisions = require('./jevDecisions');
+const { resolveShotId } = require('./shotVocabulary');
 const { JevDecisionError } = jevDecisions;
 const jevSelection = require('./jevSelection');
 const { lookupByName } = require('./castResolver');
@@ -1858,7 +1859,12 @@ async function applyJevBriefDecisions({ expansions, beats, visualBible, bibleSec
     if (!x) continue;
     const r = vbByPage.get(n);
     const locId = locOf.get(n);
+    // The shot Jev assigned (field 0 of the plan line) is pinned like the
+    // other decided fields (owner, 2026-09-28). A plan still carrying the
+    // placeholder resolves to no shot and pins none.
+    const planShot = resolveShotId(jevDecisions.planParts(b.planLine)[0]);
     b.jevFixed = {
+      ...(planShot ? { shot: planShot } : {}),
       ...(b.fixed ? { timeOfDay: b.fixed.timeOfDay, indoor: b.fixed.indoor } : {}),
       cites: r ? r.elements.map(e => e.cite) : [], decidedIds,
       ...(locId && pop.byLocation[locId] ? { population: pop.byLocation[locId].population } : {}),
@@ -1904,6 +1910,11 @@ async function applyJevBriefDecisions({ expansions, beats, visualBible, bibleSec
     }
     x.brief = pinned.brief;
     b.jevChanges = pinned.changes;
+    const shotMove = pinned.changes.find(c => c.field === 'shot');
+    if (shotMove) {
+      log.warn(`📌 [BEATS] Page ${n}: the Art Director wrote shot ${shotMove.from || '(none)'}; Jev's ${shotMove.to} restored`);
+      gl.warn('beats_jev_shot_restored', `Page ${n}: the Art Director changed the shot Jev assigned (${shotMove.to} → ${shotMove.from || 'none'}); code restored ${shotMove.to}`, null, { pageNumber: n, assigned: shotMove.to, written: shotMove.from });
+    }
     const finding = jevDecisions.fixedFieldFinding(n, pinned.changes, labelOf);
     b.jevFinding = finding;
     citesByPage.set(n, b.jevFixed.cites);

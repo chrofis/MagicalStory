@@ -215,6 +215,43 @@ describe('pinBrief: code writes the decided fields; the review is told what chan
   });
 });
 
+// OWNER 2026-09-28 (staging job_1790539784661_6mjcny1c7 p15): Jev assigned
+// over-the-shoulder, the Art Director wrote `medium`, and only a console line
+// recorded it. The shot is a pinned Jev field like the others.
+describe('the shot is a pinned Jev field', () => {
+  const adBrief = brief({ shot: 'medium', characters: [{ name: 'Ana', looksAt: 'Ben' }, { name: 'Ben', looksAt: 'Ana' }], objects: ['LOC001'] });
+  it('pinBrief restores the assigned shot and the review is told', () => {
+    const p = JD.pinBrief(adBrief, { shot: 'over-the-shoulder' });
+    expect(metaOf(p.brief).shot).toBe('over-the-shoulder');
+    expect(p.changes).toContainEqual({ field: 'shot', from: 'medium', to: 'over-the-shoulder' });
+    expect(JD.fixedFieldFinding(15, p.changes).detail).toMatch(/shot is over-the-shoulder/);
+    expect(JD.pinBrief(p.brief, { shot: 'over-the-shoulder' }).brief).toBe(p.brief);
+  });
+  it('the fixed-fields rule names the shot as fixed', () => {
+    expect(JD.JEV_FIXED_FIELDS_RULE).toMatch(/`shot` is the first field of its plan line exactly/);
+  });
+  it('the Art Director step pins the plan-line shot and logs the restore to the generation log', async () => {
+    const J = req('../../server/lib/jevAudit');
+    const saved = J.callJev;
+    J.callJev = makeJevStub().impl;
+    try {
+      const { applyJevBriefDecisions } = req('../../server/lib/beatsPipeline');
+      const events: any[] = [];
+      const gl = { info: (k: string) => events.push(['info', k]), warn: (k: string, m: string, _x: any, d: any) => events.push(['warn', k, d]), error: (k: string) => events.push(['error', k]) };
+      const beats = [
+        { pageNumber: 15, planLine: 'over-the-shoulder — Ana and Ben — Ana watches Ben run off — Ben is gone' },
+        { pageNumber: 16, planLine: 'SHOT — Ana — she waits — she is alone' },
+      ];
+      const expansions = [{ pageNumber: 15, brief: adBrief }, { pageNumber: 16, brief: brief({ shot: 'wide', characters: [{ name: 'Ana', looksAt: 'away' }], objects: ['LOC001'] }) }];
+      await applyJevBriefDecisions({ expansions, beats, visualBible: {}, bibleSections: null, approvedArc: '1. A thing.', inputData: { characters: [{ name: 'Ana' }, { name: 'Ben' }] }, gl });
+      expect(metaOf(expansions[0].brief).shot).toBe('over-the-shoulder');
+      expect(metaOf(expansions[1].brief).shot).toBe('wide');                 // a placeholder plan pins no shot
+      const w = events.find(e => e[0] === 'warn' && e[1] === 'beats_jev_shot_restored');
+      expect(w && w[2]).toEqual({ pageNumber: 15, assigned: 'over-the-shoulder', written: 'medium' });
+    } finally { J.callJev = saved; }
+  });
+});
+
 describe('the fixed-fields rule reaches the brief authors and the critic from one constant', () => {
   beforeAll(async () => { await loadPromptTemplates(); });
   it('both Art Director templates and the scene review carry it, filled', () => {
