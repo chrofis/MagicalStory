@@ -160,6 +160,60 @@ async function q9(pool) {
   return { stories, tags, bibleCorr, corrKinds, removals };
 }
 
+/**
+ * The owner's Q9 checks (2026-09-28), one by one over the stored pre-review
+ * briefs: every fire printed with the text it read, so each can be judged.
+ */
+async function newchecks(pool) {
+  const SBC = require('../../server/lib/sceneBriefCheck');
+  const { checkClothingIncomplete } = require('../../server/lib/clothingCheck');
+  const { extractSceneMetadata, splitBrief } = require('../../server/lib/sceneMetadata');
+  const { resolveReplayPresent } = require('../../server/lib/beatsReplayInputs');
+  const counts = {}; let pages = 0; const rows = [];
+  const only = argv.type ? String(argv.type).split(',') : null;
+  const { planSegments, namesIn } = require('../../server/lib/planCounters');
+  const readsPages = new Set(String(argv.reads || '').split(',').filter(Boolean));
+  for (const r of await loadStories(pool)) {
+    const d = r.data;
+    const briefs = (d.sceneReviewReport && d.sceneReviewReport.briefsIn) || [];
+    const vb = (d.sceneReviewReport && d.sceneReviewReport.visualBibleIn) || d.visualBible || null;
+    const beats = briefBeatsOf(d);
+    const present = resolveReplayPresent(d);
+    const commissioned = (d.characters || []).map(c => c && c.name).filter(Boolean);
+    for (const x of briefs) {
+      pages++;
+      const meta = extractSceneMetadata(x.brief) || {};
+      const full = meta.fullData || meta;
+      const b = beats.find(bb => bb.pageNumber === x.pageNumber) || {};
+      // In frame: the stored head count with --present; by default the who
+      // column (stored stories predate the current counters, whose `present`
+      // is what production passes). READ: the pages the 2026-09-28 Jev READ
+      // measurement flagged (--reads=id:page,...); the replay makes no Jev call.
+      const who = planSegments(String(b.planLine || '').replace(/^\s*PLAN:\s*/i, ''))[1] || '';
+      const inFrame = argv.present && present ? present.get(x.pageNumber) : namesIn(who, commissioned);
+      const page = { pageNumber: x.pageNumber, brief: x.brief, planLine: b.planLine || '', inFrame, readsText: readsPages.has(`${r.id.slice(-9)}:${x.pageNumber}`) };
+      const found = [
+        ...SBC.checkNegationNamed(page, meta),
+        ...SBC.checkElementUncited(page, full, vb, commissioned),
+        ...SBC.checkCharacterFields(page, full),
+        ...SBC.checkCastNotInPlan(page, full, commissioned),
+        ...SBC.checkRequiredTextUndeclared(page, full, vb),
+        ...checkClothingIncomplete({ pageNumber: x.pageNumber, prose: splitBrief(x.brief).prose, cast: (full.characters || []).map(c => (typeof c === 'string' ? c : c && c.name)).filter(Boolean), perCharClothing: meta.characterClothing || {}, shot: full.shot }, d.clothingRequirements || null),
+      ];
+      for (const f of found) {
+        counts[f.type] = counts[f.type] || { fires: 0, pages: new Set() };
+        counts[f.type].fires++; counts[f.type].pages.add(`${r.id}:${x.pageNumber}`);
+        if (only && !only.includes(f.type)) continue;
+        rows.push({ id: r.id, pageNumber: x.pageNumber, type: f.type, detail: f.detail, planLine: page.planLine });
+        console.log(`\n${r.id.slice(-9)} p${x.pageNumber} [${f.type}] ${String(f.detail).slice(0, 330)}${f.type === 'cast_not_in_plan' || f.type === 'required_text_undeclared' ? `\n   PLAN: ${page.planLine.slice(0, 200)}` : ''}`);
+      }
+    }
+  }
+  console.log(`\nover ${pages} pre-review briefs:`);
+  for (const [t, c] of Object.entries(counts)) console.log(`  ${t}: ${c.fires} fires on ${c.pages.size} pages`);
+  return { rows, counts: Object.fromEntries(Object.entries(counts).map(([t, c]) => [t, { fires: c.fires, pages: c.pages.size }])), pages };
+}
+
 async function jev(pool) {
   const { decideBriefFields } = require('../../server/lib/jevBriefFields');
   const { resolveReplayPresent } = require('../../server/lib/beatsReplayInputs');
@@ -231,6 +285,7 @@ async function jev(pool) {
     else if (mode === 'outfit') result = await outfit(pool);
     else if (mode === 'q9') result = await q9(pool);
     else if (mode === 'jev') result = await jev(pool);
+    else if (mode === 'newchecks') result = await newchecks(pool);
     else { console.error('mode: checks | outfit | q9 | jev'); process.exitCode = 2; }
     if (argv.out && result) fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
   } finally {

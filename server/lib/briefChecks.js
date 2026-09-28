@@ -105,8 +105,11 @@ function briefCastNames(inputData, visualBible) {
  * @param {{inputData:Object, clothingRequirements:Object|null, visualBible:Object|null, briefBeats:Array}} ctx
  */
 function collectBriefFindings(expansions, ctx) {
-  const { checkScenes: checkBriefs, REVIEWABLE } = require('./sceneBriefCheck');
-  const { checkScenes: checkClothing, REVIEWABLE: CLOTHING_SENDABLE } = require('./clothingCheck');
+  const {
+    checkScenes: checkBriefs, REVIEWABLE,
+    checkNegationNamed, checkElementUncited, checkCharacterFields, checkCastNotInPlan, checkRequiredTextUndeclared,
+  } = require('./sceneBriefCheck');
+  const { checkScenes: checkClothing, REVIEWABLE: CLOTHING_SENDABLE, checkClothingIncomplete } = require('./clothingCheck');
   const { extractSceneMetadata, splitBrief } = require('./sceneMetadata');
   const { textZoneRulesActive } = require('../config/runtime');
   const { pinBrief } = require('./jevDecisions');
@@ -135,6 +138,27 @@ function collectBriefFindings(expansions, ctx) {
     };
   }), ctx.clothingRequirements, { artifacts: (ctx.visualBible || {}).artifacts, visualBible: ctx.visualBible });
   for (const f of clothingRes.findings) if (f && (CLOTHING_SENDABLE.has(f.type) || REASK_CLOTHING_EXTRA.has(f.type))) findings.push(f);
+  // The scene review's rules kept as code checks (owner, 2026-09-28, Q9), plus
+  // the required-text check. Each page reads its beat's head count (`inFrame`)
+  // and the decision layer's READ answer (`jevFixed.readsText`).
+  const commissioned = (ctx.inputData.characters || []).map(c => c && c.name).filter(Boolean);
+  for (const x of expansions) {
+    const meta = extractSceneMetadata(x.brief) || {};
+    const full = meta.fullData || meta;
+    const b = beatOf(x.pageNumber);
+    const page = { pageNumber: x.pageNumber, brief: x.brief, planLine: b.planLine || '', inFrame: b.inFrame, readsText: !!(b.jevFixed && b.jevFixed.readsText) };
+    findings.push(
+      ...checkNegationNamed(page, meta),
+      ...checkElementUncited(page, full, ctx.visualBible, commissioned),
+      ...checkCharacterFields(page, full),
+      ...checkCastNotInPlan(page, full, commissioned),
+      ...checkRequiredTextUndeclared(page, full, ctx.visualBible),
+      ...checkClothingIncomplete({
+        pageNumber: x.pageNumber, prose: splitBrief(x.brief).prose, shot: full.shot, perCharClothing: meta.characterClothing || {},
+        cast: (full.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
+      }, ctx.clothingRequirements),
+    );
+  }
   // A decided field the brief cannot hold as written: an outdoor page whose
   // weather is `none` (jevDecisions.pinBrief reports it, never guesses one).
   for (const x of expansions) {
@@ -183,6 +207,48 @@ function whoColumnDropped(prior, rewritten, planLine, visualBible, commissionedN
   return inWho.filter(n => has(before, n) && !has(after, n));
 }
 
+/**
+ * The re-ask's text lane (required_text_undeclared): the ---VISUAL BIBLE---
+ * block after the pages, `{"text": [{id, text}]}`. Taken only for an id one of
+ * the `allowed` findings cites (the page's own cited elements) and only as a
+ * non-empty string; written onto the bible entry. Everything else in the block
+ * is reported as rejected — the lane declares lettering, nothing more.
+ *
+ * @returns {{applied: Array<{id, oldText, newText}>, rejected: Array<{id, reason}>}}
+ */
+function applyBibleTextLane(raw, visualBible, allowedIds) {
+  const out = { applied: [], rejected: [] };
+  const text = String(raw || '');
+  const marker = text.match(/---\s*VISUAL BIBLE\s*---/i);
+  if (!marker || !visualBible) return out;
+  const body = text.slice(marker.index + marker[0].length);
+  const fenced = body.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const jsonText = (fenced ? fenced[1] : body.slice(body.indexOf('{'), body.lastIndexOf('}') + 1)).trim();
+  let json;
+  try { json = JSON.parse(jsonText); } catch (err) {
+    out.rejected.push({ id: '(section)', reason: `unparseable JSON (${err.message})` });
+    return out;
+  }
+  const rows = json && Array.isArray(json.text) ? json.text : [];
+  if (!rows.length) out.rejected.push({ id: '(section)', reason: 'no `text` rows' });
+  const allowed = new Set([...allowedIds].map(id => String(id).toUpperCase()));
+  for (const row of rows) {
+    const id = String((row && row.id) || '').trim().toUpperCase().split('.')[0];
+    const value = row && typeof row.text === 'string' ? row.text.trim() : '';
+    if (!id || !value) { out.rejected.push({ id: id || '(none)', reason: 'row has no id or no text' }); continue; }
+    if (!allowed.has(id)) { out.rejected.push({ id, reason: 'not an element a page with required_text_undeclared cites' }); continue; }
+    let entry = null;
+    for (const key of ['artifacts', 'vehicles', 'locations', 'animals', 'secondaryCharacters']) {
+      const list = Array.isArray(visualBible[key]) ? visualBible[key] : Object.values(visualBible[key] || {});
+      entry = entry || list.find(e => e && String(e.id || '').toUpperCase().split('.')[0] === id) || null;
+    }
+    if (!entry) { out.rejected.push({ id, reason: 'no bible entry has that id' }); continue; }
+    out.applied.push({ id, oldText: typeof entry.text === 'string' ? entry.text : null, newText: value });
+    entry.text = value;
+  }
+  return out;
+}
+
 /** One page's findings as the re-ask lists them. */
 function renderPageFindings(list) {
   return list.map(f => `- [${f.type}] ${String(f.detail || '').trim()}`).join('\n');
@@ -221,7 +287,7 @@ async function runBriefChecks({ inputData, expansions, briefBeats, visualBible, 
   const flagged = [...byPage.keys()].sort((a, b) => a - b);
   const report = {
     model, findingsBefore: before.findings, withheld: before.withheld, briefsIn,
-    reask: null, verdicts: [], pages: [], findingsAfter: [], introduced: [], survived: [], wornUnresolvedPages: [], durationMs: 0,
+    reask: null, bibleText: null, verdicts: [], pages: [], findingsAfter: [], introduced: [], survived: [], wornUnresolvedPages: [], durationMs: 0,
   };
   if (flagged.length === 0) {
     log.info('🧩 [BEATS] brief checks: every brief clean — no re-ask');
@@ -257,6 +323,14 @@ async function runBriefChecks({ inputData, expansions, briefBeats, visualBible, 
   } else {
     const parsed = parseRefinedText(res.text || '', flagged, 'SCENES', BRIEF_TRAILING_MARKERS);
     const rewrites = new Map(parsed.pages.map(p => [p.pageNumber, p.text]));
+    // The text lane first, so each page's recheck reads the declared lettering.
+    const textFindings = before.findings.filter(f => f.type === 'required_text_undeclared');
+    if (textFindings.length) {
+      const lane = applyBibleTextLane(res.text, visualBible, textFindings.flatMap(f => f.cited || []));
+      report.bibleText = lane;
+      for (const a of lane.applied) gl.info('beats_brief_reask_text', `${a.id}: the re-ask declared text "${a.newText}"${a.oldText ? ` (was "${a.oldText}")` : ''}`, null, a);
+      for (const r of lane.rejected) gl.warn('beats_brief_reask_text_rejected', `${r.id}: ${r.reason}`, null, r);
+    }
     for (const n of flagged) {
       const x = expansions.find(e => e.pageNumber === n);
       const prior = x.brief;
@@ -325,6 +399,7 @@ module.exports = {
   keepDeclaredLight,
   briefCastNames,
   collectBriefFindings,
+  applyBibleTextLane,
   namesInBrief,
   whoColumnDropped,
   renderPageFindings,

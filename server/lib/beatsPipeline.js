@@ -2000,6 +2000,9 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
   const coverBeats = buildCoverBeats(inputData, { coverTypes: coverTypesFor(inputData), clothingRequirements, centralFigure: arcCentralFigure });
   const briefBeats = [...beats, ...coverBeats];
   const beatPageNumbers = briefBeats.map(b => b.pageNumber);
+  // The head count each story page's brief checks read (cast_not_in_plan): the
+  // shipped plan check's `present`, on the Jev path and the backup alike.
+  if (present) for (const b of beats) b.inFrame = present.get(Number(b.pageNumber)) || [];
 
   // ── Call 1: the Visual Bible ──────────────────────────────────────────────
   // Two attempts; a reply is whole only when its JSON parses — a partial bible
@@ -4081,6 +4084,13 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     contextPrompt: ad.briefsPrompt || '', model: sceneModel, gl, stage,
   });
   meta.timings.briefChecksMs = briefCheckReport.durationMs;
+  // Lettering the re-ask declared (required_text_undeclared) reaches the
+  // transcript every later re-parse reads.
+  if (briefCheckReport.bibleText?.applied.length && bibleSections) {
+    const synced = syncVisualBibleSection(bibleSections, visualBible);
+    if (synced === bibleSections) gl.warn('beats_vb_sync_failed', 'The re-ask\'s declared text could not be written back into the transcript');
+    else bibleSections = synced;
+  }
 
   // VB ELEMENT BUDGET — REPORTED HERE, NEVER ENFORCED (owner, 2026-09-11).
   // `truncateBriefToBudget` used to cut each brief's `objects[]` down to the

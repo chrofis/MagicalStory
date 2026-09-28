@@ -980,6 +980,173 @@ function checkIdLabelMismatch(page, visualBible) {
   return out;
 }
 
+// ── THE REVIEW'S RULES, AS CODE CHECKS (owner, 2026-09-28, Q9) ─────────────
+// The scene review no longer runs (docs/decisions.md 2026-09-28 "Jev first,
+// then no scene review"). The owner kept five of its checks as code checks
+// that feed the one brief re-ask, plus a check for required in-image text.
+// Each reads the brief's own fields or a fixed word list; each was replayed
+// over stored staging briefs before it was wired (numbers in decisions.md
+// 2026-09-28 "The scene review is deleted …").
+
+const esc = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** Every string value in a metadata object, ids and enum words included. */
+function metadataStrings(m, out = []) {
+  if (typeof m === 'string') out.push(m);
+  else if (Array.isArray(m)) m.forEach(x => metadataStrings(x, out));
+  else if (m && typeof m === 'object') Object.values(m).forEach(x => metadataStrings(x, out));
+  return out;
+}
+
+/**
+ * negation_named — naming a thing that must be absent paints it (the review's
+ * check 9, the Art Director's rule 12b). The review's own word list: "no …",
+ * "without …", "does not …", "empty of …", and the n't forms of the same verbs.
+ * `bare …` is not on it: measured, it names a surface (bare branches, bare
+ * feet), not an absent thing.
+ */
+const NEGATION_RE = /\b(?:no\s+(?!one\b|longer\b|more\b|matter\b|doubt\b|sooner\b)[a-z][a-z-]*|without\s+(?:a\s+|an\s+|the\s+|any\s+)?[a-z][a-z-]*|empty of\s+[a-z][a-z-]*|(?:does|do|did|is|are|was|were|has|have)\s+not\s+[a-z][a-z-]*|(?:doesn't|don't|didn't|isn't|aren't|wasn't|weren't|hasn't|haven't)\s+[a-z][a-z-]*)/gi;
+function checkNegationNamed(page, metadata) {
+  const brief = String((page && page.brief) || '');
+  const prose = brief.split('---METADATA---')[0];
+  const texts = [prose, ...metadataStrings(metadata && (metadata.fullData || metadata))];
+  const hits = [];
+  for (const t of texts) {
+    NEGATION_RE.lastIndex = 0;
+    let m;
+    while ((m = NEGATION_RE.exec(t)) !== null) if (!hits.includes(m[0])) hits.push(m[0]);
+  }
+  if (!hits.length) return [];
+  return [{
+    pageNumber: page.pageNumber, type: 'negation_named', phrases: hits,
+    detail: `The brief names what must be absent: ${hits.slice(0, 4).map(h => `"${h}"`).join(', ')}. A named absence is painted. Rewrite each as what does occupy that space, in the prose and in every metadata field.`,
+  }];
+}
+
+/**
+ * element_uncited — the prose stages a Visual Bible element by its authored
+ * `label`, its proper name or (a creature or a figure) its given name, while
+ * the brief cites no id for it (the review's check 9d). NOT the head-noun check
+ * deleted 2026-09-18 (75% false): only the entry's whole authored name counts,
+ * and a possessive occurrence ("<name>'s egg") names the thing owned, not the
+ * owner. On a Jev page the cites are decided, so the fix is the prose.
+ */
+function checkElementUncited(page, metadata, visualBible, castNames = []) {
+  if (!visualBible) return [];
+  const prose = String((page && page.brief) || '').split('---METADATA---')[0];
+  const cited = new Set(citedBaseIds(metadata).keys());
+  const { findVbIds, baseVbId } = require('./vbIdGuard');
+  for (const c of ((metadata && Array.isArray(metadata.characters)) ? metadata.characters : [])) {
+    for (const hit of findVbIds(String(typeof c === 'string' ? c : (c && c.name) || ''))) cited.add(baseVbId(hit));
+  }
+  const commissioned = new Set(castNames.map(n => String(n).trim().toLowerCase()));
+  // A worn garment is carried by `wornItems`, never by objects[] (2026-09-23,
+  // "A worn garment is not a budget element"): measured, 17 of 29 fires were one.
+  for (const w of ((metadata && Array.isArray(metadata.wornItems)) ? metadata.wornItems : [])) if (w && w.id) cited.add(baseVbId(w.id));
+  const out = [];
+  for (const key of ['animals', 'artifacts', 'vehicles', 'secondaryCharacters']) {
+    const list = Array.isArray(visualBible[key]) ? visualBible[key] : Object.values(visualBible[key] || {});
+    for (const e of list) {
+      if (!e || !e.id || e.generic === true || e.wornAs) continue;
+      const base = baseVbId(e.id);
+      if (cited.has(base)) continue;
+      const names = [e.label, e.properName, ...(key === 'animals' || key === 'secondaryCharacters' ? [e.name] : [])]
+        .map(n => String(n || '').trim()).filter(n => n.length >= 3 && !commissioned.has(n.toLowerCase()));
+      const hit = names.find(n => new RegExp(`(?<![\\p{L}])${esc(n)}(?!['’]s\\b)(?![\\p{L}])`, 'iu').test(prose));
+      if (!hit) continue;
+      out.push({
+        pageNumber: page.pageNumber, type: 'element_uncited', id: base, name: hit,
+        detail: `The prose stages ${hit}, and objects[] cites no ${base}. Cite ${base} if the page shows it; if this page's objects[] is fixed, take ${hit} out of the prose instead.`,
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * character_fields — every character row carries `depth` and an `expression`
+ * that names brows, eyes or mouth, never a bare mood word (the review's check 6,
+ * the field rules 8k and "depth, expression and emotion — required").
+ */
+const FACE_PART_RE = /\b(?:brows?|eyebrows?|eyes?|\w+-eyed|eyelids?|gaze|star(?:e|es|ing)|squint\w*|mouth|lips?|jaw|teeth|smil\w*|grin\w*|frown\w*|pout\w*)\b/i;
+// Where no face can be read the field rules ask for body language instead (a
+// wide frame, a plain back view, the over-the-shoulder near crop), so the face
+// half is not asked for there. Read from the structured `shot` / `perspective`.
+const FACELESS_SHOTS = new Set(['wide', 'ultra-wide', 'aerial']);
+function faceHidden(row, shot) {
+  if (FACELESS_SHOTS.has(classifyShot(shot || ''))) return true;
+  const p = String(row.perspective || '').toLowerCase();
+  return /back view|over-the-shoulder/.test(p) && !/head turned|glanc/.test(p);
+}
+function checkCharacterFields(page, metadata) {
+  const rows = (metadata && Array.isArray(metadata.characters)) ? metadata.characters : [];
+  const out = [];
+  for (const c of rows) {
+    if (!c || typeof c !== 'object' || !c.name) continue;
+    const missing = [];
+    if (!String(c.depth || '').trim()) missing.push('`depth`');
+    const expr = String(c.expression || '').trim();
+    if (!expr) missing.push('`expression`');
+    else if (!FACE_PART_RE.test(expr) && !faceHidden(c, metadata.shot)) missing.push(`an \`expression\` that names brows, eyes or mouth (it reads "${expr}")`);
+    if (missing.length) {
+      out.push({
+        pageNumber: page.pageNumber, type: 'character_fields', character: c.name,
+        detail: `${c.name}'s characters[] row lacks ${missing.join(' and ')}. Every character carries its depth and a drawable expression naming brows, eyes or mouth; the one mood word goes in \`emotion\`.`,
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * cast_not_in_plan — `characters[]` lists a commissioned character the page's
+ * plan line does not put in frame (the review's check 5a, rule 3). "In frame"
+ * is the shipped plan check's head count for the page (`page.inFrame`, the
+ * same `present` the shots and the gaze roster read), which also resolves a
+ * collective who column ("all four children"). A page without a head count is
+ * not checked. Covers are checked by cover_cast_dropped.
+ */
+function checkCastNotInPlan(page, metadata, commissionedNames = []) {
+  if (!(Number(page && page.pageNumber) > 0) || !Array.isArray(page.inFrame)) return [];
+  const rows = (metadata && Array.isArray(metadata.characters)) ? metadata.characters : [];
+  const listed = rows.map(c => String(typeof c === 'string' ? c : (c && c.name) || '').trim()).filter(Boolean);
+  const extra = listed.filter(n => commissionedNames.some(c => isSameFigureName(c, n)))
+    .filter(n => !page.inFrame.some(x => isSameFigureName(x, n)));
+  if (!extra.length) return [];
+  const who = planSegments(String(page.planLine || '').replace(/^\s*PLAN:\s*/i, ''))[1] || '';
+  return [{
+    pageNumber: page.pageNumber, type: 'cast_not_in_plan', names: extra,
+    detail: `characters[] lists ${extra.join(' and ')}, whom the plan line does not put in frame${who ? ` ("${who}")` : ''}. Take them out of characters[] and out of the prose; the plan line decides who is in the picture.`,
+  }];
+}
+
+/**
+ * required_text_undeclared — the page has the reader read lettering in the
+ * picture (`page.readsText`: the decision layer's READ noul,
+ * jevDecisions.READ_TEXT_Q), and no element the brief cites declares `text`
+ * (the review's check 9g; requiredText.REQUIRED_TEXT_AUTHORING_RULE). Without
+ * a declared string the page prompt carries no REQUIRED TEXT block and the
+ * illustrator invents the letters. Plan lines never quote the string (0 of 7
+ * reading pages in 674 stored plan lines), so the page is found by the
+ * question and the string is the Art Director's to write. Not checked on the
+ * Jev-outage backup: no page carries `readsText` there.
+ */
+function checkRequiredTextUndeclared(page, metadata, visualBible) {
+  if (!page || page.readsText !== true) return [];
+  const { declaredText } = require('./requiredText');
+  const cited = [...citedBaseIds(metadata).keys()];
+  for (const base of cited) {
+    for (const key of ['artifacts', 'vehicles', 'locations', 'animals', 'secondaryCharacters']) {
+      const list = visualBible && (Array.isArray(visualBible[key]) ? visualBible[key] : Object.values(visualBible[key] || {}));
+      const e = (list || []).find(x => x && String(x.id || '').toUpperCase().split('.')[0] === base);
+      if (e && declaredText(e)) return [];
+    }
+  }
+  return [{
+    pageNumber: page.pageNumber, type: 'required_text_undeclared', cited,
+    detail: `Someone on this page reads, spells out or points at lettering the reader must be able to read, and no element the page cites (${cited.join(', ') || 'none'}) declares it in \`text\`. Write the exact characters, in the order they must read, into the \`text\` of the cited element that carries them — in a ---VISUAL BIBLE--- block after the last page — and have the prose show them on it.`,
+  }];
+}
+
 function checkPage(page, castNames = [], visualBible = null, opts = {}) {
   const findings = [];
   const brief = String((page && page.brief) || '');
@@ -1535,6 +1702,11 @@ module.exports = {
   checkPopulationContradiction,
   checkIdLabelMismatch,
   vbFigureNamesCited,
+  checkNegationNamed,
+  checkElementUncited,
+  checkCharacterFields,
+  checkCastNotInPlan,
+  checkRequiredTextUndeclared,
   checkShotOffPlate,
   checkLightDeclared,
   checkGroupStaging,

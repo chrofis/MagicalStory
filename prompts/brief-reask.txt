@@ -23,4 +23,9 @@ For each page listed above, in the same order, exactly:
 ## Page <number>
 <the corrected brief for that page, complete: its prose, then a line reading ---METADATA---, then its JSON object unfenced>
 
-Nothing before the first page heading, nothing after the last page's metadata. All output in English.
+When a page's faults include [required_text_undeclared], add after the last page's metadata, once for all such pages:
+
+---VISUAL BIBLE---
+{"text": [{"id": "<the id of the cited element that carries the lettering>", "text": "<the exact characters, in the order they must read>"}]}
+
+Nothing before the first page heading, nothing after the last page's metadata but that block. All output in English.

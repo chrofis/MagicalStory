@@ -4522,7 +4522,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
           model: report.reask?.model || null, cost: reaskCalls.reduce((acc, r) => acc + costOfCall(r), 0), usage: reaskCalls[0]?.usage || null,
           findingsBefore: report.findingsBefore, withheld: report.withheld, verdicts: report.verdicts,
           findingsAfter: report.findingsAfter, introduced: report.introduced, survived: report.survived,
-          wornUnresolvedPages: report.wornUnresolvedPages, reaskPrompt: report.reask?.prompt || null, events: armEvents,
+          wornUnresolvedPages: report.wornUnresolvedPages, bibleText: report.bibleText, reaskPrompt: report.reask?.prompt || null, events: armEvents,
         };
       } catch (err) {
         briefChecks = { ok: false, error: err.message, elapsedMs: Date.now() - t2, events: armEvents };

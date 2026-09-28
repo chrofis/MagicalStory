@@ -73,6 +73,7 @@ const JEV_DECISIONS = {
   light: { reps: 1, indoorAt: 0.5 },
   vb: { reps: 1, creature: 0.7, vehicle: 0.5, secondary: 0.5, object: 0.7, objectBand: 0.5 },
   aboard: { reps: 1, at: 0.5 },     // 9/10 on the one ship book
+  reads: { at: 0.5 },               // rides the vb call; 7/7 true on 674 stored plan lines (2026-09-28)
   population: { reps: 1, publicAt: 0.5, crowdAt: 0.5 }, // 13/13
   gaze: { reps: 3 },                // G2 128/139 averaged (owner: 3 calls for this field)
   state: { reps: 3 },               // a choice, averaged as gaze is (owner, 2026-09-28)
@@ -815,9 +816,21 @@ async function decideStates({ arc, pages, perPage }, opts = {}) {
 }
 
 /**
- * Per page, which Visual Bible elements are in the picture, and whether the
- * camera is aboard a vehicle. One call per page (all elements + all vehicles'
- * aboard nouls in it).
+ * The page asks the reader to READ lettering in the picture (owner, 2026-09-28:
+ * "Text should also get its own check"). Plan lines never quote the string —
+ * the quote heuristic found 0 of the reading pages in 674 stored plan lines —
+ * so the question is asked of the moment. Measured on those 674 lines
+ * (staging + prod): P ≥ 0.5 on 7 pages, all 7 reading pages (an alphabet
+ * lesson, a name spelled out, a sign read aloud). It feeds the brief check
+ * `required_text_undeclared` (sceneBriefCheck).
+ */
+const READ_TEXT_Q = 'In the picture of the page to judge, someone reads, spells out, traces or points at specific written letters, numbers or words, and the reader of the book must be able to read them in the picture.';
+
+/**
+ * Per page, which Visual Bible elements are in the picture, whether the
+ * camera is aboard a vehicle, and whether the page has lettering the reader
+ * must read. One call per page (all elements, all vehicles' aboard nouls and
+ * the READ noul in it).
  *
  * @param {{arc:string, pages:Array<{pageNumber:number, planLine:string}>, visualBible:Object,
  *          commissionedNames:string[], adCited:Map<number,Set<string>>}} input
@@ -828,9 +841,8 @@ async function decideVbAndAboard({ arc, pages, visualBible, commissionedNames = 
   const els = vbElements(visualBible, commissionedNames);
   const vehicles = els.filter(e => e.type === 'vehicle');
   const stats = newStats();
-  if (!els.length) return { pages: pages.map(p => ({ pageNumber: Number(p.pageNumber), elements: [], aboard: null, scores: {} })), stats: summarise(stats) };
   const reqs = pages.flatMap(p => {
-    const qs = {};
+    const qs = { READ: { type: 'noul', instructions: READ_TEXT_Q } };
     els.forEach((e, i) => { qs[`E${i}`] = { type: 'noul', instructions: vbQuestion(e) }; });
     vehicles.forEach((v, i) => { qs[`ABOARD${i}`] = { type: 'noul', instructions: aboardQuestion(v) }; });
     return repeat({ key: `vb:p${p.pageNumber}`, state: pageState(arc, pages, p), questions: qs }, JEV_DECISIONS.vb.reps);
@@ -850,8 +862,9 @@ async function decideVbAndAboard({ arc, pages, visualBible, commissionedNames = 
     const kept = inPicture.slice(0, VB_ELEMENT_BUDGET);
     const aboardScores = vehicles.map((v, i) => ({ id: v.id, p: meanNoul(a, `ABOARD${i}`) })).sort((x, y) => y.p - x.p);
     const aboard = aboardScores.length && aboardScores[0].p >= JEV_DECISIONS.aboard.at ? aboardScores[0].id : null;
+    const readP = meanNoul(a, 'READ');
     return {
-      pageNumber: n, kept, overBudget, aboard,
+      pageNumber: n, kept, overBudget, aboard, readsText: readP >= JEV_DECISIONS.reads.at, readP: +readP.toFixed(3),
       scores: Object.fromEntries(scored.map(({ e, p: P }) => [e.id, +P.toFixed(3)])),
       aboardScores: Object.fromEntries(aboardScores.map(x => [x.id, +x.p.toFixed(3)])),
     };
@@ -869,7 +882,7 @@ async function decideVbAndAboard({ arc, pages, visualBible, commissionedNames = 
     delete r.kept;
   }
   for (const r of out) if (r.overBudget.length) log.warn(`🧱 [JEV/vb] page ${r.pageNumber}: ${r.elements.length + r.overBudget.length} elements in the picture, budget ${VB_ELEMENT_BUDGET} — left out (lowest P): ${r.overBudget.join(', ')}`);
-  log.info(`🧩 [JEV/vb] ${out.map(r => `p${r.pageNumber}:[${r.elements.map(e => e.cite).join(',')}]${r.aboard ? `@${r.aboard}` : ''}`).join(' ')} (${stats.calls} calls)`);
+  log.info(`🧩 [JEV/vb] ${out.map(r => `p${r.pageNumber}:[${r.elements.map(e => e.cite).join(',')}]${r.aboard ? `@${r.aboard}` : ''}${r.readsText ? ' reads' : ''}`).join(' ')} (${stats.calls} calls)`);
   return { pages: out, stats: summarise(stats) };
 }
 
@@ -1225,6 +1238,7 @@ function applyVbPages(visualBible, citesByPage, decidedIds) {
 
 module.exports = {
   JevDecisionError,
+  READ_TEXT_Q,
   JEV_OUTAGE,
   probeJev,
   jevActive,

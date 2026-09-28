@@ -62,6 +62,8 @@ function pageLocations(visualBible, pageNumbers) {
  *     the Art Director's own `pages` claims are the draft the 0.5–0.7 band reads),
  *   - `aboard`, the location or vantage (the bible's page tables, Q8) and the
  *     location's `population` (decidePopulation),
+ *   - whether the reader must read lettering in the picture (`readsText`, the
+ *     READ noul of the same call; the brief check required_text_undeclared),
  *   - each commissioned character's `looksAt` (decideGaze; the roster is the
  *     shipped plan check's head count — the same `present` the shots read —
  *     and the candidates are the page's cites and the figures its plan line
@@ -128,6 +130,7 @@ async function decideBriefFields({ beats, visualBible, bibleSections, approvedAr
       ...(loc ? { location: loc.cite } : {}),
       ...(loc && pop.byLocation[loc.base] ? { population: pop.byLocation[loc.base].population } : {}),
       aboard: r ? r.aboard : null, aboardIds: vehicleIds,
+      readsText: !!(r && r.readsText),
     };
   }
   // Gaze: the roster is the head count's commissioned characters; the
