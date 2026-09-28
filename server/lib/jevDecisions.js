@@ -1028,7 +1028,18 @@ async function decideGaze({ arc, pages, perPage }, opts = {}) {
  * a close-up widened for below-waist staging, a gap action reframed, a group
  * pulled wider — applies to the staging inside it, never to the field.
  */
-const JEV_FIXED_FIELDS_RULE = 'Fields decided upstream are FIXED: every story page\'s `shot` is the first field of its plan line exactly — the moment is staged within that framing, and no other rule changes it; a page whose plan carries a FIXED line takes its `timeOfDay` from it exactly, and its `weather` is `none` when the line says indoors and never `none` when it says outdoors. After the briefs are written, code sets each story page\'s cited Visual Bible elements in `objects[]` (locations excepted) — for an element with states, the dotted id of the look it shows on that page, and every state\'s `pages` follow from those citations — its `population`, its `aboard` and every character\'s `looksAt`; the prose renders those values and no rewrite changes them.';
+const JEV_FIXED_FIELDS_RULE = 'A story page\'s FIXED block holds the fields decided before you write: its `shot`, `timeOfDay` and indoors, the Visual Bible ids its `objects[]` cites — its location or vantage, and for an element with looks the dotted id of the look it shows — its `aboard`, its `population` and each listed character\'s `looksAt`. Copy each into the page\'s METADATA exactly and write the prose so the picture shows it: every cited element staged, even where only part of it is in frame, and no Visual Bible element staged that `objects[]` leaves out. No other rule changes a fixed field; a rule that would change one applies to the staging inside it. `weather` stays yours — `none` when the page is indoors, never `none` outdoors.';
+
+/**
+ * Which shot a vantage holds, as the Visual Bible call is told it (owner,
+ * 2026-09-28, "Jev first"): on the Jev path every story page's shot is already
+ * field 0 of its plan line, so a vantage is written to hold its pages' shots.
+ */
+function vantageShotRule(jevBackup = false) {
+  return jevBackup
+    ? `A plan line whose first field is still the word ${SV.PLAN_SHOT_PLACEHOLDER} gets its shot with its brief: put such a page on a vantage whose plate holds the framing its plan line needs.`
+    : 'Each story page\'s shot is the first field of its plan line and is fixed: a vantage holds only pages whose shot its plate can hold, so a page whose shot a shared plate cannot hold takes a vantage of its own.';
+}
 
 /**
  * The rule as a brief author / the review is given it. On the Jev-outage
@@ -1043,6 +1054,30 @@ function fixedFieldsRule(jevBackup = false) { return jevBackup ? JEV_BACKUP_SHOT
 function fixedLine(fixed) {
   if (!fixed || !fixed.timeOfDay) return '';
   return `FIXED: timeOfDay ${fixed.timeOfDay}; ${fixed.indoor ? 'indoors (weather none)' : 'outdoors'}`;
+}
+
+/**
+ * THE FIXED BLOCK under a story page's PLAN line in the page-brief call (owner,
+ * 2026-09-28, "Jev first"): every field the decision layer decided, in the
+ * words the brief's METADATA uses, each id with its label so the prose can
+ * stage it. A page with no `jevFixed` (a cover, the Jev-outage backup, the
+ * Visual Bible call before any element decision) carries only its light line,
+ * if any. `labels`: id → display label (name, and the look for a dotted id).
+ */
+function fixedBlock(page) {
+  const f = page && page.jevFixed;
+  if (!f) return fixedLine(page && page.fixed);
+  const label = id => (f.labels && f.labels[id] ? `${id} (${f.labels[id]})` : id);
+  const lines = ['FIXED — copy each into METADATA exactly; the prose shows each:'];
+  if (f.shot) lines.push(`- shot: ${f.shot}`);
+  if (f.timeOfDay) lines.push(`- timeOfDay: ${f.timeOfDay}; ${f.indoor ? 'indoors (weather none)' : 'outdoors'}`);
+  const objects = [...(f.location ? [f.location] : []), ...(f.cites || [])];
+  lines.push(`- objects: ${objects.length ? objects.map(label).join('; ') : 'none'}`);
+  lines.push(`- aboard: ${f.aboard ? label(f.aboard) : 'none'}`);
+  if (f.population) lines.push(`- population: ${f.population}`);
+  const gaze = Object.entries(f.looksAt || {});
+  if (gaze.length) lines.push(`- looksAt: ${gaze.map(([n, t]) => `${n} → ${t === GAZE_AWAY ? 'away' : label(t)}`).join('; ')}`);
+  return lines.join('\n');
 }
 
 /**
@@ -1087,6 +1122,19 @@ function pinBrief(brief, fixed) {
     const added = fixed.cites.filter(c => !before.includes(c));
     const removed = before.filter(o => decided.has(baseId(o)) && !fixed.cites.includes(o));
     if (added.length || removed.length) { m.objects = next; changes.push({ field: 'objects', from: before, to: next, added, removed }); }
+  }
+  // THE LOCATION IS CODE'S (owner, 2026-09-28, Q8): the page's location or
+  // vantage id, read from the Visual Bible's own page tables. Any other LOC
+  // cite leaves objects[]; the decided one stands first.
+  if (fixed.location) {
+    const before = Array.isArray(m.objects) ? m.objects.map(String) : [];
+    const isLoc = o => /^LOC\d+/i.test(String(o));
+    const next = [fixed.location, ...before.filter(o => !isLoc(o))];
+    if (JSON.stringify(next) !== JSON.stringify(before)) {
+      const removed = before.filter(o => isLoc(o) && o !== fixed.location);
+      m.objects = next;
+      changes.push({ field: 'location', from: before.filter(isLoc), to: fixed.location, removed });
+    }
   }
   if (fixed.population) set('population', fixed.population);
   if (fixed.aboard !== undefined) {
@@ -1188,6 +1236,8 @@ module.exports = {
   JEV_BACKUP_SHOT_RULE,
   fixedFieldsRule,
   fixedLine,
+  fixedBlock,
+  vantageShotRule,
   pinBrief,
   fixedFieldFinding,
   applyVbPages,

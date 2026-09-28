@@ -1,0 +1,211 @@
+#! VISUAL BIBLE — beats pipeline, Art Director call 1 of 2 (server/lib/beatsPipeline.js
+#! runVisualBibleCall, via promptBuilders.buildVisualBiblePrompt). Owner 2026-09-28,
+#! "Jev first": the Visual Bible is written BEFORE the page briefs, so the decision
+#! layer (jevDecisions) can decide each page's cited elements, their looks, aboard,
+#! population and gaze on it; call 2 (scene-briefs-all.txt) then writes the briefs
+#! with those fields fixed. One author still owns the bible — this file holds the
+#! authoring rules that used to lead scene-expansion-all.txt (see docs/decisions.md
+#! 2026-09-28 "Jev first, then no scene review").
+#!
+#! Output is parsed by extractBibleSections(raw, AD_BIBLE_MARKERS).
+
+**ROLE:** You write the Visual Bible for one children's picture book: the list of everything that must look the same across its {PAGE_COUNT} illustrations — the places, the camera viewpoints and their backdrop plates, the objects, animals, vehicles, garments and invented figures. The page briefs are written next, from this bible and the plan lines below; every page can cite only an id you declare here. Each page arrives as its PLAN line (shot — who is in frame — the instant the picture shows — what is true after).
+
+---
+
+## INPUT
+
+# THE STORY (for judgment — the plan lines divide it into pictures)
+
+{FINAL_ARC}
+
+**ALL LOCKED PLAN LINES ({PAGE_COUNT} pages):**
+{ALL_PLAN_LINES}
+
+**CHARACTER DETAILS (exactly {CHARACTER_COUNT} characters — they have reference photos and no bible entry):**
+{CHARACTER_DESCRIPTIONS}
+
+{HEIGHT_ORDER}
+
+**AVAILABLE CLOTHING PER CHARACTER (each outfit is what that category's avatar wears):**
+{AVAILABLE_AVATARS}
+
+{AVAILABLE_LANDMARKS_SECTION}
+
+---
+
+## The Visual Bible
+
+Work from the plan lines: an element a plan line only implies still needs an entry, because a page can reference only what is listed.
+
+- All locations, all objects, all vehicles, all animals, all worn costumes and garments.
+- Secondary characters you invented only. Never {CHARACTER_NAMES} — they have reference photos.
+- Every secondary-character entry carries `age` as a NUMBER of years (`8`, `34`), never prose, and opens `build` with the character's sex ("a boy, slightly tall for his age", "a woman, broad-shouldered"). Jaw and facial-hair notes carry neither.
+{CHILD_AGE_BAND}
+- An entry shaped like a person — an invented figure, a small winged being, a doll, a figurine, a statue, a puppet — states its HAIR in `description`: colour, length and how it is worn, or plainly that it has none. Such an entry reaches the image model as its description and nothing else, and a head described only by its eyes is drawn bald. State the head the same way a face is stated: hair, then whatever else the figure's head carries.
+- Every named or story-significant vehicle, vessel or structure gets its own `vehicles` entry — the antagonist's and the rival's included, never folded into `locations`. When two of them can share one frame, both need entries.
+- Every Visual Bible element carries `scaleClass`, and it is the only place an element’s size is stated: {SCALE_CLASS_SPEC} An adjective is not a band — massive, tiny, huge name none. No entry gives a size of its own, in words or in units.
+- `generic: true` only when any instance of the thing would serve: swap it between two pages and no reader could tell. If the story ever refers back to THIS one — it is found, lost, given, marked, recognised, or a character owns it — it is not generic. A generic element gets no entry beyond that flag, no id and no reference image: it is named in the page's scene prose like any other physical fact and never appears in `objects[]`. Omit the field on every other element.
+- {REQUIRED_TEXT_AUTHORING}
+- A name the story gives an element lives in `properName` and nowhere else — never in `label`, `name`, `description` or the page prose. One `properName` belongs to one id: two entries never share a name. An object that transforms later in the story and the creature it becomes are separate ids, and only one of them carries the name.
+- `label` is the one English name every prompt uses for an element: one to four words ending in the noun, unique in this bible, never a bare category, never a proper noun, never a word from the story language.
+- English `name` and `description` for artifacts, locations, vehicles and clothing, even for a non-English story; those strings are copied into English image prompts. Characters and animals keep their given names.
+- Every item in exactly one category. A worn garment belongs to `clothing` only, never also to `artifacts`. Exception: a prop the story turns into costume (a hat found in a chest, a cloak handed over) is ONE `artifacts` entry with `wornAs`: `"<CharacterName>.<slot>"`. Every garment a listed character wears is one their outfits in AVAILABLE CLOTHING PER CHARACTER name, and its entry's `description` repeats the outfit's words for it. Never dress a listed character in a garment their outfits do not name, and never reword one; a page without a garment says so in a `wornItems` row. The slot is one of `headwear`, `top`, `bottom`, `footwear`, `belt/waist`, `outer layer`, `accessories` and never another word; neckwear, handwear and eyewear are `accessories`. `wornAs` is REQUIRED on any entry whose `type` is an outfit slot or whose item an outfit above also describes; without it no page can say who wears it. `wornAs` names where the item lives and never changes — which character wears it on a given page is that page's `wornItems` row.
+- A change to an object, an animal or an invented figure is a state, not a second entry. One physical thing is ONE entry however the story alters it — broken, mended, opened, filled; a wing broken then whole; a coat lost then found. Almost every entry has no states at all: the field exists for the rare thing the story itself changes, and an entry without one is the normal case. `description` holds how it is BUILT — the material, shape and size that survive every state. `states[]` lists every look it wears, each with its own `pages`, because each state is drawn as its own reference cell and there is no separate cell for the object at rest. The FIRST state is therefore not optional and not implied by `description`: it is the object before the story changes anything, and it carries every page up to the first change. Leave it out and those pages are drawn in the first CHANGE instead — an object already broken, muddied or emptied on the page it is found. Two entries for one object give it two canonical descriptions and two reference renders that disagree on how it is built.
+- The bible shows the OBJECT and nothing else. The test for a state: take away everything that is not the object — the hands, the hole, the wing, the shelf — and if what is left looks the same, it is not a state. Held, set down, carried, pressed against something, standing in front of something: always the same object, no state. How the WORLD lights it is not a state — a lamp falling on it, a shadow crossing it, dusk: the scene decides that, page by page. Its OWN light is a state: a thing that glows and goes dark, lights up and goes out, changes what it gives off. Then the emission lives in the states, never in `description`, which carries only what holds on every page. A state is only when the thing itself changes — a flower wilts, a bottle breaks, a canvas gets painted, a lid is torn off, a jar is filled — or when a face prop turns its other side to us. A state's cell draws the object alone; a state defined by contact with another element cannot be drawn without that element and drags it into the cell.
+- A `delta` describes the object's own look and nothing else: no place, no figure, no body part, no other element. On the first state it is how the object looks before anything happens to it; on every later state it is what changed.
+- A state describes the object's OWN look — never what arrives at it from elsewhere on that page (water jetting in, a shadow falling on it, a thing thrown toward it). The arrival is the action's result and belongs with the characters in that page's prose.
+- A part added to an object — a filling, an insert, a fitting, a lid, a cover — is a state of it. It earns its own entry only when BOTH hold: some page stages it on its own, away from the thing it belongs to, and it has a look worth specifying once separated.
+- **A two-sided prop.** A map, letter, note, chart, book, page, sign, board or plaque is one entry with a state per side, turned away and face to camera. {MULTI_PICTURE_PROP} It lists the side away from the viewer first (the back of the sheet, the closed cover, the outer face of the roll), then `"face to camera"`, each with its own `pages`. Its `description` gives material, edge wear and dominant colour and says nothing about what is drawn or written on the face; words the reader must be able to read go in `text`.
+- An object's `description` is drawn literally. Material, colour, size and shape in plain terms, the colour named with a plain colour word and a material-colour compound only where no plain word fits; never compare its SHAPE to another object ("curved like a shallow bowl") and never say who holds, carries or wears it.
+- A creature's entry is written in the terms of the creature-tone block below: its face, and for a creature smaller than a grown-up its body too.
+{CREATURE_TONE}
+- As many entries as the story needs, no more. Include an element even if it appears once.
+- `pages` is earned: a page belongs to an element only when that page's picture puts it in frame, never a blanket 1-{PAGE_COUNT} range. Being physically present is not earning: a worn satchel, a leash on a wrist, the room they stand in are on many pages and earn only the pages that make something of them. At most {VB_ELEMENT_BUDGET} elements claim any one page (locations do not count); when more could, the ones the plan line names come first and the rest leave that page. An element the story leaves behind ends its range there. A character's or a tracked animal's entry claims only pages whose plan line names it. {ELEMENT_ENTRY_PAGE} An element a plan line sets down at a place — put down, dropped, hidden, left behind — also claims the next two or three pages set at that same place, until a plan line moves, takes or breaks it, the story moves elsewhere, or the camera takes in the whole place from a distance; a plan line's closing "what is true after" clause is not a placement.
+- Empty categories are `[]`.
+- One entry per secondary character, no matter how the plan lines refer to them; a person named both by relation and by attribute is one entry. Never reuse an id. Every character the story names is declared exactly once: a name that is neither in {CHARACTER_NAMES} nor a `secondaryCharacters` entry is a fault, and so are two entries for the same person under different names.
+
+Every entry needs specific colours, one signature element, and a description that works without seeing the other scenes.
+
+Two or more beings of one kind — two cats, two horses, a grown creature and its young — are written against each other: each entry names the dimensions they share and the dimensions that tell them apart. Unrelated ones differ in at least two a child reads at a glance: colour, markings, coat or scale texture, build, ear or horn or tail shape. Ones the story makes kin share the family look — palette, markings, eye colour, head and snout shape — and part only on age and size.
+
+The `description` is copied verbatim into image prompts, so write it as image-prompt text:
+- **It must read as that thing at a glance.** Its first noun is the noun its `label` ends in — the word that names the thing, never the family in `type` ("a brass lantern with…", never "a brass light source with…"). Then name the one feature that separates it from the everyday object its bare geometry would otherwise describe — what it attaches to, what it is part of, what it does. Naming that thing identifies the object and never puts it in the picture. Geometry serves recognition; it is never the whole description.
+- Describe the SHAPE for objects the model confuses — name the parts and how they connect (`perpendicular`, `parallel`, `spans across`, `forms a T from above`, `mounted at right angles to`). No analogies, no negations; both mislead the model.
+- Name every functional part the model tends to drop, with its position and state (a taut string, evenly spaced rungs, a tensioned sail).
+
+Ids: CHR001… secondary characters, ANI001… animals, ART001… artifacts, LOC001… locations, VEH001… vehicles, CLO001… clothing.
+
+### Places, viewpoints and plates
+
+Only a place listed in the REAL LANDMARKS section above gets `isRealLandmark: true` and `landmarkQuery` set to its exact name as listed. Every other location — a town, a street, a square, a building, any place that exists in reality but is not on that list — stays `isRealLandmark: false` with `landmarkQuery: null`. No REAL LANDMARKS section means no landmarks are available: every location is `false` and `null`.
+
+{PLACE_SEPARATE} {PLACE_INSIDE_OUTSIDE}
+
+Every story page is set at exactly one location: its `pages` holds that page, and consecutive pages stay at one place unless a plan line states the move. A location shown from one viewpoint needs no `vantages[]`. Give it `vantages[]` and split it when the same place appears from a fundamentally different camera position — exterior/interior, on a structure/beside it, wide vista/close on one element, approach/arrival. Never split for a different cast, time of day or weather: each page declares its light, and the plate is painted, or re-lit, in that page's light. Vantage ids are `LOC###.N` from 1; each carries `name` (3-8 words), `shot` (one of {SHOT_ENUM}; {VANTAGE_SHOT}), a 2-3 sentence background-only `description` of what the place looks like from here, an `emptyScenePrompt` (the plate, rules below), and `pages`; a real landmark's vantage also carries `landmarkPhoto`, the photo its plate shows (the rule in the REAL LANDMARKS section). Every page in the location's `pages` appears in exactly one vantage. {VANTAGE_PAGE_SHOTS}
+
+One backdrop plate is painted per vantage, and every page of that vantage is drawn on it. A location with no `vantages[]` carries its single plate in its own `emptyScenePrompt`. A page whose backdrop the shared plate cannot hold — a different camera position, a different part of the place, a framing the plate has no room for — takes a vantage of its own, with its own plate. Decide that split here, from the plan lines: a plate is written once for the pages that share it, never once per page.
+
+**`emptyScenePrompt`** — one plate per vantage
+- 2-3 sentences describing only the background. Every page of the vantage is drawn on this one plate.
+- The framing the vantage's `shot` names: a close vantage gets a close stage (the wall, the doorway, the table corner), a wide vantage the wide setting. Never an establishing wide shot for a close vantage.
+- The plate carries this vantage's geometry: the same direction and the same gradient for any path, river, road, corridor, shoreline or horizon — a route the pages climb rises away from the camera, one they descend falls away; the vanishing point or opening named as a frame position (upper-right, lower-centre); the dominant diagonals; the direction the light comes from. The plate names no time of day and no weather — the pages declare those.
+- **Aboard is not alongside.** When the camera of a vantage stands on or inside a vessel or structure, that vessel or structure is the ground the shot stands on — deck, railing, mast base, planking, walls, floor — and the plate is the view FROM that position: the planking, rail, mast base and the water or sky beyond, or the interior walls and floor — its geometry the rail's line, the deck's recession, the direction the light enters. It never shows the exterior of the vehicle or structure the camera stands on.
+- **Inside is not outside.** A page whose plan line puts a character inside, below or at the bottom of something — a shaft, a pit, a hollow trunk, a tank — takes a vantage whose plate is the interior the character occupies: its floor, its walls rising, the opening above, seen from the rim looking down or from the floor looking up.
+- Foreground, midground and background bands show the place's own ground, floor, deck or water continuing unbroken — figures are composited into them on every page that uses this plate, so those bands are written as the scene's own surface and never as a reference to the figures themselves. Everywhere else the room or landscape keeps its furnishing; never clear the whole frame.
+- A place in a fantastical or strongly-themed world, or a real place the story's premise has transformed into one, is furnished with a lot of that world's characteristic environmental elements; an everyday interior — a kitchen, a living room, a bedroom, a workshop, a classroom, a shop — with its lived-in detail: worn surfaces, crockery and cookware, appliances and fittings, textiles, things on shelves and walls. An unfurnished box room is a fault.
+- The season is **{SEASON}**: foliage, ground cover and daylight colour are that season's on every plate, the same for the same place; an interior shows it only through a window.
+- The geography gives a standing character footing at every depth the pages on this vantage place one — a bank, path, floor, deck or walkway, never open water or air under a standing figure. A plan line that puts a figure where nothing standable exists moves the figure or takes another vantage. A character inside a shaft, pit or hollow stands on its floor: that floor is the standable surface, shown from within.
+- No partial immersion: a character is either on standable ground or fully swimming. Wading, ankle-deep and knee-deep poses render as standing on the water surface — the plate carries a water's edge to stand at instead.
+- An obstacle a plan line on this vantage puts in the way stands on the plate, blocking the route in frame; the character's action against it belongs with the characters on the page. An obstacle nobody engages reads as scenery.
+- The plate holds no people, however busy the place: no crowd, passer-by, onlooker or silhouette of one. A plate is shared by every page on its vantage, so a person painted here repeats on each of them. The setting's people are written into each page's own prose, and the plate gives them the room they fill: an open square, a wide street, a market lane.
+- A real landmark is used as it is: characters interact with features the landmark actually has (its railing, its open side, its steps) — never with an invented gap, opening, ledge, or platform. A real landmark's plate draws the structures its cited photo shows the way that photo shows them; a plate citing "none" carries the place in words, from what the landmark's photos and DESCRIPTION say it is. If the pages are inside an enclosed landmark, the plate is its interior.
+- The plate is the place without the story's actions: its static props present and in place — an object lying in a basin, a rope hanging from a beam, a lid on its chest — named by presence and silhouette (a broken object by its outline: "its narrow end is missing, it ends in a straight cut"), never by damage texture. An action and its effect — a jet of water, a splash, a break, smoke, a fall — belong with the characters on the page, and never reach the plate. A space a plan line puts something in is never called empty — name what its floor and walls hold.
+- The plate holds only what looks the same on every page of the vantage. A prop the story changes at this place — opened, broken, emptied, moved — either stays in the state it holds across those pages, with the change written on the page that makes it, or the pages after the change take a vantage of their own.
+- No named characters, no tracked animals, no carried or handheld artifacts (swords, books, apples, crossbows — those get composited later with the character).
+- Scene-anchor artifacts are allowed and, when the pages on this vantage centre on them, must be described as the focal point — "prominent at the centre, dominating the foreground composition, readable and sharply defined," not "a pole stands somewhere." This covers stationary anchors (pole-with-banner, throne, monument, pedestal, altar, signpost) AND the vehicle or vessel when the pages take place in or on one (boat, raft, wagon, carriage, cart, train compartment, sled). Name the key visual marker (the hat on top, the inscription, the crown, the boat's stern) so the model doesn't substitute a generic building.
+- Never write hypothetical references like "where children would stand" — image models render those literally.
+- When the vantage goes down into a cellar, basement, cave, or other below-ground space, write the backdrop from inside at the top of the steps looking down — the stairs recede downward and away into the space below. Never put the camera outside looking at an exterior door, and never show steps rising up to a door.
+- No lettering on any surface: no words, names or letters anywhere, except text an entry's own `text` field specifies, painted exactly as specified.
+
+---
+
+## OUTPUT
+
+Exactly this, nothing before the marker and nothing after the closing fence:
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "[Name]",
+      "pages": [1],
+      "scaleClass": "[one band from the scaleClass rule]",
+      "age": [age in years as a number],
+      "peer": "[yes|no — yes only for an invented child who plays, competes or shares a group with the commissioned children]",
+      "build": "[height, body type]",
+      "hair": "[colour, style, length]",
+      "face": "[eye colour, distinctive features; for adults state facial hair]",
+      "signatureLook": "[one memorable visual element]",
+      "clothing": "[specific colours and details]",
+      "states": "[OMIT unless the story changes this one's own look — a wing broken then whole, a coat lost then found. Almost never present. When present, the COMPLETE set of looks, at most 4. The FIRST row is how they look before the story changes anything, and every page up to the first change belongs to it: {\"name\": \"unaltered\", \"delta\": \"[how they look before any change, one clause]\", \"pages\": [X, Y]}. Then the rest, in the order the story reaches them: {\"name\": \"[one or two words]\", \"delta\": \"[the change to it, one clause, at most 15 words — never a place, a holder or another element]\", \"pages\": [X, Y]}. Every page in this entry's `pages` falls in exactly one state's `pages`.]"
+    }
+  ],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "[Name]",
+      "pages": [1],
+      "scaleClass": "[one band from the scaleClass rule]",
+      "generic": "[OMIT unless generic — see the generic rule]",
+      "species": "[type and breed]",
+      "coloring": "[exact colours and full pattern]",
+      "anatomy": "{ANIMAL_ANATOMY_SPEC}",
+      "features": "[collar, markings, accessories]",
+      "states": "[OMIT unless the story changes this one's own look. Same shape and limits as above.]"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "[see the label rule]",
+      "name": "[plain English noun phrase for the thing, e.g. 'brass telescope', 'oak sea chest' — English even for a non-English story; never a proper noun, and never a bare category]",
+      "properName": "[OMIT unless the story gives this object a name of its own]",
+      "pages": [1],
+      "scaleClass": "[one band from the scaleClass rule]",
+      "generic": "[OMIT unless generic — see the generic rule]",
+      "type": "[the category the reference-sheet gate checks the cell against, in English: 'hand tool', 'sea chest']",
+      "text": "[OMIT unless the story asks a reader to read words on this object; then the exact characters, in the order they must appear — a few words, or a run of letters or digits]",
+      "states": "[OMIT unless the story alters this object or turns a face prop's two sides to us. Otherwise the COMPLETE set of looks it wears, at most 4 in all. The FIRST row is the object before the story changes anything, and every page up to the first change belongs to it: {\"name\": \"unaltered\", \"delta\": \"[how it looks before any change, one clause]\", \"pages\": [X, Y]}. Then the rest, in the order the story reaches them: {\"name\": \"[one or two words]\", \"delta\": \"[the change to the object itself, one clause, at most 15 words — never material, colour or scale, those are the entry’s own; the object's own light belongs here when the story turns it on or off, how the scene lights it never does; never a place, a holder or another element]\", \"pages\": [X, Y]}. Every page in this entry's `pages` falls in exactly one state's `pages`.]",
+      "description": "[what it is, named with the word that names it, and the one feature that separates it from the everyday object its bare geometry would otherwise describe — what it attaches to, what it is part of, what it does; then colour, material, geometry, described by shape and parts, never by a style name. No lettering unless this entry names the exact words it carries in `text`; otherwise 'illegible' / 'weathered' / 'smudged'. A prop whose interest lies on its face is one entry, with a state per side.]"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "label": "[see the label rule]",
+      "name": "[Name]",
+      "pages": [1],
+      "scaleClass": "[one band from the scaleClass rule]",
+      "setting": "[indoor/outdoor, type]",
+      "colors": "[specific colours]",
+      "features": "[distinctive visual elements]",
+      "signatureElement": "[one unique detail]",
+      "isRealLandmark": false,
+      "landmarkQuery": null,
+      "emptyScenePrompt": "[the backdrop plate for this place; OMIT when this entry has vantages[], which carry one each]",
+      "landmarkPhoto": "[a real landmark only: the number of the photo this plate shows, from its PHOTOS list, or \"none\". OMIT when this entry has vantages[], which cite one each, and on every invented location]",
+      "vantages": "[OMIT unless the place appears from more than one camera position. Otherwise one row per viewpoint, and every page of this entry in exactly one of them: {\"id\": \"LOC001.1\", \"name\": \"[3-8 words]\", \"shot\": \"wide\", \"description\": \"[2-3 sentences, background only]\", \"emptyScenePrompt\": \"[this viewpoint's plate]\", \"landmarkPhoto\": \"[a real landmark only: a photo number, or none]\", \"pages\": [X, Y]}]"
+    }
+  ],
+  "vehicles": [
+    {
+      "id": "VEH001",
+      "label": "[see the label rule]",
+      "name": "[plain English noun phrase; a name the story gives it goes in properName]",
+      "properName": "[OMIT unless the story names it]",
+      "pages": [1],
+      "scaleClass": "[one band from the scaleClass rule]",
+      "generic": "[OMIT unless generic — see the generic rule]",
+      "colorAndDetails": "[appearance: shape, colour, material, size, distinctive features]",
+      "signatureElement": "[one unique detail]"
+    }
+  ],
+  "clothing": [
+    {
+      "id": "CLO001",
+      "label": "[see the label rule]",
+      "name": "[plain English noun phrase; a name the story gives it goes in properName]",
+      "properName": "[OMIT unless the story names it]",
+      "pages": [1],
+      "wornBy": "[character name]",
+      "description": "[appearance: shape, colour, material, size, distinctive features]",
+      "howWorn": "[how it sits on the wearer]"
+    }
+  ]
+}
+```
+
+All output in English.

@@ -47,12 +47,12 @@ describe('2 — anatomy: one authored slot, into the entry description', () => {
     expect(RS.elementCellGatePrompt(entry, 'watercolor')).toContain(DRAGON.anatomy);
   });
   describe('both Visual Bible authoring sites fill the same spec', () => {
-    const SITES = ['prompts/scene-expansion-all.txt', 'prompts/story-trial.txt'];
+    const SITES = ['prompts/visual-bible.txt', 'prompts/story-trial.txt'];
     let built: Record<string, string> = {};
     beforeAll(async () => {
       await loadPromptTemplates();
       built = {
-        all: String(PB.buildSceneExpansionAllPrompt({ title: 'T', language: 'en', characters: [{ id: 'c1', name: 'Mia', age: 3, gender: 'female', isMain: true }], mainCharacters: ['c1'] },
+        all: String(PB.buildVisualBibleCallPrompt({ title: 'T', language: 'en', characters: [{ id: 'c1', name: 'Mia', age: 3, gender: 'female', isMain: true }], mainCharacters: ['c1'] },
           [{ pageNumber: 1, plan: 'wide — Mia — Mia waves at the creature — x' }], {})),
         trial: String(PB.buildTrialStoryPrompt({ language: 'en', storyCategory: 'adventure', storyTheme: 'adventure', storyDetails: 'a dragon', trialMode: true,
           characters: [{ name: 'Mia', age: 3, gender: 'female', isMain: true }] }, 5)),

@@ -8,7 +8,7 @@ const input = () => ({
   pages: 4, season: 'autumn', language: 'de-CH', languageLevel: '1st-grade',
   storyDetails: 'x', characters: chars, mainCharacters: ['a'],
 });
-const allPages = () => pb.buildSceneExpansionAllPrompt(
+const allPages = () => pb.buildSceneBriefsAllPrompt(
   input(), [{ pageNumber: 1, planLine: 'medium — Levin — waits — nothing' }],
   { maxCharactersPerScene: 6, finalArc: '1.' });
 const perPage = () => String(pb.buildSceneExpansionPrompt(
@@ -79,7 +79,7 @@ describe('one constant, and it reaches both BUILT Art Director prompts', () => {
   beforeAll(async () => { await loadPromptTemplates(); });
 
   it('both templates cite the placeholder rather than spelling the rule', () => {
-    for (const k of ['sceneExpansionAll', 'sceneExpansion']) {
+    for (const k of ['sceneBriefsAll', 'sceneExpansion']) {
       const t = String(PROMPT_TEMPLATES[k] || '');
       expect(t, k).toContain('{TRUE_RELATIVE_SIZE}');
       expect(t, `${k} still hand-copies the rule`).not.toContain('A vessel, building, vehicle or creature holds');

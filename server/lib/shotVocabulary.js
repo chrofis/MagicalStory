@@ -548,6 +548,14 @@ const CLOSEUP_KEPT_RULE = 'A close-up the page\'s plan asks for stays `close-up`
   + `Only a plan whose own words put the subject below the frame line — ${CLOSEUP_BELOW_WAIST_PHRASE} — makes that page \`medium\`.`;
 
 /**
+ * THE SHOT IS FIXED (owner, 2026-09-28, "Jev first"): on a page whose shot the
+ * decision layer fixed, no author changes it — a rule that used to pick or
+ * widen a shot applies to the staging inside it. Covers and the Jev-outage
+ * backup keep the wording above; promptBuilders.shotRuleFills picks per call.
+ */
+const CLOSEUP_KEPT_FIXED_SHOT_RULE = 'A `close-up` stays `close-up`: restage the moment waist-up — holding, reaching, reacting — and bring what the moment acts on up into the frame.';
+
+/**
  * A capitalised name or a person pronoun — kept for the entry that needs an
  * actor named BEFORE the match rather than inside it. No current entry does
  * (every one is `selfSubject`), and the guard stays because the next pattern
@@ -818,12 +826,16 @@ const GROUP_WIDER_SHOTS = ['wide', 'ultra-wide', 'high-angle', 'aerial'];
 if (GROUP_WIDER_SHOTS.some(id => !SHOT_TYPES.includes(id))) {
   throw new Error('shotVocabulary: GROUP_WIDER_SHOTS names a shot that does not exist');
 }
-const GROUP_STAGING_RULE = `When more than three characters share the frame, keep the whole group together at one depth in a wider shot — ${GROUP_WIDER_SHOTS.map(id => '`' + id + '`').join(', ').replace(/, ([^,]*)$/, ' or $1')} — or show them from behind (\`perspective: back view\`) as they move away; never five detailed close foreground faces. The group turns to each other or to what they look at, never lined up facing the viewer: a group looking at something deeper in the frame is seen from behind.`;
+const GROUP_STAGING_TAIL = 'never five detailed close foreground faces. The group turns to each other or to what they look at, never lined up facing the viewer: a group looking at something deeper in the frame is seen from behind.';
+const GROUP_STAGING_RULE = `When more than three characters share the frame, keep the whole group together at one depth in a wider shot — ${GROUP_WIDER_SHOTS.map(id => '`' + id + '`').join(', ').replace(/, ([^,]*)$/, ' or $1')} — or show them from behind (\`perspective: back view\`) as they move away; ${GROUP_STAGING_TAIL}`;
+/** The same rule on a page whose shot is fixed: the shot assignment already holds GROUP_WIDER_SHOTS (jevDecisions.assign). */
+const GROUP_STAGING_FIXED_SHOT_RULE = `When more than three characters share the frame, keep the whole group together at one depth, or show them from behind (\`perspective: back view\`) as they move away; ${GROUP_STAGING_TAIL}`;
 
 module.exports = {
   GROUP_STAGING_MAX,
   GROUP_WIDER_SHOTS,
   GROUP_STAGING_RULE,
+  GROUP_STAGING_FIXED_SHOT_RULE,
   OTS_NEAR_FIGURE_CROP,
   OTS_NEAR_FIGURE_FACING,
   OTS_MIN_IN_FRAME,
@@ -863,6 +875,7 @@ module.exports = {
   SHOT_FLOOR_TIERS,
   CLOSEUP_BELOW_WAIST_VERBS,
   CLOSEUP_KEPT_RULE,
+  CLOSEUP_KEPT_FIXED_SHOT_RULE,
   CLOSEUP_BELOW_WAIST_PHRASE,
   closeUpBelowWaistVerbs,
   shotFloors,

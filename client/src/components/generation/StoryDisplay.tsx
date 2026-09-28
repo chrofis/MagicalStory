@@ -210,6 +210,8 @@ interface StoryDisplayProps {
   beatsReviewReport?: ReviewDiffReport | null;
   /** Per-page before/after from the scene review (beats pipeline, dev mode). */
   sceneReviewReport?: ReviewDiffReport | null;
+  /** The brief checks and the one Art Director re-ask (beats pipeline, dev mode, 2026-09-28). */
+  briefCheckReport?: import('../../types/story').BriefCheckReport | null;
   /** What the wardrobe review was given and what it rewrote (dev mode). */
   clothingReviewReport?: import('../../types/story').ClothingReviewReport | null;
   /** Per-function model/token/cost/time ledger (tokenUsage.byFunction). */
@@ -386,6 +388,7 @@ export function StoryDisplay({
   arcReviewReport,
   beatsReviewReport,
   sceneReviewReport,
+  briefCheckReport = null,
   clothingReviewReport = null,
   storyTextPrompts = [],
   visualBible,
@@ -3157,6 +3160,26 @@ export function StoryDisplay({
                   sceneReviewReport,
                   'scene-review',
                   language === 'de' ? 'Szenen-Review (Diff)' : language === 'fr' ? 'Revue des scènes (diff)' : 'Scene review (diff)',
+                  'violet',
+                  true,
+                )}
+                {briefCheckReport && renderDiffPanel(
+                  {
+                    model: briefCheckReport.model ?? null,
+                    durationMs: briefCheckReport.durationMs,
+                    pages: briefCheckReport.pages || [],
+                    changedPages: (briefCheckReport.pages || []).map(p => p.pageNumber),
+                    briefsIn: briefCheckReport.briefsIn,
+                    prompt: briefCheckReport.reask?.prompt ?? null,
+                    analysis: [
+                      `Findings before: ${(briefCheckReport.findingsBefore || []).map(f => `p${f.pageNumber} ${f.type}`).join(', ') || 'none'}`,
+                      `Findings after: ${(briefCheckReport.findingsAfter || []).map(f => `p${f.pageNumber} ${f.type}`).join(', ') || 'none'}`,
+                      ...(briefCheckReport.verdicts || []).map(v => `p${v.pageNumber}: ${v.reason}`),
+                      ...(briefCheckReport.reask?.failed ? [`Re-ask failed: ${briefCheckReport.reask.failed}`] : []),
+                    ].join('\n'),
+                  },
+                  'brief-checks',
+                  language === 'de' ? 'Brief-Checks + Nachfrage (Diff)' : language === 'fr' ? 'Contrôles des briefs + relance (diff)' : 'Brief checks + re-ask (diff)',
                   'violet',
                   true,
                 )}

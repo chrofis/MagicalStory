@@ -6,6 +6,9 @@ const { arcRepairFindingsWithCastCheck } = require('./jevAudit');
 const jevDecisions = require('./jevDecisions');
 const { resolveShotId } = require('./shotVocabulary');
 const { salvageReplanRound } = require('./replanSalvage');
+// The decided fields of every story page (Jev first, 2026-09-28): a leaf module,
+// so a replay or a test can load them without the pipeline's provider graph.
+const { decideBriefFields, pinDecidedFields, pageLocations, visualBibleJsonOf } = require('./jevBriefFields');
 const { JevDecisionError } = jevDecisions;
 const jevSelection = require('./jevSelection');
 const { lookupByName } = require('./castResolver');
@@ -34,11 +37,16 @@ const { buildCharacterDescription } = require('./visualBible');
  *      DIVISION only, then at most ONE re-plan by the planner. No story
  *      checking happens at this layer by design (owner, 2026-09-01)
  *   3. beats_story_bible     MODEL_DEFAULTS.outline    CLOTHING REQUIREMENTS only
- *   4. beats_scene_expansion MODEL_DEFAULTS.sceneDescription  ONE call over ALL pages: the VISUAL BIBLE
- *      first, then every page's brief — the covers included, as pages -1/-2/-3
- *      from code-written cover beats (coverBeats.js, 2026-09-24) — (cross-page
- *      continuity, and no page can cite an element nobody declared)
- *   5. beats_scene_review    MODEL_DEFAULTS.sceneReviewModel  ONE call over ALL briefs, rewrites faulted
+ *   4. THE ART DIRECTOR, two calls (owner, 2026-09-28, "Jev first"):
+ *      beats_visual_bible    MODEL_DEFAULTS.sceneDescription  the VISUAL BIBLE alone;
+ *      then the Jev decision layer fixes every story page's cited elements,
+ *      looks, location, aboard, population and gaze (jevBriefFields.js);
+ *      beats_scene_expansion MODEL_DEFAULTS.sceneDescription  ONE call over ALL pages
+ *      — the covers included, as pages -1/-2/-3 from code-written cover beats
+ *      (coverBeats.js) — each story page with its FIXED block
+ *   5. beats_brief_reask     MODEL_DEFAULTS.sceneDescription  code checks every brief
+ *      (briefChecks.js); the flagged pages go back to the Art Director ONCE.
+ *      The scene review no longer runs (its code stays until the owner's Q9)
  *   6. beats_story_text      MODEL_DEFAULTS.storyText  page text written from the arc + the locked plan lines
  *
  * Model names are NOT written here: every stage above names the
@@ -50,10 +58,10 @@ const { buildCharacterDescription } = require('./visualBible');
  * Scheduling is by data dependency, not by list order:
  *
  *   beats ─> plan check ─> wardrobe ─┬─> styled avatars  (caller-owned, long pole)
- *                                    └─> scene expansion (bible + briefs)
- *                                          ─> scene review ─> page text
+ *                                    └─> visual bible ─> Jev fields ─> page briefs
+ *                                          ─> brief checks + one re-ask ─> page text
  *
- * Step 6 runs AFTER the scene review and reads the FINAL briefs (owner decision
+ * Step 6 runs AFTER the brief checks and reads the FINAL briefs (owner decision
  * 2026-08-10: the scenes come first, the text must follow — see the note at the
  * old kickoff site below). Styled avatars need only clothingRequirements, so
  * they start the instant step 3 returns (via opts.onClothingRequirements) and
@@ -129,7 +137,8 @@ const {
   parsePlanResponse,
   pickMainCharacters,
   buildSceneExpansionPrompt,
-  buildSceneExpansionAllPrompt,
+  buildVisualBibleCallPrompt,
+  buildSceneBriefsAllPrompt,
   buildSceneReviewPrompt,
   buildStoryTextFromBeatsPrompt,
   buildStoryBibleFromBeatsPrompt,
@@ -143,39 +152,10 @@ const {
   getHistoricalObjects,
 } = require('./storyHelpers');
 const { parseCastRemovals, diffCastRemovals, whoColumnRemovals, revertUndeclaredRemovals, restoreUndeclaredRemovals } = require('./sceneReviewGuard');
-const { carryForwardWornItemsInBrief } = require('./wornItems');
 
-/**
- * A reviewed brief keeps every worn-state row the brief it replaces declared
- * (2026-09-23). A rewrite changes a state by restating the row; an omitted row
- * would resolve to the default `worn` and paint a garment the page took off
- * back on (wornItems.carryForwardWornItems). Loud: the omission is logged.
- */
-function keepDeclaredWornRows(pageNumber, rewritten, previous, pass, gl) {
-  const carry = carryForwardWornItemsInBrief(rewritten, previous);
-  if (!carry) return rewritten;
-  const msg = `Page ${pageNumber}: the ${pass} dropped the declared wornItems row(s) ${carry.carried.join(', ')} — carried forward as declared`;
-  log.warn(`🎩 [BEATS] ${msg}`);
-  if (gl) gl.warn('beats_worn_rows_carried', msg, null, { pageNumber, carried: carry.carried, pass });
-  return carry.brief;
-}
-
-/**
- * A reviewed brief keeps the declared light (`timeOfDay` / `weather`) of the
- * brief it replaces when it states none (2026-09-24). A rewrite that states a
- * value wins — the review's check 3a may correct it. Without this a rewritten
- * page loses its light, its plate falls back into the vantage's base light, and
- * its page prompt carries no LIGHT line. Loud: the omission is logged.
- */
-function keepDeclaredLight(pageNumber, rewritten, previous, pass, gl) {
-  const { carryForwardLightInBrief } = require('./sceneLight');
-  const carry = carryForwardLightInBrief(rewritten, previous);
-  if (!carry) return rewritten;
-  const msg = `Page ${pageNumber}: the ${pass} dropped ${carry.carried.join(' and ')} — carried forward as declared`;
-  log.warn(`🌗 [BEATS] ${msg}`);
-  if (gl) gl.warn('beats_light_carried', msg, null, { pageNumber, carried: carry.carried, pass });
-  return carry.brief;
-}
+// The rewrite guards every brief rewrite runs (moved to briefChecks.js, the
+// module that owns the one re-ask; the scene review reads the same two).
+const { keepDeclaredWornRows, keepDeclaredLight } = require('./briefChecks');
 // The corrective loop's shared halves — the payload contract and the
 // introduced-vs-survived verdict. The rewrite path (images.js iteratePageCore)
 // reaches the same two through briefCorrection.correctFindings.
@@ -1838,12 +1818,21 @@ async function finalizePlanShots({ approvedArc, beats, check, gl, callImpl, jevR
   }
 }
 
-async function finalizePlanShotsJev({ approvedArc, beats, check, gl, callImpl }) {
+/**
+ * The head count of a checked division: page → the names its plan check counts
+ * in frame (planCounters `present`). ONE reading for the shot assignment and
+ * the gaze roster. Null when the check carries no roster.
+ */
+function presentOf(check) {
   const perPage = check && check.counters && check.counters.stats && check.counters.stats.castPerPage;
-  if (!Array.isArray(perPage) || !perPage.length) {
+  return Array.isArray(perPage) && perPage.length ? new Map(perPage.map(r => [Number(r.pageNumber), r.names || []])) : null;
+}
+
+async function finalizePlanShotsJev({ approvedArc, beats, check, gl, callImpl }) {
+  const present = presentOf(check);
+  if (!present) {
     throw new JevDecisionError(`no head count for the shipped division (${check && check.counters && check.counters.skipped ? `plan counters skipped: ${check.counters.skipped}` : 'the plan check gave no roster'}) — the shot assignment cannot apply the group rule, so no page gets a shot`);
   }
-  const present = new Map(perPage.map(r => [Number(r.pageNumber), r.names || []]));
   const t0 = Date.now();
   const d = await jevDecisions.decideShots({ arc: approvedArc, pages: beats, present }, callImpl ? { callImpl } : {});
   const shotBeats = jevDecisions.applyShots(beats, d.shots);
@@ -1852,135 +1841,6 @@ async function finalizePlanShotsJev({ approvedArc, beats, check, gl, callImpl })
   gl.info('beats_jev_shots', `Shots by Jev + code: ${d.shots.map((x, i) => `p${beats[i].pageNumber} ${x}`).join(', ')} (${d.stats.calls} Jev calls, $${d.stats.costUsd}, ${(report.elapsedMs / 1000).toFixed(1)}s)${d.unmet ? ` — UNMET: ${d.unmet.join(', ')}` : ''}`, null, { shots: d.shots, violations: d.violations, unmet: d.unmet, stats: d.stats });
   if (d.unmet) gl.error('beats_jev_shots_unmet', `The shot assignment could not meet ${d.unmet.join(', ')}`, null, { unmet: d.unmet });
   return { beats: shotBeats, pagePlan, report };
-}
-
-/**
- * THE DECISION LAYER AFTER THE ART DIRECTOR — Parts 3-5 (owner, 2026-09-27).
- * The Visual Bible is authored in the same call as the briefs, so the element
- * decisions run here, on the bible the Art Director wrote:
- *   - VB citations per story page (creatures 0.7, vehicles 0.5, secondaries
- *     0.5, objects 0.7 — 0.5–0.7 only where the brief cited it), the page's
- *     state id, the element budget (top-P);
- *   - `aboard` per page and vehicle; `population` per LOCATION (the LOC each
- *     brief cites);
- *   - `looksAt` per character, over code-listed targets (after the citations,
- *     which are among the targets).
- * Code writes each into the brief's metadata (jevDecisions.pinBrief), makes the
- * bible's `pages` agree, and records per page what changed: the scene review
- * gets a `jev_fixed_field` line for it and code re-pins the fields after the
- * review (pinJevFixedFields). The timeOfDay/indoor decision ran before the Art
- * Director (its FIXED line) and is pinned here with the rest.
- *
- * Mutates `expansions` (briefs), `beats` (b.jevFixed / b.jevChanges) and
- * `visualBible`; returns the synced bibleSections and the report. A Jev failure
- * throws JevDecisionError — the story step fails.
- */
-async function applyJevBriefDecisions({ expansions, beats, visualBible, bibleSections, approvedArc, inputData, gl }) {
-  const { isCoverPage } = require('./coverBeats');
-  const { extractSceneMetadata: meta } = require('./sceneMetadata');
-  const t0 = Date.now();
-  const storyBeats = beats.filter(b => !isCoverPage(b.pageNumber));
-  const byPage = new Map(expansions.filter(x => !isCoverPage(x.pageNumber)).map(x => [Number(x.pageNumber), x]));
-  const metaOf = n => (byPage.has(n) ? (meta(byPage.get(n).brief) || {}) : {});
-  const fullOf = n => { const m = metaOf(n); return m.fullData || m; };
-  const commissioned = (inputData.characters || []).map(c => c && c.name).filter(Boolean);
-  const els = jevDecisions.vbElements(visualBible || {}, commissioned);
-  const decidedIds = els.map(e => e.id);
-  const vehicleIds = els.filter(e => e.type === 'vehicle').map(e => e.id);
-  const baseOf = id => String(id || '').trim().toUpperCase().split('.')[0];
-  const adCited = new Map(storyBeats.map(b => [Number(b.pageNumber), new Set((fullOf(Number(b.pageNumber)).objects || []).map(baseOf))]));
-  // Decide the elements and aboard, and the population of each cited location.
-  const vb = await jevDecisions.decideVbAndAboard({ arc: approvedArc, pages: storyBeats, visualBible: visualBible || {}, commissionedNames: commissioned, adCited });
-  const locOf = new Map();
-  for (const b of storyBeats) {
-    const loc = (fullOf(Number(b.pageNumber)).objects || []).map(String).find(o => /^LOC\d+/i.test(o));
-    if (loc) locOf.set(Number(b.pageNumber), baseOf(loc));
-    else gl.error('beats_jev_population_no_location', `Page ${b.pageNumber}'s brief cites no location — its population stays as the Art Director wrote it`, null, { pageNumber: b.pageNumber });
-  }
-  const pop = await jevDecisions.decidePopulation({ arc: approvedArc, pages: storyBeats, visualBible: visualBible || {}, locOf });
-  // Pin elements / population / aboard / light first — the gaze targets read the pinned citations.
-  const vbByPage = new Map(vb.pages.map(r => [r.pageNumber, r]));
-  for (const b of storyBeats) {
-    const n = Number(b.pageNumber);
-    const x = byPage.get(n);
-    if (!x) continue;
-    const r = vbByPage.get(n);
-    const locId = locOf.get(n);
-    // The shot Jev assigned (field 0 of the plan line) is pinned like the
-    // other decided fields (owner, 2026-09-28). A plan still carrying the
-    // placeholder resolves to no shot and pins none.
-    const planShot = resolveShotId(jevDecisions.planParts(b.planLine)[0]);
-    b.jevFixed = {
-      ...(planShot ? { shot: planShot } : {}),
-      ...(b.fixed ? { timeOfDay: b.fixed.timeOfDay, indoor: b.fixed.indoor } : {}),
-      cites: r ? r.elements.map(e => e.cite) : [], decidedIds,
-      ...(locId && pop.byLocation[locId] ? { population: pop.byLocation[locId].population } : {}),
-      aboard: r ? r.aboard : null, aboardIds: vehicleIds,
-    };
-  }
-  const gIndex = jevDecisions.gazeIndex(visualBible || {});
-  const perPage = [];
-  for (const b of storyBeats) {
-    const n = Number(b.pageNumber);
-    const x = byPage.get(n);
-    if (!x || !b.jevFixed) continue;
-    const pinned = jevDecisions.pinBrief(x.brief, b.jevFixed);
-    const f = (meta(pinned.brief) || {}).fullData || meta(pinned.brief) || {};
-    const roster = (f.characters || []).map(c => c && c.name).filter(Boolean);
-    const material = jevDecisions.gazePageMaterial({ objects: f.objects || [], interactions: f.interactions || [], planLine: b.planLine, index: gIndex });
-    perPage.push({ pageNumber: n, roster, ...material });
-  }
-  const gaze = await jevDecisions.decideGaze({ arc: approvedArc, pages: storyBeats, perPage });
-  for (const g of gaze.pages) {
-    const b = storyBeats.find(s => Number(s.pageNumber) === g.pageNumber);
-    b.jevFixed.looksAt = Object.fromEntries(g.characters.map(c => [c.name, c.looksAt]));
-  }
-  // Write every decided field into the briefs, and the bible's pages to agree.
-  // A dotted cite names the look too, so a look Jev switched reads as one.
-  const lookOf = new Map(els.flatMap(e => jevDecisions.stateOptions(e.entry).map(o => [o.id, o.label])));
-  const labelOf = (id) => {
-    const e = gIndex[id] || gIndex[baseOf(id)];
-    const name = e ? e.name : id;
-    const look = lookOf.get(String(id).toUpperCase());
-    return look ? `${name}, ${look}` : name;
-  };
-  const citesByPage = new Map();
-  const fixedChanges = [];
-  for (const b of storyBeats) {
-    const n = Number(b.pageNumber);
-    const x = byPage.get(n);
-    if (!x || !b.jevFixed) continue;
-    const pinned = jevDecisions.pinBrief(x.brief, b.jevFixed);
-    if (pinned.unparsed) {
-      gl.error('beats_jev_brief_unparsed', `Page ${n}: the brief carries no parseable METADATA — the decided fields could not be written`, null, { pageNumber: n });
-      continue;
-    }
-    x.brief = pinned.brief;
-    b.jevChanges = pinned.changes;
-    const shotMove = pinned.changes.find(c => c.field === 'shot');
-    if (shotMove) {
-      log.warn(`📌 [BEATS] Page ${n}: the Art Director wrote shot ${shotMove.from || '(none)'}; Jev's ${shotMove.to} restored`);
-      gl.warn('beats_jev_shot_restored', `Page ${n}: the Art Director changed the shot Jev assigned (${shotMove.to} → ${shotMove.from || 'none'}); code restored ${shotMove.to}`, null, { pageNumber: n, assigned: shotMove.to, written: shotMove.from });
-    }
-    const finding = jevDecisions.fixedFieldFinding(n, pinned.changes, labelOf);
-    b.jevFinding = finding;
-    citesByPage.set(n, b.jevFixed.cites);
-    if (pinned.changes.length) fixedChanges.push({ pageNumber: n, changes: pinned.changes });
-  }
-  if (visualBible) {
-    const moved = jevDecisions.applyVbPages(visualBible, citesByPage, decidedIds);
-    if (moved && bibleSections) {
-      const synced = syncVisualBibleSection(bibleSections, visualBible);
-      if (synced === bibleSections) gl.warn('beats_vb_sync_failed', 'The decided element pages could not be written back into the transcript');
-      else bibleSections = synced;
-    }
-  }
-  const report = { vb, population: pop, gaze, fixedChanges, elapsedMs: Date.now() - t0 };
-  const nChanged = fixedChanges.length;
-  gl.info('beats_jev_brief_fields', `Jev decided the cited elements, aboard, population and gaze of ${storyBeats.length} page(s); ${nChanged} brief(s) changed by code (${vb.stats.calls + pop.stats.calls + gaze.stats.calls} Jev calls, ${(report.elapsedMs / 1000).toFixed(1)}s)`, null, {
-    changedPages: fixedChanges.map(c => c.pageNumber), stats: { vb: vb.stats, population: pop.stats, gaze: gaze.stats },
-  });
-  return { bibleSections, report };
 }
 
 /**
@@ -2024,37 +1884,45 @@ function repinJevStatePages(visualBible, bibleSections, briefBeats, gl) {
 }
 
 /**
- * STEP 4 OF THE BEATS PIPELINE — the all-pages Art Director: the page and
- * cover briefs and the Visual Bible in one call (two attempts), the bible's
- * adoption (label round, the invented-child age clamp, the transcript sync),
- * the landmark photo link, the wardrobe-vs-bible corrections, the caller's
- * bible hook and the per-page fallback for pages the batch still owes. Moved
- * verbatim out of generateStoryViaBeats on 2026-09-27 so the Test Lab
- * beats_scenes stage runs the Art Director production runs (owner: "The Lab
- * must use 100% identical code to production"); the stage used to
- * re-implement the batch retry, the recovery and the bible adoption.
+ * STEP 4 OF THE BEATS PIPELINE — the Art Director, in two calls with the
+ * decision layer between them (owner, 2026-09-28: "Jev first, then remove the
+ * scene review"):
+ *   light     Jev's timeOfDay / indoors per story page (unchanged);
+ *   call 1    the Visual Bible alone (visual-bible.txt; two attempts), then its
+ *             adoption — label round, invented-child age clamp, transcript
+ *             sync, landmark link, wardrobe-vs-bible corrections, the caller's
+ *             bible hook (the landmark-shortfall abort now fires before any
+ *             brief is paid for);
+ *   decide    every other decided field of every story page
+ *             (decideBriefFields → b.jevFixed);
+ *   call 2    every page's brief, the covers included (scene-briefs-all.txt;
+ *             two attempts), each story page with its FIXED block; the
+ *             per-page fallback for pages it still owes;
+ *   pin       code writes the decided fields (pinDecidedFields).
+ * The briefs are then checked and re-asked once by the caller
+ * (briefChecks.runBriefChecks). On the Jev-outage backup (path A) nothing is
+ * fixed and call 2 authors every field itself.
  *
  * `labCallOptions` (the Lab's reasoning A/B), `labForcePerPage` (the historical
  * per-page comparison) and `onCall` are Test Lab knobs; the run passes none.
  *
- * @returns {Promise<{expansions: Array, visualBible: object|null, bibleSections: string|null, wardrobeBibleReport: object|null, sceneExpansionReport: object, briefBeats: Array, coverBeats: Array}>}
+ * @param {Map<number,string[]>} present - the shipped plan check's head count per page (the gaze roster)
+ * @returns {Promise<{expansions: Array, visualBible: object|null, bibleSections: string|null, wardrobeBibleReport: object|null, sceneExpansionReport: object, briefBeats: Array, coverBeats: Array, briefsPrompt: string|null}>}
  */
-async function runArtDirector({ inputData, modelOverrides, clothingRequirements, visualBible, bibleSections, sceneModel, onChunk, gl, meta, stage, beats, arcCentralFigure, approvedArc, onVisualBible = null, wardrobeBibleReport = null, labCallOptions = {}, labForcePerPage = false, onCall = null, jevReport = null }) {
+async function runArtDirector({ inputData, modelOverrides, clothingRequirements, visualBible, bibleSections, sceneModel, onChunk, gl, meta, stage, beats, arcCentralFigure, approvedArc, present = null, onVisualBible = null, wardrobeBibleReport = null, labCallOptions = {}, labForcePerPage = false, onCall = null, jevReport = null }) {
   const lang = inputData.language || 'en';
   const imgModelConfig = IMAGE_MODELS[modelOverrides.imageModel || inputData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageRenderImage];
   const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters || [], clothingRequirements);
   const maxCharactersPerScene = imgModelConfig?.maxCharactersPerScene || 3;
 
   /**
-   * Per-page expansion — the fallback for pages the single call omitted, and
-   * the only remaining user of the per-page scene-expansion.txt template here.
+   * Per-page expansion — the fallback for pages the page-brief call omitted.
+   * The PLAN line stands in for page.text (the text does not exist yet), with
+   * the page's FIXED block under it exactly as in the all-pages plan block
+   * (promptBuilders.planBlocks).
    */
   async function expandOnePage(b) {
-    // The PLAN line stands in for page.text: in a beats-first run the text
-    // does not exist yet, so the Art Director works from the locked plan.
-    // The FIXED line (the decided time of day / indoors) rides under the plan
-    // line exactly as in the all-pages plan block (promptBuilders.planBlocks).
-    const pageContent = [`PLAN: ${b.planLine || ''}`, jevDecisions.fixedLine(b.fixed)].filter(Boolean).join(String.fromCharCode(10));
+    const pageContent = [`PLAN: ${b.planLine || ''}`, jevDecisions.fixedBlock(b)].filter(Boolean).join(String.fromCharCode(10));
     const prompt = buildSceneExpansionPrompt(
       b.pageNumber, pageContent, inputData.characters || [], lang,
       visualBible, availableAvatars, null,
@@ -2078,17 +1946,9 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
     let salvage = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        // Own usage label (2026-08-31): fallback pages used to book under
-        // 'beats_scene_expansion' like the batch call, so a truncated batch
-        // plus silent per-page recovery was invisible in the usage summary
-        // (job_1788123310558: 6 calls under one label, no way to tell 1
-        // batch + 5 fallbacks from 6 batches).
         const res = await textModels.callTextModelStreaming(prompt, null, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion_fallback', ...labCallOptions });
         if (onCall) onCall(res);
         if (!res || !res.text || !res.text.trim()) throw new Error('empty scene brief');
-        // Same contract as the batch merge above — a recovery that itself comes
-        // back cut is not a recovery. The second attempt is the retry; if both
-        // are cut the throw below names why, instead of storing half a spec.
         const { assessSceneBrief, describeSceneBrief } = require('./iterateBriefGuard');
         const verdict = assessSceneBrief(res.text);
         if (!verdict.usable) {
@@ -2114,9 +1974,8 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
   let t = Date.now();
   // THE LIGHT IS DECIDED BEFORE THE ART DIRECTOR WRITES (owner, 2026-09-27,
   // Part 4): Jev's timeOfDay (the clock held forward in code) and indoors per
-  // story page, from the arc and the plan. Each reaches the Art Director as the
-  // page's FIXED line; weather stays the Art Director's, Jev's answer logged
-  // beside it. A Jev failure throws — no second author for the light.
+  // story page, from the arc and the plan. Weather stays the Art Director's,
+  // Jev's answer logged beside it. A Jev failure switches to the backup.
   if (jevActive(jevReport)) try {
     const light = await jevDecisions.decideLight({ arc: approvedArc, pages: beats });
     const byNum = new Map(light.pages.map(r => [r.pageNumber, r]));
@@ -2133,158 +1992,55 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
     jevFallBack(jevReport, 'light', err, gl);
   }
   // COVERS ARE PAGES (owner, 2026-09-24). Each cover the job renders is a page
-  // whose BEAT code writes (coverBeats.js: purpose, cast, costumes, the landmark
-  // rule, the element budget, gaze and the copy space), briefed by the Art
-  // Director with every other page and reviewed with them. They ride AFTER the
-  // story pages, so the story's own page order is untouched, and they never
-  // reach the page text writer or the plan counters — `beats` stays the story.
-  const { buildCoverBeats, isCoverPage } = require('./coverBeats');
+  // whose BEAT code writes (coverBeats.js), briefed by the Art Director with
+  // every other page. They ride AFTER the story pages and never reach the page
+  // text writer or the plan counters — `beats` stays the story.
+  const { buildCoverBeats } = require('./coverBeats');
   const { coverTypesFor } = require('./coverKeys');
   const coverBeats = buildCoverBeats(inputData, { coverTypes: coverTypesFor(inputData), clothingRequirements, centralFigure: arcCentralFigure });
   const briefBeats = [...beats, ...coverBeats];
   const beatPageNumbers = briefBeats.map(b => b.pageNumber);
-  let expansions = [];
-  // The Visual Bible the Art Director emits ahead of page 1.
-  let adBible = null;
-  // THE REPLY AS RETURNED, one row per all-pages attempt (2026-09-23). Only
-  // parsed parts were stored — the briefs, and the bible after the post-review
-  // usage rebuild and every sync had rewritten it — so the prompt audit of
-  // staging job_1790100385959_1nitlympp compared the checker's page table with
-  // the REBUILT one, took it for the Art Director's, and reported a mutation
-  // that never happened. Stored beside the prompt in sceneExpansionReport.
-  const adReplies = [];
-  // No rulings travel here any more (2026-09-01): the beats reviewer that
-  // produced them is gone, and the plan check never rules on anything — it
-  // counts, and the planner re-divides. CARRY_ROUTES stays for the Lab.
-  // labForcePerPage (Test Lab only): the historical per-page comparison runs
-  // every page through the per-page fallback below. The run never passes it.
-  const allPrompt = labForcePerPage ? null : buildSceneExpansionAllPrompt(inputData, briefBeats, {
-      jevBackup: !jevActive(jevReport),
-      availableAvatars,
-      maxCharactersPerScene,
-      // The whole story, read-only, for the Art Director's judgment — it
-      // stages only what each page's beat and plan line carry.
-      finalArc: approvedArc,
-      // The Art Director needs the outfit TEXT, not just the category key — see
-      // buildSceneExpansionAllPrompt. In beats mode the visual contract is the
-      // only source, and it is resolved by the time scenes are expanded.
-      clothingRequirements,
+
+  // ── Call 1: the Visual Bible ──────────────────────────────────────────────
+  // Two attempts; a reply is whole only when its JSON parses — a partial bible
+  // must never ship, and JSON.parse is the completeness test.
+  const vbPrompt = buildVisualBibleCallPrompt(inputData, briefBeats, {
+    jevBackup: !jevActive(jevReport), availableAvatars, maxCharactersPerScene, finalArc: approvedArc, clothingRequirements,
   });
-  if (!allPrompt) {
-    log.error(labForcePerPage ? '🧪 [BEATS] Test Lab per-page comparison — every page expanded per-page' : '🚨 [BEATS] scene-expansion-all template unavailable — falling back to per-page expansion for every page');
-    gl.warn('beats_scene_expansion_fallback', 'All-pages template unavailable — every page expanded per-page (no cross-page continuity)');
+  const vbReplies = [];
+  let adBible = null;
+  if (!vbPrompt) {
+    log.error('🚨 [BEATS] visual-bible template unavailable — the story ships with an empty bible');
+    gl.warn('beats_visual_bible_missing', 'The Visual Bible template is unavailable — story ships with an empty bible');
   } else {
-    // Output is `## Page N` + prose + METADATA per page — the same shape the
-    // scene review returns, so the review's parser reads it unchanged.
-    // Two attempts at the full batch (2026-08-31): the call already asks for
-    // the model's full maxOutputTokens (maxTokens=null), but an incomplete
-    // parse — the truncation signature — used to drop straight to the
-    // per-page fallback with no batch retry and no stored warning until the
-    // shortfall guard below. job_1788123310558 lost pages 12-16 that way
-    // (gemini-3.1-pro's configured cap was 16384; raised in models.js).
-    // First attempt's pages win the merge so a retry can only FILL gaps,
-    // never rewrite pages already parsed.
-    let allModelId = sceneModel;
-    const byPage = new Map();
-    await stage(30, 'Writing the visual bible and the scene briefs...', { next: 42, ms: 176000 });
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      let allRaw = '';
+    await stage(30, 'Writing the visual bible...', { next: 36, ms: 90000 });
+    for (let attempt = 1; attempt <= 2 && !adBible; attempt++) {
       try {
-        const res = await textModels.callTextModelStreaming(allPrompt, null, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion', ...labCallOptions });
+        const res = await textModels.callTextModelStreaming(vbPrompt, null, onChunk, sceneModel, { usageLabel: 'beats_visual_bible', ...labCallOptions });
         if (onCall) onCall(res);
-        allRaw = res?.text || '';
-        allModelId = res?.modelId || sceneModel;
-        adReplies.push({ attempt, modelId: allModelId, text: allRaw });
-      } catch (err) {
-        log.error(`🚨 [BEATS] All-pages scene expansion attempt ${attempt} failed (${err.message}) — falling back to per-page expansion`);
-        gl.warn('beats_scene_expansion_failed', `All-pages call failed on attempt ${attempt}: ${err.message} — falling back to per-page expansion`);
-        break;
-      }
-      // THE BIBLE RIDES IN FRONT of page 1 (2026-09-11). A response is only
-      // whole when BOTH halves parsed: a partial bible must never ship, and
-      // JSON.parse is the completeness test — a reply cut mid-JSON yields null
-      // here, not half a bible, and the retry below is the recovery.
-      if (!adBible) {
-        const sections = extractBibleSections(allRaw, AD_BIBLE_MARKERS);
+        const raw = res?.text || '';
+        vbReplies.push({ attempt, modelId: res?.modelId || sceneModel, text: raw });
+        const sections = extractBibleSections(raw, AD_BIBLE_MARKERS);
         const parsedVb = sections ? new UnifiedStoryParser(sections.body).extractVisualBible() : null;
-        if (sections && parsedVb) {
-          adBible = { body: sections.body, visualBible: parsedVb, found: sections.found, modelId: allModelId };
-        } else if (sections) {
-          log.error(`🚨 [BEATS] All-pages attempt ${attempt}: ---VISUAL BIBLE--- present but its JSON did not parse (${sections.body.length} chars) — treating the bible as MISSING rather than shipping a partial one`);
-        } else {
-          log.error(`🚨 [BEATS] All-pages attempt ${attempt}: response carries no ---VISUAL BIBLE--- section (${allRaw.length} chars)`);
-        }
-      }
-      const parsed = parseRefinedText(allRaw, beatPageNumbers, 'SCENES', BRIEF_TRAILING_MARKERS);
-      // A PAGE IS NOT A BRIEF. parseRefinedText accepts any non-empty run of
-      // text under a `## Page N` heading, so a page the reply cut mid-sentence
-      // counted as delivered: no retry, no fallback, no warning — the generator
-      // rendered half a spec and the eval judged it against that same half.
-      // Measured once in 955 staging pages (job_1789207854566_l43qgl34w p7).
-      // Incomplete pages are simply not merged, which hands them to the retry
-      // above and the per-page fallback below — the recovery that already
-      // exists. The verdict is the one the iterate round already uses
-      // (iterateBriefGuard.js), built from this very page: prose, parseable
-      // metadata, a sceneIntent. Measured over 1035 stored beats briefs / 85
-      // staging stories it rejects 4 — p7, and three August pages that predate
-      // sceneIntent. No current story loses a page to it.
-      const { partitionSceneBriefs, describeSceneBrief } = require('./iterateBriefGuard');
-      const { whole, cut, formatWide } = partitionSceneBriefs(parsed.pages);
-      for (const p of (formatWide ? cut : whole)) {
-        if (!byPage.has(p.pageNumber)) byPage.set(p.pageNumber, p.text);
-      }
-      if (formatWide) {
-        log.error(`🚨 [BEATS] All-pages attempt ${attempt}: not one of the ${cut.length} brief(s) meets the brief contract (${describeSceneBrief(cut[0].verdict)}) — accepting them as written rather than re-expanding the whole book`);
-        gl.warn('beats_scene_brief_contract_missed', `No scene brief in the all-pages reply meets the brief contract (${cut.length} page(s), first: ${describeSceneBrief(cut[0].verdict)}) — briefs ship as written and every metadata-driven supervisor runs blind`);
-      } else if (cut.length > 0) {
-        const detail = cut.sort((a, b) => a.pageNumber - b.pageNumber)
-          .map(p => `p${p.pageNumber} (${describeSceneBrief(p.verdict)})`).join('; ');
-        const pages = cut.map(p => p.pageNumber);
-        log.error(`🚨 [BEATS] All-pages attempt ${attempt}: incomplete brief(s) — ${detail} — treating them as NOT delivered`);
-        gl.warn('beats_scene_brief_incomplete', `Brief(s) for page(s) ${pages.join(', ')} came back incomplete — ${detail}. Not accepted; re-expanded instead`, null, { pages });
-      }
-      if (briefBeats.every(b => byPage.has(b.pageNumber)) && adBible) break;
-      if (attempt === 1) {
-        const missingNow = briefBeats.filter(b => !byPage.has(b.pageNumber)).map(b => b.pageNumber);
-        const what = [
-          missingNow.length ? `missing page(s) ${missingNow.join(', ')}` : null,
-          adBible ? null : 'no parseable Visual Bible',
-        ].filter(Boolean).join(' and ');
-        log.error(`🚨 [BEATS] All-pages expansion incomplete: ${byPage.size}/${briefBeats.length} briefs parsed, ${what} — retrying the batch ONCE at full cap`);
-        gl.warn('beats_scene_expansion_truncated', `All-pages call returned ${byPage.size}/${briefBeats.length} briefs, ${what} — retrying the batch once at full output cap`);
+        if (sections && parsedVb) adBible = { body: sections.body, visualBible: parsedVb, found: sections.found, modelId: res?.modelId || sceneModel };
+        else log.error(`🚨 [BEATS] Visual Bible attempt ${attempt}: ${sections ? `---VISUAL BIBLE--- present but its JSON did not parse (${sections.body.length} chars)` : `no ---VISUAL BIBLE--- section (${raw.length} chars)`}`);
+      } catch (err) {
+        log.error(`🚨 [BEATS] Visual Bible attempt ${attempt} failed: ${err.message}`);
+        gl.warn('beats_visual_bible_failed', `Visual Bible call failed on attempt ${attempt}: ${err.message}`);
       }
     }
-    expansions = briefBeats
-      .filter(b => byPage.has(b.pageNumber))
-      .map(b => ({ pageNumber: b.pageNumber, brief: byPage.get(b.pageNumber), prompt: allPrompt, modelId: allModelId }));
   }
+  const vbMs = Date.now() - t;
 
-  // ── Adopt the Art Director's Visual Bible ─────────────────────────────────
-  // Runs BEFORE the per-page fallback below, so a recovered page is expanded
-  // against the same bible the batch wrote, and before the scene review and the
-  // page text, so the landmark-shortfall hook can still abort attempt 1 cheaply.
-  //
-  // With no parseable bible at all the run is degraded exactly as a failed
-  // bible stage used to be — empty VB, no cover hints, blind per-page briefs —
-  // and says so loudly. It is never a kill: a contract miss must not end a paid
-  // run (docs/SETTLED.md, gates are guidelines).
+  // ── Adopt the Visual Bible ────────────────────────────────────────────────
+  // With no parseable bible the run is degraded — empty VB, blind briefs — and
+  // says so loudly. It is never a kill: a contract miss must not end a paid run
+  // (docs/SETTLED.md, gates are guidelines).
   if (adBible) {
     visualBible = adBible.visualBible;
     let bibleBody = adBible.body;
-
-    // An invented child the bible declares a PEER of the commissioned children
-    // must state an age inside their band. The band went into the prompt above;
-    // this is the deterministic post-check over what came back — no model call,
-    // no classification, it reads the bible's own `peer` field and compares a
-    // number. Fail-soft: clamp to the nearest tolerated edge, flag the entry,
-    // warn. No retry loop and never a kill — an age constraint must not be able
-    // to end a paid run. Evidence: job_1788641639919_mpjwlzkf1, CHR001 "The boy
-    // in the striped scarf" stated ten next to a commissioned 6-year-old,
-    // rendered 11-12 on p5.
     // ONE authored English label per element, enforced the moment the bible is
-    // adopted — BEFORE the clamp, so the clamp's own sync carries the labels
-    // too. Its own sync below runs regardless, so the projection never depends
-    // on whether the clamp fired.
+    // adopted — BEFORE the clamp, so the clamp's own sync carries the labels too.
     const labelRound = await runVisualBibleLabelRound(visualBible, {
       model: sceneModel, language: inputData.language, gl, log, stageReport: meta,
     });
@@ -2297,7 +2053,9 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
         bibleBody = synced;
       }
     }
-
+    // An invented child the bible declares a PEER of the commissioned children
+    // must state an age inside their band: clamp, flag, warn — never a kill
+    // (job_1788641639919_mpjwlzkf1).
     const childBand = visualBible?.secondaryCharacters?.length
       ? commissionedChildBand(inputData.characters || [])
       : null;
@@ -2309,10 +2067,6 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
           id: a.id, statedAge: a.statedAge, clampedTo: a.clampedTo, bandLow: childBand.low, bandHigh: childBand.high,
         });
       }
-      // ONE SOURCE OF TRUTH. The clamp mutated this module's parsed copy only;
-      // the transcript is what every later reader re-parses (storyJobPipeline,
-      // resume, the Lab). Write the mutated fields back so every
-      // extractVisualBible() from here on agrees.
       if (ageClamps.length > 0) {
         const synced = syncVisualBibleSection(bibleBody, visualBible);
         if (synced === bibleBody) {
@@ -2323,27 +2077,21 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
         }
       }
     }
-
     // Append to the wardrobe transcript: CLOTHING REQUIREMENTS, VISUAL BIBLE.
     bibleSections = bibleSections ? `${bibleSections.trimEnd()}
 
 ${bibleBody}` : bibleBody;
-
     const vbCount = Object.values(visualBible).reduce((n, v) => n + (Array.isArray(v) ? v.length : 0), 0);
-    gl.info('beats_visual_bible', `Visual Bible by ${adBible.modelId || sceneModel}: ${vbCount} entr(ies), written with the page briefs`, null, {
+    gl.info('beats_visual_bible', `Visual Bible by ${adBible.modelId || sceneModel}: ${vbCount} entr(ies), written before the page briefs (${(vbMs / 1000).toFixed(1)}s)`, null, {
       vbEntries: vbCount, sections: adBible.found,
     });
-  } else if (allPrompt) {
-    log.error('🚨 [BEATS] All-pages call produced NO parseable Visual Bible after both attempts — story ships with an empty bible and blind briefs');
+  } else if (vbPrompt) {
+    log.error('🚨 [BEATS] The Visual Bible call produced NO parseable bible after both attempts — story ships with an empty bible and blind briefs');
     gl.warn('beats_visual_bible_missing', 'The Art Director returned no parseable Visual Bible — story ships with an empty bible');
   }
 
-  // The page images need each real landmark's PHOTO VARIANTS on the bible entry
-  // (the resolver serves the photo a vantage's `landmarkPhoto` cites). The Art
-  // Director already cited its photos from the numbered PHOTOS lists in
-  // {AVAILABLE_LANDMARKS_SECTION}; these two steps link what it chose to the
-  // index rows. Both are cheap (in-memory matching; one DB query) and
-  // idempotent, so the caller repeating them costs nothing.
+  // Each real landmark's PHOTO VARIANTS on its bible entry (the resolver serves
+  // the photo a vantage's `landmarkPhoto` cites). Cheap and idempotent.
   if (visualBible) {
     try {
       if (inputData.availableLandmarks?.length) {
@@ -2361,24 +2109,14 @@ ${bibleBody}` : bibleBody;
   }
 
   // ── Wardrobe contract vs Visual Bible ────────────────────────────────────
-  // The two describe the same body and nothing compared them: a costume line
-  // could put a hat on a character the bible already dresses with a different
-  // one, on every page she appears (staging job_1789420511893_zly5rcdej,
-  // ART002). The contract owns garment wording (owner, 2026-09-23): a linked
-  // entry naming the SAME garment takes the contract's words (`adopt`). A
-  // DIFFERENT garment in an occupied slot (`conflict`) becomes a new OUTFIT
-  // VERSION on the bible entry (owner, 2026-09-24) — the contract is never
-  // touched and no avatar is re-rendered; the page that needs the garment
-  // selects the version, which gets its own sheet (wardrobeVariants, after the
-  // scene briefs exist). Contained like every other check: a throw ships the
-  // contradiction rather than killing the run, but never silently.
+  // The contract owns garment wording (owner, 2026-09-23): a linked entry naming
+  // the SAME garment takes the contract's words (`adopt`); a DIFFERENT garment in
+  // an occupied slot becomes a new OUTFIT VERSION (owner, 2026-09-24). A throw
+  // ships the contradiction rather than killing the run, but never silently.
   if (visualBible && clothingRequirements && Object.keys(clothingRequirements).length > 0) {
     try {
       const { applyWardrobeBibleCorrections } = require('./clothingCheck');
       const { findings, applied, versions, unresolved } = applyWardrobeBibleCorrections(clothingRequirements, visualBible);
-      // `applied` / `versions` hold RE-DERIVED finding objects (the corrector
-      // re-checks after every change), so identity comparison against
-      // `findings` is always false. Compare on what identifies a finding.
       const correctionKey = (f) => `${f.character} ${f.category} ${f.slot} ${f.elementId || ''}`;
       const appliedKeys = new Set([...applied, ...versions].map(correctionKey));
       if (findings.length > 0) {
@@ -2411,81 +2149,132 @@ ${bibleBody}` : bibleBody;
   }
 
   // Deliberately OUTSIDE every try/catch above: a throw from the caller's hook
-  // must abort the run (the landmark-shortfall retry uses exactly that), not be
-  // swallowed into "ships with an empty bible".
+  // must abort the run (the landmark-shortfall retry uses exactly that). Since
+  // the split it fires before any page brief is paid for.
   if (onVisualBible && visualBible) await onVisualBible(visualBible);
 
-  // Page-count guard: a short response must never ship a story with pages that
-  // have no brief. Only the MISSING pages are re-expanded per-page.
+  // ── The decided fields of every story page (Jev first) ───────────────────
+  let fieldsReport = null;
+  if (jevActive(jevReport)) try {
+    const decided = await decideBriefFields({ beats, visualBible, bibleSections, approvedArc, inputData, present, gl });
+    bibleSections = decided.bibleSections;
+    fieldsReport = decided.report;
+    if (jevReport) Object.assign(jevReport, { vb: decided.report.vb, population: decided.report.population, gaze: decided.report.gaze, locations: decided.report.locations });
+  } catch (err) {
+    if (!(err instanceof JevDecisionError) || !jevReport) throw err;
+    // The backup: nothing is fixed, and the page-brief call authors every
+    // field itself. No brief exists yet, so only the records are cleared.
+    for (const b of beats) delete b.jevFixed;
+    jevFallBack(jevReport, 'brief_fields', err, gl);
+  }
+
+  // ── Call 2: every page's brief ───────────────────────────────────────────
+  t = Date.now();
+  let expansions = [];
+  // THE REPLY AS RETURNED, one row per attempt (2026-09-23): only parsed parts
+  // were stored before, and an audit once compared the wrong bible.
+  const adReplies = [];
+  const allPrompt = labForcePerPage ? null : buildSceneBriefsAllPrompt(inputData, briefBeats, {
+    jevBackup: !jevActive(jevReport),
+    availableAvatars,
+    maxCharactersPerScene,
+    // The whole story, read-only, for the Art Director's judgment.
+    finalArc: approvedArc,
+    clothingRequirements,
+    visualBible: visualBibleJsonOf(bibleSections),
+  });
+  if (!allPrompt) {
+    log.error(labForcePerPage ? '🧪 [BEATS] Test Lab per-page comparison — every page expanded per-page' : '🚨 [BEATS] scene-briefs-all template unavailable — falling back to per-page expansion for every page');
+    gl.warn('beats_scene_expansion_fallback', 'All-pages template unavailable — every page expanded per-page (no cross-page continuity)');
+  } else {
+    // Two attempts; the first attempt's pages win the merge, so a retry can
+    // only FILL gaps (job_1788123310558 lost pages 12-16 to a cut reply).
+    let allModelId = sceneModel;
+    const byPage = new Map();
+    await stage(36, 'Writing the scene briefs...', { next: 42, ms: 140000 });
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      let allRaw = '';
+      try {
+        const res = await textModels.callTextModelStreaming(allPrompt, null, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion', ...labCallOptions });
+        if (onCall) onCall(res);
+        allRaw = res?.text || '';
+        allModelId = res?.modelId || sceneModel;
+        adReplies.push({ attempt, modelId: allModelId, text: allRaw });
+      } catch (err) {
+        log.error(`🚨 [BEATS] All-pages scene briefs attempt ${attempt} failed (${err.message}) — falling back to per-page expansion`);
+        gl.warn('beats_scene_expansion_failed', `All-pages call failed on attempt ${attempt}: ${err.message} — falling back to per-page expansion`);
+        break;
+      }
+      const parsed = parseRefinedText(allRaw, beatPageNumbers, 'SCENES', BRIEF_TRAILING_MARKERS);
+      // A PAGE IS NOT A BRIEF: a page cut mid-sentence is not merged, which
+      // hands it to the retry and the per-page fallback (iterateBriefGuard).
+      const { partitionSceneBriefs, describeSceneBrief } = require('./iterateBriefGuard');
+      const { whole, cut, formatWide } = partitionSceneBriefs(parsed.pages);
+      for (const p of (formatWide ? cut : whole)) {
+        if (!byPage.has(p.pageNumber)) byPage.set(p.pageNumber, p.text);
+      }
+      if (formatWide) {
+        log.error(`🚨 [BEATS] All-pages attempt ${attempt}: not one of the ${cut.length} brief(s) meets the brief contract (${describeSceneBrief(cut[0].verdict)}) — accepting them as written rather than re-expanding the whole book`);
+        gl.warn('beats_scene_brief_contract_missed', `No scene brief in the all-pages reply meets the brief contract (${cut.length} page(s), first: ${describeSceneBrief(cut[0].verdict)}) — briefs ship as written and every metadata-driven supervisor runs blind`);
+      } else if (cut.length > 0) {
+        const detail = cut.sort((a, b) => a.pageNumber - b.pageNumber)
+          .map(p => `p${p.pageNumber} (${describeSceneBrief(p.verdict)})`).join('; ');
+        const pages = cut.map(p => p.pageNumber);
+        log.error(`🚨 [BEATS] All-pages attempt ${attempt}: incomplete brief(s) — ${detail} — treating them as NOT delivered`);
+        gl.warn('beats_scene_brief_incomplete', `Brief(s) for page(s) ${pages.join(', ')} came back incomplete — ${detail}. Not accepted; re-expanded instead`, null, { pages });
+      }
+      if (briefBeats.every(b => byPage.has(b.pageNumber))) break;
+      if (attempt === 1) {
+        const missingNow = briefBeats.filter(b => !byPage.has(b.pageNumber)).map(b => b.pageNumber);
+        log.error(`🚨 [BEATS] All-pages briefs incomplete: ${byPage.size}/${briefBeats.length} parsed, missing page(s) ${missingNow.join(', ')} — retrying the batch ONCE at full cap`);
+        gl.warn('beats_scene_expansion_truncated', `All-pages call returned ${byPage.size}/${briefBeats.length} briefs, missing page(s) ${missingNow.join(', ')} — retrying the batch once at full output cap`);
+      }
+    }
+    expansions = briefBeats
+      .filter(b => byPage.has(b.pageNumber))
+      .map(b => ({ pageNumber: b.pageNumber, brief: byPage.get(b.pageNumber), prompt: allPrompt, modelId: allModelId }));
+  }
+
+  // Page-count guard: only the MISSING pages are re-expanded per-page.
   const missingBriefs = briefBeats.filter(b => !expansions.some(x => x.pageNumber === b.pageNumber));
   if (missingBriefs.length > 0) {
-    log.error(`🚨 [BEATS] All-pages expansion returned ${expansions.length}/${briefBeats.length} briefs — re-expanding page(s) ${missingBriefs.map(b => b.pageNumber).join(', ')} per-page`);
+    log.error(`🚨 [BEATS] All-pages briefs returned ${expansions.length}/${briefBeats.length} — re-expanding page(s) ${missingBriefs.map(b => b.pageNumber).join(', ')} per-page`);
     gl.warn('beats_scene_expansion_incomplete', `All-pages call returned ${expansions.length}/${briefBeats.length} briefs — page(s) ${missingBriefs.map(b => b.pageNumber).join(', ')} expanded per-page`);
     const recovered = await Promise.all(missingBriefs.map(expandOnePage));
     expansions = expansions.concat(recovered).sort((a, b) => a.pageNumber - b.pageNumber);
   }
-  meta.timings.sceneExpansionMs = Date.now() - t;
+  const briefsMs = Date.now() - t;
+  meta.timings.sceneExpansionMs = vbMs + briefsMs;
 
-  // ── The decision layer after the Art Director (Parts 3-5) ────────────────
-  if (jevActive(jevReport)) try {
-    const decided = await applyJevBriefDecisions({ expansions, beats, visualBible, bibleSections, approvedArc, inputData, gl });
-    bibleSections = decided.bibleSections;
-    if (jevReport) Object.assign(jevReport, { vb: decided.report.vb, population: decided.report.population, gaze: decided.report.gaze, fixedChanges: decided.report.fixedChanges });
-    // Jev's weather is an ADVICE: a disagreement with the Art Director's own
-    // weather is logged, never written.
-    const { extractSceneMetadata: m } = require('./sceneMetadata');
-    const disagree = beats.filter(b => b.fixed && b.fixed.weatherAdvice).map((b) => {
-      const x = expansions.find(e => e.pageNumber === b.pageNumber);
-      const f = x ? ((m(x.brief) || {}).fullData || m(x.brief) || {}) : {};
-      return f.weather && f.weather !== b.fixed.weatherAdvice ? `p${b.pageNumber} AD ${f.weather} / Jev ${b.fixed.weatherAdvice}` : null;
-    }).filter(Boolean);
-    if (disagree.length) gl.info('beats_jev_weather_advice', `Weather, Art Director vs Jev (advisory): ${disagree.join(', ')}`, null, { disagree });
-  } catch (err) {
-    if (!(err instanceof JevDecisionError) || !jevReport) throw err;
-    // The backup: the Art Director's own citations, population, aboard and
-    // gaze ship. Nothing was written into a brief before the last decision
-    // returned, so only the per-page decision records are cleared.
-    for (const b of beats) { delete b.jevFixed; delete b.jevChanges; delete b.jevFinding; }
-    jevFallBack(jevReport, 'brief_fields', err, gl);
-  }
+  // ── Pin: code writes the decided fields ───────────────────────────────────
+  const disobeyed = pinDecidedFields(expansions, briefBeats, gl);
+  if (jevReport && fieldsReport) jevReport.fixedChanges = disobeyed;
+  // Jev's weather is an ADVICE: a disagreement with the Art Director's own
+  // weather is logged, never written.
+  const disagree = beats.filter(b => b.fixed && b.fixed.weatherAdvice).map((b) => {
+    const x = expansions.find(e => e.pageNumber === b.pageNumber);
+    const f = x ? ((extractSceneMetadata(x.brief) || {}).fullData || extractSceneMetadata(x.brief) || {}) : {};
+    return f.weather && f.weather !== b.fixed.weatherAdvice ? `p${b.pageNumber} AD ${f.weather} / Jev ${b.fixed.weatherAdvice}` : null;
+  }).filter(Boolean);
+  if (disagree.length) gl.info('beats_jev_weather_advice', `Weather, Art Director vs Jev (advisory): ${disagree.join(', ')}`, null, { disagree });
 
-  // THE PROMPT THAT WROTE THE BRIEFS (2026-09-19).
-  //
-  // `sceneReviewReport.prompt` is the REVIEWER's prompt. The Art Director's own
-  // — ~100k chars of rules, the Visual Bible spec, the cover spec and all 18
-  // plan lines — was stored nowhere, so recovering it for
-  // job_1789759147125_p08djwhbl meant a git worktree at the run's commit plus a
-  // rebuild from inputData + finalArc + pagePlan + clothingRequirements +
-  // characterAvatars. Worse, WHICH commit to rebuild at was only decidable by
-  // probing the stored review prompt for a constant a candidate commit had
-  // introduced. The beats planner got `plannerPrompt` the same day; this is the
-  // same gap one stage later.
-  //
-  // Rolled up by DISTINCT prompt rather than one copy per page: the all-pages
-  // call normally covers every page in one row, and a page that fell back to the
-  // per-page template keeps its own prompt in a row of its own. Storing it per
-  // page would mean eighteen copies of the same 100k string.
-  //
-  // Written HERE, not into sceneReviewReport: that object is assigned only
-  // inside the branch where the review template loaded, so a run that shipped
-  // briefs unreviewed — precisely the run worth inspecting — would carry no
-  // prompt at all.
-  // `prompts[]` is NOT built here. The prompt table is one story-wide object
-  // that every page references (server/lib/storyShape.js), so it has exactly
-  // one builder — `rollUpScenePrompts()`, called by the caller over the
-  // assembled scenes, which covers the unified (non-beats) path with the same
-  // code. This report carries only what beats alone knows.
+  // THE PROMPTS THAT WROTE THE BIBLE AND THE BRIEFS (2026-09-19): stored with
+  // the replies. `prompts[]` is built by the caller (rollUpScenePrompts).
   const sceneExpansionReport = {
     durationMs: meta.timings.sceneExpansionMs,
+    visualBibleMs: vbMs,
+    briefsMs,
     fallbackPages: missingBriefs.map(b => b.pageNumber),
+    visualBiblePrompt: vbPrompt || null,
+    visualBibleReplies: vbReplies,
     replies: adReplies,
+    jevFieldsDisobeyed: disobeyed,
   };
-
-  gl.info('beats_scenes', `${expansions.length} scene briefs expanded by ${sceneModel} in one call${missingBriefs.length ? ` (+${missingBriefs.length} per-page fallback)` : ''} (${(meta.timings.sceneExpansionMs / 1000).toFixed(1)}s)`, null, {
-    pages: expansions.length, fallbackPages: missingBriefs.map(b => b.pageNumber), model: sceneModel,
+  gl.info('beats_scenes', `${expansions.length} scene briefs by ${sceneModel} (bible ${(vbMs / 1000).toFixed(1)}s + briefs ${(briefsMs / 1000).toFixed(1)}s)${missingBriefs.length ? ` (+${missingBriefs.length} per-page fallback)` : ''}; ${disobeyed.length} page(s) had decided fields restored`, null, {
+    pages: expansions.length, fallbackPages: missingBriefs.map(b => b.pageNumber), model: sceneModel, disobeyed: disobeyed.map(d => d.pageNumber),
   });
 
-  return { expansions, visualBible, bibleSections, wardrobeBibleReport, sceneExpansionReport, briefBeats, coverBeats };
+  return { expansions, visualBible, bibleSections, wardrobeBibleReport, sceneExpansionReport, briefBeats, coverBeats, briefsPrompt: allPrompt };
 }
 
 /**
@@ -3261,7 +3050,7 @@ async function runSceneReview({ inputData, expansions, clothingRequirements, vis
  *   generation (the long pole in front of every image) while scene expansion and
  *   page text are still running. Same callback the unified stream's progressive
  *   parser fires; it must be non-blocking and own its own error handling.
- * @returns {Promise<{title, beats, pages, scenes, rawOutline, meta, beatsReviewReport, storyBibleReport, clothingReviewReport, wardrobeBibleReport, sceneReviewReport}>}
+ * @returns {Promise<{title, beats, pages, scenes, rawOutline, meta, beatsReviewReport, storyBibleReport, clothingReviewReport, wardrobeBibleReport, briefCheckReport}>}
  *   pages[]  mirrors UnifiedStoryParser.extractPages() output consumed by server.js
  *   scenes[] mirrors the resolved value of startSceneExpansion() (expandedScenes)
  *   *ReviewReport  {model, durationMs, changedPages[], analysis, pages:[{pageNumber,before,after}]},
@@ -3322,14 +3111,13 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   if (arcRoundsRequested > arcRoundsMax) log.warn(`⚠️ [ARC] arcRounds=${arcRoundsRequested} clamped to ${arcRoundsMax} (owner cap 2026-08-30 — iteration study regressed at round 4)`);
   // Scene and wardrobe reviews are their own decisions — see models.js. They
   // deliberately do NOT follow the beats reviewer.
-  const sceneReviewModel = modelOverrides.sceneReviewModel || MODEL_DEFAULTS.sceneReviewModel || reviewModel;
   const clothingReviewModel = modelOverrides.clothingReviewModel || MODEL_DEFAULTS.clothingReviewModel || reviewModel;
   const sceneModel = modelOverrides.sceneDescriptionModel || MODEL_DEFAULTS.sceneDescription;
   const textModel = modelOverrides.textModel || MODEL_DEFAULTS.storyText;
 
-  const meta = { pageCount, models: { planModel, arcCreateModel, arcRetellModel, arcPanelModels, arcRounds, planCheckModel: modelOverrides.planCheckModel || MODEL_DEFAULTS.planCheckModel, reviewModel, sceneReviewModel, clothingReviewModel, sceneModel, textModel }, timings: {} };
+  const meta = { pageCount, models: { planModel, arcCreateModel, arcRetellModel, arcPanelModels, arcRounds, planCheckModel: modelOverrides.planCheckModel || MODEL_DEFAULTS.planCheckModel, reviewModel, clothingReviewModel, sceneModel, briefReaskModel: sceneModel, textModel }, timings: {} };
   const started = Date.now();
-  log.info(`🪜 [BEATS] job=${jobId} pages=${pageCount} plan=${planModel} arcCreate=${arcCreateModel} arcRetell=${arcRetellModel} arcPanel=${arcPanelModels.join('+')} arcRounds=${arcRounds} planCheck=${modelOverrides.planCheckModel || MODEL_DEFAULTS.planCheckModel} review=${reviewModel} sceneReview=${sceneReviewModel} wardrobeReview=${clothingReviewModel} scenes=${sceneModel} text=${textModel}`);
+  log.info(`🪜 [BEATS] job=${jobId} pages=${pageCount} plan=${planModel} arcCreate=${arcCreateModel} arcRetell=${arcRetellModel} arcPanel=${arcPanelModels.join('+')} arcRounds=${arcRounds} planCheck=${modelOverrides.planCheckModel || MODEL_DEFAULTS.planCheckModel} review=${reviewModel} wardrobeReview=${clothingReviewModel} scenes=${sceneModel} (bible + briefs + re-ask) text=${textModel}`);
 
   // THE JEV DECISION LAYER'S REPORT (owner, 2026-09-27): every decision the
   // layer makes on this story — cast cuts per re-plan round, shots, light, VB
@@ -4270,6 +4058,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   const ad = await runArtDirector({
     inputData, modelOverrides, clothingRequirements, visualBible, bibleSections, sceneModel, onChunk, gl, meta, stage,
     beats, arcCentralFigure, approvedArc, onVisualBible, wardrobeBibleReport, jevReport,
+    // The gaze roster: the head count of the division that shipped — the same
+    // `present` the shot assignment read (finalizePlanShots).
+    present: presentOf(shippedCheck),
   });
   let expansions = ad.expansions;
   visualBible = ad.visualBible;
@@ -4278,14 +4069,18 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   const { sceneExpansionReport, briefBeats, coverBeats } = ad;
   const { isCoverPage } = require('./coverBeats');
 
-  // ── Step 4: ONE review over ALL scene briefs ──────────────────────────────
+  // ── Step 4b: the brief checks and the ONE re-ask (owner, 2026-09-28) ─────
+  // The scene review no longer runs: the decided fields reached the Art
+  // Director before it wrote, so what is left to catch is what code can check.
+  // The review's code stays in the tree until the owner has read the rung-1
+  // count of what its prose checks changed (Q9) — see tasks/jev-first-briefs-2026-09-28.md.
   await checkCancellation();
-  const reviewOut = await runSceneReview({
-    inputData, expansions, clothingRequirements, visualBible, briefBeats, beats, bibleSections, meta, sceneReviewModel, stage, onChunk, gl,
+  const { runBriefChecks } = require('./briefChecks');
+  const briefCheckReport = await runBriefChecks({
+    inputData, expansions, briefBeats, visualBible, clothingRequirements,
+    contextPrompt: ad.briefsPrompt || '', model: sceneModel, gl, stage,
   });
-  const sceneReviewAnalysis = reviewOut.sceneReviewAnalysis;
-  const sceneReviewReport = reviewOut.sceneReviewReport;
-  bibleSections = reviewOut.bibleSections;
+  meta.timings.briefChecksMs = briefCheckReport.durationMs;
 
   // VB ELEMENT BUDGET — REPORTED HERE, NEVER ENFORCED (owner, 2026-09-11).
   // `truncateBriefToBudget` used to cut each brief's `objects[]` down to the
@@ -4491,6 +4286,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // and the Lab's stored-beats recovery all decide beats-vs-unified mode
       // from this field's shape.
       outlineExtract: `PLAN: ${b.planLine || ''}`,
+      // The decided fields (2026-09-28), stored so an iterate rewrite re-pins them.
+      ...(b.jevFixed ? { jevFixed: b.jevFixed } : {}),
       // Present only on a page whose brief went OVER the element budget:
       // {requested, kept, dropped} ids, for the page view and the Lab. Since
       // 2026-09-11 nothing is actually dropped — the brief ships as written
@@ -4627,8 +4424,10 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     '---BEATS REVIEW---',
     beatsReviewReport?.analysis || '(no plan check)',
     '',
-    '---SCENE REVIEW---',
-    sceneReviewAnalysis || '(no review)',
+    // The brief checks and their one re-ask (2026-09-28) — what the scene
+    // review's analysis block held before.
+    '---BRIEF CHECKS---',
+    `${briefCheckReport.findingsBefore.length} finding(s) before the re-ask, ${briefCheckReport.findingsAfter.length} after; re-asked page(s): ${(briefCheckReport.reask && briefCheckReport.reask.pages.join(', ')) || 'none'}`,
     '',
     ...(bibleSections ? [bibleSections, ''] : []),
     '---STORY PAGES---',
@@ -4658,7 +4457,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // kept in step by syncVisualBibleSection; the re-parse is the fallback).
   // The backup marker rides on the report the dev panel already shows.
   if (beatsReviewReport) beatsReviewReport.jevFallback = jevReport.fallback;
-  return { title, titleJudge, beats, pages, scenes, coverScenes, rawOutline, visualBible, meta, challengeDrawIds, challengeTakenIds, challengeDraw, challengeSelection, arcReviewReport, beatsReviewReport, jevDecisions: jevReport, jevFallback: jevReport.fallback, storyBibleReport, clothingReviewReport, wardrobeBibleReport, sceneExpansionReport, sceneReviewReport };
+  return { title, titleJudge, beats, pages, scenes, coverScenes, rawOutline, visualBible, meta, challengeDrawIds, challengeTakenIds, challengeDraw, challengeSelection, arcReviewReport, beatsReviewReport, jevDecisions: jevReport, jevFallback: jevReport.fallback, storyBibleReport, clothingReviewReport, wardrobeBibleReport, sceneExpansionReport, briefCheckReport };
 }
 
-module.exports = { generateStoryViaBeats, reportChallengeMemoryBreach, finalizePlanShots, applyJevBriefDecisions, pinJevFixedFields, repinJevStatePages, runArtDirector, arcTempFor, makeArcCreatorCall, runSceneReview, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, bibleCorrectionsMissingFromTranscript, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };
+module.exports = { generateStoryViaBeats, reportChallengeMemoryBreach, finalizePlanShots, presentOf, decideBriefFields, pinDecidedFields, pageLocations, visualBibleJsonOf, pinJevFixedFields, repinJevStatePages, runArtDirector, arcTempFor, makeArcCreatorCall, runSceneReview, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, bibleCorrectionsMissingFromTranscript, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };

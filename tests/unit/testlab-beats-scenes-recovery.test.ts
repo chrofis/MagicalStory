@@ -62,10 +62,18 @@ beforeAll(async () => { await loadPromptTemplates(); jevAudit.callJev = makeJevS
 afterAll(() => { jevAudit.callJev = savedJev; });
 
 /** Run the Art Director on pages 1-2 plus the front cover with scripted replies. */
-async function run(batchReplies: (string | Error)[]) {
+async function run(batchReplies: (string | Error)[], bibleReplies: (string | Error)[] = [BIBLE]) {
   const batchCalls: number[] = [];
+  const bibleCalls: number[] = [];
   const fallbackCalls: string[] = [];
   textModels.callTextModelStreaming = async (prompt: string, _s: any, _c: any, model: string, opts: any) => {
+    // Call 1 (2026-09-28): the Visual Bible alone.
+    if (opts?.usageLabel === 'beats_visual_bible') {
+      bibleCalls.push(bibleCalls.length + 1);
+      const reply = bibleReplies[Math.min(bibleCalls.length, bibleReplies.length) - 1];
+      if (reply instanceof Error) throw reply;
+      return { text: reply, modelId: model, usage: {} };
+    }
     if (opts?.usageLabel === 'beats_scene_expansion') {
       batchCalls.push(batchCalls.length + 1);
       const reply = batchReplies[Math.min(batchCalls.length, batchReplies.length) - 1];
@@ -84,8 +92,9 @@ async function run(batchReplies: (string | Error)[]) {
     onChunk: null, gl, meta: { timings: {} }, stage: async () => {},
     beats: [{ pageNumber: 1, planLine: 'page 1' }, { pageNumber: 2, planLine: 'page 2' }],
     arcCentralFigure: null, approvedArc: 'an arc',
+    present: new Map([[1, ['Mila']], [2, ['Mila']]]),
   });
-  return { out, batchCalls, fallbackCalls };
+  return { out, batchCalls, bibleCalls, fallbackCalls };
 }
 
 describe('runArtDirector — the run\'s truncation recovery', () => {
@@ -154,5 +163,35 @@ describe('summarizeSceneExpansions — a partial run announces itself', () => {
   it('handles a stage that expanded nothing at all', () => {
     expect(summarizeSceneExpansions(null)).toBeNull();
     expect(summarizeSceneExpansions([])).toBeNull();
+  });
+});
+
+describe('runArtDirector — the Visual Bible call (2026-09-28, call 1 of 2)', () => {
+  it('a bible reply cut mid-JSON is not adopted: the call is retried once, and the second whole reply is the bible', async () => {
+    const cut = BIBLE.slice(0, BIBLE.indexOf('"appearsInPages"'));
+    const reply = wholeBrief(1) + wholeBrief(2) + wholeBrief(-1);
+    const { out, bibleCalls } = await run([reply], [cut, BIBLE]);
+    expect(bibleCalls).toEqual([1, 2]);
+    expect(out.visualBible.locations.map((l: any) => l.id)).toEqual(['LOC001']);
+    expect(out.sceneExpansionReport.visualBibleReplies).toHaveLength(2);
+  });
+
+  it('the page-brief call receives the adopted bible and each story page\'s decided location', async () => {
+    const reply = wholeBrief(1) + wholeBrief(2) + wholeBrief(-1);
+    let briefsPrompt = '';
+    const { out } = await run([reply]);
+    briefsPrompt = out.briefsPrompt;
+    expect(briefsPrompt).toContain('"market square"');
+    expect(briefsPrompt).toContain('- objects: LOC001');
+    // the cover page carries no FIXED block
+    expect(briefsPrompt.split('## Page -1')[1].split(String.fromCharCode(10, 10))[0]).not.toContain('FIXED');
+  });
+
+  it('no bible at all: the story still gets its briefs, loudly, from an empty bible', async () => {
+    const reply = wholeBrief(1) + wholeBrief(2) + wholeBrief(-1);
+    const { out, bibleCalls } = await run([reply], [new Error('provider 503')]);
+    expect(bibleCalls).toEqual([1, 2]);
+    expect(out.visualBible).toBeNull();
+    expect(out.expansions.map((x: any) => x.pageNumber).sort()).toEqual([-1, 1, 2]);
   });
 });

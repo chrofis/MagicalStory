@@ -144,7 +144,7 @@ describe('the waist-up rule is one constant, not five sentences', () => {
   // apart. The planner left this list 2026-09-27: it no longer writes a shot.
   const templates = [
     'prompts/scene-expansion.txt',
-    'prompts/scene-expansion-all.txt',
+    'prompts/scene-briefs-all.txt',
     'prompts/scene-iteration.txt',
     'prompts/scene-iteration-free.txt',
     // The CRITIC. Check 7b spelled the list out by hand until 2026-09-20, which

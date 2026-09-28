@@ -930,6 +930,56 @@ function checkBiblePageTable(page, metadata, visualBible) {
  * @param {boolean} [opts.textZoneRules] run the text-zone geometry check
  * @returns {Array<{pageNumber, type, detail, names?, ids?}>}
  */
+/**
+ * vb_id_label_mismatch (owner, 2026-09-28, "Jev first" — one of the two kinds
+ * the scene review really caught): the prose writes a Visual Bible id with a
+ * label beside it — `ART002 (black sash)` or `black sash (ART002)` — and the
+ * label names a DIFFERENT entry. Staging job_1790529840433_ar4u7qry3, covers
+ * -1/-2/-3: "ART002 (black Piratentuch)" while the Piratentuch is ART004.
+ * The label is tied to an entry by the one row matcher
+ * (visualBible.entryNamedByRow: a token no other entry carries); an ambiguous
+ * or unmatched label yields nothing, never a guess.
+ */
+const ID_THEN_LABEL = /\b([A-Z]{3}\d{3}(?:\.\d+)?)\s*\(([^()]{2,80})\)/g;
+const LABEL_THEN_ID = /([^()—–.;:,]{2,80}?)\s*\(\s*([A-Z]{3}\d{3}(?:\.\d+)?)\s*\)/g;
+function checkIdLabelMismatch(page, visualBible) {
+  if (!visualBible) return [];
+  const { entryNamedByRow } = require('./visualBible');
+  const { baseVbId } = require('./vbIdGuard');
+  const prose = String((page && page.brief) || '').split('---METADATA---')[0];
+  const cands = [];
+  for (const key of ['secondaryCharacters', 'animals', 'artifacts', 'vehicles', 'locations', 'clothing']) {
+    const list = Array.isArray(visualBible[key]) ? visualBible[key] : Object.values(visualBible[key] || {});
+    for (const e of list) if (e && e.id) cands.push(e);
+  }
+  if (!cands.length) return [];
+  const pairs = [];
+  let m;
+  ID_THEN_LABEL.lastIndex = 0;
+  while ((m = ID_THEN_LABEL.exec(prose)) !== null) pairs.push({ id: m[1], label: m[2].trim() });
+  LABEL_THEN_ID.lastIndex = 0;
+  while ((m = LABEL_THEN_ID.exec(prose)) !== null) pairs.push({ id: m[2], label: m[1].trim().split(/\s+/).slice(-6).join(' ') });
+  const out = [];
+  const seen = new Set();
+  for (const { id, label } of pairs) {
+    if (/[A-Z]{3}\d{3}/.test(label)) continue;
+    const named = entryNamedByRow(label, cands);
+    if (!named || baseVbId(named.id) === baseVbId(id)) continue;
+    const key = `${id}|${named.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const own = cands.find(c => baseVbId(c.id) === baseVbId(id));
+    out.push({
+      pageNumber: page.pageNumber,
+      type: 'vb_id_label_mismatch',
+      id, named: named.id,
+      detail: `The prose writes ${id} as "${label}", which is ${named.id} (${named.label || named.name}), not ${id}${own ? ` (${own.label || own.name})` : ''}. `
+        + 'Name each element in the prose by its own label, and keep ids out of the prose.',
+    });
+  }
+  return out;
+}
+
 function checkPage(page, castNames = [], visualBible = null, opts = {}) {
   const findings = [];
   const brief = String((page && page.brief) || '');
@@ -965,6 +1015,8 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
         + `A figure added this way takes the action the page already has, or "watching" — never a second one.`,
     });
   }
+
+  findings.push(...checkIdLabelMismatch(page, visualBible));
 
   // B — ids in `objects[]` that resolve to nothing.
   const known = knownIds(visualBible);
@@ -1411,7 +1463,7 @@ function checkScenes(pages, castNames = [], visualBible = null, opts = {}) {
 //     never produces it, so the iterate path cannot see it.
 //   - the `textzone_*` family is not run there: `opts.textZoneRules` is off on
 //     that call, and a repaired page usually has its text position locked.
-const REVIEWABLE = new Set(['cover_cast_dropped', 'plan_cast_uncited', 'cover_location_repeated', 'cast_unlisted', 'cast_id_unresolved', 'interaction_multiple_actions', 'interaction_object_shared_hands', 'interaction_actor_unknown',
+const REVIEWABLE = new Set(['vb_id_label_mismatch', 'cover_cast_dropped', 'plan_cast_uncited', 'cover_location_repeated', 'cast_unlisted', 'cast_id_unresolved', 'interaction_multiple_actions', 'interaction_object_shared_hands', 'interaction_actor_unknown',
   'vb_element_overflow', 'vb_state_contradicted', 'vb_state_no_base',
   'vb_page_uncited', 'vb_cite_offpage',
   // The scene review already has the brief and the plan line in front of it and
@@ -1481,6 +1533,8 @@ module.exports = {
   checkBiblePageTable, bibleEntries, citedBaseIds, CITABLE_POOLS,
   checkTextZoneDistribution, checkTextZoneCollision, parseTextPosition, checkCoverBrief, checkCoverCast, checkCoverLocations, checkPlanCastCited,
   checkPopulationContradiction,
+  checkIdLabelMismatch,
+  vbFigureNamesCited,
   checkShotOffPlate,
   checkLightDeclared,
   checkGroupStaging,

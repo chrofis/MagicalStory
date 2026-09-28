@@ -832,8 +832,12 @@ describe('scene_review_replay: no params = the run\'s review of the briefs it wa
     expect(r.briefsIn.map((b: any) => b.pageNumber)).toEqual([1, -1]);
   });
 
-  it('the run reviews through runSceneReview (source scan)', () => {
-    expect(read('server/lib/beatsPipeline.js')).toMatch(/const reviewOut = await runSceneReview\(\{/);
+  it('the stored-review replay still reviews through runSceneReview; the run no longer calls it (source scan)', () => {
+    // 2026-09-28: the run's briefs are checked and re-asked once
+    // (briefChecks.runBriefChecks); the review's code stays until the owner's
+    // Q9 answer, for replaying the reviews stored on earlier stories.
+    expect(read('server/lib/testlab.js')).toMatch(/const out = await runSceneReview\(\{/);
+    expect(read('server/lib/beatsPipeline.js')).not.toMatch(/await runSceneReview\(\{/);
   });
 });
 
@@ -907,13 +911,15 @@ describe('arc_panel_replay: no params = the run\'s panel and re-telling calls', 
   });
 });
 
-// ── beats_scenes: the run's Art Director and scene review ────────────────────
-describe('beats_scenes (stored plan lines): the run\'s Art Director and review calls', () => {
+// ── beats_scenes: the run's Art Director and brief checks ────────────────────
+describe('beats_scenes (stored plan lines): the run\'s Art Director and brief-check calls', () => {
   const PLAN_1 = 'medium — Mira, Tobias — Mira holds the lantern up — the way is lit';
-  const AD_REPLY = [
+  const VB_REPLY = [
     '---VISUAL BIBLE---', '```json',
     JSON.stringify({ locations: [{ id: 'LOC001', name: 'the harbour wall', label: 'harbour wall', description: 'a low granite sea wall', appearsInPages: [1] }] }, null, 2),
     '```', '',
+  ].join('\n');
+  const AD_REPLY = [
     '## Page 1', 'Mira stands on the harbour wall holding the lantern while Tobias crouches beside her.', '', '---METADATA---',
     JSON.stringify({ sceneIntent: 'Mira lights the way', characters: [{ name: 'Mira' }, { name: 'Tobias' }], objects: ['LOC001'], shot: 'medium' }), '',
     '## Page -1', 'Mira and Tobias stand on the quay facing the viewer.', '', '---METADATA---',
@@ -927,7 +933,8 @@ describe('beats_scenes (stored plan lines): the run\'s Art Director and review c
     savedStream = textModelsMod.callTextModelStreaming;
     textModelsMod.callTextModelStreaming = async (prompt: string, _s: any, _c: any, model: string, opts: any) => {
       modelCalls.push({ prompt, model, label: opts?.usageLabel });
-      const text = /scene_expansion/.test(opts?.usageLabel || '') ? AD_REPLY : 'ANALYSIS:\nFAULTED PAGES: none\n';
+      const label = opts?.usageLabel || '';
+      const text = label === 'beats_visual_bible' ? VB_REPLY : /scene_expansion|brief_reask/.test(label) ? AD_REPLY : 'ANALYSIS:\nFAULTED PAGES: none\n';
       return { text, modelId: model, usage: { input_tokens: 1, output_tokens: 5 } };
     };
     // The Jev decision layer runs inside runArtDirector (light before the AD,
@@ -938,10 +945,12 @@ describe('beats_scenes (stored plan lines): the run\'s Art Director and review c
   });
   afterEach(() => { textModelsMod.callTextModelStreaming = savedStream; jevAuditMod2.callJev = savedJev2; });
 
-  it('briefs and reviews as the run does: the run\'s Art Director call, then the SCENE reviewer', async () => {
+  it('briefs and checks as the run does: the Visual Bible call, the page-brief call, then the one re-ask on the AD model', async () => {
     STORY = {
       ...storyFor(storedScene({ pageNumber: 1, outlineExtract: `PLAN: ${PLAN_1}` }), { textInImage: false }), pages: 1,
       coverTypes: ['frontCover'], arcReviewReport: { finalArc: 'Mira lights the way home.', centralFigure: ['Mira'] },
+      // The shipped division's head count — the gaze roster the run hands the decision step.
+      beatsReviewReport: { counterStats: { castPerPage: [{ pageNumber: 1, names: ['Mira', 'Tobias'] }] } },
     };
     const r = await testlab.runBeatsScenesStage({ storyId: 'job_parity' }, { params: { plainStoredBeats: true } });
     const labCalls = modelCalls.splice(0);
@@ -953,11 +962,13 @@ describe('beats_scenes (stored plan lines): the run\'s Art Director and review c
       inputData, modelOverrides: {}, clothingRequirements: STORY.clothingRequirements, visualBible: null, bibleSections: null,
       sceneModel: MODEL_DEFAULTS.sceneDescription, onChunk: null, gl, meta: { timings: {} }, stage: async () => {},
       beats: [{ pageNumber: 1, planLine: PLAN_1 }], arcCentralFigure: ['Mira'], approvedArc: 'Mira lights the way home.',
+      present: new Map([[1, ['Mira', 'Tobias']]]),
     });
-    await BP.runSceneReview({
-      inputData, expansions: ad.expansions.map((x: any) => ({ pageNumber: x.pageNumber, brief: x.brief })), clothingRequirements: STORY.clothingRequirements,
-      visualBible: ad.visualBible, briefBeats: ad.briefBeats, beats: [{ pageNumber: 1, planLine: PLAN_1 }], bibleSections: ad.bibleSections,
-      meta: { timings: {} }, sceneReviewModel: MODEL_DEFAULTS.sceneReviewModel, stage: async () => {}, onChunk: null, gl,
+    const { runBriefChecks } = req('../../server/lib/briefChecks');
+    await runBriefChecks({
+      inputData, expansions: ad.expansions.map((x: any) => ({ pageNumber: x.pageNumber, brief: x.brief })), briefBeats: ad.briefBeats,
+      visualBible: ad.visualBible, clothingRequirements: STORY.clothingRequirements, contextPrompt: ad.briefsPrompt || '',
+      model: MODEL_DEFAULTS.sceneDescription, gl,
     });
     const prodCalls = modelCalls.splice(0);
     expect(labCalls.map(c => [c.label, c.model, c.prompt])).toEqual(prodCalls.map(c => [c.label, c.model, c.prompt]));
@@ -965,8 +976,10 @@ describe('beats_scenes (stored plan lines): the run\'s Art Director and review c
     expect(labJev.length).toBeGreaterThan(0);
     expect(labJev).toEqual(jevStub.calls);
     expect(r.jevDecisions && r.jevDecisions.light).toBeTruthy();
-    const review = labCalls.find(c => c.label === 'beats_scene_review');
-    expect(review.model).toBe(MODEL_DEFAULTS.sceneReviewModel);                 // pre-fix: the beats reviewer's model
+    expect(labCalls.map(c => c.label).slice(0, 2)).toEqual(['beats_visual_bible', 'beats_scene_expansion']);
+    expect(labCalls.some(c => c.label === 'beats_scene_review'), 'the scene review no longer runs').toBe(false);
+    const reask = labCalls.find(c => c.label === 'beats_brief_reask');
+    if (reask) expect(reask.model).toBe(MODEL_DEFAULTS.sceneDescription);        // the Art Director's model (owner, Q2)
     expect(r.sceneExpansions.map((x: any) => x.pageNumber)).toEqual([1, -1]);
   });
 

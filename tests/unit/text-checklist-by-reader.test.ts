@@ -89,7 +89,7 @@ describe('the text-is-not-a-checklist rule is cut to its reader', () => {
     // them. The judges that are shown the text keep the whole rule
     // (text-not-a-checklist-reach.test.ts).
     it('the two stages shown no page text carry neither half', () => {
-      for (const prompt of [judged, PB.buildSceneExpansionAllPrompt(inputData, BEATS, {})]) {
+      for (const prompt of [judged, PB.buildSceneBriefsAllPrompt(inputData, BEATS, {})]) {
         expect(prompt).not.toContain(PERMISSION);
         expect(prompt).not.toContain(VERDICT);
       }

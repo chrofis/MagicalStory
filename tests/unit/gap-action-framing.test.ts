@@ -50,7 +50,7 @@ describe('a gap action is framed over the shoulder or ultra-wide, never flat', (
   });
 
   it('reaches both Art Director templates as ONE constant', () => {
-    for (const k of ['sceneExpansionAll', 'sceneExpansion']) {
+    for (const k of ['sceneBriefsAll', 'sceneExpansion']) {
       const t = String(PROMPT_TEMPLATES[k] || '');
       expect(t, `${k} lost the placeholder`).toContain('{GAP_ACTION_FRAMING}');
       expect(t, `${k} kept the old weapon framing`).not.toMatch(/solo-before|weapon aim line/);
@@ -86,7 +86,7 @@ describe('over-the-shoulder is a shot value, not a second field', () => {
   });
 
   it('no live template mentions framingPattern any more', () => {
-    for (const k of ['sceneExpansionAll', 'sceneExpansion', 'sceneIteration', 'sceneIterationFree']) {
+    for (const k of ['sceneBriefsAll', 'sceneExpansion', 'sceneIteration', 'sceneIterationFree']) {
       expect(String(PROMPT_TEMPLATES[k] || ''), k).not.toContain('framingPattern');
     }
   });

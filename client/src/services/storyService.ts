@@ -149,6 +149,7 @@ interface StoryDetailsServer {
   arcReviewReport?: SavedStory['arcReviewReport'];
   beatsReviewReport?: SavedStory['beatsReviewReport'];
   sceneReviewReport?: SavedStory['sceneReviewReport'];
+  briefCheckReport?: SavedStory['briefCheckReport'];
   clothingReviewReport?: SavedStory['clothingReviewReport'];
   id: string;
   title: string;
@@ -426,6 +427,7 @@ export const storyService = {
       arcReviewReport: s.arcReviewReport,
       beatsReviewReport: s.beatsReviewReport,
       sceneReviewReport: s.sceneReviewReport,
+      briefCheckReport: s.briefCheckReport,
       clothingReviewReport: s.clothingReviewReport,
       story: storyContent,
       storyTextPrompts: s.storyTextPrompts,

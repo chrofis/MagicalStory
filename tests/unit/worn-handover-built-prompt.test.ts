@@ -93,7 +93,7 @@ describe('the wornAs-is-required rule reaches every VB authoring site', () => {
   // is the source of the set; a template deleted by a pipeline change drops out
   // of it here rather than failing as a missing file.
   const SITES = [
-    'prompts/scene-expansion-all.txt',
+    'prompts/visual-bible.txt',
     'prompts/scene-expansion.txt',
     'prompts/story-unified.txt',
     'prompts/story-unified-imagefirst.txt',
@@ -113,7 +113,7 @@ describe('the wornAs-is-required rule reaches every VB authoring site', () => {
   }
 
   it('the per-page wearer field is documented on both Art Director templates', () => {
-    for (const rel of ['prompts/scene-expansion-all.txt', 'prompts/scene-expansion.txt']) {
+    for (const rel of ['prompts/scene-briefs-all.txt', 'prompts/scene-expansion.txt']) {
       expect(/`wearer`/.test(read(rel)), path.basename(rel)).toBe(true);
     }
   });

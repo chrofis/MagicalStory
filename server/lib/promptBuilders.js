@@ -18,7 +18,7 @@ const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = requi
 // exported from visualBible.js for coverIterate.js, which still uses it.
 const { REQUIRED_TEXT_AUTHORING_RULE, declaredText } = require('./requiredText');
 const { SCALE_CLASS_SPEC, ANIMAL_ANATOMY_SPEC, GROWN_CREATURE_SCALE_CLASSES, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote, withScaleNote } = require('./visualBible');
-const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, PLAN_SHOT_PLACEHOLDER, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE, GROUP_STAGING_RULE } = require('./shotVocabulary');
+const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, CLOSEUP_KEPT_FIXED_SHOT_RULE, PLAN_SHOT_PLACEHOLDER, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE, GROUP_STAGING_RULE, GROUP_STAGING_FIXED_SHOT_RULE } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { SLOP_RULES } = require('./proseSlop');
 const { castCoverage, castCoverageRule, castActionRule, castTableSpec, castTableFormat, castTableBlock, groupPageBudget, groupPageRule } = require('./castCoverage');
@@ -3108,12 +3108,7 @@ function buildExpansionCastBlock(characters, clothingReqs, primaryCategory = nul
   return { block, resolvedOutfits };
 }
 
-function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
-  const template = PROMPT_TEMPLATES.sceneExpansionAll;
-  if (!template) {
-    log.error('[PROMPT] sceneExpansionAll template not loaded — all-pages scene expansion unavailable');
-    return null;
-  }
+function artDirectorFills(inputData, beats = [], options = {}) {
   const characters = inputData.characters || [];
   // Clothing TEXT per character, not the category key. Passing null here left
   // the all-pages Art Director with no outfit at all, so it wrote the key into
@@ -3140,7 +3135,7 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     log.error(`👕 [PROMPT] all-pages scene expansion resolved an outfit for only ${resolvedOutfits}/${characters.length} character(s) — the rest have no outfit text and the Art Director will invent one`);
   }
 
-  const filledAll = fillTemplate(template, {
+  return {
     PAGE_COUNT: beats.length,
     ALL_PLAN_LINES: planBlocks(beats),
     // The whole story, read-only: the Art Director stages each page's plan line
@@ -3191,9 +3186,6 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     CONTACT_VERB: CONTACT_VERB_RULE,
     REACHABLE_CONTACT: REACHABLE_CONTACT_RULE,
     SMALL_PROP_CONTACT: SMALL_PROP_CONTACT_RULE,
-    // Rule 11 in both Art Director templates — ONE constant, so the framing and
-    // the field that records it cannot drift apart.
-    GAP_ACTION_FRAMING: GAP_ACTION_FRAMING_RULE,
     // Rules 6d / 8l, shared with scene-review.txt check 6.
     EYES_OPEN: EYES_OPEN_RULE,
     SHARED_GRIP: SHARED_GRIP_RULE,
@@ -3244,13 +3236,11 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     CLOSEUP_BELOW_WAIST: CLOSEUP_BELOW_WAIST_PHRASE,
     // 11c: a planned close-up is restaged, never widened — the scene review's
     // 7b / 10 and `shot_widened` state the same constant.
-    CLOSEUP_KEPT: CLOSEUP_KEPT_RULE,
     // The over-the-shoulder near figure is a crop, and never on a contact page
     // (owner, 2026-09-23) — the same constant at all four brief-authoring sites.
     OTS_NEAR_FIGURE: OTS_NEAR_FIGURE_RULE,
     // Rule 4, the group rule scene-review check 6d and the brief check
     // checkGroupStaging hold briefs to (shotVocabulary, 2026-09-27).
-    GROUP_STAGING: GROUP_STAGING_RULE,
     // C4 names the two axes separately — the eight-word SHOT_ENUM is not a
     // list of distances, and where the camera stands is no longer the vantage's
     // business but the shot word's own.
@@ -3262,8 +3252,83 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // What counts as one location (2026-09-24).
     PLACE_SEPARATE: PLACE_SEPARATE_RULE,
     PLACE_INSIDE_OUTSIDE: PLACE_INSIDE_OUTSIDE_RULE,
+    // The shot rules per path: on the Jev path a story page's shot is fixed
+    // (owner, 2026-09-28) and no rule sets or widens it.
+    ...shotRuleFills({ fixedShot: options.jevBackup === false }),
+    // Which shots a vantage holds: the pages' fixed shots on the Jev path.
+    VANTAGE_PAGE_SHOTS: require('./jevDecisions').vantageShotRule(options.jevBackup),
+  };
+}
+
+
+/**
+ * THE ART DIRECTOR, CALL 1: the Visual Bible alone (owner, 2026-09-28, "Jev
+ * first"). Written before any page brief so the decision layer can decide each
+ * page's cited elements, looks, location, aboard, population and gaze on it;
+ * call 2 (buildSceneBriefsAllPrompt) writes the briefs with those fields fixed.
+ * Both calls read ONE fills object (artDirectorFills), so a rule or an input
+ * the two share cannot drift between them.
+ *
+ * @returns {string|null} null when the template is unavailable
+ */
+function buildVisualBibleCallPrompt(inputData, beats = [], options = {}) {
+  const template = PROMPT_TEMPLATES.visualBible;
+  if (!template) {
+    log.error('[PROMPT] visualBible template not loaded — the Visual Bible call is unavailable');
+    return null;
+  }
+  return fillTemplate(template, artDirectorFills(inputData, beats, options));
+}
+
+/**
+ * THE ART DIRECTOR, CALL 2: every page's brief, the covers included, with the
+ * Visual Bible call 1 wrote as input (`options.visualBible`, the transcript's
+ * JSON) and each story page's FIXED block under its plan line
+ * (planBlocks → jevDecisions.fixedBlock).
+ *
+ * @returns {string|null} null when the template is unavailable
+ */
+function buildSceneBriefsAllPrompt(inputData, beats = [], options = {}) {
+  const template = PROMPT_TEMPLATES.sceneBriefsAll;
+  if (!template) {
+    log.error('[PROMPT] sceneBriefsAll template not loaded — the page-brief call is unavailable');
+    return null;
+  }
+  const vb = String(options.visualBible || '').trim();
+  const filled = fillTemplate(template, {
+    ...artDirectorFills(inputData, beats, options),
+    VISUAL_BIBLE: vb ? '```json\n' + vb + '\n```' : '(the Visual Bible call returned no bible — cite no Visual Bible id)',
   });
-  return applyTextZoneGate(filledAll, textZoneRulesActive(inputData));
+  return applyTextZoneGate(filled, textZoneRulesActive(inputData));
+}
+
+/**
+ * THE ONE BRIEF RE-ASK (owner, 2026-09-28, "Jev first"): the call-2 prompt as
+ * its context, then each flagged page's brief as the Art Director returned it
+ * with the faults code found. The payload always carries the briefs it asks to
+ * correct (briefCorrection.assertCorrectorSeesText reads it).
+ *
+ * @param {{contextPrompt:string, pages:Array<{pageNumber:number, brief:string, findings:string}>, jevBackup?:boolean}} input
+ * @returns {string|null}
+ */
+function buildBriefReaskPrompt({ contextPrompt, pages = [], jevBackup = false }) {
+  const template = PROMPT_TEMPLATES.briefReask;
+  if (!template) {
+    log.error('[PROMPT] briefReask template not loaded — the brief re-ask is unavailable');
+    return null;
+  }
+  const flagged = pages.map(p => [
+    `## Page ${p.pageNumber} — as you wrote it`,
+    String(p.brief || '').trim(),
+    '',
+    `FAULTS ON PAGE ${p.pageNumber}:`,
+    String(p.findings || '').trim(),
+  ].join('\n')).join('\n\n');
+  return fillTemplate(template, {
+    ART_DIRECTOR_PROMPT: String(contextPrompt || '').trim(),
+    FIXED_FIELDS_KEPT: jevBackup ? '' : 'every field of its FIXED block, ',
+    FLAGGED_PAGES: flagged,
+  });
 }
 
 /**
@@ -3527,9 +3592,9 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     CONTACT_VERB: CONTACT_VERB_RULE,
     REACHABLE_CONTACT: REACHABLE_CONTACT_RULE,
     SMALL_PROP_CONTACT: SMALL_PROP_CONTACT_RULE,
-    // Rule 11 in both Art Director templates — ONE constant, so the framing and
-    // the field that records it cannot drift apart.
-    GAP_ACTION_FRAMING: GAP_ACTION_FRAMING_RULE,
+    // Rules 4, 5d, 11 and 11c and the `shot` field, per path (shotRuleFills):
+    // a story page whose shot the decision layer fixed stages inside it.
+    ...shotRuleFills({ fixedShot: options.jevBackup === false }),
     // Rules 6d / 8l, shared with scene-review.txt check 6.
     EYES_OPEN: EYES_OPEN_RULE,
     SHARED_GRIP: SHARED_GRIP_RULE,
@@ -3574,13 +3639,11 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     CLOSEUP_BELOW_WAIST: CLOSEUP_BELOW_WAIST_PHRASE,
     // 11c: a planned close-up is restaged, never widened — the scene review's
     // 7b / 10 and `shot_widened` state the same constant.
-    CLOSEUP_KEPT: CLOSEUP_KEPT_RULE,
     // The over-the-shoulder near figure is a crop, and never on a contact page
     // (owner, 2026-09-23) — the same constant at all four brief-authoring sites.
     OTS_NEAR_FIGURE: OTS_NEAR_FIGURE_RULE,
     // Rule 4, the group rule scene-review check 6d and the brief check
     // checkGroupStaging hold briefs to (shotVocabulary, 2026-09-27).
-    GROUP_STAGING: GROUP_STAGING_RULE,
     // C4 names the two axes separately — the eight-word SHOT_ENUM is not a
     // list of distances, and where the camera stands is no longer the vantage's
     // business but the shot word's own.
@@ -4004,9 +4067,9 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       // templates and scene-review check 6 carry (2026-09-23).
       EYES_OPEN: EYES_OPEN_RULE,
       CREATURE_FACE: CREATURE_FACE_RULE,
-    // Rule 11 in both Art Director templates — ONE constant, so the framing and
-    // the field that records it cannot drift apart.
-    GAP_ACTION_FRAMING: GAP_ACTION_FRAMING_RULE,
+    // The shot rules per path (shotRuleFills): a strict iterate of a page whose
+    // shot the decision layer fixed stages inside it (owner, 2026-09-28).
+    ...shotRuleFills({ fixedShot: options.fixedShot === true }),
     // SEVEN page-brief contracts, one constant each, filled at all FOUR sites
     // that author a page brief — see ONE_INSTANT_RULE and the block around it.
     // Registered as sibling set art-director-vs-iterate.
@@ -4049,8 +4112,6 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       // The over-the-shoulder near figure is a crop, and never on a contact page
       // (owner, 2026-09-23) — the same constant at all four brief-authoring sites.
       OTS_NEAR_FIGURE: OTS_NEAR_FIGURE_RULE,
-      // The group rule the scene review and the brief check hold briefs to.
-      GROUP_STAGING: GROUP_STAGING_RULE,
       // C4 names the two axes separately — the eight-word SHOT_ENUM is not a
       // list of distances, and where the camera stands is no longer the vantage's
       // business but the shot word's own.
@@ -8751,10 +8812,10 @@ function parsePlanResponse(raw, expectedPages = []) {
 function planBlocks(pages = []) {
   // A story page's FIXED line (the Jev decision layer's time of day and
   // indoors, 2026-09-27) rides under its plan line; covers carry none.
-  const { fixedLine } = require('./jevDecisions');
+  const { fixedBlock } = require('./jevDecisions');
   return (pages || [])
     .filter(p => p && p.pageNumber != null)
-    .map(p => [`## Page ${p.pageNumber}`, `PLAN: ${String(p.planLine || '').trim()}`, fixedLine(p.fixed)].filter(Boolean).join('\n'))
+    .map(p => [`## Page ${p.pageNumber}`, `PLAN: ${String(p.planLine || '').trim()}`, fixedBlock(p)].filter(Boolean).join('\n'))
     .join('\n\n');
 }
 
@@ -9413,7 +9474,46 @@ const CONTACT_VERB_RULE = "An interaction's `where` opens with the verb the char
  * text in a children's pipeline. What it is actually about is a SENT THING and
  * a RECEIVER, and in this product that is a snowball far more often than a bow.
  */
-const GAP_ACTION_FRAMING_RULE = `When the page has one figure act on another across a gap — sending, throwing, aiming, rolling or kicking something toward them, or calling or gesturing across to them — the page is framed one of two ways, and the prose says which. OVER THE SHOULDER (set \`shot\` to \`over-the-shoulder\`): the acting figure is the near crop — ${OTS_NEAR_FIGURE_CROP}; the receiving figure stands small and deep in the opposite back corner, about a tenth of the frame's height; the line of the throw, the call or the look runs down the diagonal between them. Take this one by default — the camera axis IS the line of the action, so the direction holds whether or not the picture understood the verb. ULTRA-WIDE (set \`shot\` to \`ultra-wide\`): take it when the page needs both faces readable, which the over-the-shoulder framing spends on the actor's back. Then the gap itself must be written — how far apart they stand, measured against something in the frame — because a gap left to the words alone is drawn as two figures almost touching however many paces the sentence claims. Either way the interaction's \`where\` carries the separation phrase ('across the square', 'a few paces apart', 'down the lane'). What is never allowed is the flat middle: both figures the same size at opposite edges of an ordinary shot, which states neither the direction nor the distance.`;
+const GAP_ACTION_WHEN = 'When the page has one figure act on another across a gap — sending, throwing, aiming, rolling or kicking something toward them, or calling or gesturing across to them —';
+const GAP_ACTION_OTS = `the acting figure is the near crop — ${OTS_NEAR_FIGURE_CROP}; the receiving figure stands small and deep in the opposite back corner, about a tenth of the frame's height; the line of the throw, the call or the look runs down the diagonal between them`;
+const GAP_ACTION_WRITTEN_GAP = 'the gap itself must be written — how far apart they stand, measured against something in the frame — because a gap left to the words alone is drawn as two figures almost touching however many paces the sentence claims';
+const GAP_ACTION_TAIL = 'Either way the interaction\'s `where` carries the separation phrase (\'across the square\', \'a few paces apart\', \'down the lane\'). What is never allowed is the flat middle: both figures the same size at opposite edges of an ordinary shot, which states neither the direction nor the distance.';
+const GAP_ACTION_FRAMING_RULE = `${GAP_ACTION_WHEN} the page is framed one of two ways, and the prose says which. OVER THE SHOULDER (set \`shot\` to \`over-the-shoulder\`): ${GAP_ACTION_OTS}. Take this one by default — the camera axis IS the line of the action, so the direction holds whether or not the picture understood the verb. ULTRA-WIDE (set \`shot\` to \`ultra-wide\`): take it when the page needs both faces readable, which the over-the-shoulder framing spends on the actor's back. Then ${GAP_ACTION_WRITTEN_GAP}. ${GAP_ACTION_TAIL}`;
+/**
+ * Rule 11 on a page whose shot is FIXED (owner, 2026-09-28, "Jev first"): the
+ * fixed shot says which of the two framings applies; the author never sets it.
+ */
+const GAP_ACTION_FRAMING_FIXED_SHOT_RULE = `${GAP_ACTION_WHEN} the page's fixed \`shot\` decides the framing, and the prose says it. On an \`over-the-shoulder\` page ${GAP_ACTION_OTS}. On any other shot ${GAP_ACTION_WRITTEN_GAP}. ${GAP_ACTION_TAIL}`;
+
+/**
+ * THE SHOT RULES, PER PATH (owner, 2026-09-28, "Jev first"). On the Jev path a
+ * story page's shot is fixed before any brief is written, so the rules that
+ * used to set or widen `shot` are worded for staging inside it. Covers keep the
+ * shot the author picks (the fixed-shot wording names "a story page"), and the
+ * Jev-outage backup keeps the old wording whole. One function for every brief
+ * author (both Art Director templates and both iterate templates), so the four
+ * sites cannot disagree about who owns the shot.
+ *
+ * @param {{fixedShot?: boolean}} opts - true when the page's shot is decided upstream
+ */
+function shotRuleFills({ fixedShot = false } = {}) {
+  const shotField = 'Decide it once — the scene prose and the metadata use this same framing, and it is a framing the plate of the vantage this page cites can hold.';
+  return fixedShot ? {
+    GAP_ACTION_FRAMING: GAP_ACTION_FRAMING_FIXED_SHOT_RULE,
+    CLOSEUP_KEPT: CLOSEUP_KEPT_FIXED_SHOT_RULE,
+    GROUP_STAGING: GROUP_STAGING_FIXED_SHOT_RULE,
+    PLAN_SHOT_DEFAULT: 'Follow the page\'s action verb; its shot is fixed, and the moment is staged inside it.',
+    SHOT_FIELD: `On a story page it is the page's fixed shot exactly, and the prose stages the moment in that framing; on a cover, ${shotField.charAt(0).toLowerCase()}${shotField.slice(1)}`,
+    CLOSEUP_WAIST_SHOT: 'On a story page the shot is fixed: a close-up whose moment reaches below the waist is staged waist-up.',
+  } : {
+    GAP_ACTION_FRAMING: GAP_ACTION_FRAMING_RULE,
+    CLOSEUP_KEPT: CLOSEUP_KEPT_RULE,
+    GROUP_STAGING: GROUP_STAGING_RULE,
+    PLAN_SHOT_DEFAULT: 'Follow the page\'s action verb and shot size unless they cannot be staged.',
+    SHOT_FIELD: shotField,
+    CLOSEUP_WAIST_SHOT: 'A plan line whose point is below the waist is a `medium` shot, not a close-up.',
+  };
+}
 
 /**
  * THE CONTACT LEVER (owner, 2026-09-26). The one mechanism measured to hold a
@@ -12932,7 +13032,10 @@ module.exports = {
   withBakedTitle,
   buildBasePrompt,
   buildRecurringElementsText,
-  buildSceneExpansionAllPrompt,
+  buildVisualBibleCallPrompt,
+  buildSceneBriefsAllPrompt,
+  buildBriefReaskPrompt,
+  shotRuleFills,
   buildSceneExpansionPrompt,
   buildSceneDescriptionPrompt,
   pageSeasonLabel,

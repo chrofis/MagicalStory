@@ -36,7 +36,7 @@ describe('a removed garment is shown by what is there, not by what is gone', () 
   it('reaches BOTH Art Director templates through the one placeholder', async () => {
     await loadPromptTemplates();
     const { PROMPT_TEMPLATES } = require('../../server/services/prompts');
-    for (const key of ['sceneExpansionAll', 'sceneExpansion']) {
+    for (const key of ['sceneBriefsAll', 'sceneExpansion']) {
       const t = String(PROMPT_TEMPLATES[key] || '');
       expect(t, `${key} lost its {GARMENT_REMOVED} placeholder`).toContain('{GARMENT_REMOVED}');
       expect(t, `${key} hand-copied the rule instead of citing it`).not.toContain('state the character is WITHOUT it');

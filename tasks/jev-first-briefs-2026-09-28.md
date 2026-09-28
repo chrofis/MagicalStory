@@ -2,7 +2,103 @@
 
 **Owner decision (2026-09-28):** "Jev first, then remove the scene review."
 
-**STATUS: Step 2 (build) under way.**
+**STATUS (2026-09-28): the new path is built and tested, and rung 1 has been run. WAITING on the
+owner's Q9 answer (table below) before the review is deleted and before rung 2.**
+
+Built (see decisions.md 2026-09-28 "Jev first, then no scene review"):
+- [x] Two Art Director calls: `prompts/visual-bible.txt` + `prompts/scene-briefs-all.txt`, one fills
+      object (`artDirectorFills`); `scene-expansion-all.txt` / `buildSceneExpansionAllPrompt` deleted.
+- [x] Jev between them (`server/lib/jevBriefFields.js`: `decideBriefFields`, `pageLocations`,
+      `pinDecidedFields`); FIXED block (`jevDecisions.fixedBlock`); location cite by code (Q8).
+- [x] Shot rules per path (`promptBuilders.shotRuleFills`) and the vantage-holds-the-fixed-shot rule.
+- [x] Code checks + one batched re-ask on the AD model (`server/lib/briefChecks.js`,
+      `prompts/brief-reask.txt`); strict verdict, who-column refusal, pin, carry-forward guards.
+- [x] `vb_id_label_mismatch` (authored path and iterate path); `outfit_missing` sent to the re-ask (Q7).
+- [x] Bug `clothing-review-none-body-erases-outfit` fixed (d1ed5efca) + guard `beats_outfit_absent`.
+- [x] Iterate re-pin (Q6); `jevFixed` stored per page.
+- [x] Backup path: call 2 with the pre-Jev wording, same checks + re-ask, no review.
+- [x] Lab `beats_scenes` = production (`runArtDirector` + `runBriefChecks`); sibling set
+      `lab-vs-prod-brief-checks`; registry sets moved to the new templates.
+- [x] Client: dev-mode "Brief checks + re-ask" panel (StoryDisplay), Lab panel (TestLab).
+- [x] Tests: new `brief-checks-reask`, `jev-first-shot-rules`, `clothing-review-none-body`; 40+
+      tests moved to the new builders; full unit suite green apart from the pre-existing
+      `no-output-caps` failure (BACKLOG).
+- [x] decisions.md entry, SETTLED factual refresh (lines 46, 66, 67), prompt-inventory, verify
+      entry `jev-first-briefs`, BACKLOG ticks.
+- [ ] NOT DONE, waits for Q9: delete `runSceneReview`, `scene-review.txt`, the review prompt builder,
+      `sceneReviewModel`, the `scene_review_replay` Lab stage, the review sibling sets; re-point the six
+      verify entries that name the review.
+- [ ] NOT DONE, waits for the Q9 report: rung 2 (Lab `beats_scenes` on the dragon book, to images, cap
+      CHF 1.00).
+
+## Rung 1 results (2026-09-28, `scripts/analysis/replay-jev-first-briefs.js`)
+
+- **Jev before the briefs vs after** (3 Jev stories, 147 Jev calls): cited elements 26/26 pages;
+  looks 17/20 (the 3 differences are the 2026-09-28 look fix, e.g. dragon p3 now grey); population
+  24/25; gaze 41/42 → Q5 holds, gaze is decided before the briefs. Dragon p5 sits in no location's
+  `pages` in the AD's bible (logged `beats_jev_page_unlocated`; the AD writes its LOC there).
+- **New checks:** `vb_id_label_mismatch` 3/3 true (the ar4u7qry3 covers), 0 false on 360 briefs.
+  `outfit_missing` 4 fires on 251 briefs, all real omissions → sent to the re-ask.
+- **Prompts** build from stored inputs with no unfilled placeholder: dragon call 1 45.6k chars,
+  call 2 100.6k (bible 24.4k) vs the stored single call 119.9k.
+- **Re-ask volume** on stored pre-review briefs (written before the FIXED block): 193 of 251 pages
+  flagged over 15 stories; the 5 newest stories 8-12 pages each. Top types: light_undeclared 134
+  (older stories only), interaction_multiple_actions 64, removal_unstated 56, vb_page_uncited 20.
+  Expect a re-ask on nearly every story carrying about half the book — rung 2 measures the real rate
+  on briefs written with the FIXED block.
+
+### Q9 table — what each scene-review check did (15 latest staging stories with a stored review, 3 on the Jev path)
+
+"Named" = pages the check's tagged analysis line listed; "rewritten" = of those, pages the review
+rewrote; "alone" = pages only this tag named (so the rewrite is attributable to it). This counts what
+the review ACTED on, not whether the rewrite was right (the 3 Jev stories: 2 harmful removals, 4 new
+faults — see Why).
+
+| check | stories naming pages | pages named | named & rewritten | named by this tag alone | …and rewritten |
+|---|---|---|---|---|---|
+| interaction_multiple_actions (code check exists) | 15 | 66 | 65 | 10 | 10 |
+| element_uncited | 13 | 61 | 56 | 6 | 6 |
+| negation_named | 10 | 31 | 29 | 7 | 6 |
+| gaze_budget | 12 | 40 | 38 | 4 | 4 |
+| character_fields | 11 | 28 | 28 | 3 | 3 |
+| clothing_mechanical (code check → re-ask) | 4 | 28 | 28 | 3 | 3 |
+| population_contradicted (code check → re-ask) | 4 | 12 | 12 | 3 | 3 |
+| clothing_incomplete | 7 | 31 | 31 | 2 | 2 |
+| cast_not_in_plan | 6 | 23 | 22 | 2 | 2 |
+| closeup_below_waist | 8 | 11 | 11 | 2 | 2 |
+| facing_not_per_character | 9 | 17 | 16 | 1 | 1 |
+| page_repetition | 5 | 14 | 10 | 2 | 1 |
+| themed_setting_bare | 3 | 7 | 7 | 1 | 1 |
+| scene_intent | 6 | 18 | 18 | 0 | 0 |
+| gaze_missing | 8 | 17 | 17 | 0 | 0 |
+| critique_in_brief | 3 | 20 | 17 | 0 | 0 |
+| force_at_rest | 9 | 16 | 16 | 0 | 0 |
+| continuity | 6 | 18 | 15 | 0 | 0 |
+| landmark_photo_mismatch | 2 | 17 | 14 | 0 | 0 |
+| depth_unearned | 7 | 13 | 13 | 0 | 0 |
+| contact_not_pose | 8 | 15 | 13 | 0 | 0 |
+| cast_over_cap | 5 | 12 | 12 | 0 | 0 |
+| drawability | 5 | 13 | 12 | 0 | 0 |
+| element_stranded | 3 | 13 | 12 | 0 | 0 |
+| light_fields | 1 | 12 | 11 | 0 | 0 |
+| vb_state_range | 7 | 13 | 10 | 1 | 0 |
+| plate_contains_effect | 6 | 12 | 10 | 1 | 0 |
+| footing | 1 | 9 | 8 | 0 | 0 |
+| prop_unheld | 4 | 10 | 8 | 1 | 0 |
+| scale_unanchored | 6 | 8 | 8 | 0 | 0 |
+| elevation_unsupported | 4 | 8 | 7 | 0 | 0 |
+| closeup_environment | 6 | 8 | 7 | 1 | 0 |
+| era_landmark_named | 3 | 9 | 7 | 0 | 0 |
+| group_staging | 3 | 5 | 4 | 0 | 0 |
+| cast_crowded | 3 | 7 | 3 | 1 | 0 |
+| extras_undescribed | 2 | 3 | 3 | 0 | 0 |
+| visual_arc | 1 | 1 | 1 | 0 | 0 |
+| clothing_owner | 1 | 1 | 1 | 0 | 0 |
+| result_not_at_contact | 1 | 1 | 1 | 0 | 0 |
+| required_text_undeclared | 0 | 0 | 0 | 0 | 0 |
+
+Bible corrections the review applied over the 15 stories: 9 (8 state-page ranges — Jev owns those
+now — and 1 landmark photo). Declared cast removals: 8.
 
 **Owner answers (2026-09-28, AskUserQuestion, relayed by the coordinator):**
 - Q1 = A (two-phase AD: VB call → Jev → briefs call). Q-split = two template files.

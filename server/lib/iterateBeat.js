@@ -514,6 +514,9 @@ const REINSTATE_TYPES = new Set(['cast_unlisted']);
  * state it resolves to.
  */
 const INTRODUCED_TYPES = new Set([
+  // A rewrite that writes an element's id with another element's label
+  // (2026-09-28, the authored path's `vb_id_label_mismatch`) — same check, both paths.
+  'vb_id_label_mismatch',
   'cast_id_unresolved', 'interaction_multiple_actions', 'interaction_object_shared_hands',
   'interaction_actor_unknown', 'vb_element_overflow', 'vb_state_contradicted',
   // A rewrite INHERITS `population` (images.js carries the field forward, since

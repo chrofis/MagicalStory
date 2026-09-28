@@ -45,7 +45,7 @@ const BANDS = ['fingertip-sized', 'palm-sized', 'hand-sized', 'melon-sized', 'fo
 // were deleted as unreachable (docs/decisions.md).
 const ARTIFACT_AUTHORING_TEMPLATES = [
   'story-trial.txt',
-  'scene-expansion-all.txt'
+  'visual-bible.txt'
 ];
 
 describe('artifact size — builder contract', () => {
@@ -206,7 +206,7 @@ describe('artifact scale — authoring instruction contract', () => {
  * carries a band.
  */
 describe('the Art Director size-ratio rule survives the field swap', () => {
-  for (const file of ['scene-expansion.txt', 'scene-expansion-all.txt']) {
+  for (const file of ['scene-expansion.txt', 'scene-briefs-all.txt']) {
     it(file + ' states the ratio obligation without a size-field condition', () => {
       const text = read(file);
       // Scoped 2026-09-19 to the things the rule's own first sentence names — a

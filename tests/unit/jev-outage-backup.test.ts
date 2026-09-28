@@ -3,8 +3,10 @@
  * setup as backup if Jev is down?" — an explicit exception to NO FALLBACKS).
  *
  * Runs the real beats pipeline — arc machine, plan, plan check, re-plan, shots,
- * wardrobe, Art Director, scene review — with every text model mocked and Jev
- * DOWN, and stops in front of the page text. Pins that the backup path is the
+ * wardrobe, the Art Director's two calls (Visual Bible, then the page briefs),
+ * the brief checks and their one re-ask — with every text model mocked and Jev
+ * DOWN, and stops in front of the page text. No scene review runs on either
+ * path since 2026-09-28 ("Jev first, then remove the scene review"). Pins that the backup path is the
  * planner-authored setup, that the switch is logged and stored once, and that
  * a story that loses Jev half-way keeps what was decided and hands the rest to
  * the planner / Art Director. This test is what keeps the backup from rotting.
@@ -50,8 +52,8 @@ const PLAN_REPLY = (shot: string) => ['---CAST---', 'Mila — deed page 3: carri
 const CHECK_REPLY = ['ROSTER 1: people=Mila, Ben', 'ROSTER 2: people=Ben', 'ROSTER 3: people=Mila', 'ROSTER 4: people=Mila, Ben', 'ACTION Mila: sentence 3, page 3', 'ACTION Ben: sentence 2, page 2'].join('\n');
 const brief = (n: number) => [`## Page ${n}`, `Mila and Ben by the tree on page ${n}.`, '', '---METADATA---',
   JSON.stringify({ sceneIntent: `page ${n}`, characters: [{ name: 'Mila', looksAt: 'Ben' }, { name: 'Ben', looksAt: 'Mila' }], shot: 'medium', objects: ['LOC001'], timeOfDay: 'evening', weather: 'clear', population: 'cast_only' })].join('\n');
-const AD_REPLY = ['---VISUAL BIBLE---', '```json', JSON.stringify({ locations: [{ id: 'LOC001', name: 'the old oak', description: 'a big oak', pages: [1, 2, 3, 4] }], animals: [], secondaryCharacters: [], artifacts: [], vehicles: [], clothing: [] }), '```', '',
-  ...[1, 2, 3, 4].map(brief)].join('\n\n');
+const VB_REPLY = ['---VISUAL BIBLE---', '```json', JSON.stringify({ locations: [{ id: 'LOC001', name: 'the old oak', description: 'a big oak', pages: [1, 2, 3, 4] }], animals: [], secondaryCharacters: [], artifacts: [], vehicles: [], clothing: [] }), '```', ''].join('\n');
+const AD_REPLY = [1, 2, 3, 4].map(brief).join('\n\n');
 
 async function run(jevImpl: any) {
   const prompts: Record<string, string> = {};
@@ -65,16 +67,17 @@ async function run(jevImpl: any) {
         : label === 'arc_hints' ? 'ISSUE: x → CHANGE: y'
           : label === 'beats_plan' || label === 'beats_replan' ? PLAN_REPLY(/first field is always the word/.test(p) ? SV.PLAN_SHOT_PLACEHOLDER : 'medium')
             : /plan_(re)?check/.test(label) ? CHECK_REPLY
-              : /scene_expansion/.test(label) ? AD_REPLY
-                : /scene_review/.test(label) ? 'ANALYSIS:\nFAULTED PAGES: none\n'
+              : label === 'beats_visual_bible' ? VB_REPLY
+                : /scene_expansion|brief_reask/.test(label) ? AD_REPLY
                   : '';
     return { text, usage: { output_tokens: 10 }, stop_reason: 'end_turn', modelId: 'mock', truncation: null };
   };
   const jevCalls: any[] = [];
   jevAudit.callJev = async (req: any) => { jevCalls.push(req); return jevImpl(req); };
   const stop = new Error('stop before the page text');
-  const checkCancellation = async () => { if (labels.some(l => /scene_review/.test(l))) throw stop; };
   const events: { level: string; key: string; msg: string; data: any }[] = [];
+  // Stop once the brief checks (and their one re-ask) have run: the page text is next.
+  const checkCancellation = async () => { if (events.some(e => /^beats_brief_(checks|reask)$/.test(e.key) && e.level === 'info' && /re-ask by|every brief clean/.test(e.msg))) throw stop; };
   const genLog = {
     info: (key: string, msg: string, _x: any, data: any) => events.push({ level: 'info', key, msg, data }),
     warn: (key: string, msg: string, _x: any, data: any) => events.push({ level: 'warn', key, msg, data }),
@@ -110,11 +113,14 @@ describe('Jev down before the story starts: the whole story runs the backup', ()
     // The counters: the shot counters run on the planner's shots (4 × medium).
     const check = r.events.find(e => e.key === 'plan_check' && e.data && e.data.counterFindings);
     expect(check.data.counterFindings.join('\n')).toMatch(/SHOT_MEDIUM_WIDE_EXCESS/);
-    // No Jev step ran; the Art Director gets no FIXED line and no decided-fields rule.
+    // No Jev step ran; the Art Director gets no FIXED block and no decided-fields rule.
     expect(r.events.some(e => /^beats_jev_(shots|light|brief_fields|cast_cuts)$/.test(e.key))).toBe(false);
-    expect(r.prompts.beats_scene_expansion).not.toContain('FIXED: timeOfDay');
+    expect(r.prompts.beats_visual_bible).toBeTruthy();
+    expect(r.prompts.beats_scene_expansion).not.toContain('FIXED');
     expect(r.prompts.beats_scene_expansion).not.toContain(JD.JEV_FIXED_FIELDS_RULE);
-    expect(r.prompts.beats_scene_review).not.toContain(JD.JEV_FIXED_FIELDS_RULE);
+    // The backup runs the checks and at most one re-ask, never the scene review.
+    expect(r.labels.some(l => /scene_review/.test(l))).toBe(false);
+    expect(r.labels.filter(l => l === 'beats_brief_reask').length).toBeLessThanOrEqual(1);
   });
 });
 
@@ -129,7 +135,8 @@ describe('Jev lost half-way: what was decided stays, the rest goes to the backup
     expect(r.prompts.beats_plan).toContain('first field is always the word');       // the plan was written for Jev
     expect(r.prompts.beats_scene_expansion).toContain(`PLAN: ${SV.PLAN_SHOT_PLACEHOLDER} —`);
     expect(r.prompts.beats_scene_expansion).toContain(JD.JEV_BACKUP_SHOT_RULE);
-    expect(r.prompts.beats_scene_expansion).not.toContain('FIXED: timeOfDay');       // no later Jev step ran
+    expect(r.prompts.beats_scene_expansion).not.toContain('FIXED');                  // no later Jev step ran
+    expect(r.labels.some(l => /scene_review/.test(l))).toBe(false);
     // Before the shots only the probe and the challenge ranking asked Jev anything.
     const selection = (c: any) => c.questions.PROBE || Object.keys(c.questions).every(k => /^c\d+$/.test(k));
     expect(r.jevCalls.filter((c: any) => Object.keys(c.questions).every(k => /^c\d+$/.test(k)))).toHaveLength(1);
@@ -149,7 +156,14 @@ describe('Jev lost half-way: what was decided stays, the rest goes to the backup
     for (const key of ['beats_jev_shots', 'beats_jev_light', 'beats_jev_brief_fields', 'jev_challenge_selection']) expect(r.events.some(e => e.key === key), key).toBe(true);
     // The arc is offered Jev's draw: 12 catalogue lines.
     expect((r.prompts.arc_create.match(/^- \[C\d+\]/gm) || []).length).toBe(12);
-    expect(r.prompts.beats_scene_expansion).toContain('FIXED: timeOfDay');
+    // Every decided field reaches the page-brief call BEFORE it writes (2026-09-28).
+    expect(r.prompts.beats_scene_expansion).toContain('FIXED — copy each into METADATA exactly');
+    expect(r.prompts.beats_scene_expansion).toContain('- timeOfDay: ');
+    expect(r.prompts.beats_scene_expansion).toContain('- objects: LOC001');
     expect(r.prompts.beats_scene_expansion).toContain(JD.JEV_FIXED_FIELDS_RULE);
+    // The Visual Bible call came first and carries no FIXED block.
+    expect(r.labels.indexOf('beats_visual_bible')).toBeLessThan(r.labels.indexOf('beats_scene_expansion'));
+    expect(r.prompts.beats_visual_bible).not.toContain('FIXED —');
+    expect(r.labels.some(l => /scene_review/.test(l))).toBe(false);
   });
 });

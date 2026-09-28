@@ -137,7 +137,7 @@ describe('every brief-reply parser passes the terminator', () => {
   });
 
   it('the constant names the block the two brief templates actually emit', () => {
-    for (const tpl of ['scene-review.txt', 'scene-expansion-all.txt']) {
+    for (const tpl of ['scene-review.txt', 'visual-bible.txt']) {
       const template = fs.readFileSync(path.join(root, 'prompts', tpl), 'utf8');
       for (const name of BRIEF_TRAILING_MARKERS) {
         expect(template, tpl).toContain(`---${name}---`);

@@ -14,7 +14,7 @@ const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 // The two pre-beats unified writers were members until 2026-09-15, when they
 // were deleted as unreachable (docs/decisions.md).
 const VB_AUTHORING_TEMPLATES = [
-  'prompts/scene-expansion-all.txt',
+  'prompts/visual-bible.txt',
   'prompts/story-trial.txt',
 ];
 

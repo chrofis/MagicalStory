@@ -344,7 +344,7 @@ describe('the constant reaches all six BUILT prompts', () => {
   // page text cannot apply there. Neither half may reach them.
   it('the two stages that never see the page text carry neither half', () => {
     const blind = [
-      String(PB.buildSceneExpansionAllPrompt(inputData, BEATS, {})),
+      String(PB.buildSceneBriefsAllPrompt(inputData, BEATS, {})),
       String(PB.buildSceneReviewPrompt(inputData, [{ pageNumber: 1, brief: BRIEF }, { pageNumber: 2, brief: BRIEF }], { beats: BEATS })),
     ];
     for (const text of blind) {

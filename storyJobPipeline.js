@@ -4161,7 +4161,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // check's findings (adopt / conflict) — diagnostics, stored with the story.
     const storyBibleReport = beatsResult?.storyBibleReport || null;
     const wardrobeBibleReport = beatsResult?.wardrobeBibleReport || null;
-    const sceneReviewReport = beatsResult?.sceneReviewReport || null;
+    // The brief checks and their one re-ask (2026-09-28) — the scene review's
+    // successor; before/after per re-asked page.
+    const briefCheckReport = beatsResult?.briefCheckReport || null;
     // The prompt that WROTE the briefs, next to the one that reviewed them.
     // Beats contributes the timings and which pages fell back to a per-page
     // call; `prompts[]` is the story-wide prompt table every page references
@@ -5717,6 +5719,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // no score, no severity and no repair route.
           degradedScene: describeDegradedSceneMetadata(img.sceneMetadata),
           outlineExtract: img.scene?.outlineExtract || img.scene?.sceneHint || '',
+          // The fields the Jev decision layer fixed for this page (2026-09-28):
+          // an iterate rewrite re-pins them (images.js iteratePageCore). null
+          // on a trial, a cover and the Jev-outage backup.
+          jevFixed: img.scene?.jevFixed || null,
           imageData: img.imageData,
           generatedAt: new Date().toISOString(),
           prompt: img.prompt,
@@ -6154,6 +6160,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // no score, no severity and no repair route.
           degradedScene: describeDegradedSceneMetadata(img.sceneMetadata),
           outlineExtract: img.scene?.outlineExtract || img.scene?.sceneHint || '',
+          // The fields the Jev decision layer fixed for this page (2026-09-28):
+          // an iterate rewrite re-pins them (images.js iteratePageCore). null
+          // on a trial, a cover and the Jev-outage backup.
+          jevFixed: img.scene?.jevFixed || null,
           imageData: img.imageData,
           generatedAt: new Date().toISOString(),
           prompt: img.prompt,
@@ -6884,7 +6894,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // pages each produced — so "what was this book's brief actually asked for"
       // is a query, not a worktree rebuild at the run's commit.
       sceneExpansionReport,
-      sceneReviewReport, // per-page before/after from the scene review (beats mode)
+      briefCheckReport, // brief checks + the one Art Director re-ask: findings, verdicts, taken rewrites (beats mode)
       finalChecksReport: finalChecksReport || null, // Final consistency checks report (dev mode)
       analytics: {
         // Cost

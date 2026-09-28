@@ -24,7 +24,7 @@ const { assertReviewedArtifactUsable, pickReviewedBrief } = require('./sceneRevi
 // Production's arguments for the beats writer/Art-Director calls, resolved from
 // a stored story. Every replay stage builds its inputs through these so a
 // divergent, thinner expression cannot be written a fourth time.
-const { buildReplayTextArgs, buildReplaySceneOptions, resolveReplayArc, resolveReplayArcHints, resolveReplayCentralFigure, resolveReplayStoryLogic, resolveArcFromExperiment, resolveReplayInputData } = require('./beatsReplayInputs');
+const { buildReplayTextArgs, buildReplaySceneOptions, resolveReplayArc, resolveReplayArcHints, resolveReplayCentralFigure, resolveReplayPresent, resolveReplayStoryLogic, resolveArcFromExperiment, resolveReplayInputData } = require('./beatsReplayInputs');
 // Production's evalOptions for evaluateImageQuality, resolved from a stored
 // story. Same rule as above: every eval stage builds its options through this
 // so a thinner, silently-check-disabling expression cannot be written again.
@@ -4399,6 +4399,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   let sceneExpansions = null;
   let sceneReview = null;
   let sceneReviews = null;
+  let briefChecks = null;
   let authoredBible = null;
   let timeToScenesMs = null;
   let allPagesCost = null;
@@ -4407,15 +4408,14 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   let labJevReport = null;
   const events = [];
   if (params.expandScenes !== false) {
-    // THE RUN'S OWN ART DIRECTOR AND SCENE REVIEW (owner 2026-09-27: "The Lab
+    // THE RUN'S OWN ART DIRECTOR AND BRIEF CHECKS (owner 2026-09-27: "The Lab
     // must use 100% identical code to production"): beatsPipeline.runArtDirector
-    // (the all-pages call with its retry, the bible's adoption — label round,
-    // age clamp, transcript sync — the landmark link, the wardrobe-vs-bible
-    // corrections and the per-page fallback) and beatsPipeline.runSceneReview,
-    // on the inputs the run held. The stage used to re-implement the batch
-    // retry, the recovery, the bible adoption and the review merge, and it
-    // reviewed on the beats reviewer's model with no clothing findings.
-    const { runArtDirector, runSceneReview } = require('./beatsPipeline');
+    // (the Visual Bible call and its adoption — label round, age clamp,
+    // transcript sync, landmark link, wardrobe-vs-bible corrections — the Jev
+    // decisions before the briefs, the page-brief call with its retry and the
+    // per-page fallback, the pin) and briefChecks.runBriefChecks (2026-09-28),
+    // on the inputs the run held.
+    const { runArtDirector } = require('./beatsPipeline');
     const { calculateTextCost: textCost } = require('../config/models');
     const record = (level) => (event, message) => { events.push({ level, event, message }); };
     const gl = { info: record('info'), warn: record('warn'), error: record('error'), debug: record('debug') };
@@ -4445,6 +4445,8 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       sceneModel, onChunk: null, gl, meta, stage: async () => {}, beats: beatsIn,
       arcCentralFigure: Array.isArray(params.centralFigure) ? params.centralFigure : resolveReplayCentralFigure(storyData),
       approvedArc: resolveReplayArc(storyData, { parseBeats }), onVisualBible: null, wardrobeBibleReport: null,
+      // The run's gaze roster: the shipped division's head count, as stored.
+      present: resolveReplayPresent(storyData),
       labCallOptions: params.sceneNoReasoning ? { reasoning: { enabled: false } } : {},
       labForcePerPage: params.perPageExpansion === true,
       onCall: (res) => adCalls.push(res),
@@ -4491,67 +4493,40 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       }
     }
 
-    // ── the run's scene review ────────────────────────────────────────────
-    // A comma-separated params.sceneReviewModel fans out over ONE frozen set
-    // of briefs; each arm reviews its own copy of the briefs and the bible, as
-    // the run would.
-    if (params.reviewScenes !== false && ad.expansions.length > 0) {
-      const mo = storyData.modelOverrides;
-      const srModels = String(params.sceneReviewModel || mo.sceneReviewModel || MODEL_DEFAULTS.sceneReviewModel || mo.outlineReviewModel || MODEL_DEFAULTS.outlineReviewModel)
-        .split(',').map(x => x.trim()).filter(Boolean);
-      for (const m of srModels) if (!TEXT_MODELS[m]) throw new Error('Unknown model "' + m + '"');
-      sceneReviews = [];
-      for (const srModel of srModels) {
-        const t2 = Date.now();
-        try {
-          const srCalls = [];
-          const armEvents = [];
-          const rec = (level) => (event, message) => { armEvents.push({ level, event, message }); };
-          const expansions = ad.expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief }));
-          const out = await runSceneReview({
-            inputData: storyData, expansions, clothingRequirements: storyData.clothingRequirements || null,
-            visualBible: ad.visualBible ? JSON.parse(JSON.stringify(ad.visualBible)) : null, briefBeats: ad.briefBeats, beats: beatsIn,
-            bibleSections: ad.bibleSections, meta: { timings: {}, labelRound: meta.labelRound || null }, sceneReviewModel: srModel,
-            stage: async () => {}, onChunk: null, gl: { info: rec('info'), warn: rec('warn'), error: rec('error'), debug: rec('debug') },
-            onCall: (res) => srCalls.push(res),
-          });
-          const report = out.sceneReviewReport;
-          const failed = report?.failed || armEvents.find(e => e.event === 'beats_scene_review_empty' || e.event === 'beats_scene_review_failed')?.message || null;
-          sceneReviews.push({
-            modelKey: srModel,
-            modelId: report?.model || null,
-            ok: !!report && !failed,
-            error: failed,
-            elapsedMs: Date.now() - t2,
-            usage: srCalls[0]?.usage || null,
-            cost: srCalls.reduce((a, r) => a + costOfCall(r), 0),
-            promptChars: String(report?.prompt || '').length,
-            prompt: report?.prompt || null,
-            analysis: String(out.sceneReviewAnalysis || '').slice(0, 40000),
-            rewrotePages: report ? report.changedPages : [],
-            clothingUnfixed: report?.clothingUnfixed || [],
-            briefUnfixed: report?.briefUnfixed || [],
-            briefIntroduced: report?.briefIntroduced || [],
-            wornRound: report?.wornRound || null,
-            events: armEvents,
-            _reviewed: expansions,
-          });
-        } catch (err) {
-          sceneReviews.push({ modelKey: srModel, ok: false, elapsedMs: Date.now() - t2, error: err.message });
-        }
-      }
-      // Each page's reviewed brief, as the run's review merged it (the first
-      // arm on `reviewedBrief`, further arms under `reviewedBriefs[model]`).
-      sceneReviews.forEach((r, i) => {
-        if (!r._reviewed) return;
+    // ── the run's brief checks and its one re-ask (2026-09-28) ─────────────
+    // beatsPipeline's own step (briefChecks.runBriefChecks), on the briefs and
+    // the bible this run's Art Director wrote — the step that replaced the
+    // scene review. A taken rewrite lands on `reviewedBrief` with
+    // `rewrittenBy: 'brief re-ask'`, so the page view shows it beside the brief.
+    if (params.checkBriefs !== false && ad.expansions.length > 0) {
+      const { runBriefChecks } = require('./briefChecks');
+      const reaskCalls = [];
+      const armEvents = [];
+      const rec = (level) => (event, message) => { armEvents.push({ level, event, message }); };
+      const expansions = ad.expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief }));
+      const t2 = Date.now();
+      try {
+        const report = await runBriefChecks({
+          inputData: storyData, expansions, briefBeats: ad.briefBeats, visualBible: ad.visualBible,
+          clothingRequirements: storyData.clothingRequirements || null, contextPrompt: ad.briefsPrompt || '',
+          model: sceneModel, gl: { info: rec('info'), warn: rec('warn'), error: rec('error'), debug: rec('debug') },
+          onCall: (res) => reaskCalls.push(res),
+          labCallOptions: params.sceneNoReasoning ? { reasoning: { enabled: false } } : {},
+        });
         for (const x of sceneExpansions) {
-          const reviewed = r._reviewed.find(e => e.pageNumber === x.pageNumber);
-          if (!reviewed || reviewed.brief === x.fromBeats || !(r.rewrotePages || []).includes(x.pageNumber)) continue;
-          if (i === 0) { x.reviewedBrief = reviewed.brief; x.reviewRewrote = true; } else { (x.reviewedBriefs = x.reviewedBriefs || {})[r.modelKey] = reviewed.brief; }
+          const taken = report.pages.find(p => p.pageNumber === x.pageNumber);
+          if (taken) { x.reviewedBrief = taken.after; x.reviewRewrote = true; x.rewrittenBy = 'brief re-ask'; }
         }
-        delete r._reviewed;
-      });
-      sceneReview = sceneReviews[0] || null;
+        briefChecks = {
+          ok: !report.reask?.failed, error: report.reask?.failed || null, elapsedMs: Date.now() - t2,
+          model: report.reask?.model || null, cost: reaskCalls.reduce((acc, r) => acc + costOfCall(r), 0), usage: reaskCalls[0]?.usage || null,
+          findingsBefore: report.findingsBefore, withheld: report.withheld, verdicts: report.verdicts,
+          findingsAfter: report.findingsAfter, introduced: report.introduced, survived: report.survived,
+          wornUnresolvedPages: report.wornUnresolvedPages, reaskPrompt: report.reask?.prompt || null, events: armEvents,
+        };
+      } catch (err) {
+        briefChecks = { ok: false, error: err.message, elapsedMs: Date.now() - t2, events: armEvents };
+      }
     }
     timeToScenesMs = timeToLockMs + (Date.now() - expStart);
   }
@@ -4577,6 +4552,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     allPagesModelId,
     sceneReview,
     sceneReviews,
+    briefChecks,
     authoredBible,
     landmarkPhotoCitations,
     timeToScenesMs,

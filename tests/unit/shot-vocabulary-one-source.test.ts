@@ -57,7 +57,7 @@ describe('one shot vocabulary, injected — never hand-typed', () => {
   });
 
   it('C4 names the real four and points its angle axis at the vantage', () => {
-    const t = String(PROMPT_TEMPLATES.sceneExpansionAll);
+    const t = String(PROMPT_TEMPLATES.sceneBriefsAll);
     const c4 = t.split('\n').find(l => l.startsWith('C4.')) || '';
     // C4 names the two axes separately: the eight-word SHOT_ENUM is not a list
     // of distances, and where the camera stands is the shot word's own business
@@ -70,7 +70,7 @@ describe('one shot vocabulary, injected — never hand-typed', () => {
 
 
   it('every brief-authoring template fills SHOT_ENUM rather than spelling it', () => {
-    for (const k of ['sceneExpansionAll', 'sceneExpansion', 'sceneIteration', 'sceneIterationFree']) {
+    for (const k of ['sceneBriefsAll', 'sceneExpansion', 'sceneIteration', 'sceneIterationFree']) {
       expect(String(PROMPT_TEMPLATES[k] || ''), `${k}`).toContain('{SHOT_ENUM}');
     }
   });

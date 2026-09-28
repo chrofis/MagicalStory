@@ -180,14 +180,14 @@ describe('the Art Director prompts carry the injected budget', () => {
   });
 
   it('fills {VB_ELEMENT_BUDGET} in both scene-expansion templates', () => {
-    const { buildSceneExpansionPrompt, buildSceneExpansionAllPrompt } = require('../../server/lib/promptBuilders');
+    const { buildSceneExpansionPrompt, buildSceneBriefsAllPrompt } = require('../../server/lib/promptBuilders');
     const characters = [{ name: 'Mara', age: 7 }];
     const one = buildSceneExpansionPrompt(3, 'PLAN: wide — Mara — she pushes off — the boat moves', characters, 'de');
     expect(one).toBeTruthy();
     expect(one).not.toContain('{VB_ELEMENT_BUDGET}');
     expect(one).toContain(`At most ${VB_ELEMENT_BUDGET} Visual Bible elements per page`);
 
-    const all = buildSceneExpansionAllPrompt(
+    const all = buildSceneBriefsAllPrompt(
       { characters, language: 'de' },
       [{ pageNumber: 1, planLine: 'wide — Mara — she pushes off — the boat moves' }],
       {},

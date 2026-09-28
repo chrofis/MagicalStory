@@ -71,7 +71,7 @@ describe('the plan-line cast rule and the multi-picture prop rule each reach eve
   beforeAll(async () => {
     await loadPromptTemplates();
     built = {
-      'all-pages Art Director': PB.buildSceneExpansionAllPrompt(inputData, BEATS, {}),
+      'all-pages Art Director': PB.buildSceneBriefsAllPrompt(inputData, BEATS, {}),
       'per-page Art Director': PB.buildSceneExpansionPrompt(
         1, 'The lamp guttered twice and then went out.', CHARACTERS, 'en', VISUAL_BIBLE, '', null, {}),
       'scene review': PB.buildSceneReviewPrompt(inputData, SCENES, { beats: BEATS, visualBible: VISUAL_BIBLE }),
@@ -105,8 +105,9 @@ describe('the plan-line cast rule and the multi-picture prop rule each reach eve
     }
   });
 
-  it('the all-pages Art Director ties a tracked entry\u2019s pages to the plan line', () => {
-    const all = built['all-pages Art Director'];
+  it('the Art Director\u2019s Visual Bible call ties a tracked entry\u2019s pages to the plan line', () => {
+    // The bible's authoring rules live in the first call since 2026-09-28.
+    const all = PB.buildVisualBibleCallPrompt(inputData, BEATS, {});
     const earned = String(all).split('\n').find((l) => l.includes('`pages` is earned')) || '';
     expect(earned, 'the pages-is-earned rule is gone').not.toBe('');
     expect(earned, 'the pages-is-earned rule no longer names the plan line as the authority for a tracked entry')

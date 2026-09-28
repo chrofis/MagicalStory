@@ -199,7 +199,7 @@ describe('the authoring rule reaches every site that authors or judges a declara
   });
 
   it('arrives in the BUILT all-pages Art Director prompt (the live beats path)', () => {
-    const built = PB.buildSceneExpansionAllPrompt(STORY, [{ pageNumber: 1, planLine: 'The child walks.' }], {});
+    const built = PB.buildVisualBibleCallPrompt(STORY, [{ pageNumber: 1, planLine: 'The child walks.' }], {});
     expect(built).toBeTruthy();
     expect(built).toContain(rt.REQUIRED_TEXT_AUTHORING_RULE);
     expect(built).not.toContain('{REQUIRED_TEXT_AUTHORING}');

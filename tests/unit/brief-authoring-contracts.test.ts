@@ -144,7 +144,7 @@ describe('the brief-authoring contracts reach every site that writes a brief', (
   beforeAll(async () => {
     await loadPromptTemplates();
     built = {
-      'AD all-pages': PB.buildSceneExpansionAllPrompt(inputData, BEATS, {}),
+      'AD all-pages': PB.buildSceneBriefsAllPrompt(inputData, BEATS, {}),
       'AD per-page': PB.buildSceneExpansionPrompt(
         10, 'page text', ROSTER, 'de-ch', VISUAL_BIBLE, '', null, {}),
       'iterate strict': PB.buildSceneDescriptionPrompt(
@@ -190,7 +190,8 @@ describe('the brief-authoring contracts reach every site that writes a brief', (
 
   it('the two Visual-Bible authoring sites carry the entry-page contract', () => {
     const trial = String(PB.buildTrialStoryPrompt(inputData));
-    for (const [site, prompt] of [['AD all-pages', built['AD all-pages']], ['trial writer', trial]] as const) {
+    const bible = String(PB.buildVisualBibleCallPrompt(inputData, BEATS, {}));
+    for (const [site, prompt] of [['AD Visual Bible call', bible], ['trial writer', trial]] as const) {
       expect(prompt.includes(PB.ELEMENT_ENTRY_PAGE_RULE), `${site} lost the entry-page contract`).toBe(true);
     }
     expect(unfilled(trial), 'trial writer shipped an unfilled placeholder').toEqual([]);
@@ -336,7 +337,7 @@ describe('the reach contract reaches every site that writes or rewrites this pag
   });
 
   it('the all-pages Art Director carries it when authoring p6 from its real plan line', () => {
-    const prompt = String(PB.buildSceneExpansionAllPrompt(
+    const prompt = String(PB.buildSceneBriefsAllPrompt(
       inputData, [{ pageNumber: 6, planLine: P6_PLAN_LINE.replace(/^PLAN:\s*/, '') }], {}));
     expect(prompt.includes(PB.REACHABLE_CONTACT_RULE), 'the Art Director never got the reach contract').toBe(true);
     expect(unfilled(prompt), 'the Art Director prompt shipped an unfilled placeholder').toEqual([]);
@@ -393,7 +394,7 @@ describe('the reach contract survives on the page whose placement is the point',
   beforeAll(async () => {
     await loadPromptTemplates();
     p12 = {
-      'AD all-pages': String(PB.buildSceneExpansionAllPrompt(
+      'AD all-pages': String(PB.buildSceneBriefsAllPrompt(
         inputData, [{ pageNumber: 12, planLine: P12_PLAN_LINE.replace(/^PLAN:\s*/, '') }], {})),
       'AD per-page': String(PB.buildSceneExpansionPrompt(
         12, 'page text', ROSTER, 'de-ch', VISUAL_BIBLE, '', null, {})),
@@ -429,7 +430,7 @@ describe('the reach contract survives on the page whose placement is the point',
   });
 
   it('every template sources the contract from the placeholder — no second, drifting copy', () => {
-    for (const key of ['sceneExpansion', 'sceneExpansionAll', 'sceneIteration', 'sceneIterationFree']) {
+    for (const key of ['sceneExpansion', 'sceneBriefsAll', 'sceneIteration', 'sceneIterationFree']) {
       const tpl = String(PROMPT_TEMPLATES[key] || '');
       expect(tpl.length, `${key} did not load`).toBeGreaterThan(0);
       expect(occurrences(tpl, '{REACHABLE_CONTACT}'), `${key} does not hold the placeholder exactly once`).toBe(1);
@@ -488,7 +489,7 @@ describe('the non-hand contact contract reaches every site that writes or rewrit
   beforeAll(async () => { await loadPromptTemplates(); });
 
   it('the all-pages Art Director carries it when authoring p4 from its real plan line', () => {
-    const prompt = String(PB.buildSceneExpansionAllPrompt(
+    const prompt = String(PB.buildSceneBriefsAllPrompt(
       inputData, [{ pageNumber: 4, planLine: P4_PLAN_LINE.replace(/^PLAN:\s*/, '') }], {}));
     expect(prompt.includes(PB.CONTACT_VERB_RULE), 'the Art Director never got the contact contract').toBe(true);
     expect(unfilled(prompt), 'the Art Director prompt shipped an unfilled placeholder').toEqual([]);

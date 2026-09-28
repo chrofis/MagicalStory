@@ -232,16 +232,18 @@ describe('the per-page Art Director prompt is decided by the clothing contract a
   });
 });
 
-describe('the Lab beats stage runs the run\'s own Art Director and review', () => {
+describe('the Lab beats stage runs the run\'s own Art Director and brief checks', () => {
   // Since 2026-09-27 beats_scenes calls beatsPipeline.runArtDirector (the
-  // all-pages call, its recovery, the per-page fallback with the clothing
-  // contract and the story, the bible adoption) and runSceneReview; it keeps
-  // no builder call, parse or bible adoption of its own.
+  // Visual Bible call, the Jev decisions, the page-brief call, its recovery,
+  // the per-page fallback, the bible adoption) and, since 2026-09-28, the run's
+  // brief checks and one re-ask (briefChecks.runBriefChecks) in place of the
+  // scene review; it keeps no builder call, parse or bible adoption of its own.
   it('calls the shared functions and no Art Director builder of its own', () => {
     const stage = TESTLAB.slice(TESTLAB.indexOf('async function runBeatsScenesStage'), TESTLAB.indexOf('async function runTextRefineStage'));
     expect(stage).toMatch(/await runArtDirector\(\{/);
-    expect(stage).toMatch(/await runSceneReview\(\{/);
-    expect(stage).not.toMatch(/buildSceneExpansionPrompt\(|buildSceneExpansionAllPrompt\(|new UnifiedStoryParser\(/);
+    expect(stage).toMatch(/await runBriefChecks\(\{/);
+    expect(stage).not.toMatch(/await runSceneReview\(\{/);
+    expect(stage).not.toMatch(/buildSceneExpansionPrompt\(|buildVisualBibleCallPrompt\(|buildSceneBriefsAllPrompt\(|new UnifiedStoryParser\(/);
   });
 });
 

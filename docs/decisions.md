@@ -65410,3 +65410,101 @@ fires on exactly dragon p2 and p7, on none of the 3 other stored declarations.
 `alsoListed`), server/lib/sceneReviewGuard.js, server/lib/beatsPipeline.js (runSceneReview),
 server/lib/promptBuilders.js (PLAN_LINE_CAST_RULE), tasks/bugs.json,
 tests/unit/scene-review-who-column-cast.test.ts.
+
+## 2026-09-28 — Jev first, then no scene review: the Art Director writes in two calls with every decided field fixed, code checks the briefs and re-asks the Art Director once (owner)
+
+**Context:** the Jev decision layer (entries above, 2026-09-27/28) decided each page's shot, light,
+cited elements and their looks, aboard, population and gaze AFTER the Art Director had written the
+briefs, so the scene review (`scene-review.txt`, DeepSeek) mostly existed to write those fields into
+the prose, and code re-pinned them after it. Measured on the three Jev stories
+(`job_1790529840433_ar4u7qry3`, `job_1790536739048_ruynosw80`, `job_1790539784661_6mjcny1c7`) and
+Lab 1579: the review wrote the pinned fields into the prose on 10 of 24 page-instances, code re-pinned
+after it on 5 pages (+7 in the Lab), it made 2 harmful removals and 4 new faults, and its only real
+catches were two kinds code can detect. On the dragon book code changed 17 of 18 briefs after the
+Art Director. Owner, 2026-09-28: "Jev first, then remove the scene review"; answers Q1-Q8 recorded in
+`tasks/jev-first-briefs-2026-09-28.md`.
+
+**Decision:**
+1. **Two Art Director calls.** Call 1 writes the Visual Bible alone (`prompts/visual-bible.txt`,
+   `buildVisualBibleCallPrompt`), two attempts, `JSON.parse` the completeness test; its adoption
+   (label round, age clamp, transcript sync, landmark link, wardrobe-vs-bible corrections, the
+   `onVisualBible` hook) is unchanged. Call 2 writes every page's brief, the covers included
+   (`prompts/scene-briefs-all.txt`, `buildSceneBriefsAllPrompt`), with the adopted bible as input.
+   Both builders read ONE fills object (`artDirectorFills`). `scene-expansion-all.txt` and
+   `buildSceneExpansionAllPrompt` are deleted (replaced, not demoted).
+2. **Jev between the calls** (`server/lib/jevBriefFields.js` `decideBriefFields`): the cited
+   elements and their looks (the Art Director's own `pages` claims are the 0.5-0.7 band's draft), each
+   page's location or vantage read off the bible's own page tables (Q8: code writes the LOC id),
+   population per location, aboard, and gaze — the roster is the shipped plan check's head count
+   (`presentOf`, the same `present` the shots read), the candidates the decided cites and the figures
+   the plan line names (Q5; no interaction row exists yet). Each story page's decisions reach call 2
+   as a FIXED block under its plan line (`jevDecisions.fixedBlock`); code pins them after the call and
+   logs every field the brief did not copy (`beats_jev_field_disobeyed`). The light stays decided
+   before call 1.
+3. **The shot is fixed on the Jev path.** `promptBuilders.shotRuleFills` words rules 4, 5d, 11 and
+   11c and the `shot` field for staging inside a fixed shot (`GAP_ACTION_FRAMING_FIXED_SHOT_RULE`,
+   `CLOSEUP_KEPT_FIXED_SHOT_RULE`, `GROUP_STAGING_FIXED_SHOT_RULE`); covers and the Jev-outage backup
+   keep the old wording. Call 1 is told a vantage holds its pages' fixed shots (`vantageShotRule`).
+   `JEV_FIXED_FIELDS_RULE` is rewritten for the FIXED block.
+4. **Code checks, one re-ask** (`server/lib/briefChecks.js` `runBriefChecks`, replacing the review
+   in the run): the `sceneBriefCheck` REVIEWABLE types, the clothing check's `removal_unstated` and
+   `outfit_missing` (Q7, `REASK_CLOTHING_EXTRA`), and an outdoor page with weather `none`. On a Jev
+   page the types a decided field owns (`JEV_OWNED`: plan_cast_uncited, vb_state_contradicted,
+   vb_state_no_base, shot_off_plate, shot_widened) are withheld and logged. The flagged pages go back to
+   the Art Director's model (Q2) in ONE batched call (`prompts/brief-reask.txt`, the call-2 prompt as
+   context, Q3), never a second round. Each rewrite goes through `briefCorrection.correctFindings`,
+   `strict` (Q4), and is refused when it drops a who-column name; `keepDeclaredWornRows` /
+   `keepDeclaredLight` and the pin run on it. Survivors ship flagged; a failed call ships the briefs as
+   written. Stored as `stories.data.briefCheckReport`.
+5. **New check `vb_id_label_mismatch`** (`sceneBriefCheck.checkIdLabelMismatch`): a VB id written in
+   the prose with another entry's label, tied by `visualBible.entryNamedByRow` (never a guess). Also on
+   the iterate path (`iterateBeat.INTRODUCED_TYPES`).
+6. **"Wearing no clothing" at the root:** bug `clothing-review-none-body-erases-outfit` (fixed,
+   d1ed5efca) plus the outfit guard `beats_outfit_absent`.
+7. **Iterate re-pin (Q6):** each page's `jevFixed` is stored on its scene; `iteratePageCore` pins
+   every decided field on a strict rewrite, every one but the shot on a free rewrite, and words the
+   strict prompt for the fixed shot.
+8. **Backup (path A, unchanged exception):** a Jev failure before call 2 hands call 2 the pre-Jev
+   wording and the Art Director authors every field; the brief checks and the one re-ask run exactly
+   as on the Jev path. No review runs on either path. The backup loses the review's prose checks too.
+9. **Lab parity:** `beats_scenes` calls `runArtDirector` (with the stored head count,
+   `resolveReplayPresent`) and `runBriefChecks`; sibling set `lab-vs-prod-brief-checks`.
+
+**NOT YET DONE — owner Q9:** the review's code, prompt, `scene_review_replay` stage and sibling sets stay
+in the tree, unused by the run, until the owner has decided from the rung-1 table which of its prose
+checks come back as a code check or a Jev question. The deletion is its own commit.
+
+**Evidence (rung 1, stored staging data; `scripts/analysis/replay-jev-first-briefs.js`):**
+- `vb_id_label_mismatch` over 360 stored pre-review briefs: exactly the 3 ar4u7qry3 covers, 0 others.
+- `outfit_missing` over 251 briefs: 4 fires, each a real omission ("in their standard clothes"; a
+  character with no garment named). It cannot catch the Noah case (the contract itself said NONE) —
+  the root-cause fix does.
+- Jev before the briefs vs the run's decisions after them (3 Jev stories, 147 Jev calls): cited
+  elements 26/26 pages, looks 17/20 (the differences are the 2026-09-28 look fix: dragon p3 now grey,
+  and the scale's look on p3/p5), population 24/25, gaze 41/42 — Q5 holds, gaze stays before the briefs.
+- Both prompts build from stored inputs with no unfilled placeholder: dragon call 1 45.6k chars, call
+  2 100.6k (bible 24.4k) vs the stored single call 119.9k.
+- Re-ask volume on the stored pre-review briefs (written before the FIXED block): 193 of 251 pages
+  flagged over 15 stories; the 5 newest stories 8-12 pages each, `interaction_multiple_actions` the
+  largest type (64). Expect a re-ask on nearly every story, carrying about half the book.
+
+**Replaces (partly):** 2026-09-11 "The Art Director authors the Visual Bible, ahead of the page briefs"
+(still the Art Director, now its own call); 2026-08-08 "findings go to the scene review, and nowhere
+else"; 2026-08-11 advisory acceptance on the authored path (now strict); 2026-09-27 Parts 3-5 "the
+Art Director and the review render them" (the fields are decided before the brief is written);
+2026-09-28 "The scene review never removes a character the who column names" (the refusal now guards
+the re-ask).
+
+**Revisit if:** `beats_jev_field_disobeyed` fires on most pages (the FIXED block is not being
+followed), the re-ask's taken rate is low, or the Q9 table shows a lost review check was carrying
+real fixes.
+
+**Touched:** prompts/visual-bible.txt, prompts/scene-briefs-all.txt (new; scene-expansion-all.txt
+deleted), prompts/brief-reask.txt (new), prompts/scene-expansion.txt, server/lib/jevBriefFields.js
+(new), server/lib/briefChecks.js (new), server/lib/beatsPipeline.js, server/lib/jevDecisions.js,
+server/lib/promptBuilders.js, server/lib/shotVocabulary.js, server/lib/sceneBriefCheck.js,
+server/lib/clothingCheck.js, server/lib/iterateBeat.js, server/lib/images.js, server/lib/testlab.js,
+server/lib/beatsReplayInputs.js, server/lib/storyMetrics.js, server/lib/storyScorecard.js,
+server/lib/storyHelpers.js, server/services/prompts.js, server/routes/stories.js, storyJobPipeline.js,
+client (story types, StoryDisplay, StoryWizard, storyService, TestLab), scripts/admin/sibling-registry.json,
+scripts/analysis/replay-jev-first-briefs.js, tests.

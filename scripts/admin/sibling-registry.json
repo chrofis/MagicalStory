@@ -50,10 +50,10 @@
     {
       "id": "art-director-templates",
       "axis": "per-page vs all-pages Art Director",
-      "reason": "scene-expansion.txt is the per-page gap-fill/fallback template for the same Art Director contract scene-expansion-all.txt drives on the live beats path; a rule or metadata field on one and not the other silently reads as absent on whichever path runs.",
+      "reason": "scene-expansion.txt is the per-page gap-fill/fallback template for the same Art Director contract scene-briefs-all.txt drives on the live beats path; a rule or metadata field on one and not the other silently reads as absent on whichever path runs.",
       "members": [
         "prompts/scene-expansion.txt",
-        "prompts/scene-expansion-all.txt"
+        "prompts/scene-briefs-all.txt"
       ],
       "severity": "block",
       "parity": {
@@ -111,7 +111,7 @@
       "axis": "Art Director VB authoring vs writer VB authoring",
       "reason": "the Visual Bible is authored at two LIVE sites — the all-pages Art Director on the beats path (every full story) and the trial writer — and a rule about what a VB entry must state has to exist at both. The two pre-beats unified writers were members until 2026-09-15, when they were deleted as unreachable (docs/decisions.md).",
       "members": [
-        "prompts/scene-expansion-all.txt",
+        "prompts/visual-bible.txt",
         "prompts/story-trial.txt"
       ],
       "severity": "block",
@@ -127,7 +127,7 @@
           "\"generic\"",
           "\"states\""
         ],
-        "anchorsNote": "the VB entry keys both live authoring sites genuinely declare today. `\"size\"` was anchored until 2026-09-15 and was dropped when the free-text size field was replaced by the `scaleClass` enum as the single source of scale truth; story-trial.txt still declares a PER-PAGE `size` on its scene-hint objects, which is a different field with a different consumer and is deliberately not anchored here. `\"states\"` is anchored since 2026-09-15 — owner ruling, every bible-authoring site declares it. `\"vantages\"` stays deliberately NOT anchored: it is absent from scene-expansion-all.txt, which is a real divergence, not a parity target to assert into existence."
+        "anchorsNote": "the VB entry keys both live authoring sites genuinely declare today. `\"size\"` was anchored until 2026-09-15 and was dropped when the free-text size field was replaced by the `scaleClass` enum as the single source of scale truth; story-trial.txt still declares a PER-PAGE `size` on its scene-hint objects, which is a different field with a different consumer and is deliberately not anchored here. `\"states\"` is anchored since 2026-09-15 — owner ruling, every bible-authoring site declares it. `\"vantages\"` stays deliberately NOT anchored: it is absent from visual-bible.txt, which is a real divergence, not a parity target to assert into existence."
       }
     },
     {
@@ -248,9 +248,9 @@
     {
       "id": "scene-brief-generator-vs-critic",
       "axis": "generator-vs-critic",
-      "reason": "scene-review.txt critiques the briefs scene-expansion-all.txt authors; a check the reviewer applies that the Art Director was never given produces a finding no rewrite can satisfy.",
+      "reason": "scene-review.txt critiques the briefs scene-briefs-all.txt authors; a check the reviewer applies that the Art Director was never given produces a finding no rewrite can satisfy.",
       "generators": [
-        "prompts/scene-expansion-all.txt"
+        "prompts/scene-briefs-all.txt"
       ],
       "critics": [
         "prompts/scene-review.txt"
@@ -262,7 +262,7 @@
       "axis": "generator-vs-critic",
       "reason": "A real landmark's photo is the one its plate's author cites in `landmarkPhoto` (docs/decisions.md 2026-09-26). The citation is authored at three sites - the all-pages Art Director per vantage (inside {AVAILABLE_LANDMARKS_SECTION}), the trial writer per location (inside {LANDMARKS}), an iterate rewrite per page (`{LANDMARK_PHOTO_CITE}`) - and judged by scene-review.txt check 10ab [landmark_photo_mismatch] (`{LANDMARK_PHOTO_CITE}`). All four read ONE constant, promptBuilders.LANDMARK_PHOTO_CITE_RULE; tests/unit/landmark-photo-citation.test.ts pins that it reaches every built prompt. A citation rule the reviewer applies that an author was never given is a correction no author can pre-empt.",
       "generators": [
-        "prompts/scene-expansion-all.txt",
+        "prompts/visual-bible.txt",
         "prompts/story-trial.txt",
         "prompts/scene-iteration.txt",
         "prompts/scene-iteration-free.txt"
@@ -277,7 +277,7 @@
       "axis": "generator-vs-critic",
       "reason": "A group of more than three characters is staged at one depth in a wider shot, or seen from behind as it moves away, and never lined up facing the viewer (owner, 2026-09-27; docs/decisions.md). The rule is authored by both Art Director templates (rule 4) and both iterate templates, and judged by scene-review.txt check 6d [group_staging]; all five read ONE constant, shotVocabulary.GROUP_STAGING_RULE, through {GROUP_STAGING}. The brief check sceneBriefCheck.checkGroupStaging measures the same rule from structured fields (GROUP_WIDER_SHOTS, `perspective`, `looksAt`) and sends group_shot_too_close / group_facing_viewer to the review. tests/unit/group-staging.test.ts pins that the constant reaches every built prompt. The planner (story-beats.txt) read it too while it picked the shot; since 2026-09-27 (later the same day) code writes every shot and holds the group rule in the Jev shot assignment (jevDecisions.assign, GROUP_WIDER_SHOTS), so the planner is no longer a generator of this rule.",
       "generators": [
-        "prompts/scene-expansion-all.txt",
+        "prompts/scene-briefs-all.txt",
         "prompts/scene-expansion.txt",
         "prompts/scene-iteration.txt",
         "prompts/scene-iteration-free.txt"
@@ -423,7 +423,7 @@
     {
       "id": "wardrobe-bible-vs-clothing-review",
       "axis": "generator-vs-critic",
-      "reason": "clothing-review.txt reviews the wardrobe contract story-bible-from-beats.txt writes (buildClothingReviewPrompt fills {CURRENT_CLOTHING} from the bible's used outfits) and rewrites it before the styled avatars start. A check the reviewer applies must be a rule the bible writer was given, and a bible rule the reviewer never checks is a rule nobody enforces: on 2026-09-23 the audit found the plot-worn-object rule and the base-layer variety under a removed outer layer with no reviewer check, and the reviewer dressing non-cast creatures because nothing told it only the listed characters have a wardrobe (docs/audits/prompt-audit-2026-09-23/03-wardrobe.md F3-F5); checks 9, 11 and 12 now carry them. Both templates also read the same wardrobe-scoped brief and cast (promptBuilders wardrobeStoryBrief / wardrobeCharacterDetails). Garment WORDING is owned by this contract (docs/decisions.md 2026-09-23): the Art Director's scene-expansion-all.txt selects versions and copies words, and clothingCheck.js makes a linked Visual Bible entry adopt the contract's clause. Since 2026-09-26 both read GARMENT_ONE_OUTFIT_RULE (promptBuilders): a garment belongs to the outfit of the character who wears it first, and a plan handoff lives in the plan line and wornItems, never in a second outfit (staging job_1790373080139_vnx5l8iy7: the reviewer's check 12 copied one brother's jacket into the other's outfit).",
+      "reason": "clothing-review.txt reviews the wardrobe contract story-bible-from-beats.txt writes (buildClothingReviewPrompt fills {CURRENT_CLOTHING} from the bible's used outfits) and rewrites it before the styled avatars start. A check the reviewer applies must be a rule the bible writer was given, and a bible rule the reviewer never checks is a rule nobody enforces: on 2026-09-23 the audit found the plot-worn-object rule and the base-layer variety under a removed outer layer with no reviewer check, and the reviewer dressing non-cast creatures because nothing told it only the listed characters have a wardrobe (docs/audits/prompt-audit-2026-09-23/03-wardrobe.md F3-F5); checks 9, 11 and 12 now carry them. Both templates also read the same wardrobe-scoped brief and cast (promptBuilders wardrobeStoryBrief / wardrobeCharacterDetails). Garment WORDING is owned by this contract (docs/decisions.md 2026-09-23): the Art Director's page briefs (scene-briefs-all.txt) select versions and copies words, and clothingCheck.js makes a linked Visual Bible entry adopt the contract's clause. Since 2026-09-26 both read GARMENT_ONE_OUTFIT_RULE (promptBuilders): a garment belongs to the outfit of the character who wears it first, and a plan handoff lives in the plan line and wornItems, never in a second outfit (staging job_1790373080139_vnx5l8iy7: the reviewer's check 12 copied one brother's jacket into the other's outfit).",
       "generators": [
         "prompts/story-bible-from-beats.txt"
       ],
@@ -532,7 +532,7 @@
       "reason": "A page brief is authored at FOUR sites: the two Art Director templates that write it the first time, and the two iterate templates that REWRITE it when the render proves it unbuildable. The rewrite replaces the brief wholesale and becomes the page's contract with the image model, so a rule only the first author holds is a rule one repair round deletes. Measured 2026-09-17 over the 11 stored iterate rounds of staging job_1789584708605_rts4wqupm and job_1789506283204_3kxqshifx: 11 of 11 rewrites dropped `shot`, `landmarkView` and every character's `depth` and `looksAt`, and emitted no `wornItems` row at all, where the brief each replaced carried all of them. This set is why that cannot happen silently again: touch an Art Director template and the gate asks what the rewriter gets.",
       "members": [
         "prompts/scene-expansion.txt",
-        "prompts/scene-expansion-all.txt",
+        "prompts/scene-briefs-all.txt",
         "prompts/scene-iteration.txt",
         "prompts/scene-iteration-free.txt"
       ],
@@ -992,8 +992,7 @@
       "severity": "block",
       "parity": {
         "anchors": [
-          "runSceneReview",
-          "runArtDirector"
+          "runSceneReview"
         ]
       }
     },
@@ -1042,6 +1041,22 @@
       "parity": {
         "anchors": [
           "makePageImagePrompt"
+        ]
+      }
+    },
+    {
+      "id": "lab-vs-prod-brief-checks",
+      "axis": "Lab vs prod",
+      "reason": "The Test Lab beats_scenes stage and the beats pipeline (Step 4b) run the SAME brief checks and the one Art Director re-ask, briefChecks.runBriefChecks, after the SAME two-call Art Director, beatsPipeline.runArtDirector (owner 2026-09-27: the Lab must use 100% identical code to production; 2026-09-28: the checks and the re-ask replace the scene review). A change to the checks, the re-ask or its verdict lands in briefChecks.js, where both call it; tests/unit/lab-prod-call-parity.test.ts compares the two calls.",
+      "members": [
+        "server/lib/beatsPipeline.js",
+        "server/lib/testlab.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "runBriefChecks",
+          "runArtDirector"
         ]
       }
     }

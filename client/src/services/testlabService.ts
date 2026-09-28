@@ -300,6 +300,15 @@ export interface ExperimentResult {
   beatsReview?: BeatsReview | null;
   /** One entry per scene-review arm; all judged the same frozen briefs. */
   sceneReviews?: SceneReviewArm[] | null;
+  /** The run's brief checks and its one Art Director re-ask (2026-09-28). */
+  briefChecks?: {
+    ok: boolean; error?: string | null; elapsedMs?: number; model?: string | null; cost?: number;
+    findingsBefore?: { pageNumber: number; type: string; detail?: string }[];
+    findingsAfter?: { pageNumber: number; type: string; detail?: string }[];
+    withheld?: { pageNumber: number; type: string; detail?: string }[];
+    verdicts?: { pageNumber: number; accepted: boolean; reason: string }[];
+    reaskPrompt?: string | null;
+  } | null;
   finalBeats?: { pageNumber: number; planLine: string }[];
   timeToScenesMs?: number | null;
   // Set when the stage could not produce a brief for every page it was asked

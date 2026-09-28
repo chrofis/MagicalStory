@@ -227,40 +227,109 @@ describe('the shot is a pinned Jev field', () => {
     expect(JD.fixedFieldFinding(15, p.changes).detail).toMatch(/shot is over-the-shoulder/);
     expect(JD.pinBrief(p.brief, { shot: 'over-the-shoulder' }).brief).toBe(p.brief);
   });
-  it('the fixed-fields rule names the shot as fixed', () => {
-    expect(JD.JEV_FIXED_FIELDS_RULE).toMatch(/`shot` is the first field of its plan line exactly/);
+  it('the fixed-fields rule names the shot as fixed, and no other rule may change it', () => {
+    expect(JD.JEV_FIXED_FIELDS_RULE).toMatch(/FIXED block holds the fields decided before you write: its `shot`/);
+    expect(JD.JEV_FIXED_FIELDS_RULE).toMatch(/No other rule changes a fixed field/);
   });
-  it('the Art Director step pins the plan-line shot and logs the restore to the generation log', async () => {
-    const J = req('../../server/lib/jevAudit');
-    const saved = J.callJev;
-    J.callJev = makeJevStub().impl;
-    try {
-      const { applyJevBriefDecisions } = req('../../server/lib/beatsPipeline');
-      const events: any[] = [];
-      const gl = { info: (k: string) => events.push(['info', k]), warn: (k: string, m: string, _x: any, d: any) => events.push(['warn', k, d]), error: (k: string) => events.push(['error', k]) };
-      const beats = [
-        { pageNumber: 15, planLine: 'over-the-shoulder — Ana and Ben — Ana watches Ben run off — Ben is gone' },
-        { pageNumber: 16, planLine: 'SHOT — Ana — she waits — she is alone' },
-      ];
-      const expansions = [{ pageNumber: 15, brief: adBrief }, { pageNumber: 16, brief: brief({ shot: 'wide', characters: [{ name: 'Ana', looksAt: 'away' }], objects: ['LOC001'] }) }];
-      await applyJevBriefDecisions({ expansions, beats, visualBible: {}, bibleSections: null, approvedArc: '1. A thing.', inputData: { characters: [{ name: 'Ana' }, { name: 'Ben' }] }, gl });
-      expect(metaOf(expansions[0].brief).shot).toBe('over-the-shoulder');
-      expect(metaOf(expansions[1].brief).shot).toBe('wide');                 // a placeholder plan pins no shot
-      const w = events.find(e => e[0] === 'warn' && e[1] === 'beats_jev_shot_restored');
-      expect(w && w[2]).toEqual({ pageNumber: 15, assigned: 'over-the-shoulder', written: 'medium' });
-    } finally { J.callJev = saved; }
+  it('the page-brief step pins every decided field and logs what it restored (the shot among them)', () => {
+    const { pinDecidedFields } = req('../../server/lib/jevBriefFields');
+    const events: any[] = [];
+    const gl = { info: () => {}, warn: (k: string, _m: string, _x: any, d: any) => events.push([k, d]), error: (k: string) => events.push([k]) };
+    const briefBeats = [
+      { pageNumber: 15, planLine: 'over-the-shoulder — Ana and Ben — Ana watches Ben run off — Ben is gone', jevFixed: { shot: 'over-the-shoulder' } },
+      { pageNumber: 16, planLine: 'SHOT — Ana — she waits — she is alone' },
+    ];
+    const expansions = [{ pageNumber: 15, brief: adBrief }, { pageNumber: 16, brief: brief({ shot: 'wide', characters: [{ name: 'Ana', looksAt: 'away' }], objects: ['LOC001'] }) }];
+    const restored = pinDecidedFields(expansions, briefBeats, gl);
+    expect(metaOf(expansions[0].brief).shot).toBe('over-the-shoulder');
+    expect(metaOf(expansions[1].brief).shot).toBe('wide');                 // no decided field, nothing pinned
+    expect(restored.map((r: any) => [r.pageNumber, r.fields])).toEqual([[15, ['shot']]]);
+    const w = events.find(e => e[0] === 'beats_jev_field_disobeyed');
+    expect(w && w[1]).toMatchObject({ pageNumber: 15, fields: ['shot'], pass: 'page briefs' });
   });
 });
 
 describe('the fixed-fields rule reaches the brief authors and the critic from one constant', () => {
   beforeAll(async () => { await loadPromptTemplates(); });
   it('both Art Director templates and the scene review carry it, filled', () => {
-    const all = String(PB.buildSceneExpansionAllPrompt({ characters: [], language: 'en' }, [{ pageNumber: 1, planLine: 'wide — Ana — x — y' }], {}));
+    const all = String(PB.buildSceneBriefsAllPrompt({ characters: [], language: 'en' }, [{ pageNumber: 1, planLine: 'wide — Ana — x — y' }], {}));
     const one = String(PB.buildSceneExpansionPrompt(1, 'PLAN: x', [], 'en', null, '', null, {}));
     const review = String(PB.buildSceneReviewPrompt({ characters: [], language: 'en' }, [{ pageNumber: 1, brief: brief({}) }], {}));
     for (const [site, p] of [['all', all], ['one', one], ['review', review]] as [string, string][]) {
       expect(p, site).toContain(JD.JEV_FIXED_FIELDS_RULE);
       expect(p, site).not.toContain('{JEV_FIXED_FIELDS}');
     }
+  });
+});
+
+// OWNER 2026-09-28, "Jev first, then remove the scene review": every decided
+// field reaches the page-brief call as the page's FIXED block, before any brief
+// is written; the location is read off the Visual Bible's own page tables.
+describe('Jev first: the decided fields exist before the page briefs', () => {
+  const vb: any = {
+    locations: [
+      { id: 'LOC001', name: 'harbour', appearsInPages: [1, 2], vantages: [{ id: 'LOC001.1', name: 'quay steps', pages: [1] }, { id: 'LOC001.2', name: 'harbour wall', pages: [2] }] },
+      { id: 'LOC002', name: 'cabin', appearsInPages: [3] },
+    ],
+    animals: [{ id: 'ANI001', name: 'Drako', species: 'dragon', appearsInPages: [2, 3], states: [{ name: 'red', delta: 'red scales', pages: [2] }, { name: 'grey', delta: 'dull grey scales', pages: [3] }] }],
+    artifacts: [{ id: 'ART001', name: 'lamp', label: 'brass lamp', appearsInPages: [1] }],
+  };
+  it('pageLocations: the vantage whose pages hold the page, else the bare location; an unplaced page is reported', () => {
+    const { pageLocations } = req('../../server/lib/jevBriefFields');
+    const r = pageLocations(vb, [1, 2, 3, 4]);
+    expect([...r.byPage].map(([n, x]: any) => [n, x.cite])).toEqual([[1, 'LOC001.1'], [2, 'LOC001.2'], [3, 'LOC002']]);
+    expect(r.unplaced).toEqual([4]);
+  });
+  it('decideBriefFields sets every page\'s fixed fields from the bible and the head count, and the bible pages follow', async () => {
+    const J = req('../../server/lib/jevAudit');
+    const saved = J.callJev;
+    const stub = makeJevStub({ noul: (q, st) => (/Drako/.test(q) ? 0.9 : /lamp/.test(q) ? (/PAGE TO JUDGE: Page 1 /.test(st) ? 0.8 : 0.1) : /public can walk/.test(q) ? 0.7 : 0.1) });
+    J.callJev = stub.impl;
+    try {
+      const { decideBriefFields } = req('../../server/lib/jevBriefFields');
+      const events: any[] = [];
+      const gl = { info: (k: string) => events.push(['info', k]), warn: (k: string) => events.push(['warn', k]), error: (k: string) => events.push(['error', k]) };
+      const beats: any[] = [
+        { pageNumber: 1, planLine: 'wide — Ana — Ana lifts the lamp — it glows', fixed: { timeOfDay: 'dusk', indoor: false } },
+        { pageNumber: 2, planLine: 'medium — Ana and Ben — Drako lands — they gasp', fixed: { timeOfDay: 'dusk', indoor: false } },
+        { pageNumber: 3, planLine: 'SHOT — Ben — Drako sleeps — quiet', fixed: { timeOfDay: 'night', indoor: true } },
+      ];
+      const bible = JSON.parse(JSON.stringify(vb));
+      const present = new Map([[1, ['Ana']], [2, ['Ana', 'Ben', 'Drako']], [3, ['Ben', 'Drako']]]);
+      const out = await decideBriefFields({ beats, visualBible: bible, bibleSections: null, approvedArc: '1. A thing.', inputData: { characters: [{ name: 'Ana' }, { name: 'Ben' }] }, present, gl });
+      const f = (n: number) => beats.find(b => b.pageNumber === n).jevFixed;
+      expect(f(1)).toMatchObject({ shot: 'wide', timeOfDay: 'dusk', indoor: false, location: 'LOC001.1', population: 'ambient' });
+      expect(f(1).cites).toContain('ART001');
+      expect(f(2).cites.some((c: string) => c.startsWith('ANI001.'))).toBe(true);
+      expect(f(3)).toMatchObject({ location: 'LOC002', indoor: true });
+      expect(f(3).shot).toBeUndefined();                                    // a placeholder plan fixes no shot
+      expect(Object.keys(f(2).looksAt).sort()).toEqual(['Ana', 'Ben']);      // the head count's commissioned characters
+      expect(f(1).labels['LOC001.1']).toMatch(/harbour/);
+      expect(out.report.locations).toEqual({ 1: 'LOC001.1', 2: 'LOC001.2', 3: 'LOC002' });
+      // the bible's element pages follow the cites before call 2 reads it
+      expect(bible.artifacts[0].appearsInPages).toEqual([1]);
+    } finally { J.callJev = saved; }
+  });
+  it('decideBriefFields refuses to guess a roster: no head count, no decision', async () => {
+    const { decideBriefFields } = req('../../server/lib/jevBriefFields');
+    const gl = { info: () => {}, warn: () => {}, error: () => {} };
+    await expect(decideBriefFields({ beats: [{ pageNumber: 1, planLine: 'wide — Ana — x — y' }], visualBible: vb, bibleSections: null, approvedArc: '1.', inputData: { characters: [{ name: 'Ana' }] }, present: null, gl }))
+      .rejects.toThrow(/no head count/);
+  });
+  it('the FIXED block carries every decided field, labelled, under the plan line; a cover carries none', () => {
+    const b = PB.planBlocks([
+      { pageNumber: 2, planLine: 'medium — Ana — x — y', jevFixed: { shot: 'medium', timeOfDay: 'dusk', indoor: false, location: 'LOC001.2', cites: ['ANI001.1'], aboard: null, population: 'cast_only', looksAt: { Ana: 'ANI001' }, labels: { 'LOC001.2': 'harbour, harbour wall', 'ANI001.1': 'Drako, red: red scales', ANI001: 'Drako' } } },
+      { pageNumber: -1, planLine: 'cover' },
+    ]);
+    const page2 = b.split('## Page -1')[0];
+    for (const line of ['- shot: medium', '- timeOfDay: dusk; outdoors', '- objects: LOC001.2 (harbour, harbour wall); ANI001.1 (Drako, red: red scales)', '- aboard: none', '- population: cast_only', '- looksAt: Ana → ANI001 (Drako)']) {
+      expect(page2).toContain(line);
+    }
+    expect(b.split('## Page -1')[1]).not.toContain('FIXED');
+  });
+  it('pinBrief writes the location: the decided LOC stands first, any other LOC leaves objects[]', () => {
+    const p = JD.pinBrief(brief({ sceneIntent: 'Ana waits.', characters: [{ name: 'Ana' }], objects: ['LOC002', 'ART001'] }), { location: 'LOC001.1' });
+    expect(metaOf(p.brief).objects).toEqual(['LOC001.1', 'ART001']);
+    expect(p.changes).toContainEqual({ field: 'location', from: ['LOC002'], to: 'LOC001.1', removed: ['LOC002'] });
   });
 });

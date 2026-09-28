@@ -4683,6 +4683,9 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     // which the evaluator then judges the render against.
     {
       freeIterate, textInImage: iterateTextInImage, extraRule: options.sceneExtraRule || null, clothingRequirements,
+      // A strict rewrite of a page whose shot the decision layer fixed stages
+      // inside that shot (owner, 2026-09-28): the shot rules are worded for it.
+      fixedShot: !freeIterate && !!(savedScene && savedScene.jevFixed && savedScene.jevFixed.shot),
       stagedFigures: renderStagedFiguresBlock(stagedFigures),
       // THE STORY, for the two page facts the Art Director is given and the
       // rewriter was not: the book's SEASON and the creature-tone band. A
@@ -4929,6 +4932,21 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     }
     if (briefFindings.length > 0) {
       log.error(`❌ [ITERATE] Page ${pageNumber}: shipping a rewrite that fails a check an authored brief is held to:\n${describeBriefFindings(briefFindings)}`);
+    }
+  }
+
+  // THE DECIDED FIELDS HOLD ON A REWRITE (owner, 2026-09-28, Q6). A page whose
+  // fields the Jev decision layer fixed keeps them: a strict iterate every one,
+  // a free iterate every one but the shot (free exists to reframe). Code
+  // restores what the rewrite moved and says so; the prose is not touched.
+  const jevFixedOfPage = savedScene && savedScene.jevFixed;
+  if (jevFixedOfPage) {
+    const { pinBrief } = require('./jevDecisions');
+    const pinned = pinBrief(newSceneDescription, freeIterate ? { ...jevFixedOfPage, shot: undefined } : jevFixedOfPage);
+    const moved = [...new Set(pinned.changes.filter(c => !c.problem).map(c => c.field))];
+    if (moved.length) {
+      newSceneDescription = pinned.brief;
+      log.warn(`📌 [ITERATE] Page ${pageNumber}: the rewrite moved decided field(s) ${moved.join(', ')} — restored (mode=${freeIterate ? 'free' : 'strict'})`);
     }
   }
 

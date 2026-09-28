@@ -39,14 +39,14 @@ function metadataKeys(file: string): string[] {
 }
 
 describe('the page brief no longer asks for a plate', () => {
-  for (const file of ['prompts/scene-expansion-all.txt', 'prompts/scene-expansion.txt']) {
+  for (const file of ['prompts/scene-briefs-all.txt', 'prompts/scene-expansion.txt']) {
     it(`${path.basename(file)} declares no per-page emptyScenePrompt`, () => {
       expect(metadataKeys(file)).not.toContain('emptyScenePrompt');
     });
   }
 
-  it('the all-pages template puts the plate on the vantage instead', () => {
-    const t = fs.readFileSync(path.join(ROOT, 'prompts/scene-expansion-all.txt'), 'utf8');
+  it('the Visual Bible call puts the plate on the vantage instead', () => {
+    const t = fs.readFileSync(path.join(ROOT, 'prompts/visual-bible.txt'), 'utf8');
     expect(t).toContain('One backdrop plate is painted per vantage');
     expect(t).toContain('an `emptyScenePrompt` (the plate, rules below)');
     // A location shown from one viewpoint declares no vantages[] and must still

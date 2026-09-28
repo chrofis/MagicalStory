@@ -140,7 +140,8 @@ describe('testlab.js source — no hard numeric output caps, guard wired', () =>
     expect(src).toMatch(/assertReviewedArtifactUsable\(out, expId\)/);
     expect(src).toMatch(/pickReviewedBrief\(x, out, reviewer, expId\)/);
   });
-  it('beats_scenes stores each reviewer\'s briefs in the shape pickReviewedBrief reads', () => {
-    expect(src).toContain('if (i === 0) { x.reviewedBrief = reviewed.brief; x.reviewRewrote = true; } else { (x.reviewedBriefs = x.reviewedBriefs || {})[r.modelKey] = reviewed.brief; }');
+  it('beats_scenes stores a re-asked page\'s taken brief in the shape the page view reads', () => {
+    // The run's brief re-ask replaced the review arms in beats_scenes (2026-09-28).
+    expect(src).toContain("if (taken) { x.reviewedBrief = taken.after; x.reviewRewrote = true; x.rewrittenBy = 'brief re-ask'; }");
   });
 });

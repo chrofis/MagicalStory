@@ -33,14 +33,15 @@ describe('the scene stage keeps the prompt that wrote the briefs', () => {
     expect(block).not.toMatch(/prompts:/);
   });
 
-  it('is built OUTSIDE the scene-review branch, so an unreviewed run still carries it', () => {
-    // sceneReviewReport is assigned only where the review template loaded.
+  it('is built by the Art Director step itself, before the brief checks run', () => {
+    // Since 2026-09-28 the brief checks and their one re-ask follow the Art
+    // Director (the scene review no longer runs); the report never depends on them.
     const buildIdx = beats.indexOf('const sceneExpansionReport');
-    // The review runs in runSceneReview since 2026-09-27; its call site is the review section.
-    const reviewIdx = beats.indexOf('const reviewOut = await runSceneReview({');
+    const checksIdx = beats.indexOf('const briefCheckReport = await runBriefChecks({');
     expect(buildIdx).toBeGreaterThan(-1);
-    expect(reviewIdx).toBeGreaterThan(-1);
-    expect(buildIdx, 'the AD report must be built before the review section begins').toBeLessThan(reviewIdx);
+    expect(checksIdx).toBeGreaterThan(-1);
+    expect(buildIdx, 'the AD report must be built before the brief checks begin').toBeLessThan(checksIdx);
+    expect(beats, 'the run no longer calls the scene review').not.toContain('const reviewOut = await runSceneReview({');
   });
 
   it('is returned by beats and persisted onto the story', () => {

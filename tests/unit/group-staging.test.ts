@@ -141,7 +141,7 @@ describe('one constant reaches every site that authors or reviews a brief', () =
   beforeAll(async () => {
     await loadPromptTemplates();
     built = {
-      'AD all-pages': String(PB.buildSceneExpansionAllPrompt(inputData, BEATS, {})),
+      'AD all-pages': String(PB.buildSceneBriefsAllPrompt(inputData, BEATS, {})),
       'AD per-page': String(PB.buildSceneExpansionPrompt(1, 'page text', inputData.characters, 'en', VB, '', null, {})),
       'iterate strict': String(PB.buildSceneDescriptionPrompt(1, 'page text', inputData.characters, '', 'en', VB, [], 'standard', '', '',
         { planLine: BEATS[0].planLine }, { fixIssues: ['x'] }, { freeIterate: false })),

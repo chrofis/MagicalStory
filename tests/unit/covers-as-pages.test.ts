@@ -230,7 +230,7 @@ describe('the cover gaze exception reaches the author and the critic from one co
     const PB = require_('../../server/lib/promptBuilders');
     const inputData = { language: 'en', pages: 1, characters: [{ id: 1, name: 'Child1' }], mainCharacters: [1] };
     const beats = [{ pageNumber: 1, planLine: 'wide — Child1 — x — y' }];
-    const ad = String(PB.buildSceneExpansionAllPrompt(inputData, beats, {}));
+    const ad = String(PB.buildSceneBriefsAllPrompt(inputData, beats, {}));
     const review = String(PB.buildSceneReviewPrompt(inputData, [{ pageNumber: 1, brief: 'x\n---METADATA---\n{}' }], { beats }));
     expect(PB.LOOKS_AT_FIELD_RULE).toContain(PB.COVER_GAZE_EXCEPTION);
     expect(ad).toContain(PB.COVER_GAZE_EXCEPTION);

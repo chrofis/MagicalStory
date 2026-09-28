@@ -46,14 +46,14 @@ describe('C4 names the two axes for what they are', () => {
   beforeAll(async () => { await loadPromptTemplates(); });
 
   it('separates camera distance from where the camera stands', () => {
-    const c4 = String(PROMPT_TEMPLATES.sceneExpansionAll).split('\n').find(l => l.startsWith('C4.')) || '';
+    const c4 = String(PROMPT_TEMPLATES.sceneBriefsAll).split('\n').find(l => l.startsWith('C4.')) || '';
     expect(c4).toContain('camera distance ({DISTANCE_SHOTS})');
     expect(c4).toContain('where the camera stands ({SHOT_POSITIONS})');
     expect(c4).not.toContain('the vantage they cite');
   });
 
   it('renders both lists, and the distance list is only the four distances', () => {
-    const built = pb.buildSceneExpansionAllPrompt(input(), [{ pageNumber: 1, planLine: 'medium — Levin — waits — nothing' }], { maxCharactersPerScene: 6, finalArc: '1.' });
+    const built = pb.buildSceneBriefsAllPrompt(input(), [{ pageNumber: 1, planLine: 'medium — Levin — waits — nothing' }], { maxCharactersPerScene: 6, finalArc: '1.' });
     const c4 = built.split('\n').find(l => l.startsWith('C4.')) || '';
     expect(c4).toContain('`close-up`, `medium`, `wide`, `ultra-wide`');
     for (const id of POSITION_SHOTS) expect(c4).toContain(`\`${id}\``);

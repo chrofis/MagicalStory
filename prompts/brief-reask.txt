@@ -1,0 +1,26 @@
+#! THE ONE BRIEF RE-ASK — beats pipeline (server/lib/briefChecks.js runBriefChecks,
+#! via promptBuilders.buildBriefReaskPrompt). Owner 2026-09-28, "Jev first, then
+#! remove the scene review": code checks every page brief the Art Director wrote;
+#! the pages with a finding come back to the Art Director once, in this one call,
+#! with the prompt that wrote them as the context. Each rewrite is judged in code
+#! (briefCorrection.correctFindings, strict) — never a second round.
+#! Output is parsed by parseRefinedText(raw, flaggedPages, 'SCENES').
+
+{ART_DIRECTOR_PROMPT}
+
+---
+
+# CORRECTIONS
+
+You wrote the page briefs for the prompt above. Code checked each brief against its plan line, its FIXED block, the Visual Bible and the story's clothing, and found the faults listed under each page below. Rewrite only these pages. On each, resolve every fault listed and keep everything else: the same moment, the same characters, {FIXED_FIELDS_KEPT}and every other part of the brief as it stands. A fault resolved by breaking another is not resolved. Never take out a character the page's plan line puts in frame.
+
+{FLAGGED_PAGES}
+
+# OUTPUT
+
+For each page listed above, in the same order, exactly:
+
+## Page <number>
+<the corrected brief for that page, complete: its prose, then a line reading ---METADATA---, then its JSON object unfenced>
+
+Nothing before the first page heading, nothing after the last page's metadata. All output in English.

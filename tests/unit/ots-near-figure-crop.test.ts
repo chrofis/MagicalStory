@@ -144,7 +144,7 @@ describe('one rule reaches the planner and every brief-authoring template', () =
   });
 
   it('both Art Director templates carry the near-figure rule, filled', () => {
-    const all = String(PB.buildSceneExpansionAllPrompt(inputData, [{ pageNumber: 1, planLine: 'medium — Levin — he waves — he is seen' }], {}));
+    const all = String(PB.buildSceneBriefsAllPrompt(inputData, [{ pageNumber: 1, planLine: 'medium — Levin — he waves — he is seen' }], {}));
     const one = String(PB.buildSceneExpansionPrompt(1, 'He waved.', CAST, 'en', VISUAL_BIBLE, '', null, {}));
     for (const [label, p] of [['all-pages', all], ['per-page', one]] as [string, string][]) {
       expect(p, `${label} lost the rule`).toContain(OTS_NEAR_FIGURE_RULE);
@@ -195,7 +195,7 @@ describe('the near figure is the one looking toward the far figure', () => {
   });
 
   it('reaches both Art Director templates and both iterate templates, built', () => {
-    const all = String(PB.buildSceneExpansionAllPrompt(inputData, [{ pageNumber: 1, planLine: 'medium — Levin — he waves — he is seen' }], {}));
+    const all = String(PB.buildSceneBriefsAllPrompt(inputData, [{ pageNumber: 1, planLine: 'medium — Levin — he waves — he is seen' }], {}));
     const one = String(PB.buildSceneExpansionPrompt(1, 'He waved.', CAST, 'en', VISUAL_BIBLE, '', null, {}));
     expect(all).toContain(OTS_NEAR_FIGURE_FACING);
     expect(one).toContain(OTS_NEAR_FIGURE_FACING);

@@ -131,7 +131,7 @@ describe('the cover element cap is the page element budget, in both paths', () =
       expect(b.planLine).toContain(`any animal, artifact or vehicle from the Visual Bible the picture calls for, at most ${VB_ELEMENT_BUDGET}`);
     }
     // the Art Director template itself carries no cover section any more
-    const ad = String(PB.buildSceneExpansionAllPrompt(input, [{ pageNumber: 1, planLine: 'medium — Ada — x — y' }], {}));
+    const ad = String(PB.buildSceneBriefsAllPrompt(input, [{ pageNumber: 1, planLine: 'medium — Ada — x — y' }], {}));
     expect(ad).not.toContain('COVER SCENE HINTS');
     expect(ad).not.toContain('{COVER_ELEMENT_CAP}');
   });

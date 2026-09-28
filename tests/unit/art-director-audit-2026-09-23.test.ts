@@ -106,7 +106,7 @@ describe('one close-up rule for the Art Director, the review and shot_widened', 
     await loadPromptTemplates();
     const inputData = { language: 'en', pages: 1, characters: [{ id: 1, name: 'Mira' }], mainCharacters: [1] };
     const review = String(PB.buildSceneReviewPrompt(inputData, [{ pageNumber: 1, brief: brief({}) }], { beats: [{ pageNumber: 1, planLine: 'close-up — Mira — x — y' }] }));
-    const ad = String(PB.buildSceneExpansionAllPrompt(inputData, [{ pageNumber: 1, planLine: 'close-up — Mira — x — y' }], {}));
+    const ad = String(PB.buildSceneBriefsAllPrompt(inputData, [{ pageNumber: 1, planLine: 'close-up — Mira — x — y' }], {}));
     for (const text of [review, ad]) {
       expect(text).toContain(CLOSEUP_KEPT_RULE);
       expect(text).not.toContain('{CLOSEUP_KEPT}');
@@ -128,7 +128,7 @@ describe('built prompts', () => {
   let review = '';
   beforeAll(async () => {
     await loadPromptTemplates();
-    ad = String(PB.buildSceneExpansionAllPrompt(inputData, BEATS, {}));
+    ad = String(PB.buildSceneBriefsAllPrompt(inputData, BEATS, {}));
     review = String(PB.buildSceneReviewPrompt(inputData, [{ pageNumber: 1, brief: brief({}) }], { beats: BEATS }));
   });
 
@@ -175,9 +175,12 @@ describe('built prompts', () => {
   });
 
   it('the spec, the creature tone and the generic rule are stated once', () => {
+    // The Visual Bible rules live in the Art Director's first call (2026-09-28).
+    const bible = String(PB.buildVisualBibleCallPrompt(inputData, BEATS, {}));
     const spec = require_('../../server/lib/visualBible').SCALE_CLASS_SPEC;
-    expect(ad.split(spec).length - 1).toBe(1);
-    expect(ad.split('swap it between two pages and no reader could tell').length - 1).toBe(1);
+    expect(bible.split(spec).length - 1).toBe(1);
+    expect(bible.split('swap it between two pages and no reader could tell').length - 1).toBe(1);
+    expect(ad.split(spec).length - 1, 'the page-brief call restates the scale spec').toBe(0);
   });
 
   it('depth is required on every character, with no contradicting optional line', () => {
@@ -243,7 +246,7 @@ describe('the hand-off counters never count a location id as a one-grip object',
   });
   it('the Art Director and the reviewer carry the same rule', () => {
     const { SHARED_GRIP_RULE } = require_('../../server/lib/sceneMetadata');
-    expect(String(PB.buildSceneExpansionAllPrompt({ language: 'en', characters: [{ id: 1, name: 'Mira' }], mainCharacters: [1] }, [{ pageNumber: 1, planLine: 'medium \u2014 Mira \u2014 x \u2014 y' }], {}))).toContain(SHARED_GRIP_RULE);
+    expect(String(PB.buildSceneBriefsAllPrompt({ language: 'en', characters: [{ id: 1, name: 'Mira' }], mainCharacters: [1] }, [{ pageNumber: 1, planLine: 'medium \u2014 Mira \u2014 x \u2014 y' }], {}))).toContain(SHARED_GRIP_RULE);
     expect(String(PB.buildSceneReviewPrompt({ language: 'en', characters: [{ id: 1, name: 'Mira' }], mainCharacters: [1] }, [{ pageNumber: 1, brief: 'x' }], {}))).toContain(SHARED_GRIP_RULE);
   });
 });

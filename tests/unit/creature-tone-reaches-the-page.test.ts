@@ -8,7 +8,7 @@
  * (that a commissioned pet was out of scope) was wrong.
  *
  * What actually failed: {CREATURE_TONE} was injected into ONE template
- * (scene-expansion-all.txt), in the section that governs Visual Bible ENTRY
+ * (scene-briefs-all.txt), in the section that governs Visual Bible ENTRY
  * descriptions. An animal's entry description never reaches a page — the
  * REQUIRED OBJECTS block is name-only (2026-09-02 ruling) plus its size
  * (2026-09-11) — so the page's own prose is the only place a creature's face is
@@ -55,7 +55,7 @@ describe('the creature-tone block', () => {
 });
 
 describe('both Art Director templates receive it', () => {
-  for (const f of ['prompts/scene-expansion.txt', 'prompts/scene-expansion-all.txt']) {
+  for (const f of ['prompts/scene-expansion.txt', 'prompts/scene-briefs-all.txt']) {
     it(`${f} carries the {CREATURE_TONE} placeholder`, () => {
       expect(read(f)).toContain('{CREATURE_TONE}');
     });
@@ -78,7 +78,7 @@ describe('both Art Director templates receive it', () => {
       return src.slice(start, next > -1 ? next : src.length);
     };
     for (const anchor of [
-      /const filledAll = fillTemplate\(/,
+      /function artDirectorFills\(/,
       /const filledPage = fillTemplate\(PROMPT_TEMPLATES\.sceneExpansion,/,
     ]) {
       expect(fillBlock(anchor)).toContain('CREATURE_TONE: buildCreatureToneSection(');

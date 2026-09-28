@@ -4254,6 +4254,23 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "jev-first-briefs",
+      "title": "Jev first: every decided field reaches the page-brief call before it writes; code checks the briefs and re-asks the Art Director once; no scene review runs",
+      "commits": [],
+      "addedAt": "2026-09-28",
+      "claim": "On the next staging beats story: the generation log shows beats_visual_bible before beats_jev_brief_fields before beats_scenes, and no beats_scene_review; every story page of sceneExpansionReport.prompts[] carries a FIXED block whose values the shipped brief metadata holds (shot, timeOfDay, objects incl. the location, aboard, population, looksAt); beats_jev_field_disobeyed fires on few pages (the Art Director copies the block); stories.data.briefCheckReport has at most one re-ask (reask.pages) and each verdict names a resolved finding or a refusal reason; vb_id_label_mismatch and outfit_missing appear only where the prose really writes a wrong label / omits an outfit; no page says a commissioned character wears no clothing.",
+      "runShape": [
+        "lab-beats-scenes",
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "generationLog order (beats_visual_bible, beats_jev_brief_fields, beats_scenes, beats_brief_checks / beats_brief_reask); sceneExpansionReport.visualBiblePrompt / prompts[] FIXED blocks vs sceneImages[].sceneMetadata; briefCheckReport.findingsBefore / verdicts / findingsAfter / reask; beats_jev_field_disobeyed and beats_outfit_absent counts. Rung 1 2026-09-28 (scripts/analysis/replay-jev-first-briefs.js): Jev before the briefs vs after on 3 Jev stories — cites 26/26, looks 17/20 (the look fix), population 24/25, gaze 41/42; label check 3/3 true on 360 briefs; outfit_missing 4 real fires on 251."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

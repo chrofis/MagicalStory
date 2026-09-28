@@ -421,6 +421,7 @@ export default function StoryWizard() {
   const [beatsReviewReport, setBeatsReviewReport] = useState<any>(null); // Per-page beats-review before/after (dev mode)
   const [clothingReviewReport, setClothingReviewReport] = useState<any>(null); // Wardrobe review: outfits in, outfits rewritten (dev mode)
   const [sceneReviewReport, setSceneReviewReport] = useState<any>(null); // Per-page scene-review before/after (dev mode)
+  const [briefCheckReport, setBriefCheckReport] = useState<any>(null); // Brief checks + the one re-ask (dev mode, 2026-09-28)
   const [storyTextPrompts, setStoryTextPrompts] = useState<Array<{ batch: number; startPage: number; endPage: number; prompt: string; modelId?: string; usage?: { input_tokens: number; output_tokens: number } }>>([]); // API prompts for story text (dev mode)
   const [visualBible, setVisualBible] = useState<VisualBible | null>(null); // Visual Bible for dev mode
   const [clothingRequirements, setClothingRequirements] = useState<Record<string, { standard?: { used: boolean; signature?: string }; winter?: { used: boolean; signature?: string }; summer?: { used: boolean; signature?: string }; costumed?: { used: boolean; costume?: string; description?: string } }> | null>(null); // Clothing requirements per character (dev mode)
@@ -1165,6 +1166,7 @@ export default function StoryWizard() {
             setBeatsReviewReport((fullMeta as any).beatsReviewReport || null);
             setClothingReviewReport((fullMeta as any).clothingReviewReport || null);
             setSceneReviewReport((fullMeta as any).sceneReviewReport || null);
+            setBriefCheckReport((fullMeta as any).briefCheckReport || null);
             setSceneExpansionReport((fullMeta as any).sceneExpansionReport || null);
             setStoryTextPrompts(fullMeta.storyTextPrompts || []);
             setStyledAvatarGeneration(fullMeta.styledAvatarGeneration || []);
@@ -4361,6 +4363,7 @@ export default function StoryWizard() {
           setBeatsReviewReport((status.result as any).beatsReviewReport || null);
           setClothingReviewReport((status.result as any).clothingReviewReport || null);
           setSceneReviewReport((status.result as any).sceneReviewReport || null);
+          setBriefCheckReport((status.result as any).briefCheckReport || null);
           setStoryTextPrompts(status.result.storyTextPrompts || []);
           setStyledAvatarGeneration(status.result.styledAvatarGeneration || []);
           setCostumedAvatarGeneration(status.result.costumedAvatarGeneration || []);
@@ -4950,6 +4953,7 @@ export default function StoryWizard() {
               beatsReviewReport={beatsReviewReport}
               clothingReviewReport={clothingReviewReport}
               sceneReviewReport={sceneReviewReport}
+              briefCheckReport={briefCheckReport}
               storyTextPrompts={storyTextPrompts}
               visualBible={visualBible || undefined}
               sceneImages={displaySceneImages}

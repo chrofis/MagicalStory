@@ -1588,6 +1588,31 @@ function BeatsScenesView({ result }: { result: ExperimentResult }) {
         </div>
       )}
 
+      {/* BRIEF CHECKS — the run's code checks and its one Art Director re-ask
+          (2026-09-28, the scene review's successor). */}
+      {result.briefChecks && (
+        <div className="text-xs border border-gray-200 rounded-lg p-2 space-y-1">
+          <div className="font-semibold text-gray-700">
+            Brief checks + one re-ask{result.briefChecks.model ? ` — ${result.briefChecks.model}` : ''}
+            {' · '}{((result.briefChecks.elapsedMs || 0) / 1000).toFixed(1)}s
+            {result.briefChecks.cost != null && ` · $${result.briefChecks.cost.toFixed(4)}`}
+          </div>
+          {result.briefChecks.error && <div className="text-red-600">{result.briefChecks.error}</div>}
+          <div>Before: {(result.briefChecks.findingsBefore || []).map(f => `p${f.pageNumber} ${f.type}`).join(', ') || <span className="text-emerald-600">none</span>}</div>
+          <div>After: {(result.briefChecks.findingsAfter || []).map(f => `p${f.pageNumber} ${f.type}`).join(', ') || <span className="text-emerald-600">none</span>}</div>
+          {!!result.briefChecks.withheld?.length && <div className="text-gray-500">Decided-field disagreements (logged, not re-asked): {result.briefChecks.withheld.map(f => `p${f.pageNumber} ${f.type}`).join(', ')}</div>}
+          {(result.briefChecks.verdicts || []).map(v => (
+            <div key={v.pageNumber} className={v.accepted ? 'text-emerald-700' : 'text-amber-700'}>p{v.pageNumber}: {v.reason}</div>
+          ))}
+          {result.briefChecks.reaskPrompt && (
+            <details>
+              <summary className="cursor-pointer text-indigo-600">Re-ask prompt ({result.briefChecks.reaskPrompt.length.toLocaleString()} chars)</summary>
+              <pre className="mt-1 bg-white border border-gray-200 rounded-lg p-2 max-h-96 overflow-auto whitespace-pre-wrap font-mono text-[11px]">{result.briefChecks.reaskPrompt}</pre>
+            </details>
+          )}
+        </div>
+      )}
+
       {/* SCENE CREATION FROM BEATS — the load-bearing test. Production expands
           scenes from finished page TEXT; a beats-first pipeline has none yet, so
           each result sits next to the scene description the real pipeline made
