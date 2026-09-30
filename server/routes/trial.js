@@ -473,6 +473,7 @@ const TRIAL_META_SCHEMA = {
   theme: 'slug',
   preselected: 'bool',
   deepLink: 'bool',
+  introSkipped: 'bool',    // intro_start recorded for a homepage visitor who skipped the /try intro (2026-09-30)
   age: 'age',              // the child's declared age — decides which tiles were shown
   // site_arrival / site_exit (ad-tagged visits)
   bootMs: 'ms',            // ms from navigation start until the app ran — a slow mobile load shows here
