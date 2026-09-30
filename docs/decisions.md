@@ -65672,3 +65672,25 @@ id was a constant in `jevAudit.js`, the only model not configured in `server/con
 down. **Touched:** `server/lib/jevDecisions.js`, `server/lib/jevAudit.js`, `server/lib/beatsPipeline.js`,
 `storyJobPipeline.js`, `server/config/models.js`, `tests/unit/jev-auditor-outage.test.ts`,
 `tests/unit/jev-outage-backup.test.ts`. **Status:** ✅ active
+
+## 2026-09-30 — Scene brief outfit descriptions shortened to colour + garment noun; construction detail stays in contract and worn lines
+
+**Context:**
+Staging job_1790618717512_n9wrh5u0j (4-page smoke story, Jev-first path) logged prompt_fit_failed on 6 of 7 renders. Floors after all allowed cuts vs the 7,900 Grok cap: p1 8,272, p2 9,049, p4 10,990, front cover 8,379, initial 9,029, back 8,991. The brief prose repeated the full outfit text (rule 10: "weave each character's physical description … clothing"), naming every garment with construction detail ("blue quilted linen coat, brown wool trousers, black leather boots"), and the scene prompt also carried a WORN ITEMS block naming the same garments verbatim ("- Fiona IS wearing this on this page: a blue quilted linen coat"). The duplication — prose + a never-cut metadata block — pushed every page over the cap. The stored art-directed briefs predated linked worn items (2026-09-28 decision), so the rule had not been measured against the new block size before staging.
+
+**Decision:**
+Rule 10 ("Prose construction") now specifies that outfit descriptions in the scene prose use **colour + garment noun only** — never construction detail, materials, or accessories (e.g., "blue coat, brown trousers, black shoes", not "blue quilted linen coat with horn buttons, brown wool trousers with a brass buckle, black leather boots with steel toes"). The outfit contract (clothingRequirements), the character block, and the WORN ITEMS metadata block retain full detail; construction, materials, and accessories reside there. The rule preserves the original intent (commit 91365c86c, 2026-08-09): "the image model draws only what the prose names", enforcing that top/bottom/footwear are named on every page so no character renders undressed.
+
+The `clothing_incomplete` check (server/lib/clothingCheck.js, code function; formerly `[clothing_incomplete]` in the deleted scene-review.txt) accepts the short form: a slot counts as stated when the prose names any garment noun of that slot (shoes, boots, trainers, etc. for footwear; shirt, blouse, top for top; trousers, pants, skirt for bottom). Derived through wornItems.SLOT_NOUNS, which the brief authors already use to map garment names to outfit slots.
+
+**Rationale:**
+Empirically, the prompts fit once construction detail is removed: the outfit's essential identity (colour + shape) reaches the image model, and the never-cut WORN ITEMS block carries the detail downstream. A character described as "blue coat" and marked WORN as "a blue quilted linen coat" is rendered consistently without prose and metadata conflicting or duplicating.
+
+**Touched:**
+prompts/scene-briefs-all.txt (rule 10),
+prompts/scene-expansion.txt (rule 10),
+server/lib/clothingCheck.js (checkClothingIncomplete already accepts short form via deriveSlotFromName / SLOT_NOUNS),
+tests/unit/outfit-short-form.test.ts (new; verifies the check accepts short prose form).
+
+**Status:** ✅ active.
+
