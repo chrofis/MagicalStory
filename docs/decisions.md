@@ -785,6 +785,8 @@ tests/unit/recorded-features-render-and-judge.test.ts, tests/judge-fixtures/fixt
 
 ## 2026-09-26 — The judges read the prompt the image model was SENT; the shrink never cuts the page's scene; the consolidator reads what the judges read (SUPERSEDES part 3 of the same day's "The judges read what the generator was given, whole", f9d3e5cb6)
 
+> **Part 3 ("the shrink never cuts the scene") SUPERSEDED 2026-09-30** → "A prompt over Grok's cap is never sent, and a page's scene is shortened to fit" (bottom of this file). Parts 1 and 2 stand.
+
 **Context.** Owner correction, 2026-09-26: **"The eval should judge the same thing as image generation, not a
 different prompt."** Part 3 of f9d3e5cb6 (entry below) made the quality and semantic judges read the page's whole
 BRIEF (batch eval) or the prompt as BUILT before the shrink (direct `runEval`, the Gemini branch, iterate, the direct
@@ -65591,3 +65593,57 @@ server/services/prompts.js, prompts/brief-reask.txt, prompts/scene-review.txt (d
 client/src/services/testlabService.ts, client/src/components/testlab/ScorecardsPanel.tsx,
 scripts/admin/sibling-registry.json, scripts/analysis/replay-jev-first-briefs.js, tasks/verify.json,
 tests.
+
+## 2026-09-30 — A prompt over Grok's cap is never sent, and a page's scene is shortened to fit instead of the page shipping with no image (owner; SUPERSEDES part 3 of 2026-09-26 "the shrink never cuts the page's scene" and REVERSES the 2026-09-21 removal of `prompt_compress`)
+
+**Context.** Two failures, audited 2026-09-30 on staging `6ab4664`:
+- **Pages with no image.** Since 2026-09-26 a page whose scene + must-keep blocks overran the 7,900 cap
+  after every ranked drop threw `PromptFitError` and rendered NOTHING: smoke `job_1790529840433_ar4u7qry3`
+  p1 and p4, dragon `job_1790539784661_6mjcny1c7` front cover (8,378) and its p18 repair (8,618 = rewritten
+  scene 4,707 + must-keep 3,911). Compacting the fixed blocks (9c897bc16, 4677059d0) saved ~540 chars —
+  not enough for a repair rewrite, which runs ~1.1k longer than the stored briefs. Nothing bounds the scene
+  a writer produces ("under 450 words" is an unchecked instruction).
+- **Prompts sent over the cap.** `generateWithGrok` / `editWithGrok` had no length check. The page, cover
+  and plate paths fitted first, but ~20 other callers (face/character repair, inpaint, avatars, the style
+  edit `editImageWithPrompt`, the composite blend) sent whatever they built; Grok answered 400 above 8,000
+  and `editImageWithPrompt` read that as content moderation and fell back to Gemini. The composite blend
+  caught its own `PromptFitError` and "sent as built". `sectionAwareCut` blind-truncated the END of any
+  prompt without section markers.
+
+Owner, 2026-09-30: "They must be shortened. One try. If not cut enough mechanically cut things till it
+fits. That was the logic we had…"
+
+**Decision.**
+1. **No over-cap prompt leaves the machine.** `grok.js assertGrokPromptFits` runs in both send points after
+   the final prompt is assembled and throws `PromptFitError` over the tier's `maxPromptLength` — before any
+   request, logged as `prompt_fit_failed`. Every provider-fallback catch already rethrows it
+   (`rethrowLocalFault`), so it is never mistaken for a Grok failure again.
+2. **No blind cut.** `truncatePromptForModel` is deleted; a markerless prompt the drops cannot fit throws.
+   The composite blend no longer swallows the shrink's error (composite is off: `sceneCompositeEnabled: false`).
+3. **The scene is shortened, last.** `shrinkPromptForModel`: dedupe → ranked block drops → only if still
+   over, `sceneShorten.shortenSceneToFit`: ONE LLM try (`MODEL_DEFAULTS.promptCompress`, deepseek-v4-pro,
+   reasoning off) to the exact room the page has; a failed or unusable answer counts as the try; then a
+   sentence cut from the END of the scene prose until it fits. Only the scene prose paragraph(s) are touched;
+   every labelled block (THIS IMAGE DEPICTS, HEIGHT ORDER, AGE & PROPORTIONS, DISTINCTIVE FEATURES, card
+   frames, WORN ITEMS) and the protected tail stay byte-exact. If even no prose would fit, it throws.
+4. The judges still read what was SENT: the shortened head is stamped as `compressedScene` (2026-09-26
+   parts 1 and 2 stand). The `prompt_shrink` event records `branch: scene-shorten | scene-cut`, `llmChars`
+   and `proseCut`.
+
+**Rationale.** A page with no image is the worst outcome for a paid book; a slightly shorter scene is
+recoverable by the judges and repair loop. Why this is not the retired compressor again: that one ran
+BEFORE the drops on every over-cap render (34 calls a story, output in zero stored prompts), rewrote the
+whole head (it deleted four characters' hats), and retried. This one runs only on the pages that would
+otherwise fail, never sees the cast/clothing/proportion blocks, and makes one call. Measured on the stored
+smoke page with the p18-sized scene: fits on every path (tests/unit/scene-shorten-fit.test.ts). NOT yet
+validated on a story run — verify entry `scene-shortened-to-fit`.
+
+**Not covered.** Plates (`fitPlatePrompt`) still fail loudly when they do not fit; Runware's primary branch
+has no length check (dev-only routing).
+
+**Touched:** `server/lib/grok.js`, `server/lib/images.js`, `server/lib/sceneShorten.js` (new),
+`server/lib/sceneComposite.js`, `server/config/models.js`, tests `grok-prompt-cap-at-send`,
+`grok-prompt-budget`, `scene-shorten-fit`, `judges-read-the-sent-prompt`, `cover-shrink-must-keep`,
+`page-prompt-fixed-blocks-fit`, `cover-prompt-fixed-blocks-fit`.
+
+**Status:** ✅ active

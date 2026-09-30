@@ -4301,6 +4301,25 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "scene-shortened-to-fit",
+      "title": "No render is left without an image for length: over-cap scenes are shortened (one LLM try, then a sentence cut), and no prompt over the cap is ever sent",
+      "commits": [
+        "(this commit)"
+      ],
+      "addedAt": "2026-09-30",
+      "claim": "On the next full staging beats story no page, cover or repair logs prompt_fit_failed; any page that needed it logs prompt_shrink with branch scene-shorten or scene-cut and still renders; no Grok 400 for prompt length appears.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "pagePromptsFit"
+      },
+      "status": "pending",
+      "evidence": [],
+      "backlog": "tasks/BACKLOG.md p18 repair owner-call line (resolved 2026-09-30); docs/decisions.md 2026-09-30"
     }
   ],
   "runs": [

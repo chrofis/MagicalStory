@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
 
 // REQUIRED OBJECTS, SEASON and COMPOSITION GUIDELINES ARE MUST-KEEP (owner,
 // 2026-09-23). A cover with no REQUIRED OBJECTS block had its protected tail
@@ -73,11 +76,24 @@ describe('cover shrink — the must-keep sections survive', () => {
     expect(out).toContain('SENTINEL_PROSE_END the last sentence of the brief.');
   });
 
-  it('when the drops are not enough, it fails loudly and never trims the prose', async () => {
-    const prompt = coverPrompt(100);
-    const cap = 7000;
-    expect(prompt.length).toBeGreaterThan(cap + 2500); // drops alone cannot fit it
-    await expect(shrinkPromptForModel(prompt, cap, 'TEST cover', null)).rejects.toThrow(/refusing to cut/);
+  // Since 2026-09-30 (owner: "They must be shortened. One try. If not cut
+  // enough mechanically cut things till it fits"): the scene prose is shortened,
+  // the labelled blocks and the must-keep tail are not.
+  it('when the drops are not enough, the scene prose is shortened until it fits — nothing else', async () => {
+    const shorten = require('../../server/lib/sceneShorten.js');
+    const orig = shorten.shortenSceneOnce;
+    shorten.shortenSceneOnce = async () => null; // the one try gives nothing usable
+    try {
+      const prompt = coverPrompt(100);
+      const cap = 7000;
+      expect(prompt.length).toBeGreaterThan(cap + 2500); // drops alone cannot fit it
+      const out: string = await shrinkPromptForModel(prompt, cap, 'TEST cover', null);
+      expect(out.length).toBeLessThanOrEqual(cap);
+      for (const m of MUST_KEEP) expect(out).toContain(m);
+      expect(out).toContain('SENTINEL_OUTFIT');
+      expect(out).toContain('A wide group portrait set before the harbour.');
+      expect(out).not.toContain('SENTINEL_PROSE_END');
+    } finally { shorten.shortenSceneOnce = orig; }
   });
 
   it('when the must-keep tail alone cannot fit, it fails loudly instead of cutting it', async () => {

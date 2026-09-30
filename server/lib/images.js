@@ -749,30 +749,14 @@ function resolveOutputAspect(evaluationType, aspectRatioOverride) {
         : MODEL_DEFAULTS.pageAspect);
 }
 
-/**
- * Truncate a prompt to a backend's max length, emitting the same "Prompt too
- * long" warning every dispatch site used to hand-roll. Returns the prompt
- * unchanged when it already fits. `modelName` is optional — when supplied the
- * warning appends " for <model>" (three sites logged it, the gen-only Gemini
- * site did not), so the emitted string stays byte-identical to each original.
- * The caller keeps any follow-on side effect (e.g. updating parts[0] on the
- * Gemini path) by testing `result !== prompt`, which is true iff truncated.
- */
-function truncatePromptForModel(prompt, maxPromptLength, logLabel, modelName = null) {
-  if (prompt.length <= maxPromptLength) return prompt;
-  const forClause = modelName != null ? ` for ${modelName}` : '';
-  log.warn(`✂️ [${logLabel}] Prompt too long (${prompt.length} chars), truncating to ${maxPromptLength}${forClause}`);
-  return prompt.substring(0, maxPromptLength - 3) + '...';
-}
-
 // Over-budget prompts are SHRUNK, never blind-cut: the blunt substring cut
 // dropped whole tail sections — a page whose 9.4k prompt was cut at 7.5k lost
 // its entire ART STYLE block and rendered photographic on every roll (3/3
 // measured), and lost its object specs (map drawn with a ship instead of the
 // described bridge). Order: deterministic dedupe → LLM compression → a
 // section-aware cut that always preserves the tail sections as the final
-// guarantee. truncatePromptForModel above remains only as the last-resort
-// fallback inside that guarantee.
+// guarantee. There is no blind cut left: a prompt the ranked cut cannot fit
+// throws PromptFitError.
 function dedupeIdenticalBullets(prompt) {
   // Merge "- Name: body" bullet lines whose body text is identical (sibling
   // characters often share verbatim proportion boilerplate) into one line:
@@ -1078,20 +1062,16 @@ function sectionAwareCut(prompt, maxLen, logLabel) {
   if (out.length > maxLen) {
     const tailStart = protectedTailStart(out);
     if (tailStart < 0) {
-      // Not an image prompt (the Grok edit body, the composite blend): no
-      // section markers, nothing must-keep to protect.
-      const truncated = truncatePromptForModel(out, maxLen, logLabel);
-      return { text: truncated, dropped, droppedSteps, proseCut: out.length - truncated.length };
+      // No section markers (the composite blend, a Grok edit body): nothing
+      // tells the must-keep text apart from the rest. A blind cut here once
+      // chopped the END of the prompt silently — the end is where ART STYLE
+      // and the text directive live. Fail loudly instead (2026-09-30).
+      throw new PromptFitError(`prompt-shrink [${logLabel}]: ${out.length} chars after every allowed drop (${dropped.join(', ') || 'none'}), cap ${maxLen}; the prompt has no section markers, so nothing more can be cut safely — refusing a blind cut`);
     }
-    // THE SCENE IS NEVER CUT (owner, 2026-09-26: "The eval should judge the
-    // same thing as image generation"). Every ranked block is gone and the
-    // prompt still does not fit. What is left before the protected tail is the
-    // page itself — THIS IMAGE DEPICTS, the cast and worn items, the brief's
-    // prose — and the judges score the render against exactly what was sent,
-    // so trimming it here (as a last-resort sentence cut did until this date)
-    // would hand the illustrator and the judges a smaller page than the brief.
-    // Fail the render loudly instead (the 2026-09-23 prompt-fit rule).
-    throw new PromptFitError(`prompt-shrink [${logLabel}]: ${out.length} chars after every allowed drop (${dropped.join(', ') || 'none'}), cap ${maxLen}; what is left is the page's scene (${tailStart} chars) and its must-keep sections (${out.length - tailStart} chars) — refusing to cut either`);
+    // Every ranked block is gone and the prompt still does not fit. What is
+    // left is the page's scene and its must-keep sections: the caller
+    // (shrinkPromptForModel) shortens the scene prose next (owner, 2026-09-30).
+    return { text: out, dropped, droppedSteps, proseCut: 0, over: true, tailStart };
   }
 
   log.warn(`✂️ [${logLabel}] Section-aware cut: ${prompt.length}→${out.length} chars`
@@ -1138,13 +1118,13 @@ function sceneHeadOf(prompt) {
 /**
  * FIT A BUILT IMAGE PROMPT INTO THE MODEL'S CHARACTER CAP.
  *
- * Two deterministic steps, in order: merge duplicated bullet bodies, then drop
- * ranked blocks (sectionAwareCut). There is no third, paid step. A deepseek
- * head-rewrite lived between them until 2026-09-21; measured over staging
- * job_1789853503332_riqncqg1i it made 34 calls ($0.13, ~180 s) whose output
- * appears in ZERO stored prompts — on pages the head budget was under its own
- * 1,500-char floor so it never ran, and on covers it ran, was rejected for
- * overshooting, and the cut ran anyway. See docs/decisions.md 2026-09-21.
+ * In order, stopping as soon as it fits: merge duplicated bullet bodies; drop
+ * ranked blocks (sectionAwareCut); then, only when the scene and the must-keep
+ * blocks alone overrun the cap, shorten the SCENE PROSE — one LLM try, then a
+ * sentence cut from its end (sceneShorten.js, owner 2026-09-30). The labelled
+ * blocks and the protected tail are never touched. The 2026-08 compressor
+ * (retired 2026-09-21) ran BEFORE the drops and rewrote the whole head; this
+ * one runs only on the pages that would otherwise ship with no image.
  *
  * @param {Object|null} meta - optional out-param. Whenever this function
  *   actually CHANGES the prompt, `meta.compressedScene` receives the SCENE
@@ -1173,12 +1153,36 @@ async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName
     return out;
   }
 
-  // 2. Guarantee: drop ranked blocks, generic guidance before page facts.
+  // 2. Drop ranked blocks, generic guidance before page facts.
   const cut = sectionAwareCut(out, maxPromptLength, logLabel);
-  recordPromptShrink({ logLabel, modelName, branch: 'cut', before: prompt.length, after: cut.text.length,
-    cap: maxPromptLength, dropped: cut.dropped, droppedSteps: cut.droppedSteps, proseCut: cut.proseCut });
-  if (meta) meta.compressedScene = sceneHeadOf(cut.text) || undefined;
-  return cut.text;
+  let text = cut.text;
+  let branch = 'cut';
+  let proseCut = cut.proseCut;
+  let llmChars = 0;
+  if (cut.over) {
+    // 3 + 4. Still over: the scene prose is shortened — one LLM try, then a
+    // sentence cut from its end until it fits (owner, 2026-09-30). Every
+    // labelled block and the protected tail stay byte-exact (sceneShorten.js).
+    const fitted = await require('./sceneShorten').shortenSceneToFit(text, maxPromptLength, cut.tailStart, logLabel);
+    if (!fitted) {
+      throw new PromptFitError(`prompt-shrink [${logLabel}]: ${text.length} chars after every allowed drop (${cut.dropped.join(', ') || 'none'}), cap ${maxPromptLength}; the must-keep sections (${text.length - cut.tailStart} chars) and the labelled head blocks do not fit even with the scene prose gone`);
+    }
+    ({ text, proseCut, llmChars } = fitted);
+    branch = proseCut ? 'scene-cut' : 'scene-shorten';
+  }
+  recordPromptShrink({ logLabel, modelName, branch, before: prompt.length, after: text.length,
+    cap: maxPromptLength, dropped: cut.dropped, droppedSteps: cut.droppedSteps, proseCut, llmChars });
+  if (meta) meta.compressedScene = sceneHeadOf(text) || undefined;
+  return text;
+}
+
+/**
+ * The size of `prompt` once every ranked block drop has run — before any
+ * scene shortening. The fixed blocks are compact when this sits under the cap
+ * with room to spare, so a full scene needs no shortening at all.
+ */
+function promptFloor(prompt) {
+  return sectionAwareCut(dedupeIdenticalBullets(prompt), 1, 'floor').text.length;
 }
 
 /**
@@ -1279,15 +1283,16 @@ function rethrowLocalFault(err, { logLabel, pageLabel = '', provider }) {
  * per page, so a whole book could ship with AGE & PROPORTIONS missing from
  * every prompt and nothing in the story record said so.
  */
-function recordPromptShrink({ logLabel, modelName, branch, before, after, cap, dropped, droppedSteps = [], proseCut }) {
+function recordPromptShrink({ logLabel, modelName, branch, before, after, cap, dropped, droppedSteps = [], proseCut, llmChars = 0 }) {
   const genLog = getCurrentLogger();
   if (!genLog) return;  // not in a generation context (ad-hoc Lab / script call)
   const details = { label: logLabel, model: modelName || null, branch, before, after, cap,
-    charsCut: before - after, dropped, droppedSteps, proseCut };
+    charsCut: before - after, dropped, droppedSteps, proseCut, llmChars };
   const msg = `${logLabel}: ${before}→${after} chars (cap ${cap}) via ${branch}`
     + (droppedSteps.length ? `, cut in order: ${describeCutSteps(droppedSteps)}` : '')
+    + (llmChars ? `, scene shortened by ${llmChars} chars (LLM)` : '')
     + (proseCut ? `, ${proseCut} chars of scene prose trimmed` : '');
-  if (dropped.length || proseCut) genLog.warn('prompt_shrink', msg, null, details);
+  if (dropped.length || proseCut || llmChars) genLog.warn('prompt_shrink', msg, null, details);
   else genLog.info('prompt_shrink', msg, null, details);
 }
 
@@ -6476,8 +6481,9 @@ module.exports = {
 
   // Pure dispatch helpers (exported for unit tests / reuse)
   resolveOutputAspect,
-  truncatePromptForModel,
   shrinkPromptForModel,
+  promptFloor,
+  dedupeIdenticalBullets,
   fitPlatePrompt,
   PLATE_CUT_ORDER,
   PROMPT_CUT_ORDER,

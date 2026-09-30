@@ -712,6 +712,15 @@ const MODEL_DEFAULTS = {
   // on. Env: IDENTITY_ARBITER_MODEL.
   identityArbiter: process.env.IDENTITY_ARBITER_MODEL || 'gpt-5.6-sol',
 
+  // SCENE SHORTENER — the one LLM try inside the image-prompt fit
+  // (sceneShorten.js, called by images.js shrinkPromptForModel). Restored
+  // 2026-09-30 (owner: "They must be shortened. One try. If not cut enough
+  // mechanically cut things till it fits"); retired 2026-09-21 as
+  // `promptCompress`. DeepSeek V4 Pro was the owner's pick on 2026-08-12 after
+  // flash deleted four characters' hats; reasoning must stay OFF (with it on it
+  // spent its whole output budget thinking and returned nothing).
+  promptCompress: process.env.PROMPT_COMPRESS_MODEL || 'deepseek-v4-pro',
+
   // Utility models (inspection, visual bible, etc.)
   utility: 'gemini-2.5-flash',         // Fast utility tasks. 2.0-flash RETIRED by Google
                                        // (404 "no longer available", found 2026-07-18 when the
@@ -1689,6 +1698,7 @@ function resolveSceneIterationModel() { return guardModel(MODEL_DEFAULTS.sceneIt
 function resolveBriefCorrectionModel() { return guardModel(MODEL_DEFAULTS.briefCorrectionModel, 'BRIEF CORRECTION MODEL'); }
 function resolveSceneValidationModel() { return guardModel(MODEL_DEFAULTS.sceneValidationRepair, 'SCENE VALIDATION MODEL'); }
 function resolveSceneRewriteModel() { return guardModel(MODEL_DEFAULTS.sceneRewrite, 'SCENE REWRITE MODEL'); }
+function resolvePromptCompressModel() { return guardModel(MODEL_DEFAULTS.promptCompress, 'PROMPT COMPRESS MODEL'); }
 
 /**
  * The model's own output ceiling, for the few direct provider calls that
@@ -1719,6 +1729,7 @@ module.exports = {
   resolveBriefCorrectionModel,
   resolveSceneValidationModel,
   resolveSceneRewriteModel,
+  resolvePromptCompressModel,
   IMAGE_MODELS,
   resolveGrokImageModel,
   emptyScenePlateRouting,

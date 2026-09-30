@@ -17,6 +17,7 @@ const r2 = require('./r2');
 const { withGrok } = require('./aiConcurrency');
 const { frameColorForName } = require('./characterFrames');
 const { guardPromptString } = require('../services/prompts');
+const { PromptFitError } = require('./promptFitError');
 
 const XAI_API_KEY = process.env.XAI_API_KEY;
 const XAI_API_URL = 'https://api.x.ai/v1';
@@ -99,6 +100,7 @@ async function generateWithGrok(prompt, options = {}) {
   log.debug(`🎨 [GROK] Prompt (${prompt.length} chars): ${prompt.substring(0, 120)}...`);
 
   prompt = guardPromptString(prompt, 'grok.generateWithGrok');
+  assertGrokPromptFits(prompt, model, 'grok.generateWithGrok');
   const body = {
     model,
     prompt,
@@ -216,6 +218,43 @@ function buildMagentaExtensionPrefix(pad) {
 }
 
 /**
+ * The prompt budget of the Grok tier `model` names. Derived from the model id —
+ * never a ternary, never a hardcoded number. Unknown id → the registry's
+ * default Grok tier, same as the dispatcher's fallback.
+ */
+function grokPromptBudget(model) {
+  const { IMAGE_MODELS, resolveGrokImageModel } = require('../config/models');
+  const tier = Object.values(IMAGE_MODELS).find(m => m.backend === 'grok' && m.modelId === model)
+    || IMAGE_MODELS[resolveGrokImageModel(null).key];
+  return tier.maxPromptLength;
+}
+
+/**
+ * NO PROMPT OVER THE CAP LEAVES THIS MACHINE (2026-09-30). The last line before
+ * every Grok request. The page, cover and plate paths fit their prompts first
+ * (images.js shrinkPromptForModel / fitPlatePrompt), but ~20 other callers
+ * (repair, inpaint, avatars, style edit, composite) sent whatever they built:
+ * Grok answered 400 above 8,000 chars and the caller read that as a provider
+ * failure — `editImageWithPrompt` even retried it as "content moderation" and
+ * fell back to Gemini. Here an over-cap prompt is our bug, raised before any
+ * request as a PromptFitError, which every provider-fallback catch rethrows
+ * (images.js rethrowLocalFault). Never cuts — a caller that can shrink must do
+ * it before calling.
+ */
+function assertGrokPromptFits(prompt, model, logLabel) {
+  const budget = grokPromptBudget(model);
+  if (prompt.length <= budget) return;
+  const msg = `${logLabel}: prompt is ${prompt.length} chars, over the ${budget} cap of ${model} — not sent`;
+  log.error(`❌ [GROK] ${msg}`);
+  try {
+    const { getCurrentLogger } = require('./generationLogger');
+    getCurrentLogger()?.error('prompt_fit_failed', msg, null,
+      { label: logLabel, provider: 'grok', chars: prompt.length, cap: budget });
+  } catch { /* logging only */ }
+  throw new PromptFitError(msg);
+}
+
+/**
  * Fit `prefix + body` into the prompt budget of the Grok tier being called.
  *
  * The caller (`generateImageOnly` / `_dispatchImageGeneration`) already fits the
@@ -244,13 +283,7 @@ function buildMagentaExtensionPrefix(pad) {
  * @returns {Promise<string>} final prompt, <= the tier's maxPromptLength
  */
 async function fitGrokPromptWithPrefix(prefix, body, model) {
-  const { IMAGE_MODELS, resolveGrokImageModel } = require('../config/models');
-  // Derive the tier from the model id — never a ternary, never a hardcoded
-  // number. Unknown id → the registry's default Grok tier, same as the
-  // dispatcher's fallback.
-  const tier = Object.values(IMAGE_MODELS).find(m => m.backend === 'grok' && m.modelId === model)
-    || IMAGE_MODELS[resolveGrokImageModel(null).key];
-  const budget = tier.maxPromptLength;
+  const budget = grokPromptBudget(model);
   if (prefix.length + body.length <= budget) return prefix + body;
 
   // Lazy require: images.js requires this module, so a top-level import would
@@ -465,6 +498,7 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
   log.debug(`🎨 [GROK] Prompt (${prompt.length} chars): ${prompt.substring(0, 120)}...`);
 
   prompt = guardPromptString(prompt, 'grok.editWithGrok');
+  assertGrokPromptFits(prompt, model, 'grok.editWithGrok');
   const body = {
     model,
     prompt,
@@ -2110,6 +2144,7 @@ module.exports = {
   // the part that broke in production, and reaching it through editWithGrok
   // would mean a live xAI call.
   fitGrokPromptWithPrefix,
+  assertGrokPromptFits,
   buildMagentaExtensionPrefix,
   GROK_MODELS,
 };

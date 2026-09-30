@@ -22,7 +22,7 @@ const worn = require('../../server/lib/wornItems.js');
 const { IMAGE_MODELS } = require('../../server/config/models.js');
 const { loadPromptTemplates } = require('../../server/services/prompts.js');
 // @ts-expect-error - JS module without types
-import { shrinkPromptForModel } from '../../server/lib/images.js';
+import { shrinkPromptForModel, promptFloor } from '../../server/lib/images.js';
 
 const CUT_ORDER_PREFIXES = ['Generate a SINGLE', 'When the FIRST reference', '**HEIGHT ORDER', '**Composition', '**DEPTH AND SIZE', '**COUNTS'];
 
@@ -38,13 +38,8 @@ function build() {
   return { prompt, model: tier.pageImageModel, cap: IMAGE_MODELS[tier.pageImageModel].maxPromptLength };
 }
 
-async function floorOf(prompt: string, model: string): Promise<number> {
-  try { await shrinkPromptForModel(prompt, 1, 'floor', model); } catch (e: any) {
-    const m = String(e.message).match(/: (\d+) chars after every allowed drop/);
-    if (m) return Number(m[1]);
-    throw e;
-  }
-  throw new Error('a 1-char cap cannot be met');
+async function floorOf(prompt: string, _model: string): Promise<number> {
+  return promptFloor(prompt);
 }
 
 beforeAll(async () => { await loadPromptTemplates(); });

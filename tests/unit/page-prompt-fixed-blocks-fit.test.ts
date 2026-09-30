@@ -21,7 +21,7 @@ const worn = require('../../server/lib/wornItems.js');
 const { IMAGE_MODELS } = require('../../server/config/models.js');
 const { loadPromptTemplates } = require('../../server/services/prompts.js');
 // @ts-expect-error - JS module without types
-import { shrinkPromptForModel, PROMPT_CUT_ORDER, PROMPT_NEVER_CUT } from '../../server/lib/images.js';
+import { shrinkPromptForModel, promptFloor, PROMPT_CUT_ORDER, PROMPT_NEVER_CUT } from '../../server/lib/images.js';
 
 /** Room the floor must leave under the cap: a page one citation longer still fits. */
 const MARGIN = 300;
@@ -41,15 +41,8 @@ function build(page: any) {
 }
 
 /** The prompt's size once EVERY allowed cut has run (the shrink reports it when told to fit into 1 char). */
-async function floorOf(prompt: string, model: string): Promise<number> {
-  try {
-    await shrinkPromptForModel(prompt, 1, 'floor', model);
-  } catch (e: any) {
-    const m = String(e.message).match(/: (\d+) chars after every allowed drop/);
-    if (m) return Number(m[1]);
-    throw e;
-  }
-  throw new Error('a 1-char cap cannot be met');
+async function floorOf(prompt: string, _model: string): Promise<number> {
+  return promptFloor(prompt);
 }
 
 beforeAll(async () => { await loadPromptTemplates(); });

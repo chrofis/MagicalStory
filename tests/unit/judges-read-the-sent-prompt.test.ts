@@ -34,7 +34,6 @@ const images = require_('../../server/lib/images.js');
 const { resolveEvalSceneDescription, splitBrief } = require_('../../server/lib/sceneMetadata.js');
 const { judgedSceneText } = require_('../../server/lib/evalPipeline.js');
 const { consolidateFeedback } = require_('../../server/lib/feedbackConsolidator.js');
-const { PromptFitError } = require_('../../server/lib/promptFitError.js');
 
 const inputData: any = {
   title: 'The Lamp on the Pier',
@@ -73,7 +72,7 @@ beforeAll(async () => {
   built = String(PB.buildImagePrompt(BRIEF, inputData, null, VISUAL_BIBLE, 1, null, {}));
 });
 
-describe('the shrink never cuts the scene', () => {
+describe('the shrink cuts the scene only when nothing else fits', () => {
   it('a cap the ranked drops can reach: the whole brief prose, the scene intent and the LIGHT line are sent', async () => {
     const cap = built.length - 400;
     const meta: any = {};
@@ -85,9 +84,25 @@ describe('the shrink never cuts the scene', () => {
     expect(sent).toContain('**LIGHT:**');
   });
 
-  it('a cap the drops cannot reach: the render fails loudly and nothing is trimmed', async () => {
-    const cap = built.length - 4000;
-    await expect(images.shrinkPromptForModel(built, cap, 'TEST scene', null)).rejects.toBeInstanceOf(PromptFitError);
+  // Owner, 2026-09-30: one LLM try, then a sentence cut from the end of the
+  // prose. The judges still read exactly what was sent (compressedScene).
+  it('a cap the drops cannot reach: the prose is cut at sentence ends, and the judges read that cut scene', async () => {
+    const shorten = require_('../../server/lib/sceneShorten.js');
+    const orig = shorten.shortenSceneOnce;
+    shorten.shortenSceneOnce = async () => null;
+    try {
+      const floor = images.promptFloor(built);
+      const cap = floor - 100;
+      const meta: any = {};
+      const sent: string = await images.shrinkPromptForModel(built, cap, 'TEST scene', null, meta);
+      expect(sent.length).toBeLessThanOrEqual(cap);
+      expect(sent).toContain('SCENE_INTENT_SENTINEL');
+      expect(sent).toContain('**LIGHT:**');
+      expect(sent).not.toContain('LAST_BRIEF_SENTENCE');
+      const judged = resolveEvalSceneDescription({ compressedScene: meta.compressedScene, sceneDescription: BRIEF, prompt: sent });
+      expect(sent).toContain(judged);
+      expect(judged).not.toContain('LAST_BRIEF_SENTENCE');
+    } finally { shorten.shortenSceneOnce = orig; }
   });
 });
 
