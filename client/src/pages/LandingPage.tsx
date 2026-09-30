@@ -338,8 +338,10 @@ export default function LandingPage() {
     }
   }, [searchParams]);
 
+  // skipIntro: this visitor just read the pitch here, so /try opens straight at
+  // step 1 instead of a second explanation page (see TrialWizard showIntro).
   const handleStartJourney = () => {
-    navigate('/try');
+    navigate('/try', { state: { skipIntro: true } });
   };
 
   const handleAuthSuccess = async () => {
@@ -434,13 +436,16 @@ export default function LandingPage() {
           {/* Left Side - Text and Button */}
           <div className="w-full lg:w-[35%] flex flex-col justify-center">
             <div>
-              <h1 className="text-4xl lg:text-6xl font-title text-black mb-4 lg:mb-6 leading-tight">
+              {/* Phone sizes cut 2026-09-30: at text-4xl / text-lg an iPhone's whole first
+                  screen was text; the photo -> book example below never showed without
+                  scrolling. Desktop (lg:) sizes unchanged. */}
+              <h1 className="text-3xl lg:text-6xl font-title text-black mb-3 lg:mb-6 leading-tight">
                 {t.heroTitle}
               </h1>
-              <p className="text-lg lg:text-2xl font-body text-black mb-3 lg:mb-4">
+              <p className="text-base lg:text-2xl font-body text-black mb-2 lg:mb-4">
                 {t.heroDescription}
               </p>
-              <p className="text-lg lg:text-2xl font-body text-black mb-6 lg:mb-8">
+              <p className="text-base lg:text-2xl font-body text-black mb-4 lg:mb-8">
                 {t.bookText}
               </p>
 
