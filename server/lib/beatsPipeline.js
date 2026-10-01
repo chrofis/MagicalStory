@@ -2292,9 +2292,11 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // on its own findings; it never opens the gate.
       const { gate, jevCast } = await arcRepairFindingsWithCastCheck({
         critique: roundCritique, reviewedArc: arcBlock, panel, castNames: commissionedCast(inputData).listed,
-      });
+      }, { jevFallback: jevReport.fallback });
       if (jevCast?.weak.length) {
         gl.info('arc_jev_cast', `Round ${round}: Jev cast check — ${jevCast.weak.map(w => `${w.name} ${w.score}`).join(', ')} with no act of their own; ${jevCast.delivered === 'retell' ? 'handed to the re-telling as feedback' : 'recorded only (the gate stayed shut)'}`, null, { round, ...jevCast });
+      } else if (jevCast?.skipped) {
+        gl.warn('arc_jev_cast_skipped', `Round ${round}: Jev cast check not run — ${jevCast.skipped}`, null, { round, skipped: jevCast.skipped });
       } else if (jevCast && !jevCast.ok) {
         gl.error('arc_jev_cast_failed', `Round ${round}: Jev cast check FAILED — no cast feedback this round: ${jevCast.error}`, null, { round, error: jevCast.error });
       }

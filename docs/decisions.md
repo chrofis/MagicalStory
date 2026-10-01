@@ -65647,3 +65647,28 @@ has no length check (dev-only routing).
 `page-prompt-fixed-blocks-fit`, `cover-prompt-fixed-blocks-fit`.
 
 **Status:** ✅ active
+
+## 2026-09-30 — The two Jev auditors wait out an outage like the decisions, and skip a story already on the Jev backup; Jev's model id lives in models.js
+
+**Context.** The 2026-09-27 outage policy ("Jev outage: wait, then today's setup as backup") covered the
+decision layer only (`jevDecisions.runJevRequests`). The arc cast check (`jevAudit.jevCastBeatVoice`) and the
+text audit source (`jevAudit.runJevTextSource`) called `callJev` directly: the first error dropped every
+finding they would have made, while a decision step in the same story waited up to 5 minutes. And once a
+story had switched to the backup, nothing stopped those two from asking a known-down Jev again. Jev's model
+id was a constant in `jevAudit.js`, the only model not configured in `server/config/models.js`.
+
+**Decision.**
+1. The retry-and-wait loop is one function, `jevDecisions.callJevWaiting` (C of the policy: backoff up to
+   `JEV_OUTAGE.waitMs`, never on a missing key). `runJevRequests` and both auditors use it.
+2. Both auditors take `jevFallback`: a story already on the backup does not ask Jev again — the cast check
+   logs `arc_jev_cast_skipped` (warn), the text source reports "not run". Wired from `beatsPipeline` (the
+   round loop's `jevReport.fallback`) and `storyJobPipeline` (`beatsResult.jevFallback` into `jevOptions`).
+3. A failure after the wait keeps the existing contract: logged as an error, the auditor contributes nothing.
+   The text audit's own 15-minute deadline still bounds it; it runs beside the image phase. The cast check is
+   on the critical path, as every decision step already is.
+4. `MODEL_DEFAULTS.jevModel` (`typesafe/jev-1.13`, env `JEV_MODEL`) is the one place the id is set.
+
+**Rationale.** One outage policy for every Jev consumer; no second 5-minute wait for a Jev already known to be
+down. **Touched:** `server/lib/jevDecisions.js`, `server/lib/jevAudit.js`, `server/lib/beatsPipeline.js`,
+`storyJobPipeline.js`, `server/config/models.js`, `tests/unit/jev-auditor-outage.test.ts`,
+`tests/unit/jev-outage-backup.test.ts`. **Status:** ✅ active

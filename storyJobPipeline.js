@@ -3778,6 +3778,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // No `rounds`: the chain is fixed at two parallel audits → one repair
           // → one lector (owner ruling 2026-09-03). There is no loop to bound.
           usageLabel: 'text_refine',
+          // A story already on the Jev-outage backup does not ask Jev again.
+          jevOptions: { jevFallback: beatsResult?.jevFallback || null },
           // Latest completed state, so the join below can salvage the audit and
           // any finished round if the chain FAILS partway. (It is no longer a
           // deadline fallback — the join has no deadline.)

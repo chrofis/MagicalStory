@@ -167,6 +167,41 @@ function withTimeout(promise, ms, what) {
 }
 
 /**
+ * C of the outage policy, for ONE Jev request: retry with backoff until it
+ * answers or `JEV_OUTAGE.waitMs` has passed since its first failure, then throw
+ * JevDecisionError. A missing OPENROUTER_API_KEY is never retried. Shared by the
+ * decision pool below and by the two Jev auditors (jevAudit runJevTextSource,
+ * jevCastBeatVoice — 2026-09-30: they used to fail on the first error while the
+ * decisions waited, so a short outage silently dropped their findings).
+ *
+ * @param {Function} call  (req) => Promise<{answers, cost, usage, model}>
+ * @param {{key?:string, state:string, questions:Object}} rq
+ * @param {{retryDelayMs?:number, shouldStop?:Function, onFailure?:Function}} opts
+ */
+async function callJevWaiting(call, rq, { retryDelayMs = 2000, shouldStop = () => null, onFailure = () => {} } = {}) {
+  let firstFailAt = null;
+  for (let attempt = 1; ; attempt++) {
+    const stop = shouldStop();
+    if (stop) throw stop;
+    try {
+      return await withTimeout(call({ state: rq.state, questions: rq.questions }), JEV_OUTAGE.callTimeoutMs, 'Jev call');
+    } catch (e) {
+      const stopNow = shouldStop();
+      if (stopNow && e === stopNow) throw e;
+      const msg = String(e.message || e);
+      firstFailAt = firstFailAt || Date.now();
+      const waited = Date.now() - firstFailAt;
+      const final = NOT_AN_OUTAGE.test(msg) || waited >= JEV_OUTAGE.waitMs;
+      onFailure({ attempt, msg, final });
+      if (final) throw new JevDecisionError(`Jev ${rq.key ? `decision "${rq.key}"` : 'call'} failed after ${attempt} attempt(s) over ${Math.round(waited / 1000)} s: ${msg}`);
+      if (attempt === 1) log.warn(`⏳ [JEV] ${rq.key ? `"${rq.key}"` : 'call'} failed (${msg.slice(0, 160)}) — waiting and retrying for up to ${Math.round(JEV_OUTAGE.waitMs / 1000)} s`);
+      const delay = Math.min(retryDelayMs * 2 ** (attempt - 1), JEV_OUTAGE.maxBackoffMs, Math.max(0, JEV_OUTAGE.waitMs - waited));
+      await new Promise(res => setTimeout(res, delay));
+    }
+  }
+}
+
+/**
  * Run a list of Jev requests with bounded concurrency. Every answer is kept;
  * a request still failing after the outage wait (C) throws JevDecisionError,
  * the other workers stop, and nothing partial is returned.
@@ -182,32 +217,19 @@ async function runJevRequests(requests, { callImpl, concurrency = JEV_DECISION_C
   let next = 0;
   let failed = null;
   const one = async (rq) => {
-    let firstFailAt = null;
-    for (let attempt = 1; ; attempt++) {
-      if (failed) throw failed;
-      const t0 = Date.now();
-      try {
-        const r = await withTimeout(call({ state: rq.state, questions: rq.questions }), JEV_OUTAGE.callTimeoutMs, 'Jev call');
-        const ms = Date.now() - t0;
-        stats.calls++; stats.cost += Number(r.cost || 0); stats.ms.push(ms);
-        recordTextUsage('openrouter', { ...openRouterUsage(r.usage), direct_cost: Number(r.cost || 0), elapsed_ms: ms }, usageLabel, r.model || J.JEV_MODEL);
-        return r.answers;
-      } catch (e) {
-        if (e instanceof JevDecisionError && e === failed) throw e;
-        const msg = String(e.message || e);
+    const t0 = Date.now();
+    const r = await callJevWaiting(call, rq, {
+      retryDelayMs,
+      shouldStop: () => failed,
+      onFailure: ({ attempt, msg, final }) => {
         stats.errors.push({ key: rq.key, attempt, error: msg.slice(0, 300) });
-        firstFailAt = firstFailAt || Date.now();
-        const waited = Date.now() - firstFailAt;
-        if (NOT_AN_OUTAGE.test(msg) || waited >= JEV_OUTAGE.waitMs) {
-          stats.failed++;
-          throw new JevDecisionError(`Jev decision "${rq.key}" failed after ${attempt} attempt(s) over ${Math.round(waited / 1000)} s: ${msg}`);
-        }
-        stats.retries++;
-        if (attempt === 1) log.warn(`⏳ [JEV] "${rq.key}" failed (${msg.slice(0, 160)}) — waiting and retrying for up to ${Math.round(JEV_OUTAGE.waitMs / 1000)} s`);
-        const delay = Math.min(retryDelayMs * 2 ** (attempt - 1), JEV_OUTAGE.maxBackoffMs, Math.max(0, JEV_OUTAGE.waitMs - waited));
-        await new Promise(res => setTimeout(res, delay));
-      }
-    }
+        if (final) stats.failed++; else stats.retries++;
+      },
+    });
+    const ms = Date.now() - t0;
+    stats.calls++; stats.cost += Number(r.cost || 0); stats.ms.push(ms);
+    recordTextUsage('openrouter', { ...openRouterUsage(r.usage), direct_cost: Number(r.cost || 0), elapsed_ms: ms }, usageLabel, r.model || J.JEV_MODEL);
+    return r.answers;
   };
   const workers = Array.from({ length: Math.min(concurrency, requests.length) }, async () => {
     while (next < requests.length && !failed) {
@@ -1245,6 +1267,7 @@ module.exports = {
   whoText,
   pageState,
   runJevRequests,
+  callJevWaiting,
   shotFitQuestions,
   hungarian,
   budgetOf,

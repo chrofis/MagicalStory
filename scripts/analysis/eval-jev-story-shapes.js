@@ -464,7 +464,7 @@ async function llm(prompt, model) {
   const t0 = Date.now();
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', { method: 'POST',
     headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], max_tokens: 65536, usage: { include: true } }) });
+    body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], usage: { include: true } }) });
   const t = await res.text();
   if (!res.ok) throw new Error(`LLM HTTP ${res.status}: ${t.slice(0, 300)}`);
   const j = JSON.parse(t);

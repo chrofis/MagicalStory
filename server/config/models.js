@@ -721,6 +721,13 @@ const MODEL_DEFAULTS = {
   // spent its whole output budget thinking and returned nothing).
   promptCompress: process.env.PROMPT_COMPRESS_MODEL || 'deepseek-v4-pro',
 
+  // JEV — the decision model behind every Jev call (jevAudit.callJev): the
+  // decision layer, the challenge / landmark selection, the arc cast check and
+  // the text audit. Not a TEXT_MODELS entry: it is called on OpenRouter's
+  // decisions endpoint (answers noul / choice questions, writes no text).
+  // Lived as a constant in jevAudit.js until 2026-09-30.
+  jevModel: process.env.JEV_MODEL || 'typesafe/jev-1.13',
+
   // Utility models (inspection, visual bible, etc.)
   utility: 'gemini-2.5-flash',         // Fast utility tasks. 2.0-flash RETIRED by Google
                                        // (404 "no longer available", found 2026-07-18 when the

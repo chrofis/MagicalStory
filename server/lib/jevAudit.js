@@ -29,7 +29,8 @@ const { log } = require('../utils/logger');
 const { SLOP_TYPES } = require('./proseSlop');
 
 const JEV_URL = 'https://openrouter.ai/api/alpha/decisions';
-const JEV_MODEL = 'typesafe/jev-1.13';
+/** The model id is configured with every other model (models.js MODEL_DEFAULTS.jevModel). */
+const JEV_MODEL = require('../config/models').MODEL_DEFAULTS.jevModel;
 /** Jev's context is ~32k tokens incl. questions; ~4 chars/token with headroom. */
 const MAX_STATE_CHARS = 100000;
 const QUESTIONS_FILE = path.join(__dirname, '../../prompts/jev-text-audit.txt');
@@ -478,6 +479,19 @@ async function auditStoryText(input, { checks = JEV_CHECKS, callImpl = callJev, 
 
 // ───────────────────────── consumer 1: the text chain ─────────────────────────
 
+/**
+ * The auditors' default call: callJev under the outage wait every Jev decision
+ * gets (jevDecisions.callJevWaiting — retry up to 5 min, never on a missing key).
+ * Lazy require: jevDecisions requires this module.
+ */
+function callJevWithOutageWait(req) {
+  return require('./jevDecisions').callJevWaiting((r) => module.exports.callJev(r), req);
+}
+
+/** Why a Jev auditor does not run on a story already on the Jev-outage backup. */
+const onBackup = (jevFallback) => `Jev is unavailable for this story (backup from step "${jevFallback.step}") — not asked again`;
+
+
 /** Languages the 2026-09-27 evaluation covered. Any other language: the source does not run, and says so. */
 const JEV_TEXT_LANGUAGES = new Set(['de', 'fr', 'en']);
 
@@ -498,6 +512,10 @@ function mechanicalFaultLines(mechanical = []) {
  * lines for mergeAuditFindings. The cast-beat check is not asked here — it
  * judges the ARC and runs in the arc machine (jevCastBeatVoice).
  *
+ * Each call waits out a Jev outage like the decisions do (callJevWithOutageWait,
+ * up to 5 min; the audit's own 15-min deadline still bounds it); a story already
+ * on the Jev-outage backup (`jevFallback`) is not asked again.
+ *
  * NEVER THROWS, and NEVER DEGRADES QUIETLY: on any Jev error the whole source
  * is reported failed (`ok: false`, logged as an error) and contributes no
  * finding, exactly like a failed arc-informed or blind audit. The $0 string
@@ -509,8 +527,13 @@ function mechanicalFaultLines(mechanical = []) {
  * @returns {Promise<{source:'jev', ok:boolean, raw?:string, error?:string, skipped?:string,
  *   flags?:Array, mechanical?:Array, cost?:number, calls?:number, elapsedMs:number}>}
  */
-async function runJevTextSource(storyData, pages, { checks = JEV_CHECKS, callImpl = callJev, concurrency } = {}) {
+async function runJevTextSource(storyData, pages, { checks = JEV_CHECKS, callImpl = callJevWithOutageWait, concurrency, jevFallback = null } = {}) {
   const t0 = Date.now();
+  if (jevFallback) {
+    const skipped = onBackup(jevFallback);
+    log.warn(`⚠️ [TEXT-AUDIT/jev] not run: ${skipped}`);
+    return { source: 'jev', ok: false, skipped, elapsedMs: 0 };
+  }
   const language = String(storyData?.language || '').toLowerCase();
   if (!JEV_TEXT_LANGUAGES.has(language.split(/[-_]/)[0])) {
     const skipped = `language "${language || '(none)'}" was not in the 2026-09-27 evaluation (de, fr, en)`;
@@ -555,16 +578,23 @@ function arcSentencesText(arcBlock) {
  * the gate opens for its own MAJOR/CRITICAL findings, `feedback` rides into the
  * one re-telling (arcRepairFindingsWithCastCheck). Closed gate: report only.
  *
+ * Waits out a Jev outage like the decisions (up to 5 min); skipped when the story
+ * is already on the Jev-outage backup (`jevFallback`).
  * Never throws: on a Jev error it logs an error and returns ok:false, no feedback.
  *
  * @param {string} arcBlock  the committed block's story logic + arc (splitCommittedBlock().arcBlock)
  * @param {string[]} names   the character list (castCoverage.commissionedCast().listed)
  * @returns {Promise<{ok:boolean, weak:Array<{name:string,score:number}>, feedback:string, scores?:Object, error?:string, cost?:number}|null>}
  */
-async function jevCastBeatVoice(arcBlock, names, { checks = JEV_CHECKS, callImpl = callJev } = {}) {
+async function jevCastBeatVoice(arcBlock, names, { checks = JEV_CHECKS, callImpl = callJevWithOutageWait, jevFallback = null } = {}) {
   const cfg = checks.ARC_CAST_BEAT;
   const list = [...new Set((names || []).map(n => String(n || '').trim()).filter(Boolean))];
   if (!cfg?.enabled || !list.length) return null;
+  if (jevFallback) {
+    const skipped = onBackup(jevFallback);
+    log.warn(`⚠️ [ARC/jev] cast-beat check not run: ${skipped}`);
+    return { ok: false, weak: [], feedback: '', skipped };
+  }
   const arcText = arcSentencesText(arcBlock);
   if (!arcText) return null;
   try {
@@ -603,7 +633,7 @@ async function arcRepairFindingsWithCastCheck({ critique, reviewedArc, panel = [
   const handed = !!(gate.retell && cast?.feedback);
   if (handed) gate.text = `${gate.text}\n\n${CAST_FEEDBACK_HEADING}\n${cast.feedback}`;
   const jevCast = cast && {
-    ok: cast.ok, scores: cast.scores || null, weak: cast.weak, error: cast.error || null, cost: cast.cost ?? null,
+    ok: cast.ok, scores: cast.scores || null, weak: cast.weak, error: cast.error || null, skipped: cast.skipped || null, cost: cast.cost ?? null,
     // 'retell' = handed to the re-telling as feedback; 'report-only' = the gate stayed shut.
     delivered: cast.weak.length ? (handed ? 'retell' : 'report-only') : null,
   };
