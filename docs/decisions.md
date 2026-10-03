@@ -65694,3 +65694,10 @@ tests/unit/outfit-short-form.test.ts (new; verifies the check accepts short pros
 
 **Status:** ✅ active.
 
+
+## 2026-10-03 — The Visual Bible lists a garment only when the story changes it
+
+**Context.** On the Jev-first path the Visual Bible has its own call (`prompts/visual-bible.txt`). Its line "all worn costumes and garments" made it author every garment of every outfit: staging smoke `job_1790618717512_n9wrh5u0j` got 27 clothing entries (the 13 stories before it: 0–17), so every brief wrote a "worn" row per garment and every page prompt carried a never-cut WORN ITEMS block repeating the outfit (p4: 2,490 chars).
+**Decision (owner, 2026-09-30).** A garment gets an entry only when the story changes it: taken off, handed over, found, or worn by someone whose outfit does not name it. The outfit text carries everything else. The rules for an entry that exists (one category, description repeats the outfit's words, `wornAs` required) are unchanged.
+**Not done.** No length budget for the Art Director: over-cap prompts are already fitted by the scene shortener (`sceneShorten.js`, 0832cc784). A code skip of plain worn rows was not built: its `wornAsLinked` test is also true for a prop turned costume, so it would have dropped the found-item lines.
+**Touched:** `prompts/visual-bible.txt`. **Status:** ✅ active — unvalidated until the next Jev-first story (count clothing entries).
