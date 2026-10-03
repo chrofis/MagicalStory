@@ -4320,6 +4320,26 @@
       "status": "pending",
       "evidence": [],
       "backlog": "tasks/BACKLOG.md p18 repair owner-call line (resolved 2026-09-30); docs/decisions.md 2026-09-30"
+    },
+    {
+      "id": "outfit-prose-short-and-vb-garments",
+      "title": "Briefs name outfits by colour + garment noun; the Visual Bible lists only garments the story changes",
+      "commits": [
+        "4f0d16d3b",
+        "868b166ca"
+      ],
+      "addedAt": "2026-10-03",
+      "claim": "On the next Jev-first staging beats story: every character in frame still has top, bottom and footwear named (no clothing_incomplete / outfit_missing from missing slots), outfit prose carries no material/construction detail, the Visual Bible has clothing entries only for garments that change (taken off, handed over, found, not in the outfit), and the WORN ITEMS block per page shrinks accordingly versus job_1790618717512_n9wrh5u0j.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "how": "Count visualBible clothing entries and their reasons; read 3 briefs for outfit wording; compare WORN ITEMS block sizes in the sent prompts."
+      },
+      "status": "pending",
+      "evidence": [],
+      "backlog": "none"
     }
   ],
   "runs": [
