@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { BookOpen, ArrowRight } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
@@ -196,16 +196,7 @@ export default function TrialWizard() {
   // by email). Not persisted — reload shows it again. Intentional: it's
   // a tiny screen, and re-seeing it costs nothing vs the risk of
   // skipping it for a returning bouncer who never actually started.
-  //
-  // Exception (2026-09-30): the homepage's start button navigates here with
-  // state.skipIntro. That visitor has just read the same pitch on the homepage
-  // and chosen to start; a second explanation page in a row cost the paid
-  // phone traffic (4 of 5 paid visitors who opened /try left on this screen
-  // without a tap, 21-28 Sept). Router state, not a query param, so a shared or
-  // bookmarked /try link still shows the intro.
-  const location = useLocation();
-  const introSkipped = useRef(Boolean((location.state as { skipIntro?: boolean } | null)?.skipIntro)).current;
-  const [showIntro, setShowIntro] = useState(!introSkipped);
+  const [showIntro, setShowIntro] = useState(true);
 
   // Wizard step
   const [currentStep, setCurrentStep] = useState<TrialStep>('character');
@@ -281,11 +272,6 @@ export default function TrialWizard() {
         ? { deepLink: true, category: deepLink.category || undefined, topic: deepLink.topic || undefined }
         : undefined
     );
-    // intro_start is a mandatory funnel step; a visitor who skipped the intro
-    // still passed it (by pressing the homepage button), so it is recorded -
-    // flagged, so the two paths stay separable - rather than leaving a false
-    // drop-off on the funnel card.
-    if (introSkipped) trackTrialStep('intro_start', { introSkipped: true });
   }, []);
 
   useEffect(() => {

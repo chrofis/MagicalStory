@@ -338,10 +338,8 @@ export default function LandingPage() {
     }
   }, [searchParams]);
 
-  // skipIntro: this visitor just read the pitch here, so /try opens straight at
-  // step 1 instead of a second explanation page (see TrialWizard showIntro).
   const handleStartJourney = () => {
-    navigate('/try', { state: { skipIntro: true } });
+    navigate('/try');
   };
 
   const handleAuthSuccess = async () => {
@@ -470,15 +468,19 @@ export default function LandingPage() {
                 </button>
               </div>
               {/* Trust row: claims already made elsewhere on the site (CreditsModal,
-                  step 4) + the legal pages, surfaced next to the CTA. */}
+                  step 4) + the legal pages, surfaced next to the CTA. On phones only the
+                  two claims show (2026-10-03, owner): the two legal links, with their
+                  44px tap targets, wrapped to three lines and pushed the photo -> book
+                  example off an iPhone's first screen. They stay in the footer on every
+                  page, and next to the CTA from lg up. */}
               <p className="text-xs lg:text-sm text-stone-600 flex flex-wrap items-center gap-x-2">
                 <span>{st.trustPayment}</span>
                 <span aria-hidden="true">·</span>
                 <span>{st.trustSwiss}</span>
-                <span aria-hidden="true">·</span>
-                <Link to="/impressum" className="inline-flex items-center min-h-[44px] underline hover:text-stone-900">{st.trustImprint}</Link>
-                <span aria-hidden="true">·</span>
-                <Link to="/privacy" className="inline-flex items-center min-h-[44px] underline hover:text-stone-900">{st.trustPrivacy}</Link>
+                <span aria-hidden="true" className="hidden lg:inline">·</span>
+                <Link to="/impressum" className="hidden lg:inline-flex items-center min-h-[44px] underline hover:text-stone-900">{st.trustImprint}</Link>
+                <span aria-hidden="true" className="hidden lg:inline">·</span>
+                <Link to="/privacy" className="hidden lg:inline-flex items-center min-h-[44px] underline hover:text-stone-900">{st.trustPrivacy}</Link>
               </p>
             </div>
           </div>
