@@ -132,7 +132,16 @@ serves immediately; the three new campaigns ramp as Google reviews their ads (~2
 - iPhone screenshots (production): homepage first screen = text only, no picture; /try first screen = headline +
   a stock girl photo, **no button** — "Los geht's" is ~2.5 screens down; the finished-book image is 3rd, below the fold.
 - [x] `activate-week.js` per-arm `status`; Deutschschweiz PAUSED (resume = flip its status back + --apply).
-- [ ] Owner to choose the phone-page fixes (proposed 2026-09-28). No code yet.
+- [x] Owner chose all four phone-page fixes (2026-09-30); built on staging (6ab466467):
+      /try phones = finished-book image first + compact step list + start button pinned to the bottom
+      (visible on the first screen on iPhone 14 / Pixel 7 / iPhone SE); homepage hero smaller on phones.
+- [x] **Owner review on a phone (2026-10-03): the homepage->step-1 skip REMOVED** — it landed visitors on the
+      consent boxes without ever seeing the finished book; with the intro on one screen it saved only a tap.
+      Phone trust row: legal links lg-only (footer keeps them) so the example reaches the first screen. 6afc9d444,
+      push to staging WAITING for an in-flight staging story job to finish (pre-push idle gate).
+- [ ] Staging screenshots of 6afc9d444 to owner; then production only on the owner's explicit OK (cherry-pick
+      onto origin/master — staging is hundreds of commits ahead). Then resume Deutschschweiz
+      (`activate-week.js`: set its status back to ENABLED, --apply) and measure.
 
 ## Expectation stated to the owner up front
 
