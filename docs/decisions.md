@@ -65701,3 +65701,37 @@ tests/unit/outfit-short-form.test.ts (new; verifies the check accepts short pros
 **Decision (owner, 2026-09-30).** A garment gets an entry only when the story changes it: taken off, handed over, found, or worn by someone whose outfit does not name it. The outfit text carries everything else. The rules for an entry that exists (one category, description repeats the outfit's words, `wornAs` required) are unchanged.
 **Not done.** No length budget for the Art Director: over-cap prompts are already fitted by the scene shortener (`sceneShorten.js`, 0832cc784). A code skip of plain worn rows was not built: its `wornAsLinked` test is also true for a prop turned costume, so it would have dropped the found-item lines.
 **Touched:** `prompts/visual-bible.txt`. **Status:** ✅ active — unvalidated until the next Jev-first story (count clothing entries).
+
+## 2026-10-03 — Slim the brief re-ask's context: rules + Visual Bible + only the flagged pages, never the whole book
+
+**Context.** `briefChecks.runBriefChecks` (the Jev-first path's one re-ask to the Art Director) carried the FULL call-2 prompt (`buildSceneBriefsAllPrompt` output — the whole arc, every page's plan line, the full character block) as `ART_DIRECTOR_PROMPT`, whatever the flag count. Measured on staging `job_1790618717512_n9wrh5u0j` (4-page smoke, 5 flagged pages: -3, -2, 1, 2, 4): 119,048 chars (30,433 prompt tokens), 120.3s, $0.229, for a book that was only 4 story pages + 3 covers — the context carried pages the re-ask was never asked to touch.
+
+**Decision.** `promptBuilders.buildBriefReaskContext(inputData, briefBeats, flaggedPageNumbers, options)` splices `scene-briefs-all.txt`'s own `## INPUT ... ## OUTPUT` span out and replaces it with a minimal block: only the FLAGGED pages' plan lines + FIXED blocks (`planBlocks` over the filtered beats), the same Visual Bible JSON, and the same character/avatar/height blocks (needed for the output contract — rule 10c trait-copying, clothing categories). Everything else — the per-page rules, the cross-page rules, the metadata field rules and the output contract — is kept byte-for-byte from the template, so the re-ask can never disagree with what wrote the briefs on what a VALID brief is. The full arc and every unflagged page's plan line are dropped entirely. `briefChecks.runBriefChecks` now builds this context itself instead of receiving `contextPrompt`; the Lab's `beats_scenes` stage (testlab.js) and production (beatsPipeline.js) both call the same `runBriefChecks`, so the two code paths cannot drift (sibling set, `check-sibling-paths.js`).
+
+**Measured** (replay of the same story on staging DB data, 2026-10-03; see the paid-replay entry below for the combined effect with the cover-only change): reconstructing the slim context for the SAME flagged-page set this story's prod run used shows the cut scales with story length — on this short 4-page book the shared rules/output text and the Visual Bible JSON dominate the prompt, so the saving from dropping the arc + unflagged plan lines alone is modest (~6-13k chars depending on exact reconstruction); on a longer book (more pages → a proportionally bigger `ALL_PLAN_LINES` and `FINAL_ARC` in the old code) the saving is larger. Unit-pinned on a synthetic 12-page fixture (`tests/unit/brief-reask-slim-context.test.ts`): the slim context never contains the dropped arc text and never contains an unflagged page's plan line.
+
+**Not done.** No length budget or token count assertion — the saving is structural (fewer pages, no arc), not a hard cap.
+
+**Touched:** `server/lib/promptBuilders.js` (new `buildBriefReaskContext`), `server/lib/briefChecks.js` (`runBriefChecks` builds the context itself), `server/lib/beatsPipeline.js` / `server/lib/testlab.js` (both pass `visualBibleJson`/`availableAvatars`/`maxCharactersPerScene` instead of `briefsPrompt`), `tests/unit/brief-reask-slim-context.test.ts` (new), `tests/unit/brief-checks-reask.test.ts`, `tests/unit/lab-prod-call-parity.test.ts`. **Status:** ✅ active.
+
+## 2026-10-03 — Brief re-ask reasoning lowered to "medium"; cover-only findings ship flagged, never trigger it
+
+**Context.** Same staging measurement (`job_1790618717512_n9wrh5u0j`): the re-ask's 120.3s / $0.229 call spent 10,814 of its 17,091 output tokens on reasoning (the model's default effort on `gemini-3.1-pro` via OpenRouter, unset by this call site). Separately, two of its five findings (`cover_location_repeated` on pages -2 and -3) are cover-only: `checkCoverLocations` only ever fires on `isCoverPage` pages, a cover's location is a field the decision layer (Jev) chose, and the re-ask cannot move it without re-deciding that field — the stored run's own verdict for page -3 was "refused: resolves nothing".
+
+**Decision.**
+1. Reasoning for the `beats_brief_reask` call is set to `{ effort: 'medium' }` (one step down from the implicit default), the same setting the lector A/B found ✅ on this model (`low` was ❌ in that earlier test — see the lector entry) — `server/lib/briefChecks.js`, overridable by `labCallOptions` (Test Lab).
+2. `briefChecks.COVER_ONLY_TYPES` (`cover_cast_dropped`, `cover_location_repeated`, `cover_gaze_not_viewer`, `cover_text_zone_mismatch` — every finding type `sceneBriefCheck.js` restricts to `isCoverPage`) is withheld from the re-ask and logged as shipped (`beats_brief_cover_only_shipped`) in `briefCheckReport.coverOnlyShipped`. A page with both a cover-only and a non-cover finding still sends the non-cover one — covers are pages -1/-2/-3 only, so this never collides with a story page.
+
+**Measured — real paid replay, 2026-10-03** (staging DB data for the same story, combined with the slim-context change above; `scripts` not committed — a one-off local script against the real stored `briefsIn`/`visualBible`/`clothingRequirements`, deleted after the run):
+| | before (stored, production) | after (replay, both changes) |
+|---|---|---|
+| flagged pages | -3, -2, 1, 2, 4 (5) | 1, 2, 4 (3) — -2/-3 shipped flagged, no call |
+| prompt sent | 119,048 chars / 30,433 input tokens | 107,479 chars / 26,949 input tokens |
+| output tokens | 17,091 (10,814 reasoning) | 8,948 (5,423 reasoning) |
+| wall clock | 120.3s | 61.8s |
+| cost | $0.229 | $0.161 (-30%) |
+| result | 3/5 taken, 1 refused (-3, "resolves nothing"), 1 taken but introduced a new finding (-2) | 3/3 taken, 0 refused, 0 introduced |
+
+Resolution quality held (all 3 sent pages taken, none introduced) at lower cost, lower latency and fewer wasted cover-page calls. Cap used: $0.161 of the $0.50 authorized for this task; one replay call, no retry needed.
+
+**Touched:** `server/lib/briefChecks.js` (`COVER_ONLY_TYPES`, reasoning option, `coverOnlyShipped` report field), `tests/unit/brief-checks-reask.test.ts` (new `describe` blocks for both). **Status:** ✅ active.

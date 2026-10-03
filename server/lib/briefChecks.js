@@ -79,6 +79,20 @@ const JEV_OWNED = new Set(['plan_cast_uncited', 'vb_state_contradicted', 'vb_sta
  */
 const REASK_CLOTHING_EXTRA = new Set(['outfit_missing']);
 
+/**
+ * Finding types that concern only a cover page (owner, 2026-09-30): each of
+ * these fires exclusively on `isCoverPage` pages (sceneBriefCheck's cover
+ * checks). A cover-only finding ships flagged rather than triggering the
+ * re-ask — the 2026-09-28 Jev-first replay (job_1790618717512_n9wrh5u0j) sent
+ * a `cover_location_repeated` finding to the re-ask and the rewrite it
+ * produced was refused as "resolves nothing": a cover's location is a decided
+ * field the re-ask cannot move, so sending it there bought nothing but the
+ * call's cost. A page with both cover and non-cover findings still sends its
+ * non-cover findings (only covers are pages -1/-2/-3, so this never collides
+ * with a story page).
+ */
+const COVER_ONLY_TYPES = new Set(['cover_cast_dropped', 'cover_location_repeated', 'cover_gaze_not_viewer', 'cover_text_zone_mismatch']);
+
 /** The cast the brief check counts: the commissioned characters and the bible's secondaries, once each. */
 function briefCastNames(inputData, visualBible) {
   const secondaryList = Array.isArray(visualBible?.secondaryCharacters)
@@ -263,10 +277,10 @@ function renderPageFindings(list) {
  *
  * @returns {Promise<Object>} briefCheckReport
  */
-async function runBriefChecks({ inputData, expansions, briefBeats, visualBible, clothingRequirements, contextPrompt, model, gl, stage = async () => {}, onCall = null, labCallOptions = {} }) {
+async function runBriefChecks({ inputData, expansions, briefBeats, visualBible, visualBibleJson, clothingRequirements, availableAvatars, maxCharactersPerScene, model, gl, stage = async () => {}, onCall = null, labCallOptions = {} }) {
   const t0 = Date.now();
   const textModels = require('./textModels');
-  const { parseRefinedText, BRIEF_TRAILING_MARKERS, buildBriefReaskPrompt } = require('./promptBuilders');
+  const { parseRefinedText, BRIEF_TRAILING_MARKERS, buildBriefReaskPrompt, buildBriefReaskContext } = require('./promptBuilders');
   const { correctFindings, partitionFindings } = require('./briefCorrection');
   const { assessSceneBrief, describeSceneBrief } = require('./iterateBriefGuard');
   const { pinBrief } = require('./jevDecisions');
@@ -279,29 +293,42 @@ async function runBriefChecks({ inputData, expansions, briefBeats, visualBible, 
   for (const f of before.withheld) {
     gl.warn('beats_jev_field_vs_brief', `Page ${f.pageNumber}: ${f.type} on a page whose field the decision layer owns — ${String(f.detail || '').split('. ')[0]}`, null, { pageNumber: f.pageNumber, finding: f });
   }
+  // Cover-only findings ship flagged — they never reach the re-ask (see
+  // COVER_ONLY_TYPES). A page with both kinds still sends its non-cover ones.
+  const coverOnly = before.findings.filter(f => f && COVER_ONLY_TYPES.has(f.type));
+  for (const f of coverOnly) {
+    gl.info('beats_brief_cover_only_shipped', `Page ${f.pageNumber}: ${f.type} ships flagged — cover-only findings never trigger the re-ask`, null, { pageNumber: f.pageNumber, finding: f });
+  }
+  const reaskable = before.findings.filter(f => !(f && COVER_ONLY_TYPES.has(f.type)));
   const byPage = new Map();
-  for (const f of before.findings) {
+  for (const f of reaskable) {
     if (!byPage.has(f.pageNumber)) byPage.set(f.pageNumber, []);
     byPage.get(f.pageNumber).push(f);
   }
   const flagged = [...byPage.keys()].sort((a, b) => a - b);
   const report = {
-    model, findingsBefore: before.findings, withheld: before.withheld, briefsIn,
+    model, findingsBefore: before.findings, withheld: before.withheld, coverOnlyShipped: coverOnly, briefsIn,
     reask: null, bibleText: null, verdicts: [], pages: [], findingsAfter: [], introduced: [], survived: [], wornUnresolvedPages: [], durationMs: 0,
   };
   if (flagged.length === 0) {
     log.info('🧩 [BEATS] brief checks: every brief clean — no re-ask');
-    gl.info('beats_brief_checks', 'Brief checks: every brief clean — no re-ask', null, { withheld: before.withheld.length });
+    gl.info('beats_brief_checks', 'Brief checks: every brief clean — no re-ask', null, { withheld: before.withheld.length, coverOnlyShipped: coverOnly.length });
     report.durationMs = Date.now() - t0;
     return report;
   }
 
-  log.info(`🧩 [BEATS] brief checks: ${before.findings.length} finding(s) on page(s) ${flagged.join(', ')} — one re-ask to the Art Director`);
-  gl.info('beats_brief_checks', `Brief checks found ${before.findings.length} fault(s) on page(s) ${flagged.join(', ')}`, null, { findings: before.findings });
+  log.info(`🧩 [BEATS] brief checks: ${reaskable.length} finding(s) on page(s) ${flagged.join(', ')} — one re-ask to the Art Director`);
+  gl.info('beats_brief_checks', `Brief checks found ${reaskable.length} fault(s) on page(s) ${flagged.join(', ')}`, null, { findings: reaskable });
   await stage(42, 'Checking the scene briefs...', { next: 51, ms: 60000 });
   const jevBackup = !(briefBeats || []).some(b => b && b.jevFixed);
+  // THE SLIM CONTEXT (owner, 2026-09-30): the call-2 template's own rules and
+  // output contract, the Visual Bible, and only the FLAGGED pages' plan lines
+  // and FIXED blocks — never the whole book. See buildBriefReaskContext.
+  const adContext = buildBriefReaskContext(inputData, briefBeats, flagged, {
+    jevBackup, availableAvatars, maxCharactersPerScene, visualBible: visualBibleJson,
+  }) || '';
   const prompt = buildBriefReaskPrompt({
-    contextPrompt,
+    contextPrompt: adContext,
     pages: flagged.map(n => ({ pageNumber: n, brief: expansions.find(x => x.pageNumber === n).brief, findings: renderPageFindings(byPage.get(n)) })),
     jevBackup,
   });
@@ -309,7 +336,10 @@ async function runBriefChecks({ inputData, expansions, briefBeats, visualBible, 
   let failed = null;
   const t1 = Date.now();
   try {
-    res = await textModels.callTextModelStreaming(prompt, null, null, model, { usageLabel: 'beats_brief_reask', ...labCallOptions });
+    // Reasoning lowered one step from the model's default (owner, 2026-09-30):
+    // the lector A/B on the same model found "medium" ✅ / "low" ❌ — see
+    // docs/decisions.md. labCallOptions (Test Lab) may still override it.
+    res = await textModels.callTextModelStreaming(prompt, null, null, model, { usageLabel: 'beats_brief_reask', reasoning: { effort: 'medium' }, ...labCallOptions });
     if (onCall) onCall(res);
     if (!res || !String(res.text || '').trim()) failed = 'the re-ask returned nothing';
     else if (res.truncation?.suspected) failed = `the re-ask reply was ${textModels.describeTruncation(res.truncation)}`;
@@ -404,6 +434,7 @@ async function runBriefChecks({ inputData, expansions, briefBeats, visualBible, 
 module.exports = {
   JEV_OWNED,
   REASK_CLOTHING_EXTRA,
+  COVER_ONLY_TYPES,
   keepDeclaredWornRows,
   keepDeclaredLight,
   briefCastNames,

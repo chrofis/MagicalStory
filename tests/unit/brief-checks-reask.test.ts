@@ -32,7 +32,7 @@ const fixed = { shot: 'medium', timeOfDay: 'dusk', indoor: false, cites: [], dec
 function stubModel(reply: (prompt: string) => string | Error) {
   const calls: any[] = [];
   textModels.callTextModelStreaming = async (prompt: string, _s: any, _c: any, model: string, opts: any) => {
-    calls.push({ prompt, model, label: opts?.usageLabel });
+    calls.push({ prompt, model, label: opts?.usageLabel, reasoning: opts?.reasoning });
     const r = reply(prompt);
     if (r instanceof Error) throw r;
     return { text: r, modelId: model, usage: { input_tokens: 1, output_tokens: 1 } };
@@ -43,7 +43,7 @@ const events: any[] = [];
 const gl = { info: (k: string, m: string) => events.push(['info', k, m]), warn: (k: string, m: string) => events.push(['warn', k, m]), error: (k: string, m: string) => events.push(['error', k, m]), debug() {} };
 const runOn = (expansions: any[], briefBeats: any[]) => BC.runBriefChecks({
   inputData: INPUT, expansions, briefBeats, visualBible: VB, clothingRequirements: null,
-  contextPrompt: 'THE ART DIRECTOR PROMPT THAT WROTE THE BRIEFS', model: 'gemini-3.1-pro', gl,
+  visualBibleJson: JSON.stringify(VB), model: 'gemini-3.1-pro', gl,
 });
 
 describe('the brief checks and the one re-ask', () => {
@@ -62,8 +62,11 @@ describe('the brief checks and the one re-ask', () => {
     expect(calls).toHaveLength(1);
     expect(calls[0].label).toBe('beats_brief_reask');
     expect(calls[0].model).toBe('gemini-3.1-pro');
-    expect(calls[0].prompt).toContain('THE ART DIRECTOR PROMPT THAT WROTE THE BRIEFS');
+    // The slimmed context (2026-09-30): the call-2 template's own rules travel
+    // with the re-ask, never the full prompt that wrote every page's brief.
+    expect(calls[0].prompt).toContain('Simplify, don\'t elaborate');
     expect(calls[0].prompt).toContain('[weather_none_outdoors]');
+    expect(calls[0].reasoning).toEqual({ effort: 'medium' });
     expect(report.verdicts).toEqual([expect.objectContaining({ pageNumber: 1, accepted: true })]);
     expect(extractSceneMetadata(x.brief).weather).toBe('clear');
     expect(report.findingsAfter).toEqual([]);
@@ -134,6 +137,33 @@ describe('the "wearing no clothing" kind reaches the re-ask (Q7)', () => {
     const missing = r.findings.filter((f: any) => f.type === 'outfit_missing');
     expect(missing.map((f: any) => f.character)).toEqual(['Ben']);
     expect(BC.REASK_CLOTHING_EXTRA.has('outfit_missing')).toBe(true);
+  });
+});
+
+describe('cover-only findings ship flagged, never reach the re-ask (owner, 2026-09-30)', () => {
+  const coverPlan = 'medium — Ana and Ben — the cover moment — nothing changes';
+
+  it('a cover page whose only fault is cover_gaze_not_viewer makes no model call', async () => {
+    const calls = stubModel(() => 'unused');
+    // The fixture's default metadata gives Ana/Ben looksAt each other, not the
+    // viewer — a cover fault (checkCoverBrief), cover-only.
+    const x = { pageNumber: -2, brief: brief({ weather: 'clear' }) };
+    const report = await runOn([x], [{ pageNumber: -2, planLine: coverPlan, jevFixed: fixed }]);
+    expect(calls).toHaveLength(0);
+    expect(report.reask).toBeNull();
+    expect(report.coverOnlyShipped.map((f: any) => f.type).sort()).toEqual(['cover_cast_dropped', 'cover_gaze_not_viewer']);
+    expect(BC.COVER_ONLY_TYPES.has('cover_gaze_not_viewer')).toBe(true);
+  });
+
+  it('a cover page with both a cover-only and a non-cover finding sends only the non-cover one to the re-ask', async () => {
+    const x = { pageNumber: -2, brief: brief({ weather: 'none' }) };
+    const calls = stubModel(() => `## Page -2\n${brief({ weather: 'clear' })}`);
+    const report = await runOn([x], [{ pageNumber: -2, planLine: coverPlan, jevFixed: fixed }]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].prompt).toContain('[weather_none_outdoors]');
+    expect(calls[0].prompt).not.toContain('[cover_gaze_not_viewer]');
+    expect(report.coverOnlyShipped.some((f: any) => f.type === 'cover_gaze_not_viewer')).toBe(true);
+    expect(report.verdicts[0].accepted).toBe(true);
   });
 });
 

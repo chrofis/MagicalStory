@@ -4506,7 +4506,8 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       try {
         const report = await runBriefChecks({
           inputData: storyData, expansions, briefBeats: ad.briefBeats, visualBible: ad.visualBible,
-          clothingRequirements: storyData.clothingRequirements || null, contextPrompt: ad.briefsPrompt || '',
+          clothingRequirements: storyData.clothingRequirements || null,
+          visualBibleJson: ad.visualBibleJson, availableAvatars: ad.availableAvatars, maxCharactersPerScene: ad.maxCharactersPerScene,
           model: sceneModel, gl: { info: rec('info'), warn: rec('warn'), error: rec('error'), debug: rec('debug') },
           onCall: (res) => reaskCalls.push(res),
           labCallOptions: params.sceneNoReasoning ? { reasoning: { enabled: false } } : {},

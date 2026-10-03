@@ -920,7 +920,8 @@ describe('beats_scenes (stored plan lines): the run\'s Art Director and brief-ch
     const { runBriefChecks } = req('../../server/lib/briefChecks');
     await runBriefChecks({
       inputData, expansions: ad.expansions.map((x: any) => ({ pageNumber: x.pageNumber, brief: x.brief })), briefBeats: ad.briefBeats,
-      visualBible: ad.visualBible, clothingRequirements: STORY.clothingRequirements, contextPrompt: ad.briefsPrompt || '',
+      visualBible: ad.visualBible, clothingRequirements: STORY.clothingRequirements,
+      visualBibleJson: ad.visualBibleJson, availableAvatars: ad.availableAvatars, maxCharactersPerScene: ad.maxCharactersPerScene,
       model: MODEL_DEFAULTS.sceneDescription, gl,
     });
     const prodCalls = modelCalls.splice(0);

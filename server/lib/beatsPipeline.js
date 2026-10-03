@@ -1949,7 +1949,13 @@ ${bibleBody}` : bibleBody;
     pages: expansions.length, fallbackPages: missingBriefs.map(b => b.pageNumber), model: sceneModel, disobeyed: disobeyed.map(d => d.pageNumber),
   });
 
-  return { expansions, visualBible, bibleSections, wardrobeBibleReport, sceneExpansionReport, briefBeats, coverBeats, briefsPrompt: allPrompt };
+  return {
+    expansions, visualBible, bibleSections, wardrobeBibleReport, sceneExpansionReport, briefBeats, coverBeats, briefsPrompt: allPrompt,
+    // Carried for the brief re-ask's slimmed context (briefChecks.runBriefChecks):
+    // the same avatar list, cast cap and bible JSON this call itself used, so
+    // the re-ask's context can never disagree with what wrote the briefs.
+    availableAvatars, maxCharactersPerScene, visualBibleJson: visualBibleJsonOf(bibleSections),
+  };
 }
 
 /**
@@ -2997,7 +3003,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   const { runBriefChecks } = require('./briefChecks');
   const briefCheckReport = await runBriefChecks({
     inputData, expansions, briefBeats, visualBible, clothingRequirements,
-    contextPrompt: ad.briefsPrompt || '', model: sceneModel, gl, stage,
+    visualBibleJson: ad.visualBibleJson, availableAvatars: ad.availableAvatars, maxCharactersPerScene: ad.maxCharactersPerScene,
+    model: sceneModel, gl, stage,
   });
   meta.timings.briefChecksMs = briefCheckReport.durationMs;
   // Lettering the re-ask declared (required_text_undeclared) reaches the

@@ -4340,6 +4340,31 @@
       "status": "pending",
       "evidence": [],
       "backlog": "none"
+    },
+    {
+      "id": "brief-reask-slim-cover-only-reasoning",
+      "title": "The brief re-ask uses a slimmed context, skips cover-only findings, and runs reasoning=medium",
+      "commits": [],
+      "addedAt": "2026-10-03",
+      "claim": "beats_brief_reask sends only the flagged pages’ plan lines/FIXED blocks (not the whole arc or every page), never triggers on a cover-only finding (cover_cast_dropped, cover_location_repeated, cover_gaze_not_viewer, cover_text_zone_mismatch — those ship flagged in briefCheckReport.coverOnlyShipped), and calls the model at reasoning effort medium.",
+      "runShape": [
+        "replay"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Confirmed by a direct replay against staging story job_1790618717512_n9wrh5u0j (real briefsIn, visualBible, clothingRequirements, briefBeats reconstructed from the stored re-ask prompt): flagged pages dropped from [-3,-2,1,2,4] to [1,2,4] (cover pages -2/-3 shipped flagged, no call), prompt sent 119048 -> 107479 chars, 30433 -> 26949 input tokens, cost $0.229 -> $0.161, wall clock 120.3s -> 61.8s, result 3/3 pages taken (0 refused, 0 introduced) vs the stored run's 3/5 taken with 1 refused and 1 introduced. See docs/decisions.md 2026-10-03 entries for the full table."
+      },
+      "status": "confirmed",
+      "evidence": [],
+      "lastChecked": {
+        "storyId": "job_1790618717512_n9wrh5u0j",
+        "env": "staging",
+        "build": null,
+        "runDate": null,
+        "checkedAt": "2026-10-03",
+        "result": "CONFIRMED",
+        "note": "direct replay against stored story data (not a new story generation); see docs/decisions.md"
+      }
     }
   ],
   "runs": [

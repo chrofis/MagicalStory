@@ -3332,6 +3332,69 @@ function buildBriefReaskPrompt({ contextPrompt, pages = [], jevBackup = false })
 }
 
 /**
+ * THE RE-ASK'S SLIMMED CONTEXT (owner, 2026-09-30): the call-2 template's own
+ * rules and output contract — what the re-ask needs to write a VALID brief —
+ * plus the Visual Bible, but NOT the whole story and NOT every page's plan
+ * line. The full call-2 prompt (buildSceneBriefsAllPrompt output) used to ride
+ * along as `ART_DIRECTOR_PROMPT`; measured on staging job_1790618717512_n9wrh5u0j
+ * it carried 91k chars (30.4k tokens) to correct 5 pages. Only the flagged
+ * pages' plan lines and FIXED blocks go into `{ALL_PLAN_LINES}` here — never
+ * the full book's.
+ *
+ * Splices the template's `## INPUT ... ## OUTPUT` span (the per-page/cross-page
+ * rules and the output contract above and below it are kept verbatim) so the
+ * two templates can never drift on what a valid brief IS, only on how much of
+ * the story is shown while fixing one.
+ *
+ * @param {Object} inputData
+ * @param {Array} briefBeats - every story page's beat (pageNumber, planLine, jevFixed)
+ * @param {Array<number>} flaggedPageNumbers - the pages going to the re-ask
+ * @param {Object} options - same shape as artDirectorFills' options, plus `visualBible` (the JSON string, as buildSceneBriefsAllPrompt receives it)
+ * @returns {string|null}
+ */
+function buildBriefReaskContext(inputData, briefBeats = [], flaggedPageNumbers = [], options = {}) {
+  const template = PROMPT_TEMPLATES.sceneBriefsAll;
+  if (!template) {
+    log.error('[PROMPT] sceneBriefsAll template not loaded — the brief re-ask context is unavailable');
+    return null;
+  }
+  const inputStart = template.indexOf('## INPUT');
+  const outputStart = template.indexOf('## OUTPUT');
+  if (inputStart === -1 || outputStart === -1 || outputStart < inputStart) {
+    log.error('[PROMPT] sceneBriefsAll template has no ## INPUT/## OUTPUT span — the brief re-ask context is unavailable');
+    return null;
+  }
+  const flaggedBeats = briefBeats.filter(b => b && flaggedPageNumbers.includes(Number(b.pageNumber)));
+  const fills = artDirectorFills(inputData, flaggedBeats, options);
+  fills.PAGE_COUNT = flaggedBeats.length;
+  const vb = String(options.visualBible || '').trim();
+  fills.VISUAL_BIBLE = vb ? '```json\n' + vb + '\n```' : '(the Visual Bible call returned no bible — cite no Visual Bible id)';
+  const slimInput = [
+    '## INPUT (slimmed for the re-ask — only the flagged page(s) go to the model)',
+    '',
+    "**THE FLAGGED PAGE(S)' LOCKED PLAN LINE(S):**",
+    '{ALL_PLAN_LINES}',
+    '',
+    "**CHARACTER DETAILS (weave each one's appearance into the prose; copy traits verbatim):**",
+    '{CHARACTER_DESCRIPTIONS}',
+    '',
+    '{HEIGHT_ORDER}',
+    '',
+    '**AVAILABLE CLOTHING PER CHARACTER (the `clothing` value must come from this list):**',
+    '{AVAILABLE_AVATARS}',
+    '',
+    '**THE VISUAL BIBLE (written; every id a page cites is one of these, and every recurring element looks as its entry says):**',
+    '{VISUAL_BIBLE}',
+    '',
+    '---',
+    '',
+  ].join('\n');
+  const spliced = template.slice(0, inputStart) + slimInput + template.slice(outputStart);
+  const filled = fillTemplate(spliced, fills);
+  return applyTextZoneGate(filled, textZoneRulesActive(inputData));
+}
+
+/**
  * Strip the `<!-- TEXT_OVERLAY_BEGIN --> … <!-- TEXT_OVERLAY_END -->` blocks —
  * the text-zone rule family — keeping only the markers when they are active and
  * dropping markers AND contents when they are not. Same gate the unified writer,
@@ -12808,6 +12871,7 @@ module.exports = {
   buildVisualBibleCallPrompt,
   buildSceneBriefsAllPrompt,
   buildBriefReaskPrompt,
+  buildBriefReaskContext,
   shotRuleFills,
   buildSceneExpansionPrompt,
   buildSceneDescriptionPrompt,
