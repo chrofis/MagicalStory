@@ -28,5 +28,5 @@ limits; NO FALLBACKS everywhere (Turnstile fails closed). One Sonnet agent at a 
 - [x] F4 Trial + limits (e5323f57a, c3fc0278b, 3c64c98c8; trust proxy 2 hops) — T1, T2, T3, T4, R4, V4, V5, V2(4-5)
 - [x] F5 Avatars/character writes (59f9048e2, 7d808489f; sync avatar branch deleted; modifyCharactersRow helper) — V1, V2, V3, V6 (area 6), A4 (area 1), T5
 - [x] F6 Story pipeline (ee60dea83..e37033ec7) — A1, A2, C1, C2, C3, C4, C6, C8, C9, B1, B2, B3, B4 (area 1)
-- [ ] F7 Images + repair — A1, A2, A4-A6, A8, A10, A11, C1, C3, C4, C5, D1-D4, B4, B5 (area 2)
-- [ ] F8 Eval + scoring — A1-A5, B1-B7 (area 3)
+- [x] F7 Images + repair (1986c0961..d558a57bc) — A1, A2, A4-A6, A8, A10, A11, C1, C3, C4, C5, D1-D4, B4, B5 (area 2)
+- [x] F8 Eval + scoring (702a3bfdd, 3afb7b596, 313cae148) — A1-A5, B1-B7 (area 3)
