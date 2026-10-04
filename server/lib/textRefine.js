@@ -781,6 +781,11 @@ function quotedSpan(s) {
   if (!close) return null;
   const end = t.lastIndexOf(close);
   if (end <= 0) return false;
+  // A PAIRED opener («, „, “, ‹, ‘) also starts ordinary text: a bare correction
+  // `«Komm!», sagte er.` is prose, not a quoted span. It is a delimiter only when
+  // its close ends the side (review 2026-10-04 C4). Symmetric quotes (' " `)
+  // keep first-to-last.
+  if (close !== t[0] && end !== t.length - 1) return null;
   return t.slice(1, end);
 }
 
