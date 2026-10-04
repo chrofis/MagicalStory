@@ -65962,3 +65962,9 @@ The pin on atbttop6w's stored front-cover brief moves `LOC001.1` → `LOC001.5` 
 
 **Context.** Staging job_1791040103540_atbttop6w p12 shipped the named secondary character (CHR001, placed "in the background") with a smeared, featureless face. The page's never-cut REQUIRED CAST line asked for passers-by with "faces indistinct". Lab #1586–#1589 (old vs new wording, 2 renders each, on a stale branch's prompt override) did not reproduce the smear, so the wording is a likely contributor, not a proven sole cause.
 **Decision (owner).** "Never smudge faces": the `ambient` and `crowd` tails of `REQUIRED_CAST_BACKGROUND` describe extras as busy with their own business, mostly turned away, every face fully drawn; the never-confusable clause stays. **Touched:** `server/lib/promptBuilders.js`, `tests/unit/ambient-background-people.test.ts`. **Status:** ✅ active.
+
+## 2026-10-04 — core.hooksPath always names the MAIN working tree's .githooks
+
+**Context.** `scripts/admin/setup-git-hooks.js` (npm `prepare`) built the hooks dir from `__dirname`, and `core.hooksPath` lives in the SHARED `.git/config`, so an `npm install` inside any agent worktree repointed every worktree — the main clone included — at that worktree (found: `.claude/worktrees/agent-a5140749b699320ad/.githooks`). Removing that worktree would make git skip the pre-push hook silently.
+**Decision.** The hooks dir is the parent of `git rev-parse --git-common-dir` (the main working tree) + `.githooks`, from whichever worktree runs it. Still never fails the install. Pinned by `tests/unit/setup-git-hooks.test.ts`.
+**Touched:** `scripts/admin/setup-git-hooks.js`, `tests/unit/setup-git-hooks.test.ts`.
