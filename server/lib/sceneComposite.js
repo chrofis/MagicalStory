@@ -1018,11 +1018,16 @@ async function cropSheetCell(sheetBuf, cellIdx, sheetKey = null) {
   const key = sheetKey || sheetKeyOf(sheetBuf);
   if (!_sheetSplitCache.has(key)) {
     _cacheSet(_sheetSplitCache, key, (async () => {
+      await null; // let _cacheSet run first so a failure's delete below always lands
       _sheetSplitCalls++;
       try {
         return await splitSheetByEdgeDetection(sheetBuf);
       } catch (err) {
-        log.warn(`[SCENE COMPOSITE] edge-detection split failed: ${err.message} — falling back to fixed-math crop`);
+        log.warn(`[SCENE COMPOSITE] edge-detection split failed: ${err.message} — falling back to fixed-math crop for this call (decisions 2026-09-19)`);
+        // Never cache a transient analyzer failure (code review 2026-10 C5): a
+        // cached null pinned the sheet to the fixed grid until LRU eviction.
+        // The fixed-grid crop itself is the documented fallback and stays.
+        _sheetSplitCache.delete(key);
         return null;
       }
     })());
