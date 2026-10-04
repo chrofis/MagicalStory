@@ -4673,6 +4673,22 @@
       "evidence": []
     },
     {
+      "id": "cover-places-distinct-offered",
+      "title": "The three covers are distinct (different landmark, or same landmark with a different viewpoint and cast); offered famous landmarks can host a cover",
+      "commits": [],
+      "addedAt": "2026-10-04",
+      "claim": "On the next full staging story with an offered landmark list: data.jevDecisions.coverPlaces.unmet is empty; a cover on an offered landmark cites a new bible vantage (coverOnly) whose landmarkPhoto is that landmark's best exterior photo; its rendered plate shows that landmark with open ground in front and the cast standing there; the three cover images are visibly different places or viewpoints.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read data.jevDecisions.coverPlaces (covers, unmet); find each cited vantage in data.visualBible.locations; look at the three cover images and the plate of any offered-landmark cover."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
       "id": "trial-page-clothing-name-spelling",
       "title": "A trial whose outline spells the hero's name differently from the character still renders the costume on every costumed page",
       "commits": [

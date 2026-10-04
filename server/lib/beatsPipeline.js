@@ -1853,25 +1853,42 @@ ${bibleBody}` : bibleBody;
   // The result is the cover beat's location-only FIXED field (pinned like a
   // story page's location) and the covers' pages in the bible's tables.
   if (jevActive(jevReport) && coverBeats.length) try {
-    const { decideCoverPlaces, applyCoverPlacePages } = require('./jevBriefFields');
-    const places = await decideCoverPlaces({ arc: approvedArc, pages: beats, visualBible, coverKeys: coverBeats.map(cb => cb.coverKey) });
+    const { decideCoverPlaces, applyCoverPlacePages, materializeCoverPlaces } = require('./jevBriefFields');
+    // Each cover's cast is its beat's who column (coverBeats): two covers on one
+    // landmark must differ in viewpoint AND cast (owner, 2026-10-04).
+    const casts = Object.fromEntries(coverBeats.map(cb => [cb.coverKey, String(jevDecisions.planParts(cb.planLine)[1] || '').split(/,\s*/).map(x => x.trim()).filter(Boolean)]));
+    // The candidates include the story's OFFERED landmarks no page stands on
+    // (owner, 2026-10-04), each rated by its own yes/no per cover.
+    const places = await decideCoverPlaces({
+      arc: approvedArc, pages: beats, visualBible, coverKeys: coverBeats.map(cb => cb.coverKey), casts,
+      availableLandmarks: inputData.availableLandmarks || [], town: (inputData.userLocation && inputData.userLocation.city) || null,
+    });
+    if (places.unmet && places.unmet.length) {
+      log.error(`🚨 [BEATS] The covers are not distinct: ${places.unmet.join('; ')} — they ship flagged`);
+      gl.error('beats_cover_places_not_distinct', `The covers are not distinct: ${places.unmet.join('; ')}`, null, { unmet: places.unmet, covers: places.covers });
+    }
     if (jevReport) jevReport.coverPlaces = places;
     if (!places.covers.length) {
       log.error(`🚨 [BEATS] No cover place decided: ${places.reason} — the covers keep the Art Director's own-place rule`);
       gl.error('beats_cover_place_unassigned', `No cover place decided: ${places.reason} — the Art Director picks each cover's place under the own-place rule`, null, { reason: places.reason });
     }
+    // A picked offered landmark becomes a bible place with a wide vantage that
+    // cites its best cover photo; every cover then cites a real vantage id.
+    const cites = visualBible ? materializeCoverPlaces(visualBible, places.covers) : {};
     const citeByPage = new Map();
     for (const c of places.covers) {
       const cb = coverBeats.find(b => b.coverKey === c.coverKey);
-      cb.jevFixed = { coverPlace: true, location: c.cite, labels: { [c.cite]: c.label } };
-      citeByPage.set(Number(cb.pageNumber), c.cite);
+      const cite = cites[c.coverKey] || c.cite;
+      c.cite = cite;
+      cb.jevFixed = { coverPlace: true, location: cite, labels: { [cite]: c.offered ? `${c.label}, in front of it` : c.label } };
+      citeByPage.set(Number(cb.pageNumber), cite);
     }
     if (visualBible && applyCoverPlacePages(visualBible, citeByPage) && bibleSections) {
       const synced = syncVisualBibleSection(bibleSections, visualBible);
       if (synced === bibleSections) gl.warn('beats_vb_sync_failed', 'The covers\' decided places could not be written back into the transcript');
       else bibleSections = synced;
     }
-    gl.info('beats_jev_cover_places', `Cover places by Jev + code: ${places.covers.map(c => `p${coverBeats.find(b => b.coverKey === c.coverKey).pageNumber} ${c.cite} (${c.p}${c.shared ? ', shared' : ''})`).join(', ') || 'none'} over ${places.candidates.length} wide vantage(s)`, null, { covers: places.covers, candidates: places.candidates, stats: places.stats });
+    gl.info('beats_jev_cover_places', `Cover places by Jev + code: ${places.covers.map(c => `p${coverBeats.find(b => b.coverKey === c.coverKey).pageNumber} ${c.cite} (${c.p}${c.shared ? ', shared' : ''})`).join(', ') || 'none'} over ${places.candidates.length} candidate(s)`, null, { covers: places.covers, candidates: places.candidates, stats: places.stats });
   } catch (err) {
     if (!(err instanceof JevDecisionError) || !jevReport) throw err;
     for (const cb of coverBeats) delete cb.jevFixed;

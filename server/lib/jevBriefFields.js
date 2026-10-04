@@ -220,13 +220,30 @@ function visualBibleJsonOf(bibleSections) {
  *               place only seen in the distance;
  *   Jev         one choice call per cover over the candidates, on the arc and
  *               the page plan (the state of the 2026-10-04 replay);
- *   code        the assignment: distinct vantages, highest summed probability;
- *               two covers share one only when the candidates run out.
+ *   code        the assignment: the front cover takes its top-rated vantage;
+ *               the others take distinct ones from what is left by their
+ *               probabilities, sharing only when none remains.
  * The result is the cover beat's location-only `jevFixed`, pinned like a story
  * page's location (jevDecisions.pinBrief), and the covers' pages in the
  * bible's location / vantage tables.
  */
 const COVER_PLACE_SHOTS = new Set(['wide', 'ultra-wide']);
+
+/** P(yes) of one noul answer in a Jev reply; throws on a malformed answer. */
+function jevAuditYes(answers, id) {
+  return require('./jevAudit').yesProb(answers && answers[id]);
+}
+
+/**
+ * The yes/no each OFFERED landmark gets per cover (owner, 2026-10-04): does
+ * this famous place of the town suit this cover's picture? Generic wording —
+ * the cover's purpose and the place's own label, nothing of any one story.
+ */
+const COVER_OFFERED_Q = Object.freeze({
+  frontCover: label => `This famous place of the book's town suits the book's front cover: a bright portrait of the cast standing together in front of it, under the book's title. The place: ${label}`,
+  initialPage: label => `This famous place of the book's town suits the title page, the opening picture before the story begins: the cast standing together in front of it, setting out. The place: ${label}`,
+  backCover: label => `This famous place of the book's town suits the back cover, a calm closing picture after the adventure: the cast standing together, at rest, in front of it. The place: ${label}`,
+});
 
 const COVER_PLACE_Q = Object.freeze({
   frontCover: 'The front cover, under the book title: the place and viewpoint that best stands for the whole story — its key place, where the cast can stand together.',
@@ -234,12 +251,45 @@ const COVER_PLACE_Q = Object.freeze({
   backCover: 'The back cover, a calm closing picture after the adventure: the place and viewpoint where the story ends at rest, where the cast can stand together.',
 });
 
+const normName = x => String(x || '').toLowerCase().replace(/[()[\],.]/g, ' ').replace(/\s+/g, ' ').trim();
+
+/** The bible location an offered landmark already is (name matched like visualBible.linkPreDiscoveredLandmarks; any location, real or not). */
+function bibleLocationOf(visualBible, landmark) {
+  const n = normName(landmark && landmark.name);
+  if (!n) return null;
+  return (visualBible && Array.isArray(visualBible.locations) ? visualBible.locations : []).find((l) => {
+    if (!l) return false;
+    return [l.landmarkQuery, l.name].some((q) => {
+      const v = normName(q);
+      return v && (v === n || (v.includes(n) && n.length >= 5) || (n.includes(v) && v.length >= 5));
+    });
+  }) || null;
+}
+
+/** A photo a cover may be painted in front of: an exterior, wide or medium, photo_score >= 40 (owner, 2026-10-04). */
+const COVER_PHOTO_MIN_SCORE = 40;
+function coverPhotoOf(landmark) {
+  const ok = (Array.isArray(landmark && landmark.photoVariants) ? landmark.photoVariants : [])
+    .filter(v => v && v.kind === 'exterior' && (v.framing === 'wide' || v.framing === 'medium') && Number(v.photoScore) >= COVER_PHOTO_MIN_SCORE);
+  return ok.sort((a, b) => (Number(b.photoScore) - Number(a.photoScore)) || (a.variantNumber - b.variantNumber))[0] || null;
+}
+
+/** A photo description without its "[scope, season, time]" tag. */
+const photoText = v => String((v && v.description) || '').replace(/^\s*\[[^\]]*\]\s*/, '').trim();
+
 /**
- * The vantages a cover may take: `wide` / `ultra-wide` vantages of the
- * locations story pages stand on. Pure.
- * @returns {Array<{id:string, base:string, name:string, label:string, shot:string}>}
+ * The places a cover may take (owner, 2026-10-04):
+ *   - the `wide` / `ultra-wide` vantages of the locations story pages stand on;
+ *   - every OFFERED landmark (the story's ranked list, `inputData.availableLandmarks`)
+ *     no story page stands on, with at least one exterior wide/medium photo of
+ *     photo_score >= COVER_PHOTO_MIN_SCORE — a backdrop the cast stands in front
+ *     of, painted from its best such photo. It may already be a bible location
+ *     (seen from the pages, never stood on) or not be one yet;
+ *     materializeCoverPlaces writes it into the bible once a cover picks it.
+ * Pure.
+ * @returns {Array<{id:string, base:string, name:string, label:string, shot:string, visited:boolean, offered?:Object}>}
  */
-function coverPlaceCandidates(visualBible, storyPageNumbers) {
+function coverPlaceCandidates(visualBible, storyPageNumbers, availableLandmarks = []) {
   const { resolveShotId } = require('./shotVocabulary');
   const located = pageLocations(visualBible, storyPageNumbers);
   const bases = new Set([...located.byPage.values()].map(r => r.base));
@@ -254,46 +304,148 @@ function coverPlaceCandidates(visualBible, storyPageNumbers) {
       if (!COVER_PLACE_SHOTS.has(shot)) continue;
       const desc = String(v.description || '').replace(/\s+/g, ' ').trim().slice(0, 120);
       const name = `${l.name}, ${v.name}`;
-      out.push({ id: String(v.id).trim().toUpperCase(), base, shot, name, label: `${name} (${shot} view)${desc ? `: ${desc}` : ''}` });
+      out.push({ id: String(v.id).trim().toUpperCase(), base, shot, name, visited: true, label: `${name} (${shot} view)${desc ? `: ${desc}` : ''}` });
     }
+  }
+  const seen = new Set();
+  for (const lm of (Array.isArray(availableLandmarks) ? availableLandmarks : [])) {
+    if (!lm || !lm.name || seen.has(normName(lm.name))) continue;
+    seen.add(normName(lm.name));
+    const loc = bibleLocationOf(visualBible, lm);
+    const locBase = loc ? String(loc.id).trim().toUpperCase().split('.')[0] : null;
+    if (locBase && bases.has(locBase)) continue; // stood on: its own vantages are the candidates
+    const photo = coverPhotoOf(lm);
+    if (!photo) continue;
+    const base = locBase || `NEW:${normName(lm.name)}`;
+    out.push({
+      id: `${base}+`, base, shot: 'wide', name: lm.name, visited: false,
+      offered: { landmark: lm, photo, locId: locBase },
+      label: `${lm.name}${lm.type ? ` (${String(lm.type).toLowerCase()})` : ''}: ${photoText(photo).slice(0, 140)} — a famous place of the town; no story page is set here`,
+    });
   }
   return out;
 }
 
 /**
- * Distinct vantages first, then the highest summed probability; a vantage is
- * shared only when there are fewer candidates than covers (every candidate is
- * then used once before any is used twice). Ties keep the earlier candidate.
- * Pure.
+ * Write each picked OFFERED landmark into the bible as the place its cover
+ * stands at — from structured data only: the landmark's name and type, and its
+ * best cover photo's description and number. A landmark already in the bible
+ * gets a new wide vantage; one that is not gets a location with one wide
+ * vantage, linked to the offered landmark like any real landmark
+ * (visualBible.linkPreDiscoveredLandmarks) and carrying its photoVariants. The
+ * vantage cites that photo (`landmarkPhoto`), so its plate is painted from it.
+ * Covers that picked the same offered landmark share the vantage. Mutates;
+ * returns coverKey → the vantage id now cited.
+ */
+function materializeCoverPlaces(visualBible, covers) {
+  const out = {};
+  if (!visualBible) return out;
+  if (!Array.isArray(visualBible.locations)) visualBible.locations = [];
+  const made = new Map();
+  const nextLocId = () => {
+    const nums = visualBible.locations.map(l => Number((String((l && l.id) || '').match(/^LOC(\d+)/i) || [])[1] || 0));
+    return `LOC${String(Math.max(0, ...nums) + 1).padStart(3, '0')}`;
+  };
+  for (const c of covers) {
+    if (!c.offered) { out[c.coverKey] = c.cite; continue; }
+    const key = normName(c.offered.landmark.name);
+    if (made.has(key)) { out[c.coverKey] = made.get(key); continue; }
+    const { landmark, photo } = c.offered;
+    let loc = c.offered.locId ? visualBible.locations.find(l => String(l.id).toUpperCase() === c.offered.locId) : null;
+    const text = photoText(photo);
+    if (!loc) {
+      loc = {
+        id: nextLocId(), label: String(landmark.type || 'landmark').toLowerCase(), name: landmark.name,
+        isRealLandmark: true, landmarkQuery: landmark.name, scaleClass: 'landmark', setting: 'outdoor, landmark',
+        description: text, appearsInPages: [], coverOnly: true,
+      };
+      visualBible.locations.push(loc);
+      require('./visualBible').linkPreDiscoveredLandmarks({ locations: [loc] }, [landmark]);
+    }
+    if (!Array.isArray(loc.photoVariants) && Array.isArray(landmark.photoVariants)) loc.photoVariants = landmark.photoVariants;
+    if (!Array.isArray(loc.vantages)) loc.vantages = [];
+    const n = Math.max(0, ...loc.vantages.map(v => Number(String((v && v.id) || '').split('.')[1] || 0))) + 1;
+    const vantage = {
+      id: `${loc.id}.${n}`, name: `in front of ${landmark.name}`, shot: 'wide', description: text,
+      emptyScenePrompt: `${text} Seen wide, with open, level ground in the foreground in front of it.`,
+      landmarkPhoto: String(photo.variantNumber), pages: [], coverOnly: true,
+    };
+    loc.vantages.push(vantage);
+    made.set(key, vantage.id);
+    out[c.coverKey] = vantage.id;
+  }
+  return out;
+}
+
+/** A cover's own Jev rating below this is a leftover, not a pick (owner: "never a near-zero leftover"). */
+const COVER_PLACE_FLOOR = 0.1;
+
+/**
+ * THE THREE COVERS MUST BE DISTINCT (owner, 2026-10-04: "Either different
+ * landmark that is best or different view point and different cast").
+ *   - The front cover picks first: its top-rated candidate.
+ *   - Two covers on DIFFERENT landmarks are distinct.
+ *   - Two covers on the SAME landmark are distinct only with a different
+ *     viewpoint AND a different cast (`casts[i]` as a set of names).
+ *   - Every other cover's own rating is at least COVER_PLACE_FLOOR.
+ * Code searches every assignment of the other covers: the fewest pairs that
+ * are not distinct first, then the fewest covers under the floor, then the
+ * highest summed rating; ties keep the earlier
+ * candidate. When no assignment meets them all, the best one is returned with
+ * `unmet` listing what failed — the caller logs it at error level and ships it
+ * flagged. Pure.
  *
  * @param {string[]} coverKeys
  * @param {number[][]} probs - probs[i][j]: cover i, candidate j
- * @returns {number[]} candidate index per cover
+ * @param {{cands?:Array<{id:string, base:string}>, casts?:string[][], floor?:number}} [opts]
+ * @returns {{pick:number[], unmet:string[]}}
  */
-function assignCoverPlaces(coverKeys, probs) {
+function assignCoverPlaces(coverKeys, probs, { cands = null, casts = null, floor = COVER_PLACE_FLOOR } = {}) {
   const n = coverKeys.length;
   const m = probs.length ? probs[0].length : 0;
-  if (!n) return [];
+  if (!n) return { pick: [], unmet: [] };
   if (!m) throw new Error('assignCoverPlaces: no candidate vantage');
-  let best = null;
+  const C = cands || probs[0].map((_, j) => ({ id: `c${j}`, base: `c${j}` }));
+  const castKey = i => [...new Set((casts && casts[i]) || [])].map(x => String(x).trim().toLowerCase()).sort().join('|');
+  const front = coverKeys.indexOf('frontCover');
   const pick = new Array(n);
+  if (front >= 0) pick[front] = probs[front].reduce((bi, p, j, arr) => (p > arr[bi] + 1e-12 ? j : bi), 0);
+  const failures = () => {
+    const out = [];
+    for (let a = 0; a < n; a++) {
+      if (a !== front && probs[a][pick[a]] < floor) out.push(`floor: ${coverKeys[a]} rated ${probs[a][pick[a]].toFixed(2)} for ${C[pick[a]].id}, under ${floor}`);
+      for (let b = a + 1; b < n; b++) {
+        if (C[pick[a]].base !== C[pick[b]].base) continue;
+        const sameView = pick[a] === pick[b];
+        const sameCast = castKey(a) === castKey(b);
+        if (sameView || sameCast) out.push(`distinct: ${coverKeys[a]} and ${coverKeys[b]} share ${C[pick[a]].base}${sameView ? ' and its viewpoint' : ''}${sameCast ? ' with the same cast' : ''}`);
+      }
+    }
+    return out;
+  };
+  let best = null;
   const walk = (i) => {
     if (i === n) {
-      const distinct = new Set(pick).size;
-      const sum = pick.reduce((s, j, k) => s + probs[k][j], 0);
-      if (!best || distinct > best.distinct || (distinct === best.distinct && sum > best.sum + 1e-12)) best = { distinct, sum, pick: [...pick] };
+      const unmet = failures();
+      const pairs = unmet.filter(u => u.startsWith('distinct:')).length;
+      const low = unmet.length - pairs;
+      const sum = pick.reduce((s, j, k) => (k === front ? s : s + probs[k][j]), 0);
+      // Distinctness first (the owner's must), then the floor, then the ratings.
+      const better = !best || pairs < best.pairs || (pairs === best.pairs && (low < best.low || (low === best.low && sum > best.sum + 1e-12)));
+      if (better) best = { unmet, pairs, low, sum, pick: [...pick] };
       return;
     }
+    if (i === front) { walk(i + 1); return; }
     for (let j = 0; j < m; j++) { pick[i] = j; walk(i + 1); }
   };
   walk(0);
-  return best.pick;
+  return { pick: best.pick, unmet: best.unmet };
 }
 
 /** The cover question's state: the arc and the whole page plan (shot stripped). */
-function coverPlaceState(arc, pages) {
+function coverPlaceState(arc, pages, town = null) {
   const plan = pages.map(p => `Page ${p.pageNumber}: ${jevDecisions.stripPlanShot(p.planLine)}`).join('\n');
-  return `THE STORY, beat by beat:\n${String(arc || '').trim() || '(no arc stored)'}\n\n${jevDecisions.PLAN_HEAD}\n${plan}\n\nTHE BOOK'S COVERS each show the cast standing together, whole in frame, on solid ground at a place of this story, seen wide.`;
+  return `THE STORY, beat by beat:\n${String(arc || '').trim() || '(no arc stored)'}\n\n${jevDecisions.PLAN_HEAD}\n${plan}\n\nTHE BOOK'S COVERS each show the cast standing together, whole in frame, on solid ground at a place of this story${town ? ` or a famous place of its town, ${town}` : ''}, seen wide.`;
 }
 
 /**
@@ -304,38 +456,59 @@ function coverPlaceState(arc, pages) {
  * @param {{arc:string, pages:Array, visualBible:Object, coverKeys:string[]}} input
  * @returns {Promise<{covers:Array<{coverKey:string, cite:string, label:string, p:number, shared:boolean, candidates:Object}>, candidates:string[], reason?:string, stats:Object}>}
  */
-async function decideCoverPlaces({ arc, pages, visualBible, coverKeys }, opts = {}) {
+async function decideCoverPlaces({ arc, pages, visualBible, coverKeys, casts = {}, availableLandmarks = [], town = null }, opts = {}) {
   const stats = jevDecisions.newStats();
   const keys = (coverKeys || []).filter(k => COVER_PLACE_Q[k]);
-  const cands = coverPlaceCandidates(visualBible, pages.map(p => Number(p.pageNumber)));
+  const cands = coverPlaceCandidates(visualBible, pages.map(p => Number(p.pageNumber)), availableLandmarks);
   if (!keys.length) return { covers: [], candidates: [], stats: jevDecisions.summarise(stats) };
-  if (!cands.length) return { covers: [], candidates: [], reason: 'no wide or ultra-wide vantage of a location a story page stands on', stats: jevDecisions.summarise(stats) };
-  const state = coverPlaceState(arc, pages);
-  const criteria = Object.fromEntries(cands.map((c, j) => [`v${j}`, c.label]));
-  const reqs = keys.map(k => ({ key: `cover:${k}`, state, questions: { PLACE: { type: 'choice', instructions: COVER_PLACE_Q[k], criteria } } }));
+  if (!cands.length) return { covers: [], candidates: [], reason: 'no wide or ultra-wide vantage of a location a story page stands on, and no offered landmark with a cover photo', stats: jevDecisions.summarise(stats) };
+  // TWO RANKINGS (owner, 2026-10-04): the visited vantages compete in one
+  // choice per cover, as before; each OFFERED landmark gets its own yes/no per
+  // cover — never ranked against the places the story visits, which take
+  // nearly all of a shared choice's probability (replay: ~0.01 for every
+  // offered landmark). The rating of a candidate is its choice probability or
+  // its P(yes); assignCoverPlaces reads both on one scale.
+  const state = coverPlaceState(arc, pages, town);
+  const visited = cands.map((c, j) => [c, j]).filter(([c]) => !c.offered);
+  const offered = cands.map((c, j) => [c, j]).filter(([c]) => c.offered);
+  const reqs = [];
+  for (const k of keys) {
+    if (visited.length) {
+      reqs.push({ key: `cover:${k}`, state, questions: { PLACE: { type: 'choice', instructions: COVER_PLACE_Q[k], criteria: Object.fromEntries(visited.map(([c, j]) => [`v${j}`, c.label])) } } });
+    }
+    if (offered.length) {
+      reqs.push({ key: `offered:${k}`, state, questions: Object.fromEntries(offered.map(([c, j]) => [`o${j}`, { type: 'noul', instructions: COVER_OFFERED_Q[k](c.label) }])) });
+    }
+  }
   const ans = await jevDecisions.runJevRequests(reqs, { ...opts, usageLabel: 'jev_decisions_cover_place', stats });
+  const mean = xs => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
   const probs = keys.map((k) => {
+    const row = new Array(cands.length).fill(0);
     const a = ans.get(`cover:${k}`) || [];
-    return cands.map((_, j) => {
-      const vals = a.map((x) => {
+    for (const [, j] of visited) {
+      row[j] = mean(a.map((x) => {
         const q = x && x.PLACE;
         if (!q || !q.probabilities) throw new JevDecisionError(`Jev cover place answer for ${k} carries no probabilities`);
         return Number(q.probabilities[`v${j}`] || 0);
-      });
-      return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
-    });
+      }));
+    }
+    const b = ans.get(`offered:${k}`) || [];
+    for (const [, j] of offered) row[j] = mean(b.map(x => jevAuditYes(x, `o${j}`)));
+    return row;
   });
-  const pick = assignCoverPlaces(keys, probs);
+  const { pick, unmet } = assignCoverPlaces(keys, probs, { cands, casts: keys.map(k => casts[k] || []) });
   const covers = keys.map((k, i) => ({
     coverKey: k,
     cite: cands[pick[i]].id,
     label: cands[pick[i]].name,
+    ...(cands[pick[i]].offered ? { offered: cands[pick[i]].offered, photo: cands[pick[i]].offered.photo.variantNumber } : {}),
     p: +probs[i][pick[i]].toFixed(3),
     shared: pick.filter(j => j === pick[i]).length > 1,
+    cast: casts[k] || [],
     candidates: Object.fromEntries(cands.map((c, j) => [c.id, +probs[i][j].toFixed(3)])),
   }));
-  log.info(`🖼️ [JEV/cover-place] ${covers.map(c => `${c.coverKey} ${c.cite} ${c.p}${c.shared ? ' (shared)' : ''}`).join(', ')} over ${cands.length} wide vantage(s) (${stats.calls} calls)`);
-  return { covers, candidates: cands.map(c => c.id), stats: jevDecisions.summarise(stats) };
+  log.info(`🖼️ [JEV/cover-place] ${covers.map(c => `${c.coverKey} ${c.cite} ${c.p}${c.shared ? ' (shared)' : ''}`).join(', ')} over ${cands.length} candidate(s) (${stats.calls} calls)${unmet.length ? ` — NOT DISTINCT: ${unmet.join('; ')}` : ''}`);
+  return { covers, candidates: cands.map(c => c.id), unmet, stats: jevDecisions.summarise(stats) };
 }
 
 /**
@@ -373,5 +546,5 @@ function applyCoverPlacePages(visualBible, citeByPage) {
 
 module.exports = {
   decideBriefFields, pinDecidedFields, pageLocations, visualBibleJsonOf,
-  COVER_PLACE_SHOTS, COVER_PLACE_Q, coverPlaceCandidates, assignCoverPlaces, coverPlaceState, decideCoverPlaces, applyCoverPlacePages,
+  COVER_PLACE_SHOTS, COVER_PLACE_Q, COVER_OFFERED_Q, COVER_PLACE_FLOOR, COVER_PHOTO_MIN_SCORE, coverPhotoOf, bibleLocationOf, materializeCoverPlaces, coverPlaceCandidates, assignCoverPlaces, coverPlaceState, decideCoverPlaces, applyCoverPlacePages,
 };
