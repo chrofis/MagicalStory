@@ -1266,46 +1266,14 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
     // figure's intended facing direction on this page. Falls through when
     // the story doesn't yet have a sheet for the character.
     if (useStorySheetCells && storyData?.characterAvatars && Array.isArray(refApplied.characterPhotos)) {
-      const { cropAvatarCell } = require('../lib/sceneComposite');
+      const sav = require('../lib/storyAvatars');
       const metaChars = sceneMetadata?.fullData?.characters || sceneMetadata?.characters || [];
-      // Shared resolver — beats metadata carries `perspective` prose, not
-      // `pose`; the inline copy here served threeQuarter to every declared
-      // back-view figure.
-      const { resolveCellPose, resolveSheetForRef, wornResolvedForPage } = require('../lib/storyAvatars');
-      // Wardrobe state — same sheet choice as generation and as the other two
-      // repair entry points; never a fourth inline copy of the lookup.
-      const wornResolved = wornResolvedForPage(visualBible, sceneMetadata, metaChars, pageNumber);
-      const poseByName = new Map();
-      for (const sc of metaChars) {
-        const nm = (typeof sc === 'string' ? sc : sc?.name) || '';
-        if (!nm) continue;
-        poseByName.set(nm.toLowerCase(), resolveCellPose(sc));
-      }
-      for (const ref of refApplied.characterPhotos) {
-        const charName = ref.name;
-        if (!charName) continue;
-        const story = storyData.characterAvatars[charName];
-        if (!story) continue;
-        // Shared resolver (slot mapping + wardrobe state + loud costumed fallback).
-        const resolved = resolveSheetForRef(story, ref, { wornResolved });
-        if (!resolved) continue;
-        const { uri: sheetUri, slotKey } = resolved;
-        const pf = poseByName.get(charName.toLowerCase()) || { pose: 'threeQuarter', flip: false, depth: 'foreground' };
-        const includeFace = pf.depth === 'foreground';
-        try {
-          const { body, stacked } = await cropAvatarCell(sheetUri, { pose: pf.pose, flip: pf.flip, includeFace, stack: includeFace });
-          const buf = stacked || body;
-          ref.photoUrl = `data:image/png;base64,${buf.toString('base64')}`;
-          ref.photoType = `cell-${pf.pose}${pf.flip ? '-flip' : ''}${includeFace ? '-headbody' : ''}`;
-          ref.cellPose = pf.pose;
-          ref.cellFlip = pf.flip;
-          ref.cellDepth = pf.depth;
-          ref.cellIncludesFace = includeFace;
-          log.debug(`[CELL REFS] ${charName}: cropped ${pf.pose}${pf.flip ? ' flipped' : ''}${includeFace ? ' + head' : ''} (depth=${pf.depth}) from ${slotKey}`);
-        } catch (err) {
-          log.warn(`[CELL REFS] crop failed for ${charName}: ${err.message}`);
-        }
-      }
+      // The one shared cell-crop (code review 2026-10 C3): same sheet, wardrobe
+      // state and close-up head crop as generation and the other repair entries.
+      await sav.applyStoryCellRefs(refApplied.characterPhotos, storyData.characterAvatars, metaChars, {
+        closeUp: sceneMetadata?.fullData?.shot === 'close-up',
+        wornResolved: sav.wornResolvedForPage(visualBible, sceneMetadata, metaChars, pageNumber),
+      });
     }
     // Snapshot of inputs that every model in this run was given. Surfaced in
     // the response so the panel can show "what was sent to the model" next to

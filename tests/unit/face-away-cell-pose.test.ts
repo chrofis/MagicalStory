@@ -62,7 +62,9 @@ describe('every cell-ref call site reads the one resolver', () => {
   const root = path.resolve(__dirname, '../..');
   it.each(['server/lib/images.js', 'server/routes/regeneration.js'])('%s', (rel) => {
     const src = fs.readFileSync(path.join(root, rel), 'utf8');
-    expect(src).toMatch(/resolveCellPose\(sc\)/);
+    // Every site delegates to the ONE cell-crop (no hand-copied loop, code review 2026-10 C3).
+    expect(src).toMatch(/applyStoryCellRefs\(/);
+    expect(src).not.toMatch(/cropAvatarCell\(/);
     // No inline copy of the perspective → pose mapping.
     expect(src).not.toMatch(/\bback\b\|behind/);
   });

@@ -5259,15 +5259,15 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // scene-expansion metadata so the cell matches the figure's intended
   // facing direction on this page. Skips characters with no story sheet.
   if (useStorySheetCells && storyData?.characterAvatars) {
-    const { cropAvatarCell } = require('./sceneComposite');
     const metaChars = newSceneMetadata?.fullData?.characters
       || newSceneMetadata?.characters
       || sceneCharacters
       || [];
-    // Pose + depth resolution is shared with applyStoryCellRefs — beats
-    // metadata carries `perspective` prose, not `pose`, and the inline copy
-    // here served threeQuarter to every declared back-view figure.
-    const { resolveCellPose, resolveSheetForRef, wornResolvedForPage } = require('./storyAvatars');
+    // ONE implementation of the cell crop (storyAvatars.applyStoryCellRefs): pose
+    // resolution, sheet/wardrobe resolution, the close-up head crop and the loud
+    // warnings all live there. The hand-copy that stood here dropped the close-up
+    // head crop and skipped missing sheets silently (code review 2026-10 C3).
+    const { applyStoryCellRefs, wornResolvedForPage } = require('./storyAvatars');
     // WARDROBE STATE ON A REWRITTEN PAGE. scene-iteration.txt emits no
     // `wornItems`, so the rewrite's own metadata says nothing about what this
     // page takes off — the carry-forward is the ONLY thing that keeps an
@@ -5281,38 +5281,10 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       metaChars,
       pageNumber
     );
-    const poseByName = new Map();
-    for (const sc of metaChars) {
-      const nm = (typeof sc === 'string' ? sc : sc?.name) || '';
-      if (!nm) continue;
-      poseByName.set(nm.toLowerCase(), resolveCellPose(sc));
-    }
-    for (const ref of referencePhotos) {
-      const charName = ref.name;
-      if (!charName) continue;
-      const story = storyData.characterAvatars[charName];
-      if (!story) continue;
-      // Shared resolver: slot mapping, the wardrobe-state variant, and the loud
-      // costumed fallback (which also corrects ref.clothingCategory) all live in
-      // storyAvatars.js. The inline copy here fell back silently.
-      const resolved = resolveSheetForRef(story, ref, { wornResolved });
-      if (!resolved) continue;
-      const { uri: sheetUri, slotKey } = resolved;
-      const pf = poseByName.get(charName.toLowerCase()) || { pose: 'threeQuarter', depth: 'foreground' };
-      const includeFace = pf.depth === 'foreground';
-      try {
-        const { body, stacked } = await cropAvatarCell(sheetUri, { pose: pf.pose, includeFace, stack: includeFace });
-        const buf = stacked || body;
-        ref.photoUrl = `data:image/png;base64,${buf.toString('base64')}`;
-        ref.photoType = `cell-${pf.pose}${includeFace ? '-headbody' : ''}`;
-        ref.cellPose = pf.pose;
-        ref.cellDepth = pf.depth;
-        ref.cellIncludesFace = includeFace;
-        log.debug(`[CELL REFS] ${charName}: cropped ${pf.pose}${includeFace ? ' + head' : ''} (depth=${pf.depth}) from ${slotKey}`);
-      } catch (err) {
-        log.warn(`[CELL REFS] crop failed for ${charName}: ${err.message} — falling back to existing ref`);
-      }
-    }
+    await applyStoryCellRefs(referencePhotos, storyData.characterAvatars, metaChars, {
+      closeUp: newSceneMetadata?.fullData?.shot === 'close-up',
+      wornResolved,
+    });
   }
 
   // The rewrite's metadata is the working copy, but scene-iteration.txt does
