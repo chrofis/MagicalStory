@@ -122,17 +122,8 @@ Grok image cap: **7,900 characters** (`server/config/models.js` `maxPromptLength
 2. **Composition: facing** (~367 chars) — the "faces the target, not the camera" bullet. *Why here:* yields to every declared facing, and EXACT POSES / EXPRESSIONS AND EYES declare one per figure; never built on a cover.
 3. **Composition: ground** (~600 chars) — the feet-on-the-ground bullet. *Why here:* the one feet-on-the-ground rule for pages and covers; kept longer than the generic rules above.
 4. **HEIGHT ORDER** (~140 chars) — the shortest-to-tallest line. *Why here:* a page fact: the relative size the height judge compares.
-5. **AGE & PROPORTIONS** (~485 chars) — the per-age head-count proportions. *Why here:* a page fact: without it an infant is drawn as a preschooler.
-6. **reference-photo rule** (~512 chars) — which attached photo is a place and which is a person. *Why here:* a page fact: the plate-vs-identity binding of the attached images.
-7. **single-illustration rule** (~503 chars) — one full-bleed picture, no lettering, ids are not painted. *Why here:* the frame rule; the very last block the cut may spend.
-
-2. **Composition: size** (~305 chars) — the vessel / building / vehicle true-size bullet. *Why here:* the REQUIRED OBJECTS scale riders and DEPTH AND SIZE ("a size stated for an element always wins") state it per element.
-3. **Composition: facing** (~367 chars) — the "faces the target, not the camera" bullet. *Why here:* yields to every declared facing, and EXACT POSES / EXPRESSIONS AND EYES declare one per figure; never built on a cover.
-4. **DEPTH AND SIZE** (~647 chars) — the foreground / midground / background definitions. *Why here:* defines the brief's depth words; the prose still places every figure.
-5. **Composition: ground** (~600 chars) — the feet-on-the-ground bullet (the header goes with it). *Why here:* the one feet-on-the-ground rule for pages and covers; kept longer than the generic rules above.
-6. **HEIGHT ORDER** (~140 chars) — the shortest-to-tallest line. *Why here:* a page fact: the relative size the height judge compares.
-7. **reference-photo rule** (~512 chars) — which attached photo is a place and which is a person. *Why here:* a page fact: the plate-vs-identity binding of the attached images.
-8. **single-illustration rule** (~503 chars) — one full-bleed picture, no lettering, ids are not painted. *Why here:* the frame rule; the very last block the cut may spend.
+5. **reference-photo rule** (~512 chars) — which attached photo is a place and which is a person. *Why here:* a page fact: the plate-vs-identity binding of the attached images.
+6. **single-illustration rule** (~503 chars) — one full-bleed picture, no lettering, ids are not painted. *Why here:* the frame rule; the very last block the cut may spend.
 
 **Never cut, and neither are the labelled blocks of the page's head before the protected tail (from the first of REQUIRED OBJECTS / SEASON / LIGHT / COMPOSITION GUIDELINES / ART STYLE): THIS IMAGE DEPICTS, the cast, age, feature, card and worn-item lines. If the prompt still does not fit once every step has run, the brief's scene prose alone is shortened — one LLM try, then a sentence cut from its end (sceneShorten.js, since 2026-09-30). A prompt that cannot fit even with no prose fails loudly.**
 

@@ -8,8 +8,15 @@
  * (REQUIRED TEXT), the copy-space OPEN AREA, and a WORN ITEMS block listing
  * whole outfits — one "X IS wearing this" line per garment, each garment name
  * said twice. The fixture is the stored brief; the builder is production's.
+ *
+ * SIZE IS NEVER CUT (owner, 2026-10-04): with Composition: size and DEPTH AND
+ * SIZE protected, this cover's floor (8,654) is over the cap again, so it takes
+ * the 2026-09-30 path — its scene prose is shortened (one LLM try, stubbed here)
+ * and every labelled block, the title and the size blocks are sent whole. The
+ * current-format front cover of dragon run 9 fits on block drops alone
+ * (prompt-fit-keeps-size-run9.test.ts).
  */
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import { createRequire } from 'module';
 import fs from 'fs';
 import path from 'path';
@@ -21,10 +28,42 @@ const { coverRenderOptions } = require('../../server/lib/coverRender.js');
 const worn = require('../../server/lib/wornItems.js');
 const { IMAGE_MODELS } = require('../../server/config/models.js');
 const { loadPromptTemplates } = require('../../server/services/prompts.js');
+const PB = require('../../server/lib/promptBuilders.js');
+const shorten = require('../../server/lib/sceneShorten.js');
+const { PROMPT_TEMPLATES } = require('../../server/services/prompts.js');
 // @ts-expect-error - JS module without types
-import { shrinkPromptForModel, promptFloor } from '../../server/lib/images.js';
+import { shrinkPromptForModel, promptFloor, dedupeIdenticalBullets, PROMPT_NEVER_CUT } from '../../server/lib/images.js';
 
-const CUT_ORDER_PREFIXES = ['Generate a SINGLE', 'When the FIRST reference', '**HEIGHT ORDER', '**Composition', '**DEPTH AND SIZE', '**COUNTS'];
+/** Paragraph openings of the ranked PROMPT_CUT_ORDER blocks — the only labelled text the shrink may drop. */
+const CUT_ORDER_PREFIXES = ['Generate a SINGLE', 'When the FIRST reference', '**HEIGHT ORDER', '**Composition', '**COUNTS'];
+
+/**
+ * Scene-prose room the cover's fixed blocks must leave under the cap once every
+ * allowed drop has run (measured 2026-10-04 with size never cut: 591). A cover
+ * block that grows eats into this and fails here.
+ */
+const MIN_SCENE_ROOM = 500;
+
+/** The one scene-shortening LLM try, stubbed: a sentence-cut copy of the prose that fits its target. */
+const ORIGINAL_TRY = shorten.shortenSceneOnce;
+let llmCalls: Array<{ prose: string; target: number }> = [];
+function stubLlm() {
+  llmCalls = [];
+  shorten.shortenSceneOnce = async (prose: string, target: number) => {
+    llmCalls.push({ prose, target });
+    return `${shorten.cutAtSentence(prose, target - 40)} LLM_SHORTENED.`;
+  };
+}
+afterEach(() => { shorten.shortenSceneOnce = ORIGINAL_TRY; });
+
+/** The scene prose of a built prompt: the head's paragraphs that are no labelled block. */
+function sceneProse(prompt: string): string {
+  const p = dedupeIdenticalBullets(prompt);
+  const tailStart = Math.min(...PROMPT_NEVER_CUT.filter((k: any) => k.marker)
+    .map((k: any) => p.indexOf(k.marker)).filter((i: number) => i >= 0));
+  const head = p.slice(0, tailStart);
+  return shorten.sceneParagraphIndices(head).map((i: number) => head.split('\n\n')[i]).join('\n\n');
+}
 
 function build() {
   const coverOpts = coverRenderOptions(-1, { title: FX.title, dedication: FX.dedication });
@@ -45,14 +84,28 @@ async function floorOf(prompt: string, _model: string): Promise<number> {
 beforeAll(async () => { await loadPromptTemplates(); });
 
 describe('the dragon front cover', () => {
-  it('fits Grok\'s cap after the allowed cuts, with room to spare', async () => {
+  it('fits Grok\'s cap: over it after the allowed cuts, its scene is shortened by one LLM try', async () => {
     const { prompt, model, cap } = build();
-    expect(await floorOf(prompt, model)).toBeLessThanOrEqual(cap - 150);
-    expect((await shrinkPromptForModel(prompt, cap, 'test', model)).length).toBeLessThanOrEqual(cap);
+    expect(await floorOf(prompt, model)).toBeGreaterThan(cap); // size kept: drops alone no longer fit
+    stubLlm();
+    const meta: any = {};
+    const sent = await shrinkPromptForModel(prompt, cap, 'test', model, meta);
+    expect(sent.length).toBeLessThanOrEqual(cap);
+    expect(llmCalls).toHaveLength(1);
+    expect(llmCalls[0].prose).toBe(sceneProse(prompt));
+    expect(sent).toContain('LLM_SHORTENED.');
+    expect(meta.compressedScene).toContain('LLM_SHORTENED.');
   });
 
-  it('sends the title, the scene and every protected block whole', async () => {
+  it('the fixed blocks leave room for a scene after every allowed cut', async () => {
     const { prompt, model, cap } = build();
+    const fixed = (await floorOf(prompt, model)) - sceneProse(prompt).length;
+    expect(cap - fixed).toBeGreaterThanOrEqual(MIN_SCENE_ROOM);
+  });
+
+  it('sends the title and every labelled block whole — the size blocks included; only the scene prose is shortened', async () => {
+    const { prompt, model, cap } = build();
+    stubLlm();
     const sent = await shrinkPromptForModel(prompt, cap, 'test', model);
     expect(sent).toContain(`Paint "${FX.title}"`);
     expect(sent).toContain('8% of the canvas width');
@@ -60,8 +113,10 @@ describe('the dragon front cover', () => {
       expect(sent, m).toContain(m);
     }
     const kept = prompt.split(/\n{2,}/).map((p: string) => p.trim()).filter(Boolean)
-      .filter((p: string) => !CUT_ORDER_PREFIXES.some(pre => p.startsWith(pre)));
+      .filter((p: string) => shorten.isLabelledBlock(p) && !CUT_ORDER_PREFIXES.some(pre => p.startsWith(pre)));
     for (const para of kept) expect(sent, para.slice(0, 60)).toContain(para);
+    expect(sent).toContain(`${PB.COMPOSITION_HEADER}\n${PB.COMPOSITION_SIZE_BULLET}`);
+    expect(sent).toContain(PROMPT_TEMPLATES.imageGeneration.split(/\n{2,}/).map((x: string) => x.trim()).find((x: string) => x.startsWith('**DEPTH AND SIZE:**')));
   });
 
   it('lists every worn garment once per wearer line, never its name twice', () => {

@@ -63962,6 +63962,28 @@ reference-photo rule, single-illustration rule (was COUNTS, size, facing, DEPTH,
 the most over-cap pages now spend page facts and, on p18, the frame rule. Shortening the prompt itself is the
 lever for that, not the cut order.
 
+**Reconciled with the 2026-09-30 scene shortening (same day, after merging origin/staging).** The two
+sentences above that say an over-cap prompt "fails loudly, as before" and "the scene prose stays uncut" were
+written against a branch that predated 0832cc784. On the merged code the order is: dedupe → ranked drops (size
+never among them) → only if still over, `sceneShorten.shortenSceneToFit` shortens the brief's scene prose (one
+LLM try, then a sentence cut from its end) → only a prompt that cannot fit even with no prose throws. So size is
+never cut AND a normal page still renders: the over-cap case pays with scene prose, never with a size block.
+Every site reaches this one function (page render and iterate and covers through `_dispatchImageGeneration`,
+the Lab through `generateImageOnly`, the Grok edit refit through `fitGrokPromptWithPrefix`). Replay on the
+merged code (AGE & PROPORTIONS is never-cut there too, f1d7c57a8): **14/14 run-9 prompts fit on block drops
+alone, 0 scene shortenings, 0 throws**, size + DEPTH AND SIZE + REQUIRED OBJECTS kept in all; worst floor p18
+7,602 (298 under the cap), sent sizes 7,333–7,891. Older fixtures whose briefs predate the 2026-09-30 colour +
+garment-noun outfit rule no longer fit on drops: smoke `job_1790529840433_ar4u7qry3` p1/p4 (floor 8,439 / 8,316,
+scene room 1,156 / 1,093 against 1,695 / 1,509 of prose) and dragon `job_1790539784661_6mjcny1c7` front cover
+(floor 8,654, room 591 against 1,345) — they now take the scene-shortening path. Compacting the fixed blocks
+further was considered and not done: closing those gaps needs ~550–900 chars, and the remaining large
+never-cut blocks are ART STYLE (not touched, 2026-09-27), the NO MARKS / HANDS judge-parity constants and the
+size rules themselves; rewording any of them is a prompt change needing a Lab render, not a cheap cut.
+Pinned by `prompt-fit-keeps-size-run9.test.ts` (fixture: the 14 rebuilt run-9 prompts — fit with no LLM call)
+and the updated `page-prompt-fixed-blocks-fit`, `cover-prompt-fixed-blocks-fit` (fixed blocks leave ≥1,000 /
+≥500 chars of scene room; the shortening fires once and every labelled block, size included, ships whole),
+`prompt-shrink-rank` and `scene-shorten-fit` tests.
+
 **Touched.** server/lib/images.js, docs/image-generation-methods.html, docs/prompt-inventory.md (generated),
 scripts/admin/verify-checks.js (`promptShrinkKeepsSize`), tests/unit/prompt-shrink-rank.test.ts,
 prompt-says-each-thing-once.test.ts, prompt-cut-protects-the-page.test.ts (+4 fixtures that used DEPTH AND SIZE

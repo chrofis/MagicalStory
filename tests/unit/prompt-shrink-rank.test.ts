@@ -129,9 +129,33 @@ describe('the cut spends Composition one bullet at a time, in rank order', () =>
     expect(out).toContain(PB.HANDS_HOLD_ONLY_NAMED_RULE);
   });
 
-  it('a prompt that only fits by cutting size fails loudly instead', async () => {
-    const p = prompt(40);
+  // A prompt that would only fit by cutting size has its SCENE PROSE shortened
+  // instead (sceneShorten.js, owner 2026-09-30) — one LLM try, stubbed here to
+  // give nothing usable, then a sentence cut from the prose's end.
+  it('a prompt that only fits by cutting size has its scene shortened instead; size stays', async () => {
+    const shorten = require('../../server/lib/sceneShorten.js');
+    const original = shorten.shortenSceneOnce;
+    let calls = 0;
+    shorten.shortenSceneOnce = async () => { calls++; return null; };
+    try {
+      const p = prompt(40);
+      const cap = p.length - (facing.length + ground.length + size.length) + 5;
+      const out = String(await shrinkPromptForModel(p, cap, 'TEST rank', null));
+      expect(calls).toBe(1);
+      expect(out.length).toBeLessThanOrEqual(cap);
+      expect(out).toContain(`${header}\n${size}`);
+      expect(out).toContain(PB.NO_CHARACTER_MARKING_RULE);
+      expect(out).toContain(PB.HANDS_HOLD_ONLY_NAMED_RULE);
+      expect(out).toMatch(/^The main character stands on the pier\./); // the prose is shortened, not gone
+      expect(out.split('The main character stands on the pier.').length - 1).toBeLessThan(40);
+    } finally {
+      shorten.shortenSceneOnce = original;
+    }
+  });
+
+  it('with no scene prose to shorten, a prompt that only fits by cutting size fails loudly', async () => {
+    const p = `${composition.join('\n')}\n\n${tail()}`;
     await expect(shrinkPromptForModel(p, p.length - (facing.length + ground.length + size.length) + 5, 'TEST rank', null))
-      .rejects.toThrow(/refusing to cut|after every allowed drop/);
+      .rejects.toThrow(/after every allowed drop/);
   });
 });

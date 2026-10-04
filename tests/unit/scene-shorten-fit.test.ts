@@ -116,7 +116,12 @@ describe('a page whose scene overruns the cap is shortened, not left without an 
   });
 
   it('a page that fits on block drops alone never calls the LLM', async () => {
-    const { prompt, cap, model } = build(1600);
+    // 900 chars of scene: the stored page's room once size is never cut
+    // (2026-10-04) is ~1,150, so this page is over the cap as built and fits
+    // on the ranked drops alone.
+    const { prompt, cap, model } = build(900);
+    expect(prompt.length).toBeGreaterThan(cap);
+    expect(images.promptFloor(prompt)).toBeLessThanOrEqual(cap);
     llmReturns(() => { throw new Error('must not be called'); });
     const out: string = await images.shrinkPromptForModel(prompt, cap, 'TEST fits', model);
     expect(calls).toHaveLength(0);

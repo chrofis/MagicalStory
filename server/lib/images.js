@@ -908,7 +908,9 @@ function compositionBulletUnit(bullet) {
  * over-cap prompts, and the grown dragon rendered egg-sized on p17/p18. Both
  * are on PROMPT_NEVER_CUT now, beside the REQUIRED OBJECTS scale riders the
  * protected tail already holds. The size bullet is the Composition block's last
- * bullet and is never removed, so the header always stays with it.
+ * bullet and is never removed, so the header always stays with it. A prompt
+ * still over the cap once every step below has run has its SCENE PROSE
+ * shortened (sceneShorten.js, owner 2026-09-30) — never a size block.
  */
 const PROMPT_CUT_ORDER = [
   {
@@ -965,10 +967,12 @@ const PROMPT_CUT_ORDER = [
  * NEVER CUT. None of these is a step above, and no step may reach one:
  * cutBlocks() throws if a step would remove an exact-text entry (`text`).
  * Entries with a `marker` open the PROTECTED TAIL — everything from the first
- * of them to the end of the prompt (protectedTailStart). The text before that
- * tail (THIS IMAGE DEPICTS, the cast lines, the brief's prose) is never cut
- * either: once every step has run and the prompt still does not fit, the render
- * fails loudly (owner, 2026-09-23 for the tail; 2026-09-26 for the scene).
+ * of them to the end of the prompt (protectedTailStart). The labelled blocks
+ * before that tail (THIS IMAGE DEPICTS, the cast, age, feature, card and worn
+ * lines) are never cut either (owner, 2026-09-23 for the tail). Once every step
+ * has run and the prompt still does not fit, only the brief's scene prose is
+ * shortened (sceneShorten.js, owner 2026-09-30, superseding 2026-09-26's "the
+ * scene is never cut"); a prompt that cannot fit even with no prose fails loudly.
  */
 const PROMPT_NEVER_CUT = [
   { label: 'NO MARKS', why: 'generator half of D-24 (sibling-registry page-image-generator-vs-critics parity anchor)', text: () => NO_CHARACTER_MARKING_RULE },
