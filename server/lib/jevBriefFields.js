@@ -220,8 +220,9 @@ function visualBibleJsonOf(bibleSections) {
  *               place only seen in the distance;
  *   Jev         one choice call per cover over the candidates, on the arc and
  *               the page plan (the state of the 2026-10-04 replay);
- *   code        the assignment: distinct vantages, highest summed probability;
- *               two covers share one only when the candidates run out.
+ *   code        the assignment: the front cover takes its top-rated vantage;
+ *               the others take distinct ones from what is left by their
+ *               probabilities, sharing only when none remains.
  * The result is the cover beat's location-only `jevFixed`, pinned like a story
  * page's location (jevDecisions.pinBrief), and the covers' pages in the
  * bible's location / vantage tables.
@@ -261,10 +262,14 @@ function coverPlaceCandidates(visualBible, storyPageNumbers) {
 }
 
 /**
- * Distinct vantages first, then the highest summed probability; a vantage is
- * shared only when there are fewer candidates than covers (every candidate is
- * then used once before any is used twice). Ties keep the earlier candidate.
- * Pure.
+ * THE FRONT COVER PICKS FIRST (owner, 2026-10-04, after the replay showed the
+ * max-sum rule handing the front cover Jev's lowest-rated vantage on both
+ * stored stories): the front cover always takes its top-rated candidate. The
+ * other covers then take distinct vantages from what is left — as many
+ * distinct as possible, then the highest summed probability — and share one
+ * only when no distinct candidate remains (every candidate used once before
+ * any twice). Ties keep the earlier candidate. Without a front cover every
+ * cover is assigned the second way. Pure.
  *
  * @param {string[]} coverKeys
  * @param {number[][]} probs - probs[i][j]: cover i, candidate j
@@ -275,15 +280,18 @@ function assignCoverPlaces(coverKeys, probs) {
   const m = probs.length ? probs[0].length : 0;
   if (!n) return [];
   if (!m) throw new Error('assignCoverPlaces: no candidate vantage');
-  let best = null;
+  const front = coverKeys.indexOf('frontCover');
   const pick = new Array(n);
+  if (front >= 0) pick[front] = probs[front].reduce((bi, p, j, arr) => (p > arr[bi] + 1e-12 ? j : bi), 0);
+  let best = null;
   const walk = (i) => {
     if (i === n) {
       const distinct = new Set(pick).size;
-      const sum = pick.reduce((s, j, k) => s + probs[k][j], 0);
+      const sum = pick.reduce((s, j, k) => (k === front ? s : s + probs[k][j]), 0);
       if (!best || distinct > best.distinct || (distinct === best.distinct && sum > best.sum + 1e-12)) best = { distinct, sum, pick: [...pick] };
       return;
     }
+    if (i === front) { walk(i + 1); return; }
     for (let j = 0; j < m; j++) { pick[i] = j; walk(i + 1); }
   };
   walk(0);

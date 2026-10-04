@@ -9149,8 +9149,8 @@ const REQUIRED_CAST_LEAD = '**REQUIRED CAST:** Every named character is in the f
 const REQUIRED_CAST_UNACTED = 'A character given no action is still drawn, placed and occupied as the moment suggests.';
 const REQUIRED_CAST_BACKGROUND = {
   cast_only: ', and no one else is added.',
-  ambient: ". Add a few unnamed passers-by far behind the cast (where the scene description places them, if it does), each much smaller than any listed character, faces indistinct, none sharing a listed character's hair, build or outfit. No one else is added.",
-  crowd: ". Paint the unnamed people the scene description places, as it places them: faces indistinct, varied hair and garment colours and shapes, none sharing a listed character's hair, build or outfit. No one else is added.",
+  ambient: ". Add a few unnamed passers-by far behind the cast (where the scene description places them, if it does), each much smaller than any listed character, busy with their own business and mostly turned away, every face fully drawn, none sharing a listed character's hair, build or outfit. No one else is added.",
+  crowd: ". Paint the unnamed people the scene description places, as it places them: busy with their own business, every face fully drawn, varied hair and garment colours and shapes, none sharing a listed character's hair, build or outfit. No one else is added.",
 };
 
 /** The REQUIRED CAST line for a page of this `population` (normalised). */
