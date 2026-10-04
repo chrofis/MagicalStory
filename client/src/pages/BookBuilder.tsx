@@ -363,8 +363,9 @@ export default function BookBuilder() {
       .catch(err => log.error('Failed to fetch book page info:', err));
     return () => { cancelled = true; };
   }, [storyIdsKey, coverType, bookFormat, isOverLimit]);
-  // From this many blank pages on, also suggest a longer story / combining stories.
-  const BLANK_PAGES_SUGGEST_FROM = 4;
+  // Owner 2026-10-04: up to 3 blank pages are fine and stay silent; from 4 on,
+  // warn and suggest a longer story / combining stories.
+  const BLANK_PAGES_WARN_FROM = 4;
 
   // Move story up/down
   const moveStory = (index: number, direction: 'up' | 'down') => {
@@ -607,16 +608,14 @@ export default function BookBuilder() {
                   <span className="text-sm">{t.tooManyPagesDesc}</span>
                 </div>
               )}
-              {pageInfo && pageInfo.blankPages > 0 && !isOverLimit && (
+              {pageInfo && pageInfo.blankPages >= BLANK_PAGES_WARN_FROM && !isOverLimit && (
                 <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                   <div className="flex items-start gap-2 text-amber-700">
                     <Info size={18} className="flex-shrink-0 mt-0.5" />
                     <div>
                       <div className="font-semibold text-sm">{t.blankPagesTitle}</div>
                       <span className="text-sm">{t.blankPagesDesc(pageInfo.printedPages, pageInfo.contentPages, pageInfo.blankPages)}</span>
-                      {pageInfo.blankPages >= BLANK_PAGES_SUGGEST_FROM && (
-                        <span className="text-sm block mt-1">{t.blankPagesHint}</span>
-                      )}
+                      <span className="text-sm block mt-1">{t.blankPagesHint}</span>
                     </div>
                   </div>
                 </div>
