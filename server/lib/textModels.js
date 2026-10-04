@@ -5,7 +5,7 @@
  */
 
 const { log } = require('../utils/logger');
-const { TEXT_MODELS, MODEL_DEFAULTS, GROK_VISION_FALLBACK } = require('../config/models');
+const { TEXT_MODELS, MODEL_DEFAULTS } = require('../config/models');
 const { withAnthropic, withGemini, withGrok } = require('./aiConcurrency');
 const apiHealth = require('./apiHealth');
 const { recordTextUsage } = require('./usageContext');
@@ -16,6 +16,28 @@ const { guardPromptString } = require('../services/prompts');
 // calls bill to gemini_text (image/quality Gemini are tracked on their own
 // paths); xAI text bills to grok.
 const USAGE_PROVIDER_KEY = { anthropic: 'anthropic', google: 'gemini_text', xai: 'grok', openrouter: 'openrouter' };
+
+/**
+ * options.cachePrefix carries REQUIRED content (the consolidator's whole rules
+ * template). Anthropic caches it as its own block; every other provider has no
+ * prompt caching, so it is prepended to the prompt. No provider may drop it
+ * (review 2026-10-04 C1: Gemini and xAI sent only the per-page input).
+ */
+function withCachePrefix(prompt, options) {
+  return (options && options.cachePrefix ? options.cachePrefix : '') + prompt;
+}
+
+/**
+ * Sampling temperature for the OpenAI-style bodies (xAI, OpenRouter): sent only
+ * when the caller asked for one, so judges pinned to EVAL_TEMPERATURE (0) get 0
+ * instead of the provider default (~1.0). Gemini always sends a value (0.7
+ * default) in its own generationConfig. Anthropic is deliberately absent: its
+ * current models take no temperature knob (SETTLED: judge runs on Claude have
+ * no temperature control; docs/decisions.md 2026-10-04).
+ */
+function temperatureField(options) {
+  return options && options.temperature != null ? { temperature: options.temperature } : {};
+}
 
 // ─── Image inputs (options.images) ──────────────────────────────────────────
 // ONE resolver for every provider entry point. Until 2026-09-27 the Gemini text
@@ -383,11 +405,20 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk, op
   // Build messages - optionally add assistant prefill to prevent preamble
   // Claude 4+ models don't support assistant prefill — move it into the prompt instead
   const supportsAssistantPrefill = !modelId.match(/claude-(sonnet|opus|haiku)-[4-9]/);
-  const messages = [{ role: 'user', content: prompt }];
+  // cachePrefix rides as its own cache_control block, same as the non-streaming call.
+  const userText = options.prefill && !supportsAssistantPrefill
+    ? prompt + `
+
+IMPORTANT: Start your response EXACTLY with: ${options.prefill}`
+    : prompt;
+  const messages = [{
+    role: 'user',
+    content: options.cachePrefix
+      ? [{ type: 'text', text: options.cachePrefix, cache_control: { type: 'ephemeral' } }, { type: 'text', text: userText }]
+      : userText
+  }];
   if (options.prefill && supportsAssistantPrefill) {
     messages.push({ role: 'assistant', content: options.prefill });
-  } else if (options.prefill) {
-    messages[0] = { role: 'user', content: prompt + `\n\nIMPORTANT: Start your response EXACTLY with: ${options.prefill}` };
   }
 
   // Wrap entire request + stream reading in retry to handle mid-stream socket errors
@@ -575,7 +606,7 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk, o
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{
-          parts: [{ text: prompt }]
+          parts: [{ text: withCachePrefix(prompt, options) }]
         }],
         generationConfig: {
           maxOutputTokens: maxTokens,
@@ -682,7 +713,7 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk, o
 
 /**
  * Call Google Gemini API for text generation
- * Includes retry logic with fallback to gemini-2.0-flash on empty responses
+ * Retries transport errors; an empty or blocked reply throws (no model swap)
  */
 async function callGeminiTextAPI(prompt, maxTokens, modelId, options = {}) {
   prompt = guardPromptString(prompt, 'textModels.callGeminiTextAPI');
@@ -699,7 +730,7 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId, options = {}) {
   const images = await resolveImageInputs(options, 'callGeminiTextAPI');
   const userParts = [
     ...images.map(img => ({ inline_data: { mime_type: img.mimeType, data: img.data } })),
-    { text: prompt }
+    { text: withCachePrefix(prompt, options) }
   ];
 
   const callAPI = async (model) => {
@@ -735,9 +766,9 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId, options = {}) {
   };
 
   // callAPI throws on non-ok (after retries), so `response` is always ok here.
-  let response = await callAPI(modelId);
+  const response = await callAPI(modelId);
 
-  let data = await response.json();
+  const data = await response.json();
 
   // Extract token usage (including thinking tokens for Gemini 2.5)
   const usage = geminiUsage(data.usageMetadata);
@@ -747,47 +778,14 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId, options = {}) {
     log.debug(`📊 [GEMINI] Token usage - input: ${usage.input_tokens.toLocaleString()}, output: ${usage.output_tokens.toLocaleString()}${thinkingInfo}, finishReason=${data.candidates?.[0]?.finishReason || 'none'}`);
   }
 
-  // Check for empty/blocked response and retry with fallback model
+  // Empty/blocked reply: fail loudly (NO FALLBACKS, owner decision #4 2026-10-04;
+  // docs/decisions.md). The silent Grok / flash-lite swap booked the answer under
+  // the wrong model and dropped the first call's tokens. The blocked call was
+  // paid for, so its usage is booked before the throw.
   if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
-    const blockReason = data.promptFeedback?.blockReason || 'empty response';
-
-    // Try fallback to Grok (no PROHIBITED_CONTENT issues), then a second Gemini
-    // tier as last resort. gemini-2.5-flash-lite is the last resort because it
-    // is a different, cheaper tier — NOT, as this comment used to say, because
-    // "gemini-2.0-flash was RETIRED by Google (404)". That was inferred from the
-    // model's absence from GET /v1beta/models; a per-model read returns 200 and
-    // still advertises generateContent (2026-09-18). Leaving the false claim in
-    // place is how a non-bug gets "fixed" later.
-    const LAST_RESORT_GEMINI = 'gemini-2.5-flash-lite';
-    if (modelId !== LAST_RESORT_GEMINI) {
-      const grokFallbackModel = TEXT_MODELS[GROK_VISION_FALLBACK];
-      if (grokFallbackModel && process.env.XAI_API_KEY) {
-        log.warn(`⚠️  [GEMINI] No text response (${blockReason}), retrying with ${GROK_VISION_FALLBACK}...`);
-        try {
-          // The images go too — a vision fallback that answers without them is
-          // the blind judge this path used to be.
-          const grokResult = await callXaiAPI(prompt, maxTokens, grokFallbackModel.modelId, {
-            ...(prefill ? { prefill } : {}),
-            ...(images.length ? { images: options.images } : {}),
-          });
-          return { ...grokResult, modelId: grokFallbackModel.modelId };
-        } catch (grokErr) {
-          log.warn(`⚠️  [GEMINI] Grok fallback also failed: ${grokErr.message}, trying ${LAST_RESORT_GEMINI}...`);
-        }
-      } else {
-        log.warn(`⚠️  [GEMINI] No text response (${blockReason}), retrying with ${LAST_RESORT_GEMINI}...`);
-      }
-
-      response = await callAPI(LAST_RESORT_GEMINI);
-
-      data = await response.json();
-
-      if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
-        throw new Error('No text in Gemini response (all fallbacks failed)');
-      }
-    } else {
-      throw new Error('No text in Gemini response');
-    }
+    const blockReason = data.promptFeedback?.blockReason || data.candidates?.[0]?.finishReason || 'empty response';
+    recordTextUsage(USAGE_PROVIDER_KEY.google, usage, options.usageLabel, modelId);
+    throw new Error(`No text in Gemini response from ${modelId} (${blockReason})`);
   }
 
   // With a seeded model turn, Gemini returns only the continuation — prepend the
@@ -841,8 +839,8 @@ async function callXaiAPI(prompt, maxTokens, modelId, options = {}) {
   // Vision goes as OpenAI-style image_url parts (data URIs) ahead of the text.
   const images = await resolveImageInputs(options, 'callXaiAPI');
   const userContent = images.length
-    ? [...images.map(img => ({ type: 'image_url', image_url: { url: `data:${img.mimeType};base64,${img.data}` } })), { type: 'text', text: prompt }]
-    : prompt;
+    ? [...images.map(img => ({ type: 'image_url', image_url: { url: `data:${img.mimeType};base64,${img.data}` } })), { type: 'text', text: withCachePrefix(prompt, options) }]
+    : withCachePrefix(prompt, options);
   const messages = [{ role: 'user', content: userContent }];
   if (options.prefill) {
     // xAI supports assistant prefill like OpenAI
@@ -859,6 +857,7 @@ async function callXaiAPI(prompt, maxTokens, modelId, options = {}) {
       body: JSON.stringify({
         model: modelId,
         max_tokens: maxTokens,
+        ...temperatureField(options),
         messages
       }),
       signal: AbortSignal.timeout(timeoutMs)
@@ -904,7 +903,7 @@ async function callXaiAPIStreaming(prompt, maxTokens, modelId, onChunk, options 
     throw new Error('xAI API key not configured (XAI_API_KEY)');
   }
 
-  const messages = [{ role: 'user', content: prompt }];
+  const messages = [{ role: 'user', content: withCachePrefix(prompt, options) }];
   if (options.prefill) {
     messages.push({ role: 'assistant', content: options.prefill });
   }
@@ -936,7 +935,7 @@ async function callXaiAPIStreaming(prompt, maxTokens, modelId, onChunk, options 
           max_tokens: maxTokens,
           // Unset previously — the provider default (~1.0) is why the qwen
           // compliance/consolidator judges were non-reproducible.
-          ...(options?.temperature != null ? { temperature: options.temperature } : {}),
+          ...temperatureField(options),
           stream: true,
           stream_options: { include_usage: true },
           messages
@@ -1051,7 +1050,7 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
 
   // Same prompt assembly as the non-streaming path: cachePrefix carries required
   // content (OpenRouter just can't discount it), and vision goes as image_url parts.
-  const fullPrompt = (options.cachePrefix || '') + prompt;
+  const fullPrompt = withCachePrefix(prompt, options);
   let userContent;
   const images = await resolveImageInputs(options, 'callOpenRouterAPIStreaming');
   if (images.length > 0) {
@@ -1114,6 +1113,7 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
         body: JSON.stringify({
           model: modelId,
           max_tokens: maxTokens,
+          ...temperatureField(options),
           stream: true,
           stream_options: { include_usage: true },
           usage: { include: true },                      // real cost, not our estimate

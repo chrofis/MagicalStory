@@ -72,19 +72,6 @@ describe('text-model image inputs', () => {
     expect(parts.filter((p: any) => p.inline_data)).toHaveLength(2);
   });
 
-  it('Gemini empty reply → the Grok fallback carries the images too', async () => {
-    process.env.GEMINI_API_KEY = 'test';
-    process.env.XAI_API_KEY = 'test';
-    const calls = stubFetch((url) => url.includes('api.x.ai') ? xaiReply('seen') : geminiReply(''));
-    const res = await TM.callGeminiTextAPI('p', 100, 'gemini-2.5-flash', { images: [PNG_URI] });
-    expect(res.text).toBe('seen');
-    const xai = calls.find(c => String(c.url).includes('api.x.ai'));
-    expect(xai.body.messages[0].content).toEqual([
-      { type: 'image_url', image_url: { url: PNG_URI } },
-      { type: 'text', text: 'p' },
-    ]);
-  });
-
   it('xAI: images go as image_url parts', async () => {
     process.env.XAI_API_KEY = 'test';
     const calls = stubFetch(() => xaiReply('ok'));
