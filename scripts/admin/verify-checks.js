@@ -556,6 +556,23 @@ checks.wornOffGrid = (ctx) => {
   return { covered: true, pass: true, detail };
 };
 
+/** wardrobe-variant-judge (2026-10-04) — every page that takes a garment off is drawn from an off sheet. */
+checks.offSheetServed = (ctx) => {
+  const served = []; const missing = [];
+  for (const p of pages(ctx)) {
+    const owners = new Set((brief(p).wornItems || []).filter(w => w?.state === 'off' && w.owner).map(w => String(w.owner).trim().toLowerCase()));
+    if (!owners.size) continue;
+    for (const r of Array.isArray(p.referencePhotos) ? p.referencePhotos : []) {
+      if (!r || !owners.has(String(r.name || '').trim().toLowerCase())) continue;
+      if (r.wornStateFallback) missing.push(`${r.name} p${p.pageNumber} (wanted ${r.wornStateFallback.wanted})`);
+      else if (String(r.clothingCategory || '').includes('--off:')) served.push(`${r.name} p${p.pageNumber}`);
+    }
+  }
+  if (!served.length && !missing.length) return notCovered('no page drew the owner of a garment it takes off');
+  const detail = `off sheet served on ${served.length}${served.length ? ` (${served.join(', ')})` : ''}; missing on ${missing.length}${missing.length ? ` (${missing.join(', ')})` : ''}`;
+  return { covered: true, pass: missing.length === 0, detail };
+};
+
 /** 5a4672c7a — the diff pass is shown the findings; count corrections that invent a sentence. */
 checks.diffPassLedger = (ctx) => {
   const t = ctx.data?.textRefineReport;

@@ -715,6 +715,21 @@ async function getStyledAvatarForClothing(character, artStyle, clothingCategory,
   const availableKeys = Object.keys(styledForArt || {});
   log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: styledAvatars[${artStyle}] has keys: [${availableKeys.join(', ')}]`);
 
+  // Wardrobe-state variant first — for a costumed sheet too (owner, 2026-10-04),
+  // whose off sheet is stored flat as costumed--off:<ids>. The sheet WITHOUT the garment this page
+  // takes off. Absent one, the base sheet is used and says so: it still WEARS
+  // the garment the brief removed, and only the prompt's "leave it off" line
+  // stands between that and a repair painting it back on.
+  if (wardrobeState) {
+    const variantKey = `${clothingCategory}${require('./wardrobeVariants').OFF_MARK}${wardrobeState.offIds.join('+')}`;
+    const variant = await resolveStyled(styledForArt[variantKey]);
+    if (variant) {
+      log.debug(`👕 [AVATAR-LOOKUP] ${charName}: wardrobe-state sheet [${artStyle}][${variantKey}]`);
+      return variant;
+    }
+    log.error(`👕 [AVATAR-LOOKUP] ${charName}: no "${variantKey}" sheet — using the "${clothingCategory}" sheet, which still WEARS ${wardrobeState.offIds.join('+')}`);
+  }
+
   // Handle costumed category — one costume per story, grab the first
   if (clothingCategory === 'costumed' || clothingCategory.startsWith('costumed:')) {
     if (styledForArt.costumed && typeof styledForArt.costumed === 'object') {
@@ -731,20 +746,6 @@ async function getStyledAvatarForClothing(character, artStyle, clothingCategory,
       log.warn(`⚠️ [AVATAR-LOOKUP] ${charName}: wanted ${clothingCategory} but no costumed avatars exist — sending standard (output will show standard clothing)`);
       return r;
     }
-  }
-
-  // Wardrobe-state variant first — the sheet WITHOUT the garment this page
-  // takes off. Absent one, the base sheet is used and says so: it still WEARS
-  // the garment the brief removed, and only the prompt's "leave it off" line
-  // stands between that and a repair painting it back on.
-  if (wardrobeState) {
-    const variantKey = `${clothingCategory}${require('./wardrobeVariants').OFF_MARK}${wardrobeState.offIds.join('+')}`;
-    const variant = await resolveStyled(styledForArt[variantKey]);
-    if (variant) {
-      log.debug(`👕 [AVATAR-LOOKUP] ${charName}: wardrobe-state sheet [${artStyle}][${variantKey}]`);
-      return variant;
-    }
-    log.warn(`👕 [AVATAR-LOOKUP] ${charName}: no "${variantKey}" sheet — using the "${clothingCategory}" sheet, which still WEARS ${wardrobeState.offIds.join('+')}`);
   }
 
   // Handle standard categories (standard, winter, summer)

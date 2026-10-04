@@ -21,6 +21,49 @@ superseded and link forward.
 
 ---
 
+## 2026-10-04 — An off-garment sheet is judged by the judge that approved its base; costumed sheets get off variants; a missing one is a recorded defect
+
+**Context:** Staging job_1791040103540_atbttop6w. Kiaan's jacket-off sheet (`styled-standard--off:CLO001`) was redressed twice and rejected twice at 1/10, so p11, p12 and p16 were drawn from the sheet that wears the jacket.
+- The variant gate was `evaluateSheetSplit`, the Pass-1 row judges. They score an absolute crop and an outfit against a spec.
+- Kiaan's APPROVED base sheet fails those same judges (head-row crop 1/10, because the Pass-1 attempts that the style pass later approved were already scored 1 there).
+- A redress that only removes a garment inherits the base's crop, so it could never pass.
+- Staging, 15 days: 7 stories with an off garment and 47 off pages. 20 got an off sheet, 12 the worn-sheet fallback, and 6 costumed pages had no marker at all.
+  - Costumed characters were out of scope (`baseCategoryFor` returned null), and that was logged only at info.
+- Prod: 3 stories, 7 off pages, none recorded.
+- Bug: `tasks/bugs.json` → `wardrobe-variant-judged-by-row-judges`.
+
+**Decision (owner, 2026-10-04):**
+1. **The variant is judged by the Pass-2 style judge** that approved its base, `evaluateAvatarSheet({ pass: 2 })`.
+   - Image 1 is the face photo, Image 2 is the base's own Pass-1 sheet (kept per story in `styledPass1Sheets`, keyed like the styled cache), and Image 3 is the variant.
+   - It adds one task, TASK 10 `removedScore`, which checks that the removed garment is gone from all 8 cells. `removedScore` joins the lowest-axis final score.
+   - `evaluateSheetSplit` is DELETED from the variant path, not kept as a second gate.
+   - If the Pass-1 sheet or the face photo is missing, there is no variant: `redressSheetVariant` logs at ERROR and returns null before any paid edit.
+2. **Generator and critic share one rule.** `GARMENT_OFF_SHEET_RULE` (character2x4Sheet.js) goes into the redress prompt (`buildRedressPrompt`, with the garment names) and into the judge's TASK 10 (`garmentsRemovedTask`).
+3. **Costumed sheets get off variants**, built the same way as plain ones.
+   - Derivation reads the page's own declared clothing first (`pageCategoryFor`), then the story's category. A costumed character gets `costumed--off:<ids>`.
+   - The projection stores it under that bare key; there is no `styled-` prefix, because the costumed slot itself is bare `costumed`.
+   - `resolveSheetForRef` and `getStyledAvatarForClothing` both serve it.
+4. **A missing off sheet still renders, but as a recorded defect.**
+   - `resolveSheetForRef` logs at ERROR and stamps `wornStateFallback` on the reference.
+   - `collectNotEvaluated` turns that into a per-page `wardrobe_state_reference / off_sheet_missing` entry in `finalChecksReport.notEvaluated`.
+   - A character with no declared category is refused at ERROR (`no-sheet-category`).
+   - The 2026-09-19 entry below is amended to match.
+
+**Rationale:**
+- A variant differs from its base by one garment, so the base's judge plus a "garment gone" task is the matching gate.
+- Absolute Pass-1 crop and outfit scores rejected the approved base itself.
+- Validation (direct calls on stored inputs, about $0.02 each, both accepted on the first roll):
+  - Kiaan `standard--off:CLO001`: 9/10, removed 9. Viewed: the jacket is gone from all 8 cells, the grey long-sleeved shirt is outermost, and face, trousers and boots are unchanged.
+  - Fiona `costumed--off:CLO001` (job_1790446348343_z3fw660ie): 9/10, removed 10. Viewed: the coat is gone, the blouse and sash are outermost, and the face is unchanged. But the head row changed to flat line art and widened to waist-up, and the style judge still gave style 9.
+    - Its reasons cite a "dark grey vest" and "no hard outlines" that are not in the image. It reads Image 2.
+    - This is the same judge that approves every base sheet, so the gap predates this change. It is open for the owner (BACKLOG).
+
+**Touched:** server/lib/character2x4Sheet.js, prompts/sheet-2x4-style-eval.txt, server/lib/styledAvatars.js, server/lib/wardrobeVariants.js, server/lib/storyAvatars.js, server/lib/entityConsistency.js, server/lib/notEvaluated.js, scripts/admin/sibling-registry.json (`wardrobe-variant-sheet-chain`), scripts/admin/verify-checks.js (`offSheetServed`), tests/unit/wardrobe-variant-judge.test.ts
+
+**Status:** ✅ active (staging)
+
+---
+
 ## 2026-10-04 — A creature's face and action are brief fields; an animal's features are anatomy, never a feeling; an element's size has one source
 
 **Context:** Staging job_1791040103540_atbttop6w (dragon run 9).
@@ -52826,9 +52869,9 @@ character's garments off at once). Never the power set — only sets a page actu
    build and base-layer shade, so a jacket coming off would read as the CHARACTER changing — a worse failure
    than the one being fixed. Identity is fixed by construction; only wardrobe varies. Same shape as the
    costumed-vs-standard sheet swap already shipping. No base sheet ⇒ no variant, never a photo fallback.
-   Its gate is `evaluateSheetSplit` (layout + identity vs the base sheet's own head row + outfit vs the
-   stripped contract), not the Pass-2 style judge, which would answer "style not applied" for an input that
-   is already styled and reject every redress.
+   ~~Its gate is `evaluateSheetSplit`~~ — superseded 2026-10-04 ("A wardrobe-state sheet is judged by the
+   judge that approved its base"): the gate is the Pass-2 style judge with the base's own Pass-1 sheet as
+   Image 2, plus a garment-gone task; `evaluateSheetSplit` rejected every redress.
 3. **The off-sheet's outfit is the canonical contract with the clause structurally deleted** by the existing
    `resolveOutfitForPage` / `removeWornItemFromOutfit` stripper. No layer is invented and nothing is
    re-prompted. A strip the stripper cannot make unambiguously produces NO variant.
@@ -52842,9 +52885,10 @@ character's garments off at once). Never the power set — only sets a page actu
 5. **Resolution is a SUBSTITUTION, never an extra reference.** `resolveSheetForRef` crops the character's
    cell from the `--off:` sheet instead of the base one, so the model's reference cap is untouched. All
    three cell-crop sites and all three repair entry points route through it (or, for the character-row
-   lookup, through `getStyledAvatarForClothing`, made state-aware the same way). A missing variant falls
-   back to the worn sheet LOUDLY and stamps `ref.wornStateFallback` — the same honesty contract the costumed
-   fallback carries; it is never silent.
+   lookup, through `getStyledAvatarForClothing`, made state-aware the same way). A missing variant renders
+   from the worn sheet, logs at ERROR and stamps `ref.wornStateFallback`, which becomes the page's
+   `wardrobe_state_reference / off_sheet_missing` record in `finalChecksReport.notEvaluated` (updated
+   2026-10-04; costumed sheets get variants too).
 6. **The text line stays.** `buildWornStateLines`' "leave it off even if the attached reference shows it
    worn" is the only instruction on the fallback path, which is live on every story that gets no variant.
 7. **COVERS ALWAYS TAKE THE WORN (BASE) SHEET.** `compositeCastBuilder` resolves a cover cast by the page's

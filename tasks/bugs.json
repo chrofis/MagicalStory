@@ -2583,6 +2583,15 @@
       "fixedAt": "2026-10-04",
       "fixedIn": "5933f5926",
       "fix": "POST /api/trial/create-story answers TRIAL_USED with the visitor's newest trial job (jobId + status, buildTrialUsedResponse); TrialGenerationPage adopts it, stores it and resumes polling; the bare-form branch is deleted. Test: tests/unit/trial-reload-and-art-style.test.ts. Real reload re-verified on staging after push."
+    },
+    {
+      "id": "wardrobe-variant-judged-by-row-judges",
+      "title": "Every jacket-off (wardrobe-state) sheet was rejected: the variant was judged by the pass-1 row judges its own approved base sheet fails, so no off sheet was stored and off pages got the garment-wearing sheet",
+      "reportedAt": "2026-10-04",
+      "source": "Staging job_1791040103540_atbttop6w: character_2x4_wardrobe_variant billed 2 calls for Kiaan standard--off:CLO001, characterAvatars holds no off key, p11/p12/p16 refs carry wornStateFallback and the render kept the jacket (p12). Reproduced locally: redressSheetVariant on the stored base sheet + the stored redressNote -> 2 attempts, both REJECTED best=1/10 (crop: cells 1-4 show the waistband). evaluateSheetSplit on the approved base sheet itself scores 1/10 (crop, outfit, costumeReads). Staging 15 days: 0 off sheets served since 09-25, 12 pages on wornStateFallback; 6 costumed off pages with no marker at all.",
+      "rootCause": "server/lib/character2x4Sheet.js redressSheetVariant judged the redressed sheet with evaluateSheetSplit (the pass-1 heads/bodies/identity row judges, absolute crop and outfit scores, the wardrobe text fed as a costume). The base sheet it edits was approved by the pass-2 style judge and never had to pass those row judges; a redress inherits the base layout, so it cannot pass them. The judge never asked whether the removed garment is gone.",
+      "impact": "No page that takes a garment off has received an off-garment reference since ~2026-09-26; the image model gets a picture of the character wearing it plus a text line, and draws it on (p12 jacket). Costumed characters never got an off variant and no warning.",
+      "status": "open"
     }
   ]
 }

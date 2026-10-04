@@ -4781,6 +4781,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "wardrobe-variant-judge",
+      "title": "An off-garment sheet is judged by the style judge that approved its base, plus a garment-gone task; costumed sheets get off variants too; a missing one is recorded",
+      "commits": [
+        "(this push)"
+      ],
+      "addedAt": "2026-10-04",
+      "claim": "In a story where a character takes a garment off (plain or costumed outfit), every page that draws that character is sent its --off: sheet (referencePhotos[].clothingCategory contains --off:, no wornStateFallback), and the stored off sheet shows no part of the removed garment with the face unchanged.",
+      "runShape": [
+        "needs-worn-off"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "offSheetServed"
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
