@@ -4799,6 +4799,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "consolidator-fix-rests-on-scored-finding",
+      "title": "Every CRITICAL/MAJOR consolidator fix names finding ids and one of them is in a kept (scored) entry; otherwise the run log carries an ERROR",
+      "commits": [
+        "073cdc449"
+      ],
+      "addedAt": "2026-10-04",
+      "claim": "On a story run, every consolidator_calls plan has ids on scene_fix and per_character_fixes[]; no page carries a CRITICAL/MAJOR fix whose ids are all in rule-2/2a drops (a page whose finding says the picture lacks what the brief asks for is scored and repaired, not dropped); any page where that still happens has a consolidator_fix_unbacked ERROR in generationLog and plan.fix_errors.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "After a staging run: SELECT page_number, plan->'fix_errors' FROM consolidator_calls WHERE story_id=<id>, and grep generationLog for consolidator_fix_unbacked; run node scripts/analysis/measure-consolidator-orphan-fixes.js --env=staging --since=<run date> and expect 0 flagged fixes, or each flagged one to have a matching ERROR."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

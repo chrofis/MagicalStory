@@ -66176,3 +66176,15 @@ Total spend about USD 4.5 (flash and pro judge runs 1.6 incl. one unmetered flas
 **Revisit if:** the 8 both-CRITICAL pairs (staging `z3fw660ie` p7 + frontCover, `dka3jpog9` p10 + p11, `6mjcny1c7` p10, `atbttop6w` p9; prod `9n47zi342` p10, `j905g63bx` p7) prove, on viewing, to ship the worse image.
 
 **Touched files:** none in production. Added measurements and `scripts/analysis/scan-pickbest-hits.js` (read-only scan).
+
+## 2026-10-04 — A consolidator fix must name the findings it fixes, and one must be scored; a fix with none is a loud ERROR
+
+**Context.** Staging job_1791040103540_atbttop6w round 1 p17 (consolidator_calls 2971): the page's only finding (semantic CRITICAL, the creature stays inside the canopy instead of rising out) was dropped as `finding_contradicts_brief`, so it left `deduped_issues` (the score), while the plan still carried a CRITICAL `scene_fix` for it. `finalScore=100`, the page was never repaired. Fixes carried no ids, so nothing linked a fix to a scored finding. Measured over `consolidator_calls` since 2026-09-20 (`scripts/analysis/measure-consolidator-orphan-fixes.js`): staging 208 calls / 316 CRITICAL-MAJOR fixes, 10 CRITICAL fixes with no kept CRITICAL, 10 with no kept CRITICAL/MAJOR at all, 26 whose type has only not-a-defect drops behind it (7 stories); prod 178 / 279, 0 / 2 / 0. The examples are mostly rule 2a misapplied to findings that agree with the brief (the picture lacks what the brief asks for).
+
+**Decision (owner, 2026-10-04).** Prompt: rule 2a says a finding that the picture lacks what the brief asks for is a defect, never a 2a drop; rule 7d - every `scene_fix` / `per_character_fixes[]` entry carries `ids`, none in a rule 2/2a drop, one in a `deduped_issues` entry. Code (`feedbackConsolidator.checkFixesRestOnKeptFindings`, consistency only): a CRITICAL/MAJOR fix with no ids, an unknown id, or no id in a kept entry is logged at ERROR, written to the generation log (`consolidator_fix_unbacked`) and recorded on `plan.fix_errors`. Nothing is reclassified, no severity is invented, and the page score stays what the kept list says: the flag makes a CRITICAL fix with a 100 score visible in the run, it does not repair or rescore the page.
+
+**Rationale.** Classification (is this finding a defect) belongs to the prompt; code only checks that the plan agrees with itself. A second code path that "rescues" a dropped finding would be a fallback that hides the prompt's failure. The ERROR is the signal to fix the prompt.
+
+**Revisit if.** `fix_errors` still appears on staging runs after this prompt: then decide with the owner whether a page with `fix_errors` should be re-consolidated or held for review.
+
+**Touched files:** `prompts/feedback-consolidator.txt`, `server/lib/feedbackConsolidator.js`, `tests/unit/consolidator-fix-ids.test.ts`, `scripts/analysis/measure-consolidator-orphan-fixes.js`, `scripts/analysis/replay-consolidator-call.js`, `docs/prompt-inventory.md`, `tasks/bugs.json`, `tasks/verify.json`.

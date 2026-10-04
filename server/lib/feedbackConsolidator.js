@@ -17,6 +17,7 @@ const { buildCastIndex, lookupByName } = require('./castResolver');
 const { PROMPT_TEMPLATES } = require('../services/prompts');
 const { extractJsonFromText, buildCharacterPhysicalDescription } = require('./storyHelpers');
 const { log } = require('../utils/logger');
+const { getCurrentLogger } = require('./generationLogger');
 const { FINDING_SOURCES, sourcesOf, mergeSources } = require('./findingSources');
 
 /**
@@ -455,6 +456,23 @@ function isNotADefectDrop(d) {
 }
 
 /**
+ * The input finding ids the plan's not-a-defect drops remove. A drop naming no
+ * id or an unknown id removes nothing; `fail` (optional) is told why.
+ */
+function notADefectDroppedIds(plan, index, fail = () => {}) {
+  const dropped = new Set();
+  for (const d of (Array.isArray(plan?.dropped_issues) ? plan.dropped_issues : [])) {
+    if (!isNotADefectDrop(d)) continue;
+    const ids = rowIds(d);
+    if (!ids) { fail(`a "${String(d.reason).split(/[\s—-]/)[0]}" drop names no finding id — not applied`); continue; }
+    const unknown = ids.filter(id => !index.has(id));
+    if (unknown.length) { fail(`a "${String(d.reason).split(/[\s—-]/)[0]}" drop names unknown id(s) ${unknown.join(', ')} — not applied`); continue; }
+    ids.forEach(id => dropped.add(id));
+  }
+  return dropped;
+}
+
+/**
  * Turn the model's deduped_issues into the scoring list, by id.
  *
  * 1. Every not-a-defect drop removes exactly the input findings it names. A drop
@@ -474,15 +492,7 @@ function resolveDedupedIssues(plan, index, pageNumber = null) {
     errors.push(msg);
     log.error(`❌ [FEEDBACK-CONSOLIDATOR] page ${pageNumber}: ${msg}`);
   };
-  const dropped = new Set();
-  for (const d of (Array.isArray(plan?.dropped_issues) ? plan.dropped_issues : [])) {
-    if (!isNotADefectDrop(d)) continue;
-    const ids = rowIds(d);
-    if (!ids) { fail(`a "${String(d.reason).split(/[\s—-]/)[0]}" drop names no finding id — not applied`); continue; }
-    const unknown = ids.filter(id => !index.has(id));
-    if (unknown.length) { fail(`a "${String(d.reason).split(/[\s—-]/)[0]}" drop names unknown id(s) ${unknown.join(', ')} — not applied`); continue; }
-    ids.forEach(id => dropped.add(id));
-  }
+  const dropped = notADefectDroppedIds(plan, index, fail);
 
   const deduped = [];
   let removedByDrops = 0;
@@ -524,6 +534,53 @@ function resolveDedupedIssues(plan, index, pageNumber = null) {
     log.info(`🧠 [FEEDBACK-CONSOLIDATOR] page ${pageNumber}: finding(s) ${unaccounted.join(', ')} are in no deduped entry and no not-a-defect drop`);
   }
   return { deduped, errors, removedByDrops };
+}
+
+/**
+ * A REPAIR FIX MUST REST ON A SCORED FINDING (2026-10-04). Staging
+ * job_1791040103540_atbttop6w p17 (consolidator_calls 2971): the only finding
+ * was dropped as `finding_contradicts_brief` (so it left the scoring list) while
+ * the plan still carried a CRITICAL scene_fix for it. The page scored 100 and
+ * the fix never ran. Each CRITICAL/MAJOR fix names the finding ids it fixes;
+ * when none of them is in a kept deduped entry, that is logged at ERROR to the
+ * generation log and recorded on the plan (`fix_errors`). CHECK ONLY: nothing is
+ * reclassified, no severity is invented, the score stays what the kept list says.
+ *
+ * @returns {string[]} the errors, also logged
+ */
+function checkFixesRestOnKeptFindings(plan, index, pageNumber = null) {
+  const errors = [];
+  const keptIds = new Set();
+  for (const d of (Array.isArray(plan?.deduped_issues) ? plan.deduped_issues : [])) {
+    for (const id of (Array.isArray(d?.ids) ? d.ids : [])) keptIds.add(id);
+  }
+  const dropped = notADefectDroppedIds(plan, index);
+  const fixes = [];
+  const sf = plan?.scene_fix;
+  if (sf && typeof sf === 'object' && sf.instruction) fixes.push({ label: 'scene_fix', fix: sf, text: sf.instruction });
+  for (const p of (Array.isArray(plan?.per_character_fixes) ? plan.per_character_fixes : [])) {
+    if (p && typeof p === 'object' && p.fix_instruction) fixes.push({ label: `per_character_fix (${p.characterName || 'unnamed'})`, fix: p, text: p.fix_instruction });
+  }
+  for (const { label, fix, text } of fixes) {
+    const severity = String(fix.severity || '').toUpperCase();
+    if (severity !== 'CRITICAL' && severity !== 'MAJOR') continue;
+    const ids = rowIds(fix);
+    let why = null;
+    if (!ids) why = 'names no finding id';
+    else if (ids.some(id => !index.has(id))) why = `names unknown id(s) ${ids.filter(id => !index.has(id)).join(', ')}`;
+    else if (!ids.some(id => keptIds.has(id))) {
+      why = ids.every(id => dropped.has(id))
+        ? `rests only on finding(s) ${ids.join(', ')}, all dropped as not a defect`
+        : `rests only on finding(s) ${ids.join(', ')}, none in a scored entry`;
+    }
+    if (!why) continue;
+    const msg = `${label} ${severity} "${String(text).slice(0, 80)}" ${why} — no scored finding behind it, the page score does not count it`;
+    errors.push(msg);
+    log.error(`❌ [FEEDBACK-CONSOLIDATOR] page ${pageNumber}: ${msg}`);
+    const genLog = getCurrentLogger();
+    if (genLog) genLog.error('consolidator_fix_unbacked', `P${pageNumber}: ${msg}`, null, { pageNumber, fix: label, severity, ids: ids || [] });
+  }
+  return errors;
 }
 
 /**
@@ -881,6 +938,8 @@ async function consolidateFeedback({
     applyRule7SceneFixGuard(plan, pageNumber);
     dropCropArtifactFixes(plan, pageNumber);
     appendIdentitySwaps(plan, identitySwaps, pageNumber);
+    const fixErrors = checkFixesRestOnKeptFindings(plan, findingIndex, pageNumber);
+    if (fixErrors.length) plan.fix_errors = fixErrors;
 
     // Enforce the 3-fix cap even if the consolidator slipped past the prompt.
     // When Grok is handed more than 3 fixes, it usually executes none of them —
@@ -1181,6 +1240,7 @@ module.exports = {
   applyRule7SceneFixGuard,
   indexFindings, // exported for testing
   resolveDedupedIssues, // exported for testing
+  checkFixesRestOnKeptFindings, // exported for testing
   appendIdentitySwaps, // exported for testing
   identitySwapEntries, // exported for testing
   dropCropArtifactFixes, // exported for testing

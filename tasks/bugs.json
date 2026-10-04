@@ -2595,6 +2595,18 @@
       "fixedAt": "2026-10-04",
       "fixedIn": "a1bb22596",
       "fix": "Variant judged by the Pass-2 style judge (base Pass-1 sheet as Image 2) plus TASK 10 removedScore; evaluateSheetSplit deleted from the variant path; costumed off variants; missing off sheet logged at ERROR and recorded as notEvaluated off_sheet_missing. Kiaan reproduction accepted 9/10, jacket gone (viewed)."
+    },
+    {
+      "id": "consolidator-fix-without-scored-finding",
+      "title": "The feedback consolidator dropped a page's only finding as not-a-defect (so the page scored 100) while still emitting a CRITICAL scene_fix for it: the page was never repaired",
+      "reportedAt": "2026-10-04",
+      "source": "Railway log of staging deployment af727aea, job_1791040103540_atbttop6w round 1 p17 (consolidator_calls 2971): semantic finding 'the creature is still within the canopy instead of rising out' dropped as finding_contradicts_brief; scene_fix CRITICAL 'Move Rubina above the autumn canopy' requires_regeneration true; '[SCORE] page 17: math model (consolidated) -> finalScore=100'. The page text/brief states she flies out of the canopy.",
+      "rootCause": "Two parts. (1) prompts/feedback-consolidator.txt rule 2a (finding_contradicts_brief) is applied to findings that AGREE with the brief (a finding saying the picture lacks what the brief asks for) - the dominant shape in the measured staging examples (p17, p4, p3, p2, p1 of this job). (2) A plan fix names no finding ids, so nothing links a fix to a scored finding: a drop removes the finding from deduped_issues (the score) and nothing notices the fix still rests on it.",
+      "impact": "Measured over consolidator_calls since 2026-09-20 (scripts/analysis/measure-consolidator-orphan-fixes.js): staging 208 calls, 316 CRITICAL/MAJOR fixes, 10 CRITICAL fixes with no kept CRITICAL, 10 with no kept CRITICAL/MAJOR at all, 26 whose type has only not-a-defect drops behind it (7 stories); prod 178 calls, 279 fixes, 0 / 2 / 0 (the 2 are model-emitted fixes on a dropped hair/eye finding).",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "073cdc449",
+      "fix": "Prompt: rule 2a says a finding that the picture lacks what the brief asks for is a defect; new rule 7d - every fix carries ids, none in a rule 2/2a drop, one in a deduped entry. Code: feedbackConsolidator.checkFixesRestOnKeptFindings - a CRITICAL/MAJOR fix with no ids, unknown ids, or no id in a kept entry is logged at ERROR to the generation log (consolidator_fix_unbacked) and recorded on plan.fix_errors; nothing is reclassified. Test: tests/unit/consolidator-fix-ids.test.ts."
     }
   ]
 }
