@@ -4055,17 +4055,22 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
 // =============================================================================
 
 // Step 4: Re-evaluate pages
-router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, res) => {
+router.post('/:id/repair-workflow/re-evaluate', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id } = req.params;
-    const { pageNumbers, qualityModelOverride, scoreThreshold } = req.body;
+    const { qualityModelOverride, scoreThreshold } = req.body;
+    const requestedPageNumbers = req.body.pageNumbers;
 
-    if (!pageNumbers || !Array.isArray(pageNumbers) || pageNumbers.length === 0) {
+    if (!requestedPageNumbers || !Array.isArray(requestedPageNumbers) || requestedPageNumbers.length === 0) {
       return res.status(400).json({ error: 'pageNumbers array is required' });
     }
-    if (!pageNumbers.every(n => Number.isInteger(n))) {
+    if (!requestedPageNumbers.every(n => Number.isInteger(n))) {
       return res.status(400).json({ error: 'All pageNumbers must be integers' });
     }
+    // One paid evaluation per distinct page: `[1,1,1,...]` used to run one Gemini
+    // eval per entry (code review 2026-10 B4). The cap against the story's own page
+    // count is applied once the story is loaded below.
+    const pageNumbers = [...new Set(requestedPageNumbers)];
     // Validate qualityModelOverride against a bbox-capable eval allowlist. It is
     // interpolated raw into the Gemini API URL, so an unvalidated value on this
     // non-admin endpoint allowed arbitrary (expensive) model spend + path
@@ -4086,6 +4091,12 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
 
     const story = storyResult.rows[0];
     let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+
+    // The story's own pages + its three covers are the most this can evaluate.
+    const maxEvaluablePages = (storyData.sceneImages?.length || 0) + 3;
+    if (pageNumbers.length > maxEvaluablePages) {
+      return res.status(400).json({ error: `pageNumbers lists ${pageNumbers.length} distinct pages, but the story has at most ${maxEvaluablePages}` });
+    }
 
     // Rehydrate images from story_images table (they're stripped from JSON on save)
     storyData = await rehydrateStoryImages(id, storyData);
@@ -4373,8 +4384,26 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
     const badPages = findBadPages(pages, scoreThreshold ? { scoreThreshold } : {});
     res.json({ pages, badPages, apiCost });
 
-    // Save to DB in background (don't block the response)
-    saveStoryData(id, storyData).catch(err => log.error('Failed to save re-evaluation:', err.message));
+    // Save to DB in background (don't block the response). PER PAGE, atomically
+    // (saveScenePageData / saveCoverData = jsonb_set on that one entry): this
+    // evaluation can take minutes, and a whole-blob saveStoryData from the snapshot
+    // read at request start wrote every OTHER page back as it was then, reverting
+    // any repair saved in between (code review 2026-10 B5; same class as bug
+    // cover-save-clobbers-scene-page). Only pages that were actually re-scored are written.
+    (async () => {
+      for (const [pn, result] of Object.entries(pages)) {
+        if (!result || result.error) continue;
+        const pageNumber = Number(pn);
+        try {
+          const ok = isCoverPage(pageNumber)
+            ? await saveCoverData(id, getCoverType(pageNumber), getCoverData(storyData, getCoverType(pageNumber)))
+            : await saveScenePageData(id, pageNumber, storyData.sceneImages.find(sc => sc.pageNumber === pageNumber));
+          if (!ok) log.error(`❌ [RE-EVALUATE] ${id} page ${pageNumber}: not found in the stored story, evaluation not saved`);
+        } catch (saveErr) {
+          log.error(`❌ [RE-EVALUATE] ${id} page ${pageNumber}: failed to save evaluation: ${saveErr.message}`);
+        }
+      }
+    })();
     addRepairCost(id, apiCost, 'Re-evaluate').catch(err => log.error('Failed to save re-eval cost:', err.message));
   } catch (err) {
     log.error('❌ [RE-EVALUATE] Failed to re-evaluate pages:', err);
@@ -5155,7 +5184,7 @@ router.post('/:id/iterate-bbox/:pageNum', authenticateToken, async (req, res) =>
 });
 
 // Step 5: Run entity consistency check
-router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (req, res) => {
+router.post('/:id/repair-workflow/consistency-check', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id } = req.params;
 
