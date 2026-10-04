@@ -44,6 +44,7 @@ Last full sweep: **2026-09-06**.
 - [ ] Whole-codebase code review, area by area (report only; owner picks fixes) → `tasks/code-review-2026-10-04.md`
 - [ ] Legacy root `index.html` (Babel prototype, served only without `dist/`) still calls the deleted `/api/story-draft` route — remove or update it → `tasks/code-review-2026-10-04.md` F3
 - [ ] `server/lib/ipLocation.js` `clientIp()` trusts `cf-connecting-ip` first, but no Cloudflare sits in front (measured 2026-10-04) — a client can spoof its geolocation IP; use `req.ip` → `tasks/code-review-2026-10-04.md` F4
+- [ ] Staging has no Stripe webhook: the sandbox endpoint points at www.magicalstory.ch, so test checkouts made on staging never reach the staging server — add a sandbox endpoint for staging.magicalstory.ch/api/stripe/webhook (4 checkout.session events) if payments are to be tested there → `tasks/code-review-2026-10-04.md` F2
 - [ ] Run the landmark-photo R2 backfill to completion on prod — ~19,374 slots at 2 s ≈ 11 h in the
       background: `node scripts/admin/backfill-landmark-photos-to-r2.js` (resumable; re-run until
       "0 slot(s) still without an R2 copy"), then sync to staging → `docs/landmark-database.md` §11 Photo storage
