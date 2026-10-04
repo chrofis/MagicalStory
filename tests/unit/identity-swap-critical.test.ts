@@ -77,9 +77,10 @@ describe('the consolidator cannot drop or relabel an identity swap', () => {
   it('a plan whose model dropped it as profile_says_trait_is_correct still charges it', () => {
     const plan: any = {
       deduped_issues: [],
-      dropped_issues: [{ issue: 'Fiona hair', reason: 'profile_says_trait_is_correct', type: 'hair', character: 'Fiona' }],
+      dropped_issues: [{ issue: 'Fiona hair', reason: 'profile_says_trait_is_correct', ids: ['E1'], type: 'hair', character: 'Fiona' }],
     };
-    consolidator.enforceNotADefectDrops(plan, -2);
+    const idx = consolidator.indexFindings({ entityIssues: [{ characterName: 'Fiona', description: 'hair differs', severity: 'MAJOR' }] });
+    plan.deduped_issues = consolidator.resolveDedupedIssues(plan, idx, -2).deduped;
     expect(consolidator.appendIdentitySwaps(plan, [{ ...SWAP, characterName: 'Fiona' }], -2)).toBe(1);
     expect(plan.deduped_issues).toEqual([entry]);
     expect(entry).toMatchObject({ type: 'identity_swap', severity: 'CRITICAL', character: 'Fiona', sources: ['entity'] });

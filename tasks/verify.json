@@ -4552,6 +4552,109 @@
       "evidence": []
     },
     {
+      "id": "avatar-sheet-garment-colour",
+      "title": "Styled avatar sheets keep each garment's pass-1 colour; a recolour is caught by the style judge",
+      "commits": [
+        "50b5b856c"
+      ],
+      "addedAt": "2026-10-04",
+      "claim": "On the next full staging story with a non-realistic style: every character's styled sheet shows each garment in the same colour as its pass-1 sheet; styledAvatarGeneration pass-2 attempts carry garmentScore, and any attempt with garmentScore < 6 was retried.",
+      "runShape": [
+        "full-story",
+        "needs-fresh-avatar-sheet"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "styledAvatarGeneration[].passes.pass1 vs pass2 images per character (garment hues), and attempts[].garmentScore",
+        "images": [
+          "sheets"
+        ]
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "avatar-sheet-no-lettering",
+      "title": "Avatar sheets carry no lettering; a lettered row fails its judge",
+      "commits": [
+        "21b9671ec"
+      ],
+      "addedAt": "2026-10-04",
+      "claim": "On the next full staging story: no pass-1 or styled sheet shows a caption, word, letter or number; any pass-1 body row with lettering scored backgroundScore <= 2 and was retried; style-judge lettering detection observed at least once if a lettered styled sheet occurs.",
+      "runShape": [
+        "full-story",
+        "needs-fresh-avatar-sheet"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "every styledAvatarGeneration pass-1 and pass-2 sheet image; bodies background reasons and pass-2 background reasons",
+        "images": [
+          "sheets"
+        ]
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "worn-item-facing",
+      "title": "A back-view wearer's worn line carries only the garment's back look; D-05e garment_facing judges front-on-back",
+      "commits": [
+        "ed5c57184"
+      ],
+      "addedAt": "2026-10-04",
+      "claim": "On the next staging story where a figure declared back view / facing away wears a worn item: the Visual Bible clothing (and wornAs) entries carry a `back` look; that page's prompt line reads \"<name> IS wearing this on this page, seen from the back: <garment> — <back look>\" with no front feature; the CLOTHING CONTRACT the judges got tags that character \"(seen from the back)\"; the render shows no front fastening/pockets/collar on the back, and a quality garment_facing finding (never above MAJOR) appears only where it does.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "visualBible.clothing[].back; sceneImages[].prompt WORN ITEMS lines for back-view wearers; qualityRawOutput CLOTHING CONTRACT tag; pixels of each back-view wearer; fixableIssues type garment_facing. Baseline: job_1791040103540_atbttop6w p5 (zip, pockets, collar on Kiaan's back) and p18 (pockets on the back).",
+        "images": [
+          "pages"
+        ]
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "consolidator-finding-ids",
+      "title": "The consolidator cites every finding by id; votes come from the cited input findings, and a not-a-defect drop removes only its own ids",
+      "commits": [
+        "385d58966"
+      ],
+      "addedAt": "2026-10-04",
+      "claim": "On the next staging story with repairs: every consolidator_calls.full_prompt shows each finding as \"- Q1 [SEV] …\" / S / C / E / R ids; every stored plan.deduped_issues entry carries ids, and its sources/severities equal the sections and shown severities of those ids (no entry billed above or below what its cited findings said); no plan.id_errors, or each one is logged at ERROR and its entry absent; a finding_contradicts_brief / profile_says_trait_is_correct drop never removes a deduped entry whose ids it does not name (no repeat of p12's egg finding vanishing with the reader drop).",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "consolidator_calls (full_prompt ids, raw_response ids, plan.deduped_issues[].ids/sources/severities, plan.id_errors) for every page round; compare each entry's severities with the [SEV] tags of its ids in full_prompt; for each rule-2/2a drop, confirm the removed ids are exactly the drop's ids. Baseline: job_1791040103540_atbttop6w p12 (calls 2983/2996): jacket billed MINOR via mis-credited source, egg finding deleted with the reader drop.",
+        "images": []
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "refine-declined-ledger",
+      "title": "A finding the text refine leaves standing is recorded declined (open), not page-rewritten",
+      "commits": [
+        "385d58966"
+      ],
+      "addedAt": "2026-10-04",
+      "claim": "On the next staging story whose text refine leaves a finding standing: the refine prompt shows findings as \"T<n> FAULT[…]\"; its analysis ledger has \"T<n> … STANDS: <reason>\" lines; textRefineReport.findingLedger records those findings outcome \"declined\" with the reason and counts them in unresolvedCount; a finding with a fixed ledger line and a changed page stays page-rewritten.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "textRefineReport.rounds[repair].prompt (T ids), .analysis (STANDS lines), textRefineReport.findingLedger[].id/outcome/reason, unresolvedCount; also the post_audit round entry if the book audit routed TEXT faults. Baseline: job_1791040103540_atbttop6w MISMATCH p18 (\"stands: … the ending's own act\") recorded page-rewritten.",
+        "images": []
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
       "id": "cover-places-decided",
       "title": "Each full-story cover is placed on its own wide vantage by Jev + code, pinned as its FIXED location",
       "commits": [

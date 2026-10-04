@@ -109,12 +109,14 @@ channel.</p>
 
 <h3>Severity is the median of the evaluators' own votes</h3>
 <p>~76% of issues are flagged by a single evaluator, and one evaluator shouting CRITICAL was costing
-25 points. The consolidator <strong>records</strong> each evaluator's own severity per merged defect
-(<code>severities: {"quality":"MAJOR","semantic":"CRITICAL"}</code>) and
+25 points. Every finding the consolidator is shown carries an id (Q1, S2, E1, R1 …); each merged
+defect cites the ids it merges, and code reads each evaluator's vote off those input findings
+(<code>severities: {"quality":"MAJOR","semantic":"CRITICAL"}</code>, the highest per evaluator) —
+never off the model's own transcription (2026-10-04, numbered findings).
 <code>medianSeverity()</code> in <code>feedbackConsolidator.js</code> <strong>derives</strong> the
-value in code: one vote → that vote; two → the <em>lower</em>; three or more → the middle. The
-model's own pick is kept as <code>severityChosen</code> so the gap stays auditable. Three attempts to
-do this inside the prompt all failed — see the 2026-08-09 decision entry before re-litigating.</p>
+value: one vote → that vote; two → the <em>lower</em>; three or more → the middle; a CRITICAL vote
+wins. Three attempts to do this inside the prompt all failed — see the 2026-08-09 decision entry
+before re-litigating.</p>
 
 <h2 id="workflow">4. Repair workflow loop</h2>
 

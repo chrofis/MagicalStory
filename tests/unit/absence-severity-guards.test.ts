@@ -18,7 +18,7 @@ import path from 'path';
 const { loadPromptTemplates } = require('../../server/services/prompts');
 const absence = require('../../server/lib/absenceCheck');
 const { parseFixableIssues, castPeopleCount, PRESENCE_DERIVED_MARKER } = require('../../server/lib/evalPipeline');
-const { enforceNotADefectDrops } = require('../../server/lib/feedbackConsolidator');
+const { indexFindings, resolveDedupedIssues } = require('../../server/lib/feedbackConsolidator');
 
 // The run's stored p12 v0 quality findings (types, severities, subjects as stored).
 const P12 = () => ([
@@ -110,31 +110,37 @@ describe('the second look', () => {
 });
 
 describe('the consolidator never charges what it dropped as not a defect', () => {
+  const idx = () => indexFindings({ semanticIssues: [
+    { type: 'missing_element', severity: 'MAJOR', description: 'gilet missing' },
+    { type: 'action_interaction', severity: 'MAJOR', description: 'not digging' },
+  ] });
   const plan = () => ({
     deduped_issues: [
-      { type: 'missing_element', character: 'quilted gilet', severity: 'MAJOR', description: 'gilet missing' },
-      { type: 'action_interaction', character: 'Kiaan', severity: 'MAJOR', description: 'not digging' },
+      { type: 'missing_element', character: 'quilted gilet', description: 'gilet missing', ids: ['S1'] },
+      { type: 'action_interaction', character: 'Kiaan', description: 'not digging', ids: ['S2'] },
     ],
     dropped_issues: [] as any[],
   });
 
-  it('a finding_contradicts_brief drop removes the same type+subject from deduped_issues', () => {
+  it('a finding_contradicts_brief drop removes the finding it names from deduped_issues', () => {
     const p = plan();
-    p.dropped_issues.push({ issue: 'gilet missing', reason: 'finding_contradicts_brief — the brief takes it off', type: 'missing_element', character: 'Quilted Gilet' });
-    expect(enforceNotADefectDrops(p, 12)).toBe(1);
-    expect(p.deduped_issues.map((i: any) => i.type)).toEqual(['action_interaction']);
+    p.dropped_issues.push({ issue: 'gilet missing', reason: 'finding_contradicts_brief — the brief takes it off', ids: ['S1'], type: 'missing_element', character: 'Quilted Gilet' });
+    const r = resolveDedupedIssues(p, idx(), 12);
+    expect(r.removedByDrops).toBe(1);
+    expect(r.deduped.map((i: any) => i.type)).toEqual(['action_interaction']);
   });
 
   it('NEGATIVE CONTROL — a plan-only drop (capped at 3) keeps the defect charged', () => {
     const p = plan();
-    p.dropped_issues.push({ issue: 'not digging', reason: 'capped at 3, defer to next round', type: 'action_interaction', character: 'Kiaan' });
-    expect(enforceNotADefectDrops(p, 12)).toBe(0);
-    expect(p.deduped_issues).toHaveLength(2);
+    p.dropped_issues.push({ issue: 'not digging', reason: 'capped at 3, defer to next round', ids: ['S2'], type: 'action_interaction', character: 'Kiaan' });
+    const r = resolveDedupedIssues(p, idx(), 12);
+    expect(r.removedByDrops).toBe(0);
+    expect(r.deduped).toHaveLength(2);
   });
 
   it('runs inside consolidateFeedback before the plan is used', () => {
     const src = fs.readFileSync(path.join(__dirname, '../../server/lib/feedbackConsolidator.js'), 'utf8');
-    expect(src).toMatch(/enforceNotADefectDrops\(plan, pageNumber\);\s*\r?\n\s*applyRule7SceneFixGuard/);
+    expect(src).toMatch(/resolveDedupedIssues\(plan, findingIndex, pageNumber\);[\s\S]{0,200}applyRule7SceneFixGuard\(plan, pageNumber\)/);
   });
 });
 
