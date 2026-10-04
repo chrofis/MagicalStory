@@ -11,7 +11,7 @@ const fs = require('fs').promises;
 const path = require('path');
 
 // Middleware
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, verifyToken } = require('../middleware/auth');
 
 // Config
 const { CREDIT_CONFIG } = require('../config/credits');
@@ -1469,8 +1469,8 @@ async function getPriceForPages(pageCount, isHardcover) {
 
 // ── Referral / promo code helpers ───────────────────────────────────────────
 
-const { generateReferralCode } = require('../lib/referral');
-const { hasPaidOrder } = require('../lib/orders');
+const { generateReferralCode, normalizeEmailForSelfReferral } = require('../lib/referral');
+const { hasPaidOrder, orderStatusView } = require('../lib/orders');
 const referralBalance = require('../lib/referralBalance');
 
 /**
@@ -1483,7 +1483,7 @@ async function validateReferralCodeForUser(code, buyerUserId) {
 
   // Look up the code owner (case-insensitive — codes are mixed case like MagicRoger42)
   const ownerResult = await getDbPool().query(
-    'SELECT id, referral_code FROM users WHERE LOWER(referral_code) = LOWER($1)', [trimmed]
+    'SELECT id, referral_code, email FROM users WHERE LOWER(referral_code) = LOWER($1)', [trimmed]
   );
   if (ownerResult.rows.length === 0) return { valid: false, reason: 'Code not found' };
   const referrerUserId = ownerResult.rows[0].id;
@@ -1494,8 +1494,13 @@ async function validateReferralCodeForUser(code, buyerUserId) {
 
   // Buyer can only use ONE referral code ever
   const buyerResult = await getDbPool().query(
-    'SELECT referred_by FROM users WHERE id = $1', [buyerUserId]
+    'SELECT referred_by, email FROM users WHERE id = $1', [buyerUserId]
   );
+  // Second account of the same person (P9): same inbox after +tag / gmail-dot normalisation.
+  const referrerEmail = normalizeEmailForSelfReferral(ownerResult.rows[0].email);
+  if (referrerEmail && referrerEmail === normalizeEmailForSelfReferral(buyerResult.rows[0]?.email)) {
+    return { valid: false, reason: 'Cannot use your own code' };
+  }
   if (buyerResult.rows.length > 0 && buyerResult.rows[0].referred_by) {
     return { valid: false, reason: 'You have already used a referral code' };
   }
@@ -2013,6 +2018,13 @@ router.get('/stripe/order-status/:sessionId', async (req, res) => {
 
     log.debug(`🔍 Checking order status for session: ${sessionId}`);
 
+    // Optional login: the owner additionally gets the shipping recipient details (P10).
+    let viewerUserId = null;
+    try {
+      const bearer = (req.headers['authorization'] || '').split(' ')[1];
+      if (bearer) viewerUserId = verifyToken(bearer).id || null;
+    } catch { /* anonymous viewer */ }
+
     // Check database for order with retries (webhook might still be processing)
     if (STORAGE_MODE === 'database') {
       const maxRetries = 5;
@@ -2036,7 +2048,7 @@ router.get('/stripe/order-status/:sessionId', async (req, res) => {
           else if (ps === 'failed' || ps === 'cancelled') status = ps;
           else if (ps === 'pending' || ps === 'processing' || ps === '') status = 'processing';
           console.log(`✅ Order found in database (attempt ${attempt}): id=${row.id}, payment_status=${ps}, ui_status=${status}`);
-          return res.json({ status, order: row });
+          return res.json({ status, order: orderStatusView(row, viewerUserId) });
         }
 
         if (attempt < maxRetries) {
@@ -2081,7 +2093,8 @@ router.get('/stripe/order-status/:sessionId', async (req, res) => {
       log.debug(`📦 Constructing order from Stripe session data`);
       return res.json({
         status: 'processing', // Webhook hasn't completed yet but payment succeeded
-        order: {
+        order: orderStatusView({
+          user_id: session.metadata?.userId,
           customer_name: customerDetails.name || 'Customer',
           customer_email: customerDetails.email || '',
           shipping_name: shippingDetails.name || customerDetails.name || 'Customer',
@@ -2092,7 +2105,7 @@ router.get('/stripe/order-status/:sessionId', async (req, res) => {
           amount_total: session.amount_total,
           currency: session.currency,
           tokens_credited: tokensExpected // Expected tokens (will be credited when webhook completes)
-        }
+        }, viewerUserId)
       });
     }
 

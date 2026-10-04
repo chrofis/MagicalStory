@@ -35,6 +35,33 @@ async function hasPaidOrder(userId, dbClient = null) {
   return result.rows.length > 0;
 }
 
+/**
+ * What GET /api/stripe/order-status/:sessionId may return (review 2026-10-04 P10). The route
+ * is unauthenticated - the session id travels in the success URL - so the anonymous view is
+ * only the status fields the client reads (amount, currency, tokens). The recipient /
+ * shipping details the success dialog shows are added only for the order's own logged-in user.
+ */
+function orderStatusView(row, viewerUserId = null) {
+  const view = {
+    amount_total: row.amount_total,
+    currency: row.currency,
+    tokens_credited: row.tokens_credited,
+  };
+  if (viewerUserId && row.user_id && String(row.user_id) === String(viewerUserId)) {
+    Object.assign(view, {
+      customer_name: row.customer_name,
+      customer_email: row.customer_email,
+      shipping_name: row.shipping_name,
+      shipping_address_line1: row.shipping_address_line1,
+      shipping_city: row.shipping_city,
+      shipping_postal_code: row.shipping_postal_code,
+      shipping_country: row.shipping_country,
+    });
+  }
+  return view;
+}
+
 module.exports = {
   hasPaidOrder,
+  orderStatusView,
 };

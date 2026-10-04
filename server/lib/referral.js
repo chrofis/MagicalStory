@@ -16,4 +16,25 @@ function generateReferralCode(username = '') {
   return `Magic${name}${num}`;
 }
 
-module.exports = { generateReferralCode };
+/**
+ * Canonical form of an email for the self-referral check (review 2026-10-04 P9): lowercase,
+ * strip a +tag, and strip dots for gmail.com/googlemail.com (which ignore them). Two accounts
+ * whose canonical emails are equal belong to the same inbox. Returns '' for a non-email.
+ */
+function normalizeEmailForSelfReferral(email) {
+  if (typeof email !== 'string') return '';
+  const lower = email.trim().toLowerCase();
+  const at = lower.lastIndexOf('@');
+  if (at < 1) return '';
+  let local = lower.slice(0, at);
+  let domain = lower.slice(at + 1);
+  const plus = local.indexOf('+');
+  if (plus > 0) local = local.slice(0, plus);
+  if (domain === 'gmail.com' || domain === 'googlemail.com') {
+    local = local.replace(/\./g, '');
+    domain = 'gmail.com';
+  }
+  return `${local}@${domain}`;
+}
+
+module.exports = { generateReferralCode, normalizeEmailForSelfReferral };
