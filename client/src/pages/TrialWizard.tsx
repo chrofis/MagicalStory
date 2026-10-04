@@ -462,14 +462,7 @@ export default function TrialWizard() {
   if (!authLoading && user && user.role !== 'admin') {
     return (
       <div className="min-h-screen bg-gray-50">
-        <nav className="bg-black text-white px-3 py-3">
-          <div className="flex justify-between items-center">
-            <Link to="/" className="text-sm md:text-base font-bold whitespace-nowrap hover:opacity-80 flex items-center gap-1.5">
-              <img src="/images/logo-book.webp" alt="" width="88" height="88" fetchPriority="high" className="h-10 md:h-11 -my-2 w-auto" />
-              Magical Story
-            </Link>
-          </div>
-        </nav>
+        <Navigation minimal />
         <div className="px-3 md:px-8 py-4 md:py-8">
           <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xl p-8 text-center">
             <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -502,14 +495,7 @@ export default function TrialWizard() {
   if (trialUsed && !isAdmin) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <nav className="bg-black text-white px-3 py-3">
-          <div className="flex justify-between items-center">
-            <Link to="/" className="text-sm md:text-base font-bold whitespace-nowrap hover:opacity-80 flex items-center gap-1.5">
-              <img src="/images/logo-book.webp" alt="" width="88" height="88" fetchPriority="high" className="h-10 md:h-11 -my-2 w-auto" />
-              Magical Story
-            </Link>
-          </div>
-        </nav>
+        <Navigation minimal />
         <div className="px-3 md:px-8 py-4 md:py-8">
           <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xl p-8 text-center">
             <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -549,14 +535,7 @@ export default function TrialWizard() {
   if (showIntro) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <nav className="bg-black text-white px-3 py-3">
-          <div className="flex justify-between items-center">
-            <Link to="/" className="text-sm md:text-base font-bold whitespace-nowrap hover:opacity-80 flex items-center gap-1.5">
-              <img src="/images/logo-book.webp" alt="" width="88" height="88" fetchPriority="high" className="h-10 md:h-11 -my-2 w-auto" />
-              Magical Story
-            </Link>
-          </div>
-        </nav>
+        <Navigation minimal />
         <div className="px-4 md:px-8 py-6 max-w-7xl mx-auto">
           {/* Hero */}
           <div className="text-center mb-6">

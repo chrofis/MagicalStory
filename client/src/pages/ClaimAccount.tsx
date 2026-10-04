@@ -6,6 +6,7 @@ import { KeyRound, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { GoogleIcon } from '@/components/auth/GoogleIcon';
 import { signInWithGooglePopup } from '@/services/googleAuth';
 import { INITIAL_USER_CREDITS } from '@/constants/credits';
+import { Navigation } from '@/components/common';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -258,14 +259,7 @@ export default function ClaimAccount() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navigation bar matching the trial wizard */}
-      <nav className="bg-black text-white px-3 py-3">
-        <div className="flex justify-between items-center">
-          <button onClick={() => navigate('/')} className="text-sm md:text-base font-bold whitespace-nowrap hover:opacity-80 flex items-center gap-1.5">
-            <img src="/images/logo-book.webp" alt="" width="88" height="88" className="h-10 md:h-11 -my-2 w-auto" />
-            {t.brand}
-          </button>
-        </div>
-      </nav>
+      <Navigation minimal />
 
       {/* Content */}
       <div className="px-3 md:px-8 py-4 md:py-8">

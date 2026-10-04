@@ -23,7 +23,12 @@ interface NavigationProps {
   hideSteps?: boolean;  // Hide step navigation (e.g., when viewing a saved story)
   onShowGenerationProgress?: () => void;  // Called to show generation progress when already on /create
   customSteps?: CustomStep[];  // Custom steps (e.g., trial wizard with 3 steps)
+  minimal?: boolean;  // Logo + brand only (trial/claim pages): no menu, steps or modals
+  brandLink?: boolean;  // minimal only: false renders the brand as plain text (no link home)
 }
+
+// Sticky offset + z-index shared by every bar variant, so the bar is fixed on every page.
+const NAV_STICKY = 'sticky top-[var(--impersonation-banner-h,0px)] z-40';
 
 // Step labels for desktop view
 const stepLabels: Record<string, Record<number, string>> = {
@@ -33,7 +38,7 @@ const stepLabels: Record<string, Record<number, string>> = {
   it: { 1: 'Personaggi', 2: 'Libro', 3: 'Storia', 4: 'Stile', 5: 'Riepilogo' },
 };
 
-export function Navigation({ currentStep = 0, onStepClick, canAccessStep, developerMode = false, onDeveloperModeChange, hideSteps = false, onShowGenerationProgress, customSteps }: NavigationProps) {
+export function Navigation({ currentStep = 0, onStepClick, canAccessStep, developerMode = false, onDeveloperModeChange, hideSteps = false, onShowGenerationProgress, customSteps, minimal = false, brandLink = true }: NavigationProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { t, language } = useLanguage();
@@ -85,8 +90,29 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
     };
   }, [showMenu]);
 
+  if (minimal) {
+    const brand = (
+      <>
+        <img src="/images/logo-book.webp" alt="" width="88" height="88" fetchPriority="high" className="h-10 md:h-11 -my-2 w-auto" />
+        {t.title}
+      </>
+    );
+    const brandClass = 'text-sm md:text-base font-bold whitespace-nowrap flex items-center gap-1.5';
+    return (
+      <nav className={`bg-black text-white px-3 py-3 shadow-md ${NAV_STICKY}`}>
+        <div className="flex justify-between items-center">
+          {brandLink ? (
+            <button onClick={() => navigate('/')} className={`${brandClass} hover:opacity-80`}>{brand}</button>
+          ) : (
+            <span className={brandClass}>{brand}</span>
+          )}
+        </div>
+      </nav>
+    );
+  }
+
   return (
-    <nav className="bg-gray-900 text-white px-3 py-3 sticky top-[var(--impersonation-banner-h,0px)] z-40">
+    <nav className={`bg-gray-900 text-white px-3 py-3 ${NAV_STICKY}`}>
       <div className="flex justify-between items-center min-w-0">
         {/* Left: Title */}
         <div className="flex-shrink-0">
