@@ -2931,6 +2931,18 @@
       "fixedAt": "2026-10-04",
       "fixedIn": "c3fc0278b",
       "fix": "Uses verifySession + isAdminActing. Test: tests/unit/avatar-and-idea-spend-limits.test.ts"
+    },
+    {
+      "id": "review-v1-avatar-retry-keeps-rejected-url",
+      "title": "A better-scoring avatar retry was discarded; DB kept the rejected image with the retry's score",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/6-other-routes.md V1), confirmed against current code",
+      "rootCause": "Retry swapped inline bytes but not results.<cat>Url / thumbnail URLs; persistence is URL-first",
+      "impact": "Every character whose first avatar scored low stored the rejected avatar.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "59f9048e2",
+      "fix": "adoptRetryAvatar uploads the winning retry and replaces the URLs. Test: tests/unit/avatar-character-row-writes.test.ts"
     }
   ]
 }
